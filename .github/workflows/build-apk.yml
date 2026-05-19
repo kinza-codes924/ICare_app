@@ -16,7 +16,6 @@ jobs:
         with:
           ref: wajahat
 
-      # FIX 1: Upgrade to Java 21 to support AGP 8.7.0 and Kotlin 2.1.0
       - name: Setup Java 21
         uses: actions/setup-java@v4
         with:
@@ -51,12 +50,7 @@ jobs:
       - name: Restore google-services.json
         run: cp /tmp/google-services.json android/app/google-services.json
 
-      # FIX 2: Explicitly upgrade Gradle Wrapper to 8.10 to match AGP 8.7.0 requirements
-      - name: Upgrade Gradle Wrapper
-        run: |
-          cd android
-          ./gradlew wrapper --gradle-version 8.10 --distribution-type all
-
+      # Nayi Groovy files pehle write hongi taake Gradle ko project mil jaye
       - name: Write settings.gradle (Groovy, AGP 8.7.0)
         run: |
           cat > android/settings.gradle << 'EOF'
@@ -84,7 +78,6 @@ jobs:
           include ":app"
           EOF
 
-      # FIX 3: Updated Java targets to VERSION_17/VERSION_21 to match modern ecosystem
       - name: Write app/build.gradle (Groovy, Firebase)
         run: |
           cat > android/app/build.gradle << 'EOF'
@@ -112,7 +105,7 @@ jobs:
                   targetSdk flutter.targetSdkVersion
                   versionCode flutter.versionCode
                   versionName flutter.versionName
-                }
+              }
               buildTypes {
                   release {
                       signingConfig signingConfigs.debug
@@ -163,6 +156,12 @@ jobs:
         run: |
           echo "flutter.sdk=$FLUTTER_ROOT" > android/local.properties
           echo "sdk.dir=$ANDROID_SDK_ROOT" >> android/local.properties
+
+      # MOVED HERE: Ab jab settings.gradle ban chuki hai, wrapper safely update ho jayega
+      - name: Upgrade Gradle Wrapper
+        run: |
+          cd android
+          ./gradlew wrapper --gradle-version 8.10 --distribution-type all
 
       - name: Verify no .kts conflict
         run: |
