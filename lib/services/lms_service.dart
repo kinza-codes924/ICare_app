@@ -447,6 +447,23 @@ class LmsService {
   // INVITE TEACHER
   // ═══════════════════════════════════════════════════════════════════════
 
+  Future<Map<String, dynamic>> createVoucher({
+    required String code,
+    required int discountPercent,
+  }) async {
+    try {
+      final response = await _api.post('/vouchers', {
+        'code': code,
+        'discountPercent': discountPercent,
+        'isOneTime': true,
+        'isActive': true,
+      });
+      return response.data ?? {'success': true};
+    } catch (e) {
+      return {'success': false, 'message': e.toString()};
+    }
+  }
+
   Future<Map<String, dynamic>> inviteTeacher({
     required String courseId,
     required String email,
