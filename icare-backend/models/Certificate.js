@@ -10,6 +10,15 @@ const certificateSchema = new mongoose.Schema({
   verificationCode: { type: String, required: true, unique: true },
   grade: String,
   finalScore: Number,
+  // Enhanced fields for QR code and display
+  studentName: { type: String, required: true },
+  courseName: { type: String, required: true },
+  instructorName: { type: String, required: true },
+  completionDate: { type: Date, required: true },
+  template: { type: String, default: 'classic' },
+  qrCodeData: { type: String }, // Verification URL
+  verificationCount: { type: Number, default: 0 },
+  lastVerifiedAt: { type: Date },
 }, { timestamps: true });
 
 // Generate certificate number: ICARE-YYYY-XXXXXX

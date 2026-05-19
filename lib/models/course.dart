@@ -18,6 +18,8 @@ class Course {
   final CourseRating rating;
   final DateTime createdAt;
   final DateTime updatedAt;
+  final String courseType; // 'self-paced' or 'pragmatic'
+  final DateTime? startDate; // For pragmatic courses
 
   Course({
     required this.id,
@@ -39,6 +41,8 @@ class Course {
     required this.rating,
     required this.createdAt,
     required this.updatedAt,
+    this.courseType = 'self-paced',
+    this.startDate,
   });
 
   factory Course.fromJson(Map<String, dynamic> json) {
@@ -101,6 +105,10 @@ class Course {
       updatedAt: DateTime.parse(
         json['updatedAt'] ?? DateTime.now().toIso8601String(),
       ),
+      courseType: json['courseType']?.toString() ?? 'self-paced',
+      startDate: json['startDate'] != null
+          ? DateTime.parse(json['startDate'])
+          : null,
     );
   }
 
@@ -128,6 +136,8 @@ class Course {
       if (duration != null) 'duration': duration,
       'modules': modules.map((m) => m.toJson()).toList(),
       if (thumbnail != null) 'thumbnail': thumbnail,
+      'courseType': courseType,
+      if (startDate != null) 'startDate': startDate!.toIso8601String(),
     };
   }
 }
@@ -139,6 +149,7 @@ class CourseModule {
   final int order;
   final List<Lesson> lessons;
   final Quiz? quiz;
+  final int unlockAfterDays; // For pragmatic courses
 
   CourseModule({
     this.id,
@@ -147,6 +158,7 @@ class CourseModule {
     required this.order,
     this.lessons = const [],
     this.quiz,
+    this.unlockAfterDays = 0,
   });
 
   factory CourseModule.fromJson(Map<String, dynamic> json) {
@@ -159,6 +171,7 @@ class CourseModule {
           (json['lessons'] as List?)?.map((l) => Lesson.fromJson(l)).toList() ??
           [],
       quiz: json['quiz'] != null ? Quiz.fromJson(json['quiz']) : null,
+      unlockAfterDays: json['unlockAfterDays'] ?? 0,
     );
   }
 
@@ -169,6 +182,7 @@ class CourseModule {
       'order': order,
       'lessons': lessons.map((l) => l.toJson()).toList(),
       if (quiz != null) 'quiz': quiz!.toJson(),
+      'unlockAfterDays': unlockAfterDays,
     };
   }
 }

@@ -233,4 +233,53 @@ router.delete('/:id', authMiddleware, async (req, res) => {
   }
 });
 
+// POST /enrollments/:id/complete-module — mark module as complete
+router.post('/enrollments/:id/complete-module', authMiddleware, async (req, res) => {
+  try {
+    await connectMongoDB();
+    const { moduleId } = req.body;
+    if (!moduleId) return res.status(400).json({ success: false, message: 'moduleId required' });
+
+    const enrollment = await Enrollment.findById(toId(req.params.id));
+    if (!enrollment) return res.status(404).json({ success: false, message: 'Enrollment not found' });
+
+    // Check if already completed
+    const existing = enrollment.moduleCompletions.find(mc => mc.moduleId === moduleId);
+    if (existing) {
+      return res.json({ success: true, message: 'Module already completed', enrollment });
+    }
+
+    // Add completion
+    enrollment.moduleCompletions.push({ moduleId, completedAt: new Date() });
+    await enrollment.save();
+
+    // Send notification to instructor
+    const Notification = require('../models/Notification');
+    const User = require('../models/User');
+    const course = await Course.findById(enrollment.courseId).lean();
+    const student = await User.findById(enrollment.userId).lean();
+
+    if (course && student) {
+      await Notification.create({
+        userId: course.instructor_id,
+        type: 'module_completed',
+        title: 'Module Completed',
+        message: `${student.name || student.username} completed a module in ${course.title}`,
+        data: {
+          studentId: enrollment.userId,
+          studentName: student.name || student.username,
+          courseId: course._id,
+          courseName: course.title,
+          moduleId,
+          completedAt: new Date(),
+        },
+      });
+    }
+
+    res.json({ success: true, enrollment });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
 module.exports = router;

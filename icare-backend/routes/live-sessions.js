@@ -161,7 +161,7 @@ router.post('/:id/complete', authMiddleware, async (req, res) => {
   try {
     await connectMongoDB();
     const { recordingUrl } = req.body;
-    
+
     const session = await LiveSession.findById(toId(req.params.id));
     if (!session) {
       return res.status(404).json({ success: false, message: 'Session not found' });
@@ -171,7 +171,191 @@ router.post('/:id/complete', authMiddleware, async (req, res) => {
     if (recordingUrl) session.recordingUrl = recordingUrl;
     await session.save();
 
+    // Auto-save recording to linked lesson
+    if (recordingUrl && session.linkedLessonId && session.linkedModuleId) {
+      const Course = require('../models/Course');
+      const course = await Course.findById(session.courseId);
+
+      if (course) {
+        const module = course.modules.id(session.linkedModuleId);
+        if (module) {
+          const lesson = module.lessons.id(session.linkedLessonId);
+          if (lesson) {
+            lesson.videoUrl = recordingUrl;
+            await course.save();
+          }
+        }
+      }
+    }
+
     res.json({ success: true, session });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+// ── POST chat message during live session ────────────────────────────────────
+router.post('/:id/chat', authMiddleware, async (req, res) => {
+  try {
+    await connectMongoDB();
+    const { message } = req.body;
+
+    if (!message || !message.trim()) {
+      return res.status(400).json({ success: false, message: 'Message required' });
+    }
+
+    const session = await LiveSession.findById(toId(req.params.id));
+    if (!session) {
+      return res.status(404).json({ success: false, message: 'Session not found' });
+    }
+
+    session.chatMessages.push({
+      userId: toId(req.user.id),
+      userName: req.user.name || req.user.username,
+      message: message.trim(),
+      timestamp: new Date(),
+    });
+
+    await session.save();
+
+    res.json({ success: true, message: 'Message sent' });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+// ── GET chat messages for a session ──────────────────────────────────────────
+router.get('/:id/chat', authMiddleware, async (req, res) => {
+  try {
+    await connectMongoDB();
+    const session = await LiveSession.findById(toId(req.params.id)).lean();
+
+    if (!session) {
+      return res.status(404).json({ success: false, message: 'Session not found' });
+    }
+
+    res.json({ success: true, messages: session.chatMessages || [] });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+// ── STUDENT: Raise hand ──────────────────────────────────────────────────────
+router.post('/:id/raise-hand', authMiddleware, async (req, res) => {
+  try {
+    await connectMongoDB();
+    const session = await LiveSession.findById(toId(req.params.id));
+
+    if (!session) {
+      return res.status(404).json({ success: false, message: 'Session not found' });
+    }
+
+    const userId = toId(req.user.id);
+    const alreadyRaised = session.raisedHands.find(h => h.userId.equals(userId));
+
+    if (!alreadyRaised) {
+      session.raisedHands.push({
+        userId,
+        userName: req.user.name || req.user.username,
+        raisedAt: new Date(),
+      });
+      await session.save();
+    }
+
+    res.json({ success: true, message: 'Hand raised' });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+// ── STUDENT: Lower hand ──────────────────────────────────────────────────────
+router.post('/:id/lower-hand', authMiddleware, async (req, res) => {
+  try {
+    await connectMongoDB();
+    const session = await LiveSession.findById(toId(req.params.id));
+
+    if (!session) {
+      return res.status(404).json({ success: false, message: 'Session not found' });
+    }
+
+    const userId = toId(req.user.id);
+    session.raisedHands = session.raisedHands.filter(h => !h.userId.equals(userId));
+    await session.save();
+
+    res.json({ success: true, message: 'Hand lowered' });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+// ── INSTRUCTOR: Clear all raised hands ───────────────────────────────────────
+router.post('/:id/clear-hands', authMiddleware, async (req, res) => {
+  try {
+    await connectMongoDB();
+    const session = await LiveSession.findById(toId(req.params.id));
+
+    if (!session) {
+      return res.status(404).json({ success: false, message: 'Session not found' });
+    }
+
+    session.raisedHands = [];
+    await session.save();
+
+    res.json({ success: true, message: 'All hands cleared' });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+// ── INSTRUCTOR: Admit student from waiting room ──────────────────────────────
+router.post('/:id/admit/:studentId', authMiddleware, async (req, res) => {
+  try {
+    await connectMongoDB();
+    const session = await LiveSession.findById(toId(req.params.id));
+
+    if (!session) {
+      return res.status(404).json({ success: false, message: 'Session not found' });
+    }
+
+    const studentId = toId(req.params.studentId);
+
+    // Remove from waiting room
+    session.waitingStudents = session.waitingStudents.filter(id => !id.equals(studentId));
+
+    // Add to attendees
+    if (!session.attendees.includes(studentId)) {
+      session.attendees.push(studentId);
+    }
+
+    await session.save();
+
+    res.json({ success: true, message: 'Student admitted' });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+// ── INSTRUCTOR: Admit all from waiting room ──────────────────────────────────
+router.post('/:id/admit-all', authMiddleware, async (req, res) => {
+  try {
+    await connectMongoDB();
+    const session = await LiveSession.findById(toId(req.params.id));
+
+    if (!session) {
+      return res.status(404).json({ success: false, message: 'Session not found' });
+    }
+
+    // Move all waiting students to attendees
+    session.waitingStudents.forEach(studentId => {
+      if (!session.attendees.includes(studentId)) {
+        session.attendees.push(studentId);
+      }
+    });
+
+    session.waitingStudents = [];
+    await session.save();
+
+    res.json({ success: true, message: 'All students admitted' });
   } catch (e) {
     res.status(500).json({ success: false, message: e.message });
   }

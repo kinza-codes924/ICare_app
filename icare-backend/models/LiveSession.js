@@ -11,14 +11,33 @@ const liveSessionSchema = new mongoose.Schema({
   meetingId: String,
   meetingPassword: String,
   recordingUrl: String,
-  status: { 
-    type: String, 
-    enum: ['scheduled', 'live', 'completed', 'cancelled'], 
-    default: 'scheduled' 
+  status: {
+    type: String,
+    enum: ['scheduled', 'live', 'completed', 'cancelled'],
+    default: 'scheduled'
   },
   attendees: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
   maxParticipants: { type: Number, default: 100 },
-  isRecorded: { type: Boolean, default: false },
+  isRecorded: { type: Boolean, default: true }, // Auto-record by default
+  // Chat messages during live session
+  chatMessages: [{
+    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    userName: String,
+    message: String,
+    timestamp: { type: Date, default: Date.now },
+  }],
+  // Raised hands tracking
+  raisedHands: [{
+    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    userName: String,
+    raisedAt: { type: Date, default: Date.now },
+  }],
+  // Waiting room
+  waitingRoom: { type: Boolean, default: false },
+  waitingStudents: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
+  // Linked lesson (for auto-saving recording)
+  linkedLessonId: String,
+  linkedModuleId: String,
 }, { timestamps: true });
 
 module.exports = mongoose.models.LiveSession || mongoose.model('LiveSession', liveSessionSchema);

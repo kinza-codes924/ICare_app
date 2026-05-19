@@ -45,6 +45,9 @@ const quizzesRoutes = require('./routes/quizzes');
 const communityRoutes = require('./routes/community');
 const notificationRoutes = require('./routes/notifications');
 const reminderRoutes = require('./routes/reminders');
+const lessonNotesRoutes = require('./routes/lesson-notes');
+const certificatesRoutes = require('./routes/certificates');
+const liveSessionPollsRoutes = require('./routes/live-session-polls');
 
 const app = express();
 
@@ -152,6 +155,9 @@ app.use('/api/quizzes', quizzesRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/reminders', reminderRoutes);
 app.use('/api/credentials', require('./routes/credentials'));
+app.use('/api/lesson-notes', lessonNotesRoutes);
+app.use('/api/certificates', certificatesRoutes);
+app.use('/api/live-session-polls', liveSessionPollsRoutes);
 
 // Serve uploaded files (only in non-serverless environments)
 if (!process.env.VERCEL) {

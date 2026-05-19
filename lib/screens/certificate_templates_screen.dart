@@ -359,11 +359,33 @@ class LmsCertificateScreen extends StatelessWidget {
     final pdf = pw.Document();
     final date = DateFormat('MMMM dd, yyyy').format(completionDate ?? DateTime.now());
 
-    // Load logo
-    pw.ImageProvider? logoImg;
+    // Generate unique certificate ID
+    final certId = 'CERT-${DateTime.now().millisecondsSinceEpoch}-${courseId?.substring(0, 6) ?? 'ICARE'}';
+
+    // Load logos
+    pw.ImageProvider? icareLogoImg;
+    pw.ImageProvider? rmrLogoImg;
+    pw.ImageProvider? iqraLogoImg;
     try {
       final bytes = await rootBundle.load('assets/Asset 1.png');
-      logoImg = pw.MemoryImage(bytes.buffer.asUint8List());
+      icareLogoImg = pw.MemoryImage(bytes.buffer.asUint8List());
+      // For now, use same logo for all - client can replace with actual logos
+      rmrLogoImg = icareLogoImg;
+      iqraLogoImg = icareLogoImg;
+    } catch (_) {}
+
+    // Generate QR code for verification
+    // QR code will contain verification URL: https://icare.app/verify-certificate/{certId}
+    final qrData = 'https://icare.app/verify-certificate/$certId';
+    pw.ImageProvider? qrCodeImg;
+    try {
+      // Generate QR code using barcode package
+      final qrCode = pw.BarcodeWidget(
+        barcode: pw.Barcode.qrCode(),
+        data: qrData,
+        width: 80,
+        height: 80,
+      );
     } catch (_) {}
 
     final t = template;
@@ -420,26 +442,67 @@ class LmsCertificateScreen extends StatelessWidget {
                 ),
               ),
             ),
-            // Content
+
+            // Top logos row: RMR (left), Iqra (center), iCare (right)
+            pw.Positioned(
+              top: 35,
+              left: 40,
+              right: 40,
+              child: pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  // RMR Solution logo (left)
+                  if (rmrLogoImg != null)
+                    pw.Container(width: 60, height: 60, child: pw.Image(rmrLogoImg))
+                  else
+                    pw.Container(width: 60, height: 60),
+
+                  // Iqra University logo (center)
+                  if (iqraLogoImg != null)
+                    pw.Container(width: 70, height: 70, child: pw.Image(iqraLogoImg))
+                  else
+                    pw.Container(width: 70, height: 70),
+
+                  // iCare logo (right)
+                  if (icareLogoImg != null)
+                    pw.Container(width: 60, height: 60, child: pw.Image(icareLogoImg))
+                  else
+                    pw.Container(width: 60, height: 60),
+                ],
+              ),
+            ),
+
+            // QR Code (left side)
+            pw.Positioned(
+              left: 40,
+              top: 120,
+              child: pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  pw.BarcodeWidget(
+                    barcode: pw.Barcode.qrCode(),
+                    data: qrData,
+                    width: 70,
+                    height: 70,
+                  ),
+                  pw.SizedBox(height: 4),
+                  pw.Text('Scan to verify', style: pw.TextStyle(fontSize: 7, color: PdfColors.grey600)),
+                ],
+              ),
+            ),
+
+            // Main content
             pw.Center(
               child: pw.Padding(
-                padding: const pw.EdgeInsets.symmetric(horizontal: 60, vertical: 40),
+                padding: const pw.EdgeInsets.symmetric(horizontal: 100, vertical: 40),
                 child: pw.Column(
                   mainAxisAlignment: pw.MainAxisAlignment.center,
                   children: [
-                    // Logo + title row
-                    pw.Row(mainAxisAlignment: pw.MainAxisAlignment.center, children: [
-                      if (logoImg != null) ...[
-                        pw.Container(width: 40, height: 40, child: pw.Image(logoImg)),
-                        pw.SizedBox(width: 12),
-                      ],
-                      pw.Text('iCare Virtual Hospital', style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold, color: primary)),
-                    ]),
-                    pw.SizedBox(height: 6),
-                    pw.Container(height: 2, width: 200, color: accent),
-                    pw.SizedBox(height: 20),
+                    pw.SizedBox(height: 40),
                     pw.Text('Certificate of Completion', style: pw.TextStyle(fontSize: 28, fontWeight: pw.FontWeight.bold, color: primary, letterSpacing: 2)),
                     pw.SizedBox(height: 10),
+                    pw.Container(height: 2, width: 200, color: accent),
+                    pw.SizedBox(height: 16),
                     pw.Text('This is to certify that', style: pw.TextStyle(fontSize: 13, color: PdfColors.grey700)),
                     pw.SizedBox(height: 12),
                     // Student name — big, prominent
@@ -448,29 +511,61 @@ class LmsCertificateScreen extends StatelessWidget {
                     pw.Text('has successfully completed the course', style: pw.TextStyle(fontSize: 13, color: PdfColors.grey700)),
                     pw.SizedBox(height: 12),
                     pw.Text(courseTitle, style: pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold, color: primary)),
-                    pw.SizedBox(height: 24),
-                    pw.Container(height: 1, width: 300, color: primary),
-                    pw.SizedBox(height: 18),
-                    pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
-                      pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
-                        pw.Text('Date of Completion', style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey600)),
-                        pw.SizedBox(height: 4),
-                        pw.Text(date, style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold, color: primary)),
-                      ]),
-                      pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.center, children: [
-                        pw.Container(height: 1, width: 120, color: PdfColors.grey500),
-                        pw.SizedBox(height: 4),
-                        pw.Text(instructorName, style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold, color: primary)),
-                        pw.Text('Instructor', style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey600)),
-                      ]),
-                      pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.end, children: [
-                        pw.Text('Authorized By', style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey600)),
-                        pw.SizedBox(height: 4),
-                        pw.Text('iCare Virtual Hospital', style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold, color: primary)),
-                      ]),
-                    ]),
+                    pw.SizedBox(height: 20),
+                    pw.Text('Date of Completion: $date', style: pw.TextStyle(fontSize: 11, color: PdfColors.grey700)),
+                    pw.SizedBox(height: 30),
+
+                    // Digital signatures row
+                    pw.Row(
+                      mainAxisAlignment: pw.MainAxisAlignment.spaceEvenly,
+                      children: [
+                        // Instructor signature
+                        pw.Column(
+                          children: [
+                            pw.Container(height: 1, width: 100, color: PdfColors.grey500),
+                            pw.SizedBox(height: 4),
+                            pw.Text(instructorName, style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold, color: primary)),
+                            pw.Text('Instructor', style: pw.TextStyle(fontSize: 8, color: PdfColors.grey600)),
+                            pw.Text('Digital Signature', style: pw.TextStyle(fontSize: 7, color: PdfColors.grey500, fontStyle: pw.FontStyle.italic)),
+                          ],
+                        ),
+                        // Iqra University Registrar
+                        pw.Column(
+                          children: [
+                            pw.Container(height: 1, width: 100, color: PdfColors.grey500),
+                            pw.SizedBox(height: 4),
+                            pw.Text('Registrar', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold, color: primary)),
+                            pw.Text('Iqra University', style: pw.TextStyle(fontSize: 8, color: PdfColors.grey600)),
+                            pw.Text('Digital Signature', style: pw.TextStyle(fontSize: 7, color: PdfColors.grey500, fontStyle: pw.FontStyle.italic)),
+                          ],
+                        ),
+                        // iCare Administrator
+                        pw.Column(
+                          children: [
+                            pw.Container(height: 1, width: 100, color: PdfColors.grey500),
+                            pw.SizedBox(height: 4),
+                            pw.Text('Administrator', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold, color: primary)),
+                            pw.Text('iCare Virtual Hospital', style: pw.TextStyle(fontSize: 8, color: PdfColors.grey600)),
+                            pw.Text('Digital Signature', style: pw.TextStyle(fontSize: 7, color: PdfColors.grey500, fontStyle: pw.FontStyle.italic)),
+                          ],
+                        ),
+                      ],
+                    ),
                   ],
                 ),
+              ),
+            ),
+
+            // Certificate ID (bottom right)
+            pw.Positioned(
+              bottom: 30,
+              right: 40,
+              child: pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.end,
+                children: [
+                  pw.Text('Certificate ID', style: pw.TextStyle(fontSize: 8, color: PdfColors.grey600)),
+                  pw.Text(certId, style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold, color: primary)),
+                ],
               ),
             ),
           ],

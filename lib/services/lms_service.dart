@@ -286,6 +286,66 @@ class LmsService {
   }
 
   // ═══════════════════════════════════════════════════════════════════════
+  // MODULE COMPLETION
+  // ═══════════════════════════════════════════════════════════════════════
+
+  Future<Map<String, dynamic>> markModuleComplete({
+    required String enrollmentId,
+    required String moduleId,
+  }) async {
+    try {
+      final response = await _api.post(
+        '/courses/enrollments/$enrollmentId/complete-module',
+        {'moduleId': moduleId},
+      );
+      return response.data ?? {'success': true};
+    } catch (e) {
+      return {'success': false, 'message': e.toString()};
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // LESSON NOTES
+  // ═══════════════════════════════════════════════════════════════════════
+
+  Future<Map<String, dynamic>> getLessonNote(String lessonId) async {
+    try {
+      final response = await _api.get('/lesson-notes/$lessonId');
+      return response.data ?? {};
+    } catch (e) {
+      return {};
+    }
+  }
+
+  Future<Map<String, dynamic>> saveLessonNote({
+    required String courseId,
+    required String moduleId,
+    required String lessonId,
+    required String content,
+  }) async {
+    try {
+      final response = await _api.post('/lesson-notes', {
+        'courseId': courseId,
+        'moduleId': moduleId,
+        'lessonId': lessonId,
+        'content': content,
+      });
+      return response.data ?? {'success': true};
+    } catch (e) {
+      return {'success': false, 'message': e.toString()};
+    }
+  }
+
+  Future<List<dynamic>> getCourseNotes(String courseId) async {
+    try {
+      final response = await _api.get('/lesson-notes/course/$courseId');
+      return response.data['notes'] ?? [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════
   // INSTRUCTOR - COURSES
   // ═══════════════════════════════════════════════════════════════════════
 

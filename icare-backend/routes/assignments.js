@@ -115,7 +115,7 @@ router.post('/:assignmentId/submit', authMiddleware, upload.single('file'), asyn
 router.put('/submissions/:submissionId/grade', authMiddleware, async (req, res) => {
   try {
     await connectMongoDB();
-    const { marksObtained, feedback } = req.body;
+    const { marksObtained, feedback, rubricGrade, stars, comments } = req.body;
     if (marksObtained === undefined) return res.status(400).json({ success: false, message: 'marksObtained required' });
     const sub = await AssignmentSubmission.findById(toId(req.params.submissionId));
     if (!sub) return res.status(404).json({ success: false, message: 'Submission not found' });
@@ -124,6 +124,10 @@ router.put('/submissions/:submissionId/grade', authMiddleware, async (req, res) 
     sub.status    = 'graded';
     sub.gradedAt  = new Date();
     sub.gradedBy  = toId(req.user.id);
+    // Rubric-based grading
+    if (rubricGrade) sub.rubricGrade = rubricGrade;
+    if (stars !== undefined) sub.stars = Number(stars);
+    if (comments) sub.comments = comments;
     await sub.save();
     res.json({ success: true, submission: sub });
   } catch (e) {

@@ -9,6 +9,11 @@ const enrollmentSchema = new mongoose.Schema({
     completed: { type: Boolean, default: false },
     completedAt: { type: Date },
   },
+  // Track module completions with timestamps
+  moduleCompletions: [{
+    moduleId: { type: String, required: true },
+    completedAt: { type: Date, default: Date.now },
+  }],
   certificateUrl: { type: String },
 }, { timestamps: true });
 

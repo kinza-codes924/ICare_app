@@ -17,6 +17,8 @@ const moduleSchema = new mongoose.Schema({
   order: { type: Number, default: 0 },
   lessons: [lessonSchema],
   quiz: { type: mongoose.Schema.Types.Mixed, default: null },
+  // Timeline for pragmatic courses (e.g., unlock after X days/weeks)
+  unlockAfterDays: { type: Number, default: 0 },
 });
 
 const courseSchema = new mongoose.Schema({
@@ -35,6 +37,16 @@ const courseSchema = new mongoose.Schema({
 
   // Duration in hours
   duration: { type: Number, default: 0 },
+
+  // Course type: self-paced (immediate progression) or pragmatic (timeline-based)
+  courseType: {
+    type: String,
+    enum: ['self-paced', 'pragmatic'],
+    default: 'self-paced',
+  },
+
+  // Start date for pragmatic courses (timeline calculation base)
+  startDate: { type: Date, default: null },
 
   // Visibility / publish status
   visibility: {
