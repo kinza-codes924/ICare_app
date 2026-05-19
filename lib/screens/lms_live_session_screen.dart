@@ -1,4 +1,7 @@
 import 'dart:async';
+// ignore: avoid_web_libraries_in_flutter
+import 'dart:html' as html;
+import 'dart:ui_web' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:icare/services/lms_service.dart';
@@ -32,6 +35,11 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
   bool _joined = false;
   bool _micOn = true;
   bool _cameraOn = true;
+
+  // Web camera
+  html.MediaStream? _localStream;
+  html.VideoElement? _localVideo;
+  static int _viewId = 0;
   bool _loading = true;
   String? _error;
   int? _remoteUid;
@@ -79,6 +87,8 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
     _chatCtrl.dispose();
     _chatScroll.dispose();
     _panelTab.dispose();
+    // Stop camera/mic tracks
+    _localStream?.getTracks().forEach((t) => t.stop());
     super.dispose();
   }
 
@@ -88,7 +98,6 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
       _currentUserName = user?.name ?? (widget.isInstructor ? 'Instructor' : 'Student');
       _currentUserId = user?.id ?? '';
 
-      // Add self to participants
       _participants.add({
         'uid': 0,
         'name': _currentUserName,
@@ -97,9 +106,62 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
         'cameraOn': true,
       });
 
+      // Start web camera
+      if (kIsWeb) await _initWebCamera();
+
+      // Notify enrolled students when instructor starts
+      if (widget.isInstructor) await _notifyStudents();
+
       await _initAgora();
     } catch (e) {
       if (mounted) setState(() { _error = e.toString(); _loading = false; });
+    }
+  }
+
+  Future<void> _initWebCamera() async {
+    try {
+      final viewName = 'local-cam-${++_viewId}';
+      _localVideo = html.VideoElement()
+        ..autoplay = true
+        ..muted = true
+        ..style.width = '100%'
+        ..style.height = '100%'
+        ..style.objectFit = 'cover'
+        ..style.borderRadius = '0px'
+        ..style.transform = 'scaleX(-1)'; // mirror effect
+
+      _localStream = await html.window.navigator.mediaDevices?.getUserMedia({
+        'video': {'width': 1280, 'height': 720, 'facingMode': 'user'},
+        'audio': true,
+      });
+
+      if (_localStream != null) {
+        _localVideo!.srcObject = _localStream;
+        ui.platformViewRegistry.registerViewFactory(
+          viewName,
+          (int id) => _localVideo!,
+        );
+        if (mounted) setState(() => _cameraViewName = viewName);
+      }
+    } catch (e) {
+      // Camera permission denied — continue without camera
+      debugPrint('Camera error: $e');
+    }
+  }
+
+  String? _cameraViewName;
+
+  Future<void> _notifyStudents() async {
+    try {
+      // Notify backend that session has started — backend sends FCM to students
+      await _lms.startLiveSessionNotify(
+        courseId: widget.courseId,
+        sessionId: widget.sessionId,
+        instructorName: _currentUserName,
+        sessionTitle: widget.sessionTitle,
+      );
+    } catch (e) {
+      debugPrint('Notify students error: $e');
     }
   }
 
@@ -149,13 +211,21 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
 
   Future<void> _toggleMic() async {
     _micOn = !_micOn;
-    await _engine?.muteLocalAudioStream(!_micOn);
+    if (kIsWeb && _localStream != null) {
+      _localStream!.getAudioTracks().forEach((t) => t.enabled = _micOn);
+    } else {
+      await _engine?.muteLocalAudioStream(!_micOn);
+    }
     setState(() {});
   }
 
   Future<void> _toggleCamera() async {
     _cameraOn = !_cameraOn;
-    await _engine?.muteLocalVideoStream(!_cameraOn);
+    if (kIsWeb && _localStream != null) {
+      _localStream!.getVideoTracks().forEach((t) => t.enabled = _cameraOn);
+    } else {
+      await _engine?.muteLocalVideoStream(!_cameraOn);
+    }
     setState(() {});
   }
 
@@ -392,7 +462,9 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
       child: Stack(
         fit: StackFit.expand,
         children: [
-          if (false) // Agora video tile — enabled on mobile build
+          if (kIsWeb && _cameraOn && _cameraViewName != null)
+            HtmlElementView(viewType: _cameraViewName!)
+          else if (false)
             Container()
           else
             Center(

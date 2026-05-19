@@ -392,4 +392,63 @@ router.delete('/:id', authMiddleware, async (req, res) => {
   }
 });
 
+// POST /live-sessions/notify-start — notify enrolled students when instructor goes live
+router.post('/notify-start', authMiddleware, async (req, res) => {
+  try {
+    await connectMongoDB();
+    const { courseId, sessionId, instructorName, sessionTitle } = req.body;
+
+    // Find all enrolled students for this course
+    const enrollments = await Enrollment.find({
+      courseId: toId(courseId),
+      status: { $in: ['active', 'enrolled'] }
+    }).select('userId').lean();
+
+    if (!enrollments.length) {
+      return res.json({ success: true, message: 'No enrolled students', notified: 0 });
+    }
+
+    const User = require('../models/User');
+    const Notification = require('../models/Notification');
+
+    // Create in-app notifications for all students
+    const notifications = enrollments.map(e => ({
+      userId: e.userId,
+      type: 'general',
+      title: `🔴 LIVE: ${sessionTitle || 'Live Session Started'}`,
+      message: `${instructorName || 'Your instructor'} has started a live session. Join now!`,
+      data: { courseId, sessionId, type: 'live_session_started' },
+    }));
+
+    await Notification.insertMany(notifications);
+
+    // Also send FCM if tokens available
+    try {
+      const fcmTokens = await User.find({
+        _id: { $in: enrollments.map(e => e.userId) },
+        fcmToken: { $exists: true, $ne: null }
+      }).select('fcmToken').lean();
+
+      if (fcmTokens.length > 0) {
+        const admin = require('firebase-admin');
+        const tokens = fcmTokens.map(u => u.fcmToken).filter(Boolean);
+        if (tokens.length > 0) {
+          await admin.messaging().sendEachForMulticast({
+            tokens,
+            notification: {
+              title: `🔴 LIVE: ${sessionTitle || 'Live Session'}`,
+              body: `${instructorName || 'Your instructor'} has started a live session. Tap to join!`,
+            },
+            data: { courseId: courseId?.toString(), sessionId: sessionId?.toString(), type: 'live_session' },
+          }).catch(() => {});
+        }
+      }
+    } catch (_) {}
+
+    res.json({ success: true, notified: enrollments.length });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
 module.exports = router;

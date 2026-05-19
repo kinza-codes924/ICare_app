@@ -447,6 +447,24 @@ class LmsService {
   // INVITE TEACHER
   // ═══════════════════════════════════════════════════════════════════════
 
+  Future<void> startLiveSessionNotify({
+    required String courseId,
+    required String sessionId,
+    required String instructorName,
+    required String sessionTitle,
+  }) async {
+    try {
+      await _api.post('/live-sessions/notify-start', {
+        'courseId': courseId,
+        'sessionId': sessionId,
+        'instructorName': instructorName,
+        'sessionTitle': sessionTitle,
+      });
+    } catch (e) {
+      debugPrint('Session notify error: $e');
+    }
+  }
+
   Future<Map<String, dynamic>> createVoucher({
     required String code,
     required int discountPercent,
