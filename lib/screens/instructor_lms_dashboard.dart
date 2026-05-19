@@ -1233,7 +1233,7 @@ class _SettingsPageState extends State<_SettingsPage> {
         const SizedBox(height: 8),
         const Text('Create one-time discount codes for any course', style: TextStyle(fontSize: 13, color: Color(0xFF5F6368))),
         const SizedBox(height: 16),
-        _VoucherManager(),
+        VoucherManagerWidget(),
       ],
     );
   }
@@ -1256,6 +1256,144 @@ class _SettingsPageState extends State<_SettingsPage> {
         ],
       ),
     );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+// Voucher Manager
+// ─────────────────────────────────────────────────────────────
+
+class VoucherManagerWidget extends StatefulWidget {
+  const VoucherManagerWidget({super.key});
+  @override
+  State<VoucherManagerWidget> createState() => _VoucherManagerState();
+}
+
+class _VoucherManagerState extends State<VoucherManagerWidget> {
+  final List<Map<String, dynamic>> _vouchers = [];
+
+  String _generateCode() {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    final rng = Random.secure();
+    return List.generate(8, (_) => chars[rng.nextInt(chars.length)]).join();
+  }
+
+  void _createVoucher() {
+    int selectedPercent = 20;
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(builder: (ctx, setLocal) => AlertDialog(
+        title: const Row(children: [
+          Icon(Icons.local_offer_rounded, color: Color(0xFF1A73E8)),
+          SizedBox(width: 10),
+          Text('Create Discount Voucher', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
+        ]),
+        content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const Text('Select discount percentage for this one-time voucher:', style: TextStyle(fontSize: 13, color: Color(0xFF64748B))),
+          const SizedBox(height: 16),
+          Wrap(
+            spacing: 8, runSpacing: 8,
+            children: [10,20,30,40,50,60,70,80,90,100].map((p) => GestureDetector(
+              onTap: () => setLocal(() => selectedPercent = p),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                decoration: BoxDecoration(
+                  color: selectedPercent == p ? const Color(0xFF1A73E8) : Colors.grey.shade100,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: selectedPercent == p ? const Color(0xFF1A73E8) : Colors.grey.shade300),
+                ),
+                child: Text('$p%', style: TextStyle(
+                  color: selectedPercent == p ? Colors.white : const Color(0xFF444746),
+                  fontWeight: FontWeight.w700, fontSize: 13,
+                )),
+              ),
+            )).toList(),
+          ),
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(color: Colors.blue.shade50, borderRadius: BorderRadius.circular(8)),
+            child: Row(children: [
+              const Icon(Icons.info_outline, color: Color(0xFF1A73E8), size: 16),
+              const SizedBox(width: 8),
+              Expanded(child: Text('One-time use — deactivates after first use.',
+                style: TextStyle(fontSize: 11, color: Colors.blue.shade800))),
+            ]),
+          ),
+        ]),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF1A73E8), foregroundColor: Colors.white),
+            onPressed: () {
+              Navigator.pop(ctx);
+              final code = _generateCode();
+              setState(() {
+                _vouchers.insert(0, {
+                  'code': code,
+                  'discount': selectedPercent,
+                  'used': false,
+                  'createdAt': DateFormat('MMM d, yyyy').format(DateTime.now()),
+                });
+              });
+              LmsService().createVoucher(code: code, discountPercent: selectedPercent).catchError((_) {});
+              ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                content: Text('Voucher created: $code ($selectedPercent% off)'),
+                backgroundColor: Colors.green,
+                duration: const Duration(seconds: 4),
+              ));
+            },
+            icon: const Icon(Icons.add_rounded, size: 18),
+            label: const Text('Generate'),
+          ),
+        ],
+      )),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      ElevatedButton.icon(
+        onPressed: _createVoucher,
+        icon: const Icon(Icons.add_rounded, size: 18),
+        label: const Text('Create New Discount Voucher'),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: const Color(0xFF1A73E8), foregroundColor: Colors.white,
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+        ),
+      ),
+      if (_vouchers.isNotEmpty) ...[
+        const SizedBox(height: 16),
+        ..._vouchers.map((v) => Container(
+          margin: const EdgeInsets.only(bottom: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: BoxDecoration(
+            color: v['used'] == true ? Colors.grey.shade100 : Colors.green.shade50,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: v['used'] == true ? Colors.grey.shade200 : Colors.green.shade200),
+          ),
+          child: Row(children: [
+            Icon(Icons.local_offer_rounded, size: 18, color: v['used'] == true ? Colors.grey : Colors.green.shade700),
+            const SizedBox(width: 10),
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Row(children: [
+                Text(v['code'], style: const TextStyle(fontFamily: 'monospace', fontWeight: FontWeight.w800, fontSize: 14, color: Color(0xFF1A73E8))),
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(color: const Color(0xFF1A73E8), borderRadius: BorderRadius.circular(10)),
+                  child: Text('${v['discount']}% OFF', style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w700)),
+                ),
+              ]),
+              Text('${v['createdAt']} · ${v['used'] ? 'Used' : 'Active'}',
+                  style: TextStyle(fontSize: 11, color: v['used'] == true ? Colors.grey : Colors.green.shade700)),
+            ])),
+          ]),
+        )).toList(),
+      ],
+    ]);
   }
 }
 
