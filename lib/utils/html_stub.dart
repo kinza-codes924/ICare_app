@@ -6,6 +6,8 @@ class _StyleElement {
   String objectFit = '';
   String borderRadius = '';
   String transform = '';
+  String backgroundColor = '';
+  String position = '';
 }
 
 class MediaStreamTrack {
@@ -24,6 +26,13 @@ class VideoElement {
   bool muted = false;
   final _StyleElement style = _StyleElement();
   MediaStream? srcObject;
+}
+
+class DivElement {
+  String id = '';
+  final _StyleElement style = _StyleElement();
+  void append(dynamic element) {}
+  void remove() {}
 }
 
 class MediaDevices {
@@ -52,6 +61,7 @@ class Navigator {
 
 class Window {
   Navigator get navigator => Navigator();
+  dynamic callMethod(String name, [List<dynamic>? args]) => null;
 }
 
 class Body {

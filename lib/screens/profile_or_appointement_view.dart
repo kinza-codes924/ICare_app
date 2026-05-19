@@ -8,7 +8,7 @@ import 'package:icare/screens/decline_appointment_redesign.dart';
 import 'package:icare/screens/intake_notes_screen.dart';
 import 'package:icare/screens/patient_profile_view.dart';
 import 'package:icare/screens/soap_notes_screen.dart';
-import 'package:icare/screens/video_call_web.dart';
+import 'package:icare/screens/video_call.dart';
 import 'package:icare/screens/view_course.dart';
 import 'package:icare/services/appointment_service.dart';
 import 'package:icare/screens/prescription_detail_screen.dart';

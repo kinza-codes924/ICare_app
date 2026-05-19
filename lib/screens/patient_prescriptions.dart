@@ -17,8 +17,8 @@ import 'package:intl/intl.dart';
 import 'dart:async';
 import 'dart:math' as math;
 // ignore: avoid_web_libraries_in_flutter
-import '../utils/js_stub.dart' as js
-    if (dart.library.html) 'dart:js';
+import '../utils/js_stub.dart'
+    if (dart.library.html) 'dart:js' as js;
 
 class PatientPrescriptions extends ConsumerStatefulWidget {
   const PatientPrescriptions({super.key});

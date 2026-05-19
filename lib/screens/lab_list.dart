@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:math' as math;
-import '../utils/js_stub.dart' as js
-    if (dart.library.html) 'dart:js';
+import '../utils/js_stub.dart'
+    if (dart.library.html) 'dart:js' as js;
 import 'package:flutter/material.dart';
 import 'package:icare/models/lab.dart';
 import 'package:icare/screens/book_lab.dart';

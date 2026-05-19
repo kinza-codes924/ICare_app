@@ -11,6 +11,9 @@ import '../utils/html_stub.dart' as html
 // ignore: avoid_web_libraries_in_flutter
 import '../utils/ui_web_stub.dart' as ui
     if (dart.library.ui) 'dart:ui_web';
+// ignore: avoid_web_libraries_in_flutter
+import '../utils/js_stub.dart' as js
+    if (dart.library.html) 'dart:js';
 
 /// LMS Live Session Screen — Google Meet style, Agora-based
 /// Completely separate from doctor-patient consultation
@@ -93,7 +96,7 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
     _panelTab.dispose();
     // Cleanup
     if (kIsWeb) {
-      html.window.callMethod('lmsLeave', []);
+      js.context.callMethod('lmsLeave', []);
     }
     _localStream?.getTracks().forEach((t) => t.stop());
     super.dispose();
@@ -157,13 +160,13 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
 
       if (mounted) setState(() => _cameraViewName = 'lms-video-grid');
 
-      // Call JavaScript Agora bridge
-      final result = await html.window.callMethod('lmsJoin', [
+      // Call JavaScript Agora bridge — returns a Promise, but js.context.callMethod returns dynamic
+      js.context.callMethod('lmsJoin', [
         '82a63a65663c49f0bb973707b4c09f5f', // Agora App ID
         channelId,
         uid,
       ]);
-      debugPrint('LMS Agora join result: $result');
+      debugPrint('LMS Agora join initiated for channel: $channelId, uid: $uid');
 
     } catch (e) {
       debugPrint('LMS web camera/agora error: $e');
@@ -239,7 +242,7 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
   Future<void> _toggleMic() async {
     _micOn = !_micOn;
     if (kIsWeb) {
-      html.window.callMethod('lmsMuteMic', [!_micOn]);
+      js.context.callMethod('lmsMuteMic', [!_micOn]);
     } else {
       await _engine?.muteLocalAudioStream(!_micOn);
     }
@@ -254,7 +257,7 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
   Future<void> _toggleCamera() async {
     _cameraOn = !_cameraOn;
     if (kIsWeb) {
-      html.window.callMethod('lmsMuteCamera', [!_cameraOn]);
+      js.context.callMethod('lmsMuteCamera', [!_cameraOn]);
     } else {
       await _engine?.muteLocalVideoStream(!_cameraOn);
     }
@@ -314,7 +317,7 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
     );
     if (confirm == true && mounted) {
       if (kIsWeb) {
-        html.window.callMethod('lmsLeave', []);
+        js.context.callMethod('lmsLeave', []);
       } else {
         await _engine?.leaveChannel();
       }
