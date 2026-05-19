@@ -32,12 +32,32 @@ jobs:
       - name: Get dependencies
         run: flutter pub get
 
-      - name: Patch jcenter() in pub-cache (Gradle 9 removes jcenter method)
+      - name: Patch pub-cache build.gradle files (jcenter + namespace fixes)
         run: |
+          # Fix 1: Replace jcenter() with maven mirror (Gradle 9 removed jcenter method)
           find $HOME/.pub-cache -name "build.gradle" | while read f; do
             if grep -q "jcenter()" "$f" 2>/dev/null; then
-              echo "Patching: $f"
+              echo "Patching jcenter in: $f"
               sed -i 's/jcenter()/maven { url "https:\/\/jcenter.bintray.com" }/g' "$f"
+            fi
+          done
+
+          # Fix 2: Add namespace to library build.gradle files missing it (AGP 8+ requirement)
+          find $HOME/.pub-cache -name "build.gradle" | while read f; do
+            if grep -q "com.android.library" "$f" 2>/dev/null && ! grep -q "namespace" "$f" 2>/dev/null; then
+              # Try to get package from AndroidManifest.xml
+              MANIFEST_DIR=$(dirname "$f")
+              MANIFEST="$MANIFEST_DIR/src/main/AndroidManifest.xml"
+              if [ ! -f "$MANIFEST" ]; then
+                MANIFEST=$(find "$MANIFEST_DIR" -name "AndroidManifest.xml" 2>/dev/null | head -1)
+              fi
+              if [ -f "$MANIFEST" ]; then
+                PKG=$(grep -o 'package="[^"]*"' "$MANIFEST" 2>/dev/null | head -1 | sed 's/package="//;s/"//')
+                if [ -n "$PKG" ]; then
+                  echo "Adding namespace '$PKG' to: $f"
+                  sed -i "/android {/a\\    namespace \"$PKG\"" "$f"
+                fi
+              fi
             fi
           done
 
