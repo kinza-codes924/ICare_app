@@ -16,16 +16,25 @@ function toId(id) {
 router.post('/', authMiddleware, async (req, res) => {
   try {
     await connectMongoDB();
-    const { enrollmentId, template } = req.body;
+    const { enrollmentId, courseId, studentId, template } = req.body;
 
-    if (!enrollmentId) {
-      return res.status(400).json({ success: false, message: 'enrollmentId required' });
+    let enrollment;
+
+    if (enrollmentId) {
+      enrollment = await Enrollment.findById(toId(enrollmentId))
+        .populate('userId', 'name username email')
+        .populate('courseId')
+        .lean();
+    } else if (courseId && studentId) {
+      // Find enrollment by courseId + studentId
+      enrollment = await Enrollment.findOne({
+        courseId: toId(courseId),
+        userId: toId(studentId),
+      })
+        .populate('userId', 'name username email')
+        .populate('courseId')
+        .lean();
     }
-
-    const enrollment = await Enrollment.findById(toId(enrollmentId))
-      .populate('userId', 'name username email')
-      .populate('courseId')
-      .lean();
 
     if (!enrollment) {
       return res.status(404).json({ success: false, message: 'Enrollment not found' });
@@ -50,7 +59,7 @@ router.post('/', authMiddleware, async (req, res) => {
     // Generate certificate
     const certNumber = `ICARE-${new Date().getFullYear()}-${Math.floor(100000 + Math.random() * 900000)}`;
     const verificationCode = Math.random().toString(36).substring(2, 15).toUpperCase();
-    const qrCodeData = `https://icare.app/verify-certificate/${verificationCode}`;
+    const qrCodeData = `https://icare-app-ten.vercel.app/verify?code=${verificationCode}`;
 
     const certificate = await Certificate.create({
       enrollmentId: toId(enrollmentId),
@@ -97,8 +106,9 @@ router.get('/verify/:code', async (req, res) => {
     res.json({
       success: true,
       valid: true,
+      message: 'Certificate is authentic',
       certificate: {
-        certificateNumber: certificate.certificateNumber,
+        certificateId: certificate.certificateNumber,
         studentName: certificate.studentName,
         courseName: certificate.courseName,
         instructorName: certificate.instructorName,
