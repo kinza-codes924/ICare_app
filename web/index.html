@@ -271,5 +271,93 @@
     };
   </script>
   <script src="flutter_bootstrap.js" async></script>
+
+  <!-- LMS Live Session Agora Bridge -->
+  <script>
+    window._lmsClient = null;
+    window._lmsTracks = [];
+    window._lmsRemoteUids = [];
+
+    window.lmsJoin = async function(appId, channelId, uid) {
+      try {
+        const client = AgoraRTC.createClient({ mode: 'rtc', codec: 'vp8' });
+        window._lmsClient = client;
+
+        // Remote user joined — play their video/audio
+        client.on('user-published', async (user, mediaType) => {
+          await client.subscribe(user, mediaType);
+          if (mediaType === 'audio') {
+            user.audioTrack.play();
+          }
+          if (mediaType === 'video') {
+            window._lmsRemoteUids.push(user.uid);
+            // Create a container for remote video
+            let container = document.getElementById('lms-remote-' + user.uid);
+            if (!container) {
+              container = document.createElement('div');
+              container.id = 'lms-remote-' + user.uid;
+              container.style.width = '100%';
+              container.style.height = '100%';
+              container.style.backgroundColor = '#1C2333';
+              const grid = document.getElementById('lms-video-grid');
+              if (grid) grid.appendChild(container);
+            }
+            user.videoTrack.play('lms-remote-' + user.uid);
+          }
+        });
+
+        client.on('user-left', (user) => {
+          window._lmsRemoteUids = window._lmsRemoteUids.filter(u => u !== user.uid);
+          const el = document.getElementById('lms-remote-' + user.uid);
+          if (el) el.remove();
+        });
+
+        // Join channel (null token = no-auth mode)
+        await client.join(appId, channelId, null, uid);
+
+        // Create and publish mic + camera
+        const [audioTrack, videoTrack] = await Promise.all([
+          AgoraRTC.createMicrophoneAudioTrack(),
+          AgoraRTC.createCameraVideoTrack({ encoderConfig: '720p_1' })
+        ]);
+        window._lmsTracks = [audioTrack, videoTrack];
+        await client.publish(window._lmsTracks);
+
+        // Play local video
+        const localEl = document.getElementById('lms-local-video');
+        if (localEl) videoTrack.play('lms-local-video');
+
+        return 'joined';
+      } catch(e) {
+        console.error('LMS Agora error:', e);
+        return 'error:' + e.message;
+      }
+    };
+
+    window.lmsLeave = function() {
+      try {
+        if (window._lmsTracks) {
+          window._lmsTracks.forEach(function(t) {
+            try { t.stop(); t.close(); } catch(_) {}
+          });
+          window._lmsTracks = [];
+        }
+        if (window._lmsClient) {
+          window._lmsClient.leave();
+          window._lmsClient = null;
+        }
+      } catch(_) {}
+    };
+
+    window.lmsMuteMic = function(mute) {
+      const t = window._lmsTracks && window._lmsTracks[0];
+      if (t) t.setEnabled(!mute);
+    };
+
+    window.lmsMuteCamera = function(mute) {
+      const t = window._lmsTracks && window._lmsTracks[1];
+      if (t) t.setEnabled(!mute);
+    };
+  </script>
 </body>
 </html>

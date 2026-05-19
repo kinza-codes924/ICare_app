@@ -91,7 +91,10 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
     _chatCtrl.dispose();
     _chatScroll.dispose();
     _panelTab.dispose();
-    // Stop camera/mic tracks
+    // Cleanup
+    if (kIsWeb) {
+      html.window.callMethod('lmsLeave', []);
+    }
     _localStream?.getTracks().forEach((t) => t.stop());
     super.dispose();
   }
@@ -123,33 +126,47 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
   }
 
   Future<void> _initWebCamera() async {
+    if (!kIsWeb) return;
     try {
-      final viewName = 'local-cam-${++_viewId}';
-      _localVideo = html.VideoElement()
-        ..autoplay = true
-        ..muted = true
-        ..style.width = '100%'
-        ..style.height = '100%'
-        ..style.objectFit = 'cover'
-        ..style.borderRadius = '0px'
-        ..style.transform = 'scaleX(-1)'; // mirror effect
+      // Use JavaScript Agora bridge for real P2P video+audio
+      final channelId = 'lms_${widget.courseId}';
+      final uid = _currentUserId.hashCode.abs() % 100000 + 1;
 
-      _localStream = await html.window.navigator.mediaDevices?.getUserMedia({
-        'video': {'width': 1280, 'height': 720, 'facingMode': 'user'},
-        'audio': true,
-      });
+      // Register the video grid container
+      ui.platformViewRegistry.registerViewFactory(
+        'lms-video-grid',
+        (int id) {
+          final div = html.DivElement()
+            ..id = 'lms-video-grid'
+            ..style.width = '100%'
+            ..style.height = '100%'
+            ..style.backgroundColor = '#1C2333'
+            ..style.position = 'relative';
 
-      if (_localStream != null) {
-        _localVideo!.srcObject = _localStream;
-        ui.platformViewRegistry.registerViewFactory(
-          viewName,
-          (int id) => _localVideo!,
-        );
-        if (mounted) setState(() => _cameraViewName = viewName);
-      }
+          // Local video container
+          final localDiv = html.DivElement()
+            ..id = 'lms-local-video'
+            ..style.width = '100%'
+            ..style.height = '100%'
+            ..style.backgroundColor = '#2D3748';
+          div.append(localDiv);
+
+          return div;
+        },
+      );
+
+      if (mounted) setState(() => _cameraViewName = 'lms-video-grid');
+
+      // Call JavaScript Agora bridge
+      final result = await html.window.callMethod('lmsJoin', [
+        '82a63a65663c49f0bb973707b4c09f5f', // Agora App ID
+        channelId,
+        uid,
+      ]);
+      debugPrint('LMS Agora join result: $result');
+
     } catch (e) {
-      // Camera permission denied — continue without camera
-      debugPrint('Camera error: $e');
+      debugPrint('LMS web camera/agora error: $e');
     }
   }
 
@@ -221,11 +238,8 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
 
   Future<void> _toggleMic() async {
     _micOn = !_micOn;
-    if (kIsWeb && _localStream != null) {
-      final tracks = _localStream!.getAudioTracks();
-      for (final t in tracks) {
-        t.enabled = _micOn;
-      }
+    if (kIsWeb) {
+      html.window.callMethod('lmsMuteMic', [!_micOn]);
     } else {
       await _engine?.muteLocalAudioStream(!_micOn);
     }
@@ -240,14 +254,7 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
   Future<void> _toggleCamera() async {
     _cameraOn = !_cameraOn;
     if (kIsWeb) {
-      if (_cameraOn) {
-        // Restart camera stream
-        _localStream?.getTracks().forEach((t) => t.stop());
-        await _initWebCamera();
-      } else {
-        _localStream?.getVideoTracks().forEach((t) => t.stop());
-        setState(() => _cameraViewName = null);
-      }
+      html.window.callMethod('lmsMuteCamera', [!_cameraOn]);
     } else {
       await _engine?.muteLocalVideoStream(!_cameraOn);
     }
@@ -306,7 +313,11 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
       ),
     );
     if (confirm == true && mounted) {
-      await _engine?.leaveChannel();
+      if (kIsWeb) {
+        html.window.callMethod('lmsLeave', []);
+      } else {
+        await _engine?.leaveChannel();
+      }
       if (widget.isInstructor) {
         await _lms.setSessionLive(courseId: widget.courseId, isLive: false);
       }
