@@ -409,6 +409,7 @@ class _CourseLessons extends StatelessWidget {
     }
     return Column(children: modules.asMap().entries.map((me) {
       final m = me.value;
+      final moduleId = m['_id']?.toString() ?? '';
       final lessons = (m['lessons'] as List?) ?? [];
       final quizzes = (m['quizzes'] as List?) ?? [];
       return Container(
@@ -431,10 +432,70 @@ class _CourseLessons extends StatelessWidget {
               title: Text(q['title'] ?? 'Quiz', style: const TextStyle(fontSize: 13)),
               dense: true,
             )),
+            // Mark as Complete button
+            if (moduleId.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.all(12),
+                child: ElevatedButton.icon(
+                  onPressed: () => _markModuleComplete(context, moduleId),
+                  icon: const Icon(Icons.check_circle_outline, size: 18),
+                  label: const Text('Mark Module as Complete'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.green,
+                    foregroundColor: Colors.white,
+                    minimumSize: const Size(double.infinity, 40),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                ),
+              ),
           ],
         ),
       );
     }).toList());
+  }
+
+  Future<void> _markModuleComplete(BuildContext context, String moduleId) async {
+    try {
+      final lms = LmsService();
+      // Get enrollment ID from course context (you'll need to pass this)
+      final enrollmentId = ''; // TODO: Pass enrollmentId from parent widget
+
+      if (enrollmentId.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Enrollment not found'), backgroundColor: Colors.red),
+        );
+        return;
+      }
+
+      final result = await lms.markModuleComplete(
+        enrollmentId: enrollmentId,
+        moduleId: moduleId,
+      );
+
+      if (context.mounted) {
+        if (result['success'] == true) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('✅ Module marked as complete! Instructor has been notified.'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(result['message'] ?? 'Failed to mark complete'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
   }
 }
 
@@ -633,31 +694,139 @@ class _SubmissionsPageState extends State<_SubmissionsPage> {
   void _showGradeDialog(dynamic sub) {
     final marksCtrl = TextEditingController(text: sub['marksObtained']?.toString() ?? '');
     final feedbackCtrl = TextEditingController(text: sub['feedback'] ?? '');
-    showDialog(context: context, builder: (ctx) => AlertDialog(
-      title: const Text('Grade Submission'),
-      content: Column(mainAxisSize: MainAxisSize.min, children: [
-        TextField(controller: marksCtrl, keyboardType: TextInputType.number,
-          decoration: InputDecoration(labelText: 'Marks (out of ${widget.assignment['totalMarks']})', border: const OutlineInputBorder())),
-        const SizedBox(height: 12),
-        TextField(controller: feedbackCtrl, maxLines: 3,
-          decoration: const InputDecoration(labelText: 'Feedback (optional)', border: OutlineInputBorder())),
-      ]),
-      actions: [
-        TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-        ElevatedButton(
-          style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryColor, foregroundColor: Colors.white),
-          onPressed: () async {
-            Navigator.pop(ctx);
-            final marks = int.tryParse(marksCtrl.text);
-            if (marks == null) return;
-            await widget.lms.gradeSubmission(sub['_id'], marks, feedback: feedbackCtrl.text.trim());
-            _load();
-            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Graded successfully!'), backgroundColor: Colors.green));
-          },
-          child: const Text('Save Grade'),
+    final commentsCtrl = TextEditingController(text: sub['comments'] ?? '');
+    String selectedRubric = sub['rubricGrade'] ?? 'Satisfactory';
+    int selectedStars = sub['stars'] ?? 3;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setState) => AlertDialog(
+          title: const Text('Grade Submission', style: TextStyle(fontWeight: FontWeight.w800)),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Marks
+                TextField(
+                  controller: marksCtrl,
+                  keyboardType: TextInputType.number,
+                  decoration: InputDecoration(
+                    labelText: 'Marks (out of ${widget.assignment['totalMarks']})',
+                    border: const OutlineInputBorder(),
+                    prefixIcon: const Icon(Icons.score_rounded),
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // Rubric Dropdown
+                const Text('Rubric Grade', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF475569))),
+                const SizedBox(height: 8),
+                DropdownButtonFormField<String>(
+                  value: selectedRubric,
+                  decoration: const InputDecoration(
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.assessment_rounded),
+                    isDense: true,
+                  ),
+                  items: const [
+                    DropdownMenuItem(value: 'Excellent', child: Text('Excellent')),
+                    DropdownMenuItem(value: 'Satisfactory', child: Text('Satisfactory')),
+                    DropdownMenuItem(value: 'Average', child: Text('Average')),
+                    DropdownMenuItem(value: 'Needs Improvement', child: Text('Needs Improvement')),
+                  ],
+                  onChanged: (value) => setState(() => selectedRubric = value!),
+                ),
+                const SizedBox(height: 16),
+
+                // Star Rating
+                const Text('Star Rating', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF475569))),
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: List.generate(5, (index) {
+                    return IconButton(
+                      icon: Icon(
+                        index < selectedStars ? Icons.star_rounded : Icons.star_border_rounded,
+                        color: index < selectedStars ? Colors.amber : Colors.grey,
+                        size: 32,
+                      ),
+                      onPressed: () => setState(() => selectedStars = index + 1),
+                    );
+                  }),
+                ),
+                const SizedBox(height: 16),
+
+                // Feedback
+                TextField(
+                  controller: feedbackCtrl,
+                  maxLines: 3,
+                  decoration: const InputDecoration(
+                    labelText: 'Feedback',
+                    hintText: 'Provide constructive feedback...',
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.feedback_rounded),
+                  ),
+                ),
+                const SizedBox(height: 12),
+
+                // Comments
+                TextField(
+                  controller: commentsCtrl,
+                  maxLines: 2,
+                  decoration: const InputDecoration(
+                    labelText: 'Additional Comments (optional)',
+                    hintText: 'Any additional notes...',
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.comment_rounded),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primaryColor,
+                foregroundColor: Colors.white,
+              ),
+              icon: const Icon(Icons.check_rounded, size: 18),
+              onPressed: () async {
+                Navigator.pop(ctx);
+                final marks = int.tryParse(marksCtrl.text);
+                if (marks == null) return;
+
+                // Call backend with rubric data
+                final response = await widget.lms.gradeSubmission(
+                  sub['_id'],
+                  marks,
+                  feedback: feedbackCtrl.text.trim(),
+                  rubricGrade: selectedRubric,
+                  stars: selectedStars,
+                  comments: commentsCtrl.text.trim(),
+                );
+
+                _load();
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('✅ Graded successfully with rubric!'),
+                      backgroundColor: Colors.green,
+                    ),
+                  );
+                }
+              },
+              label: const Text('Save Grade'),
+            ),
+          ],
         ),
-      ],
-    ));
+      ),
+    );
   }
 }
 

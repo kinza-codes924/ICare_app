@@ -219,10 +219,16 @@ class LmsService {
     String submissionId,
     num marksObtained, {
     String? feedback,
+    String? rubricGrade,
+    int? stars,
+    String? comments,
   }) async {
     final response = await _api.put('/lms/assignments/submissions/$submissionId/grade', {
       'marksObtained': marksObtained,
-      'feedback': feedback,
+      if (feedback != null) 'feedback': feedback,
+      if (rubricGrade != null) 'rubricGrade': rubricGrade,
+      if (stars != null) 'stars': stars,
+      if (comments != null) 'comments': comments,
     });
     return response.data;
   }
