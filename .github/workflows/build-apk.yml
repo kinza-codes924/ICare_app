@@ -31,26 +31,19 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
-      - name: Patch jcenter() and add namespace in pub-cache packages
+      - name: Patch jcenter() in pub-cache (Gradle 9 fix)
         run: |
           set +e
           for f in $(find $HOME/.pub-cache -name "build.gradle" 2>/dev/null); do
-            grep -q "jcenter()" "$f" 2>/dev/null && sed -i 's/jcenter()/maven { url "https:\/\/jcenter.bintray.com" }/g' "$f"
-            if grep -q "com.android.library" "$f" 2>/dev/null && ! grep -q "namespace" "$f" 2>/dev/null; then
-              MANIFEST=$(find "$(dirname "$f")" -name "AndroidManifest.xml" 2>/dev/null | head -1)
-              if [ -f "$MANIFEST" ]; then
-                PKG=$(grep -o 'package="[^"]*"' "$MANIFEST" 2>/dev/null | head -1 | sed 's/package="//;s/"//')
-                test -n "$PKG" && sed -i "/android {/a\\    namespace \"$PKG\"" "$f"
-              fi
-            fi
+            grep -q "jcenter()" "$f" 2>/dev/null && \
+              sed -i 's/jcenter()/maven { url "https:\/\/jcenter.bintray.com" }/g' "$f"
           done
           set -e
-          echo "Patching complete"
 
       - name: Backup google-services.json
         run: cp android/app/google-services.json /tmp/google-services.json
 
-      - name: Regenerate android folder fresh
+      - name: Regenerate android folder (clean Flutter 3.44 structure)
         run: |
           rm -rf android
           flutter create --platforms android .
@@ -58,37 +51,45 @@ jobs:
       - name: Restore google-services.json
         run: cp /tmp/google-services.json android/app/google-services.json
 
-      - name: Fix duplicate Flutter plugin (settings.gradle.kts already loads it)
-        run: |
-          # Remove dev.flutter.flutter-gradle-plugin from build.gradle.kts
-          # It's already loaded via settings.gradle.kts flutter-plugin-loader
-          sed -i '/dev.flutter.flutter-gradle-plugin/d' android/app/build.gradle.kts
-
-      - name: Add Firebase to app build.gradle.kts
-        run: |
-          # Add google-services plugin
-          sed -i '/id("com.android.application")/a\    id("com.google.gms.google-services")' android/app/build.gradle.kts
-          # Add coreLibraryDesugaring and Firebase dependencies
-          cat >> android/app/build.gradle.kts << 'EOF'
-
-          // Firebase
-          val googleServicesVersion = "4.4.4"
-
-          dependencies.add("coreLibraryDesugaring", "com.android.tools:desugar_jdk_libs:2.1.4")
-          dependencies.add("implementation", platform("com.google.firebase:firebase-bom:34.0.0"))
-          dependencies.add("implementation", "com.google.firebase:firebase-messaging")
-          EOF
-
-      - name: Add google-services classpath to android build files
-        run: |
-          # Enable desugaring in compileOptions
-          sed -i '/isCoreLibraryDesugaringEnabled/d' android/app/build.gradle.kts
-          sed -i '/compileOptions {/a\        isCoreLibraryDesugaringEnabled = true' android/app/build.gradle.kts
-
       - name: Create local.properties
         run: |
           echo "flutter.sdk=$FLUTTER_ROOT" > android/local.properties
           echo "sdk.dir=$ANDROID_SDK_ROOT" >> android/local.properties
+
+      - name: Add google-services plugin to settings.gradle.kts
+        run: |
+          # Add google-services to the plugins block in settings.gradle.kts
+          if ! grep -q "google-services" android/settings.gradle.kts; then
+            sed -i 's/id("org.jetbrains.kotlin.android") version "[^"]*" apply false/&\n    id("com.google.gms.google-services") version "4.4.4" apply false/' android/settings.gradle.kts
+          fi
+
+      - name: Add google-services plugin to app build.gradle.kts
+        run: |
+          if ! grep -q "google-services" android/app/build.gradle.kts; then
+            sed -i 's/id("kotlin-android")/id("kotlin-android")\n    id("com.google.gms.google-services")/' android/app/build.gradle.kts
+          fi
+
+      - name: Add Firebase dependencies to app build.gradle.kts
+        run: |
+          # Find and add to existing dependencies block
+          python3 - << 'PYEOF'
+          import re
+
+          with open('android/app/build.gradle.kts', 'r') as f:
+              content = f.read()
+
+          firebase_deps = '''    implementation(platform("com.google.firebase:firebase-bom:34.0.0"))
+              implementation("com.google.firebase:firebase-messaging")'''
+
+          # Add before closing brace of dependencies block
+          if 'firebase-bom' not in content:
+              content = re.sub(r'(dependencies \{)', r'\1\n' + firebase_deps, content)
+
+          with open('android/app/build.gradle.kts', 'w') as f:
+              f.write(content)
+
+          print("Firebase deps added")
+          PYEOF
 
       - name: Build APK
         run: flutter build apk --release --no-tree-shake-icons --android-skip-build-dependency-validation
