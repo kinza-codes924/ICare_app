@@ -33,17 +33,19 @@ jobs:
 
       - name: Patch jcenter() and add namespace in pub-cache packages
         run: |
-          find $HOME/.pub-cache -name "build.gradle" | while read f; do
-            grep -q "jcenter()" "$f" 2>/dev/null && \
-              sed -i 's/jcenter()/maven { url "https:\/\/jcenter.bintray.com" }/g' "$f"
-          done
-          find $HOME/.pub-cache -name "build.gradle" | while read f; do
+          set +e
+          for f in $(find $HOME/.pub-cache -name "build.gradle" 2>/dev/null); do
+            grep -q "jcenter()" "$f" 2>/dev/null && sed -i 's/jcenter()/maven { url "https:\/\/jcenter.bintray.com" }/g' "$f"
             if grep -q "com.android.library" "$f" 2>/dev/null && ! grep -q "namespace" "$f" 2>/dev/null; then
               MANIFEST=$(find "$(dirname "$f")" -name "AndroidManifest.xml" 2>/dev/null | head -1)
-              [ -f "$MANIFEST" ] && PKG=$(grep -o 'package="[^"]*"' "$MANIFEST" | head -1 | sed 's/package="//;s/"//') && \
-                [ -n "$PKG" ] && sed -i "/android {/a\\    namespace \"$PKG\"" "$f"
+              if [ -f "$MANIFEST" ]; then
+                PKG=$(grep -o 'package="[^"]*"' "$MANIFEST" 2>/dev/null | head -1 | sed 's/package="//;s/"//')
+                test -n "$PKG" && sed -i "/android {/a\\    namespace \"$PKG\"" "$f"
+              fi
             fi
           done
+          set -e
+          echo "Patching complete"
 
       - name: Backup google-services.json
         run: cp android/app/google-services.json /tmp/google-services.json
