@@ -56,25 +56,26 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
   bool _chatOpen = false;
   bool _participantsOpen = false;
   bool _handRaised = false;
-  bool _screenRecording = false;
   late TabController _panelTab;
 
-  // Chat
+  // Chat — synced with backend
   final TextEditingController _chatCtrl = TextEditingController();
   final ScrollController _chatScroll = ScrollController();
-  final List<Map<String, String>> _chatMessages = [];
+  final List<Map<String, dynamic>> _chatMessages = [];
 
   // Polls
   final List<Map<String, dynamic>> _polls = [];
 
-  // Participants
+  // Participants + raised hands — synced with backend
   final List<Map<String, dynamic>> _participants = [];
   final List<String> _raisedHands = [];
 
   // Session info
   String _currentUserName = 'You';
   String _currentUserId = '';
+  String _sessionDocId = ''; // actual MongoDB _id of the LiveSession document
   Timer? _sessionTimer;
+  Timer? _syncTimer; // polls backend for chat/participants/raised hands
   int _sessionSeconds = 0;
 
   final LmsService _lms = LmsService();
@@ -91,10 +92,10 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
     _engine?.leaveChannel();
     _engine?.release();
     _sessionTimer?.cancel();
+    _syncTimer?.cancel();
     _chatCtrl.dispose();
     _chatScroll.dispose();
     _panelTab.dispose();
-    // Cleanup
     if (kIsWeb) {
       js.context.callMethod('lmsLeave', []);
     }
@@ -108,24 +109,88 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
       _currentUserName = user?.name ?? (widget.isInstructor ? 'Instructor' : 'Student');
       _currentUserId = user?.id ?? '';
 
-      _participants.add({
-        'uid': 0,
-        'name': _currentUserName,
-        'isInstructor': widget.isInstructor,
-        'micOn': true,
-        'cameraOn': true,
-      });
+      // Step 1: Get the actual MongoDB _id of the live session
+      final sessionData = await _lms.checkActiveLiveSession(widget.courseId);
+      if (sessionData['session'] != null) {
+        _sessionDocId = sessionData['session']['_id']?.toString() ?? '';
+      }
+      // If no session doc found yet (instructor just starting), use courseId as fallback
+      if (_sessionDocId.isEmpty) _sessionDocId = widget.sessionId;
 
-      // Start web camera
+      // Step 2: Join the session (registers attendance)
+      if (_sessionDocId.isNotEmpty && _sessionDocId != widget.courseId) {
+        await _lms.joinLiveSession(_sessionDocId);
+      }
+
+      // Step 3: Start web camera
       if (kIsWeb) await _initWebCamera();
 
-      // Notify enrolled students when instructor starts
+      // Step 4: Notify students if instructor
       if (widget.isInstructor) await _notifyStudents();
+
+      // Step 5: Start polling for real-time sync
+      _startSyncPolling();
 
       await _initAgora();
     } catch (e) {
       if (mounted) setState(() { _error = e.toString(); _loading = false; });
     }
+  }
+
+  void _startSyncPolling() {
+    _syncTimer = Timer.periodic(const Duration(seconds: 3), (_) => _syncSessionState());
+  }
+
+  Future<void> _syncSessionState() async {
+    if (!mounted || _sessionDocId.isEmpty || _sessionDocId == widget.courseId) return;
+    try {
+      final data = await _lms.getSessionState(_sessionDocId);
+      final session = data['session'];
+      if (session == null || !mounted) return;
+
+      // Update participants from attendees
+      final attendees = (session['attendees'] as List?) ?? [];
+      final newParticipants = attendees.map<Map<String, dynamic>>((a) => {
+        'name': a['name'] ?? a['username'] ?? 'Participant',
+        'id': a['_id']?.toString() ?? '',
+        'isInstructor': false,
+      }).toList();
+
+      // Update raised hands
+      final raisedHandsData = (session['raisedHands'] as List?) ?? [];
+      final newHands = raisedHandsData
+          .map<String>((h) => h['userName']?.toString() ?? 'Student')
+          .toList();
+
+      // Update chat messages
+      final messages = (session['chatMessages'] as List?) ?? [];
+      final newMessages = messages.map<Map<String, dynamic>>((m) => {
+        'sender': m['userName'] ?? 'User',
+        'text': m['message'] ?? '',
+        'time': '',
+        'isMe': m['userId']?.toString() == _currentUserId,
+      }).toList();
+
+      if (mounted) {
+        setState(() {
+          _participants.clear();
+          // Add self first
+          _participants.add({'name': '$_currentUserName (You)', 'isInstructor': widget.isInstructor, 'id': _currentUserId});
+          _participants.addAll(newParticipants.where((p) => p['id'] != _currentUserId));
+          _raisedHands
+            ..clear()
+            ..addAll(newHands);
+          _chatMessages.clear();
+          _chatMessages.addAll(newMessages);
+        });
+
+        // Scroll chat to bottom
+        if (_chatMessages.isNotEmpty && _chatScroll.hasClients) {
+          _chatScroll.animateTo(_chatScroll.position.maxScrollExtent,
+              duration: const Duration(milliseconds: 200), curve: Curves.easeOut);
+        }
+      }
+    } catch (_) {}
   }
 
   Future<void> _initWebCamera() async {
@@ -275,9 +340,17 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
 
   void _toggleHand() {
     setState(() => _handRaised = !_handRaised);
+    // Send to backend so instructor can see it
+    if (_sessionDocId.isNotEmpty && _sessionDocId != widget.courseId) {
+      if (_handRaised) {
+        _lms.raiseSessionHand(_sessionDocId);
+      } else {
+        _lms.lowerSessionHand(_sessionDocId);
+      }
+    }
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(_handRaised ? 'Hand raised ✋' : 'Hand lowered'),
+        content: Text(_handRaised ? '✋ Hand raised — instructor can see this' : 'Hand lowered'),
         duration: const Duration(seconds: 2),
         backgroundColor: _handRaised ? Colors.orange : Colors.grey,
       ),
@@ -287,10 +360,18 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
   void _sendChat() {
     final text = _chatCtrl.text.trim();
     if (text.isEmpty) return;
-    setState(() {
-      _chatMessages.add({'sender': _currentUserName, 'text': text, 'time': _timerText});
-    });
     _chatCtrl.clear();
+
+    // Optimistic UI update
+    setState(() {
+      _chatMessages.add({'sender': _currentUserName, 'text': text, 'time': _timerText, 'isMe': true});
+    });
+
+    // Send to backend — synced to all participants via polling
+    if (_sessionDocId.isNotEmpty && _sessionDocId != widget.courseId) {
+      _lms.sendSessionChatMessage(_sessionDocId, text);
+    }
+
     Future.delayed(const Duration(milliseconds: 100), () {
       if (_chatScroll.hasClients) {
         _chatScroll.animateTo(
@@ -678,7 +759,7 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
                   itemCount: _chatMessages.length,
                   itemBuilder: (ctx, i) {
                     final msg = _chatMessages[i];
-                    final isMe = msg['sender'] == _currentUserName;
+                    final isMe = msg['isMe'] == true || msg['sender'] == _currentUserName;
                     return Padding(
                       padding: const EdgeInsets.only(bottom: 10),
                       child: Column(

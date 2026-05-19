@@ -457,6 +457,51 @@ class LmsService {
     }
   }
 
+  Future<Map<String, dynamic>> joinLiveSession(String sessionId) async {
+    try {
+      final response = await _api.post('/live-sessions/$sessionId/join', {});
+      return response.data ?? {};
+    } catch (e) {
+      return {'success': false, 'message': e.toString()};
+    }
+  }
+
+  Future<Map<String, dynamic>> getSessionState(String sessionId) async {
+    try {
+      final response = await _api.get('/live-sessions/$sessionId');
+      return response.data ?? {};
+    } catch (_) {
+      return {};
+    }
+  }
+
+  Future<List<dynamic>> getSessionChatMessages(String sessionId) async {
+    try {
+      final response = await _api.get('/live-sessions/$sessionId/chat');
+      return response.data['messages'] ?? [];
+    } catch (_) {
+      return [];
+    }
+  }
+
+  Future<void> sendSessionChatMessage(String sessionId, String message) async {
+    try {
+      await _api.post('/live-sessions/$sessionId/chat', {'message': message});
+    } catch (_) {}
+  }
+
+  Future<void> raiseSessionHand(String sessionId) async {
+    try {
+      await _api.post('/live-sessions/$sessionId/raise-hand', {});
+    } catch (_) {}
+  }
+
+  Future<void> lowerSessionHand(String sessionId) async {
+    try {
+      await _api.post('/live-sessions/$sessionId/lower-hand', {});
+    } catch (_) {}
+  }
+
   Future<void> setSessionLive({required String courseId, required bool isLive, String? title}) async {
     try {
       await _api.post('/live-sessions/course/$courseId/set-live', {'isLive': isLive, if (title != null) 'title': title});

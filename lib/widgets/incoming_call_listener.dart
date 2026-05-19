@@ -64,7 +64,8 @@ class _IncomingCallListenerState extends State<IncomingCallListener> {
   }
 
   void _startLmsPolling() {
-    _lmsTimer = Timer.periodic(const Duration(seconds: 12), (_) => _checkLmsLive());
+    _checkLmsLive(); // run once immediately
+    _lmsTimer = Timer.periodic(const Duration(seconds: 20), (_) => _checkLmsLive());
   }
 
   Future<void> _checkLmsLive() async {
