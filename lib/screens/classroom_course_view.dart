@@ -1049,15 +1049,26 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
       return const Center(child: CircularProgressIndicator(strokeWidth: 2));
     }
 
+    // Separate live sessions to pin them at top
+    final liveSessions = _sessions
+        .where((s) => s['status']?.toString() == 'live')
+        .map((s) => {'type': 'session', 'data': s})
+        .toList();
+
     final all = [
       ..._assignments.map((a) => {'type': 'assignment', 'data': a}),
       ..._quizzes.map((q) => {'type': 'quiz', 'data': q}),
-      ..._sessions.map((s) => {'type': 'session', 'data': s}),
+      ..._sessions
+          .where((s) => s['status']?.toString() != 'live')
+          .map((s) => {'type': 'session', 'data': s}),
     ];
+
+    // Also show live banner if _isSessionLive but no session in list yet
+    final showLiveBanner = !widget.isInstructor && _isSessionLive && liveSessions.isEmpty;
 
     return RefreshIndicator(
       onRefresh: _loadClasswork,
-      child: all.isEmpty
+      child: (all.isEmpty && liveSessions.isEmpty && !showLiveBanner)
           ? _buildClassworkEmpty()
           : ListView(
               padding: const EdgeInsets.fromLTRB(24, 16, 24, 80),
@@ -1066,10 +1077,73 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
                   _buildInstructorCreateBar(),
                   const SizedBox(height: 12),
                 ],
-                // All items flat — could be grouped by topic
+                // Live sessions pinned at top
+                if (liveSessions.isNotEmpty) ...[
+                  ...liveSessions.map((item) => _buildClassworkCard(item)),
+                  const SizedBox(height: 8),
+                ],
+                // Fallback live banner when session is live but not in list
+                if (showLiveBanner) ...[
+                  _buildFallbackLiveBanner(),
+                  const SizedBox(height: 8),
+                ],
+                // All other items
                 ...all.map((item) => _buildClassworkCard(item)),
               ],
             ),
+    );
+  }
+
+  Widget _buildFallbackLiveBanner() {
+    return GestureDetector(
+      onTap: _joinLiveClass,
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [Color(0xFFB91C1C), Color(0xFFEF4444)],
+          ),
+          borderRadius: BorderRadius.circular(10),
+          boxShadow: [
+            BoxShadow(color: Colors.red.withOpacity(0.35), blurRadius: 10, offset: const Offset(0, 4)),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.2),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.live_tv_rounded, color: Colors.white, size: 22),
+            ),
+            const SizedBox(width: 14),
+            const Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('🔴 LIVE SESSION IN PROGRESS',
+                      style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w900)),
+                  SizedBox(height: 3),
+                  Text('Your instructor is live now — tap to join!',
+                      style: TextStyle(color: Colors.white70, fontSize: 12)),
+                ],
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: const Text('JOIN NOW',
+                  style: TextStyle(color: Color(0xFFB91C1C), fontWeight: FontWeight.w900, fontSize: 12)),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -1128,6 +1202,9 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
         data['title']?.toString() ?? (type == 'quiz' ? 'Quiz' : type == 'session' ? 'Session' : 'Assignment');
     final dueStr = data['dueDate']?.toString() ?? data['scheduledAt']?.toString() ?? '';
     final points = data['totalMarks']?.toString() ?? '';
+    final sessionStatus = type == 'session' ? (data['status']?.toString() ?? '') : '';
+    final isLiveSession = type == 'session' && sessionStatus == 'live';
+
     String dueLabel = '';
     if (dueStr.isNotEmpty) {
       try {
@@ -1143,12 +1220,82 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
         icon = Icons.quiz_outlined;
         break;
       case 'session':
-        iconBg = const Color(0xFF188038);
-        icon = Icons.videocam_outlined;
+        iconBg = isLiveSession ? Colors.red : const Color(0xFF188038);
+        icon = isLiveSession ? Icons.live_tv_rounded : Icons.videocam_outlined;
         break;
       default:
         iconBg = const Color(0xFF1A73E8);
         icon = Icons.assignment_outlined;
+    }
+
+    // Live session card — special highlighted style for students
+    if (isLiveSession && !widget.isInstructor) {
+      return GestureDetector(
+        onTap: () => _openItem(type, data),
+        child: Container(
+          margin: const EdgeInsets.only(bottom: 10),
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [Color(0xFFB91C1C), Color(0xFFEF4444)],
+            ),
+            borderRadius: BorderRadius.circular(10),
+            boxShadow: [
+              BoxShadow(color: Colors.red.withOpacity(0.35), blurRadius: 10, offset: const Offset(0, 4)),
+            ],
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.2),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.live_tv_rounded, color: Colors.white, size: 22),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: const Text('● LIVE',
+                            style: TextStyle(color: Color(0xFFB91C1C), fontSize: 10, fontWeight: FontWeight.w900)),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(title,
+                            style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w700),
+                            overflow: TextOverflow.ellipsis),
+                      ),
+                    ]),
+                    const SizedBox(height: 4),
+                    const Text('Your instructor is live now — tap to join!',
+                        style: TextStyle(color: Colors.white70, fontSize: 12)),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: const Text('JOIN NOW',
+                    style: TextStyle(color: Color(0xFFB91C1C), fontWeight: FontWeight.w900, fontSize: 12)),
+              ),
+            ],
+          ),
+        ),
+      );
     }
 
     return InkWell(
@@ -1187,6 +1334,16 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
                       ].join('  ·  '),
                       style: const TextStyle(
                           fontSize: 12, color: Color(0xFF70757A)),
+                    ),
+                  if (type == 'session' && sessionStatus.isNotEmpty && sessionStatus != 'live')
+                    Text(
+                      sessionStatus == 'scheduled' ? 'Scheduled${dueLabel.isNotEmpty ? ' · $dueLabel' : ''}' :
+                      sessionStatus == 'ended' ? 'Session ended' :
+                      sessionStatus == 'completed' ? 'Completed' : sessionStatus,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: sessionStatus == 'scheduled' ? const Color(0xFF1A73E8) : const Color(0xFF70757A),
+                      ),
                     ),
                 ],
               ),
