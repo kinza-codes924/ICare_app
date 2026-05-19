@@ -7,6 +7,7 @@ import 'package:icare/services/lms_service.dart';
 import 'package:icare/services/api_service.dart';
 import 'package:icare/utils/shared_pref.dart';
 import 'package:icare/utils/theme.dart';
+import 'package:icare/screens/lms_live_session_screen.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 /// Course Content Management - Moodle/Udemy style
@@ -58,15 +59,19 @@ class _InstructorCourseContentScreenState extends State<InstructorCourseContentS
     }
   }
 
-  /// Instructor starts a live class — shows meeting link info (does NOT use consultation call system)
+  /// Instructor starts a live class — launches iCare built-in LMS live session
   Future<void> _startLiveClass() async {
     final courseTitle = _course?['title']?.toString() ?? 'Live Class';
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: const Text('Use a lesson\'s "Start" button to launch your live session meeting link.'),
-        backgroundColor: Colors.orange.shade700,
-        duration: const Duration(seconds: 4),
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => LmsLiveSessionScreen(
+          sessionId: widget.courseId,
+          courseId: widget.courseId,
+          sessionTitle: courseTitle,
+          isInstructor: true,
+        ),
       ),
     );
   }

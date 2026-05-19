@@ -11,6 +11,7 @@ import 'package:icare/screens/instructor_student_progress_screen.dart';
 import 'package:icare/screens/instructor_course_analytics_screen.dart';
 import 'package:icare/services/lms_service.dart';
 import 'package:icare/utils/shared_pref.dart';
+import 'package:icare/screens/lms_live_session_screen.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -277,14 +278,16 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
   // ════════════════════════════════════════════════
 
   Future<void> _joinLiveClass() async {
-    // Navigate to Classwork tab where students can find the live lesson
-    // and click "Join Session" with the actual meeting link
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Go to Classwork tab → open the live lesson → tap "Join Session" to join.'),
-        backgroundColor: Color(0xFF1A237E),
-        duration: Duration(seconds: 5),
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => LmsLiveSessionScreen(
+          sessionId: widget.course['_id']?.toString() ?? '',
+          courseId: widget.course['_id']?.toString() ?? '',
+          sessionTitle: widget.course['title']?.toString() ?? 'Live Session',
+          isInstructor: false,
+        ),
       ),
     );
   }
@@ -1385,6 +1388,90 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
   // PEOPLE TAB
   // ════════════════════════════════════════════════
 
+  Future<void> _showInviteTeacherDialog() async {
+    final emailCtrl = TextEditingController();
+    await showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(children: [
+          Icon(Icons.person_add_outlined, color: Color(0xFF1A73E8)),
+          SizedBox(width: 10),
+          Text('Invite Co-Teacher', style: TextStyle(fontWeight: FontWeight.w700)),
+        ]),
+        content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const Text(
+            'Enter the email address of the teacher you want to invite. They will receive an email to join this course as a co-teacher.',
+            style: TextStyle(fontSize: 13, color: Color(0xFF64748B)),
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            controller: emailCtrl,
+            keyboardType: TextInputType.emailAddress,
+            decoration: const InputDecoration(
+              labelText: 'Teacher Email Address',
+              hintText: 'teacher@example.com',
+              border: OutlineInputBorder(),
+              prefixIcon: Icon(Icons.email_outlined),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: Colors.amber.shade50,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.amber.shade200),
+            ),
+            child: Row(children: [
+              Icon(Icons.info_outline, color: Colors.amber.shade700, size: 16),
+              const SizedBox(width: 8),
+              const Expanded(child: Text(
+                'Co-teachers can manage content, grade assignments, and run live sessions. Only the Lead Instructor can issue certificates.',
+                style: TextStyle(fontSize: 11, color: Color(0xFF78350F)),
+              )),
+            ]),
+          ),
+        ]),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF1A73E8), foregroundColor: Colors.white),
+            onPressed: () async {
+              final email = emailCtrl.text.trim();
+              if (email.isEmpty || !email.contains('@')) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Please enter a valid email'), backgroundColor: Colors.red),
+                );
+                return;
+              }
+              Navigator.pop(ctx);
+              try {
+                await _lms.inviteTeacher(courseId: _courseId, email: email);
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Invitation sent to $email'),
+                      backgroundColor: Colors.green,
+                    ),
+                  );
+                }
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Failed: $e'), backgroundColor: Colors.red),
+                  );
+                }
+              }
+            },
+            icon: const Icon(Icons.send_rounded, size: 16),
+            label: const Text('Send Invite'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildPeopleTab(bool isWide) {
     final instructor = widget.course['instructor'] as Map?;
     final instructorName = instructor?['name']?.toString() ??
@@ -1409,10 +1496,10 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
               ),
               if (widget.isInstructor)
                 TextButton.icon(
-                  onPressed: () {},
+                  onPressed: _showInviteTeacherDialog,
                   icon: const Icon(Icons.person_add_outlined,
                       size: 16, color: Color(0xFF1A73E8)),
-                  label: const Text('Invite students',
+                  label: const Text('Invite Teacher',
                       style: TextStyle(
                           fontSize: 13, color: Color(0xFF1A73E8))),
                 ),

@@ -276,4 +276,48 @@ router.post('/enrollments/:id/complete-module', authMiddleware, async (req, res)
   }
 });
 
+// POST /courses/:id/invite-teacher — invite co-teacher by email
+router.post('/:id/invite-teacher', authMiddleware, async (req, res) => {
+  try {
+    await connectMongoDB();
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ success: false, message: 'Email required' });
+
+    const course = await Course.findById(toId(req.params.id)).lean();
+    if (!course) return res.status(404).json({ success: false, message: 'Course not found' });
+
+    const User = require('../models/User');
+    const invitedUser = await User.findOne({ email: email.toLowerCase().trim() }).lean();
+
+    if (!invitedUser) {
+      return res.status(404).json({ success: false, message: `No user found with email: ${email}. They must register on iCare first.` });
+    }
+
+    // Add as co-teacher if not already
+    const alreadyTeacher = course.coTeachers?.some(t => t.toString() === invitedUser._id.toString());
+    if (alreadyTeacher) {
+      return res.json({ success: true, message: 'This teacher is already in the course.' });
+    }
+
+    await Course.findByIdAndUpdate(toId(req.params.id), {
+      $addToSet: { coTeachers: invitedUser._id }
+    });
+
+    // Send notification to invited teacher
+    const Notification = require('../models/Notification');
+    const inviter = await User.findById(req.user.id).lean();
+    await Notification.create({
+      userId: invitedUser._id,
+      type: 'general',
+      title: 'Co-Teacher Invitation',
+      message: `${inviter?.name || 'An instructor'} has invited you to co-teach "${course.title}"`,
+      data: { courseId: course._id, courseName: course.title },
+    }).catch(() => {});
+
+    res.json({ success: true, message: `Invitation sent to ${invitedUser.name || email}` });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
 module.exports = router;

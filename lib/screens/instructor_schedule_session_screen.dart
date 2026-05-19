@@ -318,57 +318,27 @@ class _InstructorScheduleSessionScreenState extends State<InstructorScheduleSess
 
               const SizedBox(height: 24),
 
-              // Meeting Platform Card
-              _buildCard(
-                title: 'Meeting Platform',
-                icon: Icons.settings_outlined,
-                children: [
-                  DropdownButtonFormField<String>(
-                    value: _platform,
-                    decoration: const InputDecoration(
-                      labelText: 'Platform',
-                      border: OutlineInputBorder(),
-                    ),
-                    items: const [
-                      DropdownMenuItem(value: 'zoom', child: Text('Zoom')),
-                      DropdownMenuItem(value: 'meet', child: Text('Google Meet')),
-                      DropdownMenuItem(value: 'teams', child: Text('Microsoft Teams')),
-                      DropdownMenuItem(value: 'custom', child: Text('Custom Link')),
-                    ],
-                    onChanged: (value) => setState(() => _platform = value!),
+              // Session Platform Info
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: AppColors.primaryColor.withOpacity(0.08),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AppColors.primaryColor.withOpacity(0.3)),
+                ),
+                child: const Row(children: [
+                  Icon(Icons.videocam_rounded, color: AppColors.primaryColor, size: 28),
+                  SizedBox(width: 12),
+                  Expanded(
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Text('iCare Built-in Live Session',
+                          style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: AppColors.primaryColor)),
+                      SizedBox(height: 4),
+                      Text('HD video, chat, raise hand, polls, screen sharing, recording — all built-in. No external platform needed.',
+                          style: TextStyle(fontSize: 12, color: Color(0xFF475569))),
+                    ]),
                   ),
-                  const SizedBox(height: 16),
-
-                  TextFormField(
-                    controller: _meetingLinkController,
-                    decoration: const InputDecoration(
-                      labelText: 'Meeting Link *',
-                      hintText: 'https://zoom.us/j/...',
-                      border: OutlineInputBorder(),
-                      prefixIcon: Icon(Icons.link),
-                    ),
-                    validator: (value) => value?.isEmpty ?? true ? 'Required' : null,
-                  ),
-                  const SizedBox(height: 16),
-
-                  TextFormField(
-                    controller: _meetingIdController,
-                    decoration: const InputDecoration(
-                      labelText: 'Meeting ID (optional)',
-                      hintText: 'e.g., 123 456 7890',
-                      border: OutlineInputBorder(),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-
-                  TextFormField(
-                    controller: _meetingPasswordController,
-                    decoration: const InputDecoration(
-                      labelText: 'Meeting Password (optional)',
-                      border: OutlineInputBorder(),
-                    ),
-                  ),
-                ],
+                ]),
               ),
 
               const SizedBox(height: 24),
@@ -387,7 +357,7 @@ class _InstructorScheduleSessionScreenState extends State<InstructorScheduleSess
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(
-                        'Students will receive a notification before the session starts. They can join using the meeting link.',
+                        'When you click "Go Live" in the course, an iCare live session will start. Students will see a notification and can join directly from the Classwork tab.',
                         style: TextStyle(
                           fontSize: 13,
                           color: Colors.blue[900],

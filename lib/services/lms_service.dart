@@ -444,6 +444,24 @@ class LmsService {
   }
 
   // ═══════════════════════════════════════════════════════════════════════
+  // INVITE TEACHER
+  // ═══════════════════════════════════════════════════════════════════════
+
+  Future<Map<String, dynamic>> inviteTeacher({
+    required String courseId,
+    required String email,
+  }) async {
+    try {
+      final response = await _api.post('/courses/$courseId/invite-teacher', {
+        'email': email,
+      });
+      return response.data ?? {'success': true};
+    } catch (e) {
+      throw Exception('Failed to invite teacher: $e');
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════
   // INSTRUCTOR - COURSES
   // ═══════════════════════════════════════════════════════════════════════
 
