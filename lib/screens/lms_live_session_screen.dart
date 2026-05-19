@@ -1,12 +1,16 @@
 import 'dart:async';
-// ignore: avoid_web_libraries_in_flutter
-import 'dart:html' as html;
-import 'dart:ui_web' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:icare/services/lms_service.dart';
 import 'package:icare/utils/shared_pref.dart';
 import 'package:icare/utils/theme.dart';
+// Web-only imports — guarded by kIsWeb at runtime
+// ignore: avoid_web_libraries_in_flutter
+import '../utils/html_stub.dart' as html
+    if (dart.library.html) 'dart:html';
+// ignore: avoid_web_libraries_in_flutter
+import '../utils/ui_web_stub.dart' as ui
+    if (dart.library.ui) 'dart:ui_web';
 
 /// LMS Live Session Screen — Google Meet style, Agora-based
 /// Completely separate from doctor-patient consultation
