@@ -629,45 +629,68 @@ class _CertificatePreview extends StatelessWidget {
             ),
             // Content
             Padding(
-              padding: EdgeInsets.all(compact ? 24 : 40),
+              padding: EdgeInsets.all(compact ? 16 : 36),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(t.icon, color: t.accentColor, size: compact ? 28 : 44),
+                  // ── Logo Row: RMR | Iqra University | iCare ──
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Image.asset('assets/images/health.jpeg',
+                          height: compact ? 24 : 40, fit: BoxFit.contain,
+                          errorBuilder: (_, __, ___) => Text('RMR', style: TextStyle(fontSize: compact ? 8 : 10, fontWeight: FontWeight.w700, color: const Color(0xFF0036BC)))),
+                      Image.asset('assets/LOGO-IU-01-2048x495-1.png',
+                          height: compact ? 24 : 40, width: compact ? 90 : 140, fit: BoxFit.contain,
+                          errorBuilder: (_, __, ___) => Text('Iqra University', style: TextStyle(fontSize: compact ? 8 : 11, fontWeight: FontWeight.w700, color: t.primaryColor))),
+                      Image.asset('assets/Asset 1.png',
+                          height: compact ? 24 : 40, fit: BoxFit.contain,
+                          errorBuilder: (_, __, ___) => Text('iCare', style: TextStyle(fontSize: compact ? 8 : 10, fontWeight: FontWeight.w700, color: t.primaryColor))),
+                    ],
+                  ),
                   SizedBox(height: compact ? 6 : 12),
-                  Text('Certificate of Completion',
-                      style: TextStyle(fontSize: compact ? 13 : 22, fontWeight: FontWeight.w900, color: t.primaryColor, letterSpacing: 1.5)),
-                  SizedBox(height: compact ? 4 : 8),
-                  Container(height: 2, width: 120, color: t.accentColor),
-                  SizedBox(height: compact ? 6 : 14),
-                  Text('This certifies that', style: TextStyle(fontSize: compact ? 9 : 13, color: const Color(0xFF64748B))),
-                  SizedBox(height: compact ? 4 : 8),
+                  Container(height: 1.5, color: t.accentColor),
+                  SizedBox(height: compact ? 5 : 10),
+                  Text('CERTIFICATE OF COMPLETION',
+                      style: TextStyle(fontSize: compact ? 11 : 19, fontWeight: FontWeight.w900, color: t.primaryColor, letterSpacing: 1.5)),
+                  SizedBox(height: compact ? 3 : 6),
+                  Container(height: 2, width: 80, color: t.accentColor),
+                  SizedBox(height: compact ? 5 : 12),
+                  Text('This certifies that', style: TextStyle(fontSize: compact ? 8 : 12, color: const Color(0xFF64748B), fontStyle: FontStyle.italic)),
+                  SizedBox(height: compact ? 3 : 6),
                   Text(studentName,
-                      style: TextStyle(fontSize: compact ? 18 : 32, fontWeight: FontWeight.w900, color: t.accentColor,
-                          fontStyle: FontStyle.italic)),
-                  SizedBox(height: compact ? 4 : 8),
-                  Text('has successfully completed', style: TextStyle(fontSize: compact ? 9 : 13, color: const Color(0xFF64748B))),
-                  SizedBox(height: compact ? 4 : 8),
+                      style: TextStyle(fontSize: compact ? 15 : 26, fontWeight: FontWeight.w900, color: t.primaryColor)),
+                  SizedBox(height: compact ? 3 : 6),
+                  Text('has successfully completed', style: TextStyle(fontSize: compact ? 8 : 12, color: const Color(0xFF64748B))),
+                  SizedBox(height: compact ? 3 : 6),
                   Text(courseTitle,
-                      style: TextStyle(fontSize: compact ? 12 : 18, fontWeight: FontWeight.w800, color: t.primaryColor),
+                      style: TextStyle(fontSize: compact ? 10 : 16, fontWeight: FontWeight.w800, color: t.accentColor),
                       textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis),
                   if (!compact) ...[
-                    const SizedBox(height: 24),
-                    Divider(color: t.primaryColor.withValues(alpha: 0.3)),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 20),
+                    Container(height: 1, color: t.accentColor.withOpacity(0.4)),
+                    const SizedBox(height: 14),
                     Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
-                        Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                          Text('Date', style: TextStyle(fontSize: 10, color: Colors.grey[500])),
-                          Text(date, style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12, color: t.primaryColor)),
-                        ]),
-                        Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-                          Text('Instructor', style: TextStyle(fontSize: 10, color: Colors.grey[500])),
-                          Text(instructorName, style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12, color: t.primaryColor)),
-                        ]),
+                        // QR placeholder
+                        Container(
+                          width: 56, height: 56,
+                          decoration: BoxDecoration(border: Border.all(color: t.primaryColor.withOpacity(0.3))),
+                          child: const Icon(Icons.qr_code_2_rounded, size: 48, color: Color(0xFF94A3B8)),
+                        ),
+                        const Spacer(),
+                        _sigBlock(t, 'Instructor', instructorName),
+                        const SizedBox(width: 24),
+                        _sigBlock(t, 'IU Registrar', 'Registrar'),
+                        const SizedBox(width: 24),
+                        _sigBlock(t, 'iCare Admin', 'Administrator'),
                       ],
                     ),
+                  ],
+                  if (compact) ...[
+                    const SizedBox(height: 6),
+                    Text(date, style: TextStyle(fontSize: 8, color: const Color(0xFF94A3B8))),
                   ],
                 ],
               ),
@@ -676,6 +699,15 @@ class _CertificatePreview extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  Widget _sigBlock(CertificateTemplate t, String role, String name) {
+    return Column(children: [
+      Container(width: 70, height: 1.5, color: t.primaryColor.withOpacity(0.4)),
+      const SizedBox(height: 3),
+      Text(name, style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: t.primaryColor)),
+      Text(role, style: const TextStyle(fontSize: 8, color: Color(0xFF94A3B8))),
+    ]);
   }
 
   Color _bgColor(CertificateTemplate t) {

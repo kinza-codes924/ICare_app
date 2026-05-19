@@ -12,6 +12,7 @@ import 'package:icare/services/lms_service.dart';
 import 'package:icare/providers/auth_provider.dart';
 import 'package:icare/utils/shared_pref.dart';
 import 'package:intl/intl.dart';
+import 'dart:math';
 
 // ─────────────────────────────────────────────────────────────
 // iCare Classroom — Instructor Shell (top-level, Google Classroom style)
@@ -1224,6 +1225,15 @@ class _SettingsPageState extends State<_SettingsPage> {
           title: const Text('Manage all courses', style: TextStyle(fontSize: 14, color: Color(0xFF202124))),
           onTap: widget.onManageCourses,
         ),
+
+        const SizedBox(height: 32),
+        Divider(color: Colors.grey.shade200),
+        const SizedBox(height: 20),
+        const Text('Discount Vouchers', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w400, color: Color(0xFF202124))),
+        const SizedBox(height: 8),
+        const Text('Create one-time discount codes for any course', style: TextStyle(fontSize: 13, color: Color(0xFF5F6368))),
+        const SizedBox(height: 16),
+        _VoucherManager(),
       ],
     );
   }
@@ -1268,3 +1278,4 @@ class _PopupItem extends StatelessWidget {
     );
   }
 }
+
