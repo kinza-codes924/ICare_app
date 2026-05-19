@@ -76,6 +76,7 @@ dependencies:
   printing: ^5.13.4
   web: ^1.1.0
   local_auth: ^2.3.0
+  qr_flutter: ^4.1.0
 
 dev_dependencies:
   flutter_test:

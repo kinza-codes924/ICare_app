@@ -352,6 +352,98 @@ class LmsService {
   }
 
   // ═══════════════════════════════════════════════════════════════════════
+  // CERTIFICATES
+  // ═══════════════════════════════════════════════════════════════════════
+
+  Future<Map<String, dynamic>> generateCertificate({
+    required String courseId,
+    required String studentId,
+  }) async {
+    try {
+      final response = await _api.post('/certificates', {
+        'courseId': courseId,
+        'studentId': studentId,
+      });
+      return response.data ?? {};
+    } catch (e) {
+      throw Exception('Failed to generate certificate: $e');
+    }
+  }
+
+  Future<Map<String, dynamic>> verifyCertificate(String code) async {
+    try {
+      final response = await _api.get('/certificates/verify/$code');
+      return response.data ?? {};
+    } catch (e) {
+      return {'valid': false, 'message': 'Certificate not found'};
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // LIVE SESSION FEATURES
+  // ═══════════════════════════════════════════════════════════════════════
+
+  Future<Map<String, dynamic>> sendLiveSessionChat({
+    required String sessionId,
+    required String message,
+  }) async {
+    try {
+      final response = await _api.post('/live-sessions/$sessionId/chat', {
+        'message': message,
+      });
+      return response.data ?? {'success': true};
+    } catch (e) {
+      throw Exception('Failed to send message: $e');
+    }
+  }
+
+  Future<Map<String, dynamic>> raiseHand({
+    required String sessionId,
+  }) async {
+    try {
+      final response = await _api.post('/live-sessions/$sessionId/raise-hand', {});
+      return response.data ?? {'success': true};
+    } catch (e) {
+      throw Exception('Failed to raise hand: $e');
+    }
+  }
+
+  Future<Map<String, dynamic>> admitStudent({
+    required String sessionId,
+    required String studentId,
+  }) async {
+    try {
+      final response = await _api.post('/live-sessions/$sessionId/admit/$studentId', {});
+      return response.data ?? {'success': true};
+    } catch (e) {
+      throw Exception('Failed to admit student: $e');
+    }
+  }
+
+  Future<List<dynamic>> getLiveSessionPolls(String sessionId) async {
+    try {
+      final response = await _api.get('/live-session-polls/$sessionId');
+      return response.data['polls'] ?? [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  Future<Map<String, dynamic>> respondToPoll({
+    required String pollId,
+    required String optionId,
+  }) async {
+    try {
+      final response = await _api.post('/live-session-polls/$pollId/respond', {
+        'optionId': optionId,
+      });
+      return response.data ?? {'success': true};
+    } catch (e) {
+      return {'success': false, 'message': e.toString()};
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════
   // INSTRUCTOR - COURSES
   // ═══════════════════════════════════════════════════════════════════════
 

@@ -242,6 +242,7 @@ class _LessonDetailPageState extends State<LessonDetailPage> with SingleTickerPr
             courseId: widget.courseId,
             moduleId: widget.moduleId,
             lessonId: lessonId,
+            lessonTitle: lessonTitle,
           ),
         ],
       ),

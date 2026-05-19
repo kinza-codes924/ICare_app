@@ -919,7 +919,8 @@ class _GradesTabState extends State<_GradesTab> {
               margin: const EdgeInsets.only(bottom: 20),
               child: ElevatedButton.icon(
                 onPressed: () async {
-                  final userId = await SharedPref.getUser().then((u) => u?['_id']?.toString());
+                  final user = await SharedPref().getUserData();
+                  final userId = user?.id;
                   if (userId != null && context.mounted) {
                     Navigator.push(
                       context,
