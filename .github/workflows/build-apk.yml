@@ -1,18 +1,42 @@
- - name: Install Flutter dependencies
-          run: flutter pub get
+name: iCare Build APK
 
-        - name: Build release APK
-          run: flutter build apk --release --no-tree-shake-icons
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - wajahat
 
-        - name: Rename APK
-          run: |
-            mkdir -p output
-            cp build/app/outputs/flutter-apk/app-release.apk \
-               output/iCare-$(date +'%Y%m%d-%H%M').apk
+jobs:
+  build:
+    runs-on: ubuntu-latest
 
-        - name: Upload APK
-          uses: actions/upload-artifact@v4
-          with:
-            name: iCare-APK-${{ github.run_number }}
-            path: output/*.apk
-            retention-days: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: wajahat
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: zulu
+          java-version: '17'
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Build APK
+        run: flutter build apk --release --no-tree-shake-icons
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: iCare-APK
+          path: build/app/outputs/flutter-apk/app-release.apk
+          retention-days: 30
