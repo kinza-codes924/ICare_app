@@ -28,13 +28,136 @@ jobs:
           channel: stable
           cache: true
 
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Backup google-services.json
+        run: cp android/app/google-services.json /tmp/google-services.json
+
+      - name: Regenerate Android folder (fix unsupported Gradle)
+        run: |
+          rm -rf android
+          flutter create --platforms android .
+
+      - name: Restore google-services.json
+        run: cp /tmp/google-services.json android/app/google-services.json
+
+      - name: Write app build.gradle with Firebase
+        run: |
+          cat > android/app/build.gradle << 'EOF'
+          plugins {
+              id "com.android.application"
+              id "kotlin-android"
+              id "dev.flutter.flutter-gradle-plugin"
+              id "com.google.gms.google-services"
+          }
+
+          android {
+              namespace "com.example.icare"
+              compileSdk flutter.compileSdkVersion
+              ndkVersion flutter.ndkVersion
+
+              compileOptions {
+                  sourceCompatibility JavaVersion.VERSION_11
+                  targetCompatibility JavaVersion.VERSION_11
+                  coreLibraryDesugaringEnabled true
+              }
+
+              kotlinOptions {
+                  jvmTarget = JavaVersion.VERSION_11.toString()
+              }
+
+              defaultConfig {
+                  applicationId "com.example.icare"
+                  minSdk flutter.minSdkVersion
+                  targetSdk flutter.targetSdkVersion
+                  versionCode flutter.versionCode
+                  versionName flutter.versionName
+              }
+
+              buildTypes {
+                  release {
+                      signingConfig signingConfigs.debug
+                  }
+              }
+          }
+
+          flutter {
+              source "../.."
+          }
+
+          dependencies {
+              coreLibraryDesugaring "com.android.tools:desugar_jdk_libs:2.1.4"
+              implementation platform("com.google.firebase:firebase-bom:34.0.0")
+              implementation "com.google.firebase:firebase-messaging"
+          }
+          EOF
+
+      - name: Write android build.gradle
+        run: |
+          cat > android/build.gradle << 'EOF'
+          allprojects {
+              repositories {
+                  google()
+                  mavenCentral()
+              }
+          }
+
+          rootProject.buildDir = "../build"
+          subprojects {
+              project.buildDir = "${rootProject.buildDir}/${project.name}"
+          }
+          subprojects {
+              project.evaluationDependsOn(":app")
+          }
+
+          tasks.register("clean", Delete) {
+              delete rootProject.buildDir
+          }
+          EOF
+
+      - name: Write settings.gradle
+        run: |
+          cat > android/settings.gradle << 'EOF'
+          pluginManagement {
+              def flutterSdkPath = {
+                  def properties = new Properties()
+                  file("local.properties").withInputStream { properties.load(it) }
+                  def flutterSdkPath = properties.getProperty("flutter.sdk")
+                  assert flutterSdkPath != null, "flutter.sdk not set in local.properties"
+                  flutterSdkPath
+              }()
+              includeBuild("$flutterSdkPath/packages/flutter_tools/gradle")
+              repositories {
+                  google()
+                  mavenCentral()
+                  gradlePluginPortal()
+              }
+          }
+
+          plugins {
+              id "dev.flutter.flutter-plugin-loader" version "1.0.0"
+              id "com.android.application" version "8.3.0" apply false
+              id "org.jetbrains.kotlin.android" version "1.9.0" apply false
+              id "com.google.gms.google-services" version "4.4.0" apply false
+          }
+
+          include ":app"
+          EOF
+          rm -f android/settings.gradle.kts
+
       - name: Create local.properties
         run: |
           echo "flutter.sdk=$FLUTTER_ROOT" > android/local.properties
           echo "sdk.dir=$ANDROID_SDK_ROOT" >> android/local.properties
 
-      - name: Get dependencies
-        run: flutter pub get
+      - name: Write gradle.properties
+        run: |
+          cat > android/gradle.properties << 'EOF'
+          org.gradle.jvmargs=-Xmx3G -XX:MaxMetaspaceSize=1G
+          android.useAndroidX=true
+          android.enableJetifier=true
+          EOF
 
       - name: Build APK
         run: flutter build apk --release --no-tree-shake-icons
