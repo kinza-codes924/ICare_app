@@ -66,6 +66,12 @@ class _InstructorLmsCreateCourseScreenState extends State<InstructorLmsCreateCou
   bool _uploadingThumbnail = false;
   String? _thumbnailUrl;
 
+  // Pricing
+  bool _isFree = true;
+  final _priceController = TextEditingController();
+  int _discountPercent = 0;
+  final _voucherController = TextEditingController();
+
   // Modules
   final List<Map<String, dynamic>> _modules = [];
 
@@ -134,6 +140,8 @@ class _InstructorLmsCreateCourseScreenState extends State<InstructorLmsCreateCou
     _descriptionController.dispose();
     _thumbnailController.dispose();
     _pageController.dispose();
+    _priceController.dispose();
+    _voucherController.dispose();
     super.dispose();
   }
 
@@ -157,6 +165,11 @@ class _InstructorLmsCreateCourseScreenState extends State<InstructorLmsCreateCou
         'courseType': _courseType,
         'isPublished': _isPublished,
         'modules': _modules,
+        // Pricing
+        'isFree': _isFree,
+        if (!_isFree) 'price': double.tryParse(_priceController.text) ?? 0,
+        if (!_isFree && _discountPercent > 0) 'discountPercent': _discountPercent,
+        if (!_isFree && _discountPercent > 0) 'discountedPrice': _discountedPrice,
       };
       
       await _lmsService.createCourse(courseData);
@@ -462,7 +475,7 @@ class _InstructorLmsCreateCourseScreenState extends State<InstructorLmsCreateCou
                 items: const [
                   DropdownMenuItem(value: 'HealthProgram', child: Text('Health Program')),
                   DropdownMenuItem(value: 'FCPSPart1', child: Text('FCPS Part 1')),
-                  DropdownMenuItem(value: 'Medical Training', child: Text('Medical Training')),
+                  DropdownMenuItem(value: 'Medical Training', child: Text('Medical Training (For health care professionals only)')),
                   DropdownMenuItem(value: 'Wellness', child: Text('Wellness')),
                   DropdownMenuItem(value: 'Nutrition', child: Text('Nutrition')),
                   DropdownMenuItem(value: 'Mental Health', child: Text('Mental Health')),
@@ -643,11 +656,106 @@ class _InstructorLmsCreateCourseScreenState extends State<InstructorLmsCreateCou
                 onChanged: (value) => setState(() => _isPublished = value),
                 activeColor: AppColors.primaryColor,
               ),
+
+              const SizedBox(height: 24),
+              // ── PRICING SECTION ──
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                  boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 6)],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Row(children: [
+                      Icon(Icons.payments_rounded, color: AppColors.primaryColor, size: 20),
+                      SizedBox(width: 8),
+                      Text('Course Pricing', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Color(0xFF0F172A))),
+                    ]),
+                    const SizedBox(height: 16),
+
+                    // Mark as Free checkbox
+                    CheckboxListTile(
+                      value: _isFree,
+                      onChanged: (v) => setState(() { _isFree = v!; }),
+                      title: const Text('Mark as Free', style: TextStyle(fontWeight: FontWeight.w600)),
+                      subtitle: const Text('Students can enroll at no cost'),
+                      activeColor: AppColors.primaryColor,
+                      contentPadding: EdgeInsets.zero,
+                    ),
+
+                    if (!_isFree) ...[
+                      const SizedBox(height: 12),
+                      Row(children: [
+                        Expanded(
+                          child: TextFormField(
+                            controller: _priceController,
+                            keyboardType: TextInputType.number,
+                            decoration: const InputDecoration(
+                              labelText: 'Course Price (PKR)',
+                              hintText: 'e.g. 10000',
+                              border: OutlineInputBorder(),
+                              prefixIcon: Icon(Icons.currency_exchange_rounded),
+                            ),
+                            onChanged: (_) => setState(() {}),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: DropdownButtonFormField<int>(
+                            value: _discountPercent,
+                            decoration: const InputDecoration(
+                              labelText: 'Discount',
+                              border: OutlineInputBorder(),
+                              prefixIcon: Icon(Icons.discount_rounded),
+                            ),
+                            items: [
+                              const DropdownMenuItem(value: 0, child: Text('No discount')),
+                              ...([10,20,30,40,50,60,70,80,90,100].map((p) =>
+                                DropdownMenuItem(value: p, child: Text('$p% off')))),
+                            ],
+                            onChanged: (v) => setState(() => _discountPercent = v!),
+                          ),
+                        ),
+                      ]),
+                      if (_discountPercent > 0 && _priceController.text.isNotEmpty) ...[
+                        const SizedBox(height: 12),
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.green.shade50,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: Colors.green.shade200),
+                          ),
+                          child: Row(children: [
+                            const Icon(Icons.local_offer_rounded, color: Colors.green, size: 18),
+                            const SizedBox(width: 8),
+                            Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                              Text('Original: PKR ${_priceController.text}',
+                                  style: const TextStyle(fontSize: 12, decoration: TextDecoration.lineThrough, color: Color(0xFF64748B))),
+                              Text('After discount: PKR ${_discountedPrice.toStringAsFixed(0)}',
+                                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: Colors.green)),
+                            ]),
+                          ]),
+                        ),
+                      ],
+                    ],
+                  ],
+                ),
+              ),
             ],
           ),
         ),
       ),
     );
+  }
+
+  double get _discountedPrice {
+    final price = double.tryParse(_priceController.text) ?? 0;
+    return price - (price * _discountPercent / 100);
   }
 
   Widget _buildModulesStep(bool isDesktop) {

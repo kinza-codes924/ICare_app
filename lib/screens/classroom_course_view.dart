@@ -1181,7 +1181,19 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
         ),
       );
     } else if (type == 'session') {
-      _openSessionLink(data, isInstructor: widget.isInstructor);
+      final sessionId = data['_id']?.toString() ?? widget.course['_id']?.toString() ?? '';
+      final sessionTitle = data['title']?.toString() ?? 'Live Session';
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => LmsLiveSessionScreen(
+            sessionId: sessionId,
+            courseId: widget.course['_id']?.toString() ?? '',
+            sessionTitle: sessionTitle,
+            isInstructor: widget.isInstructor,
+          ),
+        ),
+      );
     }
   }
 
@@ -1276,10 +1288,18 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
               ListTile(
                 leading: const Icon(Icons.play_circle_rounded, color: Colors.red),
                 title: const Text('Start Session', style: TextStyle(fontWeight: FontWeight.w700)),
-                subtitle: const Text('Open meeting link to go live'),
+                subtitle: const Text('Launch iCare live video session'),
                 onTap: () {
                   Navigator.pop(context);
-                  _openSessionLink(data, isInstructor: true);
+                  final sessionId = data['_id']?.toString() ?? widget.course['_id']?.toString() ?? '';
+                  Navigator.push(context, MaterialPageRoute(
+                    builder: (_) => LmsLiveSessionScreen(
+                      sessionId: sessionId,
+                      courseId: widget.course['_id']?.toString() ?? '',
+                      sessionTitle: data['title']?.toString() ?? 'Live Session',
+                      isInstructor: true,
+                    ),
+                  ));
                 },
               ),
             // Assignment — grade

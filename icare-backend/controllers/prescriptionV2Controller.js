@@ -127,21 +127,37 @@ exports.completePrescription = async (req, res) => {
       prescriptionData.doctorNotes = '';
     }
 
+    // Safe field assignment — only update allowed fields, skip patientId/doctorId to avoid CastError
+    const safeFields = ['soapNotes', 'diagnoses', 'medicines', 'labTests',
+      'referralFollowUp', 'lifestyleAdvice', 'doctorNotes', 'vitalSigns',
+      'chiefComplaint', 'historyOfPresentIllness', 'clinicalFindings'];
+
     if (prescription) {
-      // Update existing draft
-      Object.assign(prescription, prescriptionData);
+      for (const field of safeFields) {
+        if (prescriptionData[field] !== undefined) {
+          prescription[field] = prescriptionData[field];
+        }
+      }
     } else {
-      // Create new prescription
       prescription = new EnhancedPrescription({
-        ...prescriptionData,
         consultationId,
         patientId: consultation.patientId,
         doctorId: consultation.doctorId,
-        prescribedAt: new Date()
+        prescribedAt: new Date(),
+        status: 'draft',
+        isComplete: false,
       });
+      for (const field of safeFields) {
+        if (prescriptionData[field] !== undefined) {
+          prescription[field] = prescriptionData[field];
+        }
+      }
     }
 
-    // Validate completion — only require at least one clinical item
+    // Ensure doctorNotes
+    if (!prescription.doctorNotes) prescription.doctorNotes = '';
+
+    // Validate — require at least one clinical item
     const hasMeds = prescription.medicines && prescription.medicines.length > 0;
     const hasDiagnoses = prescription.diagnoses && prescription.diagnoses.length > 0;
     const hasLabTests = prescription.labTests && prescription.labTests.length > 0;
@@ -158,23 +174,21 @@ exports.completePrescription = async (req, res) => {
       });
     }
 
-    // Mark as complete and active
+    // Mark as complete
     prescription.isComplete = true;
     prescription.status = 'active';
-
-    // Set expiration date (30 days from now)
     const expirationDate = new Date();
     expirationDate.setDate(expirationDate.getDate() + 30);
     prescription.expiresAt = expirationDate;
 
     await prescription.save();
 
-    // Update consultation with prescription reference
-    await Consultation.findByIdAndUpdate(
+    // Update consultation — non-blocking
+    Consultation.findByIdAndUpdate(
       consultationId,
-      { prescriptionId: prescription._id, hasPrescription: true },
+      { $set: { prescriptionId: prescription._id, hasPrescription: true } },
       { new: true }
-    );
+    ).catch(e => console.error('Consultation update warning:', e.message));
 
     res.json({
       success: true,
