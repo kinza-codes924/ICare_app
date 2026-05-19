@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:icare/services/lms_service.dart';
 import 'package:icare/utils/theme.dart';
 import 'package:icare/widgets/back_button.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:intl/intl.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
 
 class CertificatePage extends StatefulWidget {
   final String courseId;
@@ -25,6 +29,7 @@ class _CertificatePageState extends State<CertificatePage> {
   final LmsService _lms = LmsService();
   Map<String, dynamic>? _certificate;
   bool _loading = true;
+  bool _downloading = false;
   String? _error;
 
   @override
@@ -55,12 +60,15 @@ class _CertificatePageState extends State<CertificatePage> {
         title: const Text('Certificate of Completion',
             style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
         actions: [
-          IconButton(
-            onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Download coming soon')),
+          if (_certificate != null)
+            IconButton(
+              onPressed: _downloading ? null : _downloadPdf,
+              icon: _downloading
+                  ? const SizedBox(width: 20, height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  : const Icon(Icons.download_rounded, color: Colors.white),
+              tooltip: 'Download PDF',
             ),
-            icon: const Icon(Icons.download_rounded, color: Colors.white),
-          ),
         ],
       ),
       body: _loading
@@ -262,9 +270,7 @@ class _CertificatePageState extends State<CertificatePage> {
       children: [
         Expanded(
           child: OutlinedButton.icon(
-            onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Share feature coming soon')),
-            ),
+            onPressed: _certificate == null ? null : _shareCertificate,
             icon: const Icon(Icons.share_rounded),
             label: const Text('Share'),
             style: OutlinedButton.styleFrom(
@@ -277,18 +283,217 @@ class _CertificatePageState extends State<CertificatePage> {
         const SizedBox(width: 12),
         Expanded(
           child: ElevatedButton.icon(
-            onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Download feature coming soon')),
-            ),
-            icon: const Icon(Icons.download_rounded),
-            label: const Text('Download'),
+            onPressed: (_certificate == null || _downloading) ? null : _downloadPdf,
+            icon: _downloading
+                ? const SizedBox(width: 18, height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                : const Icon(Icons.download_rounded),
+            label: Text(_downloading ? 'Generating...' : 'Download PDF'),
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.primaryColor,
               foregroundColor: Colors.white,
+              disabledBackgroundColor: Colors.grey.shade300,
               padding: const EdgeInsets.symmetric(vertical: 14),
             ),
           ),
         ),
+      ],
+    );
+  }
+
+  Future<void> _downloadPdf() async {
+    setState(() => _downloading = true);
+    try {
+      final pdfBytes = await _generatePdf();
+      final fileName = 'iCare_Certificate_${_certificate?['certificateId'] ?? 'cert'}.pdf';
+      await Printing.sharePdf(bytes: pdfBytes, filename: fileName);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Download failed: $e'), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _downloading = false);
+    }
+  }
+
+  Future<void> _shareCertificate() async {
+    setState(() => _downloading = true);
+    try {
+      final pdfBytes = await _generatePdf();
+      final fileName = 'iCare_Certificate_${_certificate?['certificateId'] ?? 'cert'}.pdf';
+      await Printing.sharePdf(bytes: pdfBytes, filename: fileName);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Share failed: $e'), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _downloading = false);
+    }
+  }
+
+  Future<Uint8List> _generatePdf() async {
+    final cert = _certificate!;
+    final studentName = cert['studentName'] ?? 'Student';
+    final instructorName = cert['instructorName'] ?? 'Instructor';
+    final certId = cert['certificateId']?.toString() ?? '';
+    final verificationCode = cert['verificationCode']?.toString() ?? '';
+    final verificationUrl = verificationCode.isNotEmpty
+        ? 'https://icare-app-ten.vercel.app/verify?code=$verificationCode'
+        : 'https://icare-app-ten.vercel.app/verify';
+    final issuedDate = _fmt(cert['issuedAt']);
+
+    // Load fonts
+    final regularFont = await PdfGoogleFonts.notoSansRegular();
+    final boldFont = await PdfGoogleFonts.notoSansBold();
+    final italicFont = await PdfGoogleFonts.notoSansItalic();
+
+    // Load logos
+    pw.ImageProvider? icareImg;
+    pw.ImageProvider? iqraImg;
+    pw.ImageProvider? rmrImg;
+    try {
+      final icareBytes = await rootBundle.load('assets/Asset 1.png');
+      icareImg = pw.MemoryImage(icareBytes.buffer.asUint8List());
+    } catch (_) {}
+    try {
+      final iqraBytes = await rootBundle.load('assets/LOGO-IU-01-2048x495-1.png');
+      iqraImg = pw.MemoryImage(iqraBytes.buffer.asUint8List());
+    } catch (_) {}
+    try {
+      final rmrBytes = await rootBundle.load('assets/images/health.jpeg');
+      rmrImg = pw.MemoryImage(rmrBytes.buffer.asUint8List());
+    } catch (_) {}
+
+    final gold = PdfColor.fromHex('#B8860B');
+    final navy = PdfColor.fromHex('#1A237E');
+    final darkText = PdfColor.fromHex('#0F172A');
+    final greyText = PdfColor.fromHex('#64748B');
+
+    final pdf = pw.Document();
+
+    pdf.addPage(
+      pw.Page(
+        pageFormat: PdfPageFormat.a4.landscape,
+        margin: const pw.EdgeInsets.all(0),
+        build: (pw.Context context) {
+          return pw.Container(
+            decoration: pw.BoxDecoration(
+              border: pw.Border.all(color: navy, width: 3),
+            ),
+            child: pw.Column(
+              children: [
+                // Gold top bar
+                pw.Container(height: 10, color: gold),
+
+                pw.Padding(
+                  padding: const pw.EdgeInsets.fromLTRB(40, 24, 40, 24),
+                  child: pw.Column(
+                    children: [
+                      // Logo row
+                      pw.Row(
+                        mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                        children: [
+                          rmrImg != null
+                              ? pw.Image(rmrImg, width: 90, height: 40, fit: pw.BoxFit.contain)
+                              : pw.Text('RM Health Solutions', style: pw.TextStyle(font: boldFont, fontSize: 10)),
+                          iqraImg != null
+                              ? pw.Image(iqraImg, width: 130, height: 40, fit: pw.BoxFit.contain)
+                              : pw.Text('Iqra University', style: pw.TextStyle(font: boldFont, fontSize: 12)),
+                          icareImg != null
+                              ? pw.Image(icareImg, width: 90, height: 40, fit: pw.BoxFit.contain)
+                              : pw.Text('iCare', style: pw.TextStyle(font: boldFont, fontSize: 14, color: navy)),
+                        ],
+                      ),
+
+                      pw.SizedBox(height: 14),
+                      pw.Divider(color: gold, thickness: 1.5),
+                      pw.SizedBox(height: 16),
+
+                      // Title
+                      pw.Text('CERTIFICATE OF COMPLETION',
+                          style: pw.TextStyle(font: boldFont, fontSize: 22, color: navy, letterSpacing: 2)),
+                      pw.SizedBox(height: 6),
+                      pw.Container(width: 60, height: 2, color: gold),
+                      pw.SizedBox(height: 20),
+
+                      // Body
+                      pw.Text('This is to certify that',
+                          style: pw.TextStyle(font: italicFont, fontSize: 12, color: greyText)),
+                      pw.SizedBox(height: 8),
+                      pw.Text(studentName,
+                          style: pw.TextStyle(font: boldFont, fontSize: 28, color: darkText)),
+                      pw.SizedBox(height: 8),
+                      pw.Text('has successfully completed the course',
+                          style: pw.TextStyle(font: regularFont, fontSize: 12, color: greyText)),
+                      pw.SizedBox(height: 6),
+                      pw.Text(widget.courseName,
+                          style: pw.TextStyle(font: boldFont, fontSize: 18, color: navy),
+                          textAlign: pw.TextAlign.center),
+                      pw.SizedBox(height: 10),
+                      pw.Text('Issued on $issuedDate',
+                          style: pw.TextStyle(font: regularFont, fontSize: 11, color: greyText)),
+
+                      pw.SizedBox(height: 20),
+                      pw.Divider(color: gold, thickness: 1.5),
+                      pw.SizedBox(height: 16),
+
+                      // Bottom row — QR + signatures
+                      pw.Row(
+                        crossAxisAlignment: pw.CrossAxisAlignment.end,
+                        children: [
+                          // QR Code
+                          pw.Column(children: [
+                            pw.BarcodeWidget(
+                              barcode: pw.Barcode.qrCode(),
+                              data: verificationUrl,
+                              width: 70,
+                              height: 70,
+                            ),
+                            pw.SizedBox(height: 4),
+                            pw.Text(certId.isNotEmpty ? certId.substring(0, certId.length.clamp(0, 14)) : '',
+                                style: pw.TextStyle(font: regularFont, fontSize: 7, color: greyText)),
+                            pw.Text('Scan to verify',
+                                style: pw.TextStyle(font: italicFont, fontSize: 8, color: greyText)),
+                          ]),
+
+                          pw.Spacer(),
+
+                          // Signatures
+                          _pdfSignature(boldFont, regularFont, 'Verified by Instructor', instructorName),
+                          pw.SizedBox(width: 30),
+                          _pdfSignature(boldFont, regularFont, 'Iqra University Registrar', 'Registrar'),
+                          pw.SizedBox(width: 30),
+                          _pdfSignature(boldFont, regularFont, 'iCare Administrator', 'Administrator'),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+
+                // Gold bottom bar
+                pw.Container(height: 10, color: gold),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+
+    return pdf.save();
+  }
+
+  pw.Widget _pdfSignature(pw.Font boldFont, pw.Font regularFont, String role, String name) {
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.center,
+      children: [
+        pw.Container(width: 80, height: 1, color: PdfColor.fromHex('#475569')),
+        pw.SizedBox(height: 4),
+        pw.Text(name, style: pw.TextStyle(font: boldFont, fontSize: 9, color: PdfColor.fromHex('#0F172A'))),
+        pw.Text(role, style: pw.TextStyle(font: regularFont, fontSize: 8, color: PdfColor.fromHex('#64748B'))),
       ],
     );
   }
