@@ -31,29 +31,57 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
-      - name: Patch jcenter() in pub-cache (Gradle 9 fix)
+      - name: Patch jcenter() and add namespace in pub-cache packages
         run: |
           find $HOME/.pub-cache -name "build.gradle" | while read f; do
-            if grep -q "jcenter()" "$f" 2>/dev/null; then
+            grep -q "jcenter()" "$f" 2>/dev/null && \
               sed -i 's/jcenter()/maven { url "https:\/\/jcenter.bintray.com" }/g' "$f"
-            fi
           done
           find $HOME/.pub-cache -name "build.gradle" | while read f; do
             if grep -q "com.android.library" "$f" 2>/dev/null && ! grep -q "namespace" "$f" 2>/dev/null; then
               MANIFEST=$(find "$(dirname "$f")" -name "AndroidManifest.xml" 2>/dev/null | head -1)
-              if [ -f "$MANIFEST" ]; then
-                PKG=$(grep -o 'package="[^"]*"' "$MANIFEST" 2>/dev/null | head -1 | sed 's/package="//;s/"//')
-                if [ -n "$PKG" ]; then
-                  sed -i "/android {/a\\    namespace \"$PKG\"" "$f"
-                fi
-              fi
+              [ -f "$MANIFEST" ] && PKG=$(grep -o 'package="[^"]*"' "$MANIFEST" | head -1 | sed 's/package="//;s/"//') && \
+                [ -n "$PKG" ] && sed -i "/android {/a\\    namespace \"$PKG\"" "$f"
             fi
           done
 
-      - name: Use main branch android folder (known working)
+      - name: Backup google-services.json
+        run: cp android/app/google-services.json /tmp/google-services.json
+
+      - name: Regenerate android folder fresh
         run: |
-          git fetch origin main
-          git checkout origin/main -- android/
+          rm -rf android
+          flutter create --platforms android .
+
+      - name: Restore google-services.json
+        run: cp /tmp/google-services.json android/app/google-services.json
+
+      - name: Fix duplicate Flutter plugin (settings.gradle.kts already loads it)
+        run: |
+          # Remove dev.flutter.flutter-gradle-plugin from build.gradle.kts
+          # It's already loaded via settings.gradle.kts flutter-plugin-loader
+          sed -i '/dev.flutter.flutter-gradle-plugin/d' android/app/build.gradle.kts
+
+      - name: Add Firebase to app build.gradle.kts
+        run: |
+          # Add google-services plugin
+          sed -i '/id("com.android.application")/a\    id("com.google.gms.google-services")' android/app/build.gradle.kts
+          # Add coreLibraryDesugaring and Firebase dependencies
+          cat >> android/app/build.gradle.kts << 'EOF'
+
+          // Firebase
+          val googleServicesVersion = "4.4.4"
+
+          dependencies.add("coreLibraryDesugaring", "com.android.tools:desugar_jdk_libs:2.1.4")
+          dependencies.add("implementation", platform("com.google.firebase:firebase-bom:34.0.0"))
+          dependencies.add("implementation", "com.google.firebase:firebase-messaging")
+          EOF
+
+      - name: Add google-services classpath to android build files
+        run: |
+          # Enable desugaring in compileOptions
+          sed -i '/isCoreLibraryDesugaringEnabled/d' android/app/build.gradle.kts
+          sed -i '/compileOptions {/a\        isCoreLibraryDesugaringEnabled = true' android/app/build.gradle.kts
 
       - name: Create local.properties
         run: |
@@ -61,7 +89,7 @@ jobs:
           echo "sdk.dir=$ANDROID_SDK_ROOT" >> android/local.properties
 
       - name: Build APK
-        run: flutter build apk --release --no-tree-shake-icons
+        run: flutter build apk --release --no-tree-shake-icons --android-skip-build-dependency-validation
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
