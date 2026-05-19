@@ -1,5 +1,7 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:icare/screens/classroom_course_view.dart';
+import 'package:icare/screens/lms_live_session_screen.dart';
 import 'package:icare/screens/lms_public_catalog.dart';
 import 'package:icare/screens/quiz_take_screen.dart';
 import 'package:icare/screens/assignment_submit_screen.dart';
@@ -29,6 +31,11 @@ class _StudentLmsDashboardState extends State<StudentLmsDashboard>
   bool _loadingTodo = true;
   String _userName = '';
 
+  // Global live session detector
+  Timer? _globalLivePoller;
+  Map<String, dynamic>? _activeLiveSession; // {courseId, courseTitle, sessionId}
+  bool _liveDialogShown = false;
+
   static const List<Color> _classColors = [
     Color(0xFF1565C0),
     Color(0xFF2E7D32),
@@ -46,12 +53,96 @@ class _StudentLmsDashboardState extends State<StudentLmsDashboard>
     _tabController = TabController(length: 2, vsync: this);
     _loadUserName();
     _loadEnrollments();
+    _startGlobalLivePolling();
   }
 
   @override
   void dispose() {
     _tabController.dispose();
+    _globalLivePoller?.cancel();
     super.dispose();
+  }
+
+  void _startGlobalLivePolling() {
+    _checkAllCoursesForLive();
+    _globalLivePoller = Timer.periodic(const Duration(seconds: 15), (_) => _checkAllCoursesForLive());
+  }
+
+  Future<void> _checkAllCoursesForLive() async {
+    if (!mounted || _enrollments.isEmpty) return;
+    for (final enrollment in _enrollments) {
+      final course = enrollment['courseId'] as Map? ?? enrollment['course'] as Map? ?? {};
+      final courseId = course['_id']?.toString() ?? enrollment['courseId']?.toString() ?? '';
+      if (courseId.isEmpty) continue;
+      try {
+        final result = await _lmsService.checkActiveLiveSession(courseId);
+        if (result['isLive'] == true && mounted) {
+          final courseTitle = course['title']?.toString() ?? 'Your Course';
+          if (_activeLiveSession?['courseId'] != courseId) {
+            setState(() {
+              _activeLiveSession = {'courseId': courseId, 'courseTitle': courseTitle, 'sessionId': courseId};
+              _liveDialogShown = false;
+            });
+            if (!_liveDialogShown) {
+              _liveDialogShown = true;
+              _showLiveAlert(courseId, courseTitle, course);
+            }
+          }
+          return;
+        }
+      } catch (_) {}
+    }
+    if (mounted) setState(() => _activeLiveSession = null);
+  }
+
+  void _showLiveAlert(String courseId, String courseTitle, Map course) {
+    if (!mounted) return;
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        backgroundColor: const Color(0xFF1C2333),
+        content: Column(mainAxisSize: MainAxisSize.min, children: [
+          const Icon(Icons.live_tv_rounded, color: Colors.red, size: 56),
+          const SizedBox(height: 12),
+          const Text('🔴 LIVE SESSION STARTED!',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900)),
+          const SizedBox(height: 8),
+          Text('$courseTitle\nis now live. Join now!',
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: Colors.white70, fontSize: 14)),
+        ]),
+        actionsAlignment: MainAxisAlignment.center,
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Later', style: TextStyle(color: Colors.white54)),
+          ),
+          ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+            ),
+            onPressed: () {
+              Navigator.pop(ctx);
+              Navigator.push(context, MaterialPageRoute(
+                builder: (_) => LmsLiveSessionScreen(
+                  sessionId: courseId,
+                  courseId: courseId,
+                  sessionTitle: courseTitle,
+                  isInstructor: false,
+                ),
+              ));
+            },
+            icon: const Icon(Icons.play_arrow_rounded),
+            label: const Text('JOIN NOW', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _loadUserName() async {
@@ -327,23 +418,39 @@ class _StudentLmsDashboardState extends State<StudentLmsDashboard>
     }
     final color = _cardColor(index);
     final enrollmentId = enrollment['_id']?.toString();
+    final courseId = course['_id']?.toString() ?? '';
+    final isLive = _activeLiveSession?['courseId'] == courseId;
 
     return GestureDetector(
-      onTap: () => Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => ClassroomCourseView(
-            course: course,
-            enrollmentId: enrollmentId,
-            isInstructor: false,
-          ),
-        ),
-      ),
+      onTap: () {
+        if (isLive) {
+          // Go directly to live session if this course is live
+          Navigator.push(context, MaterialPageRoute(
+            builder: (_) => LmsLiveSessionScreen(
+              sessionId: courseId,
+              courseId: courseId,
+              sessionTitle: title,
+              isInstructor: false,
+            ),
+          ));
+        } else {
+          Navigator.push(context, MaterialPageRoute(
+            builder: (_) => ClassroomCourseView(
+              course: course,
+              enrollmentId: enrollmentId,
+              isInstructor: false,
+            ),
+          ));
+        }
+      },
       child: Container(
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: const Color(0xFFE2E8F0)),
+          border: Border.all(color: isLive ? Colors.red : const Color(0xFFE2E8F0), width: isLive ? 2 : 1),
+          boxShadow: isLive
+              ? [BoxShadow(color: Colors.red.withOpacity(0.3), blurRadius: 12, offset: const Offset(0, 4))]
+              : [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 6, offset: const Offset(0, 2))],
           boxShadow: [
             BoxShadow(
               color: Colors.black.withOpacity(0.05),
@@ -372,6 +479,18 @@ class _StudentLmsDashboardState extends State<StudentLmsDashboard>
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      if (isLive) ...[
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(color: Colors.red, borderRadius: BorderRadius.circular(4)),
+                          child: const Row(mainAxisSize: MainAxisSize.min, children: [
+                            Icon(Icons.circle, color: Colors.white, size: 8),
+                            SizedBox(width: 4),
+                            Text('LIVE', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w900)),
+                          ]),
+                        ),
+                        const SizedBox(width: 6),
+                      ],
                       Expanded(
                         child: Text(
                           title,

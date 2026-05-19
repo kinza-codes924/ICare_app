@@ -218,17 +218,32 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
   Future<void> _toggleMic() async {
     _micOn = !_micOn;
     if (kIsWeb && _localStream != null) {
-      _localStream!.getAudioTracks().forEach((t) => t.enabled = _micOn);
+      final tracks = _localStream!.getAudioTracks();
+      for (final t in tracks) {
+        t.enabled = _micOn;
+      }
     } else {
       await _engine?.muteLocalAudioStream(!_micOn);
     }
     setState(() {});
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(_micOn ? 'Microphone on' : 'Microphone muted'),
+      duration: const Duration(seconds: 1),
+      backgroundColor: _micOn ? Colors.green : Colors.grey,
+    ));
   }
 
   Future<void> _toggleCamera() async {
     _cameraOn = !_cameraOn;
-    if (kIsWeb && _localStream != null) {
-      _localStream!.getVideoTracks().forEach((t) => t.enabled = _cameraOn);
+    if (kIsWeb) {
+      if (_cameraOn) {
+        // Restart camera stream
+        _localStream?.getTracks().forEach((t) => t.stop());
+        await _initWebCamera();
+      } else {
+        _localStream?.getVideoTracks().forEach((t) => t.stop());
+        setState(() => _cameraViewName = null);
+      }
     } else {
       await _engine?.muteLocalVideoStream(!_cameraOn);
     }
