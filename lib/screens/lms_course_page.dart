@@ -3,6 +3,8 @@ import 'package:icare/services/lms_service.dart';
 import 'package:icare/utils/shared_pref.dart';
 import 'package:icare/utils/theme.dart';
 import 'package:icare/widgets/back_button.dart';
+import 'package:icare/screens/lesson_detail_page.dart';
+import 'package:icare/screens/certificate_page.dart';
 import 'package:intl/intl.dart';
 
 class LmsCoursePage extends StatefulWidget {
@@ -429,6 +431,16 @@ class _CourseLessons extends StatelessWidget {
               leading: const Icon(Icons.play_circle_outline_rounded, color: AppColors.primaryColor, size: 20),
               title: Text(l['title'] ?? 'Lesson', style: const TextStyle(fontSize: 13)),
               dense: true,
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => LessonDetailPage(
+                    lesson: l,
+                    courseId: course['_id']?.toString() ?? '',
+                    moduleId: moduleId,
+                  ),
+                ),
+              ),
             )),
             ...quizzes.map((q) => ListTile(
               leading: const Icon(Icons.quiz_outlined, color: Colors.orange, size: 20),
@@ -900,6 +912,38 @@ class _GradesTabState extends State<_GradesTab> {
             ]),
           ),
           const SizedBox(height: 20),
+
+          // Certificate Button (show if average >= 70%)
+          if (!widget.isInstructor && _average >= 70)
+            Container(
+              margin: const EdgeInsets.only(bottom: 20),
+              child: ElevatedButton.icon(
+                onPressed: () async {
+                  final userId = await SharedPref.getUser().then((u) => u?['_id']?.toString());
+                  if (userId != null && context.mounted) {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => CertificatePage(
+                          courseId: widget.courseId,
+                          studentId: userId,
+                          courseName: 'Course Name', // TODO: Pass actual course name
+                        ),
+                      ),
+                    );
+                  }
+                },
+                icon: const Icon(Icons.workspace_premium_rounded, size: 20),
+                label: const Text('View Certificate'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.amber.shade600,
+                  foregroundColor: Colors.white,
+                  minimumSize: const Size(double.infinity, 50),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+              ),
+            ),
+
           if (_grades.isEmpty) _EmptyState(icon: Icons.grade_outlined, text: 'No assignments yet'),
           ..._grades.map((g) {
             final a = g['assignment'];
