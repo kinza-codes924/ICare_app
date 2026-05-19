@@ -153,7 +153,13 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
 
   Future<void> _notifyStudents() async {
     try {
-      // Notify backend that session has started — backend sends FCM to students
+      // Mark session as LIVE in backend — students polling will pick this up
+      await _lms.setSessionLive(
+        courseId: widget.courseId,
+        isLive: true,
+        title: widget.sessionTitle,
+      );
+      // Also send push notifications
       await _lms.startLiveSessionNotify(
         courseId: widget.courseId,
         sessionId: widget.sessionId,
@@ -282,6 +288,9 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
     );
     if (confirm == true && mounted) {
       await _engine?.leaveChannel();
+      if (widget.isInstructor) {
+        await _lms.setSessionLive(courseId: widget.courseId, isLive: false);
+      }
       Navigator.pop(context);
     }
   }

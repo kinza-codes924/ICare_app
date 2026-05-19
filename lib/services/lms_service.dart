@@ -448,6 +448,21 @@ class LmsService {
   // INVITE TEACHER
   // ═══════════════════════════════════════════════════════════════════════
 
+  Future<Map<String, dynamic>> checkActiveLiveSession(String courseId) async {
+    try {
+      final response = await _api.get('/live-sessions/course/$courseId/active');
+      return response.data ?? {'isLive': false};
+    } catch (_) {
+      return {'isLive': false};
+    }
+  }
+
+  Future<void> setSessionLive({required String courseId, required bool isLive, String? title}) async {
+    try {
+      await _api.post('/live-sessions/course/$courseId/set-live', {'isLive': isLive, if (title != null) 'title': title});
+    } catch (_) {}
+  }
+
   Future<void> startLiveSessionNotify({
     required String courseId,
     required String sessionId,

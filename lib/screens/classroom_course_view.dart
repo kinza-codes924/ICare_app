@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:icare/screens/assignment_submit_screen.dart';
@@ -55,6 +56,10 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
   List<dynamic> _students = [];
   bool _loadingPeople = true;
 
+  // Live session detection
+  bool _isSessionLive = false;
+  Timer? _livePoller;
+
   String get _courseId => widget.course['_id']?.toString() ?? '';
   String get _courseTitle =>
       widget.course['title'] ?? widget.course['name'] ?? 'Course';
@@ -91,12 +96,47 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
     _loadStream();
     _loadClasswork();
     _loadPeople();
+    // Poll for live session every 10s (students only)
+    if (!widget.isInstructor) _startLivePolling();
+  }
+
+  void _startLivePolling() {
+    _checkLiveSession();
+    _livePoller = Timer.periodic(const Duration(seconds: 10), (_) => _checkLiveSession());
+  }
+
+  Future<void> _checkLiveSession() async {
+    if (_courseId.isEmpty || !mounted) return;
+    try {
+      final result = await _lms.checkActiveLiveSession(_courseId);
+      if (mounted && result['isLive'] != _isSessionLive) {
+        setState(() => _isSessionLive = result['isLive'] == true);
+        // Show alert when session goes live
+        if (_isSessionLive) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: const Row(children: [
+              Icon(Icons.live_tv_rounded, color: Colors.white),
+              SizedBox(width: 10),
+              Text('🔴 Your instructor just went LIVE! Tap to join.', style: TextStyle(fontWeight: FontWeight.w700)),
+            ]),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 8),
+            action: SnackBarAction(
+              label: 'JOIN NOW',
+              textColor: Colors.white,
+              onPressed: _joinLiveClass,
+            ),
+          ));
+        }
+      }
+    } catch (_) {}
   }
 
   @override
   void dispose() {
     _tabs.dispose();
     _postCtrl.dispose();
+    _livePoller?.cancel();
     super.dispose();
   }
 
@@ -300,47 +340,57 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
           // ── Large banner ──────────────────────────────────
           _buildBanner(),
 
-          // ── Join Live Class button (students only) ────────
-          if (!widget.isInstructor)
+          // ── Live Session Banner (students only) ──────────
+          if (!widget.isInstructor && _isSessionLive)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+              child: GestureDetector(
+                onTap: _joinLiveClass,
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFFB91C1C), Color(0xFFEF4444)],
+                    ),
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [BoxShadow(color: Colors.red.withOpacity(0.4), blurRadius: 12, offset: const Offset(0, 4))],
+                  ),
+                  child: Row(children: [
+                    const Icon(Icons.live_tv_rounded, color: Colors.white, size: 28),
+                    const SizedBox(width: 12),
+                    const Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Text('🔴 LIVE NOW — Your instructor is live!',
+                          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 15)),
+                      SizedBox(height: 2),
+                      Text('Tap anywhere to join the live session',
+                          style: TextStyle(color: Colors.white70, fontSize: 12)),
+                    ])),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(8)),
+                      child: const Text('JOIN NOW', style: TextStyle(color: Color(0xFFB91C1C), fontWeight: FontWeight.w900, fontSize: 13)),
+                    ),
+                  ]),
+                ),
+              ),
+            ),
+          // Show subtle join option even when not live (student can still join if they know)
+          if (!widget.isInstructor && !_isSessionLive)
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
               child: Container(
-                padding: const EdgeInsets.all(14),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                 decoration: BoxDecoration(
-                  color: Colors.red.withValues(alpha: 0.06),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.red.withValues(alpha: 0.25)),
+                  color: Colors.grey.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.grey.shade200),
                 ),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 10, height: 10,
-                      decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
-                    ),
-                    const SizedBox(width: 10),
-                    const Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('Live Class Available', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: Colors.red)),
-                          Text('Your instructor may be live. Tap to join.', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
-                        ],
-                      ),
-                    ),
-                    ElevatedButton.icon(
-                      onPressed: _joinLiveClass,
-                      icon: const Icon(Icons.play_arrow_rounded, size: 18),
-                      label: const Text('Join', style: TextStyle(fontWeight: FontWeight.w700)),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.red,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                        elevation: 0,
-                      ),
-                    ),
-                  ],
-                ),
+                child: Row(children: [
+                  const Icon(Icons.videocam_outlined, color: Colors.grey, size: 18),
+                  const SizedBox(width: 8),
+                  const Expanded(child: Text('No live session right now. Check back when your instructor goes live.',
+                      style: TextStyle(fontSize: 12, color: Color(0xFF64748B)))),
+                ]),
               ),
             ),
 
