@@ -9,7 +9,6 @@ import 'package:icare/screens/instructor_grading_screen.dart';
 import 'package:icare/screens/instructor_course_content_screen.dart';
 import 'package:icare/screens/instructor_student_progress_screen.dart';
 import 'package:icare/screens/instructor_course_analytics_screen.dart';
-import 'package:icare/screens/video_call.dart';
 import 'package:icare/services/lms_service.dart';
 import 'package:icare/utils/shared_pref.dart';
 import 'package:intl/intl.dart';
@@ -277,19 +276,16 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
   // ════════════════════════════════════════════════
 
   Future<void> _joinLiveClass() async {
-    final courseId = _courseId;
-    final channelName = 'live_class_$courseId';
-    final user = await SharedPref().getUserData();
+    // Navigate to Classwork tab where students can find the live lesson
+    // and click "Join Session" with the actual meeting link
     if (!mounted) return;
-    Navigator.push(context, MaterialPageRoute(
-      builder: (_) => VideoCall(
-        channelName: channelName,
-        remoteUserName: 'Instructor',
-        isAudioOnly: false,
-        currentUserName: user?.name ?? 'Student',
-        currentUserId: user?.id ?? '',
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Go to Classwork tab → open the live lesson → tap "Join Session" to join.'),
+        backgroundColor: Color(0xFF1A237E),
+        duration: Duration(seconds: 5),
       ),
-    ));
+    );
   }
 
   Widget _buildStreamTab(bool isWide) {

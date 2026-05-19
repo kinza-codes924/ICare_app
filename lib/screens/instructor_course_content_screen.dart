@@ -3,8 +3,6 @@ import 'package:flutter/services.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:dio/dio.dart';
 import 'package:icare/screens/certificate_templates_screen.dart';
-import 'package:icare/screens/video_call.dart';
-import 'package:icare/services/call_service.dart';
 import 'package:icare/services/lms_service.dart';
 import 'package:icare/services/api_service.dart';
 import 'package:icare/utils/shared_pref.dart';
@@ -60,78 +58,15 @@ class _InstructorCourseContentScreenState extends State<InstructorCourseContentS
     }
   }
 
-  /// Instructor starts a live class — sends call signal to ALL enrolled students
+  /// Instructor starts a live class — shows meeting link info (does NOT use consultation call system)
   Future<void> _startLiveClass() async {
     final courseTitle = _course?['title']?.toString() ?? 'Live Class';
-    final channelName = 'live_class_${widget.courseId}';
-    final user = await SharedPref().getUserData();
-    final instructorName = user?.name ?? 'Instructor';
-
     if (!mounted) return;
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Row(children: [
-          Icon(Icons.live_tv_rounded, color: Colors.red, size: 26),
-          SizedBox(width: 10),
-          Text('Start Live Class', style: TextStyle(fontWeight: FontWeight.w800)),
-        ]),
-        content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text('Start a live class for "$courseTitle"?\n\nAll enrolled students will receive a join request.'),
-          const SizedBox(height: 12),
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(color: const Color(0xFFECFDF5), borderRadius: BorderRadius.circular(8)),
-            child: const Row(children: [
-              Icon(Icons.fiber_manual_record_rounded, color: Color(0xFF10B981), size: 16),
-              SizedBox(width: 8),
-              Expanded(child: Text('Live session will be auto-recorded. Video + chat will be saved to this lesson.', style: TextStyle(fontSize: 12, color: Color(0xFF10B981)))),
-            ]),
-          ),
-        ]),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-          ElevatedButton.icon(
-            onPressed: () async {
-              Navigator.pop(ctx);
-              if (!mounted) return;
-
-              // Send call signal to all enrolled students
-              // Backend returns { students: [{ _id, name, email }] }
-              try {
-                final students = await _lmsService.getCourseStudents(widget.courseId);
-                final callService = CallService();
-                for (final student in students) {
-                  final studentId = student['_id']?.toString() ?? '';
-                  if (studentId.isNotEmpty) {
-                    await callService.initiateCall(
-                      receiverId: studentId,
-                      channelName: channelName,
-                      callerName: '$instructorName — Live: $courseTitle',
-                      callType: 'video',
-                    );
-                  }
-                }
-              } catch (_) {}
-
-              if (!mounted) return;
-              // Open instructor's VideoCall
-              Navigator.push(context, MaterialPageRoute(
-                builder: (_) => VideoCall(
-                  channelName: channelName,
-                  remoteUserName: courseTitle, // show course name not "Students"
-                  isAudioOnly: false,
-                  currentUserName: instructorName,
-                  currentUserId: user?.id ?? '',
-                ),
-              ));
-            },
-            icon: const Icon(Icons.live_tv_rounded, size: 18),
-            label: const Text('Go Live Now'),
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
-          ),
-        ],
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Text('Use a lesson\'s "Start" button to launch your live session meeting link.'),
+        backgroundColor: Colors.orange.shade700,
+        duration: const Duration(seconds: 4),
       ),
     );
   }
