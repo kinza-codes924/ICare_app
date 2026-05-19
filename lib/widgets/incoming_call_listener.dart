@@ -75,25 +75,35 @@ class _IncomingCallListenerState extends State<IncomingCallListener> {
     if (user?.role?.toLowerCase() != 'student') return;
 
     try {
-      // Get enrolled courses and check each for live session
       final api = ApiService();
-      final resp = await api.get('/students/courses/enrolled');
-      final enrollments = (resp.data['courses'] ?? resp.data['enrollments'] ?? []) as List;
+      // Correct endpoint: /students/courses/enrollments/my
+      final resp = await api.get('/students/courses/enrollments/my');
+      final enrollments = (resp.data['items'] ?? resp.data['enrollments'] ?? []) as List;
+      debugPrint('🎓 LMS live check: ${enrollments.length} enrollments');
+
       for (final e in enrollments) {
-        final course = e['courseId'] as Map? ?? e['course'] as Map? ?? {};
-        final courseId = course['_id']?.toString() ?? e['courseId']?.toString() ?? '';
+        final course = (e['course'] is Map ? e['course'] : e['courseId']) as Map?;
+        if (course == null) continue;
+        final courseId = course['_id']?.toString() ?? '';
+        final courseTitle = course['title']?.toString() ?? 'Live Session';
         if (courseId.isEmpty) continue;
+
         final liveResp = await api.get('/live-sessions/course/$courseId/active');
-        if (liveResp.data['isLive'] == true && _lastLiveCourseId != courseId) {
+        final isLive = liveResp.data['isLive'] == true;
+        debugPrint('🔴 Course $courseTitle isLive=$isLive');
+
+        if (isLive && _lastLiveCourseId != courseId && mounted) {
           _lastLiveCourseId = courseId;
-          _showLiveSessionAlert(courseId, course['title']?.toString() ?? 'Live Session');
+          _showLiveSessionAlert(courseId, courseTitle);
           return;
         }
-        if (liveResp.data['isLive'] != true && _lastLiveCourseId == courseId) {
+        if (!isLive && _lastLiveCourseId == courseId) {
           _lastLiveCourseId = null;
         }
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('LMS live check error: $e');
+    }
   }
 
   void _showLiveSessionAlert(String courseId, String courseTitle) {
