@@ -1,205 +1,60 @@
-name: iCare — Build APK + Web & Deploy
+name: Build Flutter APK
 
 on:
   push:
-    branches: [ "wajahat", "main", "master" ]
-  workflow_dispatch:        # Manual trigger from GitHub UI
-    inputs:
-      build_target:
-        description: 'What to build'
-        required: false
-        default: 'both'
-        type: choice
-        options:
-          - both
-          - apk-only
-          - web-only
-
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true   # Cancel old run if new push comes
-
-env:
-  FLUTTER_VERSION: '3.32.0'
-  JAVA_VERSION: '17'
+    branches: [ "main", "master", "wajahat" ]
+  pull_request:
+    branches: [ "main", "master" ]
+  workflow_dispatch:
 
 jobs:
-  # ─── JOB 1: Build APK ───────────────────────────────────────────────────────
-  build-apk:
-    name: Build Android APK
+  build:
     runs-on: ubuntu-latest
-    if: ${{ github.event.inputs.build_target != 'web-only' }}
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-        with:
-          ref: wajahat
 
-      - name: Setup Java ${{ env.JAVA_VERSION }}
-        uses: actions/setup-java@v4
+      - name: Setup Java
+        uses: actions/setup-java@v3
         with:
           distribution: 'zulu'
-          java-version: ${{ env.JAVA_VERSION }}
+          java-version: '17'
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
-          cache: true
-
-      - name: Flutter version check
-        run: flutter --version
 
       - name: Install dependencies
         run: flutter pub get
 
-      - name: Analyze (warnings only — does not fail build)
-        run: flutter analyze --no-fatal-infos --no-fatal-warnings || true
+      - name: Analyze project
+        run: flutter analyze
+        continue-on-error: true
 
-      - name: Build APK (release)
-        run: flutter build apk --release --no-tree-shake-icons
+      - name: Build APK
+        run: flutter build apk --release
 
-      - name: Get version & date
-        id: meta
-        run: |
-          VERSION=$(grep 'version:' pubspec.yaml | head -1 | awk '{print $2}' | tr -d "'")
-          DATE=$(date +'%Y%m%d-%H%M')
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "date=$DATE" >> $GITHUB_OUTPUT
-          echo "apk_name=iCare-v${VERSION}-${DATE}.apk" >> $GITHUB_OUTPUT
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: icare-app-release
+          path: build/app/outputs/flutter-apk/app-release.apk
+          retention-days: 30
 
-      - name: Rename APK
+      - name: Get current date
+        id: date
+        run: echo "date=$(date +'%Y-%m-%d-%H%M')" >> $GITHUB_OUTPUT
+
+      - name: Rename APK with date
         run: |
           cp build/app/outputs/flutter-apk/app-release.apk \
-             build/app/outputs/flutter-apk/${{ steps.meta.outputs.apk_name }}
+             build/app/outputs/flutter-apk/icare-${{ steps.date.outputs.date }}.apk
 
-      - name: Upload APK artifact
+      - name: Upload dated APK
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ steps.meta.outputs.apk_name }}
-          path: build/app/outputs/flutter-apk/${{ steps.meta.outputs.apk_name }}
+          name: icare-${{ steps.date.outputs.date }}
+          path: build/app/outputs/flutter-apk/icare-${{ steps.date.outputs.date }}.apk
           retention-days: 30
-          if-no-files-found: error
-
-      - name: Show download info
-        run: |
-          echo "✅ APK built successfully!"
-          echo "📦 File: ${{ steps.meta.outputs.apk_name }}"
-          echo "📥 Download from: Actions → Artifacts"
-
-  # ─── JOB 2: Build Web + Deploy to Vercel ────────────────────────────────────
-  build-web:
-    name: Build Flutter Web + Deploy
-    runs-on: ubuntu-latest
-    if: ${{ github.event.inputs.build_target != 'apk-only' }}
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          ref: wajahat
-
-      - name: Setup Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          channel: 'stable'
-          cache: true
-
-      - name: Flutter version check
-        run: flutter --version
-
-      - name: Install dependencies
-        run: flutter pub get
-
-      - name: Build Flutter Web (release, no source maps)
-        run: |
-          flutter build web \
-            --release \
-            --no-source-maps \
-            --dart-define=FLUTTER_WEB_USE_SKIA=true \
-            --tree-shake-icons
-
-      - name: Verify web build output
-        run: |
-          ls -la build/web/
-          echo "✅ Web build complete: $(du -sh build/web/ | awk '{print $1}')"
-
-      - name: Upload web build artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: flutter-web-build
-          path: build/web/
-          retention-days: 7
-          if-no-files-found: error
-
-      - name: Install Vercel CLI
-        run: npm install -g vercel@latest
-
-      - name: Deploy to Vercel Production
-        env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-        run: |
-          # Only deploy if Vercel secrets are configured
-          if [ -z "$VERCEL_TOKEN" ]; then
-            echo "⚠️  VERCEL_TOKEN not set — skipping Vercel deploy"
-            echo "   Add VERCEL_TOKEN to repo secrets to enable auto-deploy"
-          else
-            echo "🚀 Deploying to Vercel..."
-            vercel deploy build/web --prod --token=$VERCEL_TOKEN
-            echo "✅ Deployed to Vercel production!"
-          fi
-
-  # ─── JOB 3: Create GitHub Release (only on wajahat push) ────────────────────
-  create-release:
-    name: Create GitHub Release with APK
-    runs-on: ubuntu-latest
-    needs: build-apk
-    if: ${{ github.ref == 'refs/heads/wajahat' && github.event_name == 'push' && github.event.inputs.build_target != 'web-only' }}
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Get metadata
-        id: meta
-        run: |
-          VERSION=$(grep 'version:' pubspec.yaml | head -1 | awk '{print $2}' | tr -d "'")
-          DATE=$(date +'%Y%m%d-%H%M')
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "date=$DATE" >> $GITHUB_OUTPUT
-          echo "tag=v${VERSION}-${DATE}" >> $GITHUB_OUTPUT
-          echo "apk_name=iCare-v${VERSION}-${DATE}.apk" >> $GITHUB_OUTPUT
-
-      - name: Download APK artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: ${{ steps.meta.outputs.apk_name }}
-          path: ./artifacts/
-
-      - name: Create Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ steps.meta.outputs.tag }}
-          name: "iCare v${{ steps.meta.outputs.version }} — ${{ steps.meta.outputs.date }}"
-          body: |
-            ## iCare Android APK
-
-            **Branch:** `wajahat`
-            **Commit:** `${{ github.sha }}`
-            **Built:** ${{ steps.meta.outputs.date }}
-
-            ### Installation
-            1. Download `${{ steps.meta.outputs.apk_name }}` below
-            2. Enable "Install from unknown sources" on your Android device
-            3. Install the APK
-
-            ### What's new
-            ${{ github.event.head_commit.message }}
-          files: ./artifacts/${{ steps.meta.outputs.apk_name }}
-          draft: false
-          prerelease: true
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
