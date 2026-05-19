@@ -43,13 +43,20 @@ router.post('/', authMiddleware, async (req, res) => {
     const course = enrollment.courseId;
     const student = enrollment.userId;
 
+    if (!course || !student) {
+      return res.status(422).json({ success: false, message: 'Course or student data missing in enrollment' });
+    }
+
     // Get instructor name
     const instructor = await User.findById(course.instructor_id).lean();
     const instructorName = instructor?.name || instructor?.username || 'Instructor';
 
-    // Check if certificate already exists
+    // Check if certificate already exists (use enrollment._id which is always available)
     const existing = await Certificate.findOne({
-      enrollmentId: toId(enrollmentId),
+      $or: [
+        { enrollmentId: enrollment._id },
+        { studentId: student._id, courseId: course._id },
+      ],
     }).lean();
 
     if (existing) {
@@ -62,9 +69,9 @@ router.post('/', authMiddleware, async (req, res) => {
     const qrCodeData = `https://icare-app-ten.vercel.app/verify?code=${verificationCode}`;
 
     const certificate = await Certificate.create({
-      enrollmentId: toId(enrollmentId),
-      studentId: enrollment.userId._id,
-      courseId: enrollment.courseId._id,
+      enrollmentId: enrollment._id,
+      studentId: student._id,
+      courseId: course._id,
       certificateNumber: certNumber,
       verificationCode,
       studentName: student.name || student.username,

@@ -4,6 +4,7 @@ const mongoose = require('mongoose');
 const { connectMongoDB } = require('../config/mongodb');
 const { authMiddleware }  = require('../middleware/auth');
 const Announcement = require('../models/Announcement');
+const User = require('../models/User');
 
 function toId(id) {
   try { return new mongoose.Types.ObjectId(id); } catch { return null; }
@@ -46,7 +47,9 @@ router.post('/:postId/comment', authMiddleware, async (req, res) => {
     const { text } = req.body;
     const post = await Announcement.findById(toId(req.params.postId));
     if (!post) return res.status(404).json({ success: false, message: 'Post not found' });
-    post.comments.push({ authorId: req.user.id, authorName: req.user.name || 'User', text });
+    const userDoc = await User.findById(req.user.id).select('name username').lean();
+    const authorName = userDoc?.name || userDoc?.username || 'User';
+    post.comments.push({ authorId: req.user.id, authorName, text });
     await post.save();
     res.json({ success: true, post });
   } catch (e) {

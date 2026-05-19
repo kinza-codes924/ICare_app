@@ -253,28 +253,22 @@ router.post('/enrollments/:id/complete-module', authMiddleware, async (req, res)
     enrollment.moduleCompletions.push({ moduleId, completedAt: new Date() });
     await enrollment.save();
 
-    // Send notification to instructor
-    const Notification = require('../models/Notification');
-    const User = require('../models/User');
-    const course = await Course.findById(enrollment.courseId).lean();
-    const student = await User.findById(enrollment.userId).lean();
-
-    if (course && student) {
-      await Notification.create({
-        userId: course.instructor_id,
-        type: 'module_completed',
-        title: 'Module Completed',
-        message: `${student.name || student.username} completed a module in ${course.title}`,
-        data: {
-          studentId: enrollment.userId,
-          studentName: student.name || student.username,
-          courseId: course._id,
-          courseName: course.title,
-          moduleId,
-          completedAt: new Date(),
-        },
-      });
-    }
+    // Send notification to instructor (non-blocking)
+    try {
+      const Notification = require('../models/Notification');
+      const User = require('../models/User');
+      const course = await Course.findById(enrollment.courseId).lean();
+      const student = await User.findById(enrollment.userId).lean();
+      if (course?.instructor_id && student) {
+        await Notification.create({
+          userId: course.instructor_id,
+          type: 'general',
+          title: 'Module Completed',
+          message: `${student.name || student.username} completed a module in ${course.title}`,
+          data: { studentId: enrollment.userId, moduleId, courseId: course._id },
+        });
+      }
+    } catch (_) { /* notification failure should not break the response */ }
 
     res.json({ success: true, enrollment });
   } catch (e) {
