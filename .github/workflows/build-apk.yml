@@ -31,6 +31,15 @@ jobs:
       - name: Get dependencies
         run: flutter pub get
 
+      - name: Patch jcenter() in all pub-cache packages (Gradle 9 fix)
+        run: |
+          echo "=== Patching jcenter() calls in pub-cache ==="
+          find $HOME/.pub-cache -name "build.gradle" | xargs grep -l "jcenter()" 2>/dev/null | while read f; do
+            echo "Patching: $f"
+            sed -i 's/jcenter()/maven { url "https:\/\/jcenter.bintray.com" }/g' "$f"
+          done
+          echo "=== Patch complete ==="
+
       - name: Backup files
         run: |
           cp android/app/google-services.json /tmp/google-services.json
