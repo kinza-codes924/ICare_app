@@ -89,7 +89,7 @@ class _LmsCoursePageState extends State<LmsCoursePage> with SingleTickerProvider
           controller: _tabs,
           children: [
             _StreamTab(courseId: _courseId, lms: _lms, isInstructor: widget.isInstructor),
-            _ClassworkTab(courseId: _courseId, lms: _lms, isInstructor: widget.isInstructor, course: widget.course),
+            _ClassworkTab(courseId: _courseId, lms: _lms, isInstructor: widget.isInstructor, course: widget.course, enrollmentId: widget.enrollmentId),
             _GradesTab(courseId: _courseId, lms: _lms, isInstructor: widget.isInstructor),
             _PeopleTab(courseId: _courseId, lms: _lms, course: widget.course, isInstructor: widget.isInstructor),
           ],
@@ -271,7 +271,8 @@ class _ClassworkTab extends StatefulWidget {
   final LmsService lms;
   final bool isInstructor;
   final Map<String, dynamic> course;
-  const _ClassworkTab({required this.courseId, required this.lms, required this.isInstructor, required this.course});
+  final String? enrollmentId;
+  const _ClassworkTab({required this.courseId, required this.lms, required this.isInstructor, required this.course, this.enrollmentId});
 
   @override
   State<_ClassworkTab> createState() => _ClassworkTabState();
@@ -358,7 +359,7 @@ class _ClassworkTabState extends State<_ClassworkTab> {
             // Course modules/lessons section
             _SectionHeader(title: 'Course Content', icon: Icons.menu_book_rounded),
             const SizedBox(height: 8),
-            _CourseLessons(course: widget.course),
+            _CourseLessons(course: widget.course, enrollmentId: widget.enrollmentId, lms: widget.lms),
             const SizedBox(height: 24),
             _SectionHeader(title: 'Assignments', icon: Icons.assignment_rounded),
             const SizedBox(height: 8),
@@ -395,7 +396,9 @@ class _SectionHeader extends StatelessWidget {
 
 class _CourseLessons extends StatelessWidget {
   final Map<String, dynamic> course;
-  const _CourseLessons({required this.course});
+  final String? enrollmentId;
+  final LmsService lms;
+  const _CourseLessons({required this.course, this.enrollmentId, required this.lms});
 
   @override
   Widget build(BuildContext context) {
@@ -456,11 +459,7 @@ class _CourseLessons extends StatelessWidget {
 
   Future<void> _markModuleComplete(BuildContext context, String moduleId) async {
     try {
-      final lms = LmsService();
-      // Get enrollment ID from course context (you'll need to pass this)
-      final enrollmentId = ''; // TODO: Pass enrollmentId from parent widget
-
-      if (enrollmentId.isEmpty) {
+      if (enrollmentId == null || enrollmentId!.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Enrollment not found'), backgroundColor: Colors.red),
         );
@@ -468,7 +467,7 @@ class _CourseLessons extends StatelessWidget {
       }
 
       final result = await lms.markModuleComplete(
-        enrollmentId: enrollmentId,
+        enrollmentId: enrollmentId!,
         moduleId: moduleId,
       );
 
