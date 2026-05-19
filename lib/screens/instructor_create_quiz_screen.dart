@@ -631,6 +631,9 @@ class _QuestionDialogState extends State<_QuestionDialog> {
                   DropdownMenuItem(value: 'true_false', child: Text('True/False')),
                   DropdownMenuItem(value: 'short_answer', child: Text('Short Answer')),
                   DropdownMenuItem(value: 'essay', child: Text('Essay')),
+                  DropdownMenuItem(value: 'clinical_scenario', child: Text('Clinical Scenario (with Image)')),
+                  DropdownMenuItem(value: 'clinical_video', child: Text('Clinical Video Question')),
+                  DropdownMenuItem(value: 'osce_station', child: Text('OSCE/TOACS Station')),
                 ],
                 onChanged: (value) => setState(() => _type = value!),
               ),
@@ -705,6 +708,83 @@ class _QuestionDialogState extends State<_QuestionDialog> {
                   ),
                   onChanged: (value) => _correctAnswer = value,
                 ),
+              ] else if (_type == 'clinical_scenario') ...[
+                TextField(
+                  controller: TextEditingController(text: _options.isNotEmpty ? _options[0] : ''),
+                  decoration: const InputDecoration(
+                    labelText: 'Image URL (Clinical Scenario)',
+                    hintText: 'https://example.com/xray.jpg',
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.image_outlined),
+                  ),
+                  onChanged: (value) {
+                    if (_options.isEmpty) _options.add(value);
+                    else _options[0] = value;
+                  },
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: TextEditingController(text: _correctAnswer),
+                  decoration: const InputDecoration(
+                    labelText: 'Expected Answer/Diagnosis',
+                    border: OutlineInputBorder(),
+                  ),
+                  maxLines: 2,
+                  onChanged: (value) => _correctAnswer = value,
+                ),
+              ] else if (_type == 'clinical_video') ...[
+                TextField(
+                  controller: TextEditingController(text: _options.isNotEmpty ? _options[0] : ''),
+                  decoration: const InputDecoration(
+                    labelText: 'Video URL (Clinical Video)',
+                    hintText: 'https://example.com/procedure.mp4',
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.video_library_outlined),
+                  ),
+                  onChanged: (value) {
+                    if (_options.isEmpty) _options.add(value);
+                    else _options[0] = value;
+                  },
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: TextEditingController(text: _correctAnswer),
+                  decoration: const InputDecoration(
+                    labelText: 'Expected Answer',
+                    hintText: 'What should students identify?',
+                    border: OutlineInputBorder(),
+                  ),
+                  maxLines: 2,
+                  onChanged: (value) => _correctAnswer = value,
+                ),
+              ] else if (_type == 'osce_station') ...[
+                TextField(
+                  controller: TextEditingController(text: _options.isNotEmpty ? _options[0] : ''),
+                  decoration: const InputDecoration(
+                    labelText: 'Station Instructions',
+                    hintText: 'Detailed instructions for the OSCE/TOACS station',
+                    border: OutlineInputBorder(),
+                  ),
+                  maxLines: 4,
+                  onChanged: (value) {
+                    if (_options.isEmpty) _options.add(value);
+                    else _options[0] = value;
+                  },
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: TextEditingController(text: _options.length > 1 ? _options[1] : ''),
+                  decoration: const InputDecoration(
+                    labelText: 'Marking Rubric',
+                    hintText: 'Key points to assess',
+                    border: OutlineInputBorder(),
+                  ),
+                  maxLines: 3,
+                  onChanged: (value) {
+                    if (_options.length < 2) _options.add(value);
+                    else _options[1] = value;
+                  },
+                ),
               ],
 
               const SizedBox(height: 16),
@@ -748,6 +828,16 @@ class _QuestionDialogState extends State<_QuestionDialog> {
               question['options'] = ['True', 'False'];
               question['correctAnswer'] = _correctAnswer;
             } else if (_type == 'short_answer') {
+              question['correctAnswer'] = _correctAnswer;
+            } else if (_type == 'clinical_scenario') {
+              question['imageUrl'] = _options.isNotEmpty ? _options[0] : '';
+              question['correctAnswer'] = _correctAnswer;
+            } else if (_type == 'clinical_video') {
+              question['videoUrl'] = _options.isNotEmpty ? _options[0] : '';
+              question['correctAnswer'] = _correctAnswer;
+            } else if (_type == 'osce_station') {
+              question['instructions'] = _options.isNotEmpty ? _options[0] : '';
+              question['rubric'] = _options.length > 1 ? _options[1] : '';
               question['correctAnswer'] = _correctAnswer;
             }
 
