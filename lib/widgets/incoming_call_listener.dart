@@ -1,12 +1,18 @@
 import 'dart:async';
-import 'dart:js_interop';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import '../services/call_service.dart';
+import '../services/api_service.dart';
 import '../utils/shared_pref.dart';
 import '../utils/app_keys.dart';
+import '../utils/theme.dart';
 import '../screens/video_call.dart';
 import '../screens/consultation_chat_screen_v2.dart';
+import '../screens/lms_live_session_screen.dart';
+
+// Conditional import for web-only dart:js_interop
+import '../utils/js_interop_stub.dart'
+    if (dart.library.html) 'dart:js_interop';
 
 @JS('playRingtone')
 external void _jsPlayRingtone();
@@ -41,16 +47,72 @@ class _IncomingCallListenerState extends State<IncomingCallListener> {
   final CallService _callService = CallService();
   final SharedPref _sharedPref = SharedPref();
   Timer? _timer;
+  Timer? _lmsTimer;
   bool _dialogShowing = false;
+  bool _lmsDialogShowing = false;
+  String? _lastLiveCourseId;
 
   @override
   void initState() {
     super.initState();
     _startPolling();
+    _startLmsPolling();
   }
 
   void _startPolling() {
     _timer = Timer.periodic(const Duration(seconds: 8), (_) => _checkIncoming());
+  }
+
+  void _startLmsPolling() {
+    _lmsTimer = Timer.periodic(const Duration(seconds: 12), (_) => _checkLmsLive());
+  }
+
+  Future<void> _checkLmsLive() async {
+    if (_lmsDialogShowing || !mounted) return;
+    final token = await _sharedPref.getToken();
+    if (token == null || token.isEmpty) return;
+    final user = await _sharedPref.getUserData();
+    if (user?.role?.toLowerCase() != 'student') return;
+
+    try {
+      // Get enrolled courses and check each for live session
+      final api = ApiService();
+      final resp = await api.get('/students/courses/enrolled');
+      final enrollments = (resp.data['courses'] ?? resp.data['enrollments'] ?? []) as List;
+      for (final e in enrollments) {
+        final course = e['courseId'] as Map? ?? e['course'] as Map? ?? {};
+        final courseId = course['_id']?.toString() ?? e['courseId']?.toString() ?? '';
+        if (courseId.isEmpty) continue;
+        final liveResp = await api.get('/live-sessions/course/$courseId/active');
+        if (liveResp.data['isLive'] == true && _lastLiveCourseId != courseId) {
+          _lastLiveCourseId = courseId;
+          _showLiveSessionAlert(courseId, course['title']?.toString() ?? 'Live Session');
+          return;
+        }
+        if (liveResp.data['isLive'] != true && _lastLiveCourseId == courseId) {
+          _lastLiveCourseId = null;
+        }
+      }
+    } catch (_) {}
+  }
+
+  void _showLiveSessionAlert(String courseId, String courseTitle) {
+    if (_lmsDialogShowing) return;
+    final nav = appNavigatorKey.currentState;
+    if (nav == null) return;
+    _lmsDialogShowing = true;
+    nav.push(PageRouteBuilder(
+      opaque: false,
+      barrierColor: Colors.black54,
+      barrierDismissible: false,
+      pageBuilder: (ctx, _, __) => _LmsLiveDialog(
+        courseId: courseId,
+        courseTitle: courseTitle,
+        onDismiss: () { _lmsDialogShowing = false; },
+      ),
+      transitionsBuilder: (ctx, anim, _, child) =>
+          FadeTransition(opacity: anim, child: child),
+    ));
   }
 
   Future<void> _checkIncoming() async {
@@ -144,6 +206,7 @@ class _IncomingCallListenerState extends State<IncomingCallListener> {
   @override
   void dispose() {
     _timer?.cancel();
+    _lmsTimer?.cancel();
     super.dispose();
   }
 
@@ -271,6 +334,107 @@ class _IncomingCallDialog extends StatelessWidget {
               ],
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─── LMS Live Session Alert Dialog ─────────────────────────────────────────
+
+class _LmsLiveDialog extends StatelessWidget {
+  final String courseId;
+  final String courseTitle;
+  final VoidCallback onDismiss;
+
+  const _LmsLiveDialog({
+    required this.courseId,
+    required this.courseTitle,
+    required this.onDismiss,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return WillPopScope(
+      onWillPop: () async { onDismiss(); return true; },
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        body: Center(
+          child: Container(
+            margin: const EdgeInsets.all(24),
+            padding: const EdgeInsets.all(28),
+            decoration: BoxDecoration(
+              color: const Color(0xFF1C2333),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: Colors.red, width: 2),
+              boxShadow: [BoxShadow(color: Colors.red.withOpacity(0.4), blurRadius: 20)],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.live_tv_rounded, color: Colors.red, size: 64),
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  decoration: BoxDecoration(color: Colors.red, borderRadius: BorderRadius.circular(20)),
+                  child: const Row(mainAxisSize: MainAxisSize.min, children: [
+                    Icon(Icons.circle, color: Colors.white, size: 10),
+                    SizedBox(width: 6),
+                    Text('LIVE NOW', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 12)),
+                  ]),
+                ),
+                const SizedBox(height: 16),
+                const Text('Your Instructor is LIVE!',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900)),
+                const SizedBox(height: 8),
+                Text(courseTitle,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: Colors.white70, fontSize: 15)),
+                const SizedBox(height: 24),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () { onDismiss(); Navigator.pop(context); },
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: Colors.white54,
+                          side: const BorderSide(color: Colors.white24),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                        ),
+                        child: const Text('Later'),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      flex: 2,
+                      child: ElevatedButton.icon(
+                        onPressed: () {
+                          onDismiss();
+                          Navigator.pop(context);
+                          Navigator.push(context, MaterialPageRoute(
+                            builder: (_) => LmsLiveSessionScreen(
+                              sessionId: courseId,
+                              courseId: courseId,
+                              sessionTitle: courseTitle,
+                              isInstructor: false,
+                            ),
+                          ));
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.red,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                        ),
+                        icon: const Icon(Icons.play_arrow_rounded, size: 22),
+                        label: const Text('JOIN NOW', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );
