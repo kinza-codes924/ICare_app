@@ -3,7 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart';
 // ignore: avoid_web_libraries_in_flutter
-import 'dart:html' as html show window;
+import '../utils/html_stub.dart' as html
+    if (dart.library.html) 'dart:html';
 import '../services/pharmacy_service.dart';
 import 'pharmacist_dashboard.dart';
 import 'tabs.dart';

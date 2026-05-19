@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 // ignore: avoid_web_libraries_in_flutter
-import 'dart:html' as html;
+import '../utils/html_stub.dart' as html
+    if (dart.library.html) 'dart:html';
 import 'package:dio/dio.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
