@@ -31,14 +31,52 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
-      - name: Patch jcenter() in pub-cache (Gradle 9 fix)
+      - name: Patch pub-cache build.gradle files (Python - reliable)
         run: |
-          set +e
-          for f in $(find $HOME/.pub-cache -name "build.gradle" 2>/dev/null); do
-            grep -q "jcenter()" "$f" 2>/dev/null && \
-              sed -i 's/jcenter()/maven { url "https:\/\/jcenter.bintray.com" }/g' "$f"
-          done
-          set -e
+          python3 << 'PYEOF'
+          import os, re, subprocess
+
+          pub_cache = os.path.expanduser('~/.pub-cache')
+
+          for root, dirs, files in os.walk(pub_cache):
+              for name in files:
+                  if name != 'build.gradle':
+                      continue
+                  f = os.path.join(root, name)
+                  try:
+                      content = open(f).read()
+                  except:
+                      continue
+
+                  changed = False
+
+                  # Fix 1: Replace jcenter()
+                  if 'jcenter()' in content:
+                      content = content.replace('jcenter()', 'maven { url "https://jcenter.bintray.com" }')
+                      changed = True
+
+                  # Fix 2: Add namespace if missing in library projects
+                  if 'com.android.library' in content and 'namespace' not in content:
+                      # Find AndroidManifest.xml
+                      for r2, d2, f2 in os.walk(root):
+                          if 'AndroidManifest.xml' in f2:
+                              try:
+                                  manifest = open(os.path.join(r2, 'AndroidManifest.xml')).read()
+                                  m = re.search(r'package="([^"]+)"', manifest)
+                                  if m:
+                                      pkg = m.group(1)
+                                      content = content.replace('android {', f'android {{\n    namespace "{pkg}"', 1)
+                                      changed = True
+                                      print(f"Namespace {pkg} added to {f}")
+                              except:
+                                  pass
+                              break
+
+                  if changed:
+                      open(f, 'w').write(content)
+
+          print("Patching complete")
+          PYEOF
 
       - name: Backup google-services.json
         run: cp android/app/google-services.json /tmp/google-services.json
