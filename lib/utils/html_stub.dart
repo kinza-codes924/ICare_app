@@ -7,7 +7,16 @@ class _StyleElement {
   String borderRadius = '';
   String transform = '';
   String backgroundColor = '';
+  String background = '';
   String position = '';
+  String bottom = '';
+  String right = '';
+  String top = '';
+  String left = '';
+  String zIndex = '';
+  String overflow = '';
+  String border = '';
+  String cssText = '';
 }
 
 class MediaStreamTrack {
@@ -32,6 +41,7 @@ class DivElement {
   String id = '';
   final _StyleElement style = _StyleElement();
   void append(dynamic element) {}
+  void appendChild(dynamic element) {}
   void remove() {}
 }
 
@@ -61,15 +71,17 @@ class Navigator {
 
 class Window {
   Navigator get navigator => Navigator();
-  dynamic callMethod(String name, [List<dynamic>? args]) => null;
 }
 
 class Body {
   void append(dynamic element) {}
+  void appendChild(dynamic element) {}
 }
 
 class Document {
   Body? get body => Body();
+  dynamic createElement(String tagName) => DivElement();
+  dynamic getElementById(String id) => null;
 }
 
 class AnchorElement {

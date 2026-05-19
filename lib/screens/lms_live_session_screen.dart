@@ -133,39 +133,27 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
     try {
       final channelId = 'lms_${widget.courseId}';
       final uid = _currentUserId.hashCode.abs() % 100000 + 1;
-      final viewKey = 'lms-video-view-${widget.courseId}';
+      const viewKey = 'lms-video-container';
 
-      // Register HtmlElementView factory using package:web (creates real DOM elements)
+      // Register the HtmlElementView — creates real DOM elements Agora can use
       ui.platformViewRegistry.registerViewFactory(viewKey, (int id) {
-        final doc = html.document;
-        final container = doc.createElement('div') as dynamic;
+        // Container div
+        final container = html.document.createElement('div') as dynamic;
         container.id = 'lms-video-grid';
-        container.style.width = '100%';
-        container.style.height = '100%';
-        container.style.background = '#1C2333';
-        container.style.position = 'relative';
+        container.style.cssText = 'width:100%;height:100%;background:#1C2333;position:relative;';
 
-        // Remote video area (full size)
-        final remote = doc.createElement('div') as dynamic;
+        // Remote full-area
+        final remote = html.document.createElement('div') as dynamic;
         remote.id = 'lms-remote-main';
-        remote.style.width = '100%';
-        remote.style.height = '100%';
-        remote.style.background = '#1C2333';
+        remote.style.cssText = 'width:100%;height:100%;background:#1C2333;';
         container.appendChild(remote);
 
-        // Local video (picture-in-picture, bottom right)
-        final local = doc.createElement('div') as dynamic;
+        // Local PiP bottom-right
+        final local = html.document.createElement('div') as dynamic;
         local.id = 'lms-local-video';
-        local.style.position = 'absolute';
-        local.style.bottom = '16px';
-        local.style.right = '16px';
-        local.style.width = '160px';
-        local.style.height = '120px';
-        local.style.borderRadius = '10px';
-        local.style.overflow = 'hidden';
-        local.style.background = '#2D3748';
-        local.style.zIndex = '10';
-        local.style.border = '2px solid rgba(255,255,255,0.3)';
+        local.style.cssText = 'position:absolute;bottom:16px;right:16px;width:160px;height:120px;'
+            'border-radius:10px;overflow:hidden;background:#2D3748;z-index:10;'
+            'border:2px solid rgba(255,255,255,0.3);';
         container.appendChild(local);
 
         return container;
@@ -173,9 +161,9 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
 
       if (mounted) setState(() => _cameraViewName = viewKey);
 
-      // Wait for the DOM element to be rendered before calling Agora
+      // Join Agora after DOM is ready
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        Future.delayed(const Duration(milliseconds: 500), () {
+        Future.delayed(const Duration(milliseconds: 600), () {
           js.context.callMethod('lmsJoin', [
             '82a63a65663c49f0bb973707b4c09f5f',
             channelId,
@@ -186,7 +174,7 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
       });
 
     } catch (e) {
-      debugPrint('LMS web camera/agora error: $e');
+      debugPrint('LMS camera error: $e');
     }
   }
 
@@ -455,9 +443,34 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
   }
 
   Widget _buildVideoArea() {
+    // On web: use the Agora-managed HtmlElementView (has both local + remote divs)
+    if (kIsWeb && _cameraViewName != null) {
+      return Stack(
+        children: [
+          SizedBox.expand(
+            child: HtmlElementView(viewType: _cameraViewName!),
+          ),
+          // Raised hands & reactions overlay
+          if (_raisedHands.isNotEmpty)
+            Positioned(
+              top: 12, left: 12,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(color: Colors.orange.withOpacity(0.9), borderRadius: BorderRadius.circular(20)),
+                child: Row(children: [
+                  const Text('✋', style: TextStyle(fontSize: 16)),
+                  const SizedBox(width: 8),
+                  Text('${_raisedHands.length} hand(s) raised', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+                ]),
+              ),
+            ),
+        ],
+      );
+    }
+
     return Stack(
       children: [
-        // Video grid
+        // Video grid (mobile / fallback)
         _remoteUids.isEmpty
             ? _buildSelfVideoTile(isLarge: true)
             : _buildVideoGrid(),
