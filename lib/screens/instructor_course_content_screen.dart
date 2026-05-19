@@ -1,4 +1,5 @@
 ﻿import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:dio/dio.dart';
 import 'package:icare/screens/certificate_templates_screen.dart';
@@ -8,6 +9,7 @@ import 'package:icare/services/lms_service.dart';
 import 'package:icare/services/api_service.dart';
 import 'package:icare/utils/shared_pref.dart';
 import 'package:icare/utils/theme.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 /// Course Content Management - Moodle/Udemy style
 class InstructorCourseContentScreen extends StatefulWidget {
@@ -330,6 +332,83 @@ class _InstructorCourseContentScreenState extends State<InstructorCourseContentS
         ),
         actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Close'))],
       ),
+    );
+  }
+
+  Future<void> _startLiveSession(Map<String, dynamic> lesson) async {
+    final meetingLink = lesson['meetingLink']?.toString() ?? '';
+    final meetingId = lesson['meetingId']?.toString() ?? '';
+    final meetingPassword = lesson['meetingPassword']?.toString() ?? '';
+    final platform = lesson['platform']?.toString() ?? 'zoom';
+
+    if (meetingLink.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No meeting link set for this session. Please edit the lesson.'), backgroundColor: Colors.red),
+      );
+      return;
+    }
+
+    // Show details dialog before opening
+    await showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(children: [
+          Icon(Icons.live_tv_rounded, color: Colors.red),
+          SizedBox(width: 10),
+          Text('Start Live Session', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
+        ]),
+        content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const Text('Share these details with students:', style: TextStyle(fontSize: 13, color: Color(0xFF64748B))),
+          const SizedBox(height: 12),
+          _infoTile('Platform', platform.toUpperCase()),
+          if (meetingId.isNotEmpty) _infoTile('Meeting ID', meetingId),
+          if (meetingPassword.isNotEmpty) _infoTile('Password', meetingPassword),
+          _infoTile('Link', meetingLink, overflow: true),
+        ]),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+            onPressed: () async {
+              Navigator.pop(ctx);
+              final uri = Uri.parse(meetingLink);
+              if (await canLaunchUrl(uri)) {
+                await launchUrl(uri, mode: LaunchMode.externalApplication);
+              }
+            },
+            icon: const Icon(Icons.play_arrow_rounded, size: 18),
+            label: const Text('Open & Start'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _infoTile(String label, String value, {bool overflow = false}) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text('$label: ', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF475569))),
+        Expanded(child: Text(value,
+          style: const TextStyle(fontSize: 13, color: Color(0xFF0F172A)),
+          overflow: overflow ? TextOverflow.ellipsis : null,
+        )),
+      ]),
+    );
+  }
+
+  void _copyMeetingLink(Map<String, dynamic> lesson) {
+    final link = lesson['meetingLink']?.toString() ?? '';
+    if (link.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No meeting link available'), backgroundColor: Colors.red),
+      );
+      return;
+    }
+    Clipboard.setData(ClipboardData(text: link));
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Meeting link copied to clipboard!'), backgroundColor: Colors.green),
     );
   }
 
@@ -690,19 +769,44 @@ class _InstructorCourseContentScreenState extends State<InstructorCourseContentS
             ),
           ),
           // Live session actions
-          if (isLiveSession) PopupMenuButton<String>(
-            icon: const Icon(Icons.more_vert, size: 18, color: Color(0xFF94A3B8)),
-            onSelected: (val) {
-              if (val == 'announce') _postAnnouncement(moduleTitle, title);
-            },
-            itemBuilder: (_) => [
-              const PopupMenuItem(value: 'announce', child: Row(children: [
-                Icon(Icons.campaign_rounded, size: 18, color: Color(0xFFF59E0B)),
-                SizedBox(width: 10),
-                Text('Cancel & Announce'),
-              ])),
-            ],
-          ),
+          if (isLiveSession) Row(mainAxisSize: MainAxisSize.min, children: [
+            // Start / Open session button
+            GestureDetector(
+              onTap: () => _startLiveSession(lesson),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: Colors.red,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Row(mainAxisSize: MainAxisSize.min, children: [
+                  Icon(Icons.play_arrow_rounded, color: Colors.white, size: 16),
+                  SizedBox(width: 4),
+                  Text('Start', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700)),
+                ]),
+              ),
+            ),
+            const SizedBox(width: 6),
+            PopupMenuButton<String>(
+              icon: const Icon(Icons.more_vert, size: 18, color: Color(0xFF94A3B8)),
+              onSelected: (val) {
+                if (val == 'announce') _postAnnouncement(moduleTitle, title);
+                if (val == 'copy') _copyMeetingLink(lesson);
+              },
+              itemBuilder: (_) => [
+                const PopupMenuItem(value: 'copy', child: Row(children: [
+                  Icon(Icons.copy_rounded, size: 18, color: AppColors.primaryColor),
+                  SizedBox(width: 10),
+                  Text('Copy Meeting Link'),
+                ])),
+                const PopupMenuItem(value: 'announce', child: Row(children: [
+                  Icon(Icons.campaign_rounded, size: 18, color: Color(0xFFF59E0B)),
+                  SizedBox(width: 10),
+                  Text('Cancel & Announce'),
+                ])),
+              ],
+            ),
+          ]),
         ],
       ),
     );

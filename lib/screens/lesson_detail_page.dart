@@ -46,6 +46,11 @@ class _LessonDetailPageState extends State<LessonDetailPage> with SingleTickerPr
     final documentUrl = widget.lesson['documentUrl'];
     final content = widget.lesson['content'] ?? '';
     final lessonId = widget.lesson['_id']?.toString() ?? '';
+    final meetingLink = widget.lesson['meetingLink']?.toString() ?? '';
+    final meetingId = widget.lesson['meetingId']?.toString() ?? '';
+    final meetingPassword = widget.lesson['meetingPassword']?.toString() ?? '';
+    final platform = widget.lesson['platform']?.toString() ?? 'zoom';
+    final scheduledAt = widget.lesson['scheduledAt']?.toString();
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
@@ -116,7 +121,7 @@ class _LessonDetailPageState extends State<LessonDetailPage> with SingleTickerPr
                     ),
                   ),
 
-                // Live Session Info
+                // Live Session Info + Join Button
                 if (lessonType == 'live')
                   Container(
                     margin: const EdgeInsets.only(bottom: 16),
@@ -126,28 +131,79 @@ class _LessonDetailPageState extends State<LessonDetailPage> with SingleTickerPr
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(color: Colors.orange.shade200),
                     ),
-                    child: Row(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Icon(Icons.videocam_rounded, color: Colors.orange.shade700, size: 32),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Live Session',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w700,
-                                  color: Colors.orange.shade900,
-                                ),
+                        Row(
+                          children: [
+                            Icon(Icons.live_tv_rounded, color: Colors.red.shade600, size: 28),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(children: [
+                                    Text('Live Session',
+                                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Colors.orange.shade900)),
+                                    const SizedBox(width: 8),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                      decoration: BoxDecoration(color: Colors.red, borderRadius: BorderRadius.circular(4)),
+                                      child: const Text('LIVE', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w800)),
+                                    ),
+                                  ]),
+                                  if (scheduledAt != null) ...[
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      _formatScheduledAt(scheduledAt),
+                                      style: TextStyle(fontSize: 12, color: Colors.orange.shade700),
+                                    ),
+                                  ],
+                                ],
                               ),
-                              const SizedBox(height: 4),
-                              Text(
-                                'Join the live session when it starts',
-                                style: TextStyle(fontSize: 13, color: Colors.orange.shade700),
-                              ),
-                            ],
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+
+                        // Platform badge
+                        Row(children: [
+                          _platformIcon(platform),
+                          const SizedBox(width: 6),
+                          Text(
+                            _platformName(platform),
+                            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.orange.shade800),
+                          ),
+                        ]),
+
+                        // Meeting ID & Password
+                        if (meetingId.isNotEmpty) ...[
+                          const SizedBox(height: 8),
+                          _infoRow(Icons.tag_rounded, 'Meeting ID', meetingId),
+                        ],
+                        if (meetingPassword.isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          _infoRow(Icons.lock_outline_rounded, 'Password', meetingPassword),
+                        ],
+
+                        const SizedBox(height: 14),
+
+                        // Join Button
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton.icon(
+                            onPressed: meetingLink.isNotEmpty
+                                ? () => _launchUrl(meetingLink)
+                                : null,
+                            icon: const Icon(Icons.video_call_rounded, size: 20),
+                            label: Text(meetingLink.isNotEmpty ? 'Join Session' : 'Link not available yet'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.red.shade600,
+                              foregroundColor: Colors.white,
+                              disabledBackgroundColor: Colors.grey.shade300,
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            ),
                           ),
                         ),
                       ],
@@ -259,6 +315,50 @@ class _LessonDetailPageState extends State<LessonDetailPage> with SingleTickerPr
           const SnackBar(content: Text('Could not open URL'), backgroundColor: Colors.red),
         );
       }
+    }
+  }
+
+  Widget _platformIcon(String platform) {
+    switch (platform.toLowerCase()) {
+      case 'zoom':
+        return const Icon(Icons.video_camera_front_rounded, color: Color(0xFF2D8CFF), size: 18);
+      case 'meet':
+        return const Icon(Icons.videocam_rounded, color: Color(0xFF00897B), size: 18);
+      case 'teams':
+        return const Icon(Icons.groups_rounded, color: Color(0xFF6264A7), size: 18);
+      default:
+        return const Icon(Icons.link_rounded, color: Colors.orange, size: 18);
+    }
+  }
+
+  String _platformName(String platform) {
+    switch (platform.toLowerCase()) {
+      case 'zoom': return 'Zoom Meeting';
+      case 'meet': return 'Google Meet';
+      case 'teams': return 'Microsoft Teams';
+      default: return 'Custom Link';
+    }
+  }
+
+  Widget _infoRow(IconData icon, String label, String value) {
+    return Row(children: [
+      Icon(icon, size: 14, color: Colors.orange.shade700),
+      const SizedBox(width: 6),
+      Text('$label: ', style: TextStyle(fontSize: 12, color: Colors.orange.shade700, fontWeight: FontWeight.w600)),
+      Text(value, style: TextStyle(fontSize: 12, color: Colors.orange.shade900, fontWeight: FontWeight.w700)),
+    ]);
+  }
+
+  String _formatScheduledAt(String iso) {
+    try {
+      final dt = DateTime.parse(iso).toLocal();
+      const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+      final h = dt.hour % 12 == 0 ? 12 : dt.hour % 12;
+      final m = dt.minute.toString().padLeft(2, '0');
+      final ampm = dt.hour < 12 ? 'AM' : 'PM';
+      return '${months[dt.month - 1]} ${dt.day}, ${dt.year}  $h:$m $ampm';
+    } catch (_) {
+      return iso;
     }
   }
 }
