@@ -24,6 +24,7 @@ import 'package:icare/screens/instructor_course_content_screen.dart';
 import 'package:icare/screens/instructor_course_analytics_screen.dart';
 import 'package:icare/screens/instructor_course_stream_screen.dart';
 import 'package:icare/screens/lms_course_page.dart';
+import 'package:icare/screens/certificate_verification_page.dart';
 import 'package:icare/utils/shared_pref.dart';
 import 'package:icare/utils/app_keys.dart';
 
@@ -58,7 +59,7 @@ final _routerNotifierProvider = Provider<_RouterNotifier>((ref) {
 });
 
 /// Public paths that don't require authentication.
-const _publicPaths = ['/home', '/login', '/signup', '/work-with-us', '/splash', '/lms/catalog'];
+const _publicPaths = ['/home', '/login', '/signup', '/work-with-us', '/splash', '/lms/catalog', '/verify'];
 
 final routerProvider = Provider<GoRouter>((ref) {
   // Trigger auth init as soon as router is created.
@@ -100,6 +101,13 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (_, state) {
           final extra = state.extra as Map<String, dynamic>?;
           return LmsPublicCatalog(audienceFilter: extra?['audienceFilter'] as String?);
+        },
+      ),
+      GoRoute(
+        path: '/verify',
+        builder: (_, state) {
+          final code = state.uri.queryParameters['code'];
+          return CertificateVerificationPage(initialCode: code);
         },
       ),
       GoRoute(path: '/admin/verifications', builder: (_, __) => const AdminVerificationPanel()),

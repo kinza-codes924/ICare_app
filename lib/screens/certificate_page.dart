@@ -259,7 +259,7 @@ class _CertificatePageState extends State<CertificatePage> {
                                 children: [
                                   if (_certificate?['verificationCode'] != null)
                                     QrImageView(
-                                      data: _certificate!['verificationCode'],
+                                      data: 'https://icare-app-ten.vercel.app/verify?code=${_certificate!['verificationCode']}',
                                       version: QrVersions.auto,
                                       size: 120,
                                       backgroundColor: Colors.white,
