@@ -94,19 +94,27 @@ jobs:
           echo "flutter.sdk=$FLUTTER_ROOT" > android/local.properties
           echo "sdk.dir=$ANDROID_SDK_ROOT" >> android/local.properties
 
-      - name: Force compileSdk 34 and minSdk 23 (Firebase + Agora require it)
+      - name: Force compileSdk 34 and minSdk 23 via Python (Agora + Firebase require it)
         run: |
-          # Replace flutter.compileSdkVersion with 34
-          sed -i 's/compileSdk = flutter.compileSdkVersion/compileSdk = 34/' android/app/build.gradle.kts
-          sed -i 's/compileSdk flutter.compileSdkVersion/compileSdk 34/' android/app/build.gradle.kts
-          # Replace minSdk with 23 (required by Firebase)
-          sed -i 's/minSdk = flutter.minSdkVersion/minSdk = 23/' android/app/build.gradle.kts
-          sed -i 's/minSdk flutter.minSdkVersion/minSdk 23/' android/app/build.gradle.kts
-          # Replace targetSdk with 34
-          sed -i 's/targetSdk = flutter.targetSdkVersion/targetSdk = 34/' android/app/build.gradle.kts
-          sed -i 's/targetSdk flutter.targetSdkVersion/targetSdk 34/' android/app/build.gradle.kts
-          echo "=== Updated build.gradle.kts ==="
-          grep -E "compileSdk|minSdk|targetSdk" android/app/build.gradle.kts
+          python3 << 'PYEOF'
+          import re
+          f = 'android/app/build.gradle.kts'
+          content = open(f).read()
+          # Replace compileSdk
+          content = re.sub(r'compileSdk\s*=?\s*flutter\.compileSdkVersion', 'compileSdk = 34', content)
+          content = re.sub(r'compileSdk\s*=?\s*\d+', 'compileSdk = 34', content)
+          # Replace minSdk
+          content = re.sub(r'minSdk\s*=?\s*flutter\.minSdkVersion', 'minSdk = 23', content)
+          content = re.sub(r'minSdk\s*=?\s*\d+', lambda m: m.group() if int(re.search(r'\d+', m.group()).group()) >= 23 else 'minSdk = 23', content)
+          # Replace targetSdk
+          content = re.sub(r'targetSdk\s*=?\s*flutter\.targetSdkVersion', 'targetSdk = 34', content)
+          content = re.sub(r'targetSdk\s*=?\s*\d+', 'targetSdk = 34', content)
+          open(f, 'w').write(content)
+          # Verify
+          for line in open(f):
+              if any(x in line for x in ['compileSdk', 'minSdk', 'targetSdk']):
+                  print(line.rstrip())
+          PYEOF
 
       - name: Add google-services plugin to settings.gradle.kts
         run: |

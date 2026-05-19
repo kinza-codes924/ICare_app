@@ -131,42 +131,59 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
   Future<void> _initWebCamera() async {
     if (!kIsWeb) return;
     try {
-      // Use JavaScript Agora bridge for real P2P video+audio
       final channelId = 'lms_${widget.courseId}';
       final uid = _currentUserId.hashCode.abs() % 100000 + 1;
+      final viewKey = 'lms-video-view-${widget.courseId}';
 
-      // Register the video grid container
-      ui.platformViewRegistry.registerViewFactory(
-        'lms-video-grid',
-        (int id) {
-          final div = html.DivElement()
-            ..id = 'lms-video-grid'
-            ..style.width = '100%'
-            ..style.height = '100%'
-            ..style.backgroundColor = '#1C2333'
-            ..style.position = 'relative';
+      // Register HtmlElementView factory using package:web (creates real DOM elements)
+      ui.platformViewRegistry.registerViewFactory(viewKey, (int id) {
+        final doc = html.document;
+        final container = doc.createElement('div') as dynamic;
+        container.id = 'lms-video-grid';
+        container.style.width = '100%';
+        container.style.height = '100%';
+        container.style.background = '#1C2333';
+        container.style.position = 'relative';
 
-          // Local video container
-          final localDiv = html.DivElement()
-            ..id = 'lms-local-video'
-            ..style.width = '100%'
-            ..style.height = '100%'
-            ..style.backgroundColor = '#2D3748';
-          div.append(localDiv);
+        // Remote video area (full size)
+        final remote = doc.createElement('div') as dynamic;
+        remote.id = 'lms-remote-main';
+        remote.style.width = '100%';
+        remote.style.height = '100%';
+        remote.style.background = '#1C2333';
+        container.appendChild(remote);
 
-          return div;
-        },
-      );
+        // Local video (picture-in-picture, bottom right)
+        final local = doc.createElement('div') as dynamic;
+        local.id = 'lms-local-video';
+        local.style.position = 'absolute';
+        local.style.bottom = '16px';
+        local.style.right = '16px';
+        local.style.width = '160px';
+        local.style.height = '120px';
+        local.style.borderRadius = '10px';
+        local.style.overflow = 'hidden';
+        local.style.background = '#2D3748';
+        local.style.zIndex = '10';
+        local.style.border = '2px solid rgba(255,255,255,0.3)';
+        container.appendChild(local);
 
-      if (mounted) setState(() => _cameraViewName = 'lms-video-grid');
+        return container;
+      });
 
-      // Call JavaScript Agora bridge — returns a Promise, but js.context.callMethod returns dynamic
-      js.context.callMethod('lmsJoin', [
-        '82a63a65663c49f0bb973707b4c09f5f', // Agora App ID
-        channelId,
-        uid,
-      ]);
-      debugPrint('LMS Agora join initiated for channel: $channelId, uid: $uid');
+      if (mounted) setState(() => _cameraViewName = viewKey);
+
+      // Wait for the DOM element to be rendered before calling Agora
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        Future.delayed(const Duration(milliseconds: 500), () {
+          js.context.callMethod('lmsJoin', [
+            '82a63a65663c49f0bb973707b4c09f5f',
+            channelId,
+            uid,
+          ]);
+          debugPrint('LMS Agora join: channel=$channelId uid=$uid');
+        });
+      });
 
     } catch (e) {
       debugPrint('LMS web camera/agora error: $e');

@@ -99,6 +99,7 @@ class _IncomingCallListenerState extends State<IncomingCallListener> {
         }
         if (!isLive && _lastLiveCourseId == courseId) {
           _lastLiveCourseId = null;
+          _lmsDialogShowing = false; // Reset so next session can show popup
         }
       }
     } catch (e) {

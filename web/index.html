@@ -291,18 +291,23 @@
           }
           if (mediaType === 'video') {
             window._lmsRemoteUids.push(user.uid);
-            // Create a container for remote video
-            let container = document.getElementById('lms-remote-' + user.uid);
-            if (!container) {
-              container = document.createElement('div');
-              container.id = 'lms-remote-' + user.uid;
-              container.style.width = '100%';
-              container.style.height = '100%';
-              container.style.backgroundColor = '#1C2333';
-              const grid = document.getElementById('lms-video-grid');
-              if (grid) grid.appendChild(container);
+            // Use the pre-built main area, else create fallback
+            const mainArea = document.getElementById('lms-remote-main');
+            const remoteId = 'lms-remote-' + user.uid;
+            if (mainArea) {
+              mainArea.id = remoteId;
+              user.videoTrack.play(remoteId);
+            } else {
+              let container = document.getElementById(remoteId);
+              if (!container) {
+                container = document.createElement('div');
+                container.id = remoteId;
+                container.style.cssText = 'width:100%;height:100%;background:#1C2333;';
+                const grid = document.getElementById('lms-video-grid');
+                if (grid) grid.insertBefore(container, grid.firstChild);
+              }
+              user.videoTrack.play(remoteId);
             }
-            user.videoTrack.play('lms-remote-' + user.uid);
           }
         });
 
