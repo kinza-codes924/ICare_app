@@ -418,8 +418,14 @@ router.post('/course/:courseId/set-live', authMiddleware, async (req, res) => {
       if (isLive) {
         await LiveSession.findOneAndUpdate(
           { courseId: toId(req.params.courseId), status: 'live' },
-          { courseId: toId(req.params.courseId), instructorId: toId(req.user.id), status: 'live', title: req.body.title || 'Live Session' },
-          { upsert: true, new: true }
+          {
+            courseId: toId(req.params.courseId),
+            instructorId: toId(req.user.id),
+            status: 'live',
+            title: req.body.title || 'Live Session',
+            scheduledAt: new Date(),   // ← required field fix
+          },
+          { upsert: true, new: true, setDefaultsOnInsert: true }
         );
       } else {
         await LiveSession.updateMany({ courseId: toId(req.params.courseId), status: 'live' }, { status: 'ended' });
