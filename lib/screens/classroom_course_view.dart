@@ -12,6 +12,7 @@ import 'package:icare/screens/instructor_course_analytics_screen.dart';
 import 'package:icare/services/lms_service.dart';
 import 'package:icare/utils/shared_pref.dart';
 import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 // ─────────────────────────────────────────────────────────────
 // Google Classroom-style inside-course view
@@ -1176,6 +1177,85 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
           ),
         ),
       );
+    } else if (type == 'session') {
+      _openSessionLink(data, isInstructor: widget.isInstructor);
+    }
+  }
+
+  Future<void> _openSessionLink(Map data, {bool isInstructor = false}) async {
+    final meetingLink = data['meetingLink']?.toString() ?? '';
+    final meetingId = data['meetingId']?.toString() ?? '';
+    final meetingPassword = data['meetingPassword']?.toString() ?? '';
+    final platform = data['platform']?.toString() ?? 'zoom';
+    final title = data['title']?.toString() ?? 'Live Session';
+
+    if (meetingLink.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No meeting link set for this session.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(children: [
+          Icon(Icons.live_tv_rounded, color: Colors.red, size: 24),
+          const SizedBox(width: 10),
+          Expanded(child: Text(title, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16))),
+        ]),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _sessionInfoRow(Icons.videocam_rounded, 'Platform', _platformName(platform)),
+            if (meetingId.isNotEmpty) ...[const SizedBox(height: 8), _sessionInfoRow(Icons.tag_rounded, 'Meeting ID', meetingId)],
+            if (meetingPassword.isNotEmpty) ...[const SizedBox(height: 8), _sessionInfoRow(Icons.lock_outline_rounded, 'Password', meetingPassword)],
+            const SizedBox(height: 8),
+            _sessionInfoRow(Icons.link_rounded, 'Link', meetingLink, overflow: true),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: isInstructor ? Colors.red : const Color(0xFF1A73E8),
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () async {
+              Navigator.pop(ctx);
+              final uri = Uri.parse(meetingLink);
+              if (await canLaunchUrl(uri)) {
+                await launchUrl(uri, mode: LaunchMode.externalApplication);
+              }
+            },
+            icon: Icon(isInstructor ? Icons.play_arrow_rounded : Icons.login_rounded, size: 18),
+            label: Text(isInstructor ? 'Start Session' : 'Join Session'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _sessionInfoRow(IconData icon, String label, String value, {bool overflow = false}) {
+    return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Icon(icon, size: 16, color: const Color(0xFF70757A)),
+      const SizedBox(width: 6),
+      Text('$label: ', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF444746))),
+      Expanded(child: Text(value, style: const TextStyle(fontSize: 13, color: Color(0xFF202124)), overflow: overflow ? TextOverflow.ellipsis : null)),
+    ]);
+  }
+
+  String _platformName(String p) {
+    switch (p.toLowerCase()) {
+      case 'zoom': return 'Zoom Meeting';
+      case 'meet': return 'Google Meet';
+      case 'teams': return 'Microsoft Teams';
+      default: return 'Custom Link';
     }
   }
 
@@ -1188,10 +1268,21 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            // Session — Start button (instructor)
+            if (type == 'session')
+              ListTile(
+                leading: const Icon(Icons.play_circle_rounded, color: Colors.red),
+                title: const Text('Start Session', style: TextStyle(fontWeight: FontWeight.w700)),
+                subtitle: const Text('Open meeting link to go live'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _openSessionLink(data, isInstructor: true);
+                },
+              ),
+            // Assignment — grade
             if (type == 'assignment' && id.isNotEmpty)
               ListTile(
-                leading: const Icon(Icons.grade_outlined,
-                    color: Color(0xFF1A73E8)),
+                leading: const Icon(Icons.grade_outlined, color: Color(0xFF1A73E8)),
                 title: const Text('Grade submissions'),
                 onTap: () {
                   Navigator.pop(context);
@@ -1204,16 +1295,13 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
                 },
               ),
             ListTile(
-              leading: const Icon(Icons.edit_outlined,
-                  color: Color(0xFF444746)),
+              leading: const Icon(Icons.edit_outlined, color: Color(0xFF444746)),
               title: const Text('Edit'),
               onTap: () => Navigator.pop(context),
             ),
             ListTile(
-              leading: const Icon(Icons.delete_outline_rounded,
-                  color: Color(0xFFB3261E)),
-              title: const Text('Delete',
-                  style: TextStyle(color: Color(0xFFB3261E))),
+              leading: const Icon(Icons.delete_outline_rounded, color: Color(0xFFB3261E)),
+              title: const Text('Delete', style: TextStyle(color: Color(0xFFB3261E))),
               onTap: () => Navigator.pop(context),
             ),
           ],
