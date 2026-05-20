@@ -1111,14 +1111,24 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel', style: TextStyle(color: Colors.white54))),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryColor),
-            onPressed: () {
+            onPressed: () async {
               Navigator.pop(ctx);
-              if (questionCtrl.text.isNotEmpty) {
+              if (questionCtrl.text.isNotEmpty && _sessionDocId.isNotEmpty) {
+                final options = optionCtrls.where((c) => c.text.isNotEmpty).map((c) => c.text).toList();
+                // Save poll to backend so students can see it
+                try {
+                  await _lms.createLiveSessionPoll(
+                    sessionId: _sessionDocId,
+                    question: questionCtrl.text,
+                    options: options,
+                  );
+                } catch (e) {
+                  debugPrint('Poll save error: $e');
+                }
                 this.setState(() {
                   _polls.add({
                     'question': questionCtrl.text,
-                    'options': optionCtrls.where((c) => c.text.isNotEmpty)
-                        .map((c) => {'text': c.text, 'votes': 0}).toList(),
+                    'options': options.map((o) => {'text': o, 'votes': 0}).toList(),
                   });
                 });
                 _panelTab.animateTo(2);

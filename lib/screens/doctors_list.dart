@@ -11,7 +11,8 @@ import 'package:icare/widgets/custom_text.dart';
 class DoctorsList extends StatefulWidget {
   final String? initialSpecialty;
   final String? initialCondition;
-  const DoctorsList({super.key, this.initialSpecialty, this.initialCondition});
+  final String? initialName;
+  const DoctorsList({super.key, this.initialSpecialty, this.initialCondition, this.initialName});
 
   @override
   State<DoctorsList> createState() => _DoctorsListState();
@@ -41,7 +42,10 @@ class _DoctorsListState extends State<DoctorsList> {
   @override
   void initState() {
     super.initState();
-    if (widget.initialSpecialty != null) {
+    if (widget.initialName != null) {
+      _searchQuery = widget.initialName!;
+      _searchMode = 'name';
+    } else if (widget.initialSpecialty != null) {
       _searchQuery = widget.initialSpecialty!;
       _searchMode = 'specialty';
     } else if (widget.initialCondition != null) {

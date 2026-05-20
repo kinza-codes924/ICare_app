@@ -59,7 +59,7 @@ class _DoctorSearchBarState extends State<DoctorSearchBar> {
           ? DoctorsList(initialSpecialty: query)
           : _mode == 'condition'
               ? DoctorsList(initialCondition: query)
-              : DoctorsList(initialSpecialty: query), // name search fallback
+              : DoctorsList(initialName: query),
     ));
   }
 

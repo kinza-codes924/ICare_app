@@ -52,6 +52,7 @@ class _IncomingCallListenerState extends State<IncomingCallListener> {
   bool _dialogShowing = false;
   bool _lmsDialogShowing = false;
   String? _lastLiveCourseId;
+  final Set<String> _shownSessions = {}; // never re-show for same courseId
 
   @override
   void initState() {
@@ -94,19 +95,20 @@ class _IncomingCallListenerState extends State<IncomingCallListener> {
         final isLive = liveResp.data['isLive'] == true;
         debugPrint('🔴 Course $courseTitle isLive=$isLive');
 
-        if (isLive && _lastLiveCourseId != courseId && mounted) {
-          // Don't show popup if student is already in the live session
-          if (LmsLiveSessionScreen.activeCourseId == courseId) {
-            _lastLiveCourseId = courseId;
-            return;
-          }
+        if (isLive && mounted) {
           _lastLiveCourseId = courseId;
+          // Don't show if: already in session, already shown, dialog open
+          if (LmsLiveSessionScreen.activeCourseId == courseId) return;
+          if (_shownSessions.contains(courseId)) return;
+          if (_lmsDialogShowing) return;
+          _shownSessions.add(courseId);
           _showLiveSessionAlert(courseId, courseTitle);
           return;
         }
         if (!isLive && _lastLiveCourseId == courseId) {
           _lastLiveCourseId = null;
-          _lmsDialogShowing = false; // Reset so next session can show popup
+          _lmsDialogShowing = false;
+          _shownSessions.remove(courseId); // Allow next session to show popup
         }
       }
     } catch (e) {

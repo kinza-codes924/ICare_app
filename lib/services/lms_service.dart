@@ -430,6 +430,24 @@ class LmsService {
     }
   }
 
+  Future<Map<String, dynamic>> createLiveSessionPoll({
+    required String sessionId,
+    required String question,
+    required List<String> options,
+  }) async {
+    try {
+      final response = await _api.post('/live-session-polls', {
+        'sessionId': sessionId,
+        'question': question,
+        'options': options,
+        'isActive': true,
+      });
+      return response.data ?? {'success': true};
+    } catch (e) {
+      return {'success': false, 'message': e.toString()};
+    }
+  }
+
   Future<Map<String, dynamic>> respondToPoll({
     required String pollId,
     required String optionId,

@@ -33,8 +33,9 @@ class _StudentLmsDashboardState extends State<StudentLmsDashboard>
 
   // Global live session detector
   Timer? _globalLivePoller;
-  Map<String, dynamic>? _activeLiveSession; // {courseId, courseTitle, sessionId}
+  Map<String, dynamic>? _activeLiveSession;
   bool _liveDialogShown = false;
+  final Set<String> _shownSessions = {}; // never re-show for same courseId
 
   static const List<Color> _classColors = [
     Color(0xFF1565C0),
@@ -78,23 +79,19 @@ class _StudentLmsDashboardState extends State<StudentLmsDashboard>
         final result = await _lmsService.checkActiveLiveSession(courseId);
         if (result['isLive'] == true && mounted) {
           final courseTitle = course['title']?.toString() ?? 'Your Course';
-          // Don't show popup if student is already IN this live session
           if (LmsLiveSessionScreen.activeCourseId == courseId) return;
-          if (_activeLiveSession?['courseId'] != courseId) {
-            setState(() {
-              _activeLiveSession = {'courseId': courseId, 'courseTitle': courseTitle, 'sessionId': courseId};
-              _liveDialogShown = false;
-            });
-            if (!_liveDialogShown) {
-              _liveDialogShown = true;
-              _showLiveAlert(courseId, courseTitle, course);
-            }
-          }
+          if (_shownSessions.contains(courseId)) return; // already shown
+          setState(() => _activeLiveSession = {'courseId': courseId, 'courseTitle': courseTitle});
+          _shownSessions.add(courseId);
+          _showLiveAlert(courseId, courseTitle, course);
           return;
         }
       } catch (_) {}
     }
-    if (mounted) setState(() => _activeLiveSession = null);
+    if (mounted) {
+      setState(() => _activeLiveSession = null);
+      _shownSessions.clear(); // Reset so next new session can show popup
+    }
   }
 
   void _showLiveAlert(String courseId, String courseTitle, Map course) {
