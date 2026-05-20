@@ -436,23 +436,29 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
     }
 
     return Scaffold(
-      backgroundColor: const Color(0xFF1C2333),
+      backgroundColor: Colors.transparent,
       body: SafeArea(
-        child: Column(
+        child: Stack(
           children: [
-            _buildTopBar(),
-            Expanded(
-              child: Row(
-                children: [
-                  // Main video area
-                  Expanded(child: _buildVideoArea()),
-                  // Side panel (chat/participants/polls)
-                  if (_chatOpen || _participantsOpen)
-                    _buildSidePanel(),
-                ],
-              ),
+            // Dark background behind everything
+            Container(color: const Color(0xFF1C2333)),
+            Column(
+              children: [
+                _buildTopBar(),
+                Expanded(
+                  child: Row(
+                    children: [
+                      // Main video area — transparent on web so JS overlay shows
+                      Expanded(child: _buildVideoArea()),
+                      // Side panel (chat/participants/polls)
+                      if (_chatOpen || _participantsOpen)
+                        _buildSidePanel(),
+                    ],
+                  ),
+                ),
+                _buildBottomBar(),
+              ],
             ),
-            _buildBottomBar(),
           ],
         ),
       ),
@@ -504,24 +510,41 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
 
   Widget _buildVideoArea() {
     // On web: Agora injects video divs directly into document.body as overlay
-    // Flutter UI shows on top (appbar + bottom bar), video is in the background
+    // Flutter widget must be transparent so the JS video overlay shows through
     if (kIsWeb) {
-      return Container(
-        color: const Color(0xFF1C2333),
-        child: _raisedHands.isNotEmpty
-            ? Positioned(
-                top: 12, left: 12,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  decoration: BoxDecoration(color: Colors.orange.withOpacity(0.9), borderRadius: BorderRadius.circular(20)),
-                  child: Row(children: [
-                    const Text('✋', style: TextStyle(fontSize: 16)),
-                    const SizedBox(width: 8),
-                    Text('${_raisedHands.length} hand(s) raised', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
-                  ]),
+      return Stack(
+        children: [
+          // Transparent background — JS overlay (lms-overlay div) shows through
+          Container(color: Colors.transparent),
+          // Raised hand banner on top
+          if (_raisedHands.isNotEmpty)
+            Positioned(
+              top: 12,
+              left: 12,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.orange.withOpacity(0.9),
+                  borderRadius: BorderRadius.circular(20),
                 ),
-              )
-            : const Center(child: Text('Camera loading...', style: TextStyle(color: Colors.white54, fontSize: 13))),
+                child: Row(children: [
+                  const Text('✋', style: TextStyle(fontSize: 16)),
+                  const SizedBox(width: 8),
+                  Text('${_raisedHands.length} hand(s) raised',
+                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+                ]),
+              ),
+            ),
+          // Show placeholder only before Agora connects
+          if (!_joined)
+            Center(
+              child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                const CircularProgressIndicator(color: Colors.white54, strokeWidth: 2),
+                const SizedBox(height: 12),
+                const Text('Connecting camera...', style: TextStyle(color: Colors.white54, fontSize: 13)),
+              ]),
+            ),
+        ],
       );
     }
 

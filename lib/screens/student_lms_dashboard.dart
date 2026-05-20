@@ -78,6 +78,8 @@ class _StudentLmsDashboardState extends State<StudentLmsDashboard>
         final result = await _lmsService.checkActiveLiveSession(courseId);
         if (result['isLive'] == true && mounted) {
           final courseTitle = course['title']?.toString() ?? 'Your Course';
+          // Don't show popup if student is already IN this live session
+          if (LmsLiveSessionScreen.activeCourseId == courseId) return;
           if (_activeLiveSession?['courseId'] != courseId) {
             setState(() {
               _activeLiveSession = {'courseId': courseId, 'courseTitle': courseTitle, 'sessionId': courseId};
