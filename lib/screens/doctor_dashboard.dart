@@ -713,12 +713,7 @@ class _DoctorDashboardState extends ConsumerState<DoctorDashboard> {
                 color: Color(0xFF0F172A),
               ),
             ),
-            if (sorted.isNotEmpty)
-              TextButton(
-                onPressed: () => _showAllTodayAppointments(),
-                style: TextButton.styleFrom(foregroundColor: AppColors.primaryColor),
-                child: const Text('View All', style: TextStyle(fontWeight: FontWeight.w700)),
-              ),
+            // "View All" removed per client request
           ],
         ),
         const SizedBox(height: 16),

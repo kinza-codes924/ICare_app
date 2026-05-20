@@ -656,18 +656,24 @@ class _WebSidebarState extends ConsumerState<_WebSidebar> {
                 // ── Role-specific extra nav items ──────────────────────────
                 if (role == 'Patient') ...[
                   const SizedBox(height: 8),
-                  // My Appointments — first item (before Home)
+                  // TOP 3 per client: Order Medicines, Book Lab, My Appointments
+                  _buildExtraNavItem(
+                    context,
+                    Icons.medication_outlined,
+                    'Order Medicines',
+                    () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const PharmaciesScreen())),
+                  ),
+                  _buildExtraNavItem(
+                    context,
+                    Icons.science_outlined,
+                    'Book a Lab Test',
+                    () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const PatientBookLabFlow())),
+                  ),
                   _buildExtraNavItem(
                     context,
                     Icons.calendar_month_outlined,
                     'My Appointments',
-                    () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (ctx) => const BookingsHistoryScreen(),
-                        ),
-                      );
-                    },
+                    () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const BookingsHistoryScreen())),
                   ),
                   _buildExtraNavItem(
                     context,
@@ -729,41 +735,9 @@ class _WebSidebarState extends ConsumerState<_WebSidebar> {
                   ),
                   _buildExtraNavItem(
                     context,
-                    Icons.science_outlined,
-                    'Book a Lab Test',
-                    () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(builder: (ctx) => const PatientBookLabFlow()),
-                      );
-                    },
-                  ),
-                  _buildExtraNavItem(
-                    context,
                     Icons.biotech_outlined,
-                    role == 'Patient'
-                        ? 'Lab Results/Reports'
-                        : 'Management Dashboard',
-                    () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (ctx) => role == 'Patient'
-                              ? LabReportsScreen()
-                              : LabBookingsManagement(),
-                        ),
-                      );
-                    },
-                  ),
-                  _buildExtraNavItem(
-                    context,
-                    Icons.medication_outlined,
-                    'Order Medicines',
-                    () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (ctx) => const PharmaciesScreen(),
-                        ),
-                      );
-                    },
+                    'Lab Results/Reports',
+                    () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => LabReportsScreen())),
                   ),
                   _buildExtraNavItem(
                     context,
