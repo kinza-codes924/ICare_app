@@ -145,7 +145,7 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
   }
 
   Future<void> _syncSessionState() async {
-    if (!mounted || _sessionDocId.isEmpty || _sessionDocId == widget.courseId) return;
+    if (!mounted || _sessionDocId.isEmpty) return;
     try {
       final data = await _lms.getSessionState(_sessionDocId);
       final session = data['session'];

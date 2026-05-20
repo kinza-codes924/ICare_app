@@ -279,6 +279,12 @@
     window._lmsRemoteUids = [];
 
     // Create video containers directly in DOM (Flutter HtmlElementView not used)
+    // Raise Flutter's input layer above video overlay so all Flutter buttons work
+    window.lmsRaiseFlutterLayer = function() {
+      var fps = document.querySelectorAll('flt-glass-pane,flt-text-editing-host');
+      fps.forEach(function(el) { el.style.zIndex = '99999'; });
+    };
+
     window.lmsCreateVideoContainers = function() {
       ['lms-overlay','lms-local-video','lms-remote-main','lms-css'].forEach(function(id) {
         var el = document.getElementById(id); if (el) el.remove();
@@ -315,6 +321,8 @@
       overlay.appendChild(local);
 
       document.body.appendChild(overlay);
+      // Ensure Flutter's input layer stays above video overlay
+      setTimeout(window.lmsRaiseFlutterLayer, 100);
       return true;
     };
 
