@@ -159,6 +159,10 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
         'isInstructor': false,
       }).toList();
 
+      // Waiting room students (instructor sees these)
+      final waiting = (session['waitingStudents'] as List?) ?? [];
+      final waitingNames = waiting.map((w) => w['name'] ?? w['username'] ?? 'Student').toList();
+
       // Update raised hands
       final raisedHandsData = (session['raisedHands'] as List?) ?? [];
       final newHands = raisedHandsData
@@ -174,6 +178,10 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
         'isMe': m['userId']?.toString() == _currentUserId,
       }).toList();
 
+      // Update polls
+      final pollsData = (session['polls'] as List?) ?? [];
+      final newPolls = pollsData.map<Map<String, dynamic>>((p) => Map<String, dynamic>.from(p is Map ? p : {})).toList();
+
       if (mounted) {
         setState(() {
           _participants.clear();
@@ -185,7 +193,29 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
             ..addAll(newHands);
           _chatMessages.clear();
           _chatMessages.addAll(newMessages);
+          _polls.clear();
+          _polls.addAll(newPolls);
+          // Show waiting room badge for instructor
+          if (widget.isInstructor && waitingNames.isNotEmpty) {
+            _waitingStudents = waitingNames.cast<String>();
+          } else {
+            _waitingStudents = [];
+          }
         });
+
+        // Notify instructor of new join request
+        if (widget.isInstructor && waitingNames.length > (_waitingStudents.length)) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text('✋ ${waitingNames.last} wants to join'),
+            backgroundColor: Colors.blue,
+            action: SnackBarAction(
+              label: 'Admit',
+              textColor: Colors.white,
+              onPressed: () => _admitStudent(waiting.last['_id']?.toString() ?? ''),
+            ),
+            duration: const Duration(seconds: 8),
+          ));
+        }
 
         // Scroll chat to bottom
         if (_chatMessages.isNotEmpty && _chatScroll.hasClients) {
@@ -193,6 +223,19 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
               duration: const Duration(milliseconds: 200), curve: Curves.easeOut);
         }
       }
+    } catch (_) {}
+  }
+
+  List<String> _waitingStudents = [];
+
+  Future<void> _admitStudent(String studentId) async {
+    if (studentId.isEmpty || _sessionDocId.isEmpty) return;
+    try {
+      final api = LmsService();
+      await api.admitStudent(sessionId: _sessionDocId, studentId: studentId);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Student admitted!'), backgroundColor: Colors.green, duration: Duration(seconds: 2)),
+      );
     } catch (_) {}
   }
 
@@ -856,18 +899,61 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
   }
 
   Widget _buildParticipantsPanel() {
-    final total = _remoteUids.length + 1;
     return ListView(
       padding: const EdgeInsets.all(12),
       children: [
-        Text('$total participant(s)',
+        // Waiting room section (instructor only)
+        if (widget.isInstructor && _waitingStudents.isNotEmpty) ...[
+          Container(
+            padding: const EdgeInsets.all(10),
+            margin: const EdgeInsets.only(bottom: 12),
+            decoration: BoxDecoration(
+              color: Colors.orange.withOpacity(0.15),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.orange.withOpacity(0.5)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(children: [
+                  const Icon(Icons.hourglass_empty, color: Colors.orange, size: 16),
+                  const SizedBox(width: 6),
+                  Text('Waiting Room (${_waitingStudents.length})',
+                      style: const TextStyle(color: Colors.orange, fontWeight: FontWeight.w700, fontSize: 13)),
+                  const Spacer(),
+                  TextButton(
+                    onPressed: () async {
+                      // Admit all
+                      try { await _lms.admitStudent(sessionId: _sessionDocId, studentId: 'all'); } catch(_) {}
+                    },
+                    child: const Text('Admit All', style: TextStyle(color: Colors.orange, fontSize: 11)),
+                  ),
+                ]),
+                ..._waitingStudents.map((name) => Padding(
+                  padding: const EdgeInsets.only(top: 6),
+                  child: Row(children: [
+                    CircleAvatar(radius: 14, backgroundColor: Colors.orange.withOpacity(0.3),
+                        child: Text(name[0].toUpperCase(), style: const TextStyle(color: Colors.white, fontSize: 11))),
+                    const SizedBox(width: 8),
+                    Expanded(child: Text(name, style: const TextStyle(color: Colors.white70, fontSize: 12))),
+                    ElevatedButton(
+                      onPressed: () => _admitStudent(''),
+                      style: ElevatedButton.styleFrom(backgroundColor: Colors.green, padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4)),
+                      child: const Text('Admit', style: TextStyle(color: Colors.white, fontSize: 11)),
+                    ),
+                  ]),
+                )).toList(),
+              ],
+            ),
+          ),
+        ],
+
+        Text('${_participants.length} participant(s)',
             style: const TextStyle(color: Colors.white54, fontSize: 12)),
         const SizedBox(height: 8),
-        // Self
         _participantTile(_currentUserName, isHost: widget.isInstructor, isYou: true),
-        // Others
-        ..._remoteUids.map((uid) =>
-            _participantTile('Participant $uid', isHost: false, isYou: false)),
+        ..._participants.where((p) => p['id'] != _currentUserId).map((p) =>
+            _participantTile(p['name'] ?? 'Participant', isHost: p['isInstructor'] == true, isYou: false)),
       ],
     );
   }

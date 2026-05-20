@@ -90,20 +90,43 @@ router.post('/:id/join', authMiddleware, async (req, res) => {
       }
     }
 
-    // Add to attendees if not already present
-    if (!session.attendees.includes(studentId)) {
-      if (session.attendees.length >= session.maxParticipants) {
-        return res.status(400).json({ 
-          success: false, 
-          message: 'Session is full' 
-        });
+    // Waiting room: add student to waitingStudents (instructor will admit)
+    const alreadyAttendee = session.attendees.some(id => id.toString() === studentId.toString());
+    const alreadyWaiting = session.waitingStudents.some(id => id.toString() === studentId.toString());
+    const isInstructor = session.instructorId?.toString() === req.user.id?.toString();
+
+    if (!alreadyAttendee && !isInstructor) {
+      if (session.waitingRoom && !alreadyWaiting) {
+        // Add to waiting room — instructor must admit
+        session.waitingStudents.push(studentId);
+        await session.save();
+        // Notify instructor via notification
+        try {
+          const Notification = require('../models/Notification');
+          const User = require('../models/User');
+          const userDoc = await User.findById(req.user.id).select('name username').lean();
+          const userName = userDoc?.name || userDoc?.username || 'A student';
+          await Notification.create({
+            userId: session.instructorId,
+            type: 'general',
+            title: `${userName} wants to join`,
+            message: `${userName} is waiting to join your live session "${session.title}"`,
+            data: { sessionId: session._id, studentId: req.user.id, type: 'join_request' },
+          });
+        } catch (_) {}
+        return res.json({ success: true, status: 'waiting', message: 'You are in the waiting room. Please wait for the instructor to admit you.' });
+      } else {
+        // No waiting room — join directly
+        if (session.attendees.length < session.maxParticipants) {
+          session.attendees.push(studentId);
+          await session.save();
+        }
       }
-      session.attendees.push(studentId);
-      await session.save();
     }
 
-    res.json({ 
-      success: true, 
+    res.json({
+      success: true,
+      status: 'joined',
       session: {
         _id: session._id,
         title: session.title,
@@ -379,13 +402,18 @@ router.get('/:id', authMiddleware, async (req, res) => {
       .populate('courseId', 'title')
       .populate('instructorId', 'name username')
       .populate('attendees', 'name username')
+      .populate('waitingStudents', 'name username')
       .lean();
 
     if (!session) {
       return res.status(404).json({ success: false, message: 'Session not found' });
     }
 
-    res.json({ success: true, session });
+    // Also fetch polls for this session
+    const LiveSessionPoll = require('../models/LiveSessionPoll');
+    const polls = await LiveSessionPoll.find({ sessionId: toId(req.params.id) }).lean().catch(() => []);
+
+    res.json({ success: true, session: { ...session, polls } });
   } catch (e) {
     res.status(500).json({ success: false, message: e.message });
   }
