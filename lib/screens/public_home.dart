@@ -373,80 +373,208 @@ class _BrowseSearchField extends StatelessWidget {
 }
 
 // ── Specialty Search Bar ──────────────────────────────────────────────────────
-class _SpecialtySearchBar extends StatelessWidget {
+class _SpecialtySearchBar extends StatefulWidget {
+  @override
+  State<_SpecialtySearchBar> createState() => _SpecialtySearchBarState();
+}
+
+class _SpecialtySearchBarState extends State<_SpecialtySearchBar> {
+  final _ctrl = TextEditingController();
+  final _focus = FocusNode();
+  bool _showDropdown = false;
+  List<String> _filtered = [];
+
+  static const _all = [
+    'Cardiologist','Dermatologist','Neurologist','Orthopedic','Gynecologist',
+    'Pediatrician','Psychiatrist','Ophthalmologist','ENT Specialist','Urologist',
+    'Gastroenterologist','Endocrinologist','Pulmonologist','Oncologist','Nephrologist',
+    'Rheumatologist','Diabetologist','General Physician','Dentist','Nutritionist',
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _focus.addListener(() {
+      if (!_focus.hasFocus) setState(() => _showDropdown = false);
+    });
+  }
+
+  @override
+  void dispose() { _ctrl.dispose(); _focus.dispose(); super.dispose(); }
+
+  void _onChanged(String v) {
+    setState(() {
+      _filtered = v.isEmpty ? _all : _all.where((s) => s.toLowerCase().contains(v.toLowerCase())).toList();
+      _showDropdown = v.isNotEmpty || _focus.hasFocus;
+    });
+  }
+
+  void _select(String s) {
+    _ctrl.text = s;
+    setState(() => _showDropdown = false);
+    _focus.unfocus();
+    Navigator.of(context).push(MaterialPageRoute(builder: (ctx) => DoctorsList(initialSpecialty: s)));
+  }
+
   @override
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Container(
-        height: 50,
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: const Color(0xFF7C3AED).withOpacity(0.3), width: 1.5),
-          boxShadow: [
-            BoxShadow(color: const Color(0xFF7C3AED).withOpacity(0.06), blurRadius: 8, offset: const Offset(0, 2)),
-          ],
-        ),
-        child: TextField(
-          decoration: InputDecoration(
-            hintText: 'Search by specialty (e.g. Cardiologist...)',
-            hintStyle: TextStyle(fontSize: 13, color: Colors.grey[400]),
-            prefixIcon: const Icon(Icons.search_rounded, color: Color(0xFF7C3AED), size: 20),
-            suffixIcon: const Icon(Icons.arrow_forward_rounded, color: Color(0xFF7C3AED), size: 20),
-            border: InputBorder.none,
-            contentPadding: const EdgeInsets.symmetric(vertical: 15),
+      child: Column(
+        children: [
+          Container(
+            height: 50,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFF7C3AED).withOpacity(0.3), width: 1.5),
+              boxShadow: [BoxShadow(color: const Color(0xFF7C3AED).withOpacity(0.06), blurRadius: 8, offset: const Offset(0, 2))],
+            ),
+            child: TextField(
+              controller: _ctrl,
+              focusNode: _focus,
+              decoration: InputDecoration(
+                hintText: 'Search by specialty (e.g. Cardiologist...)',
+                hintStyle: TextStyle(fontSize: 13, color: Colors.grey[400]),
+                prefixIcon: const Icon(Icons.search_rounded, color: Color(0xFF7C3AED), size: 20),
+                suffixIcon: _ctrl.text.isNotEmpty
+                    ? IconButton(icon: const Icon(Icons.clear, size: 18, color: Color(0xFF7C3AED)), onPressed: () { _ctrl.clear(); setState(() { _showDropdown = false; }); })
+                    : const Icon(Icons.keyboard_arrow_down_rounded, color: Color(0xFF7C3AED), size: 20),
+                border: InputBorder.none,
+                contentPadding: const EdgeInsets.symmetric(vertical: 15),
+              ),
+              onChanged: _onChanged,
+              onTap: () => _onChanged(_ctrl.text),
+              onSubmitted: (v) { if (v.trim().isNotEmpty) _select(v.trim()); },
+            ),
           ),
-          onChanged: (value) {
-            // Real-time: navigate on type with debounce not feasible without state,
-            // so show results on submit
-          },
-          onSubmitted: (value) {
-            if (value.trim().isNotEmpty) {
-              Navigator.of(context).push(
-                MaterialPageRoute(builder: (ctx) => DoctorsList(initialSpecialty: value.trim())),
-              );
-            }
-          },
-        ),
+          if (_showDropdown && _filtered.isNotEmpty)
+            Container(
+              margin: const EdgeInsets.only(top: 2),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFF7C3AED).withOpacity(0.2)),
+                boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 10)],
+              ),
+              constraints: const BoxConstraints(maxHeight: 220),
+              child: ListView(
+                padding: EdgeInsets.zero,
+                shrinkWrap: true,
+                children: _filtered.map((s) => ListTile(
+                  dense: true,
+                  leading: const Icon(Icons.medical_services_outlined, size: 16, color: Color(0xFF7C3AED)),
+                  title: Text(s, style: const TextStyle(fontSize: 13)),
+                  onTap: () => _select(s),
+                )).toList(),
+              ),
+            ),
+        ],
       ),
     );
   }
 }
 
 // ── Condition Only Search Bar ─────────────────────────────────────────────────
-class _ConditionOnlySearchBar extends StatelessWidget {
+class _ConditionOnlySearchBar extends StatefulWidget {
+  @override
+  State<_ConditionOnlySearchBar> createState() => _ConditionOnlySearchBarState();
+}
+
+class _ConditionOnlySearchBarState extends State<_ConditionOnlySearchBar> {
+  final _ctrl = TextEditingController();
+  final _focus = FocusNode();
+  bool _showDropdown = false;
+  List<String> _filtered = [];
+
+  static const _all = [
+    'Diabetes','Hypertension','Fever','Heart Disease','Asthma','Back Pain',
+    'Arthritis','Anxiety','Depression','Migraine','Obesity','Thyroid',
+    'Kidney Disease','Liver Disease','Cancer','Skin Problem','Eye Problem',
+    'Ear Infection','Stomach Pain','Chest Pain','Shortness of Breath',
+    'Joint Pain','Allergies','Insomnia','PCOS','Hepatitis','Dengue',
+    'Typhoid','Anemia','Vitamin Deficiency',
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _focus.addListener(() {
+      if (!_focus.hasFocus) setState(() => _showDropdown = false);
+    });
+  }
+
+  @override
+  void dispose() { _ctrl.dispose(); _focus.dispose(); super.dispose(); }
+
+  void _onChanged(String v) {
+    setState(() {
+      _filtered = v.isEmpty ? _all : _all.where((c) => c.toLowerCase().contains(v.toLowerCase())).toList();
+      _showDropdown = v.isNotEmpty || _focus.hasFocus;
+    });
+  }
+
+  void _select(String c) {
+    _ctrl.text = c;
+    setState(() => _showDropdown = false);
+    _focus.unfocus();
+    Navigator.of(context).push(MaterialPageRoute(builder: (ctx) => DoctorsList(initialCondition: c)));
+  }
+
   @override
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Container(
-        height: 50,
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: const Color(0xFF0891B2).withOpacity(0.3), width: 1.5),
-          boxShadow: [
-            BoxShadow(color: const Color(0xFF0891B2).withOpacity(0.06), blurRadius: 8, offset: const Offset(0, 2)),
-          ],
-        ),
-        child: TextField(
-          decoration: InputDecoration(
-            hintText: 'Search by condition (e.g. Diabetes, Fever...)',
-            hintStyle: TextStyle(fontSize: 13, color: Colors.grey[400]),
-            prefixIcon: const Icon(Icons.search_rounded, color: Color(0xFF0891B2), size: 20),
-            suffixIcon: const Icon(Icons.arrow_forward_rounded, color: Color(0xFF0891B2), size: 20),
-            border: InputBorder.none,
-            contentPadding: const EdgeInsets.symmetric(vertical: 15),
+      child: Column(
+        children: [
+          Container(
+            height: 50,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFF0891B2).withOpacity(0.3), width: 1.5),
+              boxShadow: [BoxShadow(color: const Color(0xFF0891B2).withOpacity(0.06), blurRadius: 8, offset: const Offset(0, 2))],
+            ),
+            child: TextField(
+              controller: _ctrl,
+              focusNode: _focus,
+              decoration: InputDecoration(
+                hintText: 'Search by condition (e.g. Diabetes, Fever...)',
+                hintStyle: TextStyle(fontSize: 13, color: Colors.grey[400]),
+                prefixIcon: const Icon(Icons.search_rounded, color: Color(0xFF0891B2), size: 20),
+                suffixIcon: _ctrl.text.isNotEmpty
+                    ? IconButton(icon: const Icon(Icons.clear, size: 18, color: Color(0xFF0891B2)), onPressed: () { _ctrl.clear(); setState(() { _showDropdown = false; }); })
+                    : const Icon(Icons.keyboard_arrow_down_rounded, color: Color(0xFF0891B2), size: 20),
+                border: InputBorder.none,
+                contentPadding: const EdgeInsets.symmetric(vertical: 15),
+              ),
+              onChanged: _onChanged,
+              onTap: () => _onChanged(_ctrl.text),
+              onSubmitted: (v) { if (v.trim().isNotEmpty) _select(v.trim()); },
+            ),
           ),
-          onSubmitted: (value) {
-            if (value.trim().isNotEmpty) {
-              Navigator.of(context).push(
-                MaterialPageRoute(builder: (ctx) => DoctorsList(initialCondition: value.trim())),
-              );
-            }
-          },
-        ),
+          if (_showDropdown && _filtered.isNotEmpty)
+            Container(
+              margin: const EdgeInsets.only(top: 2),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFF0891B2).withOpacity(0.2)),
+                boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 10)],
+              ),
+              constraints: const BoxConstraints(maxHeight: 220),
+              child: ListView(
+                padding: EdgeInsets.zero,
+                shrinkWrap: true,
+                children: _filtered.map((c) => ListTile(
+                  dense: true,
+                  leading: const Icon(Icons.healing_outlined, size: 16, color: Color(0xFF0891B2)),
+                  title: Text(c, style: const TextStyle(fontSize: 13)),
+                  onTap: () => _select(c),
+                )).toList(),
+              ),
+            ),
+        ],
       ),
     );
   }

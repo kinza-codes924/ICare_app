@@ -10,76 +10,145 @@ class DoctorSearchBar extends StatefulWidget {
 }
 
 class _DoctorSearchBarState extends State<DoctorSearchBar> {
-  String _searchMode = 'name';
+  String _mode = 'name';
+  final _ctrl = TextEditingController();
+  final _focus = FocusNode();
+  bool _showDrop = false;
+  List<String> _suggestions = [];
+
+  static const _specialties = [
+    'Cardiologist','Dermatologist','Neurologist','Orthopedic','Gynecologist',
+    'Pediatrician','Psychiatrist','Ophthalmologist','ENT Specialist','Urologist',
+    'Gastroenterologist','Endocrinologist','General Physician','Dentist','Nutritionist',
+    'Pulmonologist','Nephrologist','Rheumatologist','Oncologist','Diabetologist',
+  ];
+
+  static const _conditions = [
+    'Diabetes','Hypertension','Fever','Heart Disease','Asthma','Back Pain',
+    'Arthritis','Anxiety','Depression','Migraine','Obesity','Thyroid',
+    'Kidney Disease','Skin Problem','Eye Problem','Ear Infection','Stomach Pain',
+    'Chest Pain','Joint Pain','Allergies','PCOS','Hepatitis','Dengue','Anemia',
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _focus.addListener(() {
+      if (!_focus.hasFocus) setState(() => _showDrop = false);
+    });
+  }
+
+  @override
+  void dispose() { _ctrl.dispose(); _focus.dispose(); super.dispose(); }
+
+  void _onTextChanged(String v) {
+    if (_mode == 'name') { setState(() => _showDrop = false); return; }
+    final list = _mode == 'speciality' ? _specialties : _conditions;
+    setState(() {
+      _suggestions = v.isEmpty ? list : list.where((s) => s.toLowerCase().contains(v.toLowerCase())).toList();
+      _showDrop = _focus.hasFocus;
+    });
+  }
+
+  void _navigate(String query) {
+    if (query.trim().isEmpty) return;
+    setState(() => _showDrop = false);
+    _focus.unfocus();
+    Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => _mode == 'speciality'
+          ? DoctorsList(initialSpecialty: query)
+          : _mode == 'condition'
+              ? DoctorsList(initialCondition: query)
+              : DoctorsList(initialSpecialty: query), // name search fallback
+    ));
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: widget.isMobile ? 46 : 50,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.12),
-            blurRadius: 10,
-            offset: const Offset(0, 3),
+    return Column(
+      children: [
+        Container(
+          height: widget.isMobile ? 46 : 50,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.12), blurRadius: 10, offset: const Offset(0, 3))],
           ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            decoration: BoxDecoration(
-              border: Border(
-                right: BorderSide(color: Colors.grey[300]!, width: 1),
+          child: Row(
+            children: [
+              // Mode selector
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                decoration: BoxDecoration(border: Border(right: BorderSide(color: Colors.grey[300]!, width: 1))),
+                child: DropdownButton<String>(
+                  value: _mode,
+                  underline: const SizedBox(),
+                  icon: const Icon(Icons.arrow_drop_down, size: 20),
+                  style: TextStyle(fontSize: widget.isMobile ? 11 : 12, color: const Color(0xFF0036BC), fontWeight: FontWeight.w600),
+                  items: const [
+                    DropdownMenuItem(value: 'name', child: Text('Doctor Name')),
+                    DropdownMenuItem(value: 'speciality', child: Text('Speciality')),
+                    DropdownMenuItem(value: 'condition', child: Text('Condition')),
+                  ],
+                  onChanged: (v) { setState(() { _mode = v!; _ctrl.clear(); _showDrop = false; }); },
+                ),
               ),
-            ),
-            child: DropdownButton<String>(
-              value: _searchMode,
-              underline: const SizedBox(),
-              icon: const Icon(Icons.arrow_drop_down, size: 20),
-              style: TextStyle(
-                fontSize: widget.isMobile ? 11 : 12,
-                color: const Color(0xFF0036BC),
-                fontWeight: FontWeight.w600,
-              ),
-              items: const [
-                DropdownMenuItem(value: 'name', child: Text('Doctor Name')),
-                DropdownMenuItem(value: 'speciality', child: Text('Speciality')),
-                DropdownMenuItem(value: 'condition', child: Text('Condition')),
-              ],
-              onChanged: (value) => setState(() => _searchMode = value!),
-            ),
-          ),
-          Expanded(
-            child: TextField(
-              decoration: InputDecoration(
-                hintText: _searchMode == 'name'
-                    ? 'Search by doctor name...'
-                    : _searchMode == 'speciality'
-                        ? 'Search by speciality...'
+              // Search input
+              Expanded(
+                child: TextField(
+                  controller: _ctrl,
+                  focusNode: _focus,
+                  decoration: InputDecoration(
+                    hintText: _mode == 'name' ? 'Search by doctor name...'
+                        : _mode == 'speciality' ? 'Search by speciality...'
                         : 'Search by condition...',
-                hintStyle: TextStyle(
-                  fontSize: widget.isMobile ? 12 : 13,
-                  color: Colors.grey[400],
-                ),
-                prefixIcon: Icon(
-                  Icons.search_rounded,
-                  color: const Color(0xFF0036BC),
-                  size: widget.isMobile ? 20 : 22,
-                ),
-                border: InputBorder.none,
-                contentPadding: EdgeInsets.symmetric(
-                  vertical: widget.isMobile ? 14 : 16,
+                    hintStyle: TextStyle(fontSize: widget.isMobile ? 12 : 13, color: Colors.grey[400]),
+                    prefixIcon: Icon(Icons.search_rounded, color: const Color(0xFF0036BC), size: widget.isMobile ? 20 : 22),
+                    border: InputBorder.none,
+                    contentPadding: EdgeInsets.symmetric(vertical: widget.isMobile ? 14 : 16),
+                  ),
+                  onChanged: _onTextChanged,
+                  onTap: () => _onTextChanged(_ctrl.text),
+                  onSubmitted: _navigate,
                 ),
               ),
+              // Search button
+              GestureDetector(
+                onTap: () => _navigate(_ctrl.text),
+                child: Container(
+                  margin: const EdgeInsets.all(6),
+                  padding: const EdgeInsets.symmetric(horizontal: 14),
+                  decoration: BoxDecoration(color: const Color(0xFF0036BC), borderRadius: BorderRadius.circular(8)),
+                  child: const Center(child: Icon(Icons.search, color: Colors.white, size: 20)),
+                ),
+              ),
+            ],
+          ),
+        ),
+        // Inline suggestions dropdown
+        if (_showDrop && _suggestions.isNotEmpty)
+          Container(
+            margin: const EdgeInsets.only(top: 2),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: const Color(0xFF0036BC).withOpacity(0.2)),
+              boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 12)],
+            ),
+            constraints: const BoxConstraints(maxHeight: 240),
+            child: ListView(
+              padding: EdgeInsets.zero,
+              shrinkWrap: true,
+              children: _suggestions.map((s) => ListTile(
+                dense: true,
+                leading: Icon(_mode == 'speciality' ? Icons.medical_services_outlined : Icons.healing_outlined,
+                    size: 16, color: const Color(0xFF0036BC)),
+                title: Text(s, style: const TextStyle(fontSize: 13)),
+                onTap: () { _ctrl.text = s; _navigate(s); },
+              )).toList(),
             ),
           ),
-        ],
-      ),
+      ],
     );
   }
 }
-
