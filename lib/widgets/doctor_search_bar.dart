@@ -1,5 +1,7 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:icare/screens/doctors_list.dart';
+import 'package:icare/services/doctor_service.dart';
 
 class DoctorSearchBar extends StatefulWidget {
   final bool isMobile;
@@ -15,6 +17,9 @@ class _DoctorSearchBarState extends State<DoctorSearchBar> {
   final _focus = FocusNode();
   bool _showDrop = false;
   List<String> _suggestions = [];
+  List<String> _doctorNames = []; // loaded from API
+  bool _loadingDoctors = false;
+  Timer? _debounce;
 
   static const _specialties = [
     'Cardiologist','Dermatologist','Neurologist','Orthopedic','Gynecologist',
@@ -36,17 +41,53 @@ class _DoctorSearchBarState extends State<DoctorSearchBar> {
     _focus.addListener(() {
       if (!_focus.hasFocus) setState(() => _showDrop = false);
     });
+    _loadDoctorNames();
+  }
+
+  Future<void> _loadDoctorNames() async {
+    if (_loadingDoctors) return;
+    setState(() => _loadingDoctors = true);
+    try {
+      final result = await DoctorService().getAllDoctors();
+      if (result['success'] == true) {
+        final doctors = result['doctors'] as List? ?? [];
+        _doctorNames = doctors
+            .map((d) => (d['name'] ?? d['username'] ?? '').toString().trim())
+            .where((n) => n.isNotEmpty)
+            .toList();
+      }
+    } catch (_) {}
+    if (mounted) setState(() => _loadingDoctors = false);
   }
 
   @override
-  void dispose() { _ctrl.dispose(); _focus.dispose(); super.dispose(); }
+  void dispose() {
+    _debounce?.cancel();
+    _ctrl.dispose();
+    _focus.dispose();
+    super.dispose();
+  }
 
   void _onTextChanged(String v) {
-    if (_mode == 'name') { setState(() => _showDrop = false); return; }
-    final list = _mode == 'speciality' ? _specialties : _conditions;
-    setState(() {
-      _suggestions = v.isEmpty ? list : list.where((s) => s.toLowerCase().contains(v.toLowerCase())).toList();
-      _showDrop = _focus.hasFocus;
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 200), () {
+      if (!mounted) return;
+      if (_mode == 'name') {
+        setState(() {
+          _suggestions = v.isEmpty
+              ? []
+              : _doctorNames.where((n) => n.toLowerCase().contains(v.toLowerCase())).toList();
+          _showDrop = _focus.hasFocus && _suggestions.isNotEmpty;
+        });
+      } else {
+        final list = _mode == 'speciality' ? _specialties : _conditions;
+        setState(() {
+          _suggestions = v.isEmpty
+              ? list
+              : list.where((s) => s.toLowerCase().contains(v.toLowerCase())).toList();
+          _showDrop = _focus.hasFocus;
+        });
+      }
     });
   }
 
@@ -76,9 +117,8 @@ class _DoctorSearchBarState extends State<DoctorSearchBar> {
           ),
           child: Row(
             children: [
-              // Mode selector
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12),
+                padding: const EdgeInsets.symmetric(horizontal: 10),
                 decoration: BoxDecoration(border: Border(right: BorderSide(color: Colors.grey[300]!, width: 1))),
                 child: DropdownButton<String>(
                   value: _mode,
@@ -90,29 +130,33 @@ class _DoctorSearchBarState extends State<DoctorSearchBar> {
                     DropdownMenuItem(value: 'speciality', child: Text('Speciality')),
                     DropdownMenuItem(value: 'condition', child: Text('Condition')),
                   ],
-                  onChanged: (v) { setState(() { _mode = v!; _ctrl.clear(); _showDrop = false; }); },
+                  onChanged: (v) {
+                    setState(() { _mode = v!; _ctrl.clear(); _showDrop = false; _suggestions = []; });
+                  },
                 ),
               ),
-              // Search input
               Expanded(
                 child: TextField(
                   controller: _ctrl,
                   focusNode: _focus,
                   decoration: InputDecoration(
-                    hintText: _mode == 'name' ? 'Search by doctor name...'
-                        : _mode == 'speciality' ? 'Search by speciality...'
-                        : 'Search by condition...',
+                    hintText: _mode == 'name'
+                        ? 'Search doctor by name...'
+                        : _mode == 'speciality'
+                            ? 'Search by speciality...'
+                            : 'Search by condition...',
                     hintStyle: TextStyle(fontSize: widget.isMobile ? 12 : 13, color: Colors.grey[400]),
                     prefixIcon: Icon(Icons.search_rounded, color: const Color(0xFF0036BC), size: widget.isMobile ? 20 : 22),
                     border: InputBorder.none,
                     contentPadding: EdgeInsets.symmetric(vertical: widget.isMobile ? 14 : 16),
                   ),
                   onChanged: _onTextChanged,
-                  onTap: () => _onTextChanged(_ctrl.text),
+                  onTap: () {
+                    if (_mode != 'name') _onTextChanged(_ctrl.text);
+                  },
                   onSubmitted: _navigate,
                 ),
               ),
-              // Search button
               GestureDetector(
                 onTap: () => _navigate(_ctrl.text),
                 child: Container(
@@ -125,7 +169,6 @@ class _DoctorSearchBarState extends State<DoctorSearchBar> {
             ],
           ),
         ),
-        // Inline suggestions dropdown
         if (_showDrop && _suggestions.isNotEmpty)
           Container(
             margin: const EdgeInsets.only(top: 2),
@@ -135,14 +178,18 @@ class _DoctorSearchBarState extends State<DoctorSearchBar> {
               border: Border.all(color: const Color(0xFF0036BC).withOpacity(0.2)),
               boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 12)],
             ),
-            constraints: const BoxConstraints(maxHeight: 240),
+            constraints: const BoxConstraints(maxHeight: 220),
             child: ListView(
               padding: EdgeInsets.zero,
               shrinkWrap: true,
               children: _suggestions.map((s) => ListTile(
                 dense: true,
-                leading: Icon(_mode == 'speciality' ? Icons.medical_services_outlined : Icons.healing_outlined,
-                    size: 16, color: const Color(0xFF0036BC)),
+                leading: Icon(
+                  _mode == 'name' ? Icons.person_outlined
+                      : _mode == 'speciality' ? Icons.medical_services_outlined
+                      : Icons.healing_outlined,
+                  size: 16, color: const Color(0xFF0036BC),
+                ),
                 title: Text(s, style: const TextStyle(fontSize: 13)),
                 onTap: () { _ctrl.text = s; _navigate(s); },
               )).toList(),

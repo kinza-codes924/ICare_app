@@ -52,6 +52,9 @@
 
     window.agoraJoin = async function(appId, channel, token, uid, audioOnly) {
       try {
+        // Suppress Agora telemetry CORS errors
+        AgoraRTC.setLogLevel(4);
+        try { AgoraRTC.disableLogUpload(); } catch(_) {}
         // Clean up any stale previous session so mic/cam aren't "in use"
         if (_localAudioTrack) { try { _localAudioTrack.stop(); _localAudioTrack.close(); } catch(_){} _localAudioTrack = null; }
         if (_localVideoTrack) { try { _localVideoTrack.stop(); _localVideoTrack.close(); } catch(_){} _localVideoTrack = null; }
@@ -344,6 +347,10 @@
 
     window.lmsJoin = async function(appId, channelId, token, uid) {
       try {
+        // Suppress Agora telemetry/CORS errors — disable log upload
+        AgoraRTC.setLogLevel(4); // silent — no logs to collectors
+        try { AgoraRTC.disableLogUpload(); } catch(_) {}
+
         // Clean up previous session
         if (window._lmsTracks) {
           window._lmsTracks.forEach(function(t) { try { t.stop(); t.close(); } catch(_){} });
@@ -351,14 +358,8 @@
         }
         if (window._lmsClient) { try { await window._lmsClient.leave(); } catch(_){} window._lmsClient = null; }
 
-        // Note: DOM containers (lms-local-video, lms-remote-main) are created by
-        // Flutter's platformViewRegistry (registerLmsVideoView in lms_agora_web.dart)
-        // Same approach as working doctor-patient video_call_web.dart
-
-        // Enable cloud proxy for networks that block direct UDP (firewalls, ISPs)
-        AgoraRTC.setLogLevel(3); // warnings only
         const client = AgoraRTC.createClient({ mode: 'rtc', codec: 'vp8' });
-        try { await client.startProxyServer(3); } catch(_) {} // proxy mode 3 = force relay
+        try { await client.startProxyServer(3); } catch(_) {}
         window._lmsClient = client;
 
         // Retry helper — same as doctor-patient call
