@@ -2,8 +2,10 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:icare/services/lms_service.dart';
+import 'package:icare/services/agora_service.dart';
 import 'package:icare/utils/shared_pref.dart';
 import 'package:icare/utils/theme.dart';
+import 'package:web/web.dart' as web;
 // Web-only imports — guarded by kIsWeb at runtime
 // ignore: avoid_web_libraries_in_flutter
 import '../utils/html_stub.dart' as html
@@ -22,6 +24,9 @@ class LmsLiveSessionScreen extends StatefulWidget {
   final String courseId;
   final String sessionTitle;
   final bool isInstructor;
+
+  // Global flag — popup should not show when student is already in a session
+  static String? activeCourseId;
 
   const LmsLiveSessionScreen({
     super.key,
@@ -84,6 +89,7 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
   void initState() {
     super.initState();
     _panelTab = TabController(length: 3, vsync: this);
+    LmsLiveSessionScreen.activeCourseId = widget.courseId; // stop popup
     _initSession();
   }
 
@@ -96,6 +102,7 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
     _chatCtrl.dispose();
     _chatScroll.dispose();
     _panelTab.dispose();
+    LmsLiveSessionScreen.activeCourseId = null; // allow popup again after leaving
     if (kIsWeb) {
       js.context.callMethod('lmsLeave', []);
     }
@@ -197,24 +204,30 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
     if (!kIsWeb) return;
     try {
       final channelId = 'lms_${widget.courseId}';
-      final uid = _currentUserId.hashCode.abs() % 100000 + 1;
+      final int uid = _currentUserId.hashCode.abs() % 100000 + 1;
       const viewKey = 'lms-video-container';
 
-      // Register the HtmlElementView — creates real DOM elements Agora can use
+      // Get Agora token from backend (same as consultation calls)
+      String? token;
+      try {
+        final tokenData = await AgoraService().getToken(channelName: channelId, uid: uid);
+        if (tokenData['success'] == true) token = tokenData['token']?.toString();
+      } catch (_) {}
+
+      // Register HtmlElementView using package:web — REAL DOM elements Agora can use
       ui.platformViewRegistry.registerViewFactory(viewKey, (int id) {
-        // Container div
-        final container = html.document.createElement('div') as dynamic;
+        final container = web.document.createElement('div') as web.HTMLDivElement;
         container.id = 'lms-video-grid';
         container.style.cssText = 'width:100%;height:100%;background:#1C2333;position:relative;';
 
-        // Remote full-area
-        final remote = html.document.createElement('div') as dynamic;
+        // Remote (full area)
+        final remote = web.document.createElement('div') as web.HTMLDivElement;
         remote.id = 'lms-remote-main';
         remote.style.cssText = 'width:100%;height:100%;background:#1C2333;';
         container.appendChild(remote);
 
         // Local PiP bottom-right
-        final local = html.document.createElement('div') as dynamic;
+        final local = web.document.createElement('div') as web.HTMLDivElement;
         local.id = 'lms-local-video';
         local.style.cssText = 'position:absolute;bottom:16px;right:16px;width:160px;height:120px;'
             'border-radius:10px;overflow:hidden;background:#2D3748;z-index:10;'
@@ -226,15 +239,16 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
 
       if (mounted) setState(() => _cameraViewName = viewKey);
 
-      // Join Agora after DOM is ready
+      // Join Agora after view renders
       WidgetsBinding.instance.addPostFrameCallback((_) {
         Future.delayed(const Duration(milliseconds: 600), () {
           js.context.callMethod('lmsJoin', [
             '82a63a65663c49f0bb973707b4c09f5f',
             channelId,
+            token,
             uid,
           ]);
-          debugPrint('LMS Agora join: channel=$channelId uid=$uid');
+          debugPrint('LMS Agora: channel=$channelId uid=$uid token=${token != null ? "ok" : "none"}');
         });
       });
 

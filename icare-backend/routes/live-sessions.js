@@ -209,9 +209,14 @@ router.post('/:id/chat', authMiddleware, async (req, res) => {
       return res.status(404).json({ success: false, message: 'Session not found' });
     }
 
+    // Fetch actual name from DB (JWT doesn't contain name)
+    const User = require('../models/User');
+    const userDoc = await User.findById(toId(req.user.id)).select('name username').lean();
+    const userName = userDoc?.name || userDoc?.username || 'User';
+
     session.chatMessages.push({
       userId: toId(req.user.id),
-      userName: req.user.name || req.user.username,
+      userName,
       message: message.trim(),
       timestamp: new Date(),
     });
@@ -254,9 +259,12 @@ router.post('/:id/raise-hand', authMiddleware, async (req, res) => {
     const alreadyRaised = session.raisedHands.find(h => h.userId.equals(userId));
 
     if (!alreadyRaised) {
+      const User = require('../models/User');
+      const userDoc = await User.findById(req.user.id).select('name username').lean();
+      const userName = userDoc?.name || userDoc?.username || 'Student';
       session.raisedHands.push({
         userId,
-        userName: req.user.name || req.user.username,
+        userName,
         raisedAt: new Date(),
       });
       await session.save();

@@ -278,7 +278,7 @@
     window._lmsTracks = [];
     window._lmsRemoteUids = [];
 
-    window.lmsJoin = async function(appId, channelId, uid) {
+    window.lmsJoin = async function(appId, channelId, token, uid) {
       try {
         const client = AgoraRTC.createClient({ mode: 'rtc', codec: 'vp8' });
         window._lmsClient = client;
@@ -317,8 +317,8 @@
           if (el) el.remove();
         });
 
-        // Join channel (null token = no-auth mode)
-        await client.join(appId, channelId, null, uid);
+        // Join channel with token (or null for App-ID-only mode)
+        await client.join(appId, channelId, token || null, uid);
 
         // Create and publish mic + camera
         const [audioTrack, videoTrack] = await Promise.all([

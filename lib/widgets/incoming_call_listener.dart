@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import '../services/call_service.dart';
 import '../services/api_service.dart';
+import '../screens/lms_live_session_screen.dart';
 import '../utils/shared_pref.dart';
 import '../utils/app_keys.dart';
 import '../utils/theme.dart';
@@ -94,6 +95,11 @@ class _IncomingCallListenerState extends State<IncomingCallListener> {
         debugPrint('🔴 Course $courseTitle isLive=$isLive');
 
         if (isLive && _lastLiveCourseId != courseId && mounted) {
+          // Don't show popup if student is already in the live session
+          if (LmsLiveSessionScreen.activeCourseId == courseId) {
+            _lastLiveCourseId = courseId;
+            return;
+          }
           _lastLiveCourseId = courseId;
           _showLiveSessionAlert(courseId, courseTitle);
           return;
