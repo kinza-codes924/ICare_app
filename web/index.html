@@ -278,8 +278,48 @@
     window._lmsTracks = [];
     window._lmsRemoteUids = [];
 
+    // Create video containers directly in DOM (Flutter HtmlElementView not used)
+    window.lmsCreateVideoContainers = function() {
+      // Remove old containers if any
+      ['lms-overlay','lms-local-video','lms-remote-main'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.remove();
+      });
+
+      // Overlay container that fills the session screen area
+      const overlay = document.createElement('div');
+      overlay.id = 'lms-overlay';
+      overlay.style.cssText = 'position:fixed;top:52px;left:0;right:0;bottom:70px;'
+        + 'background:#1C2333;z-index:100;pointer-events:none;';
+
+      // Remote video (full)
+      const remote = document.createElement('div');
+      remote.id = 'lms-remote-main';
+      remote.style.cssText = 'position:absolute;top:0;left:0;right:0;bottom:0;background:#1C2333;';
+      overlay.appendChild(remote);
+
+      // Local PiP
+      const local = document.createElement('div');
+      local.id = 'lms-local-video';
+      local.style.cssText = 'position:absolute;bottom:16px;right:16px;width:160px;height:120px;'
+        + 'border-radius:10px;overflow:hidden;background:#2D3748;z-index:10;'
+        + 'border:2px solid rgba(255,255,255,0.4);pointer-events:auto;';
+      overlay.appendChild(local);
+
+      document.body.appendChild(overlay);
+      return true;
+    };
+
+    window.lmsRemoveVideoContainers = function() {
+      const el = document.getElementById('lms-overlay');
+      if (el) el.remove();
+    };
+
     window.lmsJoin = async function(appId, channelId, token, uid) {
       try {
+        // Create DOM containers first
+        window.lmsCreateVideoContainers();
+
         const client = AgoraRTC.createClient({ mode: 'rtc', codec: 'vp8' });
         window._lmsClient = client;
 
@@ -351,6 +391,7 @@
           window._lmsClient.leave();
           window._lmsClient = null;
         }
+        window.lmsRemoveVideoContainers();
       } catch(_) {}
     };
 

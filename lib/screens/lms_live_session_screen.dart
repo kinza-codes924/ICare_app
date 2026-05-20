@@ -5,14 +5,6 @@ import 'package:icare/services/lms_service.dart';
 import 'package:icare/services/agora_service.dart';
 import 'package:icare/utils/shared_pref.dart';
 import 'package:icare/utils/theme.dart';
-import 'package:web/web.dart' as web;
-// Web-only imports — guarded by kIsWeb at runtime
-// ignore: avoid_web_libraries_in_flutter
-import '../utils/html_stub.dart' as html
-    if (dart.library.html) 'dart:html';
-// ignore: avoid_web_libraries_in_flutter
-import '../utils/ui_web_stub.dart' as ui
-    if (dart.library.ui) 'dart:ui_web';
 // ignore: avoid_web_libraries_in_flutter
 import '../utils/js_stub.dart' as js
     if (dart.library.html) 'dart:js';
@@ -205,51 +197,24 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
     try {
       final channelId = 'lms_${widget.courseId}';
       final int uid = _currentUserId.hashCode.abs() % 100000 + 1;
-      const viewKey = 'lms-video-container';
 
-      // Get Agora token from backend (same as consultation calls)
+      // Get Agora token (same system as consultation calls)
       String? token;
       try {
         final tokenData = await AgoraService().getToken(channelName: channelId, uid: uid);
         if (tokenData['success'] == true) token = tokenData['token']?.toString();
       } catch (_) {}
 
-      // Register HtmlElementView using package:web — REAL DOM elements Agora can use
-      ui.platformViewRegistry.registerViewFactory(viewKey, (int id) {
-        final container = web.document.createElement('div') as web.HTMLDivElement;
-        container.id = 'lms-video-grid';
-        container.style.cssText = 'width:100%;height:100%;background:#1C2333;position:relative;';
-
-        // Remote (full area)
-        final remote = web.document.createElement('div') as web.HTMLDivElement;
-        remote.id = 'lms-remote-main';
-        remote.style.cssText = 'width:100%;height:100%;background:#1C2333;';
-        container.appendChild(remote);
-
-        // Local PiP bottom-right
-        final local = web.document.createElement('div') as web.HTMLDivElement;
-        local.id = 'lms-local-video';
-        local.style.cssText = 'position:absolute;bottom:16px;right:16px;width:160px;height:120px;'
-            'border-radius:10px;overflow:hidden;background:#2D3748;z-index:10;'
-            'border:2px solid rgba(255,255,255,0.3);';
-        container.appendChild(local);
-
-        return container;
-      });
-
-      if (mounted) setState(() => _cameraViewName = viewKey);
-
-      // Join Agora after view renders
+      // DOM containers are created by JS (not HtmlElementView) — avoids iframe/shadow DOM issues
+      // lmsJoin itself calls lmsCreateVideoContainers() before joining
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        Future.delayed(const Duration(milliseconds: 600), () {
-          js.context.callMethod('lmsJoin', [
-            '82a63a65663c49f0bb973707b4c09f5f',
-            channelId,
-            token,
-            uid,
-          ]);
-          debugPrint('LMS Agora: channel=$channelId uid=$uid token=${token != null ? "ok" : "none"}');
-        });
+        js.context.callMethod('lmsJoin', [
+          '82a63a65663c49f0bb973707b4c09f5f',
+          channelId,
+          token,
+          uid,
+        ]);
+        debugPrint('LMS Agora: channel=$channelId uid=$uid token=${token != null ? "ok" : "none"}');
       });
 
     } catch (e) {
@@ -538,28 +503,25 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
   }
 
   Widget _buildVideoArea() {
-    // On web: use the Agora-managed HtmlElementView (has both local + remote divs)
-    if (kIsWeb && _cameraViewName != null) {
-      return Stack(
-        children: [
-          SizedBox.expand(
-            child: HtmlElementView(viewType: _cameraViewName!),
-          ),
-          // Raised hands & reactions overlay
-          if (_raisedHands.isNotEmpty)
-            Positioned(
-              top: 12, left: 12,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                decoration: BoxDecoration(color: Colors.orange.withOpacity(0.9), borderRadius: BorderRadius.circular(20)),
-                child: Row(children: [
-                  const Text('✋', style: TextStyle(fontSize: 16)),
-                  const SizedBox(width: 8),
-                  Text('${_raisedHands.length} hand(s) raised', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
-                ]),
-              ),
-            ),
-        ],
+    // On web: Agora injects video divs directly into document.body as overlay
+    // Flutter UI shows on top (appbar + bottom bar), video is in the background
+    if (kIsWeb) {
+      return Container(
+        color: const Color(0xFF1C2333),
+        child: _raisedHands.isNotEmpty
+            ? Positioned(
+                top: 12, left: 12,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(color: Colors.orange.withOpacity(0.9), borderRadius: BorderRadius.circular(20)),
+                  child: Row(children: [
+                    const Text('✋', style: TextStyle(fontSize: 16)),
+                    const SizedBox(width: 8),
+                    Text('${_raisedHands.length} hand(s) raised', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+                  ]),
+                ),
+              )
+            : const Center(child: Text('Camera loading...', style: TextStyle(color: Colors.white54, fontSize: 13))),
       );
     }
 
