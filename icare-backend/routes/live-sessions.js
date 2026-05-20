@@ -93,9 +93,9 @@ router.post('/:id/join', authMiddleware, async (req, res) => {
     // Waiting room: add student to waitingStudents (instructor will admit)
     const alreadyAttendee = session.attendees.some(id => id.toString() === studentId.toString());
     const alreadyWaiting = session.waitingStudents.some(id => id.toString() === studentId.toString());
-    const isInstructor = session.instructorId?.toString() === req.user.id?.toString();
+    const isSessionInstructor = session.instructorId?.toString() === req.user.id?.toString();
 
-    if (!alreadyAttendee && !isInstructor) {
+    if (!alreadyAttendee && !isSessionInstructor) {
       if (session.waitingRoom && !alreadyWaiting) {
         // Add to waiting room — instructor must admit
         session.waitingStudents.push(studentId);
