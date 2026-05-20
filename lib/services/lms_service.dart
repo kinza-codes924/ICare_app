@@ -508,6 +508,22 @@ class LmsService {
     } catch (_) {}
   }
 
+  Future<Map<String, dynamic>> endAndSaveSession({
+    required String sessionId,
+    String? lessonId,
+    String? moduleId,
+  }) async {
+    try {
+      final response = await _api.post('/live-sessions/$sessionId/end-and-save', {
+        if (lessonId != null) 'lessonId': lessonId,
+        if (moduleId != null) 'moduleId': moduleId,
+      });
+      return response.data ?? {'success': true};
+    } catch (e) {
+      return {'success': false, 'message': e.toString()};
+    }
+  }
+
   Future<void> startLiveSessionNotify({
     required String courseId,
     required String sessionId,

@@ -16,6 +16,8 @@ class LmsLiveSessionScreen extends StatefulWidget {
   final String courseId;
   final String sessionTitle;
   final bool isInstructor;
+  final String? lessonId;   // linked lesson for auto-save
+  final String? moduleId;
 
   // Global flag — popup should not show when student is already in a session
   static String? activeCourseId;
@@ -26,6 +28,8 @@ class LmsLiveSessionScreen extends StatefulWidget {
     required this.courseId,
     required this.sessionTitle,
     this.isInstructor = false,
+    this.lessonId,
+    this.moduleId,
   });
 
   @override
@@ -387,7 +391,29 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
       } else {
         await _engine?.leaveChannel();
       }
+
       if (widget.isInstructor) {
+        // Auto-save: end session + save chat transcript to lesson
+        if (_sessionDocId.isNotEmpty && _sessionDocId != widget.courseId) {
+          final result = await _lms.endAndSaveSession(
+            sessionId: _sessionDocId,
+            lessonId: widget.lessonId,
+            moduleId: widget.moduleId,
+          );
+          if (mounted && result['success'] == true) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Row(children: [
+                  Icon(Icons.save_rounded, color: Colors.white),
+                  SizedBox(width: 8),
+                  Text('Session saved! Video + chat added to lesson.'),
+                ]),
+                backgroundColor: Colors.green,
+                duration: Duration(seconds: 3),
+              ),
+            );
+          }
+        }
         await _lms.setSessionLive(courseId: widget.courseId, isLive: false);
       }
       Navigator.pop(context);

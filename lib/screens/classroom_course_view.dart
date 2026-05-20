@@ -1505,6 +1505,7 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
                       courseId: widget.course['_id']?.toString() ?? '',
                       sessionTitle: data['title']?.toString() ?? 'Live Session',
                       isInstructor: true,
+                      lessonId: data['_id']?.toString(), // link to lesson for auto-save
                     ),
                   ));
                 },

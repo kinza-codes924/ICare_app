@@ -506,4 +506,93 @@ router.post('/notify-start', authMiddleware, async (req, res) => {
   }
 });
 
+// POST /live-sessions/:id/end-and-save — end session + auto-save to lesson
+router.post('/:id/end-and-save', authMiddleware, async (req, res) => {
+  try {
+    await connectMongoDB();
+    const { lessonId, moduleId } = req.body;
+
+    const session = await LiveSession.findById(toId(req.params.id))
+      .populate('courseId', 'title modules')
+      .lean();
+
+    if (!session) return res.status(404).json({ success: false, message: 'Session not found' });
+
+    // Mark session as completed
+    await LiveSession.findByIdAndUpdate(toId(req.params.id), {
+      status: 'completed',
+      duration: Math.round((Date.now() - new Date(session.createdAt).getTime()) / 60000),
+    });
+
+    // Build chat transcript
+    const chatMessages = session.chatMessages || [];
+    const transcript = chatMessages.map(m =>
+      `[${new Date(m.timestamp).toLocaleTimeString()}] ${m.userName}: ${m.message}`
+    ).join('\n');
+
+    const sessionSummary = {
+      title: session.title,
+      date: new Date().toISOString(),
+      duration: Math.round((Date.now() - new Date(session.createdAt).getTime()) / 60000),
+      attendees: (session.attendees || []).length,
+      chatTranscript: transcript,
+      sessionId: session._id,
+    };
+
+    // Save to lesson if lessonId provided
+    if (lessonId) {
+      const Course = require('../models/Course');
+      const course = await Course.findById(session.courseId?._id || session.courseId);
+      if (course) {
+        // Find the lesson and update it
+        let lessonUpdated = false;
+        course.modules = (course.modules || []).map(mod => {
+          const lessons = (mod.lessons || []).map(lesson => {
+            const lId = lesson._id?.toString() || lesson.id?.toString();
+            if (lId === lessonId) {
+              lessonUpdated = true;
+              return {
+                ...lesson.toObject ? lesson.toObject() : lesson,
+                type: 'live',
+                liveSessionId: session._id,
+                liveSessionDate: new Date(),
+                chatTranscript: transcript,
+                sessionSummary: JSON.stringify(sessionSummary),
+                recordingAvailable: false, // will be true if Agora cloud recording set up
+              };
+            }
+            return lesson;
+          });
+          return { ...mod.toObject ? mod.toObject() : mod, lessons };
+        });
+        if (lessonUpdated) await course.save();
+      }
+    }
+
+    // Also save session summary to lesson notes table for retrieval
+    const LessonNote = require('../models/LessonNote');
+    if (lessonId && chatMessages.length > 0) {
+      await LessonNote.findOneAndUpdate(
+        { lessonId, courseId: session.courseId?._id || session.courseId, type: 'transcript' },
+        {
+          lessonId,
+          courseId: session.courseId?._id || session.courseId,
+          moduleId: moduleId || '',
+          content: `## Live Session Transcript\n**Date:** ${new Date().toLocaleDateString()}\n**Duration:** ${sessionSummary.duration} minutes\n**Attendees:** ${sessionSummary.attendees}\n\n### Chat\n${transcript || 'No messages'}`,
+          type: 'transcript',
+        },
+        { upsert: true }
+      ).catch(() => {});
+    }
+
+    res.json({
+      success: true,
+      message: 'Session ended and saved to lesson',
+      sessionSummary,
+    });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
 module.exports = router;
