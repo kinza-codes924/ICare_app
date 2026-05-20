@@ -202,24 +202,29 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
       final channelId = 'lms_${widget.courseId}';
       final int uid = _currentUserId.hashCode.abs() % 100000 + 1;
 
-      // Get Agora token — response is {success: true, data: {token: "..."}}
+      // Step 1: Register platform view (same as doctor-patient video_call_web.dart)
+      final viewId = registerLmsVideoView();
+      if (mounted) setState(() => _cameraViewName = viewId);
+
+      // Step 2: Get Agora token
       String? token;
       try {
         final tokenData = await AgoraService().getToken(channelName: channelId, uid: uid);
         if (tokenData['success'] == true) {
-          token = tokenData['data']?['token']?.toString() // correct path
-              ?? tokenData['token']?.toString(); // fallback
+          token = tokenData['data']?['token']?.toString()
+              ?? tokenData['token']?.toString();
         }
-        debugPrint('LMS token fetch: ${token != null ? "ok" : "FAILED"} - ${tokenData['message'] ?? ""}');
+        debugPrint('LMS token: ${token != null ? "ok" : "FAILED"}');
       } catch (e) {
         debugPrint('LMS token error: $e');
       }
 
-      // DOM containers are created by JS (not HtmlElementView) — avoids iframe/shadow DOM issues
-      // lmsJoin itself calls lmsCreateVideoContainers() before joining
+      // Step 3: Join Agora after view renders
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        lmsJoinChannel('82a63a65663c49f0bb973707b4c09f5f', channelId, token, uid);
-        debugPrint('LMS Agora: channel=$channelId uid=$uid token=${token != null ? "ok" : "none"}');
+        Future.delayed(const Duration(milliseconds: 300), () {
+          lmsJoinChannel('82a63a65663c49f0bb973707b4c09f5f', channelId, token, uid);
+          debugPrint('LMS Agora join: channel=$channelId uid=$uid');
+        });
       });
 
     } catch (e) {
@@ -536,24 +541,20 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
   }
 
   Widget _buildVideoArea() {
-    // On web: Agora injects video divs directly into document.body as overlay
-    // Flutter widget must be transparent so the JS video overlay shows through
-    if (kIsWeb) {
+    // On web: use HtmlElementView (same as working doctor-patient call)
+    // platformViewRegistry creates divs IN Flutter's layout — buttons work naturally
+    if (kIsWeb && _cameraViewName != null) {
       return Stack(
         children: [
-          // Transparent background — JS overlay (lms-overlay div) shows through
-          Container(color: Colors.transparent),
-          // Raised hand banner on top
+          // Video platform view — contains lms-local-video + lms-remote-main
+          SizedBox.expand(child: HtmlElementView(viewType: _cameraViewName!)),
+          // Raised hand banner
           if (_raisedHands.isNotEmpty)
             Positioned(
-              top: 12,
-              left: 12,
+              top: 12, left: 12,
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                decoration: BoxDecoration(
-                  color: Colors.orange.withOpacity(0.9),
-                  borderRadius: BorderRadius.circular(20),
-                ),
+                decoration: BoxDecoration(color: Colors.orange.withOpacity(0.9), borderRadius: BorderRadius.circular(20)),
                 child: Row(children: [
                   const Text('✋', style: TextStyle(fontSize: 16)),
                   const SizedBox(width: 8),
@@ -562,16 +563,16 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
                 ]),
               ),
             ),
-          // Show placeholder only before Agora connects
-          if (!_joined)
-            Center(
-              child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-                const CircularProgressIndicator(color: Colors.white54, strokeWidth: 2),
-                const SizedBox(height: 12),
-                const Text('Connecting camera...', style: TextStyle(color: Colors.white54, fontSize: 13)),
-              ]),
-            ),
         ],
+      );
+    }
+    if (kIsWeb) {
+      return const Center(
+        child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+          CircularProgressIndicator(color: Colors.white54, strokeWidth: 2),
+          SizedBox(height: 12),
+          Text('Connecting...', style: TextStyle(color: Colors.white54, fontSize: 13)),
+        ]),
       );
     }
 

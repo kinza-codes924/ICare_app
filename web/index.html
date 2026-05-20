@@ -351,8 +351,9 @@
         }
         if (window._lmsClient) { try { await window._lmsClient.leave(); } catch(_){} window._lmsClient = null; }
 
-        // Create DOM containers
-        window.lmsCreateVideoContainers();
+        // Note: DOM containers (lms-local-video, lms-remote-main) are created by
+        // Flutter's platformViewRegistry (registerLmsVideoView in lms_agora_web.dart)
+        // Same approach as working doctor-patient video_call_web.dart
 
         // Enable cloud proxy for networks that block direct UDP (firewalls, ISPs)
         AgoraRTC.setLogLevel(3); // warnings only
