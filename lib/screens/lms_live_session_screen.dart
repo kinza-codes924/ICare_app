@@ -57,6 +57,7 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
   bool _chatOpen = false;
   bool _participantsOpen = false;
   bool _handRaised = false;
+  bool _isRecording = false;
   late TabController _panelTab;
 
   // Chat — synced with backend
@@ -140,8 +141,33 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
     }
   }
 
+  Future<void> _toggleRecording() async {
+    if (_sessionDocId.isEmpty) return;
+    if (!_isRecording) {
+      // Start recording
+      final result = await _lms.startRecording(_sessionDocId);
+      if (result['success'] == true && mounted) {
+        setState(() => _isRecording = true);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('🔴 Recording started'), backgroundColor: Colors.red, duration: Duration(seconds: 2)),
+        );
+      }
+    } else {
+      // Stop recording
+      final result = await _lms.stopRecording(_sessionDocId);
+      if (mounted) {
+        setState(() => _isRecording = false);
+        final dur = result['recording']?['durationFormatted'] ?? '';
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('⏹ Recording stopped. Duration: $dur'), backgroundColor: Colors.green, duration: const Duration(seconds: 3)),
+        );
+      }
+    }
+  }
+
   void _startSyncPolling() {
-    _syncTimer = Timer.periodic(const Duration(seconds: 3), (_) => _syncSessionState());
+    // 2-second interval for near-realtime chat/polls/participants
+    _syncTimer = Timer.periodic(const Duration(seconds: 2), (_) => _syncSessionState());
   }
 
   Future<void> _syncSessionState() async {
@@ -573,10 +599,29 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
           Row(children: [
             const Icon(Icons.people_rounded, color: Colors.white54, size: 18),
             const SizedBox(width: 4),
-            Text('${_remoteUids.length + 1}', style: const TextStyle(color: Colors.white54, fontSize: 13)),
+            Text('${_participants.length}', style: const TextStyle(color: Colors.white54, fontSize: 13)),
           ]),
-          const SizedBox(width: 12),
-          // Security icon
+          const SizedBox(width: 10),
+          // Recording button (instructor only)
+          if (widget.isInstructor)
+            GestureDetector(
+              onTap: _toggleRecording,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: _isRecording ? Colors.red : Colors.white24,
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Row(mainAxisSize: MainAxisSize.min, children: [
+                  Icon(_isRecording ? Icons.stop_circle_rounded : Icons.fiber_manual_record_rounded,
+                      color: Colors.white, size: 14),
+                  const SizedBox(width: 4),
+                  Text(_isRecording ? 'Stop REC' : 'Record',
+                      style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w700)),
+                ]),
+              ),
+            ),
+          const SizedBox(width: 8),
           const Icon(Icons.lock_rounded, color: Colors.white54, size: 18),
         ],
       ),

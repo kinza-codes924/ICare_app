@@ -534,6 +534,68 @@ router.post('/notify-start', authMiddleware, async (req, res) => {
   }
 });
 
+// POST /live-sessions/:id/recording/start — start cloud recording
+router.post('/:id/recording/start', authMiddleware, async (req, res) => {
+  try {
+    await connectMongoDB();
+    const session = await LiveSession.findById(toId(req.params.id));
+    if (!session) return res.status(404).json({ success: false, message: 'Session not found' });
+
+    // Mark recording as started
+    session.isRecorded = true;
+    session.recordingStartedAt = new Date();
+    await session.save();
+
+    // Note: For actual Agora Cloud Recording, set these env vars:
+    // AGORA_CUSTOMER_KEY, AGORA_CUSTOMER_SECRET, AGORA_BUCKET_NAME, AGORA_BUCKET_KEY, AGORA_BUCKET_SECRET
+    // Then call: https://api.agora.io/v1/apps/:appId/cloud_recording/...
+    const agoraCustomerKey = process.env.AGORA_CUSTOMER_KEY;
+    const agoraCustomerSecret = process.env.AGORA_CUSTOMER_SECRET;
+
+    if (agoraCustomerKey && agoraCustomerSecret) {
+      // TODO: Call Agora Cloud Recording API to start recording
+      // This requires Agora Cloud Recording subscription
+    }
+
+    res.json({ success: true, message: 'Recording started', sessionId: session._id });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+// POST /live-sessions/:id/recording/stop — stop recording + save metadata
+router.post('/:id/recording/stop', authMiddleware, async (req, res) => {
+  try {
+    await connectMongoDB();
+    const { recordingUrl } = req.body; // URL from Agora Cloud Recording or manual upload
+    const session = await LiveSession.findById(toId(req.params.id));
+    if (!session) return res.status(404).json({ success: false, message: 'Session not found' });
+
+    const startTime = session.recordingStartedAt || session.createdAt;
+    const endTime = new Date();
+    const durationSeconds = Math.round((endTime - startTime) / 1000);
+
+    session.recordingUrl = recordingUrl || '';
+    session.recordingEndedAt = endTime;
+    session.recordingDuration = durationSeconds;
+    await session.save();
+
+    res.json({
+      success: true,
+      recording: {
+        sessionId: session._id,
+        recordingUrl: session.recordingUrl,
+        startTime,
+        endTime,
+        durationSeconds,
+        durationFormatted: `${Math.floor(durationSeconds / 60)}m ${durationSeconds % 60}s`,
+      },
+    });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
 // POST /live-sessions/:id/end-and-save — end session + auto-save to lesson
 router.post('/:id/end-and-save', authMiddleware, async (req, res) => {
   try {

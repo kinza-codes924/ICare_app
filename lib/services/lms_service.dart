@@ -526,6 +526,24 @@ class LmsService {
     } catch (_) {}
   }
 
+  Future<Map<String, dynamic>> startRecording(String sessionId) async {
+    try {
+      final response = await _api.post('/live-sessions/$sessionId/recording/start', {});
+      return response.data ?? {'success': true};
+    } catch (e) {
+      return {'success': false, 'message': e.toString()};
+    }
+  }
+
+  Future<Map<String, dynamic>> stopRecording(String sessionId) async {
+    try {
+      final response = await _api.post('/live-sessions/$sessionId/recording/stop', {});
+      return response.data ?? {'success': true};
+    } catch (e) {
+      return {'success': false, 'message': e.toString()};
+    }
+  }
+
   Future<Map<String, dynamic>> endAndSaveSession({
     required String sessionId,
     String? lessonId,

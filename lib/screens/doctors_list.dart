@@ -131,7 +131,9 @@ class _DoctorsListState extends State<DoctorsList> {
           final q = _searchQuery.toLowerCase();
           final inSpec = doctor.specialization?.toLowerCase().contains(q) ?? false;
           final inConditions = doctor.conditionsTreated.any((c) => c.toLowerCase().contains(q));
-          matchesSearch = _searchQuery.isEmpty || inSpec || inConditions;
+          final inName = doctor.user.name.toLowerCase().contains(q);
+          // Match condition across specialization, conditions treated, or name
+          matchesSearch = _searchQuery.isEmpty || inSpec || inConditions || inName;
         }
 
         final matchesSpecialization =
@@ -220,6 +222,26 @@ class _DoctorsListState extends State<DoctorsList> {
           ? const Center(child: CircularProgressIndicator())
           : Column(
               children: [
+                // Active filter banner
+                if (_searchQuery.isNotEmpty && (_searchMode == 'condition' || _searchMode == 'specialty'))
+                  Container(
+                    color: const Color(0xFF0036BC).withOpacity(0.08),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    child: Row(children: [
+                      Icon(_searchMode == 'condition' ? Icons.healing_outlined : Icons.medical_services_outlined,
+                          size: 16, color: const Color(0xFF0036BC)),
+                      const SizedBox(width: 8),
+                      Text(
+                        '${_searchMode == 'condition' ? 'Condition' : 'Speciality'}: $_searchQuery  •  ${_filteredDoctors.length} doctor(s) found',
+                        style: const TextStyle(fontSize: 13, color: Color(0xFF0036BC), fontWeight: FontWeight.w600),
+                      ),
+                      const Spacer(),
+                      GestureDetector(
+                        onTap: () { setState(() { _searchQuery = ''; _searchMode = 'name'; _searchController.clear(); _filterDoctors(); }); },
+                        child: const Icon(Icons.close_rounded, size: 18, color: Color(0xFF0036BC)),
+                      ),
+                    ]),
+                  ),
                 // Search and Filter Section
                 Container(
                   color: Colors.white,
