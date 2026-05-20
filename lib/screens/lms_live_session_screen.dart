@@ -41,8 +41,8 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
   bool _cameraOn = true;
 
   // Web camera
-  html.MediaStream? _localStream;
-  html.VideoElement? _localVideo;
+  dynamic _localStream;
+  dynamic _localVideo;
   static int _viewId = 0;
   bool _loading = true;
   String? _error;
