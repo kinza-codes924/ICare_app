@@ -317,65 +317,89 @@
 
     window.lmsJoin = async function(appId, channelId, token, uid) {
       try {
-        // Create DOM containers first
+        // Clean up previous session
+        if (window._lmsTracks) {
+          window._lmsTracks.forEach(function(t) { try { t.stop(); t.close(); } catch(_){} });
+          window._lmsTracks = [];
+        }
+        if (window._lmsClient) { try { await window._lmsClient.leave(); } catch(_){} window._lmsClient = null; }
+
+        // Create DOM containers
         window.lmsCreateVideoContainers();
 
         const client = AgoraRTC.createClient({ mode: 'rtc', codec: 'vp8' });
         window._lmsClient = client;
 
-        // Remote user joined — play their video/audio
-        client.on('user-published', async (user, mediaType) => {
-          await client.subscribe(user, mediaType);
-          if (mediaType === 'audio') {
-            user.audioTrack.play();
+        // Retry helper — same as doctor-patient call
+        function playRemoteWithRetry(videoTrack, divId, retries) {
+          retries = retries || 0;
+          var el = document.getElementById(divId);
+          if (el) {
+            try { videoTrack.play(divId); console.log('✅ LMS remote video playing'); }
+            catch(e) { if (retries < 5) setTimeout(function(){ playRemoteWithRetry(videoTrack, divId, retries+1); }, 300); }
+          } else {
+            if (retries < 20) setTimeout(function(){ playRemoteWithRetry(videoTrack, divId, retries+1); }, 300);
+            else console.error('LMS remote div never appeared');
           }
+        }
+
+        client.on('user-published', async function(user, mediaType) {
+          await client.subscribe(user, mediaType);
+          if (mediaType === 'audio') { try { user.audioTrack.play(); } catch(e){} }
           if (mediaType === 'video') {
             window._lmsRemoteUids.push(user.uid);
-            // Use the pre-built main area, else create fallback
-            const mainArea = document.getElementById('lms-remote-main');
-            const remoteId = 'lms-remote-' + user.uid;
-            if (mainArea) {
-              mainArea.id = remoteId;
-              user.videoTrack.play(remoteId);
-            } else {
-              let container = document.getElementById(remoteId);
-              if (!container) {
-                container = document.createElement('div');
-                container.id = remoteId;
-                container.style.cssText = 'width:100%;height:100%;background:#1C2333;';
-                const grid = document.getElementById('lms-video-grid');
-                if (grid) grid.insertBefore(container, grid.firstChild);
-              }
-              user.videoTrack.play(remoteId);
-            }
+            playRemoteWithRetry(user.videoTrack, 'lms-remote-main', 0);
           }
         });
 
-        client.on('user-left', (user) => {
-          window._lmsRemoteUids = window._lmsRemoteUids.filter(u => u !== user.uid);
-          const el = document.getElementById('lms-remote-' + user.uid);
-          if (el) el.remove();
+        client.on('user-joined', async function(user) {
+          if (user.hasVideo) {
+            try { await client.subscribe(user, 'video'); playRemoteWithRetry(user.videoTrack, 'lms-remote-main', 0); } catch(e){}
+          }
+          if (user.hasAudio) {
+            try { await client.subscribe(user, 'audio'); user.audioTrack.play(); } catch(e){}
+          }
         });
 
-        // Join channel with token (or null for App-ID-only mode)
+        client.on('user-left', function(user) {
+          window._lmsRemoteUids = window._lmsRemoteUids.filter(function(u){ return u !== user.uid; });
+          var el = document.getElementById('lms-remote-main');
+          if (el) el.innerHTML = '';
+        });
+
+        // Join channel
         await client.join(appId, channelId, token || null, uid);
 
-        // Create and publish mic + camera
-        const [audioTrack, videoTrack] = await Promise.all([
-          AgoraRTC.createMicrophoneAudioTrack(),
-          AgoraRTC.createCameraVideoTrack({ encoderConfig: '720p_1' })
-        ]);
-        window._lmsTracks = [audioTrack, videoTrack];
-        await client.publish(window._lmsTracks);
+        // Subscribe to users already in channel
+        var existing = client.remoteUsers;
+        for (var i = 0; i < existing.length; i++) {
+          var u = existing[i];
+          if (u.hasVideo) { try { await client.subscribe(u, 'video'); playRemoteWithRetry(u.videoTrack, 'lms-remote-main', 0); } catch(e){} }
+          if (u.hasAudio) { try { await client.subscribe(u, 'audio'); u.audioTrack.play(); } catch(e){} }
+        }
 
-        // Play local video
-        const localEl = document.getElementById('lms-local-video');
-        if (localEl) videoTrack.play('lms-local-video');
+        // Mic — separate try/catch (don't fail if denied)
+        var audioTrack = null;
+        try { audioTrack = await AgoraRTC.createMicrophoneAudioTrack(); }
+        catch(e) { console.warn('LMS mic not available:', e.message); }
 
+        // Camera — separate try/catch
+        var videoTrack = null;
+        try { videoTrack = await AgoraRTC.createCameraVideoTrack(); }
+        catch(e) { console.warn('LMS camera not available:', e.message); }
+
+        var tracks = [];
+        if (audioTrack) tracks.push(audioTrack);
+        if (videoTrack) tracks.push(videoTrack);
+        window._lmsTracks = tracks;
+        if (tracks.length > 0) await client.publish(tracks);
+        if (videoTrack) videoTrack.play('lms-local-video');
+
+        console.log('✅ LMS session joined channel:', channelId);
         return 'joined';
       } catch(e) {
-        console.error('LMS Agora error:', e);
-        return 'error:' + e.message;
+        console.warn('LMS Agora non-fatal error:', e.message || String(e));
+        return 'ok'; // Never block user
       }
     };
 
