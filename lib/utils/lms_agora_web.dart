@@ -13,6 +13,9 @@ external void _lmsMuteMicJS(bool mute);
 @JS('lmsMuteCamera')
 external void _lmsMuteCameraJS(bool mute);
 
+@JS('lmsSetPanelWidth')
+external void _lmsSetPanelWidthJS(bool panelOpen);
+
 void lmsJoinChannel(String appId, String channelId, String? token, int uid) {
   _lmsJoinJS(appId, channelId, token, uid);
 }
@@ -20,3 +23,4 @@ void lmsJoinChannel(String appId, String channelId, String? token, int uid) {
 void lmsLeaveChannel() => _lmsLeaveJS();
 void lmsMuteMic(bool mute) => _lmsMuteMicJS(mute);
 void lmsMuteCamera(bool mute) => _lmsMuteCameraJS(mute);
+void lmsSetPanelWidth(bool panelOpen) => _lmsSetPanelWidthJS(panelOpen);

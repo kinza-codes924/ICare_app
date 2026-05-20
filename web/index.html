@@ -323,6 +323,17 @@
       if (el) el.remove();
     };
 
+    // Called from Flutter when side panel (chat/people) opens or closes
+    window.lmsSetPanelWidth = function(panelOpen) {
+      const overlay = document.getElementById('lms-overlay');
+      if (!overlay) return;
+      if (panelOpen) {
+        overlay.style.right = '300px'; // leave 300px for Flutter panel
+      } else {
+        overlay.style.right = '0px';
+      }
+    };
+
     window.lmsJoin = async function(appId, channelId, token, uid) {
       try {
         // Clean up previous session

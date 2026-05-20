@@ -1062,11 +1062,11 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
                 _participantsOpen = false;
                 if (_chatOpen) _panelTab.animateTo(0);
               });
+              if (kIsWeb) lmsSetPanelWidth(_chatOpen);
             },
             badge: _chatMessages.isNotEmpty ? '${_chatMessages.length}' : null,
           ),
           const SizedBox(width: 8),
-          // Participants
           _controlBtn(
             icon: Icons.people_rounded,
             label: 'People',
@@ -1077,10 +1077,10 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
                 _chatOpen = _participantsOpen;
                 if (_participantsOpen) _panelTab.animateTo(1);
               });
+              if (kIsWeb) lmsSetPanelWidth(_participantsOpen);
             },
           ),
           const SizedBox(width: 8),
-          // Polls (instructor)
           if (widget.isInstructor)
             _controlBtn(
               icon: Icons.poll_rounded,
@@ -1092,6 +1092,7 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
                   _participantsOpen = false;
                   _panelTab.animateTo(2);
                 });
+                if (kIsWeb) lmsSetPanelWidth(true);
               },
             ),
           if (widget.isInstructor) const SizedBox(width: 8),
