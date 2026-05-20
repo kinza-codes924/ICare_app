@@ -293,11 +293,11 @@
         + 'width:100%!important;height:100%!important;object-fit:cover!important;}';
       document.head.appendChild(style);
 
-      // Main overlay — sits above Flutter canvas
+      // Main overlay — sits above Flutter canvas, pointer-events:none so Flutter buttons work
       var overlay = document.createElement('div');
       overlay.id = 'lms-overlay';
       overlay.style.cssText = 'position:fixed;top:52px;left:0;right:0;bottom:70px;'
-        + 'background:#1C2333;z-index:9999;';
+        + 'background:#1C2333;z-index:9999;pointer-events:none;';
 
       // Remote full-area
       var remote = document.createElement('div');
@@ -335,7 +335,10 @@
         // Create DOM containers
         window.lmsCreateVideoContainers();
 
+        // Enable cloud proxy for networks that block direct UDP (firewalls, ISPs)
+        AgoraRTC.setLogLevel(3); // warnings only
         const client = AgoraRTC.createClient({ mode: 'rtc', codec: 'vp8' });
+        try { await client.startProxyServer(3); } catch(_) {} // proxy mode 3 = force relay
         window._lmsClient = client;
 
         // Retry helper — same as doctor-patient call
