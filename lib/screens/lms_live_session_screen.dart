@@ -198,12 +198,18 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
       final channelId = 'lms_${widget.courseId}';
       final int uid = _currentUserId.hashCode.abs() % 100000 + 1;
 
-      // Get Agora token (same system as consultation calls)
+      // Get Agora token — response is {success: true, data: {token: "..."}}
       String? token;
       try {
         final tokenData = await AgoraService().getToken(channelName: channelId, uid: uid);
-        if (tokenData['success'] == true) token = tokenData['token']?.toString();
-      } catch (_) {}
+        if (tokenData['success'] == true) {
+          token = tokenData['data']?['token']?.toString() // correct path
+              ?? tokenData['token']?.toString(); // fallback
+        }
+        debugPrint('LMS token fetch: ${token != null ? "ok" : "FAILED"} - ${tokenData['message'] ?? ""}');
+      } catch (e) {
+        debugPrint('LMS token error: $e');
+      }
 
       // DOM containers are created by JS (not HtmlElementView) — avoids iframe/shadow DOM issues
       // lmsJoin itself calls lmsCreateVideoContainers() before joining

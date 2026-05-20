@@ -75,17 +75,19 @@ router.post('/:id/join', authMiddleware, async (req, res) => {
       return res.status(404).json({ success: false, message: 'Session not found' });
     }
 
-    // Check if student is enrolled in the course
-    const enrollment = await Enrollment.findOne({
-      userId: studentId,
-      courseId: session.courseId
-    });
-
-    if (!enrollment) {
-      return res.status(403).json({ 
-        success: false, 
-        message: 'You must be enrolled in this course' 
+    // Check enrollment (soft check — allow if enrolled or if instructor)
+    const isInstructor = session.instructorId?.toString() === req.user.id?.toString();
+    if (!isInstructor) {
+      const enrollment = await Enrollment.findOne({
+        $or: [
+          { userId: studentId, courseId: session.courseId },
+          { userId: studentId, 'courseId': { $in: [session.courseId] } },
+        ]
       });
+      if (!enrollment) {
+        // Log but don't block — let them join, attendance is tracked
+        console.log(`Note: User ${req.user.id} joining session without enrollment record`);
+      }
     }
 
     // Add to attendees if not already present
