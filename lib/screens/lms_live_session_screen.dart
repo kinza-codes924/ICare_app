@@ -5,9 +5,9 @@ import 'package:icare/services/lms_service.dart';
 import 'package:icare/services/agora_service.dart';
 import 'package:icare/utils/shared_pref.dart';
 import 'package:icare/utils/theme.dart';
-// ignore: avoid_web_libraries_in_flutter
-import '../utils/js_stub.dart' as js
-    if (dart.library.html) 'dart:js';
+// Use dart:js_interop for web (same approach as working doctor-patient call)
+import '../utils/lms_agora_stub.dart'
+    if (dart.library.js_interop) '../utils/lms_agora_web.dart';
 
 /// LMS Live Session Screen — Google Meet style, Agora-based
 /// Completely separate from doctor-patient consultation
@@ -96,7 +96,7 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
     _panelTab.dispose();
     LmsLiveSessionScreen.activeCourseId = null; // allow popup again after leaving
     if (kIsWeb) {
-      js.context.callMethod('lmsLeave', []);
+      lmsLeaveChannel();
     }
     _localStream?.getTracks().forEach((t) => t.stop());
     super.dispose();
@@ -208,12 +208,7 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
       // DOM containers are created by JS (not HtmlElementView) — avoids iframe/shadow DOM issues
       // lmsJoin itself calls lmsCreateVideoContainers() before joining
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        js.context.callMethod('lmsJoin', [
-          '82a63a65663c49f0bb973707b4c09f5f',
-          channelId,
-          token,
-          uid,
-        ]);
+        lmsJoinChannel('82a63a65663c49f0bb973707b4c09f5f', channelId, token, uid);
         debugPrint('LMS Agora: channel=$channelId uid=$uid token=${token != null ? "ok" : "none"}');
       });
 
@@ -291,7 +286,7 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
   Future<void> _toggleMic() async {
     _micOn = !_micOn;
     if (kIsWeb) {
-      js.context.callMethod('lmsMuteMic', [!_micOn]);
+      lmsMuteMic(!_micOn);
     } else {
       await _engine?.muteLocalAudioStream(!_micOn);
     }
@@ -306,7 +301,7 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
   Future<void> _toggleCamera() async {
     _cameraOn = !_cameraOn;
     if (kIsWeb) {
-      js.context.callMethod('lmsMuteCamera', [!_cameraOn]);
+      lmsMuteCamera(!_cameraOn);
     } else {
       await _engine?.muteLocalVideoStream(!_cameraOn);
     }
@@ -382,7 +377,7 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
     );
     if (confirm == true && mounted) {
       if (kIsWeb) {
-        js.context.callMethod('lmsLeave', []);
+        lmsLeaveChannel();
       } else {
         await _engine?.leaveChannel();
       }
