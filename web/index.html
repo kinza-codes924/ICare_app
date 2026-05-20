@@ -280,32 +280,38 @@
 
     // Create video containers directly in DOM (Flutter HtmlElementView not used)
     window.lmsCreateVideoContainers = function() {
-      // Remove old containers if any
-      ['lms-overlay','lms-local-video','lms-remote-main'].forEach(id => {
-        const el = document.getElementById(id);
-        if (el) el.remove();
+      ['lms-overlay','lms-local-video','lms-remote-main','lms-css'].forEach(function(id) {
+        var el = document.getElementById(id); if (el) el.remove();
       });
 
-      // Overlay container that fills the session screen area
-      // z-index: 99 — below Flutter canvas (z-index: 100+) but above page background
-      // Flutter's video area widget is transparent, so video shows through
-      const overlay = document.createElement('div');
+      // CSS: force video elements inside our containers to fill properly
+      var style = document.createElement('style');
+      style.id = 'lms-css';
+      style.textContent = '#lms-local-video video,#lms-local-video div{'
+        + 'width:100%!important;height:100%!important;object-fit:cover!important;}'
+        + '#lms-remote-main video,#lms-remote-main div{'
+        + 'width:100%!important;height:100%!important;object-fit:cover!important;}';
+      document.head.appendChild(style);
+
+      // Main overlay — sits above Flutter canvas
+      var overlay = document.createElement('div');
       overlay.id = 'lms-overlay';
       overlay.style.cssText = 'position:fixed;top:52px;left:0;right:0;bottom:70px;'
-        + 'background:#1C2333;z-index:99;pointer-events:none;';
+        + 'background:#1C2333;z-index:9999;';
 
-      // Remote video (full)
-      const remote = document.createElement('div');
+      // Remote full-area
+      var remote = document.createElement('div');
       remote.id = 'lms-remote-main';
-      remote.style.cssText = 'position:absolute;top:0;left:0;right:0;bottom:0;background:#1C2333;';
+      remote.style.cssText = 'position:absolute;top:0;left:0;right:0;bottom:0;'
+        + 'background:#1C2333;overflow:hidden;';
       overlay.appendChild(remote);
 
-      // Local PiP — bottom right, pointer-events:auto so user can interact
-      const local = document.createElement('div');
+      // Local PiP bottom-right
+      var local = document.createElement('div');
       local.id = 'lms-local-video';
-      local.style.cssText = 'position:absolute;bottom:16px;right:16px;width:160px;height:120px;'
-        + 'border-radius:10px;overflow:hidden;background:#2D3748;z-index:10;'
-        + 'border:2px solid rgba(255,255,255,0.4);pointer-events:auto;';
+      local.style.cssText = 'position:absolute;bottom:16px;right:16px;width:180px;height:135px;'
+        + 'border-radius:10px;overflow:hidden;background:#2D3748;z-index:10000;'
+        + 'border:2px solid rgba(255,255,255,0.6);';
       overlay.appendChild(local);
 
       document.body.appendChild(overlay);
