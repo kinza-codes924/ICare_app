@@ -11,6 +11,9 @@ router.get('/consultations/:consultationId/prescription/draft', prescriptionV2Co
 // Complete prescription
 router.post('/consultations/:consultationId/prescription/complete', prescriptionV2Controller.completePrescription);
 
+// Get completed prescription by consultationId (fallback when prescriptionId not stored on consultation)
+router.get('/consultations/:consultationId/prescription/completed', prescriptionV2Controller.getCompletedPrescriptionByConsultation);
+
 // Get prescription by ID
 router.get('/prescriptions/:prescriptionId', prescriptionV2Controller.getPrescription);
 

@@ -1,7 +1,9 @@
 # iCare App — Client Meeting Changes
 **Meeting Date:** 13 April 2026
-**Status:** Pending Implementation
-**Priority:** Urgent
+**Last Reviewed:** 21 May 2026
+**Status:** In Progress
+
+> **Legend:** ✅ DONE | 🔄 PARTIAL | ⚫ CANCELLED BY CLIENT | 🔴 PENDING
 
 ---
 
@@ -104,18 +106,18 @@ These tiles should link to the courses/programs sections of the app (`lib/screen
 
 ---
 
-### 1.7 Footer Changes
+### 1.7 Footer Changes ✅ DONE
 **File:** Footer widget (likely inside `lib/screens/home.dart` or a shared footer widget)
 
-| # | Change | Details |
-|---|--------|---------|
-| 19 | Remove "Analytics" link | Delete it from footer links |
-| 20 | Remove "For Doctors" link | Delete it from footer links |
-| 21 | Theme change | Footer background: white. Text and accent: blue theme |
+| # | Change | Details | Status |
+|---|--------|---------|--------|
+| 19 | Remove "Analytics" link | Delete it from footer links | ✅ DONE |
+| 20 | Remove "For Doctors" link | Delete it from footer links | ✅ DONE |
+| 21 | Theme change | Footer background: white. Text and accent: blue theme | ✅ DONE |
 
 ---
 
-### 1.8 WhatsApp Floating Button
+### 1.8 WhatsApp Floating Button ✅ DONE
 
 Add a WhatsApp floating action button on the home page.
 - Position: Bottom-right corner
@@ -180,28 +182,28 @@ Add a WhatsApp floating action button on the home page.
 ### 3.1 Patient Profile
 **File:** `lib/screens/patient_profile.dart`, `lib/screens/profile_edit.dart`, `lib/screens/profile.dart`
 
-| # | Change | Details |
-|---|--------|---------|
-| 35 | Remove "Role" field | Do not display the role field on the patient profile |
-| 36 | Add CNIC Number field | New required field: CNIC number |
-| 37 | Profile fields to show | Age, Height, Weight, CNIC Number, Address |
-| 38 | Profile icon click → dropdown | Clicking the profile icon should show a dropdown with two options: **Edit Profile** and **Logout** |
+| # | Change | Details | Status |
+|---|--------|---------|--------|
+| 35 | Remove "Role" field | Do not display the role field on the patient profile | ✅ DONE |
+| 36 | Add CNIC Number field | New required field: CNIC number | ✅ DONE |
+| 37 | Profile fields to show | Age, Height, Weight, CNIC Number, Address | ✅ DONE |
+| 38 | Profile icon click → dropdown | Clicking the profile icon should show a dropdown with two options: **Edit Profile** and **Logout** | ✅ DONE |
 
 > Note: CNIC field needs a backend schema update.
 
 ---
 
-### 3.2 Patient Sidebar Changes
+### 3.2 Patient Sidebar Changes ✅ DONE
 **File:** `lib/navigators/drawer.dart` (Patient section)
 
-| # | Action | Details |
-|---|--------|---------|
-| 39 | Remove "My Profile" from sidebar | Profile access moves to the top-right profile icon |
-| 40 | Remove "Messages" from sidebar | Messaging will be accessible from elsewhere |
-| 41 | Remove "My Care Plans" | Keep only "Health Programs" — remove the Care Plans link |
-| 42 | Rename "Pharmacies" | Change to **"Order Medicines"** |
-| 43 | Rename "Laboratories" | Change to **"Book a Lab Test"** |
-| 44 | Rename "My Appointment" + move to top | Change to **"My Appointments"** and make it the first item in the sidebar |
+| # | Action | Details | Status |
+|---|--------|---------|--------|
+| 39 | Remove "My Profile" from sidebar | Profile access moves to the top-right profile icon | ✅ DONE |
+| 40 | Remove "Messages" from sidebar | Messaging will be accessible from elsewhere | ✅ DONE |
+| 41 | Remove "My Care Plans" | Keep only "Health Programs" — remove the Care Plans link | ✅ DONE |
+| 42 | Rename "Pharmacies" | Change to **"Order Medicines"** | ✅ DONE |
+| 43 | Rename "Laboratories" | Change to **"Book a Lab Test"** | ✅ DONE |
+| 44 | Rename "My Appointment" + move to top | Change to **"My Appointments"** and make it the first item in the sidebar | ✅ DONE |
 
 ---
 
@@ -299,41 +301,47 @@ This is a new multi-step booking flow when the patient clicks "Book a Lab Test" 
 ### 3.9 Health Community
 **File:** `lib/screens/health_community.dart`
 
-| # | Change | Details |
-|---|--------|---------|
-| 59 | Add Like and Comment | Posts must have a Like button and a Comment option |
-| 60 | Show iCare logo | The iCare app logo should appear on the Health Community page |
+| # | Change | Details | Status |
+|---|--------|---------|--------|
+| 59 | Add Like and Comment | Posts must have a Like button and a Comment option | ✅ DONE |
+| 60 | Show iCare logo | The iCare app logo should appear on the Health Community page | ✅ DONE |
 
 ---
 
-### 3.10 Patient Settings — Items to Remove
+### 3.10 Patient Settings — Items to Remove ✅ DONE
 **File:** `lib/screens/settings.dart`
 
 Remove the following items from patient Settings:
-- Privacy Policy (also `lib/screens/privacy_policy.dart`)
-- About Us (`lib/screens/about_us.dart`)
-- Terms and Conditions
+- Privacy Policy (also `lib/screens/privacy_policy.dart`) ✅ DONE
+- About Us (`lib/screens/about_us.dart`) ✅ DONE
+- Terms and Conditions ✅ DONE
+
+> Note: These were moved to "About & Legal" section (section 6.9) as requested.
 
 ---
 
 ### 3.11 Notification Preferences
+> ⚫ **NOTE (Client Update):** This section was part of settings page but client requested it be moved to a new separate notification tab beside the profile icon in the AppBar.
+
 **File:** `lib/screens/notification_settings.dart`
 
-| # | Change | Details |
-|---|--------|---------|
-| 64 | Remove "Patient Messages" | Delete this notification option |
-| 65 | Rename "Admin Announcement" | Change to **"Promotions"** |
-| 66 | Add sound toggle | Option to enable/disable notification sound |
-| 67 | Rename section heading | Change to **"Notification Settings"** |
-| 68 | Add email prescription toggle | Add a toggle: "Send prescription to email automatically" |
+| # | Change | Details | Status |
+|---|--------|---------|--------|
+| 64 | Remove "Patient Messages" | Delete this notification option | ✅ DONE |
+| 65 | Rename "Admin Announcement" | Change to **"Promotions"** | ✅ DONE |
+| 66 | Add sound toggle | Option to enable/disable notification sound | ✅ DONE |
+| 67 | Rename section heading | Change to **"Notification Settings"** | ✅ DONE |
+| 68 | Add email prescription toggle | Add a toggle: "Send prescription to email automatically" | ✅ DONE |
 
 ---
 
-### 3.12 Patient View Profile — SOAP Notes
+### 3.12 Patient View Profile — SOAP Notes ✅ DONE
+> ⚫ **NOTE (Client Update):** SOAP Notes were renamed to "Doctor's Notes" and are now part of the prescription (within consultation) — not shown on patient profile view.
+
 **File:** `lib/screens/patient_profile_view.dart`, `lib/screens/patient_history_view.dart`
 
-- SOAP Notes must NOT be visible when a patient views their own profile.
-- SOAP Notes are doctor-facing only and should stay hidden from patients.
+- SOAP Notes must NOT be visible when a patient views their own profile. ✅ DONE
+- SOAP Notes are doctor-facing only and should stay hidden from patients. ✅ DONE
 
 ---
 
@@ -353,43 +361,44 @@ Remove the following items from patient Settings:
 
 ---
 
-### 4.1 Dashboard Layout — New Order
+### 4.1 Dashboard Layout — New Order ✅ DONE
 
 The dashboard should display content in this order, top to bottom:
-1. Welcome message: "Welcome back, Dr. [Name]" with rating and satisfaction score
-2. Appointment Requests (pending, with Accept/Decline buttons)
-3. Today's Appointments
-4. Number of consultations (not revenue)
+1. Welcome message: "Welcome back, Dr. [Name]" with rating and satisfaction score ✅ DONE
+2. Appointment Requests (pending, with Accept/Decline buttons) ✅ DONE
+3. Today's Appointments ✅ DONE
+4. Number of consultations (not revenue) ✅ DONE
+5. ~~Take off revenue section from home page~~ ⚫ **CANCELLED BY CLIENT** — Revenue remains in app for Doctor, Lab, and Pharmacy accounts
 
 ---
 
 ### 4.2 Remove from Doctor Dashboard
 
-| # | Remove |
-|---|--------|
-| 69 | "Secure Health" card/widget |
-| 70 | Revenue amount display |
-| 71 | "View All" button on the Today's Appointments heading |
+| # | Remove | Status |
+|---|--------|--------|
+| 69 | "Secure Health" card/widget | ✅ DONE |
+| 70 | Revenue amount display | ⚫ **CANCELLED BY CLIENT** — Discussed with client; revenue stays in app for Doctor, Lab & Pharmacy |
+| 71 | "View All" button on the Today's Appointments heading | ✅ DONE |
 
 ---
 
-### 4.3 Appointment Requests Widget
+### 4.3 Appointment Requests Widget ✅ DONE
 
-- Replace the "Pending Appointments" section with **"Appointment Requests"**
-- Show 5 requests at a time with a "View All" link
+- Replace the "Pending Appointments" section with **"Appointment Requests"** ✅ DONE
+- Show 5 requests at a time with a "View All" link ✅ DONE
 - Each request card must have:
-  - Accept button (green checkmark)
-  - Decline button (red X)
-- Replace the Revenue card with: **Pending Appointments count** (just a number)
+  - Accept button (green checkmark) ✅ DONE
+  - Decline button (red X) ✅ DONE
+- Replace the Revenue card with: **Pending Appointments count** (just a number) ✅ DONE
 
 ---
 
-### 4.4 Today's Appointments Display
+### 4.4 Today's Appointments Display ✅ DONE
 
-- Show appointments as square cards arranged by time
-- Show "Total Patients Today" count + list
-- "View All" link for the full list
-- Quick Actions section should show appointments grouped by day
+- Show appointments as square cards arranged by time ✅ DONE
+- Show "Total Patients Today" count + list ✅ DONE
+- "View All" link for the full list ✅ DONE
+- ~~Quick Actions section should show appointments grouped by day~~ ⚫ **CANCELLED BY CLIENT**
 
 ---
 
@@ -420,25 +429,26 @@ The health tracker needs a full redesign based on the UI reference image shared 
 
 ---
 
-### 5.1 Main Dashboard Screen
+### 5.1 Main Dashboard Screen ✅ DONE
+> Note: Log history function is not yet added (for future iteration)
 
 When the patient opens the Health Tracker, they should see:
 
-- **Greeting at top:** "Hello, [Patient Name] — Your Health Today"
-- **Daily Goal progress bar:** Shows percentage complete (e.g., "Daily Goal: 60% Complete") with a checkmark when done
-- **Points earned today:** A gold star icon with "You earned X points today"
-- **Metric tiles (grid layout):** Quick-view tiles for each tracked item, for example:
-  - BP: 120/80 mmHg
-  - Blood Sugar: 110 mg/dL
-  - Weight: 70.4 kg
-  - Water: 5 glasses
-  - Medication (taken/missed)
-  - Steps: 2,500
-- **"+ Log More" button** at the bottom to add a new entry
+- **Greeting at top:** "Hello, [Patient Name] — Your Health Today" ✅ DONE
+- **Daily Goal progress bar:** Shows percentage complete (e.g., "Daily Goal: 60% Complete") with a checkmark when done ✅ DONE
+- **Points earned today:** A gold star icon with "You earned X points today" ✅ DONE
+- **Metric tiles (grid layout):** Quick-view tiles for each tracked item ✅ DONE
+  - BP: 120/80 mmHg ✅
+  - Blood Sugar: 110 mg/dL ✅
+  - Weight: 70.4 kg ✅
+  - Water: 5 glasses ✅
+  - Medication (taken/missed) ✅
+  - Steps: 2,500 ✅
+- **"+ Log More" button** at the bottom to add a new entry ✅ DONE
 
 ---
 
-### 5.2 Tracking Categories
+### 5.2 Tracking Categories ✅ DONE
 
 The tracker must support all of the following. Each category can be turned ON or OFF per patient (see Settings section 6.3).
 
@@ -489,20 +499,18 @@ When a patient taps on a metric tile (e.g., "Log Blood Pressure"):
 
 ---
 
-### 5.4 Progress Charts
+### 5.4 Progress Charts ✅ DONE
 
 A "Your Progress" screen accessible from the main tracker, with:
-- **Tabs:** Daily / Weekly / Monthly
-- **Line charts** for each tracked metric (e.g., BP over the last 7 days, Blood Sugar trend)
-- **Achievement badges** below the charts:
-  - "Logged X days in a row"
-  - "Avg BP improving"
-  - etc.
-- **"View Detailed Report"** link at the bottom
+- **Tabs:** Daily / Weekly / Monthly ✅ DONE
+- **Line charts** for each tracked metric (e.g., BP over the last 7 days, Blood Sugar trend) ✅ DONE
+- **Achievement badges** below the charts ✅ DONE
+- **"View Detailed Report"** link at the bottom ✅ DONE
 
 ---
 
-### 5.5 "Health Mode" Toggle (New Feature)
+### 5.5 "Health Mode" Toggle (New Feature) ✅ DONE
+> Note: Controlled through Patient Profile Settings (not on tracker home directly) — as confirmed with client
 
 On the tracker home or in settings, the patient selects their health mode. This changes which metrics are shown by default on the dashboard.
 
@@ -518,7 +526,9 @@ On the tracker home or in settings, the patient selects their health mode. This 
 
 ---
 
-### 5.6 Rewards / Points System
+### 5.6 Rewards / Points System 🔄 PARTIAL
+> ⚫ **NOTE:** Gamification/Rewards screen will be completed once all other application features are finalized by client. Points tracking is implemented; full redemption screen pending.
+
 **File:** `lib/screens/gamification_screen.dart`
 
 The tracker includes a points system to encourage daily logging.
@@ -588,18 +598,18 @@ This section links the patient's medical background to their tracker and doctor.
 
 ---
 
-### 6.3 Tracker Settings
+### 6.3 Tracker Settings ✅ DONE
 
 **Personalization — Toggle what to track:**
-- BP — ON/OFF toggle
-- Blood Sugar — ON/OFF toggle
-- Weight — ON/OFF toggle
-- Water intake — ON/OFF toggle
-- Medication — ON/OFF toggle
+- BP — ON/OFF toggle ✅ DONE
+- Blood Sugar — ON/OFF toggle ✅ DONE
+- Weight — ON/OFF toggle ✅ DONE
+- Water intake — ON/OFF toggle ✅ DONE
+- Medication — ON/OFF toggle ✅ DONE
 
 **Set daily goals:**
-- Water goal (e.g., 8 glasses per day)
-- Steps goal (e.g., 10,000 steps)
+- Water goal (e.g., 8 glasses per day) 🔴 PENDING
+- Steps goal (e.g., 10,000 steps) 🔴 PENDING
 
 ---
 
@@ -654,38 +664,39 @@ This section links the patient's medical background to their tracker and doctor.
 
 ---
 
-### 6.9 About & Legal
+### 6.9 About & Legal ✅ DONE
 
-| Item | Details |
-|------|---------|
-| Terms & Conditions | Link to terms |
-| Privacy Policy | Link to privacy policy |
-| App version | Display current app version |
+| Item | Details | Status |
+|------|---------|--------|
+| Terms & Conditions | Link to terms | ✅ DONE |
+| Privacy Policy | Link to privacy policy | ✅ DONE |
+| App version | ~~Display current app version~~ | ⚫ **CANCELLED BY CLIENT** — App version display is not needed, removed |
 
-> Note: These were previously removed from patient Settings (change #61–63 in section 3.10). Confirm with client whether they want these back here or removed entirely. Based on this new list, they want them under "About & Legal" — keep them.
+> Note: These were previously removed from patient Settings (change #61–63 in section 3.10). Client confirmed they want Terms & Conditions and Privacy Policy under "About & Legal". App version display removed per client request.
 
 ---
 
-### 6.10 Consultation Settings
+### 6.10 Consultation Settings ⚫ CANCELLED BY CLIENT
+> **Client requested NOT to add this section.**
 
-| Setting | Details |
-|---------|---------|
-| Preferred language | Language for consultations |
-| Preferred doctor type | Male / Female / No preference |
-| Consultation history access | Toggle to allow doctor to view past consultations |
-| Medical records upload | Upload documents for doctor reference |
-| Video/audio preferences | Camera + mic default settings for video calls |
+| Setting | Details | Status |
+|---------|---------|--------|
+| Preferred language | Language for consultations | ⚫ CANCELLED |
+| Preferred doctor type | Male / Female / No preference | ⚫ CANCELLED |
+| Consultation history access | Toggle to allow doctor to view past consultations | ⚫ CANCELLED |
+| Medical records upload | Upload documents for doctor reference | ⚫ CANCELLED |
+| Video/audio preferences | Camera + mic default settings for video calls | ⚫ CANCELLED |
 
 ---
 
 ### 6.11 Pharmacy Settings
 
-| Setting | Details |
-|---------|---------|
-| Saved delivery addresses | Add/edit delivery addresses |
-| Preferred pharmacy | Set a default pharmacy |
-| Order history | View past medicine orders |
-| Delivery preferences | Home delivery or pickup |
+| Setting | Details | Status |
+|---------|---------|--------|
+| Saved delivery addresses | Add/edit delivery addresses | ✅ DONE |
+| Preferred pharmacy | ~~Set a default pharmacy~~ | ⚫ **CANCELLED BY CLIENT** — Ordering from pharmacies has different logic; preferred pharmacy not applicable |
+| Order history | View past medicine orders | ✅ DONE |
+| Delivery preferences | ~~Home delivery or pickup~~ | ⚫ **CANCELLED BY CLIENT** — Same reason as preferred pharmacy |
 
 ---
 
@@ -711,15 +722,14 @@ This section links the patient's medical background to their tracker and doctor.
 
 ---
 
-### 6.14 Family Profiles
+### 6.14 Family Profiles 🔴 PENDING
+> This is a new feature — needs backend support for linked family accounts. MR Number per family member is not possible. Family contacts can be added in profile but full linked accounts feature is not yet built.
 
-| Feature | Details |
-|---------|---------|
-| Add family member | Add children, parents, or dependents |
-| Manage profiles | Edit or remove a family member's profile |
-| Track their health | Each family member has their own tracker data |
-
-> This is a new feature — needs backend support for linked family accounts.
+| Feature | Details | Status |
+|---------|---------|--------|
+| Add family member | Add children, parents, or dependents | 🔴 PENDING (needs backend) |
+| Manage profiles | Edit or remove a family member's profile | 🔴 PENDING (needs backend) |
+| Track their health | Each family member has their own tracker data | 🔴 PENDING (needs backend) |
 
 ---
 
@@ -745,31 +755,31 @@ This section links the patient's medical background to their tracker and doctor.
 ## 7. PRIORITY SUMMARY
 
 ### High Priority (Client Emphasized)
-1. Doctor dashboard redesign — remove revenue, add appointment requests with accept/decline
-2. Patient profile — add CNIC, remove role field
-3. "Consult Now" → goes directly to payment screen
-4. Book a Lab Test — complete new multi-step flow
-5. Patient sidebar renames: Order Medicines, Book a Lab Test, My Appointments at top
-6. Booking History redesign — card layout, pending at top, completed history with notes
-7. Health Tracker redesign — dashboard with metric tiles, points system, progress charts
-8. Settings page full restructure — all new sections (Health Profile, Tracker Settings, Family Profiles, etc.)
+1. Doctor dashboard redesign — ~~remove revenue~~ (⚫ CANCELLED, revenue stays), add appointment requests with accept/decline ✅ DONE
+2. Patient profile — add CNIC, remove role field ✅ DONE
+3. ~~"Consult Now" → goes directly to payment screen~~ ⚫ **CHANGED BY CLIENT** — "Consult Now" now takes to fill details first before payment
+4. Book a Lab Test — complete new multi-step flow ✅ DONE
+5. Patient sidebar renames: Order Medicines, Book a Lab Test, My Appointments at top ✅ DONE
+6. Booking History redesign — card layout, pending at top, completed history with notes ✅ DONE
+7. Health Tracker redesign — dashboard with metric tiles, points system, progress charts ✅ DONE
+8. Settings page full restructure — all new sections (Health Profile, Tracker Settings, etc.) ✅ DONE
 
 ### Medium Priority
-9. Home page search bars (doctors, pharmacy, lab — each separate)
-10. New Courses section on home page
-11. "Connect to a Doctor" button pulsing animation
-12. Footer changes (white background, remove Analytics and For Doctors links)
-13. Reminders with Google Calendar sync
-14. Health Mode toggle in tracker (Diabetes / BP / General Wellness)
-15. Rewards redemption screen (Free Consultation, Lab Test Discount)
+9. Home page search bars (doctors, pharmacy, lab — each separate) ✅ DONE
+10. New Courses section on home page ✅ DONE
+11. "Connect to a Doctor" button pulsing animation ✅ DONE
+12. Footer changes (white background, remove Analytics and For Doctors links) ✅ DONE
+13. Reminders with Google Calendar sync 🔴 PENDING
+14. Health Mode toggle in tracker (Diabetes / BP / General Wellness) ✅ DONE
+15. Rewards redemption screen (Free Consultation, Lab Test Discount) 🔄 PARTIAL (points done, redemption pending)
 
 ### Lower Priority
-16. WhatsApp floating button on home page
-17. Pharmacy and lab ratings on listing pages
-18. Health Community like and comment feature
-19. Notification settings cleanup
-20. Family Profiles feature (linked accounts)
-21. Language & Region settings
+16. WhatsApp floating button on home page ✅ DONE
+17. Pharmacy and lab ratings on listing pages 🔴 PENDING
+18. Health Community like and comment feature ✅ DONE
+19. Notification settings cleanup ✅ DONE
+20. Family Profiles feature (linked accounts) 🔴 PENDING (needs backend)
+21. Language & Region settings ✅ DONE
 
 ---
 

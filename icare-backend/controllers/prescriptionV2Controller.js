@@ -206,6 +206,47 @@ exports.completePrescription = async (req, res) => {
   }
 };
 
+// Get completed prescription by consultationId (fallback lookup)
+exports.getCompletedPrescriptionByConsultation = async (req, res) => {
+  try {
+    await connectMongoDB();
+    const { consultationId } = req.params;
+
+    // Look for any non-draft prescription for this consultation
+    const prescription = await EnhancedPrescription.findOne({
+      consultationId,
+      status: { $ne: 'draft' }
+    })
+      .sort({ createdAt: -1 })
+      .populate('patientId', 'name email phone age gender')
+      .populate('doctorId', 'name email phone specialization pmdcLicense')
+      .populate('patientHistoryId')
+      .populate('lifestyleAdviceId')
+      .populate('assignedCourseIds', 'title description');
+
+    if (!prescription) {
+      // Try any status as last resort
+      const anyPrescription = await EnhancedPrescription.findOne({ consultationId })
+        .sort({ createdAt: -1 })
+        .populate('patientId', 'name email phone age gender')
+        .populate('doctorId', 'name email phone specialization pmdcLicense')
+        .populate('patientHistoryId')
+        .populate('lifestyleAdviceId')
+        .populate('assignedCourseIds', 'title description');
+
+      if (!anyPrescription) {
+        return res.status(404).json({ success: false, message: 'No prescription found for this consultation' });
+      }
+      return res.json({ success: true, prescription: anyPrescription });
+    }
+
+    res.json({ success: true, prescription });
+  } catch (error) {
+    console.error('Error getting prescription by consultation:', error);
+    res.status(500).json({ success: false, message: 'Failed to get prescription', error: error.message });
+  }
+};
+
 // Get prescription by ID
 exports.getPrescription = async (req, res) => {
   try {

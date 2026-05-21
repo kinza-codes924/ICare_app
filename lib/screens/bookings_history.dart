@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 import 'package:icare/models/appointment_detail.dart';
 import 'package:icare/screens/doctors_list.dart';
 import 'package:icare/screens/prescription_detail_screen.dart';
 import 'package:icare/screens/profile_or_appointement_view.dart';
-import 'package:icare/screens/video_call.dart';
 import 'package:icare/screens/consultation_chat_screen_v2.dart';
 import 'package:icare/services/appointment_service.dart';
 import 'package:icare/services/consultation_service.dart';
@@ -767,39 +765,44 @@ class _ApptCardState extends State<_ApptCard> {
 
       if (res['success'] == true && res['consultation'] != null) {
         final consultation = res['consultation'] as Map;
+        final consultationId = (res['consultationId'] ?? consultation['_id'] ?? consultation['id'])?.toString() ?? '';
+
         // Try prescriptionId field — could be a string or a populated object
         dynamic rawPrescId = consultation['prescriptionId'];
         String prescriptionId = '';
 
         if (rawPrescId is Map) {
-          // Populated (nested) — extract _id
           prescriptionId = rawPrescId['_id']?.toString() ?? '';
-        } else if (rawPrescId is String) {
+        } else if (rawPrescId is String && rawPrescId.isNotEmpty) {
           prescriptionId = rawPrescId;
         }
 
-        // Fallback: check prescription field (sometimes stored as 'prescription' object)
+        // Fallback: check 'prescription' object field
         if (prescriptionId.isEmpty && consultation['prescription'] is Map) {
           final prescMap = consultation['prescription'] as Map;
-          if (prescMap['_id'] != null) {
-            prescriptionId = prescMap['_id'].toString();
-          } else if (prescMap['id'] != null) {
-            prescriptionId = prescMap['id'].toString();
-          }
+          prescriptionId = (prescMap['_id'] ?? prescMap['id'])?.toString() ?? '';
         }
 
+        Map<String, dynamic>? prescription;
+
         if (prescriptionId.isNotEmpty) {
-          final prescription = await svc.getPrescription(prescriptionId);
-          if (!mounted) return;
-          if (prescription != null) {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => PrescriptionDetailScreen(prescription: prescription),
-              ),
-            );
-            return;
-          }
+          prescription = await svc.getPrescription(prescriptionId);
+        }
+
+        // If still not found, try fetching by consultationId directly
+        if (prescription == null && consultationId.isNotEmpty) {
+          prescription = await svc.getPrescriptionByConsultation(consultationId);
+        }
+
+        if (!mounted) return;
+        if (prescription != null) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => PrescriptionDetailScreen(prescription: prescription!),
+            ),
+          );
+          return;
         }
       }
       if (!mounted) return;

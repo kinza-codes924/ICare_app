@@ -312,6 +312,23 @@ class ConsultationService {
     }
   }
 
+  Future<Map<String, dynamic>?> getPrescriptionByConsultation(String consultationId) async {
+    try {
+      final token = await _sharedPref.getToken();
+      final response = await _dio.get(
+        '/prescriptions-v2/consultations/$consultationId/prescription/completed',
+        options: Options(headers: {'Authorization': 'Bearer $token'}),
+      );
+      if (response.data['success'] == true) {
+        return response.data['prescription'];
+      }
+      return null;
+    } on DioException catch (e) {
+      print('Error getting prescription by consultation: ${e.message}');
+      return null;
+    }
+  }
+
   // Get patient prescriptions
   Future<List<dynamic>> getPatientPrescriptions({
     required String patientId,
