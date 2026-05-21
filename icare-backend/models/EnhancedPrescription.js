@@ -11,24 +11,23 @@ const soapNotesSchema = new mongoose.Schema({
 
 const diagnosisItemSchema = new mongoose.Schema({
   diagnosis: { type: String, required: true },
-  icd10Code: { type: String, required: true },
+  icd10Code: { type: String, default: '' },
   notes: String
 }, { _id: false });
 
 const prescriptionMedicineSchema = new mongoose.Schema({
   medicineName: { type: String, required: true },
-  dose: { type: String, required: true },
+  dose: { type: String, default: '' },
   formType: {
     type: String,
-    enum: ['tablet', 'capsule', 'liquid', 'injection', 'cream', 'drops', 'inhaler', 'other'],
+    enum: ['tablet', 'capsule', 'liquid', 'injection', 'cream', 'drops', 'inhaler', 'other', ''],
     default: 'tablet'
   },
   frequency: {
     type: String,
-    enum: ['od', 'bd', 'tds', 'qid', 'sos', 'stat', 'weekly', 'monthly'],
-    required: true
+    default: 'od',
   },
-  duration: { type: String, required: true },
+  duration: { type: String, default: '' },
   notes: String
 }, { _id: false });
 

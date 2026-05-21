@@ -15,6 +15,8 @@ const communityPostSchema = new mongoose.Schema({
   category: { type: String, default: 'General' },
   likes: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
   comments: [commentSchema],
+  resharedFrom: { type: mongoose.Schema.Types.ObjectId, ref: 'CommunityPost', default: null },
+  resharedFromUser: { type: String, default: null },
 }, { timestamps: true });
 
 module.exports = mongoose.model('CommunityPost', communityPostSchema);

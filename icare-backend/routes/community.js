@@ -177,6 +177,35 @@ router.post('/posts/:id/comment', authMiddleware, async (req, res) => {
   }
 });
 
+// POST /api/community/posts/:id/reshare — reshare a post
+router.post('/posts/:id/reshare', authMiddleware, async (req, res) => {
+  try {
+    await connectMongoDB();
+    const original = await CommunityPost.findById(req.params.id);
+    if (!original) return res.status(404).json({ success: false, message: 'Post not found' });
+
+    const reshared = await CommunityPost.create({
+      userId: req.user.id,
+      userName: req.user.name || req.user.username,
+      userRole: req.user.role,
+      content: original.content,
+      category: original.category,
+      imageUrl: original.imageUrl,
+      resharedFrom: original._id,
+      resharedFromUser: original.userName,
+    });
+
+    res.status(201).json({
+      success: true,
+      message: 'Post reshared successfully',
+      post: { ...reshared.toObject(), id: reshared._id.toString(), likeCount: 0, commentCount: 0 },
+    });
+  } catch (err) {
+    console.error('POST /community/posts/:id/reshare error:', err);
+    res.status(500).json({ success: false, message: 'Failed to reshare post' });
+  }
+});
+
 // DELETE /api/community/posts/:id — owner or admin can delete
 router.delete('/posts/:id', authMiddleware, async (req, res) => {
   try {

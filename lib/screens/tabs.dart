@@ -87,6 +87,7 @@ import 'package:icare/screens/instructor_precautions_management.dart';
 import 'package:icare/screens/instructor_analytics.dart';
 import 'package:icare/screens/instructor_profile_setup.dart';
 import 'package:icare/screens/instructor_lms_dashboard.dart';
+import 'package:icare/screens/patient_profile.dart';
 import 'package:icare/services/appointment_service.dart';
 import 'package:icare/models/appointment_detail.dart';
 
@@ -177,7 +178,8 @@ class _TabsScreenState extends ConsumerState<TabsScreen> {
       } else if (currentIndex == 1) {
         activePage = const Courses(myPurchased: true);
       } else if (currentIndex == 2) {
-        activePage = ProfileScreen();
+        // On web show the web profile overview; on mobile show the full patient profile
+        activePage = isWeb ? ProfileScreen() : const PatientProfile();
       } else if (currentIndex == 4) {
         activePage = const Courses(myPurchased: true);
       }
@@ -651,7 +653,7 @@ class _WebSidebarState extends ConsumerState<_WebSidebar> {
                       ),
                     ),
                   );
-                }).toList(),
+                }),
 
                 // ── Role-specific extra nav items ──────────────────────────
                 if (role == 'Patient') ...[
@@ -1541,7 +1543,7 @@ class _WebTopBar extends ConsumerWidget {
                   // Navigate to role-specific profile edit page
                   if (role == 'Doctor') {
                     Navigator.of(context).push(
-                      MaterialPageRoute(builder: (ctx) => const SettingsScreen()),
+                      MaterialPageRoute(builder: (ctx) => const DoctorProfileSetup()),
                     );
                   } else if (role == 'Pharmacy') {
                     Navigator.of(context).push(

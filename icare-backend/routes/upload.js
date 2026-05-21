@@ -28,6 +28,23 @@ function uploadToCloudinary(buffer, folder, resourceType = 'image') {
   });
 }
 
+// POST /api/upload — consultation chat attachments (images + PDFs)
+router.post('/', protect, upload.single('file'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: 'No file provided' });
+    }
+    const isPdf = req.file.mimetype === 'application/pdf';
+    const resourceType = isPdf ? 'raw' : 'image';
+    const folder = req.body.folder || 'icare/consultation-attachments';
+    const result = await uploadToCloudinary(req.file.buffer, folder, resourceType);
+    res.json({ success: true, url: result.secure_url, publicId: result.public_id, resourceType });
+  } catch (err) {
+    console.error('Upload error:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 // POST /api/upload/image  — general image upload (product photos, avatars, etc.)
 router.post('/image', protect, upload.single('file'), async (req, res) => {
   try {
