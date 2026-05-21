@@ -34,6 +34,7 @@ class _BookAppointmentScreenState extends ConsumerState<BookAppointmentScreen> {
 
   bool _isBooking = false;
   bool _appointmentForMyself = true; // toggle between Myself / Someone else
+  bool _isEmergency = false; // emergency booking (outside regular hours)
   final _nameController = TextEditingController();
   final _reasonController = TextEditingController();
   final _genderController = TextEditingController();
@@ -182,7 +183,7 @@ class _BookAppointmentScreenState extends ConsumerState<BookAppointmentScreen> {
   DateTime get _selectedDate => _dateRange[_selectedDateIndex];
 
   Future<void> _confirmBooking() async {
-    if (_selectedSlot == null) return;
+    if (_selectedSlot == null && !_isEmergency) return;
 
     // Validate reason
     if (_reasonController.text.trim().isEmpty) {
@@ -213,8 +214,9 @@ class _BookAppointmentScreenState extends ConsumerState<BookAppointmentScreen> {
     final result = await _appointmentService.bookAppointment(
       doctorId: widget.doctor.id,
       date: _selectedDate,
-      timeSlot: _selectedSlot!,
+      timeSlot: _isEmergency ? 'Emergency' : _selectedSlot!,
       reason: _reasonController.text.trim(),
+      isEmergency: _isEmergency,
     );
 
     setState(() => _isBooking = false);
@@ -306,7 +308,7 @@ class _BookAppointmentScreenState extends ConsumerState<BookAppointmentScreen> {
                     Container(
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
-                        color: AppColors.primaryColor.withOpacity(0.1),
+                        color: AppColors.primaryColor.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: const Icon(Icons.payment_rounded, color: AppColors.primaryColor, size: 22),
@@ -319,7 +321,7 @@ class _BookAppointmentScreenState extends ConsumerState<BookAppointmentScreen> {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                         decoration: BoxDecoration(
-                          color: AppColors.primaryColor.withOpacity(0.08),
+                          color: AppColors.primaryColor.withValues(alpha: 0.08),
                           borderRadius: BorderRadius.circular(20),
                         ),
                         child: Text('Rs. ${amount.toInt()}',
@@ -341,7 +343,7 @@ class _BookAppointmentScreenState extends ConsumerState<BookAppointmentScreen> {
                       margin: const EdgeInsets.only(bottom: 10),
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        color: isSelected ? AppColors.primaryColor.withOpacity(0.05) : const Color(0xFFF8FAFC),
+                        color: isSelected ? AppColors.primaryColor.withValues(alpha: 0.05) : const Color(0xFFF8FAFC),
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
                           color: isSelected ? AppColors.primaryColor : const Color(0xFFE2E8F0),
@@ -395,7 +397,7 @@ class _BookAppointmentScreenState extends ConsumerState<BookAppointmentScreen> {
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
-                        color: AppColors.primaryColor.withOpacity(0.3),
+                        color: AppColors.primaryColor.withValues(alpha: 0.3),
                         style: BorderStyle.solid,
                       ),
                     ),
@@ -456,7 +458,7 @@ class _BookAppointmentScreenState extends ConsumerState<BookAppointmentScreen> {
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: Colors.green.withOpacity(0.1),
+                  color: Colors.green.withValues(alpha: 0.1),
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(Icons.check_circle_rounded, color: Colors.green, size: 52),
@@ -541,7 +543,7 @@ class _BookAppointmentScreenState extends ConsumerState<BookAppointmentScreen> {
               children: [
                 CircleAvatar(
                   radius: 28,
-                  backgroundColor: AppColors.primaryColor.withOpacity(0.1),
+                  backgroundColor: AppColors.primaryColor.withValues(alpha: 0.1),
                   child: Text(
                     widget.doctor.user.name.isNotEmpty
                         ? widget.doctor.user.name.substring(0, 1).toUpperCase()
@@ -646,7 +648,63 @@ class _BookAppointmentScreenState extends ConsumerState<BookAppointmentScreen> {
 
           const SizedBox(height: 8),
 
-          // Morning Slots
+          // Emergency Booking Option (only for doctors with emergency slots)
+          if (widget.doctor.emergencySlots) ...[
+            GestureDetector(
+              onTap: () => setState(() {
+                _isEmergency = !_isEmergency;
+                if (_isEmergency) _selectedSlot = null;
+              }),
+              child: Container(
+                margin: const EdgeInsets.symmetric(horizontal: 16),
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: _isEmergency ? const Color(0xFFDC2626).withValues(alpha: 0.08) : Colors.white,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                    color: _isEmergency ? const Color(0xFFDC2626) : const Color(0xFFE2E8F0),
+                    width: _isEmergency ? 2 : 1,
+                  ),
+                ),
+                child: Row(children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFDC2626).withValues(alpha: 0.1),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.emergency_rounded, color: Color(0xFFDC2626), size: 20),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Emergency Booking', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: Color(0xFF1A1A2E))),
+                        const SizedBox(height: 2),
+                        const Text('Book outside regular hours. Doctor will confirm.', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                      ],
+                    ),
+                  ),
+                  Transform.scale(
+                    scale: 0.9,
+                    child: Switch(
+                      value: _isEmergency,
+                      onChanged: (v) => setState(() {
+                        _isEmergency = v;
+                        if (v) _selectedSlot = null;
+                      }),
+                      activeColor: const Color(0xFFDC2626),
+                    ),
+                  ),
+                ]),
+              ),
+            ),
+            const SizedBox(height: 8),
+          ],
+
+          // Morning Slots (hidden when emergency mode on)
+          if (!_isEmergency) ...[
           _buildSlotSection('Morning Slots', Icons.wb_sunny_outlined, _morningSlots),
           const SizedBox(height: 8),
 
@@ -659,6 +717,7 @@ class _BookAppointmentScreenState extends ConsumerState<BookAppointmentScreen> {
             _buildSlotSection('Evening Slots', Icons.nights_stay_outlined, _eveningSlots),
             const SizedBox(height: 8),
           ],
+          ],
 
           const SizedBox(height: 24),
 
@@ -669,7 +728,7 @@ class _BookAppointmentScreenState extends ConsumerState<BookAppointmentScreen> {
               width: double.infinity,
               height: 52,
               child: ElevatedButton(
-                onPressed: _selectedSlot != null ? () => setState(() => _step = 1) : null,
+                onPressed: (_selectedSlot != null || _isEmergency) ? () => setState(() => _step = 1) : null,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primaryColor,
                   foregroundColor: Colors.white,
@@ -882,7 +941,7 @@ class _BookAppointmentScreenState extends ConsumerState<BookAppointmentScreen> {
             children: [
               CircleAvatar(
                 radius: 20,
-                backgroundColor: AppColors.primaryColor.withOpacity(0.1),
+                backgroundColor: AppColors.primaryColor.withValues(alpha: 0.1),
                 child: Text(
                   widget.doctor.user.name.isNotEmpty
                       ? widget.doctor.user.name.substring(0, 1).toUpperCase()
@@ -1110,7 +1169,7 @@ class _BookAppointmentScreenState extends ConsumerState<BookAppointmentScreen> {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                     decoration: BoxDecoration(
-                      color: Colors.red.withOpacity(0.1),
+                      color: Colors.red.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(4),
                     ),
                     child: const Text('Mandatory',
@@ -1156,9 +1215,9 @@ class _BookAppointmentScreenState extends ConsumerState<BookAppointmentScreen> {
               Container(
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
-                  color: AppColors.primaryColor.withOpacity(0.05),
+                  color: AppColors.primaryColor.withValues(alpha: 0.05),
                   borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: AppColors.primaryColor.withOpacity(0.3)),
+                  border: Border.all(color: AppColors.primaryColor.withValues(alpha: 0.3)),
                 ),
                 child: Row(
                   children: [
@@ -1234,7 +1293,7 @@ class _BookAppointmentScreenState extends ConsumerState<BookAppointmentScreen> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
-          color: isSelected ? AppColors.primaryColor.withOpacity(0.1) : Colors.white,
+          color: isSelected ? AppColors.primaryColor.withValues(alpha: 0.1) : Colors.white,
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
             color: isSelected ? AppColors.primaryColor : const Color(0xFFE2E8F0),

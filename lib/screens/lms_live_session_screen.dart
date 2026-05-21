@@ -47,7 +47,7 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
   // Web camera
   dynamic _localStream;
   dynamic _localVideo;
-  static int _viewId = 0;
+  static final int _viewId = 0;
   bool _loading = true;
   String? _error;
   int? _remoteUid;
@@ -67,6 +67,7 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
 
   // Polls
   final List<Map<String, dynamic>> _polls = [];
+  final Map<String, String> _votedPolls = {}; // pollId → optionId the student chose
 
   // Participants + raised hands — synced with backend
   final List<Map<String, dynamic>> _participants = [];
@@ -118,8 +119,28 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
       if (sessionData['session'] != null) {
         _sessionDocId = sessionData['session']['_id']?.toString() ?? '';
       }
-      // If no session doc found yet (instructor just starting), use courseId as fallback
-      if (_sessionDocId.isEmpty) _sessionDocId = widget.sessionId;
+
+      // Fallback: scan course sessions list for an active/live one
+      if (_sessionDocId.isEmpty || _sessionDocId == widget.courseId) {
+        try {
+          final sessions = await _lms.getCourseSessions(widget.courseId);
+          if (sessions.isNotEmpty) {
+            final live = sessions.where((s) =>
+                s['isLive'] == true || s['status'] == 'live' || s['status'] == 'active').toList();
+            if (live.isNotEmpty) {
+              _sessionDocId = live.first['_id']?.toString() ?? '';
+            } else {
+              // Use most recent session as last resort
+              _sessionDocId = sessions.last['_id']?.toString() ?? '';
+            }
+          }
+        } catch (_) {}
+      }
+
+      // Final fallback: use widget.sessionId if it looks like a real ID (not equal to courseId)
+      if (_sessionDocId.isEmpty) {
+        _sessionDocId = widget.sessionId.isNotEmpty ? widget.sessionId : widget.courseId;
+      }
 
       // Step 2: Join the session (registers attendance)
       if (_sessionDocId.isNotEmpty && _sessionDocId != widget.courseId) {
@@ -190,23 +211,45 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
       final waitingNames = waiting.map((w) => w['name'] ?? w['username'] ?? 'Student').toList();
 
       // Update raised hands
-      final raisedHandsData = (session['raisedHands'] as List?) ?? [];
+      final raisedHandsData = (session['raisedHands'] as List?)
+          ?? (session['handsRaised'] as List?)
+          ?? [];
       final newHands = raisedHandsData
-          .map<String>((h) => h['userName']?.toString() ?? 'Student')
+          .map<String>((h) => h is Map
+              ? (h['userName'] ?? h['name'] ?? 'Student').toString()
+              : h.toString())
           .toList();
 
-      // Update chat messages
-      final messages = (session['chatMessages'] as List?) ?? [];
-      final newMessages = messages.map<Map<String, dynamic>>((m) => {
-        'sender': m['userName'] ?? 'User',
-        'text': m['message'] ?? '',
-        'time': '',
-        'isMe': m['userId']?.toString() == _currentUserId,
+      // Update chat messages — prefer dedicated endpoint for freshest data
+      List<dynamic> rawMessages = (session['chatMessages'] as List?) ?? [];
+      if (rawMessages.isEmpty) {
+        try {
+          final chatData = await _lms.getSessionChatMessages(_sessionDocId);
+          rawMessages = chatData;
+        } catch (_) {}
+      }
+      final newMessages = rawMessages.map<Map<String, dynamic>>((m) {
+        final msg = m is Map ? m : <String, dynamic>{};
+        return {
+          'sender': msg['userName'] ?? msg['name'] ?? 'User',
+          'text': msg['message'] ?? msg['text'] ?? '',
+          'time': '',
+          'isMe': msg['userId']?.toString() == _currentUserId,
+        };
       }).toList();
 
-      // Update polls
-      final pollsData = (session['polls'] as List?) ?? [];
-      final newPolls = pollsData.map<Map<String, dynamic>>((p) => Map<String, dynamic>.from(p is Map ? p : {})).toList();
+      // Polls: always try dedicated endpoint first for accurate real-time data
+      List<Map<String, dynamic>> newPolls = [];
+      try {
+        final pollsData = await _lms.getLiveSessionPolls(_sessionDocId);
+        if (pollsData.isNotEmpty) {
+          newPolls = pollsData.map<Map<String, dynamic>>((p) => Map<String, dynamic>.from(p is Map ? p : {})).toList();
+        } else {
+          // Fall back to embedded polls in session document
+          final pollsFromSession = (session['polls'] as List?) ?? [];
+          newPolls = pollsFromSession.map<Map<String, dynamic>>((p) => Map<String, dynamic>.from(p is Map ? p : {})).toList();
+        }
+      } catch (_) {}
 
       if (mounted) {
         setState(() {
@@ -399,7 +442,7 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
   void _toggleHand() {
     setState(() => _handRaised = !_handRaised);
     // Send to backend so instructor can see it
-    if (_sessionDocId.isNotEmpty && _sessionDocId != widget.courseId) {
+    if (_sessionDocId.isNotEmpty) {
       if (_handRaised) {
         _lms.raiseSessionHand(_sessionDocId);
       } else {
@@ -426,7 +469,7 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
     });
 
     // Send to backend — synced to all participants via polling
-    if (_sessionDocId.isNotEmpty && _sessionDocId != widget.courseId) {
+    if (_sessionDocId.isNotEmpty) {
       _lms.sendSessionChatMessage(_sessionDocId, text);
     }
 
@@ -642,7 +685,7 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
               top: 12, left: 12,
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                decoration: BoxDecoration(color: Colors.orange.withOpacity(0.9), borderRadius: BorderRadius.circular(20)),
+                decoration: BoxDecoration(color: Colors.orange.withValues(alpha: 0.9), borderRadius: BorderRadius.circular(20)),
                 child: Row(children: [
                   const Text('✋', style: TextStyle(fontSize: 16)),
                   const SizedBox(width: 8),
@@ -687,7 +730,7 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
-                color: Colors.orange.withOpacity(0.9),
+                color: Colors.orange.withValues(alpha: 0.9),
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Row(children: [
@@ -776,7 +819,7 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
                 ),
                 const SizedBox(width: 4),
                 Text(
-                  '${_currentUserName}${widget.isInstructor ? ' (Host)' : ''} (You)',
+                  '$_currentUserName${widget.isInstructor ? ' (Host)' : ''} (You)',
                   style: TextStyle(color: Colors.white, fontSize: isLarge ? 12 : 9),
                 ),
               ]),
@@ -953,9 +996,9 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
             padding: const EdgeInsets.all(10),
             margin: const EdgeInsets.only(bottom: 12),
             decoration: BoxDecoration(
-              color: Colors.orange.withOpacity(0.15),
+              color: Colors.orange.withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.orange.withOpacity(0.5)),
+              border: Border.all(color: Colors.orange.withValues(alpha: 0.5)),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -977,7 +1020,7 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
                 ..._waitingStudents.map((name) => Padding(
                   padding: const EdgeInsets.only(top: 6),
                   child: Row(children: [
-                    CircleAvatar(radius: 14, backgroundColor: Colors.orange.withOpacity(0.3),
+                    CircleAvatar(radius: 14, backgroundColor: Colors.orange.withValues(alpha: 0.3),
                         child: Text(name[0].toUpperCase(), style: const TextStyle(color: Colors.white, fontSize: 11))),
                     const SizedBox(width: 8),
                     Expanded(child: Text(name, style: const TextStyle(color: Colors.white70, fontSize: 12))),
@@ -987,7 +1030,7 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
                       child: const Text('Admit', style: TextStyle(color: Colors.white, fontSize: 11)),
                     ),
                   ]),
-                )).toList(),
+                )),
               ],
             ),
           ),
@@ -1060,8 +1103,20 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
   }
 
   Widget _buildPollCard(Map<String, dynamic> poll, int index) {
-    final options = (poll['options'] as List<Map>?) ?? [];
-    final totalVotes = options.fold<int>(0, (s, o) => s + ((o['votes'] as int?) ?? 0));
+    final rawOptions = poll['options'];
+    final options = (rawOptions is List)
+        ? rawOptions.map<Map<String, dynamic>>((o) => o is Map ? Map<String, dynamic>.from(o) : <String, dynamic>{}).toList()
+        : <Map<String, dynamic>>[];
+    final totalVotes = options.fold<int>(0, (s, o) {
+      final v = o['votes'];
+      if (v is int) return s + v;
+      if (v is num) return s + v.toInt();
+      return s;
+    });
+    final pollId = poll['_id']?.toString() ?? poll['id']?.toString() ?? '';
+    final votedOption = _votedPolls[pollId];
+    final hasVoted = votedOption != null;
+
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(12),
@@ -1075,33 +1130,71 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
           Text(poll['question'] ?? 'Poll',
               style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 14)),
           const SizedBox(height: 10),
-          ...options.map((opt) {
-            final votes = (opt['votes'] as int?) ?? 0;
+          ...options.asMap().entries.map((entry) {
+            final optIndex = entry.key;
+            final opt = entry.value;
+            final optId = opt['_id']?.toString() ?? opt['id']?.toString() ?? '$optIndex';
+            final votes = () {
+              final v = opt['votes'];
+              if (v is int) return v;
+              if (v is num) return v.toInt();
+              return 0;
+            }();
             final pct = totalVotes > 0 ? votes / totalVotes : 0.0;
+            final isMyVote = votedOption == optId;
+
             return Padding(
               padding: const EdgeInsets.only(bottom: 8),
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(opt['text'] ?? '', style: const TextStyle(color: Colors.white70, fontSize: 12)),
-                const SizedBox(height: 4),
-                Row(children: [
-                  Expanded(
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(4),
-                      child: LinearProgressIndicator(
-                        value: pct,
-                        backgroundColor: Colors.white24,
-                        valueColor: const AlwaysStoppedAnimation(AppColors.primaryColor),
-                        minHeight: 8,
+                // Student can vote if not yet voted; instructor sees results
+                if (!widget.isInstructor && !hasVoted)
+                  GestureDetector(
+                    onTap: () async {
+                      if (pollId.isNotEmpty) {
+                        setState(() => _votedPolls[pollId] = optId);
+                        try {
+                          await _lms.respondToPoll(pollId: pollId, optionId: optId);
+                        } catch (_) {}
+                      }
+                    },
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.white24),
+                      ),
+                      child: Text(opt['text'] ?? '', style: const TextStyle(color: Colors.white, fontSize: 12)),
+                    ),
+                  )
+                else ...[
+                  Row(children: [
+                    Expanded(child: Text(opt['text'] ?? '', style: TextStyle(color: isMyVote ? AppColors.primaryColor : Colors.white70, fontSize: 12))),
+                    if (isMyVote) const Icon(Icons.check_circle_rounded, color: AppColors.primaryColor, size: 14),
+                  ]),
+                  const SizedBox(height: 4),
+                  Row(children: [
+                    Expanded(
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(4),
+                        child: LinearProgressIndicator(
+                          value: pct,
+                          backgroundColor: Colors.white24,
+                          valueColor: AlwaysStoppedAnimation(isMyVote ? AppColors.primaryColor : Colors.blueGrey),
+                          minHeight: 8,
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  Text('${(pct * 100).toStringAsFixed(0)}%',
-                      style: const TextStyle(color: Colors.white54, fontSize: 11)),
-                ]),
+                    const SizedBox(width: 8),
+                    Text('${(pct * 100).toStringAsFixed(0)}%',
+                        style: const TextStyle(color: Colors.white54, fontSize: 11)),
+                  ]),
+                ],
               ]),
             );
-          }).toList(),
+          }),
+          const SizedBox(height: 4),
           Text('$totalVotes vote(s)', style: const TextStyle(color: Colors.white38, fontSize: 11)),
         ],
       ),
@@ -1314,7 +1407,7 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
             ],
           ),
           const SizedBox(height: 2),
-          Text(label, style: TextStyle(color: color.withOpacity(0.8), fontSize: 10)),
+          Text(label, style: TextStyle(color: color.withValues(alpha: 0.8), fontSize: 10)),
         ]),
       ),
     );

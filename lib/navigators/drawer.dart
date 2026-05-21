@@ -20,6 +20,7 @@ import 'package:icare/screens/patient_records_list.dart';
 import 'package:icare/screens/patient_medical_records.dart';
 import 'package:icare/screens/lab_bookings_management.dart';
 import 'package:icare/screens/lab_reports_screen.dart';
+import 'package:icare/screens/lab_tests_directory_screen.dart';
 import 'package:icare/screens/lab_list.dart';
 import 'package:icare/screens/lab_appointment.dart';
 import 'package:icare/screens/login.dart';
@@ -75,6 +76,14 @@ class CustomDrawer extends ConsumerStatefulWidget {
 }
 
 class _CustomDrawerState extends ConsumerState<CustomDrawer> {
+  final _scrollController = ScrollController();
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     final selectedRole = ref.watch(authProvider).userRole;
@@ -193,6 +202,11 @@ class _CustomDrawerState extends ConsumerState<CustomDrawer> {
           Navigator.of(
             context,
           ).push(MaterialPageRoute(builder: (ctx) => LabsListScreen()));
+        }),
+        _drawerItem('Lab Test Directory', Icons.biotech_outlined, () {
+          Navigator.of(
+            context,
+          ).push(MaterialPageRoute(builder: (ctx) => const LabTestsDirectoryScreen()));
         }),
         _drawerItem('Order Medicines', Icons.local_pharmacy_outlined, () {
           Navigator.of(
@@ -478,10 +492,12 @@ class _CustomDrawerState extends ConsumerState<CustomDrawer> {
         backgroundColor: Colors.white,
         surfaceTintColor: Colors.transparent,
         shadowColor: Colors.transparent,
-        child: Container(
+        child: SizedBox.expand(
+          child: ColoredBox(
           color: Colors.white,
           child: SafeArea(
             child: Column(
+              mainAxisSize: MainAxisSize.max,
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
               // Header with user info
@@ -489,8 +505,13 @@ class _CustomDrawerState extends ConsumerState<CustomDrawer> {
 
               // Menu list (exact items)
               Expanded(
-                child: ListView(
+                child: Scrollbar(
+                  controller: _scrollController,
+                  thumbVisibility: true,
+                  child: ListView(
+                  controller: _scrollController,
                   padding: EdgeInsets.zero,
+                  physics: const AlwaysScrollableScrollPhysics(),
                   children: [
                     if (selectedRole != 'Admin') ...[
                       _drawerItem('Home', Icons.home_outlined, () {
@@ -734,6 +755,7 @@ class _CustomDrawerState extends ConsumerState<CustomDrawer> {
                     if (selectedRole != 'Admin') ...drawerItems,
                   ],
                 ),
+                ),
               ),
 
               // Logout button at bottom of drawer
@@ -756,9 +778,9 @@ class _CustomDrawerState extends ConsumerState<CustomDrawer> {
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                     decoration: BoxDecoration(
-                      color: Colors.red.withOpacity(0.06),
+                      color: Colors.red.withValues(alpha: 0.06),
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.red.withOpacity(0.15)),
+                      border: Border.all(color: Colors.red.withValues(alpha: 0.15)),
                     ),
                     child: const Row(
                       children: [
@@ -780,6 +802,7 @@ class _CustomDrawerState extends ConsumerState<CustomDrawer> {
               ),
             ],
           ),
+        ),
         ),
       ),
     ),

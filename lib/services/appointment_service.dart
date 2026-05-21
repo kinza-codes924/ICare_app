@@ -12,6 +12,7 @@ class AppointmentService {
     required DateTime date,
     required String timeSlot,
     String? reason,
+    bool isEmergency = false,
   }) async {
     try {
       debugPrint('📅 Booking appointment...');
@@ -19,6 +20,7 @@ class AppointmentService {
       debugPrint('Date: $date');
       debugPrint('Time Slot: $timeSlot');
       debugPrint('Reason: $reason');
+      debugPrint('Emergency: $isEmergency');
 
       final response = await _apiService
           .post('/appointments/book_appointment', {
@@ -26,6 +28,8 @@ class AppointmentService {
             'date': date.toIso8601String(),
             'timeSlot': timeSlot,
             'reason': reason,
+            if (isEmergency) 'isEmergency': true,
+            if (isEmergency) 'type': 'emergency',
           });
 
       debugPrint('✅ Appointment booked successfully');

@@ -10,6 +10,7 @@ import 'package:icare/services/consultation_service.dart';
 import 'package:icare/utils/theme.dart';
 import 'package:icare/widgets/back_button.dart';
 import 'package:icare/services/icd_service.dart';
+import '../data/pakistan_drugs_data.dart';
 
 class InConsultationPrescriptionForm extends StatefulWidget {
   final AppointmentDetail appointment;
@@ -96,8 +97,9 @@ class _InConsultationPrescriptionFormState
       final result = await _consultationService.getPrescriptionDraft(
         widget.consultationId,
       );
-      if (result != null && result['success'] == true && result['prescription'] != null) {
-        final prescription = EnhancedPrescription.fromJson(result['prescription'] as Map<String, dynamic>);
+      // getPrescriptionDraft returns the prescription object directly (not the wrapper)
+      if (result != null) {
+        final prescription = EnhancedPrescription.fromJson(result);
         _populateFormWithDraft(prescription);
       }
     } catch (e) {
@@ -212,13 +214,15 @@ class _InConsultationPrescriptionFormState
   /// Build minimal payload — only send what backend expects for /prescription/complete
   Map<String, dynamic> _buildMinimalPayload(EnhancedPrescription rx) {
     final payload = <String, dynamic>{
-      'patientId': rx.patientId,
-      'doctorId': rx.doctorId,
       'consultationId': rx.consultationId,
       'isComplete': true,
       'status': 'active',
       'prescribedAt': rx.prescribedAt.toIso8601String(),
     };
+
+    // Only include IDs when non-empty — backend derives them from consultationId for instant consultations
+    if (rx.patientId.isNotEmpty) payload['patientId'] = rx.patientId;
+    if (rx.doctorId.isNotEmpty) payload['doctorId'] = rx.doctorId;
 
     // SOAP Notes — only if any content
     if (rx.soapNotes != null) {
@@ -706,7 +710,7 @@ class _InConsultationPrescriptionFormState
       context: context,
       barrierDismissible: false,
       barrierColor: Colors.black54,
-      pageBuilder: (ctx, _, __) => PatientHistoryFormScreen(
+      pageBuilder: (ctx, _, _) => PatientHistoryFormScreen(
         appointment: widget.appointment,
         consultationId: widget.consultationId,
         onHistoryComplete: (historyId) {
@@ -856,9 +860,11 @@ class _InConsultationPrescriptionFormState
   // ── Section 5: Medications ────────────────────────────────────────────────
   Widget _buildMedicationsContent() {
     final searchText = _medSearchController.text.toLowerCase();
-    final suggestions = searchText.isEmpty
+    final commonSuggestions = searchText.isEmpty
         ? <String>[]
         : _commonMeds.where((m) => m.toLowerCase().contains(searchText)).toList();
+    final drugResults = searchText.isEmpty ? <DrugFormula>[] : searchDrugs(searchText);
+    final hasAny = commonSuggestions.isNotEmpty || drugResults.isNotEmpty;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -868,7 +874,7 @@ class _InConsultationPrescriptionFormState
           controller: _medSearchController,
           onChanged: (_) => setState(() {}),
           decoration: InputDecoration(
-            hintText: 'Search medicine (e.g. Paracetamol 500mg)...',
+            hintText: 'Search generic or brand name (e.g. Paracetamol)...',
             prefixIcon: const Icon(Icons.search_rounded, color: Color(0xFF94A3B8)),
             suffixIcon: _medSearchController.text.isNotEmpty
                 ? IconButton(icon: const Icon(Icons.clear_rounded, size: 18), onPressed: () => setState(() => _medSearchController.clear()))
@@ -882,7 +888,7 @@ class _InConsultationPrescriptionFormState
         ),
 
         // ── Suggestions dropdown ─────────────────────────────────────────
-        if (suggestions.isNotEmpty) ...[
+        if (hasAny) ...[
           const SizedBox(height: 2),
           Container(
             decoration: BoxDecoration(
@@ -892,27 +898,60 @@ class _InConsultationPrescriptionFormState
               boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.06), blurRadius: 8, offset: const Offset(0, 3))],
             ),
             child: Column(
-              children: suggestions.take(6).map((med) => InkWell(
-                onTap: () {
-                  final idx = _medicines.length;
-                  setState(() {
-                    _medicines.add(PrescriptionMedicine(medicineName: med, dose: '', frequency: MedicationFrequency.bd, duration: ''));
-                    _medDoseControllers[idx] = TextEditingController();
-                    _medNotesControllers[idx] = TextEditingController();
-                    _medDurationControllers[idx] = TextEditingController();
-                    _medSearchController.clear();
-                  });
-                },
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-                  child: Row(children: [
-                    const Icon(Icons.medication_outlined, size: 15, color: Color(0xFF10B981)),
-                    const SizedBox(width: 8),
-                    Expanded(child: Text(med, style: const TextStyle(fontSize: 13))),
-                    const Icon(Icons.add_rounded, size: 15, color: Color(0xFF10B981)),
-                  ]),
-                ),
-              )).toList(),
+              children: [
+                // Pakistani drug results — tap to pick brand/strength
+                ...drugResults.take(5).map((formula) => InkWell(
+                  onTap: () => _openPharmaSheet(formula),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+                    child: Row(children: [
+                      const Icon(Icons.local_pharmacy_outlined, size: 15, color: AppColors.primaryColor),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(formula.genericName, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF0F172A))),
+                            Text(formula.category, style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8))),
+                          ],
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: AppColors.primaryColor.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: const Text('Brands ›', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: AppColors.primaryColor)),
+                      ),
+                    ]),
+                  ),
+                )),
+                if (drugResults.isNotEmpty && commonSuggestions.isNotEmpty)
+                  const Divider(height: 1, color: Color(0xFFE2E8F0)),
+                // Common meds (direct add)
+                ...commonSuggestions.take(4).map((med) => InkWell(
+                  onTap: () {
+                    final idx = _medicines.length;
+                    setState(() {
+                      _medicines.add(PrescriptionMedicine(medicineName: med, dose: '', frequency: MedicationFrequency.bd, duration: ''));
+                      _medDoseControllers[idx] = TextEditingController();
+                      _medNotesControllers[idx] = TextEditingController();
+                      _medDurationControllers[idx] = TextEditingController();
+                      _medSearchController.clear();
+                    });
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+                    child: Row(children: [
+                      const Icon(Icons.medication_outlined, size: 15, color: Color(0xFF10B981)),
+                      const SizedBox(width: 8),
+                      Expanded(child: Text(med, style: const TextStyle(fontSize: 13))),
+                      const Icon(Icons.add_rounded, size: 15, color: Color(0xFF10B981)),
+                    ]),
+                  ),
+                )),
+              ],
             ),
           ),
         ],
@@ -1120,7 +1159,7 @@ class _InConsultationPrescriptionFormState
     required ValueChanged<T?> onChanged,
   }) {
     return DropdownButtonFormField<T>(
-      value: value,
+      initialValue: value,
       isExpanded: true,
       isDense: true,
       style: const TextStyle(fontSize: 11, color: Color(0xFF0F172A)),
@@ -1161,6 +1200,42 @@ class _InConsultationPrescriptionFormState
       case MedicationFrequency.weekly: return 'Weekly';
       case MedicationFrequency.monthly: return 'Monthly';
     }
+  }
+
+  // ── Pharma picker bottom sheet ────────────────────────────────────────────
+  void _openPharmaSheet(DrugFormula formula) {
+    _medSearchController.clear();
+    setState(() {});
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => _PharmaPickerSheet(
+        formula: formula,
+        onAdd: (medicineName) {
+          final idx = _medicines.length;
+          setState(() {
+            _medicines.add(PrescriptionMedicine(
+              medicineName: medicineName,
+              dose: '',
+              frequency: MedicationFrequency.bd,
+              duration: '',
+            ));
+            _medDoseControllers[idx] = TextEditingController();
+            _medNotesControllers[idx] = TextEditingController();
+            _medDurationControllers[idx] = TextEditingController();
+          });
+          Navigator.pop(ctx);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('$medicineName added'),
+              backgroundColor: const Color(0xFF10B981),
+              duration: const Duration(seconds: 2),
+            ),
+          );
+        },
+      ),
+    );
   }
 
   // ── Section 6: Lab Tests ──────────────────────────────────────────────────
@@ -1386,7 +1461,7 @@ class _InConsultationPrescriptionFormState
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withOpacity(0.3)),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1394,7 +1469,7 @@ class _InConsultationPrescriptionFormState
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
             decoration: BoxDecoration(
-              color: color.withOpacity(0.08),
+              color: color.withValues(alpha: 0.08),
               borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
             ),
             child: Row(
@@ -1582,7 +1657,7 @@ class _InConsultationPrescriptionFormState
               const Text('Referral', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15, color: Color(0xFF475569))),
               const SizedBox(height: 12),
               DropdownButtonFormField<ReferralType>(
-                value: ref?.referralType ?? ReferralType.none,
+                initialValue: ref?.referralType ?? ReferralType.none,
                 decoration: InputDecoration(
                   labelText: 'Referral Type',
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
@@ -1697,7 +1772,7 @@ class _InConsultationPrescriptionFormState
                 const Text('Follow-up', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15, color: Color(0xFF475569))),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<FollowUpDuration>(
-                  value: ref?.followUpDuration ?? FollowUpDuration.none,
+                  initialValue: ref?.followUpDuration ?? FollowUpDuration.none,
                   decoration: InputDecoration(
                     labelText: 'Follow-up Duration',
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
@@ -1779,8 +1854,11 @@ class _InConsultationPrescriptionFormState
             activeColor: const Color(0xFF06B6D4),
             contentPadding: EdgeInsets.zero,
             onChanged: (v) => setState(() {
-              if (v == true) _assignedCourses.add(course);
-              else _assignedCourses.remove(course);
+              if (v == true) {
+                _assignedCourses.add(course);
+              } else {
+                _assignedCourses.remove(course);
+              }
             }),
           );
         }),
@@ -1849,6 +1927,236 @@ class _InConsultationPrescriptionFormState
       label: 'Clinical Notes',
       hint: 'Enter your clinical observations and notes...',
       maxLines: 6,
+    );
+  }
+}
+
+// ── Pakistani Pharma Brand Picker ─────────────────────────────────────────────
+class _PharmaPickerSheet extends StatefulWidget {
+  final DrugFormula formula;
+  final void Function(String medicineName) onAdd;
+
+  const _PharmaPickerSheet({required this.formula, required this.onAdd});
+
+  @override
+  State<_PharmaPickerSheet> createState() => _PharmaPickerSheetState();
+}
+
+class _PharmaPickerSheetState extends State<_PharmaPickerSheet> {
+  DrugBrand? _brand;
+  String? _form;
+  String? _strength;
+
+  String _buildMedicineName() {
+    if (_brand == null) return widget.formula.genericName;
+    final parts = <String>[_brand!.brandName];
+    if (_strength != null) parts.add(_strength!);
+    if (_form != null) parts.add(_form!);
+    parts.add('(${widget.formula.genericName})');
+    return parts.join(' ');
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final brands = widget.formula.brands;
+    final availableForms = _brand?.forms ?? <String>[];
+    final availableStrengths = _brand?.strengths ?? <String>[];
+
+    return Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      padding: EdgeInsets.only(
+        left: 20, right: 20, top: 16,
+        bottom: MediaQuery.of(context).viewInsets.bottom + 28,
+      ),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Drag handle
+            Center(
+              child: Container(
+                width: 40, height: 4,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE2E8F0),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // Header
+            Row(children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF0036BC).withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.local_pharmacy_outlined, color: Color(0xFF0036BC), size: 22),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      widget.formula.genericName,
+                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
+                    ),
+                    Text(
+                      widget.formula.category,
+                      style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                    ),
+                  ],
+                ),
+              ),
+            ]),
+            const SizedBox(height: 20),
+
+            // Step 1: Brand
+            const Text('Select Brand', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF475569))),
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: brands.map((brand) {
+                final sel = _brand?.brandName == brand.brandName;
+                return GestureDetector(
+                  onTap: () => setState(() {
+                    _brand = brand;
+                    _form = brand.forms.isNotEmpty ? brand.forms.first : null;
+                    _strength = brand.strengths.isNotEmpty ? brand.strengths.first : null;
+                  }),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 140),
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: sel ? const Color(0xFF0036BC) : const Color(0xFFF1F5F9),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: sel ? const Color(0xFF0036BC) : const Color(0xFFE2E8F0)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          brand.brandName,
+                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: sel ? Colors.white : const Color(0xFF0F172A)),
+                        ),
+                        Text(
+                          brand.company,
+                          style: TextStyle(fontSize: 11, color: sel ? Colors.white60 : const Color(0xFF94A3B8)),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+
+            // Step 2: Form & Strength
+            if (_brand != null) ...[
+              const SizedBox(height: 20),
+              Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Form', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF475569))),
+                        const SizedBox(height: 8),
+                        if (availableForms.isEmpty)
+                          const Text('N/A', style: TextStyle(color: Color(0xFF94A3B8)))
+                        else
+                          DropdownButtonFormField<String>(
+                            initialValue: _form,
+                            isExpanded: true,
+                            decoration: InputDecoration(
+                              isDense: true,
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                              filled: true,
+                              fillColor: const Color(0xFFF8FAFC),
+                            ),
+                            items: availableForms.map((f) => DropdownMenuItem(value: f, child: Text(f))).toList(),
+                            onChanged: (v) => setState(() => _form = v),
+                          ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Strength', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF475569))),
+                        const SizedBox(height: 8),
+                        if (availableStrengths.isEmpty)
+                          const Text('N/A', style: TextStyle(color: Color(0xFF94A3B8)))
+                        else
+                          DropdownButtonFormField<String>(
+                            initialValue: _strength,
+                            isExpanded: true,
+                            decoration: InputDecoration(
+                              isDense: true,
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                              filled: true,
+                              fillColor: const Color(0xFFF8FAFC),
+                            ),
+                            items: availableStrengths.map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
+                            onChanged: (v) => setState(() => _strength = v),
+                          ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+
+              // Preview
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF0FDF4),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: const Color(0xFFD1FAE5)),
+                ),
+                child: Row(children: [
+                  const Icon(Icons.medication_rounded, color: Color(0xFF10B981), size: 18),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      _buildMedicineName(),
+                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Color(0xFF065F46)),
+                    ),
+                  ),
+                ]),
+              ),
+              const SizedBox(height: 12),
+
+              // Add button
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: () => widget.onAdd(_buildMedicineName()),
+                  icon: const Icon(Icons.add_circle_outline_rounded),
+                  label: const Text('Add to Prescription'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF10B981),
+                    foregroundColor: Colors.white,
+                    minimumSize: const Size(double.infinity, 48),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
     );
   }
 }

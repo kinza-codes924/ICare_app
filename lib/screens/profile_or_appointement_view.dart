@@ -9,7 +9,6 @@ import 'package:icare/screens/intake_notes_screen.dart';
 import 'package:icare/screens/patient_profile_view.dart';
 import 'package:icare/screens/soap_notes_screen.dart';
 import 'package:icare/screens/video_call.dart';
-import 'package:icare/screens/view_course.dart';
 import 'package:icare/services/appointment_service.dart';
 import 'package:icare/screens/prescription_detail_screen.dart';
 import 'package:icare/services/consultation_service.dart';
@@ -28,6 +27,22 @@ class ProfileOrAppointmentViewScreen extends ConsumerWidget {
   final AppointmentDetail appointment;
 
   const ProfileOrAppointmentViewScreen({super.key, required this.appointment});
+
+  static bool _isAppointmentPast(AppointmentDetail appt) {
+    try {
+      final parts = appt.timeSlot.split(' ');
+      final timeParts = parts[0].split(':');
+      int hour = int.parse(timeParts[0]);
+      final minute = int.parse(timeParts[1]);
+      final isPm = parts.length > 1 && parts[1].toUpperCase() == 'PM';
+      if (isPm && hour != 12) hour += 12;
+      if (!isPm && hour == 12) hour = 0;
+      return DateTime(appt.date.year, appt.date.month, appt.date.day, hour, minute)
+          .isBefore(DateTime.now());
+    } catch (_) {
+      return appt.date.isBefore(DateTime.now());
+    }
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -56,18 +71,9 @@ class ProfileOrAppointmentViewScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(
         automaticallyImplyLeading: false,
-        leading: GestureDetector(
-          onTap: () {
-            if (selectedRole == 'Patient') {
-              Navigator.of(context).pushAndRemoveUntil(
-                MaterialPageRoute(builder: (ctx) => const TabsScreen()),
-                (route) => false,
-              );
-            } else {
-              Navigator.of(context).pop();
-            }
-          },
-          child: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
+          onPressed: () => Navigator.of(context).pop(),
         ),
         title: CustomText(
           text: "Appointment Details",
@@ -175,7 +181,7 @@ class ProfileOrAppointmentViewScreen extends ConsumerWidget {
             ],
             SizedBox(height: ScallingConfig.scale(15)),
 
-            if (selectedRole == "Doctor") ...[
+            if (selectedRole == "Doctor" && appointment.status.toLowerCase() == 'pending' && appointment.status.toLowerCase() != 'completed' && appointment.status.toLowerCase() != 'cancelled') ...[
               const SizedBox(height: 16),
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -937,7 +943,7 @@ class _WebPatientProfileViewState extends State<_WebPatientProfileView> {
                             ),
                           ),
                         ],
-                        if (appointment.status.toLowerCase() == 'pending') ...[
+                        if (appointment.status.toLowerCase() == 'pending' && appointment.status.toLowerCase() != 'completed' && appointment.status.toLowerCase() != 'cancelled') ...[
                           const SizedBox(height: 32),
                           Row(
                             children: [

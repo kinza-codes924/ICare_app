@@ -27,6 +27,8 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
   bool _obscureConfirm = true;
   bool _isLoading = false;
   bool _agreedToTerms = false;
+  String? _selectedGender;
+  DateTime? _dob;
 
   final _fullName = TextEditingController();
   final _email = TextEditingController();
@@ -41,6 +43,12 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
   final UserService _userService = UserService();
 
   @override
+  void initState() {
+    super.initState();
+    _password.addListener(() => setState(() {}));
+  }
+
+  @override
   void dispose() {
     _fullName.dispose();
     _email.dispose();
@@ -51,6 +59,23 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
     _password.dispose();
     _confirmPassword.dispose();
     super.dispose();
+  }
+
+  // ── Password strength ────────────────────────────────────────────────────
+  bool get _hasMinLength => _password.text.length >= 8;
+  bool get _hasUppercase => _password.text.contains(RegExp(r'[A-Z]'));
+  bool get _hasLowercase => _password.text.contains(RegExp(r'[a-z]'));
+  bool get _hasDigit => _password.text.contains(RegExp(r'[0-9]'));
+  bool get _hasSpecial => _password.text.contains(RegExp(r'[!@#$%^&*(),.?":{}|<>_\-]'));
+
+  String? _computedAge() => _computeAgeFrom(_dob);
+
+  String? _computeAgeFrom(DateTime? dob) {
+    if (dob == null) return null;
+    final now = DateTime.now();
+    int age = now.year - dob.year;
+    if (now.month < dob.month || (now.month == dob.month && now.day < dob.day)) age--;
+    return age.toString();
   }
 
   bool get _isPatient => widget.role == 'Patient';
@@ -100,14 +125,25 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
       }
 
       // Patient & Doctor → direct account creation
+      // Capture form values NOW before any async/navigation that disposes controllers
+      final capturedName = _fullName.text.trim();
+      final capturedEmail = _email.text.trim();
+      final capturedPhone = _phone.text.trim();
+      final capturedGender = _selectedGender;
+      final capturedDob = _dob;
+
       ref.read(authProvider.notifier).setUserRole(widget.role);
 
+      final capturedPassword = _password.text.trim();
+
       final result = await _authService.register(
-        name: _fullName.text.trim(),
-        email: _email.text.trim(),
-        password: _password.text.trim(),
+        name: capturedName,
+        email: capturedEmail,
+        password: capturedPassword,
         role: widget.role,
-        phoneNumber: _phone.text.trim(),
+        phoneNumber: capturedPhone,
+        gender: _isPatient ? capturedGender : null,
+        dateOfBirth: (_isPatient && capturedDob != null) ? capturedDob.toIso8601String() : null,
       );
 
       if (result['success']) {
@@ -124,7 +160,15 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
         if (token.isNotEmpty) {
           final profileResult = await _userService.getUserProfile(token: token);
           if (profileResult['success'] == true && profileResult['user'] != null) {
-            try { user = app_user.User.fromJson(profileResult['user'] as Map<String, dynamic>); } catch (_) {}
+            try {
+              final profileUser = app_user.User.fromJson(profileResult['user'] as Map<String, dynamic>);
+              // Fill in any missing fields from captured signup data
+              user = profileUser.copyWith(
+                name: profileUser.name.isNotEmpty ? profileUser.name : capturedName,
+                gender: profileUser.gender?.isNotEmpty == true ? profileUser.gender : (_isPatient ? capturedGender : null),
+                age: profileUser.age?.isNotEmpty == true ? profileUser.age : (_isPatient ? _computeAgeFrom(capturedDob) : null),
+              );
+            } catch (_) {}
           }
         }
 
@@ -141,13 +185,15 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
         if (user != null) {
           await ref.read(authProvider.notifier).setUser(user);
         } else {
-          // Create minimal user from form data so dashboard loads
+          // Create minimal user from captured form data (controllers may be disposed)
           final minUser = app_user.User(
             id: rawData['_id']?.toString() ?? rawData['id']?.toString() ?? '',
-            name: _fullName.text.trim(),
-            email: _email.text.trim(),
-            phoneNumber: _phone.text.trim(),
+            name: capturedName,
+            email: capturedEmail,
+            phoneNumber: capturedPhone,
             role: widget.role,
+            gender: _isPatient ? capturedGender : null,
+            age: _isPatient ? _computeAgeFrom(capturedDob) : null,
           );
           await ref.read(authProvider.notifier).setUser(minUser);
         }
@@ -222,6 +268,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
     VoidCallback? onToggle,
     TextInputType keyboard = TextInputType.text,
     String? Function(String?)? validator,
+    List<String>? autofillHints,
   }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 14),
@@ -230,6 +277,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
         readOnly: readOnly,
         obscureText: obscure,
         keyboardType: keyboard,
+        autofillHints: readOnly ? null : autofillHints,
         validator: validator ??
             (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
         style: const TextStyle(
@@ -278,10 +326,153 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
     );
   }
 
+  // ── Password strength widget ─────────────────────────────────────────────
+  Widget _buildPasswordStrength() {
+    if (_password.text.isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12, top: 2),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _strengthRow('At least 8 characters', _hasMinLength),
+          _strengthRow('One uppercase letter (A–Z)', _hasUppercase),
+          _strengthRow('One lowercase letter (a–z)', _hasLowercase),
+          _strengthRow('One number (0–9)', _hasDigit),
+          _strengthRow('One special character (!@#\$...)', _hasSpecial),
+        ],
+      ),
+    );
+  }
+
+  Widget _strengthRow(String label, bool passed) {
+    final color = passed ? const Color(0xFF10B981) : const Color(0xFF94A3B8);
+    return Padding(
+      padding: const EdgeInsets.only(top: 3),
+      child: Row(
+        children: [
+          Icon(
+            passed ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded,
+            size: 14,
+            color: color,
+          ),
+          const SizedBox(width: 6),
+          Text(label, style: TextStyle(fontSize: 12, color: color, fontFamily: 'Gilroy-Medium')),
+        ],
+      ),
+    );
+  }
+
+  // ── Gender selector ──────────────────────────────────────────────────────
+  Widget _buildGenderSelector() {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Padding(
+            padding: EdgeInsets.only(left: 2, bottom: 8),
+            child: Text(
+              'Gender',
+              style: TextStyle(fontSize: 13, fontFamily: 'Gilroy-Medium', color: Color(0xFF64748B)),
+            ),
+          ),
+          Row(
+            children: ['Male', 'Female', 'Other'].map((g) {
+              final selected = _selectedGender == g;
+              return Padding(
+                padding: const EdgeInsets.only(right: 10),
+                child: GestureDetector(
+                  onTap: () => setState(() => _selectedGender = g),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 180),
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 11),
+                    decoration: BoxDecoration(
+                      color: selected ? AppColors.primaryColor : const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: selected ? AppColors.primaryColor : const Color(0xFFE2E8F0),
+                        width: 1.5,
+                      ),
+                    ),
+                    child: Text(
+                      g,
+                      style: TextStyle(
+                        color: selected ? Colors.white : const Color(0xFF64748B),
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        fontFamily: 'Gilroy-Medium',
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── DOB picker ───────────────────────────────────────────────────────────
+  Widget _buildDobPicker() {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: GestureDetector(
+        onTap: () async {
+          final now = DateTime.now();
+          final picked = await showDatePicker(
+            context: context,
+            initialDate: _dob ?? DateTime(now.year - 25),
+            firstDate: DateTime(1900),
+            lastDate: DateTime(now.year - 1),
+            builder: (ctx, child) => Theme(
+              data: Theme.of(ctx).copyWith(
+                colorScheme: ColorScheme.light(primary: AppColors.primaryColor),
+              ),
+              child: child!,
+            ),
+          );
+          if (picked != null) setState(() => _dob = picked);
+        },
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF8FAFC),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: const Color(0xFFE2E8F0), width: 1.5),
+          ),
+          child: Row(
+            children: [
+              const Icon(Icons.cake_outlined, size: 20, color: Color(0xFF94A3B8)),
+              const SizedBox(width: 12),
+              Text(
+                _dob != null
+                    ? '${_dob!.day}/${_dob!.month}/${_dob!.year}'
+                    : 'Date of Birth',
+                style: TextStyle(
+                  fontSize: 15,
+                  fontFamily: 'Gilroy-Medium',
+                  color: _dob != null ? const Color(0xFF0F172A) : const Color(0xFF94A3B8),
+                ),
+              ),
+              const Spacer(),
+              const Icon(Icons.keyboard_arrow_down_rounded, color: Color(0xFF94A3B8), size: 22),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   // ── Form fields list ─────────────────────────────────────────────────────
   List<Widget> _buildFields() {
     return [
-      _field(controller: _fullName, label: 'Full Name', icon: Icons.person_outline_rounded),
+      _field(
+        controller: _fullName,
+        label: 'Full Name',
+        icon: Icons.person_outline_rounded,
+        autofillHints: const [AutofillHints.name],
+      ),
       if (!_isPatient)
         _field(
           controller: TextEditingController(text: _roleDescription),
@@ -295,6 +486,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
         label: 'Email Address',
         icon: Icons.email_outlined,
         keyboard: TextInputType.emailAddress,
+        autofillHints: const [AutofillHints.email],
         validator: (v) {
           if (v == null || v.trim().isEmpty) return 'Required';
           if (!v.contains('@')) return 'Enter a valid email';
@@ -306,7 +498,13 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
         label: 'Phone Number',
         icon: Icons.phone_outlined,
         keyboard: TextInputType.phone,
+        autofillHints: const [AutofillHints.telephoneNumber],
       ),
+      // Patient-only: gender + DOB
+      if (_isPatient) ...[
+        _buildGenderSelector(),
+        _buildDobPicker(),
+      ],
       // Doctor-only extra fields
       if (_isDoctor) ...[
         _field(controller: _licenseNumber, label: 'Medical License Number', icon: Icons.badge_outlined),
@@ -317,18 +515,21 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
         label: 'Password',
         icon: Icons.lock_outline_rounded,
         obscure: _obscurePass,
+        autofillHints: const [AutofillHints.newPassword],
         onToggle: () => setState(() => _obscurePass = !_obscurePass),
         validator: (v) {
           if (v == null || v.isEmpty) return 'Required';
-          if (v.length < 6) return 'Minimum 6 characters';
+          if (v.length < 8) return 'Minimum 8 characters';
           return null;
         },
       ),
+      _buildPasswordStrength(),
       _field(
         controller: _confirmPassword,
         label: 'Confirm Password',
         icon: Icons.lock_outline_rounded,
         obscure: _obscureConfirm,
+        autofillHints: const [AutofillHints.newPassword],
         onToggle: () => setState(() => _obscureConfirm = !_obscureConfirm),
         validator: (v) {
           if (v == null || v.isEmpty) return 'Required';
@@ -452,7 +653,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                         borderRadius: BorderRadius.circular(14),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.10),
+                            color: Colors.black.withValues(alpha: 0.10),
                             blurRadius: 12,
                             offset: const Offset(0, 4),
                           ),
@@ -469,7 +670,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                     // "by" text
                     Text('by',
                       textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: Colors.white.withOpacity(0.75)),
+                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: Colors.white.withValues(alpha: 0.75)),
                     ),
                     const SizedBox(height: 8),
                     // RM Health Solution logo
@@ -477,9 +678,9 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                       'assets/images/rm_health_solution_logo.png',
                       height: 48,
                       fit: BoxFit.contain,
-                      errorBuilder: (_, __, ___) => Text(
+                      errorBuilder: (_, _, _) => Text(
                         'RM Health Solution',
-                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: Colors.white.withOpacity(0.95)),
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: Colors.white.withValues(alpha: 0.95)),
                       ),
                     ),
                     const SizedBox(height: 32),
@@ -510,7 +711,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
         width: size, height: size,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          color: Colors.white.withOpacity(opacity),
+          color: Colors.white.withValues(alpha: opacity),
         ),
       );
 
@@ -522,13 +723,13 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
             width: 34,
             height: 34,
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.15),
+              color: Colors.white.withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Icon(icon, color: iconColor, size: 18),
           ),
           const SizedBox(width: 12),
-          Text(text, style: TextStyle(color: Colors.white.withOpacity(0.95), fontSize: 14, fontWeight: FontWeight.w600)),
+          Text(text, style: TextStyle(color: Colors.white.withValues(alpha: 0.95), fontSize: 14, fontWeight: FontWeight.w600)),
         ],
       );
 
@@ -545,8 +746,8 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(28),
                 boxShadow: [
-                  BoxShadow(color: const Color(0xFF0036BC).withOpacity(0.06), blurRadius: 40, offset: const Offset(0, 16)),
-                  BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 12, offset: const Offset(0, 4)),
+                  BoxShadow(color: const Color(0xFF0036BC).withValues(alpha: 0.06), blurRadius: 40, offset: const Offset(0, 16)),
+                  BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 12, offset: const Offset(0, 4)),
                 ],
               ),
               child: Form(
@@ -605,7 +806,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
             image: const AssetImage(ImagePaths.backgroundImage),
             fit: BoxFit.cover,
             colorFilter: ColorFilter.mode(
-              Colors.black.withOpacity(0.25),
+              Colors.black.withValues(alpha: 0.25),
               BlendMode.darken,
             ),
           ),
@@ -647,14 +848,14 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                 width: double.infinity,
                 height: Utils.windowHeight(context) * 0.72,
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.97),
+                  color: Colors.white.withValues(alpha: 0.97),
                   borderRadius: const BorderRadius.only(
                     topLeft: Radius.circular(40),
                     topRight: Radius.circular(40),
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.12),
+                      color: Colors.black.withValues(alpha: 0.12),
                       blurRadius: 20,
                       offset: const Offset(0, -4),
                     ),
@@ -688,7 +889,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.92),
+                    color: Colors.white.withValues(alpha: 0.92),
                     borderRadius: BorderRadius.circular(20),
                     boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 6)],
                   ),

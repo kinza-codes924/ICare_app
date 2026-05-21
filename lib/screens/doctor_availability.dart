@@ -31,6 +31,7 @@ class _DoctorAvailabilityState extends State<DoctorAvailability> {
   int _bufferTime = 15;
 
   bool _is24x7 = false;
+  bool _emergencySlots = false;
 
   // Leave request state
   DateTime? _leaveFrom;
@@ -162,6 +163,7 @@ class _DoctorAvailabilityState extends State<DoctorAvailability> {
           }
 
           _bufferTime = availability['bufferTime'] ?? 15;
+          _emergencySlots = availability['emergencySlots'] == true;
           _isLoading = false;
         });
       } else {
@@ -193,8 +195,11 @@ class _DoctorAvailabilityState extends State<DoctorAvailability> {
     );
     if (time != null) {
       setState(() {
-        if (isStart) _startTime = time;
-        else _endTime = time;
+        if (isStart) {
+          _startTime = time;
+        } else {
+          _endTime = time;
+        }
       });
     }
   }
@@ -270,9 +275,9 @@ class _DoctorAvailabilityState extends State<DoctorAvailability> {
         'start': '${_startTime.hour.toString().padLeft(2, '0')}:${_startTime.minute.toString().padLeft(2, '0')}',
         'end': '${_endTime.hour.toString().padLeft(2, '0')}:${_endTime.minute.toString().padLeft(2, '0')}',
       },
-      unavailableDates: _unavailableDates.map((d) => d.toIso8601String()).toList(),
+      unavailableDates: [],
       bufferTime: _bufferTime,
-      emergencySlots: false,
+      emergencySlots: _emergencySlots,
     );
 
     setState(() => _isSaving = false);
@@ -327,8 +332,6 @@ class _DoctorAvailabilityState extends State<DoctorAvailability> {
                       _buildWeeklySchedule(),
                       const SizedBox(height: 24),
                       _buildPreferences(),
-                      const SizedBox(height: 24),
-                      _buildUnavailableDates(),
                       const SizedBox(height: 24),
                       _buildEmergencyAppointmentSection(),
                       const SizedBox(height: 24),
@@ -434,7 +437,7 @@ class _DoctorAvailabilityState extends State<DoctorAvailability> {
           Switch(
             value: _is24x7,
             onChanged: (val) => val ? _enable24x7() : _disable24x7(),
-            activeColor: Colors.white,
+            activeThumbColor: Colors.white,
             activeTrackColor: Colors.white.withValues(alpha: 0.3),
             inactiveThumbColor: const Color(0xFF0036BC),
             inactiveTrackColor: const Color(0xFF0036BC).withValues(alpha: 0.15),
@@ -1083,25 +1086,18 @@ class _DoctorAvailabilityState extends State<DoctorAvailability> {
                     color: Color(0xFF64748B),
                   ),
                 ),
-                const SizedBox(height: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF59E0B).withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: const Text(
-                    'Coming Soon',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                      color: Color(0xFFD97706),
-                    ),
-                  ),
+                const SizedBox(height: 4),
+                Text(
+                  _emergencySlots ? 'Enabled — patients can book emergency slots.' : 'Disabled — tap to allow emergency bookings.',
+                  style: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
                 ),
               ],
             ),
+          ),
+          Switch(
+            value: _emergencySlots,
+            onChanged: (v) => setState(() => _emergencySlots = v),
+            activeThumbColor: AppColors.primaryColor,
           ),
         ],
       ),
@@ -1113,7 +1109,7 @@ class _DoctorAvailabilityState extends State<DoctorAvailability> {
   Widget _buildLeaveRequestSection() {
     final fmt = DateFormat('dd MMM yyyy');
 
-    Color _statusColor(String s) {
+    Color statusColor(String s) {
       switch (s) {
         case 'approved': return const Color(0xFF10B981);
         case 'rejected': return const Color(0xFFEF4444);
@@ -1245,7 +1241,7 @@ class _DoctorAvailabilityState extends State<DoctorAvailability> {
               final status = req['status']?.toString() ?? 'pending';
               final reason = req['reason']?.toString() ?? '';
               final conflicts = req['conflictingAppointments'] as int? ?? 0;
-              final color  = _statusColor(status);
+              final color  = statusColor(status);
 
               return Container(
                 margin: const EdgeInsets.only(bottom: 10),

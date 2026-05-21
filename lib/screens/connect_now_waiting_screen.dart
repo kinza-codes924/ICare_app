@@ -145,7 +145,7 @@ class _ConnectNowWaitingScreenState extends State<ConnectNowWaitingScreen>
         final appointment = AppointmentDetail(
           id: appointmentId.isNotEmpty ? appointmentId : '',
           patient: User(id: patientId, name: patientName, email: '', phoneNumber: '', role: 'patient'),
-          doctor: User(id: '', name: doctorName, email: '', phoneNumber: '', role: 'doctor'),
+          doctor: User(id: doctorId, name: doctorName, email: '', phoneNumber: '', role: 'doctor'),
           status: 'confirmed',
           timeSlot: 'Now',
           date: DateTime.now(),
@@ -278,9 +278,9 @@ class _ConnectNowWaitingScreenState extends State<ConnectNowWaitingScreen>
                   height: 160,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: AppColors.primaryColor.withOpacity(0.2),
+                    color: AppColors.primaryColor.withValues(alpha: 0.2),
                     border: Border.all(
-                      color: AppColors.primaryColor.withOpacity(0.5),
+                      color: AppColors.primaryColor.withValues(alpha: 0.5),
                       width: 3,
                     ),
                   ),
@@ -361,7 +361,7 @@ class _ConnectNowWaitingScreenState extends State<ConnectNowWaitingScreen>
                         height: 10,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          color: Colors.white.withOpacity(0.3 + value * 0.7),
+                          color: Colors.white.withValues(alpha: 0.3 + value * 0.7),
                         ),
                       );
                     },

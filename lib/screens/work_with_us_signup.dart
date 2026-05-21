@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:go_router/go_router.dart';
@@ -44,8 +45,8 @@ class _WorkWithUsSignupState extends State<WorkWithUsSignup> {
   String? _docCnic;
   String? _docPmdcCert;
   String? _docExpCert;
-  bool _docConfirmInfo = false;
-  bool _docAgreeOnboarding = false;
+  final bool _docConfirmInfo = false;
+  final bool _docAgreeOnboarding = false;
   final _docCommentsCtrl = TextEditingController();
 
   // ── Step 3: Pharmacy Fields ──────────────────────────────────────────────
@@ -63,8 +64,8 @@ class _WorkWithUsSignupState extends State<WorkWithUsSignup> {
   String? _pharmCnic;
   String? _pharmDrugLicense;
   String? _pharmRegCert;
-  bool _pharmConfirmInfo = false;
-  bool _pharmAgreeOnboarding = false;
+  final bool _pharmConfirmInfo = false;
+  final bool _pharmAgreeOnboarding = false;
   final _pharmCommentsCtrl = TextEditingController();
 
   // ── Step 3: Laboratory Fields ────────────────────────────────────────────
@@ -82,8 +83,8 @@ class _WorkWithUsSignupState extends State<WorkWithUsSignup> {
   String? _labCnic;
   String? _labLicense;
   String? _labAccredCert;
-  bool _labConfirmInfo = false;
-  bool _labAgreeOnboarding = false;
+  final bool _labConfirmInfo = false;
+  final bool _labAgreeOnboarding = false;
   final _labCommentsCtrl = TextEditingController();
 
   // ── Step 3: Student Fields ───────────────────────────────────────────────
@@ -92,7 +93,7 @@ class _WorkWithUsSignupState extends State<WorkWithUsSignup> {
   final _studentYearCtrl = TextEditingController();
   final _studentIdCtrl = TextEditingController();
   String? _studentIdFile;
-  bool _studentConfirmInfo = false;
+  final bool _studentConfirmInfo = false;
   final _studentCommentsCtrl = TextEditingController();
 
   // ── Step 3: Instructor Fields ────────────────────────────────────────────
@@ -103,8 +104,8 @@ class _WorkWithUsSignupState extends State<WorkWithUsSignup> {
   final _instrCoursesCtrl = TextEditingController();
   String? _instrCnic;
   String? _instrCvFile;
-  bool _instructorConfirmInfo = false;
-  bool _instructorAgreeOnboarding = false;
+  final bool _instructorConfirmInfo = false;
+  final bool _instructorAgreeOnboarding = false;
   final _instrCommentsCtrl = TextEditingController();
 
   bool _submitting = false;
@@ -197,19 +198,21 @@ class _WorkWithUsSignupState extends State<WorkWithUsSignup> {
     setState(() => _submitting = true);
 
     try {
+      // Backend expects capitalized roles matching the normal signup flow
       final roleMap = {
-        'Doctor': 'doctor',
-        'Pharmacy': 'pharmacy',
-        'Laboratory': 'lab',
+        'Doctor': 'Doctor',
+        'Pharmacy': 'Pharmacy',
+        'Laboratory': 'Laboratory',
         'Student': 'Student',
         'Instructor': 'Instructor',
       };
-      final backendRole = roleMap[_selectedRole] ?? _selectedRole!.toLowerCase();
+      final backendRole = roleMap[_selectedRole] ?? _selectedRole!;
+      final capturedName = _nameCtrl.text.trim();
 
       final api = ApiService();
       final response = await api.post('/auth/register', {
-        'username': _nameCtrl.text.trim(),
-        'name': _nameCtrl.text.trim(),
+        'username': capturedName,
+        'name': capturedName,
         'email': _emailCtrl.text.trim().toLowerCase(),
         'password': _passwordCtrl.text,
         'phone': _phoneCtrl.text.trim(),
@@ -218,19 +221,23 @@ class _WorkWithUsSignupState extends State<WorkWithUsSignup> {
         'address': _addressCtrl.text.trim(),
       });
 
-      if (response.statusCode == 201 || response.data['success'] == true) {
+      final resData = response.data;
+      final isSuccess = response.statusCode == 201 || response.statusCode == 200 ||
+          (resData is Map && resData['success'] == true);
+
+      if (isSuccess) {
         if (mounted) {
           Navigator.of(context).pushReplacement(
             MaterialPageRoute(
               builder: (_) => VerificationStatusScreen(
                 role: _selectedRole!,
-                applicantName: _nameCtrl.text,
+                applicantName: capturedName,
               ),
             ),
           );
         }
       } else {
-        final msg = response.data['message'] ?? 'Registration failed. Please try again.';
+        final msg = (resData is Map ? resData['message']?.toString() : null) ?? 'Registration failed. Please try again.';
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text(msg), backgroundColor: Colors.red),
@@ -239,11 +246,24 @@ class _WorkWithUsSignupState extends State<WorkWithUsSignup> {
       }
     } catch (e) {
       if (mounted) {
-        final errMsg = e.toString().contains('already exists')
-            ? 'An account with this email already exists.'
-            : 'Registration failed. Please check your connection and try again.';
+        String errMsg;
+        if (e is DioException && e.response != null) {
+          final data = e.response!.data;
+          if (data is Map) {
+            errMsg = data['message']?.toString() ?? data['error']?.toString() ?? 'Registration failed (${e.response!.statusCode}).';
+          } else {
+            errMsg = 'Registration failed. Status: ${e.response!.statusCode}';
+          }
+        } else if (e.toString().contains('already exists') || e.toString().contains('duplicate')) {
+          errMsg = 'An account with this email already exists.';
+        } else if (e.toString().contains('SocketException') || e.toString().contains('connection')) {
+          errMsg = 'Network error. Please check your internet connection.';
+        } else {
+          errMsg = 'Registration failed. Please try again.';
+          debugPrint('WorkWithUs submit error: $e');
+        }
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(errMsg), backgroundColor: Colors.red),
+          SnackBar(content: Text(errMsg), backgroundColor: Colors.red, duration: const Duration(seconds: 4)),
         );
       }
     } finally {
@@ -283,7 +303,7 @@ class _WorkWithUsSignupState extends State<WorkWithUsSignup> {
               borderRadius: BorderRadius.circular(28),
               boxShadow: [
                 BoxShadow(
-                  color: const Color(0xFF0036BC).withOpacity(0.06),
+                  color: const Color(0xFF0036BC).withValues(alpha: 0.06),
                   blurRadius: 40,
                   offset: const Offset(0, 16),
                 ),
@@ -307,8 +327,9 @@ class _WorkWithUsSignupState extends State<WorkWithUsSignup> {
               children: [
                 InkWell(
                   onTap: () {
-                    if (_step > 0) _prevStep();
-                    else if (Navigator.canPop(context)) Navigator.pop(context);
+                    if (_step > 0) {
+                      _prevStep();
+                    } else if (Navigator.canPop(context)) Navigator.pop(context);
                     else context.go('/home');
                   },
                   borderRadius: BorderRadius.circular(10),
@@ -351,8 +372,9 @@ class _WorkWithUsSignupState extends State<WorkWithUsSignup> {
         if (ResponsiveHelper.isDesktop(context)) ...[
           InkWell(
             onTap: () {
-              if (_step > 0) _prevStep();
-              else if (Navigator.canPop(context)) Navigator.pop(context);
+              if (_step > 0) {
+                _prevStep();
+              } else if (Navigator.canPop(context)) Navigator.pop(context);
               else context.go('/home');
             },
             borderRadius: BorderRadius.circular(12),
@@ -487,13 +509,13 @@ class _WorkWithUsSignupState extends State<WorkWithUsSignup> {
           duration: const Duration(milliseconds: 200),
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: isSelected ? color.withOpacity(0.06) : Colors.white,
+            color: isSelected ? color.withValues(alpha: 0.06) : Colors.white,
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
                 color: isSelected ? color : const Color(0xFFE2E8F0),
                 width: isSelected ? 2 : 1.5),
             boxShadow: isSelected
-                ? [BoxShadow(color: color.withOpacity(0.1), blurRadius: 12, offset: const Offset(0, 4))]
+                ? [BoxShadow(color: color.withValues(alpha: 0.1), blurRadius: 12, offset: const Offset(0, 4))]
                 : [],
           ),
           child: Row(
@@ -501,7 +523,7 @@ class _WorkWithUsSignupState extends State<WorkWithUsSignup> {
               Container(
                 width: 48, height: 48,
                 decoration: BoxDecoration(
-                  color: color.withOpacity(isSelected ? 0.15 : 0.08),
+                  color: color.withValues(alpha: isSelected ? 0.15 : 0.08),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(r['icon'] as IconData, color: color, size: 24),
@@ -909,9 +931,9 @@ class _WorkWithUsSignupState extends State<WorkWithUsSignup> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.06),
+        color: color.withValues(alpha: 0.06),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: color.withOpacity(0.2)),
+        border: Border.all(color: color.withValues(alpha: 0.2)),
       ),
       child: Row(
         children: [
@@ -988,7 +1010,7 @@ class _WorkWithUsSignupState extends State<WorkWithUsSignup> {
         duration: const Duration(milliseconds: 150),
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
         decoration: BoxDecoration(
-          color: isSelected ? color.withOpacity(0.08) : const Color(0xFFF8FAFC),
+          color: isSelected ? color.withValues(alpha: 0.08) : const Color(0xFFF8FAFC),
           borderRadius: BorderRadius.circular(10),
           border: Border.all(
               color: isSelected ? color : const Color(0xFFE2E8F0),
@@ -1022,10 +1044,10 @@ class _WorkWithUsSignupState extends State<WorkWithUsSignup> {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: hasFile ? color.withOpacity(0.04) : const Color(0xFFF8FAFC),
+        color: hasFile ? color.withValues(alpha: 0.04) : const Color(0xFFF8FAFC),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-            color: hasFile ? color.withOpacity(0.3) : const Color(0xFFE2E8F0)),
+            color: hasFile ? color.withValues(alpha: 0.3) : const Color(0xFFE2E8F0)),
       ),
       child: Row(
         children: [
@@ -1053,7 +1075,7 @@ class _WorkWithUsSignupState extends State<WorkWithUsSignup> {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                    hasFile ? fileName! : 'No file selected',
+                    hasFile ? fileName : 'No file selected',
                     style: TextStyle(
                         fontSize: 11,
                         color: hasFile ? color : const Color(0xFF94A3B8))),
@@ -1099,10 +1121,10 @@ class _WorkWithUsSignupState extends State<WorkWithUsSignup> {
       child: Container(
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: value ? color.withOpacity(0.04) : const Color(0xFFF8FAFC),
+          color: value ? color.withValues(alpha: 0.04) : const Color(0xFFF8FAFC),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-              color: value ? color.withOpacity(0.3) : const Color(0xFFE2E8F0)),
+              color: value ? color.withValues(alpha: 0.3) : const Color(0xFFE2E8F0)),
         ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,

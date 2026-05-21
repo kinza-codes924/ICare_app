@@ -76,9 +76,9 @@ class BookingCard extends ConsumerWidget {
                 width: double.infinity,
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF8B5CF6).withOpacity(0.1),
+                  color: const Color(0xFF8B5CF6).withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: const Color(0xFF8B5CF6).withOpacity(0.4)),
+                  border: Border.all(color: const Color(0xFF8B5CF6).withValues(alpha: 0.4)),
                 ),
                 child: const Row(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -233,6 +233,28 @@ class BookingCard extends ConsumerWidget {
               );
             },
           )
+        : appointment.status.toLowerCase() == 'completed'
+        ? Row(
+            children: [
+              Expanded(
+                child: CustomButton(
+                  label: "View Details",
+                  height: Utils.windowHeight(context) * 0.055,
+                  borderRadius: 30,
+                  labelSize: 15,
+                  onPressed: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (ctx) => ProfileOrAppointmentViewScreen(
+                          appointment: appointment,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          )
         : Row(
             children: [
               Expanded(
@@ -304,7 +326,7 @@ class BookingCard extends ConsumerWidget {
                 color: AppColors.white,
                 boxShadow: [
                   BoxShadow(
-                    color: AppColors.veryLightGrey.withOpacity(0.5),
+                    color: AppColors.veryLightGrey.withValues(alpha: 0.5),
                     offset: const Offset(0, 2),
                     blurRadius: 4,
                     spreadRadius: 1,
@@ -514,15 +536,15 @@ class _WebBookingCardState extends State<_WebBookingCard> {
             borderRadius: BorderRadius.circular(20),
             border: Border.all(
               color: _isHovered
-                  ? statusColor.withOpacity(0.3)
+                  ? statusColor.withValues(alpha: 0.3)
                   : const Color(0xFFF1F4F9),
               width: 1.5,
             ),
             boxShadow: [
               BoxShadow(
                 color: _isHovered
-                    ? const Color(0xFF000000).withOpacity(0.06)
-                    : const Color(0xFF000000).withOpacity(0.04),
+                    ? const Color(0xFF000000).withValues(alpha: 0.06)
+                    : const Color(0xFF000000).withValues(alpha: 0.04),
                 blurRadius: _isHovered ? 24 : 16,
                 offset: const Offset(0, 8),
               ),
@@ -590,9 +612,9 @@ class _WebBookingCardState extends State<_WebBookingCard> {
                         vertical: 8,
                       ),
                       decoration: BoxDecoration(
-                        color: statusColor.withOpacity(0.1),
+                        color: statusColor.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(30),
-                        border: Border.all(color: statusColor.withOpacity(0.2)),
+                        border: Border.all(color: statusColor.withValues(alpha: 0.2)),
                       ),
                       child: Row(
                         children: [
@@ -881,9 +903,9 @@ class _WebBookingCardState extends State<_WebBookingCard> {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                           decoration: BoxDecoration(
-                            color: const Color(0xFF8B5CF6).withOpacity(0.08),
+                            color: const Color(0xFF8B5CF6).withValues(alpha: 0.08),
                             borderRadius: BorderRadius.circular(10),
-                            border: Border.all(color: const Color(0xFF8B5CF6).withOpacity(0.3)),
+                            border: Border.all(color: const Color(0xFF8B5CF6).withValues(alpha: 0.3)),
                           ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,

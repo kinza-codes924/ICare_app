@@ -523,12 +523,19 @@ class ConsultationService {
         data: formData,
         options: Options(headers: {'Authorization': 'Bearer $token'}),
       );
-      return response.data is Map<String, dynamic>
-          ? response.data as Map<String, dynamic>
-          : {'success': false, 'message': 'Unexpected response'};
+      if (response.data is Map<String, dynamic>) {
+        return response.data as Map<String, dynamic>;
+      }
+      // Backend may return {url: '...'} directly without success flag
+      if (response.data is Map) {
+        return Map<String, dynamic>.from(response.data as Map);
+      }
+      return {'success': false, 'message': 'Unexpected response'};
     } on DioException catch (e) {
-      print('Error uploading attachment: ${e.message}');
-      return {'success': false, 'message': e.response?.data?['message'] ?? e.message};
+      final serverMsg = (e.response?.data is Map) ? (e.response!.data as Map)['message'] : null;
+      return {'success': false, 'message': serverMsg?.toString() ?? e.message ?? 'Upload failed'};
+    } catch (e) {
+      return {'success': false, 'message': e.toString()};
     }
   }
 
@@ -547,12 +554,18 @@ class ConsultationService {
         data: formData,
         options: Options(headers: {'Authorization': 'Bearer $token'}),
       );
-      return response.data is Map<String, dynamic>
-          ? response.data as Map<String, dynamic>
-          : {'success': false, 'message': 'Unexpected response'};
+      if (response.data is Map<String, dynamic>) {
+        return response.data as Map<String, dynamic>;
+      }
+      if (response.data is Map) {
+        return Map<String, dynamic>.from(response.data as Map);
+      }
+      return {'success': false, 'message': 'Unexpected response'};
     } on DioException catch (e) {
-      print('Error uploading attachment bytes: ${e.message}');
-      return {'success': false, 'message': e.response?.data?['message'] ?? e.message};
+      final serverMsg = (e.response?.data is Map) ? (e.response!.data as Map)['message'] : null;
+      return {'success': false, 'message': serverMsg?.toString() ?? e.message ?? 'Upload failed'};
+    } catch (e) {
+      return {'success': false, 'message': e.toString()};
     }
   }
 
