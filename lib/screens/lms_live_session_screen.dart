@@ -93,17 +93,13 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
 
   @override
   void dispose() {
-    _engine?.leaveChannel();
-    _engine?.release();
     _sessionTimer?.cancel();
     _syncTimer?.cancel();
     _chatCtrl.dispose();
     _chatScroll.dispose();
     _panelTab.dispose();
     LmsLiveSessionScreen.activeCourseId = null; // allow popup again after leaving
-    if (kIsWeb) {
-      lmsLeaveChannel();
-    }
+    lmsLeaveChannel(); // works on both web and mobile
     _localStream?.getTracks().forEach((t) => t.stop());
     super.dispose();
   }
@@ -367,33 +363,58 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
   }
 
   Future<void> _initAgora() async {
-    // On web: Agora native SDK not supported — use web-ready UI mode
     if (kIsWeb) {
+      // Web: Agora JS SDK handles video via lmsJoinChannel (called in _initWebCamera)
       if (mounted) setState(() { _joined = true; _loading = false; });
       _startSessionTimer();
       return;
     }
 
-    // Mobile/Desktop: use Agora RTC Engine
+    // Mobile: use real Agora RTC via lms_agora_stub.dart
     try {
-      // Dynamic import to avoid web compilation errors
-      // ignore: avoid_dynamic_calls
-      final engine = await _createAgoraEngine();
-      if (engine == null) {
-        if (mounted) setState(() { _joined = true; _loading = false; });
+      final channelId = 'lms_${widget.courseId}';
+      final int uid = _currentUserId.hashCode.abs() % 100000 + 1;
+
+      String? token;
+      try {
+        final tokenData = await AgoraService().getToken(channelName: channelId, uid: uid);
+        if (tokenData['success'] == true) {
+          token = tokenData['data']?['token']?.toString() ?? tokenData['token']?.toString();
+        }
+      } catch (_) {}
+
+      // Register callbacks so the screen updates when remote users join/leave
+      lmsSetCallbacks(
+        onRemote: (remoteUid, joining) {
+          if (!mounted) return;
+          setState(() {
+            if (joining && !_remoteUids.contains(remoteUid)) {
+              _remoteUids.add(remoteUid);
+            } else {
+              _remoteUids.remove(remoteUid);
+            }
+          });
+        },
+        onJoined: () {
+          if (mounted && !_joined) {
+            setState(() { _joined = true; _loading = false; });
+            _startSessionTimer();
+          }
+        },
+      );
+
+      await lmsJoinChannel('82a63a65663c49f0bb973707b4c09f5f', channelId, token, uid);
+
+      // Fallback: mark joined after 4 sec in case the callback doesn't fire
+      await Future.delayed(const Duration(seconds: 4));
+      if (mounted && !_joined) {
+        setState(() { _joined = true; _loading = false; });
         _startSessionTimer();
-        return;
       }
-      _engine = engine;
     } catch (e) {
-      // Fallback: show UI without video
       if (mounted) setState(() { _joined = true; _loading = false; });
       _startSessionTimer();
     }
-  }
-
-  Future<dynamic> _createAgoraEngine() async {
-    return null; // Web safe fallback
   }
 
   void _startSessionTimer() {
@@ -503,11 +524,7 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
       ),
     );
     if (confirm == true && mounted) {
-      if (kIsWeb) {
-        lmsLeaveChannel();
-      } else {
-        await _engine?.leaveChannel();
-      }
+      lmsLeaveChannel(); // handles both web (JS) and mobile (Agora RTC)
 
       if (widget.isInstructor) {
         // Auto-save: end session + save chat transcript to lesson
@@ -590,14 +607,51 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
               children: [
                 _buildTopBar(),
                 Expanded(
-                  child: Row(
-                    children: [
-                      // Main video area — transparent on web so JS overlay shows
-                      Expanded(child: _buildVideoArea()),
-                      // Side panel (chat/participants/polls)
-                      if (_chatOpen || _participantsOpen)
-                        _buildSidePanel(),
-                    ],
+                  child: LayoutBuilder(
+                    builder: (ctx, constraints) {
+                      final isMobile = constraints.maxWidth < 600;
+                      if (isMobile) {
+                        // Mobile: side panel slides up as overlay (Stack), video stays full-width
+                        return Stack(
+                          children: [
+                            _buildVideoArea(),
+                            if (_chatOpen || _participantsOpen)
+                              Positioned.fill(
+                                child: Container(
+                                  color: Colors.black54,
+                                  child: Align(
+                                    alignment: Alignment.bottomCenter,
+                                    child: Container(
+                                      height: constraints.maxHeight * 0.65,
+                                      decoration: const BoxDecoration(
+                                        color: Color(0xFF252D3D),
+                                        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+                                      ),
+                                      child: Column(children: [
+                                        const SizedBox(height: 6),
+                                        Container(
+                                          width: 40, height: 4,
+                                          decoration: BoxDecoration(
+                                            color: Colors.white38,
+                                            borderRadius: BorderRadius.circular(2),
+                                          ),
+                                        ),
+                                        Expanded(child: _buildSidePanel()),
+                                      ]),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                          ],
+                        );
+                      }
+                      return Row(
+                        children: [
+                          Expanded(child: _buildVideoArea()),
+                          if (_chatOpen || _participantsOpen) _buildSidePanel(),
+                        ],
+                      );
+                    },
                   ),
                 ),
                 _buildBottomBar(),
@@ -775,8 +829,8 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
         children: [
           if (kIsWeb && _cameraOn && _cameraViewName != null)
             HtmlElementView(viewType: _cameraViewName!)
-          else if (false)
-            Container()
+          else if (!kIsWeb && _cameraOn)
+            lmsGetLocalVideoWidget(_cameraViewName)
           else
             Center(
               child: Column(
@@ -839,8 +893,8 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
       child: Stack(
         fit: StackFit.expand,
         children: [
-          if (false) // Agora remote video — enabled on mobile build
-            Container()
+          if (!kIsWeb)
+            lmsGetRemoteVideoWidget(uid, 'lms_${widget.courseId}')
           else
             Center(
               child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
@@ -1280,6 +1334,129 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
   }
 
   Widget _buildBottomBar() {
+    final isMobile = MediaQuery.of(context).size.width < 600;
+
+    final micBtn = _controlBtn(
+      icon: _micOn ? Icons.mic_rounded : Icons.mic_off_rounded,
+      label: _micOn ? 'Mute' : 'Unmute',
+      color: _micOn ? Colors.white : Colors.red,
+      onTap: _toggleMic,
+    );
+    final camBtn = _controlBtn(
+      icon: _cameraOn ? Icons.videocam_rounded : Icons.videocam_off_rounded,
+      label: _cameraOn ? 'Stop Video' : 'Start Video',
+      color: _cameraOn ? Colors.white : Colors.red,
+      onTap: _toggleCamera,
+    );
+    final chatBtn = _controlBtn(
+      icon: Icons.chat_bubble_outline_rounded,
+      label: 'Chat',
+      color: _chatOpen ? AppColors.primaryColor : Colors.white,
+      onTap: () {
+        setState(() {
+          _chatOpen = !_chatOpen;
+          _participantsOpen = false;
+          if (_chatOpen) _panelTab.animateTo(0);
+        });
+        if (kIsWeb) lmsSetPanelWidth(_chatOpen);
+      },
+      badge: _chatMessages.isNotEmpty ? '${_chatMessages.length}' : null,
+    );
+    final peopleBtn = _controlBtn(
+      icon: Icons.people_rounded,
+      label: 'People',
+      color: _participantsOpen ? AppColors.primaryColor : Colors.white,
+      onTap: () {
+        setState(() {
+          _participantsOpen = !_participantsOpen;
+          _chatOpen = _participantsOpen;
+          if (_participantsOpen) _panelTab.animateTo(1);
+        });
+        if (kIsWeb) lmsSetPanelWidth(_participantsOpen);
+      },
+    );
+    final handBtn = !widget.isInstructor
+        ? _controlBtn(
+            icon: Icons.back_hand_rounded,
+            label: _handRaised ? 'Lower Hand' : 'Raise Hand',
+            color: _handRaised ? Colors.amber : Colors.white,
+            onTap: _toggleHand,
+          )
+        : null;
+    final pollsBtn = widget.isInstructor
+        ? _controlBtn(
+            icon: Icons.poll_rounded,
+            label: 'Polls',
+            color: Colors.white,
+            onTap: () {
+              setState(() {
+                _chatOpen = true;
+                _participantsOpen = false;
+                _panelTab.animateTo(2);
+              });
+              if (kIsWeb) lmsSetPanelWidth(true);
+            },
+          )
+        : null;
+    final endBtn = GestureDetector(
+      onTap: _endSession,
+      child: Container(
+        padding: EdgeInsets.symmetric(
+          horizontal: isMobile ? 16 : 20,
+          vertical: isMobile ? 8 : 10,
+        ),
+        decoration: BoxDecoration(color: Colors.red, borderRadius: BorderRadius.circular(8)),
+        child: Text(
+          widget.isInstructor ? 'End' : 'Leave',
+          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 14),
+        ),
+      ),
+    );
+
+    if (isMobile) {
+      // 2-row mobile layout — no overflow
+      return Container(
+        color: const Color(0xFF252D3D),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Row 1: all control buttons
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                micBtn,
+                camBtn,
+                if (handBtn != null) handBtn,
+                chatBtn,
+                peopleBtn,
+                if (pollsBtn != null) pollsBtn,
+              ],
+            ),
+            const SizedBox(height: 6),
+            // Row 2: end/leave full-width
+            SizedBox(
+              width: double.infinity,
+              child: GestureDetector(
+                onTap: _endSession,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  decoration: BoxDecoration(color: Colors.red, borderRadius: BorderRadius.circular(8)),
+                  child: Center(
+                    child: Text(
+                      widget.isInstructor ? 'End Session for All' : 'Leave Session',
+                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 14),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // Desktop / tablet: original single-row layout
     return Container(
       height: 70,
       color: const Color(0xFF252D3D),
@@ -1287,92 +1464,18 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          // Mic
-          _controlBtn(
-            icon: _micOn ? Icons.mic_rounded : Icons.mic_off_rounded,
-            label: _micOn ? 'Mute' : 'Unmute',
-            color: _micOn ? Colors.white : Colors.red,
-            onTap: _toggleMic,
-          ),
+          micBtn,
           const SizedBox(width: 8),
-          // Camera
-          _controlBtn(
-            icon: _cameraOn ? Icons.videocam_rounded : Icons.videocam_off_rounded,
-            label: _cameraOn ? 'Stop Video' : 'Start Video',
-            color: _cameraOn ? Colors.white : Colors.red,
-            onTap: _toggleCamera,
-          ),
+          camBtn,
           const SizedBox(width: 8),
-          // Raise hand (students only)
-          if (!widget.isInstructor)
-            _controlBtn(
-              icon: Icons.back_hand_rounded,
-              label: _handRaised ? 'Lower Hand' : 'Raise Hand',
-              color: _handRaised ? Colors.amber : Colors.white,
-              onTap: _toggleHand,
-            ),
-          if (!widget.isInstructor) const SizedBox(width: 8),
-          // Chat
-          _controlBtn(
-            icon: Icons.chat_bubble_outline_rounded,
-            label: 'Chat',
-            color: _chatOpen ? AppColors.primaryColor : Colors.white,
-            onTap: () {
-              setState(() {
-                _chatOpen = !_chatOpen;
-                _participantsOpen = false;
-                if (_chatOpen) _panelTab.animateTo(0);
-              });
-              if (kIsWeb) lmsSetPanelWidth(_chatOpen);
-            },
-            badge: _chatMessages.isNotEmpty ? '${_chatMessages.length}' : null,
-          ),
+          if (handBtn != null) ...[handBtn, const SizedBox(width: 8)],
+          chatBtn,
           const SizedBox(width: 8),
-          _controlBtn(
-            icon: Icons.people_rounded,
-            label: 'People',
-            color: _participantsOpen ? AppColors.primaryColor : Colors.white,
-            onTap: () {
-              setState(() {
-                _participantsOpen = !_participantsOpen;
-                _chatOpen = _participantsOpen;
-                if (_participantsOpen) _panelTab.animateTo(1);
-              });
-              if (kIsWeb) lmsSetPanelWidth(_participantsOpen);
-            },
-          ),
+          peopleBtn,
           const SizedBox(width: 8),
-          if (widget.isInstructor)
-            _controlBtn(
-              icon: Icons.poll_rounded,
-              label: 'Polls',
-              color: Colors.white,
-              onTap: () {
-                setState(() {
-                  _chatOpen = true;
-                  _participantsOpen = false;
-                  _panelTab.animateTo(2);
-                });
-                if (kIsWeb) lmsSetPanelWidth(true);
-              },
-            ),
-          if (widget.isInstructor) const SizedBox(width: 8),
+          if (pollsBtn != null) ...[pollsBtn, const SizedBox(width: 8)],
           const Spacer(),
-          // End/Leave button
-          GestureDetector(
-            onTap: _endSession,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-              decoration: BoxDecoration(
-                color: Colors.red,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(
-                widget.isInstructor ? 'End Session' : 'Leave',
-                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 14),
-              ),
-            ),
-          ),
+          endBtn,
         ],
       ),
     );

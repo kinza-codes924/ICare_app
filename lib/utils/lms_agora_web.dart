@@ -1,6 +1,7 @@
 // Web-only — uses dart:js_interop + dart:ui_web (same as doctor-patient video_call_web.dart)
 import 'dart:js_interop';
 import 'dart:ui_web' as ui;
+import 'package:flutter/widgets.dart';
 import 'package:web/web.dart' as web;
 
 @JS('lmsJoin')
@@ -18,7 +19,7 @@ external void _lmsMuteCameraJS(bool mute);
 @JS('lmsSetPanelWidth')
 external void _lmsSetPanelWidthJS(bool panelOpen);
 
-void lmsJoinChannel(String appId, String channelId, String? token, int uid) {
+Future<void> lmsJoinChannel(String appId, String channelId, String? token, int uid) async {
   _lmsJoinJS(appId, channelId, token, uid);
 }
 
@@ -26,6 +27,11 @@ void lmsLeaveChannel() => _lmsLeaveJS();
 void lmsMuteMic(bool mute) => _lmsMuteMicJS(mute);
 void lmsMuteCamera(bool mute) => _lmsMuteCameraJS(mute);
 void lmsSetPanelWidth(bool panelOpen) => _lmsSetPanelWidthJS(panelOpen);
+
+// No-ops on web — video is handled via HtmlElementView + JS Agora SDK
+void lmsSetCallbacks({void Function(int, bool)? onRemote, void Function()? onJoined}) {}
+Widget lmsGetLocalVideoWidget(String? viewName) => const SizedBox.shrink();
+Widget lmsGetRemoteVideoWidget(int uid, String channelId) => const SizedBox.shrink();
 
 /// Register the video container as a Flutter platform view
 /// This is the SAME approach as the working doctor-patient video_call_web.dart

@@ -72,9 +72,11 @@ class PublicHome extends StatelessWidget {
                 color: Colors.white,
               ),
               child: Padding(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: isMobile ? 12 : 24,
-                    vertical: 2,
+                  padding: EdgeInsets.only(
+                    left: isMobile ? 12 : 24,
+                    right: isMobile ? 12 : 24,
+                    top: isMobile ? MediaQuery.of(context).viewPadding.top + 4 : 14,
+                    bottom: 2,
                   ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,

@@ -2,14 +2,10 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_size_matters/flutter_size_matters.dart';
-import 'package:flutter_svg/flutter_svg.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:icare/providers/auth_provider.dart';
 import 'package:icare/screens/forget_password.dart';
 import 'package:icare/screens/privacy_policy.dart';
-import 'package:icare/screens/select_user_type.dart';
-import 'package:icare/screens/tabs.dart';
 import 'package:icare/screens/lab_profile_setup.dart';
 import 'package:icare/screens/pharmacy_profile_setup.dart';
 import 'package:icare/screens/student_profile_setup.dart';
@@ -103,7 +99,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     final existingRole = authState.userRole;
 
     // If user has a role saved, skip to login directly
-    if (existingRole != null && existingRole.isNotEmpty) {
+    if (existingRole.isNotEmpty) {
       setState(() {
         isLogin = true; // Force login mode
       });
@@ -134,52 +130,61 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     if (_biometricLoading) return;
     setState(() => _biometricLoading = true);
 
-    final label = await _biometricService.getBiometricLabel();
-    final result = await _biometricService.authenticate(
-      reason: 'Sign in to iCare with $label',
-    );
+    try {
+      final result = await _biometricService.authenticate(
+        reason: 'Sign in to iCare',
+      );
 
-    if (!mounted) return;
-    setState(() => _biometricLoading = false);
+      if (!mounted) return;
+      setState(() => _biometricLoading = false);
 
-    switch (result) {
-      case BiometricResult.success:
-        // Token already stored from last login — go straight to dashboard
-        final token = await SharedPref().getToken();
-        if (token != null && token.isNotEmpty) {
-          // Re-hydrate user from stored data
-          final user = await SharedPref().getUserData();
-          if (user != null && mounted) {
-            await ref.read(authProvider.notifier).setUserToken(token);
-            await ref.read(authProvider.notifier).setUser(user);
-            if (mounted) context.go('/dashboard');
+      switch (result) {
+        case BiometricResult.success:
+          // Use persistent biometric token (survives logout)
+          final token = await SharedPref().getBiometricToken();
+          if (token != null && token.isNotEmpty) {
+            final user = await SharedPref().getBiometricUserData();
+            if (user != null && mounted) {
+              await ref.read(authProvider.notifier).setUserToken(token);
+              await ref.read(authProvider.notifier).setUser(user);
+              if (mounted) context.go('/dashboard');
+            } else {
+              _showError('Session expired. Please sign in with your password.');
+            }
           } else {
-            _showError('Session expired. Please sign in with your password.');
+            _showError('Biometric not set up. Please sign in with your password first.');
           }
-        } else {
-          _showError('Session expired. Please sign in with your password.');
-        }
-        break;
-      case BiometricResult.notAvailable:
-        _showError('Biometric authentication is not available on this device.');
-        break;
-      case BiometricResult.lockedOut:
-        _showError('Too many attempts. Please use your password to sign in.');
-        break;
-      case BiometricResult.cancelled:
-      case BiometricResult.failed:
-        // User dismissed — do nothing, let them use password
-        break;
+          break;
+        case BiometricResult.notAvailable:
+          _showError('Biometric not available on this device.');
+          break;
+        case BiometricResult.lockedOut:
+          _showError('Too many attempts. Please use password to sign in.');
+          break;
+        case BiometricResult.cancelled:
+        case BiometricResult.failed:
+          // User dismissed — do nothing
+          break;
+      }
+    } catch (e) {
+      debugPrint('Biometric login error: $e');
+      if (!mounted) return;
+      setState(() => _biometricLoading = false);
+      _showError('Biometric authentication failed. Please use your password.');
     }
   }
 
   /// After a successful password login, offer to enable biometrics.
   Future<void> _offerBiometricSetup(String email) async {
-    if (!_biometricAvailable || _biometricEnabled) return;
+    if (!_biometricAvailable) return;
+    // Check if biometrics are already set up for THIS specific user
+    final savedEmail = await _biometricService.getBiometricEmail();
+    if (_biometricEnabled && savedEmail == email) return;
     final label = await _biometricService.getBiometricLabel();
     if (!mounted) return;
 
-    showDialog(
+    // await so navigation to dashboard waits until user responds
+    await showDialog(
       context: context,
       barrierDismissible: false,
       builder: (ctx) => AlertDialog(
@@ -187,11 +192,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
         icon: Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: AppColors.primaryColor.withOpacity(0.1),
+            color: AppColors.primaryColor.withValues(alpha: 0.1),
             shape: BoxShape.circle,
           ),
           child: Icon(
-            label == 'Face ID' ? Icons.face_retouching_natural : Icons.fingerprint,
+            label == 'Face Unlock' ? Icons.face_retouching_natural : Icons.fingerprint,
             color: AppColors.primaryColor,
             size: 36,
           ),
@@ -215,18 +220,16 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
           const SizedBox(width: 8),
           ElevatedButton(
             onPressed: () async {
+              // Save token+user BEFORE closing dialog to avoid race condition
+              final token = await SharedPref().getToken();
+              final user = await SharedPref().getUserData();
+              await _biometricService.enableBiometrics(
+                email,
+                token: token,
+                user: user,
+              );
+              if (mounted) setState(() => _biometricEnabled = true);
               Navigator.pop(ctx);
-              await _biometricService.enableBiometrics(email);
-              setState(() => _biometricEnabled = true);
-              if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('$label sign-in enabled!'),
-                    backgroundColor: Colors.green,
-                    behavior: SnackBarBehavior.floating,
-                  ),
-                );
-              }
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.primaryColor,
@@ -413,7 +416,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                       width: 300, height: 300,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: Colors.white.withOpacity(0.04),
+                        color: Colors.white.withValues(alpha: 0.04),
                       ),
                     ),
                   ),
@@ -423,7 +426,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                       width: 350, height: 350,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: Colors.white.withOpacity(0.03),
+                        color: Colors.white.withValues(alpha: 0.03),
                       ),
                     ),
                   ),
@@ -435,9 +438,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                       child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.15),
+                          color: Colors.white.withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: Colors.white.withOpacity(0.3), width: 1),
+                          border: Border.all(color: Colors.white.withValues(alpha: 0.3), width: 1),
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
@@ -463,7 +466,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                               borderRadius: BorderRadius.circular(14),
                               boxShadow: [
                                 BoxShadow(
-                                  color: Colors.black.withOpacity(0.10),
+                                  color: Colors.black.withValues(alpha: 0.10),
                                   blurRadius: 12,
                                   offset: const Offset(0, 4),
                                 ),
@@ -494,7 +497,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                             child: Image.asset(
                               'assets/images/health.jpeg',
                               fit: BoxFit.contain,
-                              errorBuilder: (_, __, ___) => const Text('RM Health Solutions', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF0036BC))),
+                              errorBuilder: (_, _, _) => const Text('RM Health Solutions', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF0036BC))),
                             ),
                           ),
                           const SizedBox(height: 14),
@@ -503,7 +506,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                             textAlign: TextAlign.center,
                             style: TextStyle(
                               fontSize: 16, fontWeight: FontWeight.w600,
-                              color: Colors.white.withOpacity(0.9),
+                              color: Colors.white.withValues(alpha: 0.9),
                             ),
                           ),
                           const SizedBox(height: 8),
@@ -512,7 +515,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                             textAlign: TextAlign.center,
                             style: TextStyle(
                               fontSize: 14,
-                              color: Colors.white.withOpacity(0.7),
+                              color: Colors.white.withValues(alpha: 0.7),
                               height: 1.6,
                             ),
                           ),
@@ -577,13 +580,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                       borderRadius: BorderRadius.circular(28),
                       boxShadow: [
                         BoxShadow(
-                          color: const Color(0xFF0036BC).withOpacity(0.06),
+                          color: const Color(0xFF0036BC).withValues(alpha: 0.06),
                           blurRadius: 40,
                           offset: const Offset(0, 16),
                           spreadRadius: 0,
                         ),
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.03),
+                          color: Colors.black.withValues(alpha: 0.03),
                           blurRadius: 12,
                           offset: const Offset(0, 4),
                         ),
@@ -619,7 +622,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                                           ? [
                                               BoxShadow(
                                                 color: AppColors.primaryColor
-                                                    .withOpacity(0.3),
+                                                    .withValues(alpha: 0.3),
                                                 blurRadius: 12,
                                                 offset: const Offset(0, 4),
                                               ),
@@ -660,7 +663,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                                           ? [
                                               BoxShadow(
                                                 color: AppColors.primaryColor
-                                                    .withOpacity(0.3),
+                                                    .withValues(alpha: 0.3),
                                                 blurRadius: 12,
                                                 offset: const Offset(0, 4),
                                               ),
@@ -1053,8 +1056,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                                   ImagePaths.google_icon,
                                   "Continue with Google",
                                 ),
-                                // Biometric sign-in button (desktop)
-                                if (_biometricAvailable && _biometricEnabled) ...[
+                                // Biometric / Face Unlock sign-in button — show whenever hardware is available
+                                if (_biometricAvailable) ...[
                                   const SizedBox(height: 12),
                                   _buildBiometricButton(isDesktop: true),
                                 ],
@@ -1536,7 +1539,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.85),
+                  color: Colors.white.withValues(alpha: 0.85),
                   borderRadius: BorderRadius.circular(20),
                   boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 6)],
                 ),
@@ -1590,7 +1593,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
               Text(
                 subtitle,
                 style: TextStyle(
-                  color: Colors.white.withOpacity(0.65),
+                  color: Colors.white.withValues(alpha: 0.65),
                   fontSize: 11,
                   fontWeight: FontWeight.w400,
                   height: 1.3,
@@ -1610,8 +1613,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
         const Text("Or Continue With", style: TextStyle(color: Colors.grey)),
         const SizedBox(height: 15),
         _socialButton(ImagePaths.google_icon, "Google"),
-        // Biometric sign-in button (mobile)
-        if (_biometricAvailable && _biometricEnabled) ...[
+        // Biometric / Face Unlock sign-in button — show whenever hardware is available
+        if (_biometricAvailable) ...[
           const SizedBox(height: 12),
           _buildBiometricButton(isDesktop: false),
         ],
@@ -1624,7 +1627,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
       future: _biometricService.getBiometricLabel(),
       builder: (ctx, snap) {
         final label = snap.data ?? 'Biometrics';
-        final icon = label == 'Face ID'
+        final icon = label == 'Face Unlock'
             ? Icons.face_retouching_natural
             : Icons.fingerprint;
         if (isDesktop) {
@@ -1635,7 +1638,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: AppColors.primaryColor.withOpacity(0.4), width: 1.5),
+                border: Border.all(color: AppColors.primaryColor.withValues(alpha: 0.4), width: 1.5),
               ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -1665,7 +1668,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(30),
-              border: Border.all(color: AppColors.primaryColor.withOpacity(0.4)),
+              border: Border.all(color: AppColors.primaryColor.withValues(alpha: 0.4)),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
@@ -1733,12 +1736,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
   Widget _buildTrustRow(IconData icon, String text) {
     return Row(
       children: [
-        Icon(icon, color: Colors.white.withOpacity(0.9), size: 18),
+        Icon(icon, color: Colors.white.withValues(alpha: 0.9), size: 18),
         const SizedBox(width: 12),
         Text(
           text,
           style: TextStyle(
-            color: Colors.white.withOpacity(0.9),
+            color: Colors.white.withValues(alpha: 0.9),
             fontSize: 14,
             fontWeight: FontWeight.w600,
             fontFamily: "Gilroy-Medium",
@@ -1754,7 +1757,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
         Container(
           padding: const EdgeInsets.all(6),
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.15),
+            color: Colors.white.withValues(alpha: 0.15),
             shape: BoxShape.circle,
           ),
           child: Icon(icon, color: Colors.white, size: 16),
