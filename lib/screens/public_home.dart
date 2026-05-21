@@ -1,12 +1,10 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:icare/screens/consultation_details_screen.dart';
 import 'package:icare/screens/doctors_list.dart';
 import 'package:icare/screens/pharmacies.dart';
 import 'package:icare/screens/lab_list.dart';
-import 'package:icare/utils/imagePaths.dart';
 import 'package:icare/utils/theme.dart';
 import 'package:icare/widgets/whatsapp_button.dart';
 import 'package:icare/utils/shared_pref.dart';
@@ -58,7 +56,6 @@ class PublicHome extends StatelessWidget {
             context: context,
             removeLeft: true,
             removeRight: true,
-            removeTop: true,
             removeBottom: true,
             child: CustomScrollView(
         slivers: [
@@ -123,6 +120,13 @@ class PublicHome extends StatelessWidget {
                               label: 'Sign Up',
                               filled: false,
                               onTap: () => context.go('/signup'),
+                            ),
+                            const SizedBox(width: 6),
+                            _NavButton(
+                              label: 'Work With Us',
+                              filled: false,
+                              accent: true,
+                              onTap: () => context.go('/work-with-us'),
                             ),
                           ],
                         ],
@@ -351,7 +355,7 @@ class _BrowseSearchField extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: const Color(0xFFE8ECF5), width: 1.5),
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 8, offset: const Offset(0, 2)),
+          BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8, offset: const Offset(0, 2)),
         ],
       ),
       child: TextField(
@@ -427,8 +431,8 @@ class _SpecialtySearchBarState extends State<_SpecialtySearchBar> {
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFF7C3AED).withOpacity(0.3), width: 1.5),
-              boxShadow: [BoxShadow(color: const Color(0xFF7C3AED).withOpacity(0.06), blurRadius: 8, offset: const Offset(0, 2))],
+              border: Border.all(color: const Color(0xFF7C3AED).withValues(alpha: 0.3), width: 1.5),
+              boxShadow: [BoxShadow(color: const Color(0xFF7C3AED).withValues(alpha: 0.06), blurRadius: 8, offset: const Offset(0, 2))],
             ),
             child: TextField(
               controller: _ctrl,
@@ -454,8 +458,8 @@ class _SpecialtySearchBarState extends State<_SpecialtySearchBar> {
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: const Color(0xFF7C3AED).withOpacity(0.2)),
-                boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 10)],
+                border: Border.all(color: const Color(0xFF7C3AED).withValues(alpha: 0.2)),
+                boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 10)],
               ),
               constraints: const BoxConstraints(maxHeight: 220),
               child: ListView(
@@ -532,8 +536,8 @@ class _ConditionOnlySearchBarState extends State<_ConditionOnlySearchBar> {
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFF0891B2).withOpacity(0.3), width: 1.5),
-              boxShadow: [BoxShadow(color: const Color(0xFF0891B2).withOpacity(0.06), blurRadius: 8, offset: const Offset(0, 2))],
+              border: Border.all(color: const Color(0xFF0891B2).withValues(alpha: 0.3), width: 1.5),
+              boxShadow: [BoxShadow(color: const Color(0xFF0891B2).withValues(alpha: 0.06), blurRadius: 8, offset: const Offset(0, 2))],
             ),
             child: TextField(
               controller: _ctrl,
@@ -559,8 +563,8 @@ class _ConditionOnlySearchBarState extends State<_ConditionOnlySearchBar> {
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: const Color(0xFF0891B2).withOpacity(0.2)),
-                boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 10)],
+                border: Border.all(color: const Color(0xFF0891B2).withValues(alpha: 0.2)),
+                boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 10)],
               ),
               constraints: const BoxConstraints(maxHeight: 220),
               child: ListView(
@@ -609,7 +613,7 @@ class _GlowingViewAllButtonState extends State<_GlowingViewAllButton> with Singl
   Widget build(BuildContext context) {
     return AnimatedBuilder(
       animation: _glow,
-      builder: (_, __) => GestureDetector(
+      builder: (_, _) => GestureDetector(
         onTap: widget.onTap,
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
@@ -672,7 +676,7 @@ class _FlashingBookLabButtonState extends State<_FlashingBookLabButton>
             borderRadius: BorderRadius.circular(10),
             boxShadow: [
               BoxShadow(
-                color: const Color(0xFFFF4D00).withOpacity(0.4),
+                color: const Color(0xFFFF4D00).withValues(alpha: 0.4),
                 blurRadius: 12,
                 spreadRadius: 2,
               ),
@@ -717,7 +721,7 @@ class _ConditionSearchBarState extends State<_ConditionSearchBar> {
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: const Color(0xFFE8ECF5), width: 1.5),
           boxShadow: [
-            BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 8, offset: const Offset(0, 2)),
+            BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 8, offset: const Offset(0, 2)),
           ],
         ),
         child: Row(
@@ -788,7 +792,7 @@ class _MedicineSearchBarState extends State<_MedicineSearchBar> {
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: const Color(0xFFE8ECF5), width: 1.5),
           boxShadow: [
-            BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 8, offset: const Offset(0, 2)),
+            BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 8, offset: const Offset(0, 2)),
           ],
         ),
         child: Row(
@@ -865,7 +869,7 @@ class _LabSearchBarState extends State<_LabSearchBar> {
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: const Color(0xFFE8ECF5), width: 1.5),
           boxShadow: [
-            BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 8, offset: const Offset(0, 2)),
+            BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 8, offset: const Offset(0, 2)),
           ],
         ),
         child: Row(
@@ -1010,7 +1014,7 @@ class _CourseCardState extends State<_CourseCard> {
                     width: 52,
                     height: 52,
                     decoration: BoxDecoration(
-                      color: color.withOpacity(0.1),
+                      color: color.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(14),
                     ),
                     child: Icon(widget.course['icon'] as IconData, color: color, size: 26),
@@ -1066,11 +1070,9 @@ class _CardData {
   const _CardData({
     required this.title,
     required this.subtitle,
-    this.imageUrl,
     required this.icon,
     required this.iconColor,
-    this.iconBg,
-  });
+  }) : imageUrl = null, iconBg = null;
 }
 
 // ── Navbar Button ─────────────────────────────────────────────────────────────
@@ -1103,7 +1105,7 @@ class _NavButtonState extends State<_NavButton> {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
           decoration: BoxDecoration(
-            color: const Color(0xFF10B981).withOpacity(0.1),
+            color: const Color(0xFF10B981).withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(10),
             border: Border.all(color: const Color(0xFF10B981), width: 1.5),
           ),
@@ -1113,10 +1115,10 @@ class _NavButtonState extends State<_NavButton> {
     }
 
     final bgColor = widget.filled
-        ? (_hovered ? AppColors.primaryColor.withOpacity(0.85) : AppColors.primaryColor)
+        ? (_hovered ? AppColors.primaryColor.withValues(alpha: 0.85) : AppColors.primaryColor)
         : widget.accent
-            ? (_hovered ? const Color(0xFF10B981).withOpacity(0.15) : const Color(0xFF10B981).withOpacity(0.08))
-            : (_hovered ? AppColors.primaryColor.withOpacity(0.06) : Colors.transparent);
+            ? (_hovered ? const Color(0xFF10B981).withValues(alpha: 0.15) : const Color(0xFF10B981).withValues(alpha: 0.08))
+            : (_hovered ? AppColors.primaryColor.withValues(alpha: 0.06) : Colors.transparent);
 
     final textColor = widget.filled
         ? Colors.white
@@ -1217,7 +1219,7 @@ class _BannerState extends State<_Banner> with SingleTickerProviderStateMixin {
               fit: BoxFit.cover,
               alignment: const Alignment(1.0, -0.85),
               filterQuality: FilterQuality.high,
-              errorBuilder: (_, __, ___) => Container(
+              errorBuilder: (_, _, _) => Container(
                 decoration: const BoxDecoration(
                   gradient: LinearGradient(
                     colors: [Color(0xFF0026A0), Color(0xFF0036BC), Color(0xFF1565C0)],
@@ -1271,7 +1273,7 @@ class _BannerState extends State<_Banner> with SingleTickerProviderStateMixin {
                       textAlign: TextAlign.left,
                       style: TextStyle(
                         fontSize: isMobile ? 12 : 15,
-                        color: Colors.white.withOpacity(0.90),
+                        color: Colors.white.withValues(alpha: 0.90),
                         height: 1.55,
                       ),
                     ),
@@ -1291,7 +1293,7 @@ class _BannerState extends State<_Banner> with SingleTickerProviderStateMixin {
                                 borderRadius: BorderRadius.circular(12),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: Colors.white.withOpacity(0.4 * g),
+                                    color: Colors.white.withValues(alpha: 0.4 * g),
                                     blurRadius: 18,
                                     spreadRadius: 3 * g,
                                   ),
@@ -1303,9 +1305,11 @@ class _BannerState extends State<_Banner> with SingleTickerProviderStateMixin {
                           child: ElevatedButton(
                             onPressed: () async {
                               if (await _requireAuth(context)) {
-                                if (context.mounted) Navigator.of(context).push(
+                                if (context.mounted) {
+                                  Navigator.of(context).push(
                                   MaterialPageRoute(builder: (_) => const ConsultationDetailsScreen()),
                                 );
+                                }
                               }
                             },
                             style: ElevatedButton.styleFrom(
@@ -1330,9 +1334,11 @@ class _BannerState extends State<_Banner> with SingleTickerProviderStateMixin {
                         OutlinedButton(
                           onPressed: () async {
                             if (await _requireAuth(context)) {
-                              if (context.mounted) Navigator.of(context).push(
+                              if (context.mounted) {
+                                Navigator.of(context).push(
                                 MaterialPageRoute(builder: (_) => const DoctorsList()),
                               );
+                              }
                             }
                           },
                           style: OutlinedButton.styleFrom(
@@ -1572,7 +1578,7 @@ class _SliderButtonState extends State<_SliderButton> {
             boxShadow: widget.enabled
                 ? [
                     BoxShadow(
-                      color: const Color(0xFF0036BC).withOpacity(_hovered ? 0.45 : 0.25),
+                      color: const Color(0xFF0036BC).withValues(alpha: _hovered ? 0.45 : 0.25),
                       blurRadius: _hovered ? 22 : 14,
                       offset: const Offset(0, 4),
                     ),
@@ -1658,7 +1664,7 @@ class _DoctorCardState extends State<_DoctorCard> {
           boxShadow: [
             if (_hovered)
               BoxShadow(
-                color: const Color(0xFF14B1FF).withOpacity(0.15),
+                color: const Color(0xFF14B1FF).withValues(alpha: 0.15),
                 blurRadius: 28,
                 offset: const Offset(0, 8),
               ),
@@ -1681,7 +1687,7 @@ class _DoctorCardState extends State<_DoctorCard> {
                 child: Image.asset(
                   widget.doctor['img']!,
                   fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => Container(
+                  errorBuilder: (_, _, _) => Container(
                     color: const Color(0xFF0036BC),
                     child: const Icon(Icons.person, size: 36, color: Colors.white),
                   ),
@@ -1902,7 +1908,7 @@ class _ServiceCardState extends State<_ServiceCard> {
           boxShadow: [
             if (_hovered)
               BoxShadow(
-                color: widget.iconColor.withOpacity(0.15),
+                color: widget.iconColor.withValues(alpha: 0.15),
                 blurRadius: 20,
                 offset: const Offset(0, 6),
               ),
@@ -1915,7 +1921,7 @@ class _ServiceCardState extends State<_ServiceCard> {
               width: 44,
               height: 44,
               decoration: BoxDecoration(
-                color: widget.iconColor.withOpacity(0.1),
+                color: widget.iconColor.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Icon(widget.icon, color: widget.iconColor, size: 22),
@@ -2043,7 +2049,7 @@ class _SpecialtyCardState extends State<_SpecialtyCard> {
             boxShadow: [
               if (_hovered)
                 BoxShadow(
-                  color: const Color(0xFF7C3AED).withOpacity(0.16),
+                  color: const Color(0xFF7C3AED).withValues(alpha: 0.16),
                   blurRadius: 24,
                   offset: const Offset(0, 6),
                 ),
@@ -2170,7 +2176,7 @@ class _ConditionCardState extends State<_ConditionCard> {
             boxShadow: [
               if (_hovered)
                 BoxShadow(
-                  color: const Color(0xFF0891B2).withOpacity(0.16),
+                  color: const Color(0xFF0891B2).withValues(alpha: 0.16),
                   blurRadius: 24,
                   offset: const Offset(0, 6),
                 ),
@@ -2374,7 +2380,7 @@ class _BranchForkItem extends StatelessWidget {
                 borderRadius: BorderRadius.circular(2),
                 boxShadow: [
                   BoxShadow(
-                    color: color.withOpacity(0.4),
+                    color: color.withValues(alpha: 0.4),
                     blurRadius: 4,
                     spreadRadius: 1,
                   ),
@@ -2386,9 +2392,9 @@ class _BranchForkItem extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
             decoration: BoxDecoration(
-              color: labelColor.withOpacity(0.10),
+              color: labelColor.withValues(alpha: 0.10),
               borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: labelColor.withOpacity(0.45), width: 1.5),
+              border: Border.all(color: labelColor.withValues(alpha: 0.45), width: 1.5),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
@@ -2420,9 +2426,9 @@ class _BranchArrow extends StatelessWidget {
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
           decoration: BoxDecoration(
-            color: color.withOpacity(0.1),
+            color: color.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: color.withOpacity(0.3)),
+            border: Border.all(color: color.withValues(alpha: 0.3)),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
@@ -2462,7 +2468,7 @@ class _StepCard extends StatelessWidget {
             border: Border.all(color: Colors.white, width: 4),
             boxShadow: [
               BoxShadow(
-                color: const Color(0xFF14B1FF).withOpacity(0.3),
+                color: const Color(0xFF14B1FF).withValues(alpha: 0.3),
                 blurRadius: 8,
                 spreadRadius: 2,
               ),
@@ -2563,7 +2569,7 @@ class _AppDownloadBanner extends StatelessWidget {
               height: 300,
               fit: BoxFit.contain,
               filterQuality: FilterQuality.high,
-              errorBuilder: (_, __, ___) => const SizedBox(
+              errorBuilder: (_, _, _) => const SizedBox(
                 height: 200,
                 child: Icon(Icons.phone_android, size: 80, color: Colors.white54),
               ),
@@ -2584,7 +2590,7 @@ class _AppDownloadBanner extends StatelessWidget {
               'Get instant access to 500+ doctors, lab results, prescriptions, and health records — all in one place.',
               style: TextStyle(
                 fontSize: 13,
-                color: Colors.white.withOpacity(0.9),
+                color: Colors.white.withValues(alpha: 0.9),
                 height: 1.5,
               ),
               textAlign: TextAlign.center,
@@ -2628,7 +2634,7 @@ class _AppDownloadBanner extends StatelessWidget {
                           'Get instant access to 500+ doctors, lab results,\nprescriptions, and health records — all in one place.',
                           style: TextStyle(
                             fontSize: 16,
-                            color: Colors.white.withOpacity(0.95),
+                            color: Colors.white.withValues(alpha: 0.95),
                             height: 1.6,
                           ),
                         ),
@@ -2683,7 +2689,7 @@ class _AppBadges extends StatelessWidget {
                     Text(
                       'Download on the',
                       style: TextStyle(
-                        color: Colors.white.withOpacity(0.8),
+                        color: Colors.white.withValues(alpha: 0.8),
                         fontSize: 10,
                         fontWeight: FontWeight.w400,
                       ),
@@ -2723,7 +2729,7 @@ class _AppBadges extends StatelessWidget {
                     Text(
                       'GET IT ON',
                       style: TextStyle(
-                        color: Colors.white.withOpacity(0.8),
+                        color: Colors.white.withValues(alpha: 0.8),
                         fontSize: 10,
                         fontWeight: FontWeight.w400,
                         letterSpacing: 0.5,
@@ -2787,14 +2793,14 @@ class _PhoneMockups extends StatelessWidget {
       height: 750,
       fit: BoxFit.contain,
       filterQuality: FilterQuality.high,
-      errorBuilder: (_, __, ___) => Container(
+      errorBuilder: (_, _, _) => Container(
         height: 600,
         width: 440,
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.15),
+          color: Colors.white.withValues(alpha: 0.15),
           borderRadius: BorderRadius.circular(30),
           border: Border.all(
-            color: Colors.white.withOpacity(0.3),
+            color: Colors.white.withValues(alpha: 0.3),
             width: 3,
           ),
         ),
@@ -2804,13 +2810,13 @@ class _PhoneMockups extends StatelessWidget {
             Icon(
               Icons.phone_android,
               size: 100,
-              color: Colors.white.withOpacity(0.4),
+              color: Colors.white.withValues(alpha: 0.4),
             ),
             const SizedBox(height: 16),
             Text(
               'Mobile Screens',
               style: TextStyle(
-                color: Colors.white.withOpacity(0.6),
+                color: Colors.white.withValues(alpha: 0.6),
                 fontSize: 18,
                 fontWeight: FontWeight.w600,
               ),

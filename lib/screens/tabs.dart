@@ -4,26 +4,18 @@ import 'package:icare/widgets/whatsapp_button.dart';
 import 'package:icare/screens/admin_dashboard.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_size_matters/flutter_size_matters.dart';
-import 'package:icare/models/app_enums.dart';
 import 'package:icare/navigators/bottom_tab_bar.dart';
 import 'package:icare/navigators/bottom_tabs.dart';
 import 'package:icare/providers/auth_provider.dart';
-import 'package:icare/screens/bookings.dart';
 import 'package:icare/screens/bookings_history.dart';
 import 'package:icare/screens/chat_list_screen.dart';
 import 'package:icare/screens/home.dart';
-import 'package:icare/screens/my_cart.dart';
 import 'package:icare/screens/notifications.dart';
-import 'package:icare/screens/order_tracking.dart';
 import 'package:go_router/go_router.dart';
 import 'package:icare/screens/profile.dart';
 import 'package:icare/screens/profile_edit.dart';
-import 'package:icare/screens/upload_prescription.dart';
 import 'package:icare/utils/imagePaths.dart';
 import 'package:icare/utils/theme.dart';
-import 'package:icare/utils/utils.dart';
-import 'package:icare/widgets/available_badge.dart';
-import 'package:icare/widgets/custom_tab_button.dart';
 import 'package:icare/widgets/custom_text.dart';
 import 'package:icare/navigators/drawer.dart';
 import 'package:icare/widgets/svg_wrapper.dart';
@@ -32,9 +24,7 @@ import 'package:icare/screens/doctor_appointments.dart';
 import 'package:icare/screens/doctor_dashboard.dart';
 import 'package:icare/screens/doctor_schedule_calendar.dart';
 import 'package:icare/screens/doctor_analytics.dart';
-import 'package:icare/screens/doctor_reviews.dart';
 import 'package:icare/screens/doctor_availability.dart';
-import 'package:icare/screens/patient_dashboard.dart';
 import 'package:icare/screens/pharmacist_dashboard.dart';
 import 'package:icare/screens/laboratory_dashboard.dart';
 import 'package:icare/screens/lab_bookings_management.dart';
@@ -42,7 +32,6 @@ import 'package:icare/screens/lab_tests_management.dart';
 import 'package:icare/screens/lab_analytics.dart';
 import 'package:icare/screens/lab_profile_setup.dart';
 import 'package:icare/screens/lab_settings_screen.dart';
-import 'package:icare/screens/lab_supplies_management.dart';
 import 'package:icare/screens/pharmacy_inventory.dart';
 import 'package:icare/screens/pharmacy_orders.dart';
 import 'package:icare/screens/pharmacy_analytics.dart';
@@ -51,35 +40,23 @@ import 'package:icare/screens/doctor_notifications.dart';
 import 'package:icare/screens/doctor_profile_setup.dart';
 import 'package:icare/screens/help_and_support.dart';
 import 'package:icare/screens/analytics_dashboard_screen.dart';
-import 'package:icare/screens/community_forum_screen.dart';
 import 'package:icare/screens/health_journey_screen.dart';
 import 'package:icare/screens/lifestyle_tracker_screen.dart';
-import 'package:icare/screens/manage_dependents_screen.dart';
 import 'package:icare/screens/emergency_contacts_screen.dart';
-import 'package:icare/screens/prescription_templates_screen.dart';
 import 'package:icare/screens/security_audit_log_screen.dart';
 import 'package:icare/screens/certificates_screen.dart';
 import 'package:icare/screens/resource_library_screen.dart';
 import 'package:icare/screens/tasks.dart';
 import 'package:icare/screens/health_community.dart';
 import 'package:icare/screens/settings.dart';
-import 'package:icare/screens/lab_list.dart';
 import 'package:icare/screens/patient_book_lab_flow.dart';
 import 'package:icare/screens/lab_reports_screen.dart';
-import 'package:icare/screens/my_appointment.dart';
-import 'package:icare/screens/my_appointments_list.dart';
-import 'package:icare/screens/my_orders.dart';
 import 'package:icare/screens/payment_invoices.dart';
 import 'package:icare/screens/pharmacies.dart';
-import 'package:icare/screens/pharmacy_management.dart';
-import 'package:icare/screens/prescriptions.dart';
 import 'package:icare/screens/patient_prescriptions.dart';
-import 'package:icare/screens/profile_or_appointement_view.dart';
 import 'package:icare/screens/reminder_list.dart';
 import 'package:icare/screens/student_dashboard.dart';
 import 'package:icare/screens/student_profile_setup.dart';
-import 'package:icare/screens/view_profile.dart';
-import 'package:icare/screens/wallet.dart';
 import 'package:icare/screens/instructor_dashboard.dart';
 import 'package:icare/screens/instructor_courses_management.dart';
 import 'package:icare/screens/instructor_learners_screen.dart';
@@ -88,8 +65,6 @@ import 'package:icare/screens/instructor_analytics.dart';
 import 'package:icare/screens/instructor_profile_setup.dart';
 import 'package:icare/screens/instructor_lms_dashboard.dart';
 import 'package:icare/screens/patient_profile.dart';
-import 'package:icare/services/appointment_service.dart';
-import 'package:icare/models/appointment_detail.dart';
 
 class TabsScreen extends ConsumerStatefulWidget {
   final String? initialAdminTab;
@@ -128,6 +103,8 @@ class _TabsScreenState extends ConsumerState<TabsScreen> {
         activePage = const PharmacyOrders();
       } else if (currentIndex == 2) {
         activePage = const PharmacyInventory();
+      } else if (currentIndex == 3) {
+        activePage = const PharmacyProfileSetup();
       }
     } else if (role == "Laboratory") {
       if (currentIndex == 0) {
@@ -214,20 +191,37 @@ class _TabsScreenState extends ConsumerState<TabsScreen> {
             },
           ),
           centerTitle: false,
-          title: Column(
-            mainAxisAlignment: MainAxisAlignment.start,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              CustomText(
-                text: "Hello,",
-                fontSize: 14,
-                color: AppColors.darkGreyColor,
-                fontWeight: FontWeight.w400,
-                fontFamily: "Gilroy-Bold",
-              ),
-              AvailableBadge(),
-            ],
-          ),
+          title: Builder(builder: (_) {
+            final userName = ref.watch(authProvider).user?.name ?? 'User';
+            final firstName = userName.split(' ').first;
+            final roleLabel = role == 'Doctor' ? 'Doctor Account'
+                : role == 'Pharmacy' ? 'Pharmacy Account'
+                : role == 'Laboratory' ? 'Laboratory Account'
+                : role == 'Instructor' ? 'Instructor Account'
+                : role == 'Student' ? 'Student Account'
+                : role == 'Admin' ? 'Admin Account'
+                : 'Patient Account';
+            return Column(
+              mainAxisAlignment: MainAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                CustomText(
+                  text: 'Hello, $firstName',
+                  fontSize: 14,
+                  color: AppColors.darkGreyColor,
+                  fontWeight: FontWeight.w700,
+                  fontFamily: 'Gilroy-Bold',
+                ),
+                CustomText(
+                  text: roleLabel,
+                  fontSize: 11,
+                  color: AppColors.primaryColor,
+                  fontWeight: FontWeight.w600,
+                  fontFamily: 'Gilroy-SemiBold',
+                ),
+              ],
+            );
+          }),
           actions: [
             Padding(
               padding: EdgeInsets.only(right: ScallingConfig.scale(10)),
