@@ -3,7 +3,6 @@
 
 import 'dart:async';
 import 'dart:typed_data';
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:icare/models/consultation_timer.dart';
@@ -21,6 +20,7 @@ import 'package:icare/utils/theme.dart';
 import 'package:icare/widgets/back_button.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class ConsultationChatScreenV2 extends StatefulWidget {
   final AppointmentDetail? appointment; // nullable — may be null for patient accepting call
@@ -280,43 +280,58 @@ class _ConsultationChatScreenV2State extends State<ConsultationChatScreenV2> {
       final result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
         allowedExtensions: ['jpg', 'jpeg', 'png', 'pdf'],
-        withData: kIsWeb, // on web, read bytes directly
+        withData: true, // always read bytes — works on web + mobile
       );
 
       if (result == null) return;
       final file = result.files.single;
       final fileName = file.name;
 
+      // Guard: max 4MB (Vercel 4.5MB limit with headroom)
+      final fileSize = file.bytes?.length ?? file.size;
+      if (fileSize > 4 * 1024 * 1024) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('File too large. Maximum size is 4 MB. Please compress the image and try again.'),
+              backgroundColor: Colors.orange,
+              duration: Duration(seconds: 4),
+            ),
+          );
+        }
+        return;
+      }
+
       Map<String, dynamic> uploadResult;
 
-      if (kIsWeb) {
-        // Web: use bytes
-        final Uint8List? bytes = file.bytes;
-        if (bytes == null) {
-          throw Exception('Could not read file bytes');
-        }
+      final Uint8List? bytes = file.bytes;
+      if (bytes != null) {
         uploadResult = await _consultationService.uploadAttachmentBytes(
           bytes: bytes,
           fileName: fileName,
         );
-      } else {
-        // Mobile/Desktop: use file path
-        if (file.path == null) throw Exception('No file path');
+      } else if (file.path != null) {
         uploadResult = await _consultationService.uploadAttachment(file.path!);
+      } else {
+        throw Exception('Could not read file');
       }
 
-      if (uploadResult['success'] == true) {
+      // Accept both {success:true, url:...} and bare {url:...} from backend
+      final url = uploadResult['url']?.toString() ?? '';
+      if (url.isNotEmpty) {
         await _consultationService.sendMessageV2(
           consultationId: _consultationId!,
           senderId: widget.currentUserId,
           senderName: widget.currentUserName,
           senderRole: widget.isDoctor ? 'doctor' : 'patient',
           message: '📎 $fileName',
-          attachmentUrl: uploadResult['url'],
+          attachmentUrl: url,
         );
         await _loadMessages();
+      } else if (uploadResult['success'] == true) {
+        throw Exception('Upload succeeded but no URL returned');
       } else {
-        throw Exception(uploadResult['message'] ?? 'Upload failed');
+        throw Exception(uploadResult['message']?.toString() ?? 'Upload failed');
       }
     } catch (e) {
       if (mounted) {
@@ -441,7 +456,18 @@ class _ConsultationChatScreenV2State extends State<ConsultationChatScreenV2> {
       );
       return;
     }
-    if (widget.appointment == null) return;
+    if (widget.appointment == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Appointment not initialized'), backgroundColor: Colors.red),
+      );
+      return;
+    }
+    if (_consultationId == null || _consultationId!.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Consultation session not ready. Please wait a moment.'), backgroundColor: Colors.orange),
+      );
+      return;
+    }
 
     Navigator.push(
       context,
@@ -636,25 +662,34 @@ class _ConsultationChatScreenV2State extends State<ConsultationChatScreenV2> {
       builder: (ctx) => AlertDialog(
         title: const Row(
           children: [
-            Icon(Icons.error_outline, color: Colors.red),
+            Icon(Icons.error_outline, color: Colors.orange),
             SizedBox(width: 8),
             Text('Prescription Incomplete'),
           ],
         ),
         content: const Text(
-          'You must complete the prescription before ending the consultation.',
+          'You have not completed a prescription for this consultation. Would you like to add one, or end without a prescription?',
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
             child: const Text('Cancel'),
           ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              setState(() => _prescriptionComplete = true);
+              _endConsultation();
+            },
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('End Without Rx'),
+          ),
           ElevatedButton(
             onPressed: () {
               Navigator.pop(ctx);
               _openPrescriptionForm();
             },
-            child: const Text('Complete Prescription'),
+            child: const Text('Add Prescription'),
           ),
         ],
       ),
@@ -760,7 +795,7 @@ class _ConsultationChatScreenV2State extends State<ConsultationChatScreenV2> {
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.04),
+                    color: Colors.black.withValues(alpha: 0.04),
                     blurRadius: 4,
                     offset: const Offset(0, 2),
                   ),
@@ -828,7 +863,7 @@ class _ConsultationChatScreenV2State extends State<ConsultationChatScreenV2> {
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             border: Border.all(color: AppColors.primaryColor, width: 1.5),
-            color: AppColors.primaryColor.withOpacity(0.08),
+            color: AppColors.primaryColor.withValues(alpha: 0.08),
           ),
           child: Icon(icon, size: 18, color: AppColors.primaryColor),
         ),
@@ -868,9 +903,9 @@ class _ConsultationChatScreenV2State extends State<ConsultationChatScreenV2> {
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           decoration: BoxDecoration(
-            color: color.withOpacity(0.08),
+            color: color.withValues(alpha: 0.08),
             borderRadius: BorderRadius.circular(6),
-            border: Border.all(color: color.withOpacity(0.3)),
+            border: Border.all(color: color.withValues(alpha: 0.3)),
           ),
           child: Row(
             children: [
@@ -904,7 +939,7 @@ class _ConsultationChatScreenV2State extends State<ConsultationChatScreenV2> {
             color: AppColors.primaryColor,
             boxShadow: [
               BoxShadow(
-                color: AppColors.primaryColor.withOpacity(0.3),
+                color: AppColors.primaryColor.withValues(alpha: 0.3),
                 blurRadius: 8,
                 offset: const Offset(0, 3),
               ),
@@ -926,7 +961,7 @@ class _ConsultationChatScreenV2State extends State<ConsultationChatScreenV2> {
           margin: const EdgeInsets.symmetric(vertical: 8),
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           decoration: BoxDecoration(
-            color: Colors.blue.withOpacity(0.1),
+            color: Colors.blue.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(16),
           ),
           child: Text(
@@ -955,7 +990,7 @@ class _ConsultationChatScreenV2State extends State<ConsultationChatScreenV2> {
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.05),
+              color: Colors.black.withValues(alpha: 0.05),
               blurRadius: 5,
               offset: const Offset(0, 2),
             ),
@@ -965,25 +1000,7 @@ class _ConsultationChatScreenV2State extends State<ConsultationChatScreenV2> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             if (message.attachmentUrl != null) ...[
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    Icons.attach_file_rounded,
-                    size: 16,
-                    color: isMe ? Colors.white : AppColors.primaryColor,
-                  ),
-                  const SizedBox(width: 4),
-                  Text(
-                    'Attachment',
-                    style: TextStyle(
-                      color: isMe ? Colors.white : AppColors.primaryColor,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
+              _buildAttachmentPreview(message.attachmentUrl!, isMe),
               const SizedBox(height: 8),
             ],
             Text(
@@ -1004,6 +1021,103 @@ class _ConsultationChatScreenV2State extends State<ConsultationChatScreenV2> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildAttachmentPreview(String url, bool isMe) {
+    final lower = url.toLowerCase();
+    final isImage = lower.endsWith('.jpg') || lower.endsWith('.jpeg') ||
+        lower.endsWith('.png') || lower.endsWith('.gif') || lower.endsWith('.webp');
+    if (isImage) {
+      return GestureDetector(
+        onTap: () => _showImagePreview(url),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(8),
+          child: Image.network(
+            url,
+            width: 180,
+            height: 140,
+            fit: BoxFit.cover,
+            errorBuilder: (_, _, _) => _attachmentIcon(isMe, 'Image'),
+          ),
+        ),
+      );
+    }
+    return GestureDetector(
+      onTap: () => _openOrDownloadFile(url),
+      child: _attachmentIcon(isMe, url.split('/').last),
+    );
+  }
+
+  void _showImagePreview(String url) {
+    showDialog(
+      context: context,
+      barrierColor: Colors.black87,
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.all(16),
+        child: Stack(
+          children: [
+            Center(
+              child: InteractiveViewer(
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: Image.network(url, fit: BoxFit.contain),
+                ),
+              ),
+            ),
+            Positioned(
+              top: 0,
+              right: 0,
+              child: IconButton(
+                icon: const Icon(Icons.close, color: Colors.white, size: 28),
+                onPressed: () => Navigator.of(ctx).pop(),
+              ),
+            ),
+            Positioned(
+              bottom: 0,
+              right: 0,
+              child: TextButton.icon(
+                onPressed: () => _openOrDownloadFile(url),
+                icon: const Icon(Icons.download_rounded, color: Colors.white),
+                label: const Text('Download', style: TextStyle(color: Colors.white)),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openOrDownloadFile(String url) async {
+    final uri = Uri.tryParse(url);
+    if (uri != null && await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+  }
+
+  Widget _attachmentIcon(bool isMe, String label) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(Icons.attach_file_rounded, size: 16,
+            color: isMe ? Colors.white : AppColors.primaryColor),
+        const SizedBox(width: 4),
+        Flexible(
+          child: Text(
+            label,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: isMe ? Colors.white : AppColors.primaryColor,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+        const SizedBox(width: 4),
+        Icon(Icons.download_rounded, size: 14,
+            color: isMe ? Colors.white70 : AppColors.primaryColor),
+      ],
     );
   }
 

@@ -6,17 +6,10 @@ import 'package:icare/providers/auth_provider.dart';
 import 'package:icare/services/appointment_service.dart';
 import 'package:icare/services/connect_now_service.dart';
 import 'package:icare/services/doctor_service.dart';
-import 'package:icare/screens/doctor_connect_now_screen.dart';
 import 'package:icare/utils/theme.dart';
 import 'package:icare/utils/utils.dart';
 import 'package:icare/screens/doctor_appointments.dart';
-import 'package:icare/screens/doctor_profile_setup.dart';
 import 'package:icare/screens/settings.dart';
-import 'package:icare/screens/patient_records_list.dart';
-import 'package:icare/screens/doctor_schedule_calendar.dart';
-import 'package:icare/screens/doctor_analytics.dart';
-import 'package:icare/screens/doctor_notifications.dart';
-import 'package:icare/screens/doctor_reviews.dart';
 import 'package:icare/screens/doctor_availability.dart';
 import 'package:icare/screens/courses.dart';
 import 'package:icare/screens/my_learning.dart';
@@ -29,7 +22,6 @@ import 'package:icare/services/medical_record_service.dart';
 import 'package:icare/services/consultation_service.dart';
 import 'package:icare/screens/medical_record_detail.dart';
 import 'package:icare/screens/prescription_detail_screen.dart';
-import 'package:intl/intl.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -48,7 +40,7 @@ class _DoctorDashboardState extends ConsumerState<DoctorDashboard> {
   List<Map<String, dynamic>> _clinicalRejectionFlags = [];
   bool _isLoading = true;
   bool _availableForInstantConsultation = true;
-  bool _isInConsultation = false;
+  final bool _isInConsultation = false;
 
   @override
   void initState() {
@@ -89,7 +81,7 @@ class _DoctorDashboardState extends ConsumerState<DoctorDashboard> {
         setState(() {
           final appResult = results[0];
           final statsResult = results[1];
-          final rejResult = results[2] as Map<String, dynamic>;
+          final rejResult = results[2];
           if (appResult['success'] == true) {
             _appointments = appResult['appointments'] as List<AppointmentDetail>;
           }
@@ -315,7 +307,7 @@ class _DoctorDashboardState extends ConsumerState<DoctorDashboard> {
                       setState(() => _availableForInstantConsultation = val);
                       _saveInstantConsultToggle(val);
                     },
-              activeColor: Colors.white,
+              activeThumbColor: Colors.white,
               activeTrackColor: Colors.white.withValues(alpha: 0.3),
               inactiveThumbColor: const Color(0xFF0036BC),
               inactiveTrackColor:
@@ -751,7 +743,7 @@ class _DoctorDashboardState extends ConsumerState<DoctorDashboard> {
                 physics: const NeverScrollableScrollPhysics(),
                 crossAxisSpacing: 12,
                 mainAxisSpacing: 12,
-                childAspectRatio: 1.0,
+                childAspectRatio: 0.82,
                 children: sorted.take(6).map((appointment) {
                   return _buildTodayAppointmentCard(appointment);
                 }).toList(),
@@ -839,7 +831,7 @@ class _DoctorDashboardState extends ConsumerState<DoctorDashboard> {
                   controller: scrollController,
                   padding: const EdgeInsets.all(16),
                   itemCount: sorted.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 12),
+                  separatorBuilder: (_, _) => const SizedBox(height: 12),
                   itemBuilder: (_, i) {
                     final appt = sorted[i];
                     final statusColor = _getStatusColor(appt.status);

@@ -19,6 +19,7 @@ import 'package:icare/services/security_service.dart';
 import 'package:icare/services/biometric_service.dart';
 import 'package:icare/services/health_settings_service.dart';
 import 'package:icare/services/api_service.dart';
+import 'package:icare/utils/shared_pref.dart';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // SETTINGS SCREEN
@@ -193,23 +194,39 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   Future<void> _toggleBiometrics(bool value) async {
     if (value) {
-      // Verify with biometrics before enabling
-      final result = await _biometricService.authenticate(
-        reason: 'Confirm your identity to enable biometric sign-in',
-      );
-      if (result == BiometricResult.success) {
-        final email = ref.read(authProvider).user?.email ?? '';
-        await _biometricService.enableBiometrics(email);
-        setState(() => _isBiometricEnabled = true);
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Biometric sign-in enabled'), backgroundColor: Colors.green),
+      try {
+        final result = await _biometricService.authenticate(
+          reason: 'Confirm your identity to enable biometric sign-in',
+        );
+        if (result == BiometricResult.success) {
+          final authState = ref.read(authProvider);
+          final email = authState.user?.email ?? '';
+          final token = authState.token ?? await SharedPref().getToken() ?? '';
+          final user = authState.user;
+          await _biometricService.enableBiometrics(
+            email,
+            token: token.isNotEmpty ? token : null,
+            user: user,
           );
+          setState(() => _isBiometricEnabled = true);
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Biometric sign-in enabled'), backgroundColor: Colors.green),
+            );
+          }
+        } else if (result == BiometricResult.notAvailable) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Biometrics not available on this device')),
+            );
+          }
         }
-      } else if (result == BiometricResult.notAvailable) {
+        // cancelled/failed → do nothing, switch stays off
+      } catch (e) {
+        debugPrint('Toggle biometrics error: $e');
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Biometrics not available on this device')),
+            const SnackBar(content: Text('Failed to enable biometric sign-in. Please try again.')),
           );
         }
       }
@@ -599,6 +616,7 @@ class _WebSettingsLayout extends StatelessWidget {
         _securityCard(context), const SizedBox(height: 24),
         if (p.isDoctor) ...[_notificationSettingsCard(context), const SizedBox(height: 24)],
         _languageCard(context), const SizedBox(height: 24),
+        if (p.isPatient) ...[_trackerCard(context), const SizedBox(height: 24)],
         if (p.isPatient) ...[_healthModeCard(context), const SizedBox(height: 24)],
         _aboutCard(context), const SizedBox(height: 32),
         _logoutButton(context), const SizedBox(height: 24),
@@ -610,7 +628,7 @@ class _WebSettingsLayout extends StatelessWidget {
     return Card(elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Padding(padding: const EdgeInsets.all(20), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
-          CircleAvatar(radius: 32, backgroundColor: AppColors.primaryColor.withOpacity(0.1),
+          CircleAvatar(radius: 32, backgroundColor: AppColors.primaryColor.withValues(alpha: 0.1),
             backgroundImage: p.user?.profilePicture != null ? NetworkImage(p.user!.profilePicture!) : null,
             child: p.user?.profilePicture == null ? Text((p.user?.name ?? 'U').substring(0, 1).toUpperCase(), style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: AppColors.primaryColor)) : null),
           const SizedBox(width: 16),
@@ -840,6 +858,41 @@ class _WebSettingsLayout extends StatelessWidget {
   }
 
   // ── HEALTH MODE ──
+  Widget _trackerCard(BuildContext context) {
+    final items = [
+      ('bloodPressure', Icons.favorite_border_rounded, 'Blood Pressure', const Color(0xFFEF4444)),
+      ('bloodSugar', Icons.water_drop_outlined, 'Blood Sugar', const Color(0xFFF59E0B)),
+      ('weight', Icons.monitor_weight_outlined, 'Weight', const Color(0xFF8B5CF6)),
+      ('water', Icons.local_drink_outlined, 'Water Intake', const Color(0xFF14B8A6)),
+      ('medication', Icons.medication_outlined, 'Medication', const Color(0xFF3B82F6)),
+    ];
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          _sectionLabel('What to Track'), const SizedBox(height: 16),
+          ...items.asMap().entries.map((e) {
+            final i = e.key;
+            final (key, icon, label, color) = e.value;
+            final isOn = p.trackerToggles[key] ?? false;
+            return Column(children: [
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(10)), child: Icon(icon, color: color, size: 20)),
+                title: Text(label, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                subtitle: Text(isOn ? 'Currently tracking' : 'Not tracking', style: TextStyle(fontSize: 12, color: isOn ? const Color(0xFF10B981) : const Color(0xFF94A3B8))),
+                trailing: Switch(value: isOn, onChanged: (v) => p.onTrackerToggle(key, v), activeThumbColor: AppColors.primaryColor),
+              ),
+              if (i < items.length - 1) const Divider(height: 1),
+            ]);
+          }),
+        ]),
+      ),
+    );
+  }
+
   Widget _healthModeCard(BuildContext context) {
     final conditions = ['Diabetes', 'Hypertension', 'Heart Disease', 'Asthma', 'Thyroid'];
     return Card(elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -884,11 +937,11 @@ class _WebSettingsLayout extends StatelessWidget {
   }
 
   Widget _settingsTile({required IconData icon, required Color iconColor, required String title, required String subtitle, required VoidCallback onTap}) {
-    return ListTile(contentPadding: EdgeInsets.zero, leading: Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: iconColor.withOpacity(0.1), borderRadius: BorderRadius.circular(10)), child: Icon(icon, color: iconColor, size: 20)), title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)), subtitle: Text(subtitle, style: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8))), trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: Color(0xFFCBD5E1)), onTap: onTap);
+    return ListTile(contentPadding: EdgeInsets.zero, leading: Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: iconColor.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(10)), child: Icon(icon, color: iconColor, size: 20)), title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)), subtitle: Text(subtitle, style: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8))), trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: Color(0xFFCBD5E1)), onTap: onTap);
   }
 
   Widget _switchTile({required IconData icon, required String title, required String subtitle, required bool value, required void Function(bool) onChanged}) {
-    return ListTile(contentPadding: EdgeInsets.zero, leading: Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: AppColors.primaryColor.withOpacity(0.1), borderRadius: BorderRadius.circular(10)), child: Icon(icon, color: AppColors.primaryColor, size: 20)), title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)), subtitle: Text(subtitle, style: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8))), trailing: Switch(value: value, onChanged: onChanged, activeColor: AppColors.primaryColor));
+    return ListTile(contentPadding: EdgeInsets.zero, leading: Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: AppColors.primaryColor.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(10)), child: Icon(icon, color: AppColors.primaryColor, size: 20)), title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)), subtitle: Text(subtitle, style: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8))), trailing: Switch(value: value, onChanged: onChanged, activeThumbColor: AppColors.primaryColor));
   }
 
   Widget _comingSoonBanner(String feature) {
@@ -923,6 +976,7 @@ class _MobileSettingsLayout extends StatelessWidget {
         _securityCard(context), const SizedBox(height: 16),
         if (p.isDoctor) ...[_notificationSettingsCard(context), const SizedBox(height: 16)],
         _languageCard(context), const SizedBox(height: 16),
+        if (p.isPatient) ...[_trackerCard(context), const SizedBox(height: 16)],
         if (p.isPatient) ...[_healthModeCard(context), const SizedBox(height: 16)],
         _aboutCard(context), const SizedBox(height: 24),
         _logoutButton(context), const SizedBox(height: 24),
@@ -930,11 +984,47 @@ class _MobileSettingsLayout extends StatelessWidget {
     );
   }
 
+  Widget _trackerCard(BuildContext context) {
+    final items = [
+      ('bloodPressure', Icons.favorite_border_rounded, 'Blood Pressure', const Color(0xFFEF4444)),
+      ('bloodSugar', Icons.water_drop_outlined, 'Blood Sugar', const Color(0xFFF59E0B)),
+      ('weight', Icons.monitor_weight_outlined, 'Weight', const Color(0xFF8B5CF6)),
+      ('water', Icons.local_drink_outlined, 'Water Intake', const Color(0xFF14B8A6)),
+      ('medication', Icons.medication_outlined, 'Medication', const Color(0xFF3B82F6)),
+    ];
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          _sectionLabel('What to Track'), const SizedBox(height: 12),
+          ...items.asMap().entries.map((e) {
+            final i = e.key;
+            final (key, icon, label, color) = e.value;
+            final isOn = p.trackerToggles[key] ?? false;
+            return Column(children: [
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: Container(padding: const EdgeInsets.all(7), decoration: BoxDecoration(color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)), child: Icon(icon, color: color, size: 18)),
+                title: Text(label, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                subtitle: Text(isOn ? 'Tracking' : 'Not tracking', style: TextStyle(fontSize: 11, color: isOn ? const Color(0xFF10B981) : const Color(0xFF94A3B8))),
+                trailing: Switch(value: isOn, onChanged: (v) => p.onTrackerToggle(key, v), activeThumbColor: AppColors.primaryColor, materialTapTargetSize: MaterialTapTargetSize.shrinkWrap),
+                dense: true,
+              ),
+              if (i < items.length - 1) const Divider(height: 1),
+            ]);
+          }),
+        ]),
+      ),
+    );
+  }
+
   Widget _profileCard(BuildContext context) {
     return Card(elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Padding(padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
-          CircleAvatar(radius: 28, backgroundColor: AppColors.primaryColor.withOpacity(0.1),
+          CircleAvatar(radius: 28, backgroundColor: AppColors.primaryColor.withValues(alpha: 0.1),
             backgroundImage: p.user?.profilePicture != null ? NetworkImage(p.user!.profilePicture!) : null,
             child: p.user?.profilePicture == null ? Text((p.user?.name ?? 'U').substring(0, 1).toUpperCase(), style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: AppColors.primaryColor)) : null),
           const SizedBox(width: 14),
@@ -1166,11 +1256,11 @@ class _MobileSettingsLayout extends StatelessWidget {
   }
 
   Widget _settingsTile({required IconData icon, required Color iconColor, required String title, required String subtitle, required VoidCallback onTap}) {
-    return ListTile(contentPadding: EdgeInsets.zero, leading: Container(padding: const EdgeInsets.all(7), decoration: BoxDecoration(color: iconColor.withOpacity(0.1), borderRadius: BorderRadius.circular(8)), child: Icon(icon, color: iconColor, size: 18)), title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)), subtitle: Text(subtitle, style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8))), trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 12, color: Color(0xFFCBD5E1)), onTap: onTap, dense: true);
+    return ListTile(contentPadding: EdgeInsets.zero, leading: Container(padding: const EdgeInsets.all(7), decoration: BoxDecoration(color: iconColor.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)), child: Icon(icon, color: iconColor, size: 18)), title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)), subtitle: Text(subtitle, style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8))), trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 12, color: Color(0xFFCBD5E1)), onTap: onTap, dense: true);
   }
 
   Widget _switchTile({required IconData icon, required String title, required String subtitle, required bool value, required void Function(bool) onChanged}) {
-    return ListTile(contentPadding: EdgeInsets.zero, leading: Container(padding: const EdgeInsets.all(7), decoration: BoxDecoration(color: AppColors.primaryColor.withOpacity(0.1), borderRadius: BorderRadius.circular(8)), child: Icon(icon, color: AppColors.primaryColor, size: 18)), title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)), subtitle: Text(subtitle, style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8))), trailing: Switch(value: value, onChanged: onChanged, activeColor: AppColors.primaryColor, materialTapTargetSize: MaterialTapTargetSize.shrinkWrap), dense: true);
+    return ListTile(contentPadding: EdgeInsets.zero, leading: Container(padding: const EdgeInsets.all(7), decoration: BoxDecoration(color: AppColors.primaryColor.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)), child: Icon(icon, color: AppColors.primaryColor, size: 18)), title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)), subtitle: Text(subtitle, style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8))), trailing: Switch(value: value, onChanged: onChanged, activeThumbColor: AppColors.primaryColor, materialTapTargetSize: MaterialTapTargetSize.shrinkWrap), dense: true);
   }
 
   Widget _mobileComingSoon(String feature, IconData icon) {
@@ -1184,7 +1274,7 @@ class _MobileSettingsLayout extends StatelessWidget {
 
 class _ProfileEditCard extends StatefulWidget {
   final _SettingsLayoutParams p;
-  const _ProfileEditCard({required this.p, super.key});
+  const _ProfileEditCard({required this.p});
   @override
   State<_ProfileEditCard> createState() => _ProfileEditCardState();
 }
@@ -1349,7 +1439,7 @@ class _ProfileEditCardState extends State<_ProfileEditCard> {
                 _fieldLabel('Gender'),
                 const SizedBox(height: 6),
                 DropdownButtonFormField<String>(
-                  value: _gender,
+                  initialValue: _gender,
                   hint: const Text('Select gender', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 14)),
                   decoration: _inputDeco(Icons.wc_rounded),
                   items: ['Male', 'Female', 'Other']

@@ -64,7 +64,6 @@ import 'package:icare/screens/instructor_precautions_management.dart';
 import 'package:icare/screens/instructor_analytics.dart';
 import 'package:icare/screens/instructor_profile_setup.dart';
 import 'package:icare/screens/instructor_lms_dashboard.dart';
-import 'package:icare/screens/patient_profile.dart';
 
 class TabsScreen extends ConsumerStatefulWidget {
   final String? initialAdminTab;
@@ -155,8 +154,8 @@ class _TabsScreenState extends ConsumerState<TabsScreen> {
       } else if (currentIndex == 1) {
         activePage = const Courses(myPurchased: true);
       } else if (currentIndex == 2) {
-        // On web show the web profile overview; on mobile show the full patient profile
-        activePage = isWeb ? ProfileScreen() : const PatientProfile();
+        // On web show the web profile overview; on mobile show the edit profile form
+        activePage = isWeb ? ProfileScreen() : const ProfileEditScreen();
       } else if (currentIndex == 4) {
         activePage = const Courses(myPurchased: true);
       }
