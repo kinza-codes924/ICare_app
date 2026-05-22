@@ -560,6 +560,15 @@ class LmsService {
     }
   }
 
+  Future<Map<String, dynamic>> getSessionTranscript(String sessionId) async {
+    try {
+      final response = await _api.get('/live-sessions/$sessionId/transcript');
+      return response.data ?? {};
+    } catch (e) {
+      return {'success': false, 'message': e.toString()};
+    }
+  }
+
   Future<void> startLiveSessionNotify({
     required String courseId,
     required String sessionId,

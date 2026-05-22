@@ -738,4 +738,47 @@ router.post('/:id/end-and-save', authMiddleware, async (req, res) => {
   }
 });
 
+// GET /live-sessions/:id/transcript — fetch saved chat transcript for a session
+router.get('/:id/transcript', authMiddleware, async (req, res) => {
+  try {
+    await connectMongoDB();
+    const sessionId = req.params.id;
+    const LessonNote = require('../models/LessonNote');
+
+    // Try both keys: plain sessionId (when lessonId was passed) or session_${id}
+    let note = await LessonNote.findOne({ lessonId: sessionId, type: 'transcript' }).lean();
+    if (!note) {
+      note = await LessonNote.findOne({ lessonId: `session_${sessionId}`, type: 'transcript' }).lean();
+    }
+
+    if (note) {
+      return res.json({ success: true, transcript: note.content });
+    }
+
+    // Fall back: build transcript directly from session chat messages
+    const session = await LiveSession.findById(toId(sessionId)).lean();
+    if (!session) return res.status(404).json({ success: false, message: 'Session not found' });
+
+    const chatMessages = session.chatMessages || [];
+    if (chatMessages.length === 0) {
+      return res.json({ success: true, transcript: 'No messages were sent during this session.' });
+    }
+
+    const lines = [
+      `## Live Session: ${session.title}`,
+      `**Duration:** ${session.duration || 0} minutes`,
+      `**Attendees:** ${(session.attendees || []).length}`,
+      '',
+      '### Chat',
+      ...chatMessages.map(m =>
+        `[${new Date(m.timestamp).toLocaleTimeString()}] ${m.userName}: ${m.message}`
+      ),
+    ];
+
+    res.json({ success: true, transcript: lines.join('\n') });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
 module.exports = router;

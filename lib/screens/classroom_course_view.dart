@@ -1393,6 +1393,14 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
     } else if (type == 'session') {
       final sessionId = data['_id']?.toString() ?? widget.course['_id']?.toString() ?? '';
       final sessionTitle = data['title']?.toString() ?? 'Live Session';
+      final status = data['status']?.toString() ?? '';
+
+      // Completed sessions → show transcript instead of re-joining
+      if (!widget.isInstructor && (status == 'completed' || status == 'ended')) {
+        _viewSessionTranscript(sessionId, sessionTitle);
+        return;
+      }
+
       Navigator.push(
         context,
         MaterialPageRoute(
@@ -1404,6 +1412,60 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
           ),
         ),
       );
+    }
+  }
+
+  Future<void> _viewSessionTranscript(String sessionId, String title) async {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const AlertDialog(
+        content: Row(children: [
+          SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2)),
+          SizedBox(width: 16),
+          Text('Loading transcript...'),
+        ]),
+      ),
+    );
+
+    try {
+      final result = await LmsService().getSessionTranscript(sessionId);
+      if (!mounted) return;
+      Navigator.pop(context); // close loading
+
+      final transcript = result['transcript']?.toString() ?? 'No transcript available.';
+
+      showDialog(
+        context: context,
+        builder: (_) => AlertDialog(
+          title: Row(children: [
+            const Icon(Icons.chat_bubble_outline_rounded, color: Color(0xFF188038), size: 20),
+            const SizedBox(width: 8),
+            Expanded(child: Text(title, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+                overflow: TextOverflow.ellipsis)),
+          ]),
+          content: SizedBox(
+            width: double.maxFinite,
+            height: 400,
+            child: SingleChildScrollView(
+              child: SelectableText(
+                transcript,
+                style: const TextStyle(fontSize: 13, height: 1.7, fontFamily: 'monospace'),
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close')),
+          ],
+        ),
+      );
+    } catch (e) {
+      if (mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not load transcript: $e'), backgroundColor: Colors.red),
+        );
+      }
     }
   }
 
@@ -1508,9 +1570,22 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
                       courseId: widget.course['_id']?.toString() ?? '',
                       sessionTitle: data['title']?.toString() ?? 'Live Session',
                       isInstructor: true,
-                      lessonId: data['_id']?.toString(), // link to lesson for auto-save
+                      lessonId: data['_id']?.toString(),
                     ),
                   ));
+                },
+              ),
+            // Session — View Transcript (completed sessions)
+            if (type == 'session' &&
+                (data['status'] == 'completed' || data['status'] == 'ended') &&
+                id.isNotEmpty)
+              ListTile(
+                leading: const Icon(Icons.chat_bubble_outline_rounded, color: Color(0xFF188038)),
+                title: const Text('View Chat Transcript', style: TextStyle(fontWeight: FontWeight.w600)),
+                subtitle: const Text('Messages from this session'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _viewSessionTranscript(id, data['title']?.toString() ?? 'Session Transcript');
                 },
               ),
             // Assignment — grade
