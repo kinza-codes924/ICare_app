@@ -534,40 +534,45 @@ router.post('/notify-start', authMiddleware, async (req, res) => {
   }
 });
 
-// POST /live-sessions/:id/recording/start — start cloud recording
+// POST /live-sessions/:id/recording/start — start Agora Cloud Recording
 router.post('/:id/recording/start', authMiddleware, async (req, res) => {
   try {
     await connectMongoDB();
     const session = await LiveSession.findById(toId(req.params.id));
     if (!session) return res.status(404).json({ success: false, message: 'Session not found' });
 
-    // Mark recording as started
-    session.isRecorded = true;
-    session.recordingStartedAt = new Date();
-    await session.save();
+    const agoraRecording = require('../services/agoraCloudRecording');
 
-    // Note: For actual Agora Cloud Recording, set these env vars:
-    // AGORA_CUSTOMER_KEY, AGORA_CUSTOMER_SECRET, AGORA_BUCKET_NAME, AGORA_BUCKET_KEY, AGORA_BUCKET_SECRET
-    // Then call: https://api.agora.io/v1/apps/:appId/cloud_recording/...
-    const agoraCustomerKey = process.env.AGORA_CUSTOMER_KEY;
-    const agoraCustomerSecret = process.env.AGORA_CUSTOMER_SECRET;
-
-    if (agoraCustomerKey && agoraCustomerSecret) {
-      // TODO: Call Agora Cloud Recording API to start recording
-      // This requires Agora Cloud Recording subscription
+    if (!agoraRecording.isConfigured()) {
+      // Credentials not set yet — mark locally and return
+      session.isRecorded = true;
+      session.recordingStartedAt = new Date();
+      await session.save();
+      return res.json({ success: true, message: 'Recording marked (cloud credentials not configured)', sessionId: session._id });
     }
 
-    res.json({ success: true, message: 'Recording started', sessionId: session._id });
+    const channelName = `lms_${session.courseId?.toString()}`;
+
+    // Acquire resource → start recording
+    const resourceId = await agoraRecording.acquireResource(channelName);
+    const sid = await agoraRecording.startRecording(channelName, resourceId);
+
+    session.isRecorded = true;
+    session.recordingStartedAt = new Date();
+    session.recordingResourceId = resourceId;
+    session.recordingSid = sid;
+    await session.save();
+
+    res.json({ success: true, message: 'Cloud recording started', sessionId: session._id, resourceId, sid });
   } catch (e) {
     res.status(500).json({ success: false, message: e.message });
   }
 });
 
-// POST /live-sessions/:id/recording/stop — stop recording + save metadata
+// POST /live-sessions/:id/recording/stop — stop Agora Cloud Recording + save URL
 router.post('/:id/recording/stop', authMiddleware, async (req, res) => {
   try {
     await connectMongoDB();
-    const { recordingUrl } = req.body; // URL from Agora Cloud Recording or manual upload
     const session = await LiveSession.findById(toId(req.params.id));
     if (!session) return res.status(404).json({ success: false, message: 'Session not found' });
 
@@ -575,19 +580,51 @@ router.post('/:id/recording/stop', authMiddleware, async (req, res) => {
     const endTime = new Date();
     const durationSeconds = Math.round((endTime - startTime) / 1000);
 
-    session.recordingUrl = recordingUrl || '';
+    let recordingUrl = session.recordingUrl || '';
+
+    const agoraRecording = require('../services/agoraCloudRecording');
+
+    if (agoraRecording.isConfigured() && session.recordingResourceId && session.recordingSid) {
+      const channelName = `lms_${session.courseId?.toString()}`;
+      const result = await agoraRecording.stopRecording(channelName, session.recordingResourceId, session.recordingSid);
+      recordingUrl = result.mp4Url || '';
+    }
+
+    session.recordingUrl = recordingUrl;
     session.recordingEndedAt = endTime;
     session.recordingDuration = durationSeconds;
+    session.recordingResourceId = undefined;
+    session.recordingSid = undefined;
     await session.save();
+
+    // If session is linked to a lesson, save recording URL there too
+    if (recordingUrl && (session.linkedLessonId || session.lessonId)) {
+      const lId = session.linkedLessonId || session.lessonId;
+      try {
+        const Course = require('../models/Course');
+        const course = await Course.findById(session.courseId);
+        if (course) {
+          let updated = false;
+          course.modules = course.modules.map(mod => ({
+            ...mod.toObject(),
+            lessons: mod.lessons.map(lesson => {
+              if (lesson._id?.toString() === lId) {
+                updated = true;
+                return { ...lesson.toObject(), videoUrl: recordingUrl, recordingAvailable: true };
+              }
+              return lesson;
+            }),
+          }));
+          if (updated) await course.save();
+        }
+      } catch (_) {}
+    }
 
     res.json({
       success: true,
       recording: {
         sessionId: session._id,
-        recordingUrl: session.recordingUrl,
-        startTime,
-        endTime,
-        durationSeconds,
+        recordingUrl,
         durationFormatted: `${Math.floor(durationSeconds / 60)}m ${durationSeconds % 60}s`,
       },
     });
@@ -596,22 +633,21 @@ router.post('/:id/recording/stop', authMiddleware, async (req, res) => {
   }
 });
 
-// POST /live-sessions/:id/end-and-save — end session + auto-save to lesson
+// POST /live-sessions/:id/end-and-save — end session, save transcript, link recording to lesson
 router.post('/:id/end-and-save', authMiddleware, async (req, res) => {
   try {
     await connectMongoDB();
     const { lessonId, moduleId } = req.body;
 
-    const session = await LiveSession.findById(toId(req.params.id))
-      .populate('courseId', 'title modules')
-      .lean();
-
+    const session = await LiveSession.findById(toId(req.params.id)).lean();
     if (!session) return res.status(404).json({ success: false, message: 'Session not found' });
+
+    const durationMinutes = Math.round((Date.now() - new Date(session.createdAt).getTime()) / 60000);
 
     // Mark session as completed
     await LiveSession.findByIdAndUpdate(toId(req.params.id), {
       status: 'completed',
-      duration: Math.round((Date.now() - new Date(session.createdAt).getTime()) / 60000),
+      duration: durationMinutes,
     });
 
     // Build chat transcript
@@ -623,61 +659,78 @@ router.post('/:id/end-and-save', authMiddleware, async (req, res) => {
     const sessionSummary = {
       title: session.title,
       date: new Date().toISOString(),
-      duration: Math.round((Date.now() - new Date(session.createdAt).getTime()) / 60000),
+      duration: durationMinutes,
       attendees: (session.attendees || []).length,
       chatTranscript: transcript,
       sessionId: session._id,
+      recordingUrl: session.recordingUrl || '',
     };
 
-    // Save to lesson if lessonId provided
-    if (lessonId) {
-      const Course = require('../models/Course');
-      const course = await Course.findById(session.courseId?._id || session.courseId);
-      if (course) {
-        // Find the lesson and update it
-        let lessonUpdated = false;
-        course.modules = (course.modules || []).map(mod => {
-          const lessons = (mod.lessons || []).map(lesson => {
-            const lId = lesson._id?.toString() || lesson.id?.toString();
-            if (lId === lessonId) {
-              lessonUpdated = true;
-              return {
-                ...lesson.toObject ? lesson.toObject() : lesson,
-                type: 'live',
-                liveSessionId: session._id,
-                liveSessionDate: new Date(),
-                chatTranscript: transcript,
-                sessionSummary: JSON.stringify(sessionSummary),
-                recordingAvailable: false, // will be true if Agora cloud recording set up
-              };
-            }
-            return lesson;
-          });
-          return { ...mod.toObject ? mod.toObject() : mod, lessons };
-        });
-        if (lessonUpdated) await course.save();
-      }
+    const courseId = session.courseId?._id || session.courseId;
+    const resolvedLessonId = lessonId || session.linkedLessonId;
+    const resolvedModuleId = moduleId || session.linkedModuleId;
+
+    // Update the lesson in the course document (if linked)
+    if (resolvedLessonId) {
+      try {
+        const Course = require('../models/Course');
+        const course = await Course.findById(courseId);
+        if (course) {
+          let lessonUpdated = false;
+          course.modules = (course.modules || []).map(mod => ({
+            ...mod.toObject(),
+            lessons: mod.lessons.map(lesson => {
+              if (lesson._id?.toString() === resolvedLessonId) {
+                lessonUpdated = true;
+                return {
+                  ...lesson.toObject(),
+                  type: 'live',
+                  liveSessionId: session._id,
+                  liveSessionDate: new Date(),
+                  chatTranscript: transcript,
+                  sessionSummary: JSON.stringify(sessionSummary),
+                  // If recording was done, save URL; otherwise keep existing
+                  ...(session.recordingUrl ? {
+                    videoUrl: session.recordingUrl,
+                    recordingAvailable: true,
+                  } : {}),
+                };
+              }
+              return lesson;
+            }),
+          }));
+          if (lessonUpdated) await course.save();
+        }
+      } catch (_) {}
     }
 
-    // Also save session summary to lesson notes table for retrieval
+    // Always save transcript to LessonNote (even without a lessonId — use sessionId as key)
     const LessonNote = require('../models/LessonNote');
-    if (lessonId && chatMessages.length > 0) {
-      await LessonNote.findOneAndUpdate(
-        { lessonId, courseId: session.courseId?._id || session.courseId, type: 'transcript' },
-        {
-          lessonId,
-          courseId: session.courseId?._id || session.courseId,
-          moduleId: moduleId || '',
-          content: `## Live Session Transcript\n**Date:** ${new Date().toLocaleDateString()}\n**Duration:** ${sessionSummary.duration} minutes\n**Attendees:** ${sessionSummary.attendees}\n\n### Chat\n${transcript || 'No messages'}`,
-          type: 'transcript',
-        },
-        { upsert: true }
-      ).catch(() => {});
-    }
+    const transcriptKey = resolvedLessonId || `session_${session._id}`;
+    await LessonNote.findOneAndUpdate(
+      { lessonId: transcriptKey, courseId, type: 'transcript' },
+      {
+        lessonId: transcriptKey,
+        courseId,
+        moduleId: resolvedModuleId || '',
+        content: [
+          `## Live Session: ${session.title}`,
+          `**Date:** ${new Date().toLocaleDateString()}`,
+          `**Duration:** ${durationMinutes} minutes`,
+          `**Attendees:** ${sessionSummary.attendees}`,
+          session.recordingUrl ? `**Recording:** [Watch](${session.recordingUrl})` : '',
+          '',
+          '### Chat Transcript',
+          transcript || 'No messages during this session.',
+        ].filter(l => l !== null).join('\n'),
+        type: 'transcript',
+      },
+      { upsert: true }
+    ).catch(() => {});
 
     res.json({
       success: true,
-      message: 'Session ended and saved to lesson',
+      message: resolvedLessonId ? 'Session saved and linked to lesson' : 'Session ended. Transcript saved.',
       sessionSummary,
     });
   } catch (e) {

@@ -18,7 +18,12 @@ const liveSessionSchema = new mongoose.Schema({
   },
   attendees: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
   maxParticipants: { type: Number, default: 100 },
-  isRecorded: { type: Boolean, default: true }, // Auto-record by default
+  isRecorded: { type: Boolean, default: true },
+  recordingStartedAt: Date,
+  recordingEndedAt: Date,
+  recordingDuration: Number,        // seconds
+  recordingResourceId: String,      // Agora Cloud Recording resource ID
+  recordingSid: String,             // Agora Cloud Recording SID
   // Chat messages during live session
   chatMessages: [{
     userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
