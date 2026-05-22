@@ -57,8 +57,9 @@ class ChatService {
         if (bytes == null) throw Exception('Bytes required for web upload');
         file = MultipartFile.fromBytes(bytes, filename: fileName);
       } else {
-        if (filePath == null)
+        if (filePath == null) {
           throw Exception('File path required for mobile upload');
+        }
         file = await MultipartFile.fromFile(filePath, filename: fileName);
       }
 

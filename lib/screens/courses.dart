@@ -1,7 +1,6 @@
 import 'dart:developer';
 
 import 'package:flutter/material.dart';
-import 'package:flutter_chat_types/flutter_chat_types.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:icare/providers/auth_provider.dart';
@@ -11,7 +10,6 @@ import 'package:icare/utils/theme.dart';
 import 'package:icare/utils/utils.dart';
 import 'package:icare/widgets/back_button.dart';
 import 'package:icare/widgets/certificates_list.dart';
-import 'package:icare/widgets/course_card.dart';
 import 'package:icare/widgets/courses_list.dart';
 import 'package:icare/widgets/custom_text.dart';
 import 'package:icare/widgets/custom_text_input.dart';
@@ -636,7 +634,7 @@ class _WebCoursesListState extends State<_WebCoursesList> {
         height: height,
         width: double.infinity,
         fit: BoxFit.cover,
-        errorBuilder: (_, __, ___) => Image.asset(
+        errorBuilder: (_, _, _) => Image.asset(
           ImagePaths.coursePremium,
           height: height,
           width: double.infinity,
@@ -658,7 +656,7 @@ class _WebCoursesListState extends State<_WebCoursesList> {
         height: height,
         width: double.infinity,
         fit: BoxFit.cover,
-        errorBuilder: (_, __, ___) => Image.asset(
+        errorBuilder: (_, _, _) => Image.asset(
           ImagePaths.coursePremium,
           height: height,
           width: double.infinity,

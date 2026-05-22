@@ -113,7 +113,7 @@ class CustomDropdown<T> extends StatelessWidget {
                 style: const TextStyle(color: Colors.black),
                 hint: CustomText(
                   text: "Select $title",
-                  color: textColor == null ? AppColors.primary500 : textColor,
+                  color: textColor ?? AppColors.primary500,
                 ),
 
                 items: items.map((item) {

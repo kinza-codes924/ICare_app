@@ -21,6 +21,8 @@ class SharedPref {
           'walkthrough',
           'biometricEnabled',
           'biometricEmail',
+          'biometricToken',
+          'biometricUserData',
         },
       ),
     );
@@ -59,7 +61,7 @@ class SharedPref {
 
   Future<void> setUserWalkthrough(bool value) async {
     final SharedPreferencesWithCache pref = await _prefs;
-    print("walkthrough == > " + value.toString());
+    print("walkthrough == > $value");
     await pref.setBool("walkthrough", value);
   }
 
@@ -87,6 +89,16 @@ class SharedPref {
   Future<void> clearAll() async {
     final SharedPreferencesWithCache pref = await _prefs;
     await pref.clear();
+  }
+
+  Future<String?> getUserId() async {
+    final user = await getUserData();
+    return user?.id;
+  }
+
+  Future<String?> getUserName() async {
+    final user = await getUserData();
+    return user?.name;
   }
 
   /// Check if user is logged in (based on token existence)
@@ -117,5 +129,36 @@ class SharedPref {
   Future<String?> getBiometricEmail() async {
     final pref = await _prefs;
     return pref.getString('biometricEmail');
+  }
+
+  // Persistent biometric session — survives normal logout
+  Future<void> setBiometricToken(String token) async {
+    final pref = await _prefs;
+    await pref.setString('biometricToken', token);
+  }
+
+  Future<String?> getBiometricToken() async {
+    final pref = await _prefs;
+    return pref.getString('biometricToken');
+  }
+
+  Future<void> setBiometricUserData(User user) async {
+    final pref = await _prefs;
+    await pref.setString('biometricUserData', jsonEncode(user));
+  }
+
+  Future<User?> getBiometricUserData() async {
+    final pref = await _prefs;
+    final json = pref.getString('biometricUserData');
+    if (json == null) return null;
+    return User.fromJson(jsonDecode(json));
+  }
+
+  Future<void> clearBiometricSession() async {
+    final pref = await _prefs;
+    await pref.remove('biometricEnabled');
+    await pref.remove('biometricEmail');
+    await pref.remove('biometricToken');
+    await pref.remove('biometricUserData');
   }
 }

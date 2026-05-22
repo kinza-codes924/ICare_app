@@ -328,11 +328,11 @@ class _PatientAddressesScreenState extends State<PatientAddressesScreen> {
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: isDefault ? AppColors.primaryColor.withOpacity(0.4) : const Color(0xFFE2E8F0),
+          color: isDefault ? AppColors.primaryColor.withValues(alpha: 0.4) : const Color(0xFFE2E8F0),
           width: isDefault ? 2 : 1,
         ),
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 8, offset: const Offset(0, 2)),
+          BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8, offset: const Offset(0, 2)),
         ],
       ),
       child: Padding(
@@ -343,7 +343,7 @@ class _PatientAddressesScreenState extends State<PatientAddressesScreen> {
             Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: typeColor.withOpacity(0.1),
+                color: typeColor.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Icon(typeIcon, color: typeColor, size: 22),

@@ -713,8 +713,6 @@ class _WebSettingsLayout extends StatelessWidget {
       child: Padding(padding: const EdgeInsets.all(20), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         _sectionLabel('Privacy & Data'), const SizedBox(height: 16),
         _settingsTile(icon: Icons.download_outlined, iconColor: const Color(0xFF8B5CF6), title: 'Download Health Data', subtitle: 'Export all consultations & records', onTap: () => p.onDownloadHealthData(context)),
-        const Divider(height: 1),
-        _settingsTile(icon: Icons.delete_forever_outlined, iconColor: const Color(0xFFEF4444), title: 'Delete Account', subtitle: 'Permanently delete your account', onTap: () => p.onDeleteAccount(context)),
       ])));
   }
 
@@ -724,8 +722,6 @@ class _WebSettingsLayout extends StatelessWidget {
       child: Padding(padding: const EdgeInsets.all(20), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         _sectionLabel('Payment & Subscription'), const SizedBox(height: 16),
         _settingsTile(icon: Icons.credit_card_outlined, iconColor: const Color(0xFF10B981), title: 'Saved Payment Methods', subtitle: p.savedPaymentMethods.isEmpty ? 'No methods saved' : '${p.savedPaymentMethods.length} method(s)', onTap: () => p.onShowPaymentMethods(context)),
-        const Divider(height: 1),
-        _settingsTile(icon: Icons.subscriptions_outlined, iconColor: const Color(0xFF8B5CF6), title: 'Subscription Plan', subtitle: 'Coming soon', onTap: () => p.onComingSoon(context, 'Subscription Plan')),
         const Divider(height: 1),
         _settingsTile(icon: Icons.receipt_long_outlined, iconColor: const Color(0xFF10B981), title: 'Billing History', subtitle: p.billingHistory.isEmpty ? 'View transactions' : '${p.billingHistory.length} transaction(s)', onTap: () => p.onShowBillingHistory(context)),
       ])));
@@ -1097,7 +1093,6 @@ class _MobileSettingsLayout extends StatelessWidget {
       child: Padding(padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         _sectionLabel('Privacy & Data'), const SizedBox(height: 12),
         _settingsTile(icon: Icons.download_outlined, iconColor: const Color(0xFF8B5CF6), title: 'Download Health Data', subtitle: 'Export all records', onTap: () => p.onDownloadHealthData(context)),
-        const Divider(height: 1), _settingsTile(icon: Icons.delete_forever_outlined, iconColor: const Color(0xFFEF4444), title: 'Delete Account', subtitle: 'Permanently delete account', onTap: () => p.onDeleteAccount(context)),
       ])));
   }
 
@@ -1106,7 +1101,6 @@ class _MobileSettingsLayout extends StatelessWidget {
       child: Padding(padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         _sectionLabel('Payment & Subscription'), const SizedBox(height: 12),
         _settingsTile(icon: Icons.credit_card_outlined, iconColor: const Color(0xFF10B981), title: 'Saved Payment Methods', subtitle: p.savedPaymentMethods.isEmpty ? 'No methods saved' : '${p.savedPaymentMethods.length} method(s)', onTap: () => p.onShowPaymentMethods(context)),
-        const Divider(height: 1), _settingsTile(icon: Icons.subscriptions_outlined, iconColor: const Color(0xFF8B5CF6), title: 'Subscription Plan', subtitle: 'Coming soon', onTap: () => p.onComingSoon(context, 'Subscription Plan')),
         const Divider(height: 1), _settingsTile(icon: Icons.receipt_long_outlined, iconColor: const Color(0xFF10B981), title: 'Billing History', subtitle: p.billingHistory.isEmpty ? 'View transactions' : '${p.billingHistory.length} transaction(s)', onTap: () => p.onShowBillingHistory(context)),
       ])));
   }

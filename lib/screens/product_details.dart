@@ -47,7 +47,7 @@ class ProductDetailsScreen extends StatelessWidget {
               Center(
                 child: Hero(
                   tag: 'product_image_capsule',
-                  child: Container(
+                  child: SizedBox(
                     height: 500,
                     child: Image.asset(ImagePaths.capsule, fit: BoxFit.contain),
                   ),

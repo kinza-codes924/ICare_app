@@ -192,7 +192,7 @@ class _SelectPaymentMethodState extends State<SelectPaymentMethod> {
                 width: 80,
                 height: 80,
                 decoration: BoxDecoration(
-                  color: const Color(0xFF10B981).withOpacity(0.1),
+                  color: const Color(0xFF10B981).withValues(alpha: 0.1),
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(
@@ -393,7 +393,7 @@ class _SelectPaymentMethodState extends State<SelectPaymentMethod> {
                           // Payment Method List
                           ...paymentMethods.asMap().entries.map((entry) {
                             return _buildWebPaymentCard(context, entry.value);
-                          }).toList(),
+                          }),
 
                           const SizedBox(height: 24),
 
@@ -409,13 +409,13 @@ class _SelectPaymentMethodState extends State<SelectPaymentMethod> {
                               padding: const EdgeInsets.all(20),
                               decoration: BoxDecoration(
                                 border: Border.all(
-                                  color: AppColors.primaryColor.withOpacity(
-                                    0.3,
+                                  color: AppColors.primaryColor.withValues(
+                                    alpha: 0.3,
                                   ),
                                   style: BorderStyle.solid,
                                 ),
                                 borderRadius: BorderRadius.circular(16),
-                                color: AppColors.primaryColor.withOpacity(0.04),
+                                color: AppColors.primaryColor.withValues(alpha: 0.04),
                               ),
                               child: Row(
                                 mainAxisAlignment: MainAxisAlignment.center,
@@ -454,7 +454,7 @@ class _SelectPaymentMethodState extends State<SelectPaymentMethod> {
                           borderRadius: BorderRadius.circular(24),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withOpacity(0.04),
+                              color: Colors.black.withValues(alpha: 0.04),
                               blurRadius: 24,
                               offset: const Offset(0, 12),
                             ),
@@ -499,7 +499,7 @@ class _SelectPaymentMethodState extends State<SelectPaymentMethod> {
                                   ),
                                   elevation: 8,
                                   shadowColor: AppColors.primaryColor
-                                      .withOpacity(0.4),
+                                      .withValues(alpha: 0.4),
                                 ),
                                 child: const Text(
                                   "Confirm & Pay",
@@ -560,7 +560,7 @@ class _SelectPaymentMethodState extends State<SelectPaymentMethod> {
           ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.02),
+              color: Colors.black.withValues(alpha: 0.02),
               blurRadius: 10,
               offset: const Offset(0, 4),
             ),
@@ -616,7 +616,7 @@ class _SelectPaymentMethodState extends State<SelectPaymentMethod> {
                   value: item['type'],
                   groupValue: _selectedMethod,
                   onChanged: (val) {
-                    setState(() => _selectedMethod = val as String?);
+                    setState(() => _selectedMethod = val);
                   },
                   activeColor: AppColors.primaryColor,
                 ),

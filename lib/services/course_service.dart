@@ -29,11 +29,13 @@ class CourseService {
     if (category != null) queryParams['category'] = category;
     if (targetAudience != null) queryParams['targetAudience'] = targetAudience;
     if (difficulty != null) queryParams['difficulty'] = difficulty;
-    if (isPublished != null)
+    if (isPublished != null) {
       queryParams['isPublished'] = isPublished.toString();
+    }
     if (instructorId != null) queryParams['instructorId'] = instructorId;
-    if (healthCondition != null)
+    if (healthCondition != null) {
       queryParams['healthCondition'] = healthCondition;
+    }
 
     final response = await _apiService.get(
       '/courses',
@@ -258,8 +260,9 @@ class CourseService {
   Future<List<dynamic>> getForumPosts({String? category}) async {
     try {
       final queryParams = <String, dynamic>{};
-      if (category != null && category != 'All')
+      if (category != null && category != 'All') {
         queryParams['category'] = category;
+      }
       final response = await _apiService.get(
         '/community/posts',
         queryParameters: queryParams,
@@ -290,6 +293,15 @@ class CourseService {
       await _apiService.post('/community/posts/$postId/like', {});
     } catch (e) {
       debugPrint('Error liking forum post: $e');
+    }
+  }
+
+  Future<void> reshareForumPost(String postId) async {
+    try {
+      await _apiService.post('/community/posts/$postId/reshare', {});
+    } catch (e) {
+      debugPrint('Error resharing forum post: $e');
+      rethrow;
     }
   }
 

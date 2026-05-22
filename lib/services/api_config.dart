@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 class ApiConfig {
   // Production backend URL - Vercel (latest fixes)
   static const String baseUrl = 'https://icare-backend-inky.vercel.app/api';

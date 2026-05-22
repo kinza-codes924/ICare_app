@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:icare/providers/auth_provider.dart';
 import 'package:icare/utils/theme.dart';
-import 'package:icare/utils/utils.dart';
 import 'package:icare/widgets/back_button.dart';
 import 'package:icare/widgets/custom_text.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -48,7 +47,7 @@ class HelpAndSupport extends ConsumerWidget {
                 borderRadius: BorderRadius.circular(16),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.04),
+                    color: Colors.black.withValues(alpha: 0.04),
                     blurRadius: 10,
                     offset: const Offset(0, 4),
                   ),
@@ -126,7 +125,7 @@ class HelpAndSupport extends ConsumerWidget {
         Container(
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
-            color: AppColors.primaryColor.withOpacity(0.1),
+            color: AppColors.primaryColor.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(8),
           ),
           child: Icon(icon, color: AppColors.primaryColor, size: 20),
@@ -527,7 +526,7 @@ class _WebFaqCardState extends State<_WebFaqCard> {
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: _expanded
-              ? AppColors.primaryColor.withOpacity(0.3)
+              ? AppColors.primaryColor.withValues(alpha: 0.3)
               : const Color(0xFFE2E8F0),
         ),
         boxShadow: const [
@@ -577,7 +576,7 @@ class _WebFaqCardState extends State<_WebFaqCard> {
 }
 
 class _WhatsAppFab extends StatelessWidget {
-  _WhatsAppFab();
+  const _WhatsAppFab();
 
   Future<void> _open(BuildContext context) async {
     final uri = Uri.parse(
@@ -606,7 +605,7 @@ class _WhatsAppFab extends StatelessWidget {
           shape: BoxShape.circle,
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFF25D366).withOpacity(0.5),
+              color: const Color(0xFF25D366).withValues(alpha: 0.5),
               blurRadius: 16,
               offset: const Offset(0, 6),
               spreadRadius: 2,
@@ -789,7 +788,7 @@ class _InquiryFormDialogState extends State<_InquiryFormDialog> {
                 _label('Category'),
                 const SizedBox(height: 6),
                 DropdownButtonFormField<String>(
-                  value: _category,
+                  initialValue: _category,
                   decoration: _deco(null, Icons.category_outlined),
                   items: _categories.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
                   onChanged: (v) => setState(() => _category = v ?? 'General'),

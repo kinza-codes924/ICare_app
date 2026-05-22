@@ -175,9 +175,9 @@ class _ProfessionalSignupState extends State<ProfessionalSignup> {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                     decoration: BoxDecoration(
-                      color: _roleColor.withOpacity(0.07),
+                      color: _roleColor.withValues(alpha: 0.07),
                       borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: _roleColor.withOpacity(0.2)),
+                      border: Border.all(color: _roleColor.withValues(alpha: 0.2)),
                     ),
                     child: Row(
                       children: [
@@ -199,7 +199,7 @@ class _ProfessionalSignupState extends State<ProfessionalSignup> {
                               Text(
                                 widget.roleDescription,
                                 style: TextStyle(
-                                  color: _roleColor.withOpacity(0.7),
+                                  color: _roleColor.withValues(alpha: 0.7),
                                   fontSize: 12,
                                   fontFamily: 'Gilroy-Medium',
                                 ),

@@ -7,7 +7,6 @@ import 'package:icare/utils/shared_pref.dart';
 import 'package:icare/utils/theme.dart';
 import 'package:icare/models/appointment_detail.dart';
 import 'package:icare/models/user.dart';
-import 'package:icare/models/user.dart';
 
 class DoctorConnectNowScreen extends StatefulWidget {
   final String requestId;
@@ -129,10 +128,16 @@ class _DoctorConnectNowScreenState extends State<DoctorConnectNowScreen>
         if (!mounted) return;
 
         if (consultResult['success'] == true) {
-          // Extract patientId from consultation if not already available
+          // Extract patientId from multiple fallback sources
+          final consultData = consultResult['consultation'] as Map? ?? {};
           final resolvedPatientId = patientId.isNotEmpty
               ? patientId
-              : (consultResult['consultation']?['patientId']?.toString() ?? '');
+              : (consultData['patientId']?.toString() ??
+                  consultData['patient']?['_id']?.toString() ??
+                  consultData['patient']?.toString() ??
+                  '');
+          final resolvedConsultationId = consultResult['consultationId']?.toString() ??
+              consultData['_id']?.toString() ?? '';
 
           // Create minimal appointment detail object for Connect Now
           final appointment = AppointmentDetail(
@@ -151,7 +156,7 @@ class _DoctorConnectNowScreenState extends State<DoctorConnectNowScreen>
           Navigator.of(context).pushReplacement(
             MaterialPageRoute(
               builder: (_) => ConsultationChatScreenV2(
-                consultationId: consultResult['consultationId'],
+                consultationId: resolvedConsultationId,
                 appointment: appointment,
                 isDoctor: true,
                 currentUserId: doctorId,
@@ -236,9 +241,9 @@ class _DoctorConnectNowScreenState extends State<DoctorConnectNowScreen>
                 margin: const EdgeInsets.only(bottom: 16),
                 padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
                 decoration: BoxDecoration(
-                  color: Colors.red.withOpacity(0.2),
+                  color: Colors.red.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: Colors.red.withOpacity(0.5)),
+                  border: Border.all(color: Colors.red.withValues(alpha: 0.5)),
                 ),
                 child: const Text(
                   'EXPIRING SOON',
@@ -265,9 +270,9 @@ class _DoctorConnectNowScreenState extends State<DoctorConnectNowScreen>
                 height: 160,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: (isUrgent ? Colors.red : Colors.green).withOpacity(0.2),
+                  color: (isUrgent ? Colors.red : Colors.green).withValues(alpha: 0.2),
                   border: Border.all(
-                    color: (isUrgent ? Colors.red : Colors.green).withOpacity(0.5),
+                    color: (isUrgent ? Colors.red : Colors.green).withValues(alpha: 0.5),
                     width: 3,
                   ),
                 ),

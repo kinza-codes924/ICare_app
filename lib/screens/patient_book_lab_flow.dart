@@ -90,8 +90,11 @@ class _PatientBookLabFlowState extends State<PatientBookLabFlow> {
   }
 
   void _goBack() {
-    if (_step > 0) setState(() => _step--);
-    else Navigator.of(context).pop();
+    if (_step > 0) {
+      setState(() => _step--);
+    } else {
+      Navigator.of(context).pop();
+    }
   }
 
   Future<void> _loadLabs() async {
@@ -257,9 +260,9 @@ class _PatientBookLabFlowState extends State<PatientBookLabFlow> {
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: AppColors.primaryColor.withOpacity(0.05),
+                color: AppColors.primaryColor.withValues(alpha: 0.05),
                 borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: AppColors.primaryColor.withOpacity(0.15)),
+                border: Border.all(color: AppColors.primaryColor.withValues(alpha: 0.15)),
               ),
               child: Row(
                 children: [
@@ -294,7 +297,7 @@ class _PatientBookLabFlowState extends State<PatientBookLabFlow> {
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.all(24),
         decoration: BoxDecoration(
-          color: isSelected ? color.withOpacity(0.07) : Colors.white,
+          color: isSelected ? color.withValues(alpha: 0.07) : Colors.white,
           borderRadius: BorderRadius.circular(18),
           border: Border.all(
             color: isSelected ? color : const Color(0xFFE2E8F0),
@@ -302,7 +305,7 @@ class _PatientBookLabFlowState extends State<PatientBookLabFlow> {
           ),
           boxShadow: [
             BoxShadow(
-              color: isSelected ? color.withOpacity(0.12) : Colors.black.withOpacity(0.04),
+              color: isSelected ? color.withValues(alpha: 0.12) : Colors.black.withValues(alpha: 0.04),
               blurRadius: 12,
               offset: const Offset(0, 4),
             ),
@@ -314,7 +317,7 @@ class _PatientBookLabFlowState extends State<PatientBookLabFlow> {
               width: 64,
               height: 64,
               decoration: BoxDecoration(
-                color: color.withOpacity(0.12),
+                color: color.withValues(alpha: 0.12),
                 shape: BoxShape.circle,
               ),
               child: Icon(icon, color: color, size: 30),
@@ -387,7 +390,7 @@ class _PatientBookLabFlowState extends State<PatientBookLabFlow> {
         // Selected count + total
         if (_selectedTests.isNotEmpty)
           Container(
-            color: AppColors.primaryColor.withOpacity(0.05),
+            color: AppColors.primaryColor.withValues(alpha: 0.05),
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
             child: Row(
               children: [
@@ -412,15 +415,18 @@ class _PatientBookLabFlowState extends State<PatientBookLabFlow> {
               : ListView.separated(
                   padding: const EdgeInsets.symmetric(vertical: 8),
                   itemCount: _filteredTests.length,
-                  separatorBuilder: (_, __) => const Divider(height: 1, color: Color(0xFFF1F5F9)),
+                  separatorBuilder: (_, _) => const Divider(height: 1, color: Color(0xFFF1F5F9)),
                   itemBuilder: (context, i) {
                     final test = _filteredTests[i];
                     final name = test['name'] as String;
                     final isSelected = _selectedTests.contains(name);
                     return InkWell(
                       onTap: () => setState(() {
-                        if (isSelected) _selectedTests.remove(name);
-                        else _selectedTests.add(name);
+                        if (isSelected) {
+                          _selectedTests.remove(name);
+                        } else {
+                          _selectedTests.add(name);
+                        }
                       }),
                       child: Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
@@ -612,7 +618,7 @@ class _PatientBookLabFlowState extends State<PatientBookLabFlow> {
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: const Color(0xFFE2E8F0)),
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 8, offset: const Offset(0, 2)),
+          BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8, offset: const Offset(0, 2)),
         ],
       ),
       child: InkWell(

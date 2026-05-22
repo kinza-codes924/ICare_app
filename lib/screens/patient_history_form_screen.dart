@@ -35,7 +35,7 @@ class _PatientHistoryFormScreenState extends State<PatientHistoryFormScreen> {
   final Set<int> _expandedSections = {0}; // First section open by default
 
   // Section 1: Chief Complaints
-  List<ChiefComplaint> _chiefComplaints = [];
+  final List<ChiefComplaint> _chiefComplaints = [];
   final TextEditingController _complaintController = TextEditingController();
   final TextEditingController _durationController = TextEditingController();
 
@@ -77,17 +77,17 @@ class _PatientHistoryFormScreenState extends State<PatientHistoryFormScreen> {
   String? _psychiatricDetails;
 
   // Section 4: Surgical History
-  List<SurgicalHistory> _surgicalHistory = [];
+  final List<SurgicalHistory> _surgicalHistory = [];
 
   // Section 5: Drug History
-  List<CurrentMedication> _currentMedications = [];
-  List<Allergy> _allergies = [];
+  final List<CurrentMedication> _currentMedications = [];
+  final List<Allergy> _allergies = [];
 
   // Section 6: Family History
   FamilyMemberHistory? _father;
   FamilyMemberHistory? _mother;
-  List<FamilyMemberHistory> _siblings = [];
-  List<FamilyMemberHistory> _children = [];
+  final List<FamilyMemberHistory> _siblings = [];
+  final List<FamilyMemberHistory> _children = [];
   String? _otherFamilyHistory;
 
   // Section 7: Personal & Social History
@@ -551,7 +551,7 @@ class _PatientHistoryFormScreenState extends State<PatientHistoryFormScreen> {
   Widget _listHeader(List<String> cols, List<int> flex) => Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
-          color: AppColors.primaryColor.withOpacity(0.08),
+          color: AppColors.primaryColor.withValues(alpha: 0.08),
           borderRadius: BorderRadius.circular(8),
         ),
         child: Row(
@@ -723,7 +723,7 @@ class _PatientHistoryFormScreenState extends State<PatientHistoryFormScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: value ? AppColors.primaryColor.withOpacity(0.4) : const Color(0xFFE2E8F0)),
+        border: Border.all(color: value ? AppColors.primaryColor.withValues(alpha: 0.4) : const Color(0xFFE2E8F0)),
       ),
       child: Column(
         children: [
@@ -732,7 +732,7 @@ class _PatientHistoryFormScreenState extends State<PatientHistoryFormScreen> {
             child: Row(
               children: [
                 Expanded(child: Text(name, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14))),
-                Switch(value: value, onChanged: toggle, activeColor: AppColors.primaryColor),
+                Switch(value: value, onChanged: toggle, activeThumbColor: AppColors.primaryColor),
                 SizedBox(
                   width: 32,
                   child: Text(
@@ -890,9 +890,9 @@ class _PatientHistoryFormScreenState extends State<PatientHistoryFormScreen> {
                 margin: const EdgeInsets.only(bottom: 8),
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.red.withOpacity(0.04),
+                  color: Colors.red.withValues(alpha: 0.04),
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.red.withOpacity(0.2)),
+                  border: Border.all(color: Colors.red.withValues(alpha: 0.2)),
                 ),
                 child: Row(
                   children: [
@@ -979,7 +979,7 @@ class _PatientHistoryFormScreenState extends State<PatientHistoryFormScreen> {
             mainAxisSize: MainAxisSize.min,
             children: [
               DropdownButtonFormField<AllergyType>(
-                value: selectedType,
+                initialValue: selectedType,
                 decoration: _inputDec('Allergy Type'),
                 items: [
                   const DropdownMenuItem(value: AllergyType.drug, child: Text('Drug Allergy')),
@@ -1113,7 +1113,7 @@ class _PatientHistoryFormScreenState extends State<PatientHistoryFormScreen> {
               const Text('Smoking', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: Color(0xFF475569))),
               const SizedBox(height: 8),
               DropdownButtonFormField<SmokingStatus>(
-                value: _smoking,
+                initialValue: _smoking,
                 decoration: _inputDec('Status'),
                 items: const [
                   DropdownMenuItem(value: SmokingStatus.never, child: Text('Never')),
@@ -1131,7 +1131,7 @@ class _PatientHistoryFormScreenState extends State<PatientHistoryFormScreen> {
               const Text('Alcohol Use', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: Color(0xFF475569))),
               const SizedBox(height: 8),
               DropdownButtonFormField<AlcoholStatus>(
-                value: _alcohol,
+                initialValue: _alcohol,
                 decoration: _inputDec('Status'),
                 items: const [
                   DropdownMenuItem(value: AlcoholStatus.never, child: Text('Never')),
@@ -1148,7 +1148,7 @@ class _PatientHistoryFormScreenState extends State<PatientHistoryFormScreen> {
             children: [
               Row(children: [
                 const Expanded(child: Text('Substance Abuse', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14))),
-                Switch(value: _substanceAbuse, onChanged: (v) => setState(() => _substanceAbuse = v), activeColor: AppColors.primaryColor),
+                Switch(value: _substanceAbuse, onChanged: (v) => setState(() => _substanceAbuse = v), activeThumbColor: AppColors.primaryColor),
               ]),
               if (_substanceAbuse) ...[
                 const SizedBox(height: 8),
@@ -1260,7 +1260,7 @@ class _PatientHistoryFormScreenState extends State<PatientHistoryFormScreen> {
               child: Row(
                 children: [
                   const Expanded(child: Text('Menopause', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14))),
-                  Switch(value: _menopause, onChanged: (v) => setState(() => _menopause = v), activeColor: AppColors.primaryColor),
+                  Switch(value: _menopause, onChanged: (v) => setState(() => _menopause = v), activeThumbColor: AppColors.primaryColor),
                   Text(_menopause ? 'Yes' : 'No', style: TextStyle(
                     fontSize: 12, fontWeight: FontWeight.w700,
                     color: _menopause ? AppColors.primaryColor : const Color(0xFF94A3B8),

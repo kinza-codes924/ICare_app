@@ -220,15 +220,15 @@ class _PharmacyInventoryState extends State<PharmacyInventory> {
       child: Container(
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.06),
+          color: color.withValues(alpha: 0.06),
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: color.withOpacity(0.2)),
+          border: Border.all(color: color.withValues(alpha: 0.2)),
         ),
         child: Row(
           children: [
             Container(
               padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(color: color.withOpacity(0.12), shape: BoxShape.circle),
+              decoration: BoxDecoration(color: color.withValues(alpha: 0.12), shape: BoxShape.circle),
               child: Icon(icon, color: color, size: 22),
             ),
             const SizedBox(width: 14),
@@ -585,8 +585,8 @@ class _MedicineCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: isControlled ? const Color(0xFF8B5CF6).withOpacity(0.4) : isLow ? const Color(0xFFEF4444).withOpacity(0.3) : const Color(0xFFE2E8F0)),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 8, offset: const Offset(0, 2))],
+        border: Border.all(color: isControlled ? const Color(0xFF8B5CF6).withValues(alpha: 0.4) : isLow ? const Color(0xFFEF4444).withValues(alpha: 0.3) : const Color(0xFFE2E8F0)),
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8, offset: const Offset(0, 2))],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -595,7 +595,7 @@ class _MedicineCard extends StatelessWidget {
           Container(
             height: 80,
             decoration: BoxDecoration(
-              color: color.withOpacity(0.08),
+              color: color.withValues(alpha: 0.08),
               borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
             ),
             child: Stack(
@@ -606,7 +606,7 @@ class _MedicineCard extends StatelessWidget {
                     height: 52,
                     width: 52,
                     fit: BoxFit.contain,
-                    errorBuilder: (_, __, ___) => Icon(_typeIcon, size: 38, color: color.withOpacity(0.7)),
+                    errorBuilder: (_, _, _) => Icon(_typeIcon, size: 38, color: color.withValues(alpha: 0.7)),
                   ),
                 ),
                 // Category badge
@@ -663,7 +663,7 @@ class _MedicineCard extends StatelessWidget {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF10B981).withOpacity(0.1),
+                        color: const Color(0xFF10B981).withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(6),
                       ),
                       child: Text('Qty: $stock',
@@ -719,7 +719,9 @@ class _AddMedicineModalState extends State<_AddMedicineModal> {
 
   @override
   void dispose() {
-    for (final c in [_name, _brand, _power, _price, _qty, _amount, _details, _precautions]) c.dispose();
+    for (final c in [_name, _brand, _power, _price, _qty, _amount, _details, _precautions]) {
+      c.dispose();
+    }
     super.dispose();
   }
 
@@ -808,7 +810,7 @@ class _AddMedicineModalState extends State<_AddMedicineModal> {
                       Row(children: [
                         Expanded(
                           child: DropdownButtonFormField<String>(
-                            value: _category,
+                            initialValue: _category,
                             decoration: _dec('Category', Icons.category_rounded),
                             items: _categories.map((c) => DropdownMenuItem(value: c, child: Text(c, style: const TextStyle(fontSize: 13)))).toList(),
                             onChanged: (v) => setState(() => _category = v!),
@@ -817,7 +819,7 @@ class _AddMedicineModalState extends State<_AddMedicineModal> {
                         const SizedBox(width: 12),
                         Expanded(
                           child: DropdownButtonFormField<String>(
-                            value: _type,
+                            initialValue: _type,
                             decoration: _dec('Type', Icons.local_pharmacy_rounded),
                             items: _types.map((t) => DropdownMenuItem(value: t, child: Text(t, style: const TextStyle(fontSize: 13)))).toList(),
                             onChanged: (v) => setState(() => _type = v!),
@@ -845,10 +847,10 @@ class _AddMedicineModalState extends State<_AddMedicineModal> {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                         decoration: BoxDecoration(
-                          color: _isControlled ? const Color(0xFF8B5CF6).withOpacity(0.06) : const Color(0xFFF8FAFC),
+                          color: _isControlled ? const Color(0xFF8B5CF6).withValues(alpha: 0.06) : const Color(0xFFF8FAFC),
                           borderRadius: BorderRadius.circular(10),
                           border: Border.all(
-                            color: _isControlled ? const Color(0xFF8B5CF6).withOpacity(0.3) : const Color(0xFFE2E8F0),
+                            color: _isControlled ? const Color(0xFF8B5CF6).withValues(alpha: 0.3) : const Color(0xFFE2E8F0),
                           ),
                         ),
                         child: Row(
@@ -867,7 +869,7 @@ class _AddMedicineModalState extends State<_AddMedicineModal> {
                             Switch(
                               value: _isControlled,
                               onChanged: (v) => setState(() => _isControlled = v),
-                              activeColor: const Color(0xFF8B5CF6),
+                              activeThumbColor: const Color(0xFF8B5CF6),
                             ),
                           ],
                         ),

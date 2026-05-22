@@ -199,7 +199,7 @@ class ErrorHandlingService {
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: const Color(0xFFEF4444).withOpacity(0.1),
+                color: const Color(0xFFEF4444).withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: const Icon(Icons.error_outline, color: Color(0xFFEF4444)),

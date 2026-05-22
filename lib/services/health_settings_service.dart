@@ -1,7 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:icare/utils/api_constants.dart';
 import 'package:icare/utils/shared_pref.dart';
-import 'package:icare/models/user_health_settings.dart';
 
 class HealthSettingsService {
   final Dio _dio = Dio(BaseOptions(baseUrl: ApiConstants.baseUrl));

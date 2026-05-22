@@ -1,13 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_size_matters/flutter_size_matters.dart';
-import 'package:flutter_steps/flutter_steps.dart';
 import 'package:icare/utils/imagePaths.dart';
 import 'package:icare/utils/theme.dart';
-import 'package:icare/utils/utils.dart';
-import 'package:icare/widgets/app_modals.dart';
 import 'package:icare/widgets/back_button.dart';
 import 'package:icare/widgets/custom_text.dart';
-import 'package:icare/widgets/svg_wrapper.dart';
 
 class TransitOrderScreen extends StatelessWidget {
   const TransitOrderScreen({super.key});
@@ -63,7 +58,7 @@ class TransitOrderScreen extends StatelessWidget {
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     colors: [
-                      const Color(0xFFF59E0B).withOpacity(0.05),
+                      const Color(0xFFF59E0B).withValues(alpha: 0.05),
                       Colors.white,
                     ],
                     begin: Alignment.topCenter,
@@ -240,7 +235,7 @@ class TransitOrderScreen extends StatelessWidget {
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 20,
             offset: const Offset(0, 8),
           ),
@@ -300,7 +295,7 @@ class TransitOrderScreen extends StatelessWidget {
                   vertical: 6,
                 ),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF59E0B).withOpacity(0.1),
+                  color: const Color(0xFFF59E0B).withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: CustomText(

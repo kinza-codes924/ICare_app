@@ -70,7 +70,7 @@ class EmptyState extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
-                color: AppColors.primaryColor.withOpacity(0.1),
+                color: AppColors.primaryColor.withValues(alpha: 0.1),
                 shape: BoxShape.circle,
               ),
               child: Icon(
@@ -145,7 +145,7 @@ class ErrorState extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
-                color: const Color(0xFFEF4444).withOpacity(0.1),
+                color: const Color(0xFFEF4444).withValues(alpha: 0.1),
                 shape: BoxShape.circle,
               ),
               child: const Icon(
@@ -215,7 +215,7 @@ class StatusBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Row(
@@ -302,7 +302,7 @@ class ConfirmationDialog extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: (isDestructive ? const Color(0xFFEF4444) : AppColors.primaryColor).withOpacity(0.1),
+              color: (isDestructive ? const Color(0xFFEF4444) : AppColors.primaryColor).withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Icon(
@@ -396,9 +396,9 @@ class InfoCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withOpacity(0.3)),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: InkWell(
         onTap: onTap,
@@ -411,7 +411,7 @@ class InfoCard extends StatelessWidget {
                 message,
                 style: TextStyle(
                   fontSize: 13,
-                  color: color.withOpacity(0.9),
+                  color: color.withValues(alpha: 0.9),
                   fontFamily: 'Gilroy-Medium',
                 ),
               ),

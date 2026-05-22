@@ -1,4 +1,3 @@
-import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -337,9 +336,9 @@ class _DoctorProfileSetupState extends ConsumerState<DoctorProfileSetup> {
                           width: 100,
                           height: 100,
                           decoration: BoxDecoration(
-                            color: AppColors.primaryColor.withOpacity(0.1),
+                            color: AppColors.primaryColor.withValues(alpha: 0.1),
                             shape: BoxShape.circle,
-                            border: Border.all(color: AppColors.primaryColor.withOpacity(0.3), width: 3),
+                            border: Border.all(color: AppColors.primaryColor.withValues(alpha: 0.3), width: 3),
                           ),
                           child: ClipOval(
                             child: _imageBytes != null
@@ -572,9 +571,9 @@ class _DoctorProfileSetupState extends ConsumerState<DoctorProfileSetup> {
                                   width: 110,
                                   height: 110,
                                   decoration: BoxDecoration(
-                                    color: AppColors.primaryColor.withOpacity(0.1),
+                                    color: AppColors.primaryColor.withValues(alpha: 0.1),
                                     shape: BoxShape.circle,
-                                    border: Border.all(color: AppColors.primaryColor.withOpacity(0.3), width: 3),
+                                    border: Border.all(color: AppColors.primaryColor.withValues(alpha: 0.3), width: 3),
                                   ),
                                   child: ClipOval(
                                     child: _imageBytes != null
@@ -778,8 +777,11 @@ class _DoctorProfileSetupState extends ConsumerState<DoctorProfileSetup> {
               label: Text(c, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: isSelected ? Colors.white : const Color(0xFF475569))),
               selected: isSelected,
               onSelected: (v) => setState(() {
-                if (v) _conditionsTreated.add(c);
-                else _conditionsTreated.remove(c);
+                if (v) {
+                  _conditionsTreated.add(c);
+                } else {
+                  _conditionsTreated.remove(c);
+                }
               }),
               selectedColor: AppColors.primaryColor,
               backgroundColor: const Color(0xFFF1F5F9),
@@ -840,8 +842,11 @@ class _DoctorProfileSetupState extends ConsumerState<DoctorProfileSetup> {
           label: Text(lang, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: isSelected ? Colors.white : const Color(0xFF475569))),
           selected: isSelected,
           onSelected: (v) => setState(() {
-            if (v) _selectedLanguages.add(lang);
-            else _selectedLanguages.remove(lang);
+            if (v) {
+              _selectedLanguages.add(lang);
+            } else {
+              _selectedLanguages.remove(lang);
+            }
           }),
           selectedColor: AppColors.primaryColor,
           backgroundColor: const Color(0xFFF1F5F9),

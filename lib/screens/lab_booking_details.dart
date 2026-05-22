@@ -21,7 +21,7 @@ class LabBookingDetails extends ConsumerWidget {
       return raw.map((r) {
         try {
           if (r is! Map) return null;
-          return LabResult.fromJson(Map<String, dynamic>.from(r as Map));
+          return LabResult.fromJson(Map<String, dynamic>.from(r));
         } catch (_) {
           return null;
         }
@@ -289,7 +289,7 @@ class LabBookingDetails extends ConsumerWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(20),
       ),
       child: Text(

@@ -2,7 +2,6 @@ import 'package:flutter/foundation.dart';
 import 'package:dio/dio.dart';
 import 'dart:convert';
 import 'api_service.dart';
-import 'api_config.dart';
 
 class UserService {
   final ApiService _apiService = ApiService();
@@ -25,7 +24,7 @@ class UserService {
         if (data is Map && data['user'] is Map) {
           userMap = Map<String, dynamic>.from(data['user'] as Map);
         } else if (data is Map && (data.containsKey('_id') || data.containsKey('id'))) {
-          userMap = Map<String, dynamic>.from(data as Map);
+          userMap = Map<String, dynamic>.from(data);
         } else {
           debugPrint("❌ Unexpected profile response format: $data");
           return {'success': false, 'message': 'Invalid profile response'};

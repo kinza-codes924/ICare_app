@@ -106,7 +106,7 @@ class _StudentDashboardState extends ConsumerState<StudentDashboard> {
                         borderRadius: BorderRadius.circular(20),
                         boxShadow: [
                           BoxShadow(
-                            color: AppColors.primaryColor.withOpacity(0.3),
+                            color: AppColors.primaryColor.withValues(alpha: 0.3),
                             blurRadius: 20,
                             offset: const Offset(0, 8),
                           ),
@@ -131,7 +131,7 @@ class _StudentDashboardState extends ConsumerState<StudentDashboard> {
                                 Text(
                                   'Continue your learning journey',
                                   style: TextStyle(
-                                    color: Colors.white.withOpacity(0.8),
+                                    color: Colors.white.withValues(alpha: 0.8),
                                     fontSize: 13,
                                   ),
                                 ),
@@ -148,10 +148,10 @@ class _StudentDashboardState extends ConsumerState<StudentDashboard> {
                                       vertical: 10,
                                     ),
                                     decoration: BoxDecoration(
-                                      color: Colors.white.withOpacity(0.2),
+                                      color: Colors.white.withValues(alpha: 0.2),
                                       borderRadius: BorderRadius.circular(30),
                                       border: Border.all(
-                                        color: Colors.white.withOpacity(0.4),
+                                        color: Colors.white.withValues(alpha: 0.4),
                                       ),
                                     ),
                                     child: const Row(
@@ -182,7 +182,7 @@ class _StudentDashboardState extends ConsumerState<StudentDashboard> {
                           Container(
                             padding: const EdgeInsets.all(16),
                             decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.15),
+                              color: Colors.white.withValues(alpha: 0.15),
                               borderRadius: BorderRadius.circular(16),
                             ),
                             child: const Icon(
@@ -320,9 +320,9 @@ class _StudentDashboardState extends ConsumerState<StudentDashboard> {
                                 as Map<String, dynamic>;
                         final progressData = enrollment['progress'];
                         int progress = 0;
-                        if (progressData is int)
+                        if (progressData is int) {
                           progress = progressData;
-                        else if (progressData is Map)
+                        } else if (progressData is Map)
                           progress = (progressData['percent'] ?? 0).toInt();
                         final status =
                             (enrollment['status'] ?? 'active') as String;
@@ -419,7 +419,7 @@ class _StudentDashboardState extends ConsumerState<StudentDashboard> {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -431,7 +431,7 @@ class _StudentDashboardState extends ConsumerState<StudentDashboard> {
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
+              color: color.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(10),
             ),
             child: Icon(icon, color: color, size: 22),
@@ -472,7 +472,7 @@ class _StudentDashboardState extends ConsumerState<StudentDashboard> {
         Container(
           padding: const EdgeInsets.all(10),
           decoration: BoxDecoration(
-            color: color.withOpacity(0.1),
+            color: color.withValues(alpha: 0.1),
             shape: BoxShape.circle,
           ),
           child: Icon(icon, color: color, size: 20),
@@ -581,7 +581,7 @@ class _StudentDashboardState extends ConsumerState<StudentDashboard> {
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.04),
+              color: Colors.black.withValues(alpha: 0.04),
               blurRadius: 10,
               offset: const Offset(0, 4),
             ),
@@ -691,7 +691,7 @@ class _StudentDashboardState extends ConsumerState<StudentDashboard> {
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: color.withOpacity(0.3),
+              color: color.withValues(alpha: 0.3),
               blurRadius: 12,
               offset: const Offset(0, 6),
             ),

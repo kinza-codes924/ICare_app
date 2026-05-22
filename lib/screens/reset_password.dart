@@ -6,7 +6,6 @@ import 'package:icare/utils/imagePaths.dart';
 import 'package:icare/utils/theme.dart';
 import 'package:icare/utils/utils.dart';
 import 'package:icare/widgets/auth_left_panel.dart';
-import 'package:icare/widgets/back_button.dart';
 import 'package:icare/widgets/custom_text.dart';
 import 'package:icare/widgets/custom_text_input.dart';
 
@@ -115,7 +114,7 @@ class _ResetPasswordState extends State<ResetPassword> {
                       borderRadius: BorderRadius.circular(28),
                       boxShadow: [
                         BoxShadow(
-                          color: const Color(0xFF0036BC).withOpacity(0.06),
+                          color: const Color(0xFF0036BC).withValues(alpha: 0.06),
                           blurRadius: 40,
                           offset: const Offset(0, 16),
                         ),
@@ -287,7 +286,7 @@ class _ResetPasswordState extends State<ResetPassword> {
         height: size,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          color: Colors.white.withOpacity(opacity),
+          color: Colors.white.withValues(alpha: opacity),
         ),
       ),
     );
@@ -300,16 +299,16 @@ class _ResetPasswordState extends State<ResetPassword> {
         Container(
           padding: const EdgeInsets.all(10),
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.12),
+            color: Colors.white.withValues(alpha: 0.12),
             borderRadius: BorderRadius.circular(12),
           ),
-          child: Icon(icon, color: Colors.white.withOpacity(0.9), size: 18),
+          child: Icon(icon, color: Colors.white.withValues(alpha: 0.9), size: 18),
         ),
         const SizedBox(width: 16),
         Text(
           text,
           style: TextStyle(
-            color: Colors.white.withOpacity(0.8),
+            color: Colors.white.withValues(alpha: 0.8),
             fontSize: 14,
             fontWeight: FontWeight.w500,
             fontFamily: "Gilroy-Medium",
@@ -328,7 +327,7 @@ class _ResetPasswordState extends State<ResetPassword> {
         child: Text(
           "© 2026 iCare Health Technologies",
           style: TextStyle(
-            color: Colors.white.withOpacity(0.35),
+            color: Colors.white.withValues(alpha: 0.35),
             fontSize: 12,
             fontWeight: FontWeight.w400,
           ),
@@ -536,7 +535,7 @@ class _ResetPasswordState extends State<ResetPassword> {
               borderRadius: BorderRadius.circular(32),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
+                  color: Colors.black.withValues(alpha: 0.1),
                   blurRadius: 24,
                   offset: const Offset(0, 8),
                 ),
@@ -554,7 +553,7 @@ class _ResetPasswordState extends State<ResetPassword> {
                     shape: BoxShape.circle,
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.green.withOpacity(0.2),
+                        color: Colors.green.withValues(alpha: 0.2),
                         blurRadius: 16,
                         offset: const Offset(0, 6),
                       ),

@@ -32,7 +32,7 @@ class _CreateReferralScreenState extends State<CreateReferralScreen> {
   List<dynamic> _specialists = [];
   List<dynamic> _medicalRecords = [];
   dynamic _selectedSpecialist;
-  List<String> _selectedRecords = [];
+  final List<String> _selectedRecords = [];
   bool _isLoading = false;
   bool _isLoadingData = true;
 

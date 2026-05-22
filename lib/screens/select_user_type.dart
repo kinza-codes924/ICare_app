@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_size_matters/flutter_size_matters.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:icare/providers/auth_provider.dart';
 import 'package:icare/screens/login.dart';
 import 'package:icare/utils/imagePaths.dart';
@@ -10,8 +9,6 @@ import 'package:icare/utils/utils.dart';
 import 'package:icare/widgets/custom_button.dart';
 import 'package:icare/widgets/custom_text.dart';
 import 'package:icare/widgets/user_type_card.dart';
-import 'package:icare/screens/tabs.dart';
-import 'package:path/path.dart';
 
 class SelectUserType extends ConsumerStatefulWidget {
   const SelectUserType({super.key});
@@ -200,7 +197,7 @@ class _SelectUserTypeState extends ConsumerState<SelectUserType> {
                       height: 300,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: Colors.white.withOpacity(0.04),
+                        color: Colors.white.withValues(alpha: 0.04),
                       ),
                     ),
                   ),
@@ -212,7 +209,7 @@ class _SelectUserTypeState extends ConsumerState<SelectUserType> {
                       height: 350,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: Colors.white.withOpacity(0.03),
+                        color: Colors.white.withValues(alpha: 0.03),
                       ),
                     ),
                   ),
@@ -230,8 +227,8 @@ class _SelectUserTypeState extends ConsumerState<SelectUserType> {
                               color: Colors.white,
                               borderRadius: BorderRadius.circular(28),
                               boxShadow: [
-                                BoxShadow(color: Colors.black.withOpacity(0.18), blurRadius: 32, spreadRadius: 0, offset: Offset(0, 8)),
-                                BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 8, spreadRadius: 0, offset: Offset(0, 2)),
+                                BoxShadow(color: Colors.black.withValues(alpha: 0.18), blurRadius: 32, spreadRadius: 0, offset: Offset(0, 8)),
+                                BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 8, spreadRadius: 0, offset: Offset(0, 2)),
                               ],
                             ),
                             child: Image.asset('assets/Asset 1.png', fit: BoxFit.contain, filterQuality: FilterQuality.high),
@@ -254,7 +251,7 @@ class _SelectUserTypeState extends ConsumerState<SelectUserType> {
                             style: TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.w700,
-                              color: Colors.white.withOpacity(0.95),
+                              color: Colors.white.withValues(alpha: 0.95),
                               fontFamily: "Gilroy-Bold",
                             ),
                           ),
@@ -265,7 +262,7 @@ class _SelectUserTypeState extends ConsumerState<SelectUserType> {
                             style: TextStyle(
                               fontSize: 15,
                               fontWeight: FontWeight.w500,
-                              color: Colors.white.withOpacity(0.75),
+                              color: Colors.white.withValues(alpha: 0.75),
                               fontFamily: "Gilroy-Medium",
                               height: 1.6,
                             ),
@@ -345,7 +342,7 @@ class _SelectUserTypeState extends ConsumerState<SelectUserType> {
                       color: Colors.white,
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.04),
+                          color: Colors.black.withValues(alpha: 0.04),
                           blurRadius: 12,
                           offset: const Offset(0, -4),
                         ),
@@ -419,12 +416,12 @@ class _SelectUserTypeState extends ConsumerState<SelectUserType> {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, color: Colors.white.withOpacity(0.9), size: 20),
+        Icon(icon, color: Colors.white.withValues(alpha: 0.9), size: 20),
         const SizedBox(width: 12),
         Text(
           text,
           style: TextStyle(
-            color: Colors.white.withOpacity(0.9),
+            color: Colors.white.withValues(alpha: 0.9),
             fontSize: 15,
             fontWeight: FontWeight.w600,
             fontFamily: "Gilroy-Medium",

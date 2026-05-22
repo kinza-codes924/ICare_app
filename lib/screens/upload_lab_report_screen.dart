@@ -188,7 +188,7 @@ class _UploadLabReportScreenState extends State<UploadLabReportScreen> {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -202,7 +202,7 @@ class _UploadLabReportScreenState extends State<UploadLabReportScreen> {
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF0B2D6E).withOpacity(0.1),
+                  color: const Color(0xFF0B2D6E).withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: const Icon(
@@ -243,7 +243,7 @@ class _UploadLabReportScreenState extends State<UploadLabReportScreen> {
       child: DottedBorder(
         options: RoundedRectDottedBorderOptions(
           radius: const Radius.circular(16),
-          color: const Color(0xFF0B2D6E).withOpacity(0.3),
+          color: const Color(0xFF0B2D6E).withValues(alpha: 0.3),
           strokeWidth: 2,
           dashPattern: const [8, 4],
         ),
@@ -252,7 +252,7 @@ class _UploadLabReportScreenState extends State<UploadLabReportScreen> {
           padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 20),
           decoration: BoxDecoration(
             color: _selectedFile != null
-                ? const Color(0xFF0B2D6E).withOpacity(0.02)
+                ? const Color(0xFF0B2D6E).withValues(alpha: 0.02)
                 : Colors.transparent,
             borderRadius: BorderRadius.circular(16),
           ),

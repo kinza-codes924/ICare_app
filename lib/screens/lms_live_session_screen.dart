@@ -67,7 +67,7 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
 
   // Polls
   final List<Map<String, dynamic>> _polls = [];
-  final Map<String, String> _votedPolls = {}; // pollId → optionId the student chose
+  final Map<String, int> _votedPolls = {}; // pollId → optionIndex the student chose
 
   // Participants + raised hands — synced with backend
   final List<Map<String, dynamic>> _participants = [];
@@ -535,15 +535,18 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
             moduleId: widget.moduleId,
           );
           if (mounted && result['success'] == true) {
+            final msg = widget.lessonId != null
+                ? 'Session saved and linked to lesson.'
+                : 'Session ended. Chat transcript saved.';
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
+              SnackBar(
                 content: Row(children: [
-                  Icon(Icons.save_rounded, color: Colors.white),
-                  SizedBox(width: 8),
-                  Text('Session saved! Video + chat added to lesson.'),
+                  const Icon(Icons.save_rounded, color: Colors.white),
+                  const SizedBox(width: 8),
+                  Expanded(child: Text(msg)),
                 ]),
                 backgroundColor: Colors.green,
-                duration: Duration(seconds: 3),
+                duration: const Duration(seconds: 3),
               ),
             );
           }
@@ -1157,19 +1160,19 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
   }
 
   Widget _buildPollCard(Map<String, dynamic> poll, int index) {
+    // Backend options are plain strings: ["Option A", "Option B", ...]
     final rawOptions = poll['options'];
     final options = (rawOptions is List)
-        ? rawOptions.map<Map<String, dynamic>>((o) => o is Map ? Map<String, dynamic>.from(o) : <String, dynamic>{}).toList()
-        : <Map<String, dynamic>>[];
-    final totalVotes = options.fold<int>(0, (s, o) {
-      final v = o['votes'];
-      if (v is int) return s + v;
-      if (v is num) return s + v.toInt();
-      return s;
-    });
+        ? rawOptions.map((o) => o.toString()).toList()
+        : <String>[];
+
+    // Vote counts come from the responses array: [{optionIndex, userId, ...}]
+    final responses = (poll['responses'] as List?) ?? [];
+    final totalVotes = responses.length;
+
     final pollId = poll['_id']?.toString() ?? poll['id']?.toString() ?? '';
-    final votedOption = _votedPolls[pollId];
-    final hasVoted = votedOption != null;
+    final votedIndex = _votedPolls[pollId]; // int?
+    final hasVoted = votedIndex != null;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -1186,28 +1189,28 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
           const SizedBox(height: 10),
           ...options.asMap().entries.map((entry) {
             final optIndex = entry.key;
-            final opt = entry.value;
-            final optId = opt['_id']?.toString() ?? opt['id']?.toString() ?? '$optIndex';
-            final votes = () {
-              final v = opt['votes'];
-              if (v is int) return v;
-              if (v is num) return v.toInt();
-              return 0;
-            }();
+            final optText = entry.value;
+            final votes = responses.where((r) {
+              if (r is! Map) return false;
+              final ri = r['optionIndex'];
+              if (ri is int) return ri == optIndex;
+              if (ri is num) return ri.toInt() == optIndex;
+              return false;
+            }).length;
             final pct = totalVotes > 0 ? votes / totalVotes : 0.0;
-            final isMyVote = votedOption == optId;
+            final isMyVote = votedIndex == optIndex;
 
             return Padding(
               padding: const EdgeInsets.only(bottom: 8),
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                // Student can vote if not yet voted; instructor sees results
+                // Student can tap to vote if not voted yet; instructor always sees results
                 if (!widget.isInstructor && !hasVoted)
                   GestureDetector(
                     onTap: () async {
                       if (pollId.isNotEmpty) {
-                        setState(() => _votedPolls[pollId] = optId);
+                        setState(() => _votedPolls[pollId] = optIndex);
                         try {
-                          await _lms.respondToPoll(pollId: pollId, optionId: optId);
+                          await _lms.respondToPoll(pollId: pollId, optionIndex: optIndex);
                         } catch (_) {}
                       }
                     },
@@ -1219,13 +1222,16 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
                         borderRadius: BorderRadius.circular(8),
                         border: Border.all(color: Colors.white24),
                       ),
-                      child: Text(opt['text'] ?? '', style: const TextStyle(color: Colors.white, fontSize: 12)),
+                      child: Text(optText, style: const TextStyle(color: Colors.white, fontSize: 12)),
                     ),
                   )
                 else ...[
                   Row(children: [
-                    Expanded(child: Text(opt['text'] ?? '', style: TextStyle(color: isMyVote ? AppColors.primaryColor : Colors.white70, fontSize: 12))),
+                    Expanded(child: Text(optText, style: TextStyle(
+                        color: isMyVote ? AppColors.primaryColor : Colors.white70, fontSize: 12))),
                     if (isMyVote) const Icon(Icons.check_circle_rounded, color: AppColors.primaryColor, size: 14),
+                    const SizedBox(width: 4),
+                    Text('$votes', style: const TextStyle(color: Colors.white54, fontSize: 11)),
                   ]),
                   const SizedBox(height: 4),
                   Row(children: [
@@ -1235,7 +1241,8 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
                         child: LinearProgressIndicator(
                           value: pct,
                           backgroundColor: Colors.white24,
-                          valueColor: AlwaysStoppedAnimation(isMyVote ? AppColors.primaryColor : Colors.blueGrey),
+                          valueColor: AlwaysStoppedAnimation(
+                              isMyVote ? AppColors.primaryColor : Colors.blueGrey),
                           minHeight: 8,
                         ),
                       ),
@@ -1320,7 +1327,8 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
                 this.setState(() {
                   _polls.add({
                     'question': questionCtrl.text,
-                    'options': options.map((o) => {'text': o, 'votes': 0}).toList(),
+                    'options': options,
+                    'responses': [],
                   });
                 });
                 _panelTab.animateTo(2);

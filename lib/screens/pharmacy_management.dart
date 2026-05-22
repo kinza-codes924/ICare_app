@@ -4,7 +4,6 @@ import 'package:icare/models/app_enums.dart';
 import 'package:icare/screens/cancelled_orders.dart';
 import 'package:icare/screens/delievered_order.dart';
 import 'package:icare/screens/filters.dart';
-import 'package:icare/screens/my_orders.dart';
 import 'package:icare/screens/recieved_orders.dart';
 import 'package:icare/screens/transit_order.dart';
 import 'package:icare/utils/imagePaths.dart';
@@ -162,7 +161,7 @@ class PharmacyManagementScreen extends StatelessWidget {
               height: 400,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: AppColors.primaryColor.withOpacity(0.03),
+                color: AppColors.primaryColor.withValues(alpha: 0.03),
               ),
             ),
           ),
@@ -182,7 +181,7 @@ class PharmacyManagementScreen extends StatelessWidget {
                         gradient: LinearGradient(
                           colors: [
                             AppColors.primaryColor,
-                            AppColors.primaryColor.withOpacity(0.8),
+                            AppColors.primaryColor.withValues(alpha: 0.8),
                           ],
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
@@ -190,7 +189,7 @@ class PharmacyManagementScreen extends StatelessWidget {
                         borderRadius: BorderRadius.circular(20),
                         boxShadow: [
                           BoxShadow(
-                            color: AppColors.primaryColor.withOpacity(0.2),
+                            color: AppColors.primaryColor.withValues(alpha: 0.2),
                             blurRadius: 20,
                             offset: const Offset(0, 10),
                           ),
@@ -233,7 +232,7 @@ class PharmacyManagementScreen extends StatelessWidget {
                         borderRadius: BorderRadius.circular(16),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.04),
+                            color: Colors.black.withValues(alpha: 0.04),
                             blurRadius: 15,
                             offset: const Offset(0, 4),
                           ),
@@ -404,7 +403,7 @@ class PharmacyManagementScreen extends StatelessWidget {
                             borderRadius: BorderRadius.circular(14),
                             boxShadow: [
                               BoxShadow(
-                                color: const Color(0xFF0F172A).withOpacity(0.2),
+                                color: const Color(0xFF0F172A).withValues(alpha: 0.2),
                                 blurRadius: 15,
                                 offset: const Offset(0, 6),
                               ),
@@ -441,7 +440,7 @@ class PharmacyManagementScreen extends StatelessWidget {
                     borderRadius: BorderRadius.circular(32),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.02),
+                        color: Colors.black.withValues(alpha: 0.02),
                         blurRadius: 30,
                         offset: const Offset(0, 10),
                       ),
@@ -495,12 +494,12 @@ class PharmacyManagementScreen extends StatelessWidget {
             borderRadius: BorderRadius.circular(28),
             boxShadow: [
               BoxShadow(
-                color: color.withOpacity(0.08),
+                color: color.withValues(alpha: 0.08),
                 blurRadius: 30,
                 offset: const Offset(0, 15),
               ),
               BoxShadow(
-                color: Colors.black.withOpacity(0.02),
+                color: Colors.black.withValues(alpha: 0.02),
                 blurRadius: 10,
                 offset: const Offset(0, 4),
               ),
@@ -516,7 +515,7 @@ class PharmacyManagementScreen extends StatelessWidget {
                   child: Icon(
                     stat['icon'],
                     size: 140,
-                    color: color.withOpacity(0.03),
+                    color: color.withValues(alpha: 0.03),
                   ),
                 ),
                 // Content
@@ -536,7 +535,7 @@ class PharmacyManagementScreen extends StatelessWidget {
                           Container(
                             padding: const EdgeInsets.all(12),
                             decoration: BoxDecoration(
-                              color: color.withOpacity(0.12),
+                              color: color.withValues(alpha: 0.12),
                               borderRadius: BorderRadius.circular(16),
                             ),
                             child: Icon(stat['icon'], color: color, size: 24),
@@ -570,7 +569,7 @@ class PharmacyManagementScreen extends StatelessWidget {
                         shaderCallback: (bounds) => LinearGradient(
                           colors: [
                             const Color(0xFF0F172A),
-                            const Color(0xFF0F172A).withOpacity(0.7),
+                            const Color(0xFF0F172A).withValues(alpha: 0.7),
                           ],
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
@@ -595,7 +594,7 @@ class PharmacyManagementScreen extends StatelessWidget {
                           const Spacer(),
                           Icon(
                             Icons.arrow_right_alt_rounded,
-                            color: color.withOpacity(0.4),
+                            color: color.withValues(alpha: 0.4),
                             size: 18,
                           ),
                         ],

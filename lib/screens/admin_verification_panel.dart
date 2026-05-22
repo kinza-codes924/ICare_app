@@ -19,7 +19,7 @@ class _AdminVerificationPanelState extends State<AdminVerificationPanel>
   List<dynamic> _pendingVerifications = [];
   List<dynamic> _allVerifications = [];
   bool _isLoading = true;
-  String _selectedFilter = 'pending';
+  final String _selectedFilter = 'pending';
 
   @override
   void initState() {
@@ -298,7 +298,7 @@ class _VerificationCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.06),
+            color: Colors.black.withValues(alpha: 0.06),
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),
@@ -311,7 +311,7 @@ class _VerificationCard extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: statusColor.withOpacity(0.1),
+              color: statusColor.withValues(alpha: 0.1),
               borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
             ),
             child: Row(
@@ -437,7 +437,7 @@ class _VerificationCard extends StatelessWidget {
                       ],
                     ),
                   );
-                }).toList(),
+                }),
               ],
             ),
           ),
@@ -493,7 +493,7 @@ class _VerificationCard extends StatelessWidget {
               child: Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.red.withOpacity(0.1),
+                  color: Colors.red.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Row(

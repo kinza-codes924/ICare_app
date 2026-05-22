@@ -142,7 +142,7 @@ class _ClinicalAuditDashboardScreenState extends ConsumerState<ClinicalAuditDash
             gradient: LinearGradient(
               colors: [
                 AppColors.primaryColor,
-                AppColors.primaryColor.withOpacity(0.8),
+                AppColors.primaryColor.withValues(alpha: 0.8),
               ],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
@@ -413,7 +413,7 @@ class _ClinicalAuditDashboardScreenState extends ConsumerState<ClinicalAuditDash
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
+              color: color.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Icon(icon, color: color, size: 24),
@@ -521,8 +521,8 @@ class _ClinicalAuditDashboardScreenState extends ConsumerState<ClinicalAuditDash
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 colors: [
-                  AppColors.primaryColor.withOpacity(0.05),
-                  AppColors.primaryColor.withOpacity(0.02),
+                  AppColors.primaryColor.withValues(alpha: 0.05),
+                  AppColors.primaryColor.withValues(alpha: 0.02),
                 ],
               ),
               borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
@@ -543,7 +543,7 @@ class _ClinicalAuditDashboardScreenState extends ConsumerState<ClinicalAuditDash
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
-                    color: _getScoreColor(score).withOpacity(0.1),
+                    color: _getScoreColor(score).withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
@@ -614,7 +614,7 @@ class _ClinicalAuditDashboardScreenState extends ConsumerState<ClinicalAuditDash
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: color.withOpacity(0.3), width: 2),
+        border: Border.all(color: color.withValues(alpha: 0.3), width: 2),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -624,7 +624,7 @@ class _ClinicalAuditDashboardScreenState extends ConsumerState<ClinicalAuditDash
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: color.withOpacity(0.1),
+                  color: color.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Icon(Icons.flag, color: color, size: 20),
@@ -654,7 +654,7 @@ class _ClinicalAuditDashboardScreenState extends ConsumerState<ClinicalAuditDash
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
-                  color: color.withOpacity(0.1),
+                  color: color.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(

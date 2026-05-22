@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:dio/dio.dart';
 import '../utils/shared_pref.dart';
 import 'api_service.dart';
@@ -21,21 +20,23 @@ class AuthService {
     required String password,
     required String role,
     String? phoneNumber,
+    String? gender,
+    String? dateOfBirth,
   }) async {
     try {
       Response? response;
       for (int attempt = 1; attempt <= 3; attempt++) {
         try {
-          response = await _apiService.post(
-            ApiConfig.register,
-            {
-              'name': name,
-              'email': email,
-              'password': password,
-              'role': _capitalizeRole(role),
-              'phone': phoneNumber ?? '',
-            },
-          );
+          final body = <String, dynamic>{
+            'name': name,
+            'email': email,
+            'password': password,
+            'role': _capitalizeRole(role),
+            'phone': phoneNumber ?? '',
+          };
+          if (gender != null) body['gender'] = gender;
+          if (dateOfBirth != null) body['dateOfBirth'] = dateOfBirth;
+          response = await _apiService.post(ApiConfig.register, body);
           break;
         } on DioException catch (e) {
           if (attempt == 3 || !_isNetworkError(e)) rethrow;

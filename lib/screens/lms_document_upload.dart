@@ -25,7 +25,7 @@ class _LmsDocumentUploadState extends State<LmsDocumentUpload> {
   
   final List<Map<String, dynamic>> _documents = [];
   bool _isUploading = false;
-  bool _canSkip = true; // Allow skip for now, can be made mandatory later
+  final bool _canSkip = true; // Allow skip for now, can be made mandatory later
 
   final List<String> _documentTypes = [
     'ID Card',
@@ -186,12 +186,12 @@ class _LmsDocumentUploadState extends State<LmsDocumentUpload> {
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
-            const Color(0xFF6366F1).withOpacity(0.1),
-            const Color(0xFF8B5CF6).withOpacity(0.1),
+            const Color(0xFF6366F1).withValues(alpha: 0.1),
+            const Color(0xFF8B5CF6).withValues(alpha: 0.1),
           ],
         ),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFF6366F1).withOpacity(0.3)),
+        border: Border.all(color: const Color(0xFF6366F1).withValues(alpha: 0.3)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -236,7 +236,7 @@ class _LmsDocumentUploadState extends State<LmsDocumentUpload> {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: const Color(0xFF10B981).withOpacity(0.1),
+              color: const Color(0xFF10B981).withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(8),
             ),
             child: const Row(
@@ -305,7 +305,7 @@ class _LmsDocumentUploadState extends State<LmsDocumentUpload> {
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF6366F1).withOpacity(0.1),
+                  color: const Color(0xFF6366F1).withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: const Icon(

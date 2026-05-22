@@ -34,7 +34,7 @@ class _StudentLmsDashboardState extends State<StudentLmsDashboard>
   // Global live session detector
   Timer? _globalLivePoller;
   Map<String, dynamic>? _activeLiveSession;
-  bool _liveDialogShown = false;
+  final bool _liveDialogShown = false;
   final Set<String> _shownSessions = {}; // never re-show for same courseId
 
   static const List<Color> _classColors = [
@@ -292,7 +292,7 @@ class _StudentLmsDashboardState extends State<StudentLmsDashboard>
             margin: const EdgeInsets.only(right: 12),
             child: CircleAvatar(
               radius: 16,
-              backgroundColor: AppColors.primaryColor.withOpacity(0.1),
+              backgroundColor: AppColors.primaryColor.withValues(alpha: 0.1),
               child: Text(
                 _userName.isNotEmpty ? _userName[0].toUpperCase() : 'S',
                 style: TextStyle(
@@ -359,8 +359,8 @@ class _StudentLmsDashboardState extends State<StudentLmsDashboard>
           MaterialPageRoute(builder: (_) => const LmsPublicCatalog()),
         ),
         backgroundColor: AppColors.primaryColor,
-        child: const Icon(Icons.add_rounded, color: Colors.white),
         tooltip: 'Browse Courses',
+        child: const Icon(Icons.add_rounded, color: Colors.white),
       ),
       body: TabBarView(
         controller: _tabController,
@@ -448,8 +448,8 @@ class _StudentLmsDashboardState extends State<StudentLmsDashboard>
           borderRadius: BorderRadius.circular(8),
           border: Border.all(color: isLive ? Colors.red : const Color(0xFFE2E8F0), width: isLive ? 2 : 1),
           boxShadow: isLive
-              ? [BoxShadow(color: Colors.red.withOpacity(0.3), blurRadius: 12, offset: const Offset(0, 4))]
-              : [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 6, offset: const Offset(0, 2))],
+              ? [BoxShadow(color: Colors.red.withValues(alpha: 0.3), blurRadius: 12, offset: const Offset(0, 4))]
+              : [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 6, offset: const Offset(0, 2))],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -499,7 +499,7 @@ class _StudentLmsDashboardState extends State<StudentLmsDashboard>
                       Container(
                         padding: const EdgeInsets.all(6),
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.2),
+                          color: Colors.white.withValues(alpha: 0.2),
                           shape: BoxShape.circle,
                         ),
                         child: const Icon(Icons.menu_book_rounded,
@@ -526,7 +526,7 @@ class _StudentLmsDashboardState extends State<StudentLmsDashboard>
                 children: [
                   CircleAvatar(
                     radius: 14,
-                    backgroundColor: color.withOpacity(0.15),
+                    backgroundColor: color.withValues(alpha: 0.15),
                     child: Text(
                       instructor.isNotEmpty ? instructor[0].toUpperCase() : 'I',
                       style: TextStyle(
@@ -868,7 +868,7 @@ class _StudentLmsDashboardState extends State<StudentLmsDashboard>
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: color.withOpacity(0.1),
+                color: color.withValues(alpha: 0.1),
                 shape: BoxShape.circle,
               ),
               child: Icon(

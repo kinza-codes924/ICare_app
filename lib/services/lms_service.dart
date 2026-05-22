@@ -423,7 +423,7 @@ class LmsService {
 
   Future<List<dynamic>> getLiveSessionPolls(String sessionId) async {
     try {
-      final response = await _api.get('/live-session-polls/$sessionId');
+      final response = await _api.get('/live-session-polls/session/$sessionId');
       return response.data['polls'] ?? [];
     } catch (e) {
       return [];
@@ -450,11 +450,11 @@ class LmsService {
 
   Future<Map<String, dynamic>> respondToPoll({
     required String pollId,
-    required String optionId,
+    required int optionIndex,
   }) async {
     try {
       final response = await _api.post('/live-session-polls/$pollId/respond', {
-        'optionId': optionId,
+        'optionIndex': optionIndex,
       });
       return response.data ?? {'success': true};
     } catch (e) {

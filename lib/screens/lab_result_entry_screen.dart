@@ -50,7 +50,9 @@ class _LabResultEntryScreenState extends State<LabResultEntryScreen>
     _tabController.dispose();
     _notesController.dispose();
     for (final p in _parameters) {
-      p.values.forEach((c) => c.dispose());
+      for (var c in p.values) {
+        c.dispose();
+      }
     }
     super.dispose();
   }
@@ -68,7 +70,9 @@ class _LabResultEntryScreenState extends State<LabResultEntryScreen>
 
   void _removeParameter(int index) {
     if (_parameters.length <= 1) return;
-    _parameters[index].values.forEach((c) => c.dispose());
+    for (var c in _parameters[index].values) {
+      c.dispose();
+    }
     setState(() => _parameters.removeAt(index));
   }
 
@@ -226,13 +230,13 @@ class _LabResultEntryScreenState extends State<LabResultEntryScreen>
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: const Color(0xFFE8ECF5), width: 1.5),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 10, offset: const Offset(0, 4))],
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 10, offset: const Offset(0, 4))],
       ),
       child: Row(
         children: [
           Container(
             padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(color: primaryColor.withOpacity(0.1), borderRadius: BorderRadius.circular(12)),
+            decoration: BoxDecoration(color: primaryColor.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12)),
             child: const Icon(Icons.biotech_rounded, color: primaryColor, size: 28),
           ),
           const SizedBox(width: 14),
@@ -255,7 +259,7 @@ class _LabResultEntryScreenState extends State<LabResultEntryScreen>
           ),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-            decoration: BoxDecoration(color: statusColor.withOpacity(0.1), borderRadius: BorderRadius.circular(20)),
+            decoration: BoxDecoration(color: statusColor.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(20)),
             child: Text(status.toUpperCase(), style: TextStyle(color: statusColor, fontSize: 11, fontWeight: FontWeight.bold)),
           ),
         ],
@@ -349,9 +353,9 @@ class _LabResultEntryScreenState extends State<LabResultEntryScreen>
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: primaryColor.withOpacity(0.05),
+                color: primaryColor.withValues(alpha: 0.05),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: primaryColor.withOpacity(0.2)),
+                border: Border.all(color: primaryColor.withValues(alpha: 0.2)),
               ),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -487,7 +491,7 @@ class _LabResultEntryScreenState extends State<LabResultEntryScreen>
               width: double.infinity,
               padding: const EdgeInsets.symmetric(vertical: 32),
               decoration: BoxDecoration(
-                color: _selectedFile != null ? primaryColor.withOpacity(0.05) : const Color(0xFFF8FAFC),
+                color: _selectedFile != null ? primaryColor.withValues(alpha: 0.05) : const Color(0xFFF8FAFC),
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(
                   color: _selectedFile != null ? primaryColor : const Color(0xFFCBD5E1),
@@ -590,9 +594,9 @@ class _LabResultEntryScreenState extends State<LabResultEntryScreen>
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: primaryColor.withOpacity(0.05),
+                color: primaryColor.withValues(alpha: 0.05),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: primaryColor.withOpacity(0.2)),
+                border: Border.all(color: primaryColor.withValues(alpha: 0.2)),
               ),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,

@@ -8,7 +8,6 @@ import 'package:icare/utils/theme.dart';
 import 'package:icare/utils/utils.dart';
 import 'package:icare/widgets/back_button.dart';
 import 'package:icare/widgets/custom_button.dart';
-import 'package:icare/widgets/custom_check_box.dart';
 import 'package:icare/widgets/custom_text.dart';
 import 'package:icare/widgets/custom_text_input.dart';
 import 'package:intl/intl.dart';
@@ -473,7 +472,7 @@ class _FillLabFormState extends State<FillLabForm> {
                     borderRadius: BorderRadius.circular(32),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.03),
+                        color: Colors.black.withValues(alpha: 0.03),
                         blurRadius: 50,
                         offset: const Offset(0, 20),
                       ),

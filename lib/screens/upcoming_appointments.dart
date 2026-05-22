@@ -134,7 +134,7 @@ class _UpcomingAppointmentsState extends State<UpcomingAppointments> {
               color: Colors.white,
               boxShadow: [
                 BoxShadow(
-                  color: const Color(0xFF0F172A).withOpacity(0.04),
+                  color: const Color(0xFF0F172A).withValues(alpha: 0.04),
                   blurRadius: 20,
                   offset: const Offset(0, 4),
                 ),
@@ -190,7 +190,7 @@ class _UpcomingAppointmentsState extends State<UpcomingAppointments> {
                             vertical: 8,
                           ),
                           decoration: BoxDecoration(
-                            color: AppColors.primaryColor.withOpacity(0.06),
+                            color: AppColors.primaryColor.withValues(alpha: 0.06),
                             borderRadius: BorderRadius.circular(20),
                           ),
                           child: Row(
@@ -240,13 +240,13 @@ class _UpcomingAppointmentsState extends State<UpcomingAppointments> {
                                   color: isSelected
                                       ? AppColors.primaryColor
                                       : isToday
-                                      ? AppColors.primaryColor.withOpacity(0.06)
+                                      ? AppColors.primaryColor.withValues(alpha: 0.06)
                                       : const Color(0xFFF8FAFC),
                                   borderRadius: BorderRadius.circular(16),
                                   border: isToday && !isSelected
                                       ? Border.all(
                                           color: AppColors.primaryColor
-                                              .withOpacity(0.2),
+                                              .withValues(alpha: 0.2),
                                           width: 1.5,
                                         )
                                       : null,
@@ -254,7 +254,7 @@ class _UpcomingAppointmentsState extends State<UpcomingAppointments> {
                                       ? [
                                           BoxShadow(
                                             color: AppColors.primaryColor
-                                                .withOpacity(0.25),
+                                                .withValues(alpha: 0.25),
                                             blurRadius: 12,
                                             offset: const Offset(0, 4),
                                           ),
@@ -283,7 +283,7 @@ class _UpcomingAppointmentsState extends State<UpcomingAppointments> {
                                         fontSize: 12,
                                         fontWeight: FontWeight.w500,
                                         color: isSelected
-                                            ? Colors.white.withOpacity(0.7)
+                                            ? Colors.white.withValues(alpha: 0.7)
                                             : const Color(0xFF94A3B8),
                                       ),
                                     ),

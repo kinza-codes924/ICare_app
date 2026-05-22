@@ -18,10 +18,10 @@ class StartConsultationButton extends StatelessWidget {
   final bool isDoctor;
 
   const StartConsultationButton({
-    Key? key,
+    super.key,
     required this.appointment,
     required this.isDoctor,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -262,9 +262,9 @@ class DoctorConsultationButton extends StatelessWidget {
   final AppointmentDetail appointment;
 
   const DoctorConsultationButton({
-    Key? key,
+    super.key,
     required this.appointment,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -339,9 +339,9 @@ class PatientJoinConsultationButton extends StatelessWidget {
   final AppointmentDetail appointment;
 
   const PatientJoinConsultationButton({
-    Key? key,
+    super.key,
     required this.appointment,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

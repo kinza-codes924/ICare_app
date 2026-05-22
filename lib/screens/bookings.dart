@@ -4,7 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_size_matters/flutter_size_matters.dart';
 import 'package:icare/models/appointment_detail.dart';
 import 'package:icare/screens/booking_categories.dart';
-import 'package:icare/screens/video_call.dart';
 import 'package:icare/screens/consultation_chat_screen_v2.dart';
 import 'package:icare/services/appointment_service.dart';
 import 'package:icare/services/consultation_service.dart';
@@ -220,7 +219,7 @@ class _BookingsScreenState extends ConsumerState<BookingsScreen> {
         "subtitle": "Currently active appointments",
         "icon": Icons.play_circle_outline_rounded,
         "color": const Color(0xFF8B5CF6),
-        "bgColor": const Color(0xFF8B5CF6).withOpacity(0.08),
+        "bgColor": const Color(0xFF8B5CF6).withValues(alpha: 0.08),
         "count": _getCount('In Progress').toString(),
         "image": ImagePaths.inProgress,
         "onPressed": () async {
@@ -243,7 +242,7 @@ class _BookingsScreenState extends ConsumerState<BookingsScreen> {
         "subtitle": "Confirmed & scheduled",
         "icon": Icons.schedule_rounded,
         "color": const Color(0xFF14B1FF),
-        "bgColor": const Color(0xFF14B1FF).withOpacity(0.08),
+        "bgColor": const Color(0xFF14B1FF).withValues(alpha: 0.08),
         "count": _appointments.where((a) => a.status.toLowerCase() == 'confirmed').length.toString(),
         "image": ImagePaths.upcoming,
         "onPressed": () {
@@ -263,7 +262,7 @@ class _BookingsScreenState extends ConsumerState<BookingsScreen> {
         "subtitle": "Awaiting confirmation",
         "icon": Icons.hourglass_empty_rounded,
         "color": const Color(0xFFF59E0B),
-        "bgColor": const Color(0xFFF59E0B).withOpacity(0.08),
+        "bgColor": const Color(0xFFF59E0B).withValues(alpha: 0.08),
         "count": _appointments.where((a) => a.status.toLowerCase() == 'pending').length.toString(),
         "image": ImagePaths.pending,
         "onPressed": () {
@@ -283,7 +282,7 @@ class _BookingsScreenState extends ConsumerState<BookingsScreen> {
         "subtitle": "Past successful visits",
         "icon": Icons.check_circle_outline_rounded,
         "color": const Color(0xFF22C55E),
-        "bgColor": const Color(0xFF22C55E).withOpacity(0.08),
+        "bgColor": const Color(0xFF22C55E).withValues(alpha: 0.08),
         "count": _getCount('Completed').toString(),
         "image": ImagePaths.completed,
         "onPressed": () {
@@ -303,7 +302,7 @@ class _BookingsScreenState extends ConsumerState<BookingsScreen> {
         "subtitle": "Appointments you cancelled",
         "icon": Icons.cancel_outlined,
         "color": const Color(0xFFEF4444),
-        "bgColor": const Color(0xFFEF4444).withOpacity(0.08),
+        "bgColor": const Color(0xFFEF4444).withValues(alpha: 0.08),
         "count": _getCount('Cancelled').toString(),
         "image": ImagePaths.cancelled,
         "onPressed": () {
@@ -443,7 +442,7 @@ class _BookingsScreenState extends ConsumerState<BookingsScreen> {
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: const Color(0xFF0F172A).withOpacity(0.15),
+                    color: const Color(0xFF0F172A).withValues(alpha: 0.15),
                     blurRadius: 30,
                     offset: const Offset(0, 10),
                   ),
@@ -464,7 +463,7 @@ class _BookingsScreenState extends ConsumerState<BookingsScreen> {
                               child: Container(
                                 padding: const EdgeInsets.all(10),
                                 decoration: BoxDecoration(
-                                  color: Colors.white.withOpacity(0.1),
+                                  color: Colors.white.withValues(alpha: 0.1),
                                   borderRadius: BorderRadius.circular(14),
                                 ),
                                 child: const Icon(
@@ -479,7 +478,7 @@ class _BookingsScreenState extends ConsumerState<BookingsScreen> {
                       Container(
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.08),
+                          color: Colors.white.withValues(alpha: 0.08),
                           borderRadius: BorderRadius.circular(20),
                         ),
                         child: const Icon(
@@ -501,7 +500,7 @@ class _BookingsScreenState extends ConsumerState<BookingsScreen> {
                         text:
                             "Stay on top of your schedule with real-time updates",
                         fontSize: 15,
-                        color: Colors.white.withOpacity(0.6),
+                        color: Colors.white.withValues(alpha: 0.6),
                         fontWeight: FontWeight.w400,
                         textAlign: TextAlign.center,
                       ),
@@ -570,9 +569,9 @@ class _BookingsScreenState extends ConsumerState<BookingsScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(50),
-        border: Border.all(color: color.withOpacity(0.15), width: 1),
+        border: Border.all(color: color.withValues(alpha: 0.15), width: 1),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -593,7 +592,7 @@ class _BookingsScreenState extends ConsumerState<BookingsScreen> {
               fontFamily: "Gilroy",
               fontSize: 13,
               fontWeight: FontWeight.w500,
-              color: color.withOpacity(0.7),
+              color: color.withValues(alpha: 0.7),
             ),
           ),
         ],
@@ -692,15 +691,15 @@ class _PremiumBookingCardState extends State<_PremiumBookingCard> {
             borderRadius: BorderRadius.circular(20),
             border: Border.all(
               color: _isHovered
-                  ? widget.color.withOpacity(0.25)
+                  ? widget.color.withValues(alpha: 0.25)
                   : const Color(0xFFE2E8F0),
               width: 1.5,
             ),
             boxShadow: [
               BoxShadow(
                 color: _isHovered
-                    ? widget.color.withOpacity(0.08)
-                    : const Color(0xFF0F172A).withOpacity(0.03),
+                    ? widget.color.withValues(alpha: 0.08)
+                    : const Color(0xFF0F172A).withValues(alpha: 0.03),
                 blurRadius: _isHovered ? 24 : 12,
                 offset: const Offset(0, 6),
               ),
@@ -777,7 +776,7 @@ class _PremiumBookingCardState extends State<_PremiumBookingCard> {
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
                   color: _isHovered
-                      ? widget.color.withOpacity(0.1)
+                      ? widget.color.withValues(alpha: 0.1)
                       : const Color(0xFFF1F5F9),
                   borderRadius: BorderRadius.circular(10),
                 ),
@@ -877,7 +876,7 @@ class InProgressConsultationsScreen extends StatelessWidget {
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 12, vertical: 6),
                             decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.15),
+                              color: Colors.white.withValues(alpha: 0.15),
                               borderRadius: BorderRadius.circular(20),
                             ),
                             child: Row(
@@ -921,7 +920,7 @@ class InProgressConsultationsScreen extends StatelessWidget {
                         Container(
                           padding: const EdgeInsets.all(24),
                           decoration: BoxDecoration(
-                            color: const Color(0xFF8B5CF6).withOpacity(0.1),
+                            color: const Color(0xFF8B5CF6).withValues(alpha: 0.1),
                             shape: BoxShape.circle,
                           ),
                           child: const Icon(Icons.video_call_rounded,
@@ -958,12 +957,12 @@ class InProgressConsultationsScreen extends StatelessWidget {
                             color: const Color(0xFFFFF5F5),
                             borderRadius: BorderRadius.circular(16),
                             border: Border.all(
-                              color: Colors.red.withOpacity(0.4),
+                              color: Colors.red.withValues(alpha: 0.4),
                               width: 2,
                             ),
                             boxShadow: [
                               BoxShadow(
-                                color: Colors.red.withOpacity(0.08),
+                                color: Colors.red.withValues(alpha: 0.08),
                                 blurRadius: 16,
                                 offset: const Offset(0, 4),
                               ),
@@ -981,7 +980,7 @@ class InProgressConsultationsScreen extends StatelessWidget {
                                       padding: const EdgeInsets.symmetric(
                                           horizontal: 10, vertical: 4),
                                       decoration: BoxDecoration(
-                                        color: Colors.red.withOpacity(0.1),
+                                        color: Colors.red.withValues(alpha: 0.1),
                                         borderRadius:
                                             BorderRadius.circular(20),
                                       ),
@@ -1027,7 +1026,7 @@ class InProgressConsultationsScreen extends StatelessWidget {
                                     CircleAvatar(
                                       radius: 22,
                                       backgroundColor:
-                                          Colors.red.withOpacity(0.1),
+                                          Colors.red.withValues(alpha: 0.1),
                                       child: Text(
                                         appt.doctorName.isNotEmpty
                                             ? appt.doctorName[0].toUpperCase()
@@ -1058,7 +1057,7 @@ class InProgressConsultationsScreen extends StatelessWidget {
                                             style: TextStyle(
                                                 fontSize: 12,
                                                 color: Colors.red
-                                                    .withOpacity(0.7)),
+                                                    .withValues(alpha: 0.7)),
                                           ),
                                         ],
                                       ),

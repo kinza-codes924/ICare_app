@@ -694,7 +694,7 @@ class _BookAppointmentScreenState extends ConsumerState<BookAppointmentScreen> {
                         _isEmergency = v;
                         if (v) _selectedSlot = null;
                       }),
-                      activeColor: const Color(0xFFDC2626),
+                      activeThumbColor: const Color(0xFFDC2626),
                     ),
                   ),
                 ]),

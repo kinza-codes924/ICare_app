@@ -34,8 +34,8 @@ class _LifestyleTrackerScreenState extends State<LifestyleTrackerScreen>
   String _mealQuality = 'Good';
 
   // Medication
-  bool _medicationTaken = true;
-  bool _missedDose = false;
+  final bool _medicationTaken = true;
+  final bool _missedDose = false;
 
   // Condition-specific
   String _conditionMode = 'General Wellness';
@@ -553,7 +553,7 @@ class _LifestyleTrackerScreenState extends State<LifestyleTrackerScreen>
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
                         color: m == _selectedMood
-                            ? AppColors.primaryColor.withOpacity(0.12)
+                            ? AppColors.primaryColor.withValues(alpha: 0.12)
                             : Colors.grey.shade100,
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
@@ -601,7 +601,7 @@ class _LifestyleTrackerScreenState extends State<LifestyleTrackerScreen>
             decoration: BoxDecoration(
               color: const Color(0xFFFEF3C7),
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: const Color(0xFFF59E0B).withOpacity(0.4)),
+              border: Border.all(color: const Color(0xFFF59E0B).withValues(alpha: 0.4)),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
@@ -1047,7 +1047,7 @@ class _LifestyleTrackerScreenState extends State<LifestyleTrackerScreen>
         border: Border.all(color: const Color(0xFFE2E8F0)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.03),
+            color: Colors.black.withValues(alpha: 0.03),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -1282,7 +1282,7 @@ class _LifestyleTrackerScreenState extends State<LifestyleTrackerScreen>
         decoration: BoxDecoration(
           color: bg,
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: Colors.black.withOpacity(0.05)),
+          border: Border.all(color: Colors.black.withValues(alpha: 0.05)),
         ),
         child: Column(
           children: [
@@ -1336,7 +1336,7 @@ class _LifestyleTrackerScreenState extends State<LifestyleTrackerScreen>
           border: Border.all(color: const Color(0xFFE2E8F0)),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.03),
+              color: Colors.black.withValues(alpha: 0.03),
               blurRadius: 8,
               offset: const Offset(0, 2),
             ),
@@ -1385,7 +1385,7 @@ class _LifestyleTrackerScreenState extends State<LifestyleTrackerScreen>
                     padding:
                         const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                     decoration: BoxDecoration(
-                      color: statusColor.withOpacity(0.1),
+                      color: statusColor.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(status,
@@ -1842,7 +1842,7 @@ class _LifestyleTrackerScreenState extends State<LifestyleTrackerScreen>
           ),
           Switch(
             value: med.taken,
-            activeColor: AppColors.primaryColor,
+            activeThumbColor: AppColors.primaryColor,
             onChanged: (v) {
               setState(() => med.taken = v);
               // Calculate adherence % and save to backend
@@ -1914,7 +1914,7 @@ class _LifestyleTrackerScreenState extends State<LifestyleTrackerScreen>
                         boxShadow: selected
                             ? [
                                 BoxShadow(
-                                  color: Colors.black.withOpacity(0.06),
+                                  color: Colors.black.withValues(alpha: 0.06),
                                   blurRadius: 6,
                                 )
                               ]
@@ -2006,13 +2006,13 @@ class _LifestyleTrackerScreenState extends State<LifestyleTrackerScreen>
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 colors: [
-                  AppColors.primaryColor.withOpacity(0.07),
+                  AppColors.primaryColor.withValues(alpha: 0.07),
                   const Color(0xFFEFF6FF),
                 ],
               ),
               borderRadius: BorderRadius.circular(20),
               border: Border.all(
-                  color: AppColors.primaryColor.withOpacity(0.15)),
+                  color: AppColors.primaryColor.withValues(alpha: 0.15)),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -2204,7 +2204,7 @@ class _LifestyleTrackerScreenState extends State<LifestyleTrackerScreen>
                     ),
                     Switch(
                       value: _periodTracking,
-                      activeColor: const Color(0xFFEC4899),
+                      activeThumbColor: const Color(0xFFEC4899),
                       onChanged: (v) =>
                           setState(() => _periodTracking = v),
                     ),

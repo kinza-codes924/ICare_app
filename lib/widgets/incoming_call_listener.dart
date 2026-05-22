@@ -6,10 +6,8 @@ import '../services/api_service.dart';
 import '../screens/lms_live_session_screen.dart';
 import '../utils/shared_pref.dart';
 import '../utils/app_keys.dart';
-import '../utils/theme.dart';
 import '../screens/video_call.dart';
 import '../screens/consultation_chat_screen_v2.dart';
-import '../screens/lms_live_session_screen.dart';
 
 // Conditional import for web-only dart:js_interop
 import '../utils/js_interop_stub.dart'
@@ -75,7 +73,7 @@ class _IncomingCallListenerState extends State<IncomingCallListener> {
     final token = await _sharedPref.getToken();
     if (token == null || token.isEmpty) return;
     final user = await _sharedPref.getUserData();
-    if (user?.role?.toLowerCase() != 'student') return;
+    if (user?.role.toLowerCase() != 'student') return;
 
     try {
       final api = ApiService();
@@ -125,7 +123,7 @@ class _IncomingCallListenerState extends State<IncomingCallListener> {
       opaque: false,
       barrierColor: Colors.black54,
       barrierDismissible: false,
-      pageBuilder: (ctx, _, __) => _LmsLiveDialog(
+      pageBuilder: (ctx, _, _) => _LmsLiveDialog(
         courseId: courseId,
         courseTitle: courseTitle,
         onDismiss: () { _lmsDialogShowing = false; },
@@ -175,7 +173,7 @@ class _IncomingCallListenerState extends State<IncomingCallListener> {
         opaque: false,
         barrierColor: Colors.black54,
         barrierDismissible: false,
-        pageBuilder: (ctx, _, __) => _IncomingCallDialog(
+        pageBuilder: (ctx, _, _) => _IncomingCallDialog(
           callerName: callerName,
           isAudioOnly: isAudioOnly,
           isConsultation: callType == 'consultation',
@@ -387,7 +385,7 @@ class _LmsLiveDialog extends StatelessWidget {
               color: const Color(0xFF1C2333),
               borderRadius: BorderRadius.circular(20),
               border: Border.all(color: Colors.red, width: 2),
-              boxShadow: [BoxShadow(color: Colors.red.withOpacity(0.4), blurRadius: 20)],
+              boxShadow: [BoxShadow(color: Colors.red.withValues(alpha: 0.4), blurRadius: 20)],
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,

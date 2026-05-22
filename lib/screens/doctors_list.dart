@@ -75,9 +75,9 @@ class _DoctorsListState extends State<DoctorsList> {
           .toList();
 
       debugPrint('✅ Loaded ${doctorsList.length} doctors');
-      doctorsList.forEach((doc) {
+      for (var doc in doctorsList) {
         debugPrint('  - ${doc.user.name}: ${doc.specialization ?? "NO SPEC"}');
-      });
+      }
 
       final specs = doctorsList
           .where(
@@ -87,8 +87,8 @@ class _DoctorsListState extends State<DoctorsList> {
           .toSet();
 
       final langs = doctorsList
-          .where((d) => d.languages != null && d.languages!.isNotEmpty)
-          .expand((d) => d.languages!)
+          .where((d) => d.languages.isNotEmpty)
+          .expand((d) => d.languages)
           .toSet();
 
       setState(() {
@@ -153,7 +153,7 @@ class _DoctorsListState extends State<DoctorsList> {
         const matchesGender = true;
 
         final matchesLanguage = _languageFilter == null ||
-            (doctor.languages?.contains(_languageFilter) ?? false);
+            (doctor.languages.contains(_languageFilter) ?? false);
 
         return matchesSearch && matchesSpecialization && matchesAvailability &&
             matchesFees && matchesRating && matchesGender && matchesLanguage;
@@ -225,7 +225,7 @@ class _DoctorsListState extends State<DoctorsList> {
                 // Active filter banner
                 if (_searchQuery.isNotEmpty && (_searchMode == 'condition' || _searchMode == 'specialty'))
                   Container(
-                    color: const Color(0xFF0036BC).withOpacity(0.08),
+                    color: const Color(0xFF0036BC).withValues(alpha: 0.08),
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                     child: Row(children: [
                       Icon(_searchMode == 'condition' ? Icons.healing_outlined : Icons.medical_services_outlined,
@@ -253,7 +253,7 @@ class _DoctorsListState extends State<DoctorsList> {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF10B981).withOpacity(0.1),
+                          color: const Color(0xFF10B981).withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Row(
@@ -269,7 +269,7 @@ class _DoctorsListState extends State<DoctorsList> {
                             ),
                             const SizedBox(width: 8),
                             Text(
-                              '${_onlineDoctorsCount} doctors online right now',
+                              '$_onlineDoctorsCount doctors online right now',
                               style: const TextStyle(
                                 fontSize: 13,
                                 fontWeight: FontWeight.w600,
@@ -336,7 +336,7 @@ class _DoctorsListState extends State<DoctorsList> {
                             SizedBox(
                               width: isDesktop ? 200 : double.infinity,
                               child: DropdownButtonFormField<String>(
-                                value: _selectedSpecialization,
+                                initialValue: _selectedSpecialization,
                                 decoration: InputDecoration(
                                   labelText: 'Speciality',
                                   border: OutlineInputBorder(
@@ -362,7 +362,7 @@ class _DoctorsListState extends State<DoctorsList> {
                           SizedBox(
                             width: isDesktop ? 150 : double.infinity,
                             child: DropdownButtonFormField<String>(
-                              value: _availabilityFilter,
+                              initialValue: _availabilityFilter,
                               decoration: InputDecoration(
                                 labelText: 'Availability',
                                 border: OutlineInputBorder(
@@ -389,7 +389,7 @@ class _DoctorsListState extends State<DoctorsList> {
                           SizedBox(
                             width: isDesktop ? 150 : double.infinity,
                             child: DropdownButtonFormField<double>(
-                              value: _minRating,
+                              initialValue: _minRating,
                               decoration: InputDecoration(
                                 labelText: 'Min Rating',
                                 border: OutlineInputBorder(
@@ -418,7 +418,7 @@ class _DoctorsListState extends State<DoctorsList> {
                           SizedBox(
                             width: isDesktop ? 130 : double.infinity,
                             child: DropdownButtonFormField<String>(
-                              value: _genderFilter,
+                              initialValue: _genderFilter,
                               decoration: InputDecoration(
                                 labelText: 'Gender',
                                 border: OutlineInputBorder(
@@ -445,7 +445,7 @@ class _DoctorsListState extends State<DoctorsList> {
                           SizedBox(
                             width: isDesktop ? 150 : double.infinity,
                             child: DropdownButtonFormField<String>(
-                              value: _languageFilter,
+                              initialValue: _languageFilter,
                               decoration: InputDecoration(
                                 labelText: 'Language',
                                 border: OutlineInputBorder(
@@ -830,7 +830,7 @@ class DoctorProfileCard extends StatelessWidget {
           border: Border.all(color: const Color(0xFFE2E8F0)),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.04),
+              color: Colors.black.withValues(alpha: 0.04),
               blurRadius: 10,
               offset: const Offset(0, 4),
             ),
@@ -847,7 +847,7 @@ class DoctorProfileCard extends StatelessWidget {
                   // Avatar with profile picture
                   CircleAvatar(
                     radius: 32,
-                    backgroundColor: AppColors.primaryColor.withOpacity(0.1),
+                    backgroundColor: AppColors.primaryColor.withValues(alpha: 0.1),
                     backgroundImage: displayDoctor.user.profilePicture != null &&
                             displayDoctor.user.profilePicture!.isNotEmpty
                         ? NetworkImage(displayDoctor.user.profilePicture!)
@@ -892,7 +892,7 @@ class DoctorProfileCard extends StatelessWidget {
                                 decoration: BoxDecoration(
                                   color: const Color(0xFFFFF7ED),
                                   borderRadius: BorderRadius.circular(6),
-                                  border: Border.all(color: const Color(0xFFF59E0B).withOpacity(0.3)),
+                                  border: Border.all(color: const Color(0xFFF59E0B).withValues(alpha: 0.3)),
                                 ),
                                 child: const Row(
                                   mainAxisSize: MainAxisSize.min,
@@ -1001,7 +1001,7 @@ class DoctorProfileCard extends StatelessWidget {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF10B981).withOpacity(0.08),
+                        color: const Color(0xFF10B981).withValues(alpha: 0.08),
                         borderRadius: BorderRadius.circular(6),
                       ),
                       child: const Text(

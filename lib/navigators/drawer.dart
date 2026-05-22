@@ -160,6 +160,11 @@ class _CustomDrawerState extends ConsumerState<CustomDrawer> {
       ];
     } else if (selectedRole == "Patient") {
       drawerItems = [
+        _drawerItem('My Appointments', Icons.calendar_month_outlined, () {
+          Navigator.of(context).push(
+            MaterialPageRoute(builder: (ctx) => const BookingsHistoryScreen()),
+          );
+        }),
         _drawerItem('Order Medicines', Icons.medication_outlined, () {
           Navigator.of(context).push(
             MaterialPageRoute(builder: (ctx) => const PharmaciesScreen()),
@@ -168,11 +173,6 @@ class _CustomDrawerState extends ConsumerState<CustomDrawer> {
         _drawerItem('Book a Lab Test', Icons.science_outlined, () {
           Navigator.of(context).push(
             MaterialPageRoute(builder: (ctx) => const PatientBookLabFlow()),
-          );
-        }),
-        _drawerItem('My Appointments', Icons.calendar_month_outlined, () {
-          Navigator.of(context).push(
-            MaterialPageRoute(builder: (ctx) => const BookingsHistoryScreen()),
           );
         }),
         _drawerItem('My Prescriptions', Icons.medication_liquid_outlined, () {
@@ -716,48 +716,6 @@ class _CustomDrawerState extends ConsumerState<CustomDrawer> {
                 ),
               ),
 
-              // Logout button at bottom of drawer
-              const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                child: Divider(color: Color(0xFFF1F5F9), height: 1),
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                child: InkWell(
-                  onTap: () {
-                    Navigator.of(context).pop(); // close drawer
-                    ref.read(authProvider.notifier).setUserLogout();
-                    Navigator.of(context).pushAndRemoveUntil(
-                      MaterialPageRoute(builder: (_) => LoginScreen()),
-                      (route) => false,
-                    );
-                  },
-                  borderRadius: BorderRadius.circular(12),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                    decoration: BoxDecoration(
-                      color: Colors.red.withValues(alpha: 0.06),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.red.withValues(alpha: 0.15)),
-                    ),
-                    child: const Row(
-                      children: [
-                        Icon(Icons.logout_rounded, size: 20, color: Colors.red),
-                        SizedBox(width: 12),
-                        Text(
-                          'Logout',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w700,
-                            color: Colors.red,
-                            fontFamily: 'Gilroy-Bold',
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
             ],
           ),
         ),

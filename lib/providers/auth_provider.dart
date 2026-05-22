@@ -33,8 +33,8 @@ class AuthNotifier extends StateNotifier<Auth> {
     state = state.copyWith(userRole: role);
   }
 
-  void setFcmToken(String _token) {
-    state = state.copyWith(fcmToken: _token);
+  void setFcmToken(String token) {
+    state = state.copyWith(fcmToken: token);
   }
 
   Future<void> setUser(User user) async {
@@ -45,19 +45,27 @@ class AuthNotifier extends StateNotifier<Auth> {
   }
 
   String _normalizeRole(String role) {
-    // Normalize role to match backend format (capitalize first letter)
     if (role.isEmpty) return role;
-    final normalized = role[0].toUpperCase() + role.substring(1).toLowerCase();
-    // Handle special cases
-    if (normalized == 'Laboratory') return 'Laboratory';
-    if (normalized == 'Pharmacy') return 'Pharmacy';
-    return normalized;
+    switch (role.trim().toLowerCase()) {
+      case 'lab':
+      case 'laboratory': return 'Laboratory';
+      case 'pharmacy':   return 'Pharmacy';
+      case 'doctor':     return 'Doctor';
+      case 'patient':    return 'Patient';
+      case 'instructor': return 'Instructor';
+      case 'student':    return 'Student';
+      case 'admin':      return 'Admin';
+      default:
+        return role[0].toUpperCase() + role.substring(1).toLowerCase();
+    }
   }
 
   Future<void> setUserLogout() async {
     await SharedPref().remove("userRole");
     await SharedPref().remove("token");
     await SharedPref().remove("userData");
+    // biometricToken, biometricEnabled, biometricEmail, biometricUserData
+    // are intentionally kept so biometric login works after logout
     state = Auth();
   }
 }

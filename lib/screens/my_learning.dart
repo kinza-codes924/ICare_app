@@ -54,7 +54,7 @@ class _MyLearningScreenState extends ConsumerState<MyLearningScreen>
 
   @override
   Widget build(BuildContext context) {
-    final role = ref.read(authProvider).userRole?.toLowerCase();
+    final role = ref.read(authProvider).userRole.toLowerCase();
     final isPatient = role == 'patient';
 
     return Scaffold(
@@ -95,7 +95,7 @@ class _MyLearningScreenState extends ConsumerState<MyLearningScreen>
   }
 
   Widget _buildCoursesTab() {
-    final role = ref.read(authProvider).userRole?.toLowerCase();
+    final role = ref.read(authProvider).userRole.toLowerCase();
     final isPatient = role == 'patient';
 
     if (_enrolledCourses.isEmpty) {
@@ -132,9 +132,9 @@ class _MyLearningScreenState extends ConsumerState<MyLearningScreen>
         // Handle progress - it's a Map with percent field
         int progress = 0;
         final progressData = enrollment['progress'];
-        if (progressData is int)
+        if (progressData is int) {
           progress = progressData;
-        else if (progressData is Map)
+        } else if (progressData is Map)
           progress = (progressData['percent'] ?? 0).toInt();
 
         final status = enrollment['status'] ?? 'active';
@@ -167,7 +167,7 @@ class _MyLearningScreenState extends ConsumerState<MyLearningScreen>
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.04),
+              color: Colors.black.withValues(alpha: 0.04),
               blurRadius: 10,
               offset: const Offset(0, 4),
             ),
@@ -230,8 +230,8 @@ class _MyLearningScreenState extends ConsumerState<MyLearningScreen>
                               ),
                               decoration: BoxDecoration(
                                 color: status == 'completed'
-                                    ? const Color(0xFF10B981).withOpacity(0.1)
-                                    : AppColors.primaryColor.withOpacity(0.1),
+                                    ? const Color(0xFF10B981).withValues(alpha: 0.1)
+                                    : AppColors.primaryColor.withValues(alpha: 0.1),
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               child: Text(

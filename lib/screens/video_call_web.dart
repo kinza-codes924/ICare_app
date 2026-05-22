@@ -8,7 +8,6 @@ import 'dart:ui_web' as ui;
 import 'dart:html' as html;
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 import 'package:web/web.dart' as web;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/agora_service.dart';
@@ -18,7 +17,6 @@ import '../services/appointment_service.dart';
 import '../services/call_service.dart';
 import '../services/medical_record_service.dart';
 import '../utils/theme.dart';
-import '../screens/consultation_chat_screen_v2.dart';
 import '../screens/patient_history_form_screen.dart';
 import '../services/consultation_service.dart';
 import '../utils/shared_pref.dart';
@@ -59,6 +57,8 @@ class VideoCall extends StatefulWidget {
   final int consultationElapsedSeconds;
   /// Signal ID of the outgoing call — used to detect if patient declined
   final String? outgoingSignalId;
+  /// Callback when call ends (to return to chat)
+  final VoidCallback? onCallEnded;
 
   const VideoCall({
     super.key,
@@ -72,6 +72,7 @@ class VideoCall extends StatefulWidget {
     this.consultationId,
     this.consultationElapsedSeconds = 0,
     this.outgoingSignalId,
+    this.onCallEnded,
   });
 
   @override
@@ -186,7 +187,7 @@ class _VideoCallWebState extends State<VideoCall> {
   Future<void> _initRole() async {
     try {
       final user = await SharedPref().getUserData();
-      if (mounted) setState(() => _isDoctor = user?.role?.toLowerCase() == 'doctor');
+      if (mounted) setState(() => _isDoctor = user?.role.toLowerCase() == 'doctor');
     } catch (_) {}
     _startRemoteJoinPoller();
     _startDeclinePoller(); // detect patient decline immediately
@@ -344,7 +345,7 @@ class _VideoCallWebState extends State<VideoCall> {
     if (widget.appointmentId == null || widget.appointmentId!.isEmpty) return;
     try {
       final user = await SharedPref().getUserData();
-      final role = user?.role?.toLowerCase() ?? '';
+      final role = user?.role.toLowerCase() ?? '';
       // Only patients need to poll — doctors end the call themselves
       if (role != 'doctor') {
         _startStatusPolling();
@@ -877,7 +878,7 @@ class _VideoCallWebState extends State<VideoCall> {
 
     // Check if current user is doctor
     final currentUser = await SharedPref().getUserData();
-    final isDoctor = currentUser?.role?.toLowerCase() == 'doctor';
+    final isDoctor = currentUser?.role.toLowerCase() == 'doctor';
 
     if (!isDoctor) {
       // Patient can also end consultation — show confirmation dialog
@@ -1081,7 +1082,7 @@ class _VideoCallWebState extends State<VideoCall> {
       final completer = Completer<Uint8List>();
       canvas.toBlob('image/jpeg', 0.75).then((resizedBlob) async {
         final reader = html.FileReader();
-        reader.readAsArrayBuffer(resizedBlob!);
+        reader.readAsArrayBuffer(resizedBlob);
         await reader.onLoad.first;
         final result = reader.result as List<int>;
         completer.complete(Uint8List.fromList(result));
@@ -1202,7 +1203,7 @@ class _VideoCallWebState extends State<VideoCall> {
                               horizontal: 10, vertical: 6),
                           decoration: BoxDecoration(
                             color: _sessionSeconds >= 900
-                                ? Colors.orange.withOpacity(0.8)
+                                ? Colors.orange.withValues(alpha: 0.8)
                                 : Colors.black45,
                             borderRadius: BorderRadius.circular(20),
                           ),
@@ -1372,7 +1373,7 @@ class _VideoCallWebState extends State<VideoCall> {
                   width: 200,
                   fit: BoxFit.cover,
                   gaplessPlayback: true, // prevents flicker/jerk on rebuild
-                  errorBuilder: (_, __, ___) => const Text(
+                  errorBuilder: (_, _, _) => const Text(
                     '🖼️ Image',
                     style: TextStyle(color: Colors.white, fontSize: 13),
                   ),
@@ -1958,7 +1959,7 @@ class _VideoCallWebState extends State<VideoCall> {
                                           Container(
                                             padding: const EdgeInsets.all(8),
                                             decoration: BoxDecoration(
-                                              color: const Color(0xFF10B981).withOpacity(0.15),
+                                              color: const Color(0xFF10B981).withValues(alpha: 0.15),
                                               borderRadius: BorderRadius.circular(8),
                                             ),
                                             child: Icon(
@@ -2087,9 +2088,9 @@ class _VideoCallWebState extends State<VideoCall> {
                                       Container(
                                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                                         decoration: BoxDecoration(
-                                          color: const Color(0xFF10B981).withOpacity(0.1),
+                                          color: const Color(0xFF10B981).withValues(alpha: 0.1),
                                           borderRadius: BorderRadius.circular(8),
-                                          border: Border.all(color: const Color(0xFF10B981).withOpacity(0.3)),
+                                          border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.3)),
                                         ),
                                         child: const Row(
                                           mainAxisAlignment: MainAxisAlignment.center,
@@ -2143,7 +2144,7 @@ class _VideoCallWebState extends State<VideoCall> {
                                     Container(
                                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                                       decoration: BoxDecoration(
-                                        color: const Color(0xFF10B981).withOpacity(0.15),
+                                        color: const Color(0xFF10B981).withValues(alpha: 0.15),
                                         borderRadius: BorderRadius.circular(12),
                                       ),
                                       child: Text(
@@ -3173,7 +3174,7 @@ class _VideoCallWebState extends State<VideoCall> {
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
             decoration: BoxDecoration(
               color: active
-                  ? AppColors.primaryColor.withOpacity(0.3)
+                  ? AppColors.primaryColor.withValues(alpha: 0.3)
                   : Colors.white12,
               borderRadius: BorderRadius.circular(20),
               border: Border.all(

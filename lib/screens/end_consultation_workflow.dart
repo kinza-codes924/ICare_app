@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 // ignore: avoid_web_libraries_in_flutter
 import 'dart:html' as html;
 import 'package:icare/models/appointment_detail.dart';
@@ -28,7 +27,7 @@ class _EndConsultationWorkflowState extends State<EndConsultationWorkflow> {
 
   // Diagnosis state
   bool _diagnosisCompleted = false;
-  List<Map<String, dynamic>> _selectedICDCodes = [];
+  final List<Map<String, dynamic>> _selectedICDCodes = [];
   final TextEditingController _diagnosisNotesController = TextEditingController();
 
   // Common medicines list for autocomplete
@@ -245,7 +244,7 @@ class _EndConsultationWorkflowState extends State<EndConsultationWorkflow> {
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: Colors.green.withOpacity(0.1),
+                color: Colors.green.withValues(alpha: 0.1),
                 shape: BoxShape.circle,
               ),
               child: const Icon(Icons.check_circle_rounded, color: Colors.green, size: 56),
@@ -313,19 +312,19 @@ class _EndConsultationWorkflowState extends State<EndConsultationWorkflow> {
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   colors: [
-                    AppColors.primaryColor.withOpacity(0.1),
-                    AppColors.primaryColor.withOpacity(0.05),
+                    AppColors.primaryColor.withValues(alpha: 0.1),
+                    AppColors.primaryColor.withValues(alpha: 0.05),
                   ],
                 ),
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: AppColors.primaryColor.withOpacity(0.2)),
+                border: Border.all(color: AppColors.primaryColor.withValues(alpha: 0.2)),
               ),
               child: Row(
                 children: [
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: AppColors.primaryColor.withOpacity(0.2),
+                      color: AppColors.primaryColor.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: const Icon(
@@ -461,7 +460,7 @@ class _EndConsultationWorkflowState extends State<EndConsultationWorkflow> {
                           decoration: BoxDecoration(
                             color: const Color(0xFFFEF2F2),
                             borderRadius: BorderRadius.circular(10),
-                            border: Border.all(color: const Color(0xFFEF4444).withOpacity(0.3)),
+                            border: Border.all(color: const Color(0xFFEF4444).withValues(alpha: 0.3)),
                           ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
@@ -469,7 +468,7 @@ class _EndConsultationWorkflowState extends State<EndConsultationWorkflow> {
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFFEF4444).withOpacity(0.2),
+                                  color: const Color(0xFFEF4444).withValues(alpha: 0.2),
                                   borderRadius: BorderRadius.circular(6),
                                 ),
                                 child: Text(
@@ -657,7 +656,7 @@ class _EndConsultationWorkflowState extends State<EndConsultationWorkflow> {
                       decoration: BoxDecoration(
                         color: const Color(0xFFF0FDF4),
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.green.withOpacity(0.3)),
+                        border: Border.all(color: Colors.green.withValues(alpha: 0.3)),
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1352,14 +1351,14 @@ class _EndConsultationWorkflowState extends State<EndConsultationWorkflow> {
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: isCompleted
-              ? color.withOpacity(0.5)
+              ? color.withValues(alpha: 0.5)
               : const Color(0xFFE2E8F0),
           width: isCompleted ? 2 : 1,
         ),
         boxShadow: isCompleted
             ? [
                 BoxShadow(
-                  color: color.withOpacity(0.1),
+                  color: color.withValues(alpha: 0.1),
                   blurRadius: 10,
                   offset: const Offset(0, 4),
                 ),
@@ -1374,7 +1373,7 @@ class _EndConsultationWorkflowState extends State<EndConsultationWorkflow> {
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: color.withOpacity(0.1),
+                  color: color.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Icon(icon, color: color, size: 24),
@@ -1416,9 +1415,9 @@ class _EndConsultationWorkflowState extends State<EndConsultationWorkflow> {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.green.withOpacity(0.1),
+        color: Colors.green.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.green.withOpacity(0.3)),
+        border: Border.all(color: Colors.green.withValues(alpha: 0.3)),
       ),
       child: Row(
         children: [
@@ -1454,15 +1453,15 @@ class _EndConsultationWorkflowState extends State<EndConsultationWorkflow> {
         labelStyle: TextStyle(color: color, fontWeight: FontWeight.w700, fontSize: 12),
         prefixIcon: Icon(icon, color: color, size: 16),
         filled: true,
-        fillColor: color.withOpacity(0.05),
+        fillColor: color.withValues(alpha: 0.05),
         contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
-          borderSide: BorderSide(color: color.withOpacity(0.3)),
+          borderSide: BorderSide(color: color.withValues(alpha: 0.3)),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
-          borderSide: BorderSide(color: color.withOpacity(0.3)),
+          borderSide: BorderSide(color: color.withValues(alpha: 0.3)),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
@@ -1476,9 +1475,9 @@ class _EndConsultationWorkflowState extends State<EndConsultationWorkflow> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: color.withOpacity(0.3)),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Text(
         text,

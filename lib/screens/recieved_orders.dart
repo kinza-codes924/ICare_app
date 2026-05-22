@@ -1,12 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_size_matters/flutter_size_matters.dart';
-import 'package:icare/models/app_enums.dart';
 import 'package:icare/utils/imagePaths.dart';
 import 'package:icare/utils/theme.dart';
 import 'package:icare/widgets/back_button.dart';
-import 'package:icare/widgets/custom_circle_icon_button.dart';
 import 'package:icare/widgets/custom_text.dart';
-import 'package:icare/widgets/order_card.dart';
 
 class RecievedOrders extends StatelessWidget {
   const RecievedOrders({super.key});
@@ -73,7 +69,7 @@ class RecievedOrders extends StatelessWidget {
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     colors: [
-                      AppColors.primaryColor.withOpacity(0.05),
+                      AppColors.primaryColor.withValues(alpha: 0.05),
                       Colors.white,
                     ],
                     begin: Alignment.topCenter,
@@ -238,7 +234,7 @@ class RecievedOrders extends StatelessWidget {
         boxShadow: isActive
             ? [
                 BoxShadow(
-                  color: AppColors.primaryColor.withOpacity(0.2),
+                  color: AppColors.primaryColor.withValues(alpha: 0.2),
                   blurRadius: 10,
                   offset: const Offset(0, 4),
                 ),
@@ -263,7 +259,7 @@ class RecievedOrders extends StatelessWidget {
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 20,
             offset: const Offset(0, 8),
           ),

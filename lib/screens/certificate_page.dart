@@ -103,7 +103,7 @@ class _CertificatePageState extends State<CertificatePage> {
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: const Color(0xFF1A237E), width: 2),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.12), blurRadius: 16, offset: const Offset(0, 6))],
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.12), blurRadius: 16, offset: const Offset(0, 6))],
       ),
       child: Column(
         children: [
@@ -131,7 +131,7 @@ class _CertificatePageState extends State<CertificatePage> {
                       child: Image.asset(
                         'assets/images/health.jpeg',
                         fit: BoxFit.contain,
-                        errorBuilder: (_, __, ___) => const Text('RM Health\nSolutions',
+                        errorBuilder: (_, _, _) => const Text('RM Health\nSolutions',
                             style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: Color(0xFF0036BC))),
                       ),
                     ),
@@ -143,7 +143,7 @@ class _CertificatePageState extends State<CertificatePage> {
                       child: Image.asset(
                         'assets/LOGO-IU-01-2048x495-1.png',
                         fit: BoxFit.contain,
-                        errorBuilder: (_, __, ___) => const Text('Iqra University',
+                        errorBuilder: (_, _, _) => const Text('Iqra University',
                             style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Color(0xFF1A237E))),
                       ),
                     ),
@@ -155,7 +155,7 @@ class _CertificatePageState extends State<CertificatePage> {
                       child: Image.asset(
                         'assets/Asset 1.png',
                         fit: BoxFit.contain,
-                        errorBuilder: (_, __, ___) => const Text('iCare',
+                        errorBuilder: (_, _, _) => const Text('iCare',
                             style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: AppColors.primaryColor)),
                       ),
                     ),

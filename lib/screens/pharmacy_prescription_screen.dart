@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:icare/services/pharmacy_service.dart';
-import 'package:icare/utils/theme.dart';
 import 'package:icare/widgets/back_button.dart';
 
 /// Pharmacy prescription screen — exactly like LabDetails
@@ -235,7 +234,7 @@ class _PharmacyPrescriptionScreenState
               border: Border.all(color: const Color(0xFFE2E8F0)),
               boxShadow: [
                 BoxShadow(
-                    color: Colors.black.withOpacity(0.04),
+                    color: Colors.black.withValues(alpha: 0.04),
                     blurRadius: 20,
                     offset: const Offset(0, 8))
               ],
@@ -308,7 +307,7 @@ class _PharmacyPrescriptionScreenState
                     Container(
                       padding: const EdgeInsets.all(20),
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.15),
+                        color: Colors.white.withValues(alpha: 0.15),
                         shape: BoxShape.circle,
                       ),
                       child: const Icon(Icons.local_pharmacy_rounded,
@@ -325,7 +324,7 @@ class _PharmacyPrescriptionScreenState
                       padding: const EdgeInsets.symmetric(
                           horizontal: 12, vertical: 4),
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2),
+                        color: Colors.white.withValues(alpha: 0.2),
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: const Text('Verified Pharmacy',
@@ -373,9 +372,9 @@ class _PharmacyPrescriptionScreenState
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.08),
+        color: color.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withOpacity(0.2)),
+        border: Border.all(color: color.withValues(alpha: 0.2)),
       ),
       child: Row(mainAxisSize: MainAxisSize.min, children: [
         Icon(icon, size: 14, color: color),
@@ -492,9 +491,9 @@ class _PharmacyPrescriptionScreenState
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: _primary.withOpacity(0.06),
+        color: _primary.withValues(alpha: 0.06),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: _primary.withOpacity(0.3), width: 1.5),
+        border: Border.all(color: _primary.withValues(alpha: 0.3), width: 1.5),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -590,12 +589,12 @@ class _PharmacyPrescriptionScreenState
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         decoration: BoxDecoration(
           color: selected
-              ? _primary.withOpacity(0.06)
+              ? _primary.withValues(alpha: 0.06)
               : const Color(0xFFF8FAFC),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: selected
-                ? _primary.withOpacity(0.3)
+                ? _primary.withValues(alpha: 0.3)
                 : const Color(0xFFE2E8F0),
           ),
         ),
@@ -639,9 +638,9 @@ class _PharmacyPrescriptionScreenState
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withOpacity(0.3)),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Text(label,
           style: TextStyle(
@@ -699,7 +698,7 @@ class _PharmacyPrescriptionScreenState
         color: Colors.white,
         boxShadow: [
           BoxShadow(
-              color: Colors.black.withOpacity(0.06),
+              color: Colors.black.withValues(alpha: 0.06),
               blurRadius: 16,
               offset: const Offset(0, -4))
         ],

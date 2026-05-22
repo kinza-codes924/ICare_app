@@ -1,11 +1,11 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:agora_rtc_engine/agora_rtc_engine.dart';
+import 'package:permission_handler/permission_handler.dart';
 import '../config/agora_config.dart';
 import '../services/agora_service.dart';
 import '../services/call_service.dart';
-import '../services/api_service.dart';
-import '../models/appointment_detail.dart';
 import '../utils/shared_pref.dart';
 
 /// Agora RTC video call — Android / iOS / Desktop
@@ -72,7 +72,7 @@ class _VideoCallMobileState extends State<VideoCall> {
     try {
       final user = await SharedPref().getUserData();
       if (mounted) {
-        setState(() => _isDoctor = user?.role?.toLowerCase() == 'doctor');
+        setState(() => _isDoctor = user?.role.toLowerCase() == 'doctor');
         if (_isDoctor) {
           _startDeclinePoller();
           _startNoAnswerTimer();
@@ -172,6 +172,26 @@ class _VideoCallMobileState extends State<VideoCall> {
 
   Future<void> _initAgora() async {
     try {
+      // 0. Request camera and microphone permissions at runtime
+      if (!kIsWeb) {
+        final camStatus = await Permission.camera.request();
+        final micStatus = await Permission.microphone.request();
+        if (camStatus.isDenied || micStatus.isDenied) {
+          setState(() {
+            _error = 'Camera and microphone permissions are required for video calls. Please grant them in Settings.';
+            _loading = false;
+          });
+          return;
+        }
+        if (camStatus.isPermanentlyDenied || micStatus.isPermanentlyDenied) {
+          setState(() {
+            _error = 'Camera and microphone permissions are permanently denied. Please enable them in App Settings.';
+            _loading = false;
+          });
+          return;
+        }
+      }
+
       // 1. Fetch token from backend
       final tokenData = await AgoraService().getToken(
         channelName: widget.channelName,
@@ -330,7 +350,7 @@ class _VideoCallMobileState extends State<VideoCall> {
 
     // Check if current user is doctor
     final currentUser = await SharedPref().getUserData();
-    final isDoctor = currentUser?.role?.toLowerCase() == 'doctor';
+    final isDoctor = currentUser?.role.toLowerCase() == 'doctor';
 
     if (!isDoctor) {
       // Patient cannot end consultation - only leave video

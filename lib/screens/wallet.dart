@@ -287,7 +287,7 @@ class _WebWalletScreen extends StatelessWidget {
                           borderRadius: BorderRadius.circular(24),
                           boxShadow: [
                             BoxShadow(
-                              color: AppColors.secondaryColor.withOpacity(0.3),
+                              color: AppColors.secondaryColor.withValues(alpha: 0.3),
                               blurRadius: 20,
                               offset: const Offset(0, 10),
                             ),
@@ -311,7 +311,7 @@ class _WebWalletScreen extends StatelessWidget {
                                 Container(
                                   padding: const EdgeInsets.all(8),
                                   decoration: BoxDecoration(
-                                    color: Colors.white.withOpacity(0.2),
+                                    color: Colors.white.withValues(alpha: 0.2),
                                     borderRadius: BorderRadius.circular(8),
                                   ),
                                   child: const Icon(

@@ -12,7 +12,7 @@ class CustomRecordCard extends StatelessWidget {
     this.label,
     this.number,
     this.color = AppColors.secondaryColor,
-    this.onTap = null,
+    this.onTap,
     this.width,
   });
 
@@ -33,12 +33,12 @@ class CustomRecordCard extends StatelessWidget {
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [color, color.withOpacity(0.85)],
+            colors: [color, color.withValues(alpha: 0.85)],
           ),
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
-              color: color.withOpacity(0.3),
+              color: color.withValues(alpha: 0.3),
               blurRadius: 10,
               offset: const Offset(0, 5),
             ),
@@ -50,7 +50,7 @@ class CustomRecordCard extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.2),
+                  color: Colors.white.withValues(alpha: 0.2),
                   shape: BoxShape.circle,
                 ),
                 child: icon!,
@@ -69,7 +69,7 @@ class CustomRecordCard extends StatelessWidget {
               fontSize: 12,
               fontFamily: "Gilroy-SemiBold",
               fontWeight: FontWeight.w600,
-              color: AppColors.white.withOpacity(0.9),
+              color: AppColors.white.withValues(alpha: 0.9),
             ),
           ],
         ),

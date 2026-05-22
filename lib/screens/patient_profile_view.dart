@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:icare/models/user.dart';
-import 'package:icare/utils/theme.dart';
 import 'package:icare/widgets/back_button.dart';
 import 'package:intl/intl.dart';
 import 'package:icare/services/course_service.dart';
@@ -219,7 +218,7 @@ class _PatientProfileViewState extends State<PatientProfileView> {
                               const SizedBox(height: 12),
                           ],
                         );
-                      }).toList(),
+                      }),
                   ],
                 ),
               ],

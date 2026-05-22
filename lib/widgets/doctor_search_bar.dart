@@ -113,7 +113,7 @@ class _DoctorSearchBarState extends State<DoctorSearchBar> {
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(12),
-            boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.12), blurRadius: 10, offset: const Offset(0, 3))],
+            boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.12), blurRadius: 10, offset: const Offset(0, 3))],
           ),
           child: Row(
             children: [
@@ -175,8 +175,8 @@ class _DoctorSearchBarState extends State<DoctorSearchBar> {
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: const Color(0xFF0036BC).withOpacity(0.2)),
-              boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 12)],
+              border: Border.all(color: const Color(0xFF0036BC).withValues(alpha: 0.2)),
+              boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 12)],
             ),
             constraints: const BoxConstraints(maxHeight: 220),
             child: ListView(

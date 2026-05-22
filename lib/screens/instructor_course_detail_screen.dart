@@ -125,7 +125,7 @@ class _InstructorCourseDetailScreenState extends State<InstructorCourseDetailScr
               background: Container(
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
-                    colors: [AppColors.primaryColor, AppColors.primaryColor.withOpacity(0.8)],
+                    colors: [AppColors.primaryColor, AppColors.primaryColor.withValues(alpha: 0.8)],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
@@ -192,7 +192,7 @@ class _InstructorCourseDetailScreenState extends State<InstructorCourseDetailScr
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.2),
+        color: Colors.white.withValues(alpha: 0.2),
         borderRadius: BorderRadius.circular(20),
       ),
       child: Row(
@@ -349,7 +349,7 @@ class _InstructorCourseDetailScreenState extends State<InstructorCourseDetailScr
                       margin: const EdgeInsets.only(bottom: 8),
                       child: ListTile(
                         leading: CircleAvatar(
-                          backgroundColor: AppColors.primaryColor.withOpacity(0.1),
+                          backgroundColor: AppColors.primaryColor.withValues(alpha: 0.1),
                           child: Text(
                             name[0].toUpperCase(),
                             style: TextStyle(color: AppColors.primaryColor, fontWeight: FontWeight.bold),

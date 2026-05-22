@@ -177,7 +177,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
               color: Colors.white,
               boxShadow: [
                 BoxShadow(
-                  color: const Color(0xFF0F172A).withOpacity(0.04),
+                  color: const Color(0xFF0F172A).withValues(alpha: 0.04),
                   blurRadius: 20,
                   offset: const Offset(0, 4),
                 ),
@@ -237,7 +237,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
                           vertical: 8,
                         ),
                         decoration: BoxDecoration(
-                          color: AppColors.primaryColor.withOpacity(0.08),
+                          color: AppColors.primaryColor.withValues(alpha: 0.08),
                           borderRadius: BorderRadius.circular(20),
                         ),
                         child: Row(
@@ -326,14 +326,14 @@ class _NotificationScreenState extends State<NotificationScreen> {
           horizontal: isDesktop ? 20 : 0,
         ),
         itemCount: _notifications.length,
-        separatorBuilder: (_, __) => isDesktop
+        separatorBuilder: (_, _) => isDesktop
             ? const SizedBox(height: 12)
             : Padding(
                 padding: EdgeInsets.symmetric(
                   horizontal: ScallingConfig.scale(20),
                 ),
                 child: Divider(
-                  color: AppColors.grayColor.withOpacity(0.3),
+                  color: AppColors.grayColor.withValues(alpha: 0.3),
                   height: 1,
                 ),
               ),
@@ -356,15 +356,15 @@ class _NotificationScreenState extends State<NotificationScreen> {
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(
                     color: isUnread
-                        ? AppColors.primaryColor.withOpacity(0.3)
+                        ? AppColors.primaryColor.withValues(alpha: 0.3)
                         : const Color(0xFFF1F5F9),
                     width: isUnread ? 1.5 : 1,
                   ),
                   boxShadow: [
                     BoxShadow(
                       color: isUnread
-                          ? AppColors.primaryColor.withOpacity(0.04)
-                          : const Color(0xFF0F172A).withOpacity(0.02),
+                          ? AppColors.primaryColor.withValues(alpha: 0.04)
+                          : const Color(0xFF0F172A).withValues(alpha: 0.02),
                       blurRadius: isUnread ? 16 : 10,
                       offset: const Offset(0, 4),
                     ),
@@ -377,7 +377,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
                       width: 52,
                       height: 52,
                       decoration: BoxDecoration(
-                        color: _getIconColor(type).withOpacity(0.12),
+                        color: _getIconColor(type).withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(16),
                       ),
                       child: Icon(
@@ -444,7 +444,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
             onTap: () => isUnread ? _markAsRead(id) : null,
             child: Container(
               color: isUnread
-                  ? AppColors.primaryColor.withOpacity(0.05)
+                  ? AppColors.primaryColor.withValues(alpha: 0.05)
                   : Colors.transparent,
               padding: EdgeInsets.symmetric(
                 vertical: ScallingConfig.verticalScale(16),
@@ -457,7 +457,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
                     width: 46,
                     height: 46,
                     decoration: BoxDecoration(
-                      color: _getIconColor(type).withOpacity(0.15),
+                      color: _getIconColor(type).withValues(alpha: 0.15),
                       shape: BoxShape.circle,
                     ),
                     child: Icon(

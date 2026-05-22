@@ -14,16 +14,16 @@ class CommonNotifier extends StateNotifier<CommonData> {
         ),
       );
 
-  void setUserData(User _userData) {
-    state = state.copyWith(userData: _userData);
+  void setUserData(User userData) {
+    state = state.copyWith(userData: userData);
   }
 
   void setProfileCreated(bool value) {
     state = state.copyWith(profileCreated: value);
   }
 
-  void setCartData(List<Map<dynamic, dynamic>> _cartData) {
-    state = state.copyWith(cartData: _cartData);
+  void setCartData(List<Map<dynamic, dynamic>> cartData) {
+    state = state.copyWith(cartData: cartData);
   }
 
   void setSelectedReason(String? reason) {

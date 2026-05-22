@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:icare/utils/imagePaths.dart';
-import 'package:icare/utils/theme.dart';
 import 'package:icare/widgets/back_button.dart';
 
 /// Reusable AppBar with the iCare logo on the left of the title.

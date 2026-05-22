@@ -286,9 +286,7 @@ class _InstructorCreateCourseScreenState
       } else {
         final result = await _instructorService.createCourse(courseData);
         try {
-          if (result is Map<String, dynamic>) {
-            savedCourse = Course.fromJson(result);
-          }
+          savedCourse = Course.fromJson(result);
         } catch (_) {}
       }
 
@@ -310,7 +308,7 @@ class _InstructorCreateCourseScreenState
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: Colors.green.withOpacity(0.1),
+                    color: Colors.green.withValues(alpha: 0.1),
                     shape: BoxShape.circle,
                   ),
                   child: const Icon(Icons.check_circle_rounded, color: Colors.green, size: 48),
@@ -593,7 +591,7 @@ class _InstructorCreateCourseScreenState
                               width: double.infinity,
                               height: 160,
                               fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => const Center(
+                              errorBuilder: (_, _, _) => const Center(
                                 child: Icon(Icons.broken_image_outlined, size: 40, color: Color(0xFFCBD5E1)),
                               ),
                             ),
@@ -658,7 +656,7 @@ class _InstructorCreateCourseScreenState
         ),
         const SizedBox(height: 16),
         DropdownButtonFormField<CourseCategory>(
-          value: _category,
+          initialValue: _category,
           decoration: const InputDecoration(
             labelText: 'Category',
             border: OutlineInputBorder(),
@@ -670,7 +668,7 @@ class _InstructorCreateCourseScreenState
         ),
         const SizedBox(height: 16),
         DropdownButtonFormField<TargetAudience>(
-          value: _targetAudience,
+          initialValue: _targetAudience,
           decoration: const InputDecoration(
             labelText: 'Target Audience',
             border: OutlineInputBorder(),
@@ -688,7 +686,7 @@ class _InstructorCreateCourseScreenState
         ),
         const SizedBox(height: 16),
         DropdownButtonFormField<CourseDifficulty?>(
-          value: _difficulty,
+          initialValue: _difficulty,
           decoration: const InputDecoration(
             labelText: 'Difficulty (optional)',
             border: OutlineInputBorder(),
@@ -1144,8 +1142,9 @@ class _InlineLessonFormWidgetState extends State<_InlineLessonFormWidget> {
         ]),
       ),
     );
-    if (choice == 'url') await _pasteVideoUrl();
-    else if (choice == 'file') await _uploadVideoFile();
+    if (choice == 'url') {
+      await _pasteVideoUrl();
+    } else if (choice == 'file') await _uploadVideoFile();
   }
 
   Future<void> _pasteVideoUrl() async {
@@ -1571,7 +1570,7 @@ class _LessonEditorScreenState extends State<LessonEditorScreen> {
       final formData = FormData.fromMap({
         'file': MultipartFile.fromBytes(
           file.bytes!,
-          filename: '${file.name}',
+          filename: file.name,
         ),
         'upload_preset': uploadPreset,
       });
@@ -1730,7 +1729,7 @@ class _LessonEditorScreenState extends State<LessonEditorScreen> {
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
                     color: _uploadedVideoUrl != null
-                        ? Colors.green.withOpacity(0.4)
+                        ? Colors.green.withValues(alpha: 0.4)
                         : const Color(0xFFE2E8F0),
                   ),
                 ),
@@ -2216,8 +2215,9 @@ class _QuestionEditorScreenState extends State<QuestionEditorScreen> {
                           controller: controller,
                           hintText: 'Option ${i + 1}',
                           validator: (val) {
-                            if (i < 2 && (val?.isEmpty ?? true))
+                            if (i < 2 && (val?.isEmpty ?? true)) {
                               return 'Required';
+                            }
                             return null;
                           },
                         ),

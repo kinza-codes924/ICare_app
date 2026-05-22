@@ -125,8 +125,9 @@ class InstructorService {
     List<String> params = [];
 
     if (visibility != null) params.add('visibility=$visibility');
-    if (search != null && search.isNotEmpty)
+    if (search != null && search.isNotEmpty) {
       params.add('q=${Uri.encodeComponent(search)}');
+    }
 
     if (params.isNotEmpty) url += '?${params.join('&')}';
 

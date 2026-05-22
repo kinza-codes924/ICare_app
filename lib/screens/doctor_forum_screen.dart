@@ -91,7 +91,7 @@ class _DoctorForumScreenState extends State<DoctorForumScreen> {
                 ),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<String>(
-                  value: category,
+                  initialValue: category,
                   items: _categories
                       .where((c) => c != 'All')
                       .map((c) => DropdownMenuItem(value: c, child: Text(c)))
@@ -228,8 +228,9 @@ class _DoctorForumScreenState extends State<DoctorForumScreen> {
                   label: 'Publish Post',
                   onPressed: () async {
                     if (titleController.text.isEmpty ||
-                        contentController.text.isEmpty)
+                        contentController.text.isEmpty) {
                       return;
+                    }
                     try {
                       await _apiService.post('/forum', {
                         'title': titleController.text,
@@ -315,7 +316,7 @@ class _DoctorForumScreenState extends State<DoctorForumScreen> {
                 setState(() => _selectedCategory = _categories[i]);
                 _fetchPosts();
               },
-              selectedColor: AppColors.primaryColor.withOpacity(0.2),
+              selectedColor: AppColors.primaryColor.withValues(alpha: 0.2),
               checkmarkColor: AppColors.primaryColor,
             ),
           );
@@ -343,7 +344,7 @@ class _DoctorForumScreenState extends State<DoctorForumScreen> {
           border: Border.all(color: const Color(0xFFE2E8F0)),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.02),
+              color: Colors.black.withValues(alpha: 0.02),
               blurRadius: 10,
               offset: const Offset(0, 4),
             ),
@@ -355,7 +356,7 @@ class _DoctorForumScreenState extends State<DoctorForumScreen> {
             Row(
               children: [
                 CircleAvatar(
-                  backgroundColor: AppColors.primaryColor.withOpacity(0.1),
+                  backgroundColor: AppColors.primaryColor.withValues(alpha: 0.1),
                   child: Text(
                     (post['author']?['name'] ?? 'D')[0].toUpperCase(),
                     style: const TextStyle(
@@ -406,7 +407,7 @@ class _DoctorForumScreenState extends State<DoctorForumScreen> {
                     vertical: 4,
                   ),
                   decoration: BoxDecoration(
-                    color: AppColors.primaryColor.withOpacity(0.1),
+                    color: AppColors.primaryColor.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
@@ -582,7 +583,7 @@ class _ForumDetailScreenState extends State<ForumDetailScreen> {
                       child: Text('No comments yet. Be the first to respond!'),
                     )
                   else
-                    ..._comments.map((c) => _buildCommentTile(c)).toList(),
+                    ..._comments.map((c) => _buildCommentTile(c)),
                 ],
               ),
             ),
@@ -597,7 +598,7 @@ class _ForumDetailScreenState extends State<ForumDetailScreen> {
     return Row(
       children: [
         CircleAvatar(
-          backgroundColor: AppColors.primaryColor.withOpacity(0.1),
+          backgroundColor: AppColors.primaryColor.withValues(alpha: 0.1),
           child: const Icon(Icons.person, color: AppColors.primaryColor),
         ),
         const SizedBox(width: 12),
@@ -693,7 +694,7 @@ class _ForumDetailScreenState extends State<ForumDetailScreen> {
         color: Colors.white,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 10,
             offset: const Offset(0, -5),
           ),

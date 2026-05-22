@@ -159,7 +159,7 @@ class _LmsPublicCourseDetailState extends State<LmsPublicCourseDetail>
           Image.network(
             thumbnail,
             fit: BoxFit.cover,
-            errorBuilder: (_, __, ___) => _buildGradientBackground(),
+            errorBuilder: (_, _, _) => _buildGradientBackground(),
           )
         else
           _buildGradientBackground(),
@@ -171,8 +171,8 @@ class _LmsPublicCourseDetailState extends State<LmsPublicCourseDetail>
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
               colors: [
-                Colors.black.withOpacity(0.3),
-                Colors.black.withOpacity(0.7),
+                Colors.black.withValues(alpha: 0.3),
+                Colors.black.withValues(alpha: 0.7),
               ],
             ),
           ),
@@ -189,9 +189,9 @@ class _LmsPublicCourseDetailState extends State<LmsPublicCourseDetail>
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.2),
+                  color: Colors.white.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: Colors.white.withOpacity(0.3)),
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.3)),
                 ),
                 child: Text(
                   _course!['category'] ?? 'General',
@@ -248,7 +248,7 @@ class _LmsPublicCourseDetailState extends State<LmsPublicCourseDetail>
         gradient: LinearGradient(
           colors: [
             AppColors.primaryColor,
-            AppColors.primaryColor.withOpacity(0.7),
+            AppColors.primaryColor.withValues(alpha: 0.7),
           ],
         ),
       ),
@@ -320,7 +320,7 @@ class _LmsPublicCourseDetailState extends State<LmsPublicCourseDetail>
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.06),
+            color: Colors.black.withValues(alpha: 0.06),
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),
@@ -538,7 +538,7 @@ class _LmsPublicCourseDetailState extends State<LmsPublicCourseDetail>
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.08),
+            color: Colors.black.withValues(alpha: 0.08),
             blurRadius: 16,
             offset: const Offset(0, 4),
           ),
@@ -572,7 +572,7 @@ class _LmsPublicCourseDetailState extends State<LmsPublicCourseDetail>
         color: Colors.white,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
+            color: Colors.black.withValues(alpha: 0.1),
             blurRadius: 12,
             offset: const Offset(0, -4),
           ),
@@ -626,7 +626,7 @@ class _StatChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Row(

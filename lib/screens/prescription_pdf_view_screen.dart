@@ -69,7 +69,7 @@ class PrescriptionPdfViewScreen extends StatelessWidget {
             borderRadius: BorderRadius.circular(16),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.08),
+                color: Colors.black.withValues(alpha: 0.08),
                 blurRadius: 20,
                 offset: const Offset(0, 4),
               ),
@@ -180,8 +180,8 @@ class PrescriptionPdfViewScreen extends StatelessWidget {
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
-            AppColors.primaryColor.withOpacity(0.05),
-            AppColors.primaryColor.withOpacity(0.02),
+            AppColors.primaryColor.withValues(alpha: 0.05),
+            AppColors.primaryColor.withValues(alpha: 0.02),
           ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
@@ -206,7 +206,7 @@ class PrescriptionPdfViewScreen extends StatelessWidget {
                   boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.06), blurRadius: 6, offset: const Offset(0, 2))],
                 ),
                 child: Image.asset('assets/Asset 1.png', height: 36, width: 36, fit: BoxFit.contain,
-                    errorBuilder: (_, __, ___) => const Icon(Icons.local_hospital_rounded, color: AppColors.primaryColor, size: 24)),
+                    errorBuilder: (_, _, _) => const Icon(Icons.local_hospital_rounded, color: AppColors.primaryColor, size: 24)),
               ),
               const SizedBox(width: 12),
               const Text(
@@ -221,9 +221,9 @@ class PrescriptionPdfViewScreen extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
-                  color: Colors.green.withOpacity(0.1),
+                  color: Colors.green.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: Colors.green.withOpacity(0.3)),
+                  border: Border.all(color: Colors.green.withValues(alpha: 0.3)),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
@@ -343,7 +343,7 @@ class PrescriptionPdfViewScreen extends StatelessWidget {
         Container(
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
-            color: AppColors.primaryColor.withOpacity(0.1),
+            color: AppColors.primaryColor.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(8),
           ),
           child: Icon(icon, color: AppColors.primaryColor, size: 20),
@@ -376,7 +376,7 @@ class PrescriptionPdfViewScreen extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             decoration: BoxDecoration(
-              color: const Color(0xFFEF4444).withOpacity(0.2),
+              color: const Color(0xFFEF4444).withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(6),
             ),
             child: Text(
@@ -526,7 +526,7 @@ class PrescriptionPdfViewScreen extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          '${medicine.dose}',
+                          medicine.dose,
                           style: const TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w600,
@@ -537,7 +537,7 @@ class PrescriptionPdfViewScreen extends StatelessWidget {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                           decoration: BoxDecoration(
-                            color: Colors.green.withOpacity(0.1),
+                            color: Colors.green.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(6),
                           ),
                           child: Text(
@@ -600,7 +600,7 @@ class PrescriptionPdfViewScreen extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: const Color(0xFF3B82F6).withOpacity(0.1),
+              color: const Color(0xFF3B82F6).withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Icon(
@@ -630,7 +630,7 @@ class PrescriptionPdfViewScreen extends StatelessWidget {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                         decoration: BoxDecoration(
-                          color: Colors.red.withOpacity(0.1),
+                          color: Colors.red.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: const Text(
@@ -674,20 +674,20 @@ class PrescriptionPdfViewScreen extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (soap.subjective != null && soap.subjective!.isNotEmpty) ...[
-            _buildSOAPSection('Subjective', soap.subjective!),
+          if (soap.subjective.isNotEmpty) ...[
+            _buildSOAPSection('Subjective', soap.subjective),
             const SizedBox(height: 12),
           ],
-          if (soap.objective != null && soap.objective!.isNotEmpty) ...[
-            _buildSOAPSection('Objective', soap.objective!),
+          if (soap.objective.isNotEmpty) ...[
+            _buildSOAPSection('Objective', soap.objective),
             const SizedBox(height: 12),
           ],
-          if (soap.assessment != null && soap.assessment!.isNotEmpty) ...[
-            _buildSOAPSection('Assessment', soap.assessment!),
+          if (soap.assessment.isNotEmpty) ...[
+            _buildSOAPSection('Assessment', soap.assessment),
             const SizedBox(height: 12),
           ],
-          if (soap.plan != null && soap.plan!.isNotEmpty) ...[
-            _buildSOAPSection('Plan', soap.plan!),
+          if (soap.plan.isNotEmpty) ...[
+            _buildSOAPSection('Plan', soap.plan),
           ],
         ],
       ),
@@ -864,9 +864,9 @@ class PrescriptionPdfViewScreen extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: Colors.blue.withOpacity(0.05),
+              color: Colors.blue.withValues(alpha: 0.05),
               borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: Colors.blue.withOpacity(0.2)),
+              border: Border.all(color: Colors.blue.withValues(alpha: 0.2)),
             ),
             child: Row(
               children: [

@@ -156,9 +156,9 @@ class UpcomingBOokingsList extends ConsumerWidget {
                       width: double.infinity,
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF8B5CF6).withOpacity(0.1),
+                        color: const Color(0xFF8B5CF6).withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: const Color(0xFF8B5CF6).withOpacity(0.4)),
+                        border: Border.all(color: const Color(0xFF8B5CF6).withValues(alpha: 0.4)),
                       ),
                       child: const Row(
                         mainAxisAlignment: MainAxisAlignment.center,
@@ -350,19 +350,19 @@ class _WebBookingCategoriesState extends State<_WebBookingCategories> {
                                   ),
                                   decoration: BoxDecoration(
                                     color: isSelected
-                                        ? color.withOpacity(0.08)
+                                        ? color.withValues(alpha: 0.08)
                                         : Colors.white,
                                     borderRadius: BorderRadius.circular(16),
                                     border: Border.all(
                                       color: isSelected
-                                          ? color.withOpacity(0.3)
+                                          ? color.withValues(alpha: 0.3)
                                           : const Color(0xFFE2E8F0),
                                       width: 1.5,
                                     ),
                                     boxShadow: isSelected
                                         ? [
                                             BoxShadow(
-                                              color: color.withOpacity(0.1),
+                                              color: color.withValues(alpha: 0.1),
                                               blurRadius: 12,
                                               offset: const Offset(0, 4),
                                             ),
@@ -375,7 +375,7 @@ class _WebBookingCategoriesState extends State<_WebBookingCategories> {
                                         padding: const EdgeInsets.all(10),
                                         decoration: BoxDecoration(
                                           color: isSelected
-                                              ? color.withOpacity(0.15)
+                                              ? color.withValues(alpha: 0.15)
                                               : const Color(0xFFF8FAFC),
                                           borderRadius: BorderRadius.circular(
                                             12,
@@ -410,7 +410,7 @@ class _WebBookingCategoriesState extends State<_WebBookingCategories> {
                                         ),
                                         decoration: BoxDecoration(
                                           color: isSelected
-                                              ? color.withOpacity(0.15)
+                                              ? color.withValues(alpha: 0.15)
                                               : const Color(0xFFF1F5F9),
                                           borderRadius: BorderRadius.circular(
                                             20,
@@ -419,12 +419,15 @@ class _WebBookingCategoriesState extends State<_WebBookingCategories> {
                                         child: Text(
                                           widget.appointments
                                               .where((a) {
-                                                if (index == 0)
+                                                if (index == 0) {
                                                   return a.status.toLowerCase() == 'confirmed';
-                                                if (index == 1)
+                                                }
+                                                if (index == 1) {
                                                   return a.status.toLowerCase() == 'pending';
-                                                if (index == 2)
+                                                }
+                                                if (index == 2) {
                                                   return a.status.toLowerCase() == 'completed';
+                                                }
                                                 return a.status.toLowerCase() == 'cancelled';
                                               })
                                               .length
@@ -578,7 +581,7 @@ class _WebBookingCategoriesState extends State<_WebBookingCategories> {
                                 ),
                                 decoration: BoxDecoration(
                                   color: (_tabs[_selectedTab]["color"] as Color)
-                                      .withOpacity(0.08),
+                                      .withValues(alpha: 0.08),
                                   borderRadius: BorderRadius.circular(20),
                                 ),
                                 child: Text(
@@ -614,12 +617,15 @@ class _WebBookingCategoriesState extends State<_WebBookingCategories> {
                           child: _WebBookingList(
                             status: _tabs[_selectedTab]["status"],
                             data: widget.appointments.where((a) {
-                              if (_selectedTab == 0)
+                              if (_selectedTab == 0) {
                                 return a.status.toLowerCase() == 'confirmed';
-                              if (_selectedTab == 1)
+                              }
+                              if (_selectedTab == 1) {
                                 return a.status.toLowerCase() == 'pending';
-                              if (_selectedTab == 2)
+                              }
+                              if (_selectedTab == 2) {
                                 return a.status.toLowerCase() == 'completed';
+                              }
                               return a.status.toLowerCase() == 'cancelled';
                             }).toList(),
                           ),
@@ -647,7 +653,7 @@ class _WebBookingCategoriesState extends State<_WebBookingCategories> {
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
           decoration: BoxDecoration(
-            color: color.withOpacity(0.08),
+            color: color.withValues(alpha: 0.08),
             borderRadius: BorderRadius.circular(12),
           ),
           child: Text(
@@ -695,8 +701,8 @@ class _WebBookingList extends ConsumerWidget {
                 margin: const EdgeInsets.only(bottom: 16),
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF8B5CF6).withOpacity(0.05),
-                  border: Border.all(color: const Color(0xFF8B5CF6).withOpacity(0.3)),
+                  color: const Color(0xFF8B5CF6).withValues(alpha: 0.05),
+                  border: Border.all(color: const Color(0xFF8B5CF6).withValues(alpha: 0.3)),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Row(

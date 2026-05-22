@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 import '../services/appointment_service.dart';
 import '../models/appointment_detail.dart';
 import '../utils/shared_pref.dart';

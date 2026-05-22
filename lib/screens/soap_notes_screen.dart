@@ -43,7 +43,7 @@ class _SoapNotesScreenState extends State<SoapNotesScreen> {
     final notes = await _clinicalService.getSoapNotes(
       widget.appointment.id ?? '',
     );
-    if (notes != null && mounted) {
+    if (mounted) {
       setState(() {
         _subjectiveController.text = notes['subjective'] ?? '';
         _objectiveController.text = notes['objective'] ?? '';
@@ -425,7 +425,7 @@ class _SoapNotesScreenState extends State<SoapNotesScreen> {
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: AppColors.primaryColor.withOpacity(0.3)),
+                  border: Border.all(color: AppColors.primaryColor.withValues(alpha: 0.3)),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
@@ -433,7 +433,7 @@ class _SoapNotesScreenState extends State<SoapNotesScreen> {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
-                        color: AppColors.primaryColor.withOpacity(0.1),
+                        color: AppColors.primaryColor.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(6),
                       ),
                       child: Text(

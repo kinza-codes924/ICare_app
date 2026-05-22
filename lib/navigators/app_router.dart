@@ -23,7 +23,6 @@ import 'package:icare/screens/instructor_student_progress_screen.dart';
 import 'package:icare/screens/instructor_course_content_screen.dart';
 import 'package:icare/screens/instructor_course_analytics_screen.dart';
 import 'package:icare/screens/instructor_course_stream_screen.dart';
-import 'package:icare/screens/lms_course_page.dart';
 import 'package:icare/screens/certificate_verification_page.dart';
 import 'package:icare/utils/shared_pref.dart';
 import 'package:icare/utils/app_keys.dart';
@@ -49,8 +48,8 @@ final authInitProvider = FutureProvider<void>((ref) async {
 /// Notifies go_router when auth or init state changes so redirect reruns.
 class _RouterNotifier extends ChangeNotifier {
   _RouterNotifier(Ref ref) {
-    ref.listen<AsyncValue<void>>(authInitProvider, (_, __) => notifyListeners());
-    ref.listen<Auth>(authProvider, (_, __) => notifyListeners());
+    ref.listen<AsyncValue<void>>(authInitProvider, (_, _) => notifyListeners());
+    ref.listen<Auth>(authProvider, (_, _) => notifyListeners());
   }
 }
 
@@ -90,12 +89,12 @@ final routerProvider = Provider<GoRouter>((ref) {
       return null;
     },
     routes: [
-      GoRoute(path: '/splash', builder: (_, __) => const SplashScreen()),
-      GoRoute(path: '/home', builder: (_, __) => const PublicHome()),
-      GoRoute(path: '/login', builder: (_, __) => const LoginScreen()),
-      GoRoute(path: '/signup', builder: (_, __) => const SignupScreen()),
-      GoRoute(path: '/work-with-us', builder: (_, __) => const WorkWithUsSignup()),
-      GoRoute(path: '/dashboard', builder: (_, __) => const TabsScreen()),
+      GoRoute(path: '/splash', builder: (_, _) => const SplashScreen()),
+      GoRoute(path: '/home', builder: (_, _) => const PublicHome()),
+      GoRoute(path: '/login', builder: (_, _) => const LoginScreen()),
+      GoRoute(path: '/signup', builder: (_, _) => const SignupScreen()),
+      GoRoute(path: '/work-with-us', builder: (_, _) => const WorkWithUsSignup()),
+      GoRoute(path: '/dashboard', builder: (_, _) => const TabsScreen()),
       GoRoute(
         path: '/lms/catalog',
         builder: (_, state) {
@@ -110,12 +109,12 @@ final routerProvider = Provider<GoRouter>((ref) {
           return CertificateVerificationPage(initialCode: code);
         },
       ),
-      GoRoute(path: '/admin/verifications', builder: (_, __) => const AdminVerificationPanel()),
+      GoRoute(path: '/admin/verifications', builder: (_, _) => const AdminVerificationPanel()),
       
       // Instructor LMS Routes
-      GoRoute(path: '/instructor/lms', builder: (_, __) => const InstructorLmsDashboard()),
-      GoRoute(path: '/instructor/lms/courses', builder: (_, __) => const InstructorLmsCoursesScreen()),
-      GoRoute(path: '/instructor/lms/create-course', builder: (_, __) => const InstructorLmsCreateCourseScreen()),
+      GoRoute(path: '/instructor/lms', builder: (_, _) => const InstructorLmsDashboard()),
+      GoRoute(path: '/instructor/lms/courses', builder: (_, _) => const InstructorLmsCoursesScreen()),
+      GoRoute(path: '/instructor/lms/create-course', builder: (_, _) => const InstructorLmsCreateCourseScreen()),
       
       // Quiz routes
       GoRoute(

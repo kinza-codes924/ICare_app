@@ -1,12 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_size_matters/flutter_size_matters.dart';
-import 'package:icare/screens/notifications.dart';
 import 'package:icare/screens/patient_prescriptions.dart';
 import 'package:icare/utils/imagePaths.dart';
 import 'package:icare/utils/theme.dart';
 import 'package:icare/widgets/back_button.dart';
 import 'package:icare/widgets/custom_text.dart';
-import 'package:icare/widgets/svg_wrapper.dart';
 
 class PrescriptionsScreen extends StatelessWidget {
   const PrescriptionsScreen({super.key});
@@ -71,7 +68,7 @@ class PrescriptionsScreen extends StatelessWidget {
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     colors: [
-                      AppColors.primaryColor.withOpacity(0.05),
+                      AppColors.primaryColor.withValues(alpha: 0.05),
                       Colors.white,
                     ],
                     begin: Alignment.topCenter,
@@ -167,7 +164,7 @@ class PrescriptionsScreen extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         elevation: 10,
-        shadowColor: AppColors.primaryColor.withOpacity(0.3),
+        shadowColor: AppColors.primaryColor.withValues(alpha: 0.3),
       ),
     );
   }
@@ -226,7 +223,7 @@ class PrescriptionsScreen extends StatelessWidget {
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 20,
             offset: const Offset(0, 8),
           ),
@@ -269,7 +266,7 @@ class PrescriptionsScreen extends StatelessWidget {
                   vertical: 5,
                 ),
                 decoration: BoxDecoration(
-                  color: (data['color'] as Color).withOpacity(0.1),
+                  color: (data['color'] as Color).withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: CustomText(
@@ -336,7 +333,7 @@ class PrescriptionsScreen extends StatelessWidget {
                 ),
                 style: TextButton.styleFrom(
                   foregroundColor: AppColors.primaryColor,
-                  backgroundColor: AppColors.primaryColor.withOpacity(0.05),
+                  backgroundColor: AppColors.primaryColor.withValues(alpha: 0.05),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(10),
                   ),

@@ -291,7 +291,7 @@ class _StudentProfileSetupState extends State<StudentProfileSetup>
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: primaryColor.withOpacity(0.3),
+            color: primaryColor.withValues(alpha: 0.3),
             blurRadius: 20,
             offset: const Offset(0, 8),
           ),
@@ -302,9 +302,9 @@ class _StudentProfileSetupState extends State<StudentProfileSetup>
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.12),
+              color: Colors.white.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: Colors.white.withOpacity(0.2)),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
             ),
             child: const Icon(
               Icons.school_rounded,
@@ -330,7 +330,7 @@ class _StudentProfileSetupState extends State<StudentProfileSetup>
                   'Customize your learning experience by completing your profile',
                   style: TextStyle(
                     fontSize: 14,
-                    color: Colors.white.withOpacity(0.85),
+                    color: Colors.white.withValues(alpha: 0.85),
                   ),
                 ),
               ],
@@ -346,10 +346,10 @@ class _StudentProfileSetupState extends State<StudentProfileSetup>
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.grey.withOpacity(0.1)),
+        border: Border.all(color: Colors.grey.withValues(alpha: 0.1)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 15,
             offset: const Offset(0, 4),
           ),
@@ -364,7 +364,7 @@ class _StudentProfileSetupState extends State<StudentProfileSetup>
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: accentColor.withOpacity(0.1),
+                  color: accentColor.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(icon, color: accentColor, size: 24),
@@ -437,7 +437,7 @@ class _StudentProfileSetupState extends State<StudentProfileSetup>
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: primaryColor.withOpacity(0.3),
+            color: primaryColor.withValues(alpha: 0.3),
             blurRadius: 15,
             offset: const Offset(0, 8),
           ),
@@ -469,7 +469,7 @@ class _StudentProfileSetupState extends State<StudentProfileSetup>
                     color: Colors.white,
                     size: 22,
                   ),
-                  const SizedBox(width: 12),
+                  SizedBox(width: 12),
                   Text(
                     'Save Profile Details',
                     style: TextStyle(

@@ -429,7 +429,7 @@ class _PharmacyDetailsScreenState extends State<PharmacyDetailsScreen> {
                       borderRadius: BorderRadius.circular(30),
                       boxShadow: [
                         BoxShadow(
-                          color: const Color(0xFF95BF47).withOpacity(0.4),
+                          color: const Color(0xFF95BF47).withValues(alpha: 0.4),
                           blurRadius: 12,
                           offset: const Offset(0, 6),
                         ),
@@ -473,7 +473,7 @@ class _PharmacyDetailsScreenState extends State<PharmacyDetailsScreen> {
                 gradient: LinearGradient(
                   colors: [
                     AppColors.primaryColor,
-                    AppColors.primaryColor.withOpacity(0.8),
+                    AppColors.primaryColor.withValues(alpha: 0.8),
                   ],
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
@@ -493,7 +493,7 @@ class _PharmacyDetailsScreenState extends State<PharmacyDetailsScreen> {
                       borderRadius: BorderRadius.circular(25),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.1),
+                          color: Colors.black.withValues(alpha: 0.1),
                           blurRadius: 10,
                         ),
                       ],
@@ -542,7 +542,7 @@ class _PharmacyDetailsScreenState extends State<PharmacyDetailsScreen> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFFF1F5F9).withOpacity(0.5),
+        color: const Color(0xFFF1F5F9).withValues(alpha: 0.5),
         borderRadius: BorderRadius.circular(20),
       ),
       child: Row(
@@ -582,7 +582,7 @@ class _PharmacyDetailsScreenState extends State<PharmacyDetailsScreen> {
   }
 
   Widget _divider() =>
-      Container(width: 1, height: 30, color: Colors.grey.withOpacity(0.2));
+      Container(width: 1, height: 30, color: Colors.grey.withValues(alpha: 0.2));
 
   Widget _buildPrescribedMedicinesBanner() {
     final meds = widget.prescribedMedicines!;
@@ -590,10 +590,10 @@ class _PharmacyDetailsScreenState extends State<PharmacyDetailsScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFF1D4ED8).withOpacity(0.2)),
+        border: Border.all(color: const Color(0xFF1D4ED8).withValues(alpha: 0.2)),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF1D4ED8).withOpacity(0.08),
+            color: const Color(0xFF1D4ED8).withValues(alpha: 0.08),
             blurRadius: 16,
             offset: const Offset(0, 6),
           ),
@@ -621,7 +621,7 @@ class _PharmacyDetailsScreenState extends State<PharmacyDetailsScreen> {
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.2),
+                    color: Colors.white.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: const Icon(Icons.description_rounded, color: Colors.white, size: 20),
@@ -641,7 +641,7 @@ class _PharmacyDetailsScreenState extends State<PharmacyDetailsScreen> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.2),
+                    color: Colors.white.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
@@ -826,9 +826,9 @@ class _PharmacyDetailsScreenState extends State<PharmacyDetailsScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withOpacity(0.3)),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Text(
         label,
@@ -884,7 +884,7 @@ class _PharmacyDetailsScreenState extends State<PharmacyDetailsScreen> {
                   border: Border.all(color: const Color(0xFFF1F5F9)),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.02),
+                      color: Colors.black.withValues(alpha: 0.02),
                       blurRadius: 4,
                       offset: const Offset(0, 2),
                     ),
@@ -911,7 +911,7 @@ class _PharmacyDetailsScreenState extends State<PharmacyDetailsScreen> {
         imageUrl,
         fit: BoxFit.cover,
         width: double.infinity,
-        errorBuilder: (_, __, ___) => _medicineIconFallback(category: category),
+        errorBuilder: (_, _, _) => _medicineIconFallback(category: category),
         loadingBuilder: (_, child, progress) => progress == null
             ? child
             : Container(
@@ -982,7 +982,7 @@ class _PharmacyDetailsScreenState extends State<PharmacyDetailsScreen> {
           border: Border.all(color: const Color(0xFFF1F5F9)),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.03),
+              color: Colors.black.withValues(alpha: 0.03),
               blurRadius: 10,
               offset: const Offset(0, 4),
             ),
@@ -1085,7 +1085,7 @@ class _PharmacyDetailsScreenState extends State<PharmacyDetailsScreen> {
                         color: AppColors.primaryColor,
                         borderRadius: BorderRadius.circular(8),
                         boxShadow: [
-                          BoxShadow(color: AppColors.primaryColor.withOpacity(0.3), blurRadius: 4, offset: const Offset(0, 2)),
+                          BoxShadow(color: AppColors.primaryColor.withValues(alpha: 0.3), blurRadius: 4, offset: const Offset(0, 2)),
                         ],
                       ),
                       child: const Icon(Icons.add_rounded, size: 16, color: Colors.white),
@@ -1142,7 +1142,7 @@ class _PharmacyDetailsScreenState extends State<PharmacyDetailsScreen> {
     final category = (med['category'] ?? '').toString();
     final inStock = (med['inStock'] ?? med['stock_quantity'] ?? 0);
     final dosage = (med['dosage'] ?? '').toString();
-    final requires_prescription = med['requiresPrescription'] == true || med['requires_prescription'] == true;
+    final requiresPrescription = med['requiresPrescription'] == true || med['requires_prescription'] == true;
 
     showDialog(
       context: context,
@@ -1187,7 +1187,7 @@ class _PharmacyDetailsScreenState extends State<PharmacyDetailsScreen> {
                             children: [
                               Text('Rs $price',
                                   style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: AppColors.primaryColor)),
-                              if (requires_prescription)
+                              if (requiresPrescription)
                                 Container(
                                   margin: const EdgeInsets.only(top: 4),
                                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
@@ -1311,7 +1311,7 @@ class _PharmacyDetailsScreenState extends State<PharmacyDetailsScreen> {
           borderRadius: BorderRadius.circular(30),
           boxShadow: [
             BoxShadow(
-              color: AppColors.primaryColor.withOpacity(0.4),
+              color: AppColors.primaryColor.withValues(alpha: 0.4),
               blurRadius: 15,
               offset: const Offset(0, 8),
             ),

@@ -126,7 +126,7 @@ class _ConsultationDetailsScreenState
                     Container(
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
-                        color: AppColors.primaryColor.withOpacity(0.1),
+                        color: AppColors.primaryColor.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: const Icon(Icons.payment_rounded,
@@ -143,7 +143,7 @@ class _ConsultationDetailsScreenState
                       padding: const EdgeInsets.symmetric(
                           horizontal: 12, vertical: 6),
                       decoration: BoxDecoration(
-                        color: AppColors.primaryColor.withOpacity(0.08),
+                        color: AppColors.primaryColor.withValues(alpha: 0.08),
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: const Text('Rs. 500',
@@ -174,7 +174,7 @@ class _ConsultationDetailsScreenState
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
                         color: isSelected
-                            ? AppColors.primaryColor.withOpacity(0.05)
+                            ? AppColors.primaryColor.withValues(alpha: 0.05)
                             : const Color(0xFFF8FAFC),
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
@@ -244,7 +244,7 @@ class _ConsultationDetailsScreenState
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
-                        color: AppColors.primaryColor.withOpacity(0.3),
+                        color: AppColors.primaryColor.withValues(alpha: 0.3),
                       ),
                     ),
                     child: Row(
@@ -326,10 +326,10 @@ class _ConsultationDetailsScreenState
             Container(
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                color: AppColors.primaryColor.withOpacity(0.06),
+                color: AppColors.primaryColor.withValues(alpha: 0.06),
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                    color: AppColors.primaryColor.withOpacity(0.2)),
+                    color: AppColors.primaryColor.withValues(alpha: 0.2)),
               ),
               child: const Row(
                 children: [
@@ -522,7 +522,7 @@ class _ConsultationDetailsScreenState
                         padding: const EdgeInsets.symmetric(
                             horizontal: 6, vertical: 2),
                         decoration: BoxDecoration(
-                          color: Colors.red.withOpacity(0.1),
+                          color: Colors.red.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: const Text('Mandatory',
@@ -650,7 +650,7 @@ class _ConsultationDetailsScreenState
             const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
           color: isSelected
-              ? AppColors.primaryColor.withOpacity(0.1)
+              ? AppColors.primaryColor.withValues(alpha: 0.1)
               : Colors.white,
           borderRadius: BorderRadius.circular(8),
           border: Border.all(

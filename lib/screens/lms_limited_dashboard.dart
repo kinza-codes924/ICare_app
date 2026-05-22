@@ -21,7 +21,7 @@ class _LmsLimitedDashboardState extends State<LmsLimitedDashboard> {
   
   Map<String, dynamic>? _course;
   Map<String, dynamic>? _enrollment;
-  String _verificationStatus = 'pending'; // pending, approved, rejected
+  final String _verificationStatus = 'pending'; // pending, approved, rejected
   bool _isLoading = true;
 
   @override
@@ -147,9 +147,9 @@ class _LmsLimitedDashboardState extends State<LmsLimitedDashboard> {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: bannerColor.withOpacity(0.1),
+        color: bannerColor.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: bannerColor.withOpacity(0.3)),
+        border: Border.all(color: bannerColor.withValues(alpha: 0.3)),
       ),
       child: Row(
         children: [
@@ -197,13 +197,13 @@ class _LmsLimitedDashboardState extends State<LmsLimitedDashboard> {
         gradient: LinearGradient(
           colors: [
             AppColors.primaryColor,
-            AppColors.primaryColor.withOpacity(0.8),
+            AppColors.primaryColor.withValues(alpha: 0.8),
           ],
         ),
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: AppColors.primaryColor.withOpacity(0.3),
+            color: AppColors.primaryColor.withValues(alpha: 0.3),
             blurRadius: 20,
             offset: const Offset(0, 8),
           ),
@@ -291,7 +291,7 @@ class _LmsLimitedDashboardState extends State<LmsLimitedDashboard> {
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.06),
+              color: Colors.black.withValues(alpha: 0.06),
               blurRadius: 12,
               offset: const Offset(0, 4),
             ),
@@ -307,7 +307,7 @@ class _LmsLimitedDashboardState extends State<LmsLimitedDashboard> {
                 gradient: LinearGradient(
                   colors: [
                     AppColors.primaryColor,
-                    AppColors.primaryColor.withOpacity(0.7),
+                    AppColors.primaryColor.withValues(alpha: 0.7),
                   ],
                 ),
                 borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
@@ -561,14 +561,14 @@ class _ActionCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: color.withOpacity(0.3)),
+          border: Border.all(color: color.withValues(alpha: 0.3)),
         ),
         child: Column(
           children: [
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: color.withOpacity(0.1),
+                color: color.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Icon(icon, color: color, size: 24),
@@ -616,7 +616,7 @@ class _NextStepItem extends StatelessWidget {
             decoration: BoxDecoration(
               color: isDone
                   ? const Color(0xFF10B981)
-                  : const Color(0xFF6366F1).withOpacity(0.1),
+                  : const Color(0xFF6366F1).withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Center(

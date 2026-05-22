@@ -117,7 +117,7 @@ class _LessonNotesEditorState extends State<LessonNotesEditor> {
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -130,7 +130,7 @@ class _LessonNotesEditorState extends State<LessonNotesEditor> {
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: AppColors.primaryColor.withOpacity(0.05),
+              color: AppColors.primaryColor.withValues(alpha: 0.05),
               borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
             ),
             child: Row(
@@ -152,10 +152,10 @@ class _LessonNotesEditorState extends State<LessonNotesEditor> {
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
                       color: _saveStatus.contains('✓')
-                          ? Colors.green.withOpacity(0.1)
+                          ? Colors.green.withValues(alpha: 0.1)
                           : _saveStatus.contains('✗')
-                              ? Colors.red.withOpacity(0.1)
-                              : Colors.grey.withOpacity(0.1),
+                              ? Colors.red.withValues(alpha: 0.1)
+                              : Colors.grey.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(

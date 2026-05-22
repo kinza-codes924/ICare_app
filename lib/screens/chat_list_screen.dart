@@ -132,13 +132,13 @@ class _ChatListScreenState extends State<ChatListScreen> {
             width: 120.w,
             height: 120.w,
             decoration: BoxDecoration(
-              color: AppColors.primaryColor.withOpacity(0.1),
+              color: AppColors.primaryColor.withValues(alpha: 0.1),
               shape: BoxShape.circle,
             ),
             child: Icon(
               Icons.chat_bubble_outline,
               size: 60.sp,
-              color: AppColors.primaryColor.withOpacity(0.5),
+              color: AppColors.primaryColor.withValues(alpha: 0.5),
             ),
           ),
           SizedBox(height: 24.h),
@@ -167,7 +167,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
           Container(
             padding: EdgeInsets.symmetric(horizontal: 24.w, vertical: 12.h),
             decoration: BoxDecoration(
-              color: AppColors.primaryColor.withOpacity(0.1),
+              color: AppColors.primaryColor.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(12.r),
             ),
             child: Row(
@@ -207,7 +207,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
         children: [
           CircleAvatar(
             radius: 28.r,
-            backgroundColor: AppColors.primaryColor.withOpacity(0.1),
+            backgroundColor: AppColors.primaryColor.withValues(alpha: 0.1),
             backgroundImage: user['profileImage'] != null
                 ? NetworkImage(user['profileImage'])
                 : null,
@@ -278,7 +278,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
             Container(
               padding: EdgeInsets.symmetric(horizontal: 6.w, vertical: 2.h),
               decoration: BoxDecoration(
-                color: _getRoleColor(user['role']).withOpacity(0.1),
+                color: _getRoleColor(user['role']).withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(4.r),
               ),
               child: Text(

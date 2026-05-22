@@ -29,7 +29,7 @@ class _QuizTakeScreenState extends State<QuizTakeScreen> {
 
   // State
   int _currentIndex = 0;
-  Map<int, dynamic> _answers = {}; // questionIndex -> answer (int for MCQ, String for text)
+  final Map<int, dynamic> _answers = {}; // questionIndex -> answer (int for MCQ, String for text)
   bool _isLoading = true;
   bool _isSubmitting = false;
   bool _showPalette = false;
@@ -39,7 +39,7 @@ class _QuizTakeScreenState extends State<QuizTakeScreen> {
   // Timer
   Timer? _timer;
   int _secondsRemaining = 0;
-  int _timeSpentSeconds = 0;
+  final int _timeSpentSeconds = 0;
   final Stopwatch _stopwatch = Stopwatch();
 
   @override
@@ -319,9 +319,9 @@ class _QuizTakeScreenState extends State<QuizTakeScreen> {
             margin: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
             decoration: BoxDecoration(
-              color: _timerColor.withOpacity(0.2),
+              color: _timerColor.withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: _timerColor.withOpacity(0.5)),
+              border: Border.all(color: _timerColor.withValues(alpha: 0.5)),
             ),
             child: Row(
               children: [
@@ -378,7 +378,7 @@ class _QuizTakeScreenState extends State<QuizTakeScreen> {
                     border: Border.all(color: const Color(0xFFE2E8F0)),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.04),
+                        color: Colors.black.withValues(alpha: 0.04),
                         blurRadius: 8,
                         offset: const Offset(0, 2),
                       ),
@@ -392,7 +392,7 @@ class _QuizTakeScreenState extends State<QuizTakeScreen> {
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                             decoration: BoxDecoration(
-                              color: AppColors.primaryColor.withOpacity(0.1),
+                              color: AppColors.primaryColor.withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: Text('Q ${_currentIndex + 1}',
@@ -457,7 +457,7 @@ class _QuizTakeScreenState extends State<QuizTakeScreen> {
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
                           color: isSelected
-                              ? AppColors.primaryColor.withOpacity(0.08)
+                              ? AppColors.primaryColor.withValues(alpha: 0.08)
                               : Colors.white,
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
@@ -497,7 +497,7 @@ class _QuizTakeScreenState extends State<QuizTakeScreen> {
                         ),
                       ),
                     );
-                  }).toList(),
+                  }),
                 ] else ...[
                   // Text answer
                   const Text('Your answer:',
@@ -683,7 +683,7 @@ class _QuizTakeScreenState extends State<QuizTakeScreen> {
                     color: bg,
                     borderRadius: BorderRadius.circular(10),
                     boxShadow: isCurrent
-                        ? [BoxShadow(color: AppColors.primaryColor.withOpacity(0.4), blurRadius: 6, offset: const Offset(0, 2))]
+                        ? [BoxShadow(color: AppColors.primaryColor.withValues(alpha: 0.4), blurRadius: 6, offset: const Offset(0, 2))]
                         : null,
                   ),
                   child: Center(
@@ -773,7 +773,7 @@ class _QuizTakeScreenState extends State<QuizTakeScreen> {
                   width: 80,
                   height: 80,
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.2),
+                    color: Colors.white.withValues(alpha: 0.2),
                     shape: BoxShape.circle,
                   ),
                   child: Icon(
@@ -798,9 +798,9 @@ class _QuizTakeScreenState extends State<QuizTakeScreen> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.2),
+                    color: Colors.white.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(50),
-                    border: Border.all(color: Colors.white.withOpacity(0.4)),
+                    border: Border.all(color: Colors.white.withValues(alpha: 0.4)),
                   ),
                   child: Text(
                     'Score: $score%',
@@ -972,8 +972,8 @@ class _QuizTakeScreenState extends State<QuizTakeScreen> {
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: isCorrect
-              ? const Color(0xFF10B981).withOpacity(0.3)
-              : const Color(0xFFEF4444).withOpacity(0.3),
+              ? const Color(0xFF10B981).withValues(alpha: 0.3)
+              : const Color(0xFFEF4444).withValues(alpha: 0.3),
         ),
       ),
       child: Column(

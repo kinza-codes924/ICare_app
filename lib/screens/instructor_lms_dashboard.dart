@@ -1045,7 +1045,7 @@ class _TodoPageState extends State<_TodoPage> with SingleTickerProviderStateMixi
     return ListView.separated(
       padding: const EdgeInsets.all(20),
       itemCount: _toReview.length,
-      separatorBuilder: (_, __) => const Divider(height: 1, color: Color(0xFFF1F3F4)),
+      separatorBuilder: (_, _) => const Divider(height: 1, color: Color(0xFFF1F3F4)),
       itemBuilder: (ctx, i) {
         final item = _toReview[i];
         final pending = item['_pendingGrading'] as int;
@@ -1093,7 +1093,7 @@ class _TodoPageState extends State<_TodoPage> with SingleTickerProviderStateMixi
     return ListView.separated(
       padding: const EdgeInsets.all(20),
       itemCount: _upcoming.length,
-      separatorBuilder: (_, __) => const Divider(height: 1, color: Color(0xFFF1F3F4)),
+      separatorBuilder: (_, _) => const Divider(height: 1, color: Color(0xFFF1F3F4)),
       itemBuilder: (ctx, i) {
         final item = _upcoming[i];
         final due = _d(item['dueDate']?.toString() ?? '');
@@ -1391,7 +1391,7 @@ class _VoucherManagerState extends State<VoucherManagerWidget> {
                   style: TextStyle(fontSize: 11, color: v['used'] == true ? Colors.grey : Colors.green.shade700)),
             ])),
           ]),
-        )).toList(),
+        )),
       ],
     ]);
   }

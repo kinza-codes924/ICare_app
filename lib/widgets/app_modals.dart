@@ -6,7 +6,6 @@ import 'package:icare/utils/utils.dart';
 import 'package:icare/widgets/custom_button.dart';
 import 'package:icare/widgets/custom_text.dart';
 import 'package:icare/widgets/svg_wrapper.dart';
-import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 
 class AppDialogs {
   static void showSuccessDialog(
@@ -86,7 +85,7 @@ class AppDialogs {
     dynamic onPrimaryButtonPressed,
     dynamic onSecondaryButtonPressed,
     String? selectedReason,
-    Widget? centerAction = null,
+    Widget? centerAction,
     bool isShowActions = true,
   }) {
     showDialog(

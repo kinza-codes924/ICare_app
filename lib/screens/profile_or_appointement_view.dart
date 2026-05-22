@@ -12,7 +12,6 @@ import 'package:icare/screens/video_call.dart';
 import 'package:icare/services/appointment_service.dart';
 import 'package:icare/screens/prescription_detail_screen.dart';
 import 'package:icare/services/consultation_service.dart';
-import 'package:icare/screens/tabs.dart';
 import 'package:icare/utils/imagePaths.dart';
 import 'package:icare/utils/shared_pref.dart';
 import 'package:icare/utils/theme.dart';

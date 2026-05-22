@@ -54,7 +54,7 @@ class _LmsCoursePageState extends State<LmsCoursePage> with SingleTickerProvider
               background: Container(
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
-                    colors: [color, color.withOpacity(0.7)],
+                    colors: [color, color.withValues(alpha: 0.7)],
                     begin: Alignment.topLeft, end: Alignment.bottomRight,
                   ),
                 ),
@@ -66,7 +66,7 @@ class _LmsCoursePageState extends State<LmsCoursePage> with SingleTickerProvider
                     const SizedBox(height: 4),
                     Text(
                       widget.course['category'] ?? 'Healthcare',
-                      style: TextStyle(color: Colors.white.withOpacity(0.85), fontSize: 13),
+                      style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontSize: 13),
                     ),
                   ],
                 ),
@@ -165,7 +165,7 @@ class _PostBox extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 8)]),
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8)]),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
@@ -202,7 +202,7 @@ class _PostCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 8)]),
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8)]),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -420,9 +420,9 @@ class _CourseLessons extends StatelessWidget {
       return Container(
         margin: const EdgeInsets.only(bottom: 8),
         decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12),
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 6)]),
+          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 6)]),
         child: ExpansionTile(
-          leading: CircleAvatar(radius: 16, backgroundColor: AppColors.primaryColor.withOpacity(0.1),
+          leading: CircleAvatar(radius: 16, backgroundColor: AppColors.primaryColor.withValues(alpha: 0.1),
             child: Text('${me.key + 1}', style: TextStyle(color: AppColors.primaryColor, fontWeight: FontWeight.w700, fontSize: 12))),
           title: Text(m['title'] ?? 'Module ${me.key + 1}', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
           subtitle: Text('${lessons.length} lessons · ${quizzes.length} quizzes', style: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8))),
@@ -524,12 +524,12 @@ class _AssignmentCard extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 8)]),
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8)]),
       child: ListTile(
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         leading: Container(
           width: 44, height: 44,
-          decoration: BoxDecoration(color: AppColors.primaryColor.withOpacity(0.1), borderRadius: BorderRadius.circular(10)),
+          decoration: BoxDecoration(color: AppColors.primaryColor.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(10)),
           child: const Icon(Icons.assignment_rounded, color: AppColors.primaryColor, size: 22),
         ),
         title: Text(assignment['title'] ?? 'Assignment', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
@@ -649,7 +649,7 @@ class _SubmissionsPageState extends State<_SubmissionsPage> {
                       margin: const EdgeInsets.only(bottom: 12),
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14),
-                        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 8)]),
+                        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8)]),
                       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                         Row(children: [
                           CircleAvatar(backgroundColor: AppColors.primaryColor,
@@ -663,9 +663,9 @@ class _SubmissionsPageState extends State<_SubmissionsPage> {
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                             decoration: BoxDecoration(
-                              color: s['status'] == 'graded' ? Colors.green.withOpacity(0.1)
-                                  : s['status'] == 'late' ? Colors.red.withOpacity(0.1)
-                                  : Colors.orange.withOpacity(0.1),
+                              color: s['status'] == 'graded' ? Colors.green.withValues(alpha: 0.1)
+                                  : s['status'] == 'late' ? Colors.red.withValues(alpha: 0.1)
+                                  : Colors.orange.withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(20),
                             ),
                             child: Text(
@@ -735,7 +735,7 @@ class _SubmissionsPageState extends State<_SubmissionsPage> {
                 const Text('Rubric Grade', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF475569))),
                 const SizedBox(height: 8),
                 DropdownButtonFormField<String>(
-                  value: selectedRubric,
+                  initialValue: selectedRubric,
                   decoration: const InputDecoration(
                     border: OutlineInputBorder(),
                     prefixIcon: Icon(Icons.assessment_rounded),
@@ -955,7 +955,7 @@ class _GradesTabState extends State<_GradesTab> {
               margin: const EdgeInsets.only(bottom: 10),
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14),
-                boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 8)]),
+                boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8)]),
               child: Row(children: [
                 Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Text(a['title'] ?? 'Assignment', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
@@ -1057,7 +1057,7 @@ class _PersonTile extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 6)]),
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 6)]),
       child: Row(children: [
         CircleAvatar(
           backgroundColor: isInstructor ? AppColors.primaryColor : const Color(0xFFE2E8F0),
@@ -1072,7 +1072,7 @@ class _PersonTile extends StatelessWidget {
         if (progress != null && progress['completed'] == true)
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            decoration: BoxDecoration(color: Colors.green.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
+            decoration: BoxDecoration(color: Colors.green.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)),
             child: const Text('Completed', style: TextStyle(fontSize: 11, color: Colors.green, fontWeight: FontWeight.w700)),
           ),
       ]),

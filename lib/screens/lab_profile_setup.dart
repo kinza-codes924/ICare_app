@@ -1,4 +1,3 @@
-import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart';
@@ -6,7 +5,6 @@ import 'package:image_picker/image_picker.dart';
 import '../utils/html_stub.dart' as html
     if (dart.library.html) 'dart:html';
 import '../services/laboratory_service.dart';
-import 'laboratory_dashboard.dart';
 import 'tabs.dart';
 import '../widgets/back_button.dart';
 
@@ -222,6 +220,7 @@ class _LabProfileSetupState extends State<LabProfileSetup>
     }
   }
 
+  @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
     final isDesktop = screenWidth > 900;
@@ -483,9 +482,9 @@ class _LabProfileSetupState extends State<LabProfileSetup>
                   width: 80,
                   height: 80,
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.2),
+                    color: Colors.white.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: Colors.white.withOpacity(0.4), width: 2),
+                    border: Border.all(color: Colors.white.withValues(alpha: 0.4), width: 2),
                   ),
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(14),
@@ -544,10 +543,10 @@ class _LabProfileSetupState extends State<LabProfileSetup>
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.grey.withOpacity(0.1)),
+        border: Border.all(color: Colors.grey.withValues(alpha: 0.1)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 15,
             offset: const Offset(0, 4),
           ),
@@ -562,7 +561,7 @@ class _LabProfileSetupState extends State<LabProfileSetup>
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: primaryColor.withOpacity(0.1),
+                  color: primaryColor.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(icon, color: primaryColor, size: 24),
@@ -639,10 +638,10 @@ class _LabProfileSetupState extends State<LabProfileSetup>
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.grey.withOpacity(0.1)),
+        border: Border.all(color: Colors.grey.withValues(alpha: 0.1)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 15,
             offset: const Offset(0, 4),
           ),
@@ -822,7 +821,7 @@ class _LabProfileSetupState extends State<LabProfileSetup>
             children: [
               Container(
                 padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(color: primaryColor.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
+                decoration: BoxDecoration(color: primaryColor.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)),
                 child: const Icon(Icons.people_rounded, color: primaryColor, size: 20),
               ),
               const SizedBox(width: 12),
@@ -902,7 +901,7 @@ class _LabProfileSetupState extends State<LabProfileSetup>
             children: [
               Container(
                 padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(color: const Color(0xFF10B981).withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
+                decoration: BoxDecoration(color: const Color(0xFF10B981).withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)),
                 child: const Icon(Icons.science_rounded, color: Color(0xFF10B981), size: 20),
               ),
               const SizedBox(width: 12),

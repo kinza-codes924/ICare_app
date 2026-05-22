@@ -5,10 +5,8 @@ import 'package:icare/models/doctor.dart';
 import 'package:icare/providers/auth_provider.dart';
 import 'package:icare/screens/active_orders.dart';
 import 'package:icare/screens/completed-reports.dart';
-import 'package:icare/screens/doctors_list.dart';
 import 'package:icare/screens/filters.dart';
 import 'package:icare/screens/lab_filters.dart';
-import 'package:icare/screens/patient_filters.dart';
 import 'package:icare/screens/public_home.dart';
 import 'package:icare/screens/patient_dashboard.dart';
 import 'package:icare/screens/pharmacy_home.dart';
@@ -130,7 +128,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           decoration: BoxDecoration(
                             boxShadow: [
                               BoxShadow(
-                                color: const Color(0xFF0F172A).withOpacity(0.03),
+                                color: const Color(0xFF0F172A).withValues(alpha: 0.03),
                                 blurRadius: 25,
                                 offset: const Offset(0, 8),
                               ),
@@ -214,7 +212,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                     BoxShadow(
                                       color: const Color(
                                         0xFF0F172A,
-                                      ).withOpacity(0.15),
+                                      ).withValues(alpha: 0.15),
                                       blurRadius: 30,
                                       offset: const Offset(0, 12),
                                     ),
@@ -238,7 +236,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                             colors: [
                                               const Color(
                                                 0xFF0F172A,
-                                              ).withOpacity(0.6),
+                                              ).withValues(alpha: 0.6),
                                               Colors.transparent,
                                             ],
                                             begin: Alignment.centerLeft,
@@ -275,7 +273,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                               decoration: BoxDecoration(
                                 color: _currentSlide == index
                                     ? Colors.white
-                                    : Colors.white.withOpacity(0.3),
+                                    : Colors.white.withValues(alpha: 0.3),
                                 borderRadius: BorderRadius.circular(10),
                               ),
                             ),
@@ -327,7 +325,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       decoration: BoxDecoration(
                         color: _currentSlide == index
                             ? AppColors.primaryColor
-                            : AppColors.primaryColor.withOpacity(0.3),
+                            : AppColors.primaryColor.withValues(alpha: 0.3),
                         borderRadius: BorderRadius.circular(10),
                       ),
                     ),
@@ -355,7 +353,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         vertical: 4,
                       ),
                       decoration: BoxDecoration(
-                        color: AppColors.themeRed.withOpacity(0.1),
+                        color: AppColors.themeRed.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: CustomText(
@@ -455,12 +453,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       borderRadius: BorderRadius.circular(50),
                       gradient: LinearGradient(
                         colors: [
-                          AppColors.primaryColor.withOpacity(0.06),
-                          AppColors.secondaryColor.withOpacity(0.06),
+                          AppColors.primaryColor.withValues(alpha: 0.06),
+                          AppColors.secondaryColor.withValues(alpha: 0.06),
                         ],
                       ),
                       border: Border.all(
-                        color: AppColors.primaryColor.withOpacity(0.15),
+                        color: AppColors.primaryColor.withValues(alpha: 0.15),
                         width: 1.5,
                       ),
                     ),
@@ -477,7 +475,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         Container(
                           padding: const EdgeInsets.all(4),
                           decoration: BoxDecoration(
-                            color: AppColors.primaryColor.withOpacity(0.1),
+                            color: AppColors.primaryColor.withValues(alpha: 0.1),
                             shape: BoxShape.circle,
                           ),
                           child: Icon(
@@ -559,7 +557,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                             borderRadius: BorderRadius.circular(14),
                             boxShadow: [
                               BoxShadow(
-                                color: Colors.black.withOpacity(0.04),
+                                color: Colors.black.withValues(alpha: 0.04),
                                 blurRadius: 12,
                                 offset: const Offset(0, 4),
                               ),
@@ -592,7 +590,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                               BoxShadow(
                                 color: const Color(
                                   0xFF0F172A,
-                                ).withOpacity(0.03),
+                                ).withValues(alpha: 0.03),
                                 blurRadius: 20,
                                 offset: const Offset(0, 6),
                               ),
@@ -752,7 +750,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                   borderRadius: BorderRadius.circular(20),
                                   boxShadow: [
                                     BoxShadow(
-                                      color: Colors.black.withOpacity(0.04),
+                                      color: Colors.black.withValues(alpha: 0.04),
                                       blurRadius: 20,
                                       offset: const Offset(0, 6),
                                     ),
@@ -865,7 +863,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                     BoxShadow(
                                       color: const Color(
                                         0xFF0B2D6E,
-                                      ).withOpacity(0.25),
+                                      ).withValues(alpha: 0.25),
                                       blurRadius: 24,
                                       offset: const Offset(0, 10),
                                     ),
@@ -887,7 +885,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                     Text(
                                       "Frequently used shortcuts",
                                       style: TextStyle(
-                                        color: Colors.white.withOpacity(0.6),
+                                        color: Colors.white.withValues(alpha: 0.6),
                                         fontSize: 12,
                                         fontWeight: FontWeight.w400,
                                       ),
@@ -941,7 +939,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                   borderRadius: BorderRadius.circular(20),
                                   boxShadow: [
                                     BoxShadow(
-                                      color: Colors.black.withOpacity(0.04),
+                                      color: Colors.black.withValues(alpha: 0.04),
                                       blurRadius: 20,
                                       offset: const Offset(0, 6),
                                     ),
@@ -1212,7 +1210,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: color.withOpacity(0.08),
+              color: color.withValues(alpha: 0.08),
               blurRadius: 20,
               offset: const Offset(0, 8),
             ),
@@ -1227,7 +1225,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: color.withOpacity(0.1),
+                    color: color.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Icon(icon, color: color, size: 24),
@@ -1284,12 +1282,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             borderRadius: BorderRadius.circular(20),
             boxShadow: [
               BoxShadow(
-                color: gradientColors[0].withOpacity(0.08),
+                color: gradientColors[0].withValues(alpha: 0.08),
                 blurRadius: 24,
                 offset: const Offset(0, 8),
               ),
               BoxShadow(
-                color: Colors.black.withOpacity(0.03),
+                color: Colors.black.withValues(alpha: 0.03),
                 blurRadius: 8,
                 offset: const Offset(0, 2),
               ),
@@ -1312,7 +1310,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       borderRadius: BorderRadius.circular(14),
                       boxShadow: [
                         BoxShadow(
-                          color: gradientColors[0].withOpacity(0.3),
+                          color: gradientColors[0].withValues(alpha: 0.3),
                           blurRadius: 12,
                           offset: const Offset(0, 4),
                         ),
@@ -1400,10 +1398,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
               decoration: BoxDecoration(
-                color: AppColors.primaryColor.withOpacity(0.06),
+                color: AppColors.primaryColor.withValues(alpha: 0.06),
                 borderRadius: BorderRadius.circular(10),
                 border: Border.all(
-                  color: AppColors.primaryColor.withOpacity(0.12),
+                  color: AppColors.primaryColor.withValues(alpha: 0.12),
                 ),
               ),
               child: Row(
@@ -1445,9 +1443,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.12),
+            color: Colors.white.withValues(alpha: 0.12),
             borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: Colors.white.withOpacity(0.15)),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
           ),
           child: Row(
             children: [
@@ -1458,7 +1456,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   borderRadius: BorderRadius.circular(10),
                   boxShadow: [
                     BoxShadow(
-                      color: color.withOpacity(0.4),
+                      color: color.withValues(alpha: 0.4),
                       blurRadius: 8,
                       offset: const Offset(0, 3),
                     ),
@@ -1479,7 +1477,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               ),
               Icon(
                 Icons.arrow_forward_ios_rounded,
-                color: Colors.white.withOpacity(0.4),
+                color: Colors.white.withValues(alpha: 0.4),
                 size: 14,
               ),
             ],
@@ -1506,7 +1504,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: color.withOpacity(0.1),
+                  color: color.withValues(alpha: 0.1),
                   shape: BoxShape.circle,
                 ),
                 child: Icon(icon, color: color, size: 16),
@@ -1628,7 +1626,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       border: Border.all(
-                        color: AppColors.primaryColor.withOpacity(0.2),
+                        color: AppColors.primaryColor.withValues(alpha: 0.2),
                         width: 2,
                       ),
                     ),
@@ -1726,7 +1724,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       borderRadius: BorderRadius.circular(10),
                       boxShadow: [
                         BoxShadow(
-                          color: AppColors.primaryColor.withOpacity(0.3),
+                          color: AppColors.primaryColor.withValues(alpha: 0.3),
                           blurRadius: 8,
                           offset: const Offset(0, 3),
                         ),
@@ -1910,8 +1908,8 @@ class DoctorConsultationCard extends StatelessWidget {
                     children: [
                       CircleAvatar(
                         radius: ScallingConfig.scale(30),
-                        backgroundColor: AppColors.primaryColor.withOpacity(
-                          0.1,
+                        backgroundColor: AppColors.primaryColor.withValues(
+                          alpha: 0.1,
                         ),
                         child: Text(
                           userName.substring(0, 1).toUpperCase(),
@@ -1976,12 +1974,12 @@ class DoctorConsultationCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(35),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF0F172A).withOpacity(0.08),
+            color: const Color(0xFF0F172A).withValues(alpha: 0.08),
             blurRadius: 50,
             offset: const Offset(0, 25),
           ),
           BoxShadow(
-            color: AppColors.primaryColor.withOpacity(0.04),
+            color: AppColors.primaryColor.withValues(alpha: 0.04),
             blurRadius: 20,
             offset: const Offset(0, 8),
           ),
@@ -2002,8 +2000,8 @@ class DoctorConsultationCard extends StatelessWidget {
                   shape: BoxShape.circle,
                   gradient: RadialGradient(
                     colors: [
-                      AppColors.secondaryColor.withOpacity(0.08),
-                      AppColors.secondaryColor.withOpacity(0),
+                      AppColors.secondaryColor.withValues(alpha: 0.08),
+                      AppColors.secondaryColor.withValues(alpha: 0),
                     ],
                   ),
                 ),
@@ -2021,10 +2019,10 @@ class DoctorConsultationCard extends StatelessWidget {
                       vertical: 8,
                     ),
                     decoration: BoxDecoration(
-                      color: AppColors.themeGreen.withOpacity(0.1),
+                      color: AppColors.themeGreen.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(10),
                       border: Border.all(
-                        color: AppColors.themeGreen.withOpacity(0.2),
+                        color: AppColors.themeGreen.withValues(alpha: 0.2),
                       ),
                     ),
                     child: Row(
@@ -2069,8 +2067,8 @@ class DoctorConsultationCard extends StatelessWidget {
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
                               border: Border.all(
-                                color: AppColors.secondaryColor.withOpacity(
-                                  0.2,
+                                color: AppColors.secondaryColor.withValues(
+                                  alpha: 0.2,
                                 ),
                                 width: 3,
                               ),
@@ -2078,7 +2076,7 @@ class DoctorConsultationCard extends StatelessWidget {
                             child: CircleAvatar(
                               radius: 45,
                               backgroundColor: AppColors.primaryColor
-                                  .withOpacity(0.1),
+                                  .withValues(alpha: 0.1),
                               child: Text(
                                 userName.substring(0, 1).toUpperCase(),
                                 style: TextStyle(
@@ -2114,8 +2112,8 @@ class DoctorConsultationCard extends StatelessWidget {
                                     Icon(
                                       Icons.videocam_rounded,
                                       size: 20,
-                                      color: AppColors.primaryColor.withOpacity(
-                                        0.6,
+                                      color: AppColors.primaryColor.withValues(
+                                        alpha: 0.6,
                                       ),
                                     ),
                                     const SizedBox(width: 10),
@@ -2146,7 +2144,7 @@ class DoctorConsultationCard extends StatelessWidget {
                                 colors: [Color(0xFF0036BC), Color(0xFF14B1FF)],
                               ),
                               boxShadow: BoxShadow(
-                                color: AppColors.primaryColor.withOpacity(0.3),
+                                color: AppColors.primaryColor.withValues(alpha: 0.3),
                                 blurRadius: 20,
                                 offset: const Offset(0, 10),
                               ),

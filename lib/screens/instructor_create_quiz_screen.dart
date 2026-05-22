@@ -1,7 +1,6 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:icare/services/lms_service.dart';
 import 'package:icare/utils/theme.dart';
-import 'package:go_router/go_router.dart';
 
 /// Quiz Creation Screen - Google Classroom style
 class InstructorCreateQuizScreen extends StatefulWidget {
@@ -241,7 +240,7 @@ class _InstructorCreateQuizScreenState extends State<InstructorCreateQuizScreen>
                 children: [
                   if (widget.courseId == null)
                     DropdownButtonFormField<String>(
-                      value: _selectedCourseId,
+                      initialValue: _selectedCourseId,
                       decoration: const InputDecoration(
                         labelText: 'Course *',
                         border: OutlineInputBorder(),
@@ -331,7 +330,7 @@ class _InstructorCreateQuizScreenState extends State<InstructorCreateQuizScreen>
                     title: const Text('Show correct answers after submission'),
                     value: _showCorrectAnswers,
                     onChanged: (value) => setState(() => _showCorrectAnswers = value),
-                    activeColor: AppColors.primaryColor,
+                    activeThumbColor: AppColors.primaryColor,
                   ),
 
                   SwitchListTile(
@@ -339,7 +338,7 @@ class _InstructorCreateQuizScreenState extends State<InstructorCreateQuizScreen>
                     subtitle: const Text('Students can take this quiz'),
                     value: _isPublished,
                     onChanged: (value) => setState(() => _isPublished = value),
-                    activeColor: AppColors.primaryColor,
+                    activeThumbColor: AppColors.primaryColor,
                   ),
                 ],
               ),
@@ -374,7 +373,7 @@ class _InstructorCreateQuizScreenState extends State<InstructorCreateQuizScreen>
                       shrinkWrap: true,
                       physics: const NeverScrollableScrollPhysics(),
                       itemCount: _questions.length,
-                      separatorBuilder: (_, __) => const Divider(height: 24),
+                      separatorBuilder: (_, _) => const Divider(height: 24),
                       itemBuilder: (context, index) {
                         return _buildQuestionItem(index);
                       },
@@ -400,7 +399,7 @@ class _InstructorCreateQuizScreenState extends State<InstructorCreateQuizScreen>
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 10,
             offset: const Offset(0, 2),
           ),
@@ -482,7 +481,7 @@ class _InstructorCreateQuizScreenState extends State<InstructorCreateQuizScreen>
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color: AppColors.primaryColor.withOpacity(0.1),
+                  color: AppColors.primaryColor.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(4),
                 ),
                 child: Row(
@@ -621,7 +620,7 @@ class _QuestionDialogState extends State<_QuestionDialog> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               DropdownButtonFormField<String>(
-                value: _type,
+                initialValue: _type,
                 decoration: const InputDecoration(
                   labelText: 'Question Type',
                   border: OutlineInputBorder(),
@@ -676,7 +675,7 @@ class _QuestionDialogState extends State<_QuestionDialog> {
                 ],
                 const SizedBox(height: 8),
                 DropdownButtonFormField<String>(
-                  value: _correctAnswer.isEmpty ? null : _correctAnswer,
+                  initialValue: _correctAnswer.isEmpty ? null : _correctAnswer,
                   decoration: const InputDecoration(
                     labelText: 'Correct Answer',
                     border: OutlineInputBorder(),
@@ -688,7 +687,7 @@ class _QuestionDialogState extends State<_QuestionDialog> {
                 ),
               ] else if (_type == 'true_false') ...[
                 DropdownButtonFormField<String>(
-                  value: _correctAnswer.isEmpty ? null : _correctAnswer,
+                  initialValue: _correctAnswer.isEmpty ? null : _correctAnswer,
                   decoration: const InputDecoration(
                     labelText: 'Correct Answer',
                     border: OutlineInputBorder(),
@@ -718,8 +717,11 @@ class _QuestionDialogState extends State<_QuestionDialog> {
                     prefixIcon: Icon(Icons.image_outlined),
                   ),
                   onChanged: (value) {
-                    if (_options.isEmpty) _options.add(value);
-                    else _options[0] = value;
+                    if (_options.isEmpty) {
+                      _options.add(value);
+                    } else {
+                      _options[0] = value;
+                    }
                   },
                 ),
                 const SizedBox(height: 12),
@@ -742,8 +744,11 @@ class _QuestionDialogState extends State<_QuestionDialog> {
                     prefixIcon: Icon(Icons.video_library_outlined),
                   ),
                   onChanged: (value) {
-                    if (_options.isEmpty) _options.add(value);
-                    else _options[0] = value;
+                    if (_options.isEmpty) {
+                      _options.add(value);
+                    } else {
+                      _options[0] = value;
+                    }
                   },
                 ),
                 const SizedBox(height: 12),
@@ -767,8 +772,11 @@ class _QuestionDialogState extends State<_QuestionDialog> {
                   ),
                   maxLines: 4,
                   onChanged: (value) {
-                    if (_options.isEmpty) _options.add(value);
-                    else _options[0] = value;
+                    if (_options.isEmpty) {
+                      _options.add(value);
+                    } else {
+                      _options[0] = value;
+                    }
                   },
                 ),
                 const SizedBox(height: 12),
@@ -781,8 +789,11 @@ class _QuestionDialogState extends State<_QuestionDialog> {
                   ),
                   maxLines: 3,
                   onChanged: (value) {
-                    if (_options.length < 2) _options.add(value);
-                    else _options[1] = value;
+                    if (_options.length < 2) {
+                      _options.add(value);
+                    } else {
+                      _options[1] = value;
+                    }
                   },
                 ),
               ],

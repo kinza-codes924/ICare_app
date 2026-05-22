@@ -1,7 +1,6 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:icare/services/lms_service.dart';
 import 'package:icare/utils/theme.dart';
-import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 /// Course Stream/Announcements - Google Classroom style
@@ -300,7 +299,7 @@ class _InstructorCourseStreamScreenState extends State<InstructorCourseStreamScr
         border: Border.all(color: const Color(0xFFE2E8F0)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -317,7 +316,7 @@ class _InstructorCourseStreamScreenState extends State<InstructorCourseStreamScr
                 Row(
                   children: [
                     CircleAvatar(
-                      backgroundColor: AppColors.primaryColor.withOpacity(0.1),
+                      backgroundColor: AppColors.primaryColor.withValues(alpha: 0.1),
                       child: Text(
                         instructorName[0].toUpperCase(),
                         style: TextStyle(
@@ -468,7 +467,7 @@ class _InstructorCourseStreamScreenState extends State<InstructorCourseStreamScr
         children: [
           CircleAvatar(
             radius: 14,
-            backgroundColor: const Color(0xFF6366F1).withOpacity(0.1),
+            backgroundColor: const Color(0xFF6366F1).withValues(alpha: 0.1),
             child: Text(
               authorName[0].toUpperCase(),
               style: const TextStyle(

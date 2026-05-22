@@ -6,7 +6,6 @@ import 'package:image_picker/image_picker.dart';
 import '../utils/html_stub.dart' as html
     if (dart.library.html) 'dart:html';
 import '../services/pharmacy_service.dart';
-import 'pharmacist_dashboard.dart';
 import 'tabs.dart';
 
 class PharmacyProfileSetup extends StatefulWidget {
@@ -196,9 +195,9 @@ class _PharmacyProfileSetupState extends State<PharmacyProfileSetup> {
                               width: 100,
                               height: 100,
                               decoration: BoxDecoration(
-                                color: const Color(0xFF00897B).withOpacity(0.1),
+                                color: const Color(0xFF00897B).withValues(alpha: 0.1),
                                 shape: BoxShape.circle,
-                                border: Border.all(color: const Color(0xFF00897B).withOpacity(0.3), width: 3),
+                                border: Border.all(color: const Color(0xFF00897B).withValues(alpha: 0.3), width: 3),
                               ),
                               child: ClipOval(
                                 child: _profileImage != null
@@ -327,7 +326,7 @@ class _PharmacyProfileSetupState extends State<PharmacyProfileSetup> {
                         onChanged: (value) {
                           setState(() => _deliveryAvailable = value);
                         },
-                        activeColor: const Color(0xFF00897B),
+                        activeThumbColor: const Color(0xFF00897B),
                       ),
                     ]),
                     const SizedBox(height: 16),
@@ -395,7 +394,7 @@ class _PharmacyProfileSetupState extends State<PharmacyProfileSetup> {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -410,7 +409,7 @@ class _PharmacyProfileSetupState extends State<PharmacyProfileSetup> {
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF00897B).withOpacity(0.1),
+                  color: const Color(0xFF00897B).withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Icon(icon, color: const Color(0xFF00897B), size: 20),

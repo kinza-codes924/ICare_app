@@ -219,7 +219,7 @@ class _LessonDetailPageState extends State<LessonDetailPage> with SingleTickerPr
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(12),
                       boxShadow: [
-                        BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 6),
+                        BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 6),
                       ],
                     ),
                     child: Row(
@@ -227,7 +227,7 @@ class _LessonDetailPageState extends State<LessonDetailPage> with SingleTickerPr
                         Container(
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            color: AppColors.primaryColor.withOpacity(0.1),
+                            color: AppColors.primaryColor.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: const Icon(Icons.description_rounded, color: AppColors.primaryColor, size: 24),
@@ -265,7 +265,7 @@ class _LessonDetailPageState extends State<LessonDetailPage> with SingleTickerPr
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(12),
                       boxShadow: [
-                        BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 6),
+                        BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 6),
                       ],
                     ),
                     child: Column(

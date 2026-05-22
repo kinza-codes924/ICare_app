@@ -205,7 +205,7 @@ class PrescriptionDetailScreen extends StatelessWidget {
                 borderRadius: BorderRadius.circular(16),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.10),
+                    color: Colors.black.withValues(alpha: 0.10),
                     blurRadius: 24,
                     offset: const Offset(0, 8),
                   ),
@@ -319,15 +319,15 @@ class PrescriptionDetailScreen extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.15),
+                  color: Colors.white.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: Colors.white.withOpacity(0.3)),
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.3)),
                 ),
                 child: Image.asset(
                   'assets/Asset 1.png',
                   height: 36,
                   fit: BoxFit.contain,
-                  errorBuilder: (_, __, ___) => const Row(
+                  errorBuilder: (_, _, _) => const Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Icon(Icons.local_hospital_rounded, color: Colors.white, size: 20),
@@ -370,7 +370,7 @@ class PrescriptionDetailScreen extends StatelessWidget {
             children: [
               Expanded(child: _buildPatientInfo()),
               const SizedBox(width: 16),
-              Container(width: 1, height: 80, color: Colors.white.withOpacity(0.3)),
+              Container(width: 1, height: 80, color: Colors.white.withValues(alpha: 0.3)),
               const SizedBox(width: 16),
               Expanded(child: _buildDoctorInfo()),
             ],
@@ -414,7 +414,7 @@ class PrescriptionDetailScreen extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.15),
+              color: Colors.white.withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(6),
             ),
             child: Text(_patientMrNumber,
@@ -767,9 +767,9 @@ class PrescriptionDetailScreen extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
-                    color: urgencyColor!.withOpacity(0.1),
+                    color: urgencyColor!.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(6),
-                    border: Border.all(color: urgencyColor.withOpacity(0.4)),
+                    border: Border.all(color: urgencyColor.withValues(alpha: 0.4)),
                   ),
                   child: Text(urgencyLabel,
                       style: TextStyle(
@@ -818,7 +818,7 @@ class PrescriptionDetailScreen extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: const Color(0xFF0EA5E9).withOpacity(0.1),
+              color: const Color(0xFF0EA5E9).withValues(alpha: 0.1),
               shape: BoxShape.circle,
             ),
             child: const Icon(Icons.event_repeat_rounded, color: Color(0xFF0EA5E9), size: 22),
@@ -885,7 +885,7 @@ class PrescriptionDetailScreen extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Image.asset('assets/Asset 1.png', height: 32, fit: BoxFit.contain,
-                      errorBuilder: (_, __, ___) => const Icon(Icons.local_hospital_rounded, color: AppColors.primaryColor, size: 28)),
+                      errorBuilder: (_, _, _) => const Icon(Icons.local_hospital_rounded, color: AppColors.primaryColor, size: 28)),
                   const SizedBox(height: 4),
                   const Text('iCare', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: AppColors.primaryColor, letterSpacing: 1)),
                 ],
@@ -1303,7 +1303,7 @@ class PrescriptionDetailScreen extends StatelessWidget {
         children: [
           Container(
             padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(color: color.withOpacity(0.1), shape: BoxShape.circle),
+            decoration: BoxDecoration(color: color.withValues(alpha: 0.1), shape: BoxShape.circle),
             child: Icon(icon, color: color, size: 24),
           ),
           const SizedBox(height: 6),

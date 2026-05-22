@@ -17,7 +17,7 @@ class _MyCartScreenState extends State<MyCartScreen> {
   final CartService _cartService = CartService();
   List<dynamic> _cartItems = [];
   bool _isLoading = true;
-  bool _isCheckingOut = false;
+  final bool _isCheckingOut = false;
   bool _isLoggedIn = true;
   String _promoCode = '';
   double _discount = 0;
@@ -193,7 +193,7 @@ class _MyCartScreenState extends State<MyCartScreen> {
             Container(
               padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
-                color: AppColors.primaryColor.withOpacity(0.08),
+                color: AppColors.primaryColor.withValues(alpha: 0.08),
                 shape: BoxShape.circle,
               ),
               child: const Icon(Icons.lock_rounded, size: 64, color: AppColors.primaryColor),
@@ -238,7 +238,7 @@ class _MyCartScreenState extends State<MyCartScreen> {
           Container(
             padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
-              color: AppColors.primaryColor.withOpacity(0.08),
+              color: AppColors.primaryColor.withValues(alpha: 0.08),
               shape: BoxShape.circle,
             ),
             child: const Icon(
@@ -346,7 +346,7 @@ class _MyCartScreenState extends State<MyCartScreen> {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -727,7 +727,7 @@ class _CheckoutScreenState extends State<_CheckoutScreen> {
                 width: 80,
                 height: 80,
                 decoration: BoxDecoration(
-                  color: const Color(0xFF10B981).withOpacity(0.1),
+                  color: const Color(0xFF10B981).withValues(alpha: 0.1),
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(Icons.check_circle_rounded, color: Color(0xFF10B981), size: 48),
@@ -866,7 +866,7 @@ class _CheckoutScreenState extends State<_CheckoutScreen> {
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(16),
-            boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 8)],
+            boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8)],
           ),
           child: Column(
             children: widget.cartItems.asMap().entries.map((entry) {
@@ -886,7 +886,7 @@ class _CheckoutScreenState extends State<_CheckoutScreen> {
                           width: 44,
                           height: 44,
                           decoration: BoxDecoration(
-                            color: AppColors.primaryColor.withOpacity(0.08),
+                            color: AppColors.primaryColor.withValues(alpha: 0.08),
                             borderRadius: BorderRadius.circular(10),
                           ),
                           child: const Center(child: Text('💊', style: TextStyle(fontSize: 22))),
@@ -993,7 +993,7 @@ class _CheckoutScreenState extends State<_CheckoutScreen> {
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(16),
-            boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 8)],
+            boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8)],
           ),
           child: Column(
             children: methods.asMap().entries.map((entry) {
@@ -1066,7 +1066,7 @@ class _CheckoutScreenState extends State<_CheckoutScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 8)],
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8)],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

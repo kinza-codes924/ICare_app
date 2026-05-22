@@ -1,7 +1,6 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:icare/services/lms_service.dart';
 import 'package:icare/utils/theme.dart';
-import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 /// Assignment Grading Screen - Google Classroom style
@@ -152,7 +151,7 @@ class _InstructorGradingScreenState extends State<InstructorGradingScreen> {
         setState(() => _filterStatus = value);
       },
       backgroundColor: Colors.white,
-      selectedColor: AppColors.primaryColor.withOpacity(0.1),
+      selectedColor: AppColors.primaryColor.withValues(alpha: 0.1),
       labelStyle: TextStyle(
         color: isSelected ? AppColors.primaryColor : const Color(0xFF64748B),
         fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
@@ -199,7 +198,7 @@ class _InstructorGradingScreenState extends State<InstructorGradingScreen> {
         border: Border.all(color: const Color(0xFFE2E8F0)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -216,7 +215,7 @@ class _InstructorGradingScreenState extends State<InstructorGradingScreen> {
               Row(
                 children: [
                   CircleAvatar(
-                    backgroundColor: AppColors.primaryColor.withOpacity(0.1),
+                    backgroundColor: AppColors.primaryColor.withValues(alpha: 0.1),
                     child: Text(
                       studentName[0].toUpperCase(),
                       style: TextStyle(
@@ -253,7 +252,7 @@ class _InstructorGradingScreenState extends State<InstructorGradingScreen> {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                       decoration: BoxDecoration(
-                        color: statusColor.withOpacity(0.1),
+                        color: statusColor.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
@@ -269,7 +268,7 @@ class _InstructorGradingScreenState extends State<InstructorGradingScreen> {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                       decoration: BoxDecoration(
-                        color: statusColor.withOpacity(0.1),
+                        color: statusColor.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(

@@ -319,7 +319,7 @@ class _PaymentInvoicesState extends State<PaymentInvoices>
                   borderRadius: BorderRadius.circular(20),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.04),
+                      color: Colors.black.withValues(alpha: 0.04),
                       blurRadius: 20,
                       offset: const Offset(0, 6),
                     ),
@@ -552,8 +552,8 @@ class _PaymentInvoicesState extends State<PaymentInvoices>
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       colors: [
-                        AppColors.primaryColor.withOpacity(0.1),
-                        AppColors.primaryColor.withOpacity(0.05),
+                        AppColors.primaryColor.withValues(alpha: 0.1),
+                        AppColors.primaryColor.withValues(alpha: 0.05),
                       ],
                     ),
                     shape: BoxShape.circle,
@@ -784,7 +784,7 @@ class _PaymentInvoicesState extends State<PaymentInvoices>
         borderRadius: BorderRadius.circular(18),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),
@@ -837,8 +837,8 @@ class _PaymentInvoicesState extends State<PaymentInvoices>
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     colors: [
-                      AppColors.primaryColor.withOpacity(0.12),
-                      AppColors.primaryColor.withOpacity(0.04),
+                      AppColors.primaryColor.withValues(alpha: 0.12),
+                      AppColors.primaryColor.withValues(alpha: 0.04),
                     ],
                   ),
                   shape: BoxShape.circle,
@@ -959,12 +959,12 @@ class _PaymentInvoicesState extends State<PaymentInvoices>
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: gradientColors[0].withOpacity(0.08),
+            color: gradientColors[0].withValues(alpha: 0.08),
             blurRadius: 24,
             offset: const Offset(0, 8),
           ),
           BoxShadow(
-            color: Colors.black.withOpacity(0.03),
+            color: Colors.black.withValues(alpha: 0.03),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -987,7 +987,7 @@ class _PaymentInvoicesState extends State<PaymentInvoices>
                   borderRadius: BorderRadius.circular(14),
                   boxShadow: [
                     BoxShadow(
-                      color: gradientColors[0].withOpacity(0.3),
+                      color: gradientColors[0].withValues(alpha: 0.3),
                       blurRadius: 12,
                       offset: const Offset(0, 4),
                     ),
@@ -1054,9 +1054,9 @@ class _PaymentInvoicesState extends State<PaymentInvoices>
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.06),
+          color: color.withValues(alpha: 0.06),
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: color.withOpacity(0.12)),
+          border: Border.all(color: color.withValues(alpha: 0.12)),
         ),
         child: Column(
           children: [
@@ -1074,7 +1074,7 @@ class _PaymentInvoicesState extends State<PaymentInvoices>
               style: TextStyle(
                 fontSize: 11,
                 fontWeight: FontWeight.w600,
-                color: color.withOpacity(0.7),
+                color: color.withValues(alpha: 0.7),
               ),
             ),
           ],

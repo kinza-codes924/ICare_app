@@ -4,7 +4,6 @@ import 'package:icare/screens/tabs.dart';
 import 'package:icare/services/laboratory_service.dart';
 import 'package:icare/utils/theme.dart';
 import 'package:icare/widgets/back_button.dart';
-import 'package:intl/intl.dart';
 
 class ConfirmBookingScreen extends StatefulWidget {
   final Map<String, dynamic> bookingData;

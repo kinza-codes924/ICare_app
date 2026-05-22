@@ -122,12 +122,14 @@ class _LifestyleTrackerScreenState extends State<LifestyleTrackerScreen> {
     try {
       final r = await LifestyleService.getTodayData();
       final d = r['data'] ?? {};
-      if (mounted) setState(() {
+      if (mounted) {
+        setState(() {
         _waterIntake = (d['waterIntake'] ?? 0).toDouble();
         _sleepHours  = (d['sleepHours']  ?? 0).toDouble();
         _steps       = (d['steps']       ?? 0) as int;
         _apiLoading  = false;
       });
+      }
     } catch (_) {
       if (mounted) setState(() => _apiLoading = false);
     }
@@ -300,7 +302,7 @@ class _LifestyleTrackerScreenState extends State<LifestyleTrackerScreen> {
         final grouped = _groupedLogs;
         final dateKeys = grouped.keys.toList();
 
-        String _dateHeader(String key) {
+        String dateHeader(String key) {
           final dt  = DateTime.parse(key);
           final now = DateTime.now();
           final today     = DateFormat('yyyy-MM-dd').format(now);
@@ -407,7 +409,7 @@ class _LifestyleTrackerScreenState extends State<LifestyleTrackerScreen> {
                                       color: AppColors.primaryColor.withValues(alpha: 0.08),
                                       borderRadius: BorderRadius.circular(20),
                                     ),
-                                    child: Text(_dateHeader(key),
+                                    child: Text(dateHeader(key),
                                       style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: AppColors.primaryColor)),
                                   ),
                                   const SizedBox(width: 8),
@@ -722,7 +724,7 @@ class _LogMoreSheetState extends State<_LogMoreSheet> {
             controller: scroll,
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
             itemCount: _filtered.length,
-            separatorBuilder: (_, __) => const SizedBox(height: 8),
+            separatorBuilder: (_, _) => const SizedBox(height: 8),
             itemBuilder: (_, i) {
               final v = _filtered[i];
               final color = Color(v.color);

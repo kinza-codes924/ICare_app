@@ -459,7 +459,7 @@ class _PharmaciesScreenState extends State<PharmaciesScreen> {
           border: Border.all(color: const Color(0xFFF1F5F9), width: 1.5),
           boxShadow: [
             BoxShadow(
-              color: (cat["color"] as Color).withOpacity(0.05),
+              color: (cat["color"] as Color).withValues(alpha: 0.05),
               blurRadius: 10,
               offset: const Offset(0, 4),
             ),
@@ -550,7 +550,7 @@ class PharmacyWidget extends StatelessWidget {
           borderRadius: BorderRadius.circular(32),
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFF0F172A).withOpacity(0.06),
+              color: const Color(0xFF0F172A).withValues(alpha: 0.06),
               blurRadius: 24,
               offset: const Offset(0, 12),
             ),
@@ -570,7 +570,7 @@ class PharmacyWidget extends StatelessWidget {
                     end: Alignment.bottomCenter,
                     colors: [
                       AppColors.primaryColor,
-                      AppColors.primaryColor.withOpacity(0.5),
+                      AppColors.primaryColor.withValues(alpha: 0.5),
                     ],
                   ),
                 ),
@@ -592,7 +592,7 @@ class PharmacyWidget extends StatelessWidget {
                               borderRadius: BorderRadius.circular(24),
                               boxShadow: [
                                 BoxShadow(
-                                  color: AppColors.primaryColor.withOpacity(0.12),
+                                  color: AppColors.primaryColor.withValues(alpha: 0.12),
                                   blurRadius: 15,
                                   offset: const Offset(0, 8),
                                 ),
@@ -770,7 +770,7 @@ class PharmacyWidget extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.08),
+        color: color.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(8),
       ),
       child: CustomText(text: label, color: color, fontSize: 10, fontWeight: FontWeight.w800),

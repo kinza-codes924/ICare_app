@@ -65,7 +65,7 @@ class _StudentHomeState extends ConsumerState<StudentHome> {
   @override
   Widget build(BuildContext context) {
     final bool isDesktop = Utils.windowWidth(context) > 900;
-    final role = ref.read(authProvider).userRole?.toLowerCase();
+    final role = ref.read(authProvider).userRole.toLowerCase();
     final isPatient = role == 'patient';
 
     if (_isLoading) {
@@ -154,7 +154,7 @@ class _StudentHomeState extends ConsumerState<StudentHome> {
                     height: 200,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: Colors.white.withOpacity(0.05),
+                      color: Colors.white.withValues(alpha: 0.05),
                     ),
                   ),
                 ),
@@ -166,7 +166,7 @@ class _StudentHomeState extends ConsumerState<StudentHome> {
                     height: 140,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: Colors.white.withOpacity(0.04),
+                      color: Colors.white.withValues(alpha: 0.04),
                     ),
                   ),
                 ),
@@ -199,7 +199,7 @@ class _StudentHomeState extends ConsumerState<StudentHome> {
                           ? "Explore your health programs and care plans."
                           : "Explore your courses and nearby laboratories.",
                       style: TextStyle(
-                        color: Colors.white.withOpacity(0.7),
+                        color: Colors.white.withValues(alpha: 0.7),
                         fontSize: 15,
                       ),
                     ),
@@ -217,7 +217,7 @@ class _StudentHomeState extends ConsumerState<StudentHome> {
                               borderRadius: BorderRadius.circular(16),
                               boxShadow: [
                                 BoxShadow(
-                                  color: Colors.black.withOpacity(0.18),
+                                  color: Colors.black.withValues(alpha: 0.18),
                                   blurRadius: 24,
                                   offset: const Offset(0, 8),
                                 ),
@@ -293,10 +293,10 @@ class _StudentHomeState extends ConsumerState<StudentHome> {
                             height: 52,
                             padding: const EdgeInsets.symmetric(horizontal: 24),
                             decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.2),
+                              color: Colors.white.withValues(alpha: 0.2),
                               borderRadius: BorderRadius.circular(16),
                               border: Border.all(
-                                color: Colors.white.withOpacity(0.3),
+                                color: Colors.white.withValues(alpha: 0.3),
                                 width: 1.5,
                               ),
                             ),
@@ -478,12 +478,12 @@ class _SectionHeader extends StatelessWidget {
               gradient: LinearGradient(
                 colors:
                     accentGradient ??
-                    [accentColor, accentColor.withOpacity(0.8)],
+                    [accentColor, accentColor.withValues(alpha: 0.8)],
               ),
               borderRadius: BorderRadius.circular(12),
               boxShadow: [
                 BoxShadow(
-                  color: accentColor.withOpacity(0.3),
+                  color: accentColor.withValues(alpha: 0.3),
                   blurRadius: 14,
                   offset: const Offset(0, 5),
                 ),
@@ -602,7 +602,7 @@ class _CoursePremiumCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(24),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.06),
+              color: Colors.black.withValues(alpha: 0.06),
               blurRadius: 24,
               offset: const Offset(0, 10),
             ),
@@ -632,7 +632,7 @@ class _CoursePremiumCard extends StatelessWidget {
                         end: Alignment.bottomCenter,
                         colors: [
                           Colors.transparent,
-                          Colors.black.withOpacity(0.4),
+                          Colors.black.withValues(alpha: 0.4),
                         ],
                       ),
                     ),
@@ -671,7 +671,7 @@ class _CoursePremiumCard extends StatelessWidget {
                       vertical: 6,
                     ),
                     decoration: BoxDecoration(
-                      color: Colors.black.withOpacity(0.55),
+                      color: Colors.black.withValues(alpha: 0.55),
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Row(
@@ -794,7 +794,7 @@ class _LabPremiumCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(24),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.12),
+              color: Colors.black.withValues(alpha: 0.12),
               blurRadius: 24,
               offset: const Offset(0, 10),
             ),
@@ -816,7 +816,7 @@ class _LabPremiumCard extends StatelessWidget {
                 gradient: LinearGradient(
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
-                  colors: [Colors.transparent, Colors.black.withOpacity(0.78)],
+                  colors: [Colors.transparent, Colors.black.withValues(alpha: 0.78)],
                 ),
               ),
             ),

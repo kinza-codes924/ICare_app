@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:icare/providers/auth_provider.dart';
 import 'package:icare/screens/pharmacy_inventory.dart';
 import 'package:icare/screens/pharmacy_orders.dart';
-import 'package:icare/screens/pharmacy_analytics.dart';
 import 'package:icare/screens/payment_invoices.dart';
 import 'package:icare/services/pharmacy_service.dart';
 import 'package:intl/intl.dart';

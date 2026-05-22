@@ -215,7 +215,7 @@ class InstructorSidebar extends StatelessWidget {
         ),
       ),
       selected: isSelected,
-      selectedTileColor: AppColors.primaryColor.withOpacity(0.05),
+      selectedTileColor: AppColors.primaryColor.withValues(alpha: 0.05),
       onTap: () {
         Navigator.pop(context); // Close drawer
         if (!isSelected) {

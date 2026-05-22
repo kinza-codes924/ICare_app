@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/connect_now_service.dart';
 import '../services/consultation_service.dart';
@@ -145,7 +144,7 @@ class _DoctorConnectNowListenerState extends State<DoctorConnectNowListener> {
         opaque: false,
         barrierColor: Colors.black54,
         barrierDismissible: false,
-        pageBuilder: (ctx, _, __) => _ConnectNowRequestDialog(
+        pageBuilder: (ctx, _, _) => _ConnectNowRequestDialog(
           patientName: patientName,
           onAccept: () async {
             // Mark as handled immediately — persisted so survives app restart
@@ -298,7 +297,7 @@ class _ConnectNowRequestDialog extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Colors.green.withOpacity(0.2),
+                color: Colors.green.withValues(alpha: 0.2),
                 shape: BoxShape.circle,
               ),
               child: const Icon(Icons.medical_services_rounded, color: Colors.green, size: 40),

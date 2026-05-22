@@ -168,10 +168,10 @@ class _CreateMedicalRecordScreenState extends State<CreateMedicalRecordScreen> {
   int _followUpMonths = 0;
 
   // Prescription list
-  List<Map<String, String>> _prescriptions = [];
+  final List<Map<String, String>> _prescriptions = [];
 
   // Lab tests list
-  List<String> _labTests = [];
+  final List<String> _labTests = [];
 
   DateTime? _followUpDate;
   bool _isSubmitting = false;
@@ -182,7 +182,7 @@ class _CreateMedicalRecordScreenState extends State<CreateMedicalRecordScreen> {
   final EfficiencyService _efficiencyService = EfficiencyService();
 
   List<dynamic> _availablePrograms = [];
-  List<String> _selectedProgramIds = [];
+  final List<String> _selectedProgramIds = [];
   bool _isLoadingPrograms = true;
 
   List<dynamic> _availableLabs = [];
@@ -274,7 +274,7 @@ class _CreateMedicalRecordScreenState extends State<CreateMedicalRecordScreen> {
           child: ListView.separated(
             shrinkWrap: true,
             itemCount: templates.length,
-            separatorBuilder: (_, __) => const Divider(height: 1),
+            separatorBuilder: (_, _) => const Divider(height: 1),
             itemBuilder: (_, i) {
               final t = templates[i];
               final drugs = (t['drugs'] ?? []) as List<dynamic>;
@@ -1627,7 +1627,7 @@ class _CreateMedicalRecordScreenState extends State<CreateMedicalRecordScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         DropdownButtonFormField<String>(
-                          value: _referSpecialty,
+                          initialValue: _referSpecialty,
                           isExpanded: true,
                           decoration: _modernInputDecoration(
                             'Select Specialty',

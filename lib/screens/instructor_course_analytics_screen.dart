@@ -1,7 +1,6 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:icare/services/lms_service.dart';
 import 'package:icare/utils/theme.dart';
-import 'package:go_router/go_router.dart';
 
 /// Course Analytics Dashboard - Google Classroom/Moodle style
 class InstructorCourseAnalyticsScreen extends StatefulWidget {
@@ -250,7 +249,7 @@ class _InstructorCourseAnalyticsScreenState extends State<InstructorCourseAnalyt
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 10,
             offset: const Offset(0, 2),
           ),
@@ -266,7 +265,7 @@ class _InstructorCourseAnalyticsScreenState extends State<InstructorCourseAnalyt
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: color.withOpacity(0.1),
+                  color: color.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Icon(icon, color: color, size: 24),
@@ -344,7 +343,7 @@ class _InstructorCourseAnalyticsScreenState extends State<InstructorCourseAnalyt
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 10,
             offset: const Offset(0, 2),
           ),
@@ -412,7 +411,7 @@ class _InstructorCourseAnalyticsScreenState extends State<InstructorCourseAnalyt
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 10,
             offset: const Offset(0, 2),
           ),
@@ -451,7 +450,7 @@ class _InstructorCourseAnalyticsScreenState extends State<InstructorCourseAnalyt
         Container(
           padding: const EdgeInsets.all(10),
           decoration: BoxDecoration(
-            color: color.withOpacity(0.1),
+            color: color.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(8),
           ),
           child: Icon(icon, color: color, size: 24),
@@ -491,11 +490,13 @@ class _InstructorCourseAnalyticsScreenState extends State<InstructorCourseAnalyt
       int progressA = 0;
       int progressB = 0;
 
-      if (a['progress'] is int) progressA = a['progress'];
-      else if (a['progress'] is Map) progressA = (a['progress']['percent'] ?? 0) as int;
+      if (a['progress'] is int) {
+        progressA = a['progress'];
+      } else if (a['progress'] is Map) progressA = (a['progress']['percent'] ?? 0) as int;
 
-      if (b['progress'] is int) progressB = b['progress'];
-      else if (b['progress'] is Map) progressB = (b['progress']['percent'] ?? 0) as int;
+      if (b['progress'] is int) {
+        progressB = b['progress'];
+      } else if (b['progress'] is Map) progressB = (b['progress']['percent'] ?? 0) as int;
 
       return progressB.compareTo(progressA);
     });
@@ -510,7 +511,7 @@ class _InstructorCourseAnalyticsScreenState extends State<InstructorCourseAnalyt
           borderRadius: BorderRadius.circular(12),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.05),
+              color: Colors.black.withValues(alpha: 0.05),
               blurRadius: 10,
               offset: const Offset(0, 2),
             ),
@@ -532,7 +533,7 @@ class _InstructorCourseAnalyticsScreenState extends State<InstructorCourseAnalyt
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 10,
             offset: const Offset(0, 2),
           ),
@@ -542,7 +543,7 @@ class _InstructorCourseAnalyticsScreenState extends State<InstructorCourseAnalyt
         shrinkWrap: true,
         physics: const NeverScrollableScrollPhysics(),
         itemCount: topStudents.length,
-        separatorBuilder: (_, __) => const Divider(height: 24),
+        separatorBuilder: (_, _) => const Divider(height: 24),
         itemBuilder: (context, index) {
           final student = topStudents[index];
           final name = student['name'] ?? 'Unknown Student';
@@ -575,7 +576,7 @@ class _InstructorCourseAnalyticsScreenState extends State<InstructorCourseAnalyt
               Icon(medalIcon, color: medalColor, size: 28),
               const SizedBox(width: 12),
               CircleAvatar(
-                backgroundColor: AppColors.primaryColor.withOpacity(0.1),
+                backgroundColor: AppColors.primaryColor.withValues(alpha: 0.1),
                 child: Text(
                   name[0].toUpperCase(),
                   style: TextStyle(
@@ -598,7 +599,7 @@ class _InstructorCourseAnalyticsScreenState extends State<InstructorCourseAnalyt
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF10B981).withOpacity(0.1),
+                  color: const Color(0xFF10B981).withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(

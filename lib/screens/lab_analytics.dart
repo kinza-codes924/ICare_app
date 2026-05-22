@@ -251,7 +251,7 @@ class _LabAnalyticsState extends State<LabAnalytics>
                 offset: const Offset(0, 2),
               ),
             ],
-            border: Border.all(color: Colors.grey.withOpacity(0.1)),
+            border: Border.all(color: Colors.grey.withValues(alpha: 0.1)),
           ),
           child: Row(
             children: periods.map((period) {
@@ -316,10 +316,10 @@ class _LabAnalyticsState extends State<LabAnalytics>
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
             decoration: BoxDecoration(
-              color: _customDateRange != null ? primaryColor.withOpacity(0.08) : Colors.white,
+              color: _customDateRange != null ? primaryColor.withValues(alpha: 0.08) : Colors.white,
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
-                color: _customDateRange != null ? primaryColor : Colors.grey.withOpacity(0.2),
+                color: _customDateRange != null ? primaryColor : Colors.grey.withValues(alpha: 0.2),
               ),
             ),
             child: Row(
@@ -441,12 +441,12 @@ class _LabAnalyticsState extends State<LabAnalytics>
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 15,
             offset: const Offset(0, 8),
           ),
         ],
-        border: Border.all(color: Colors.grey.withOpacity(0.1)),
+        border: Border.all(color: Colors.grey.withValues(alpha: 0.1)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -497,9 +497,9 @@ class _LabAnalyticsState extends State<LabAnalytics>
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 20, offset: const Offset(0, 4)),
+          BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 20, offset: const Offset(0, 4)),
         ],
-        border: Border.all(color: Colors.grey.withOpacity(0.1)),
+        border: Border.all(color: Colors.grey.withValues(alpha: 0.1)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -546,9 +546,9 @@ class _LabAnalyticsState extends State<LabAnalytics>
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.06),
+        color: color.withValues(alpha: 0.06),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withOpacity(0.2)),
+        border: Border.all(color: color.withValues(alpha: 0.2)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -589,7 +589,7 @@ class _LabAnalyticsState extends State<LabAnalytics>
             offset: const Offset(0, 4),
           ),
         ],
-        border: Border.all(color: Colors.grey.withOpacity(0.1)),
+        border: Border.all(color: Colors.grey.withValues(alpha: 0.1)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -793,12 +793,12 @@ class _LabAnalyticsState extends State<LabAnalytics>
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 15,
             offset: const Offset(0, 8),
           ),
         ],
-        border: Border.all(color: Colors.grey.withOpacity(0.1)),
+        border: Border.all(color: Colors.grey.withValues(alpha: 0.1)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -808,7 +808,7 @@ class _LabAnalyticsState extends State<LabAnalytics>
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: color.withOpacity(0.12),
+                  color: color.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(metric['icon'] as IconData, color: color, size: 22),
@@ -875,7 +875,7 @@ class _LabAnalyticsState extends State<LabAnalytics>
             offset: const Offset(0, 4),
           ),
         ],
-        border: Border.all(color: Colors.grey.withOpacity(0.1)),
+        border: Border.all(color: Colors.grey.withValues(alpha: 0.1)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -949,7 +949,7 @@ class _LabAnalyticsState extends State<LabAnalytics>
                       decoration: BoxDecoration(
                         color: index == 0
                             ? primaryColor
-                            : primaryColor.withOpacity(0.6),
+                            : primaryColor.withValues(alpha: 0.6),
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: Center(
@@ -980,7 +980,7 @@ class _LabAnalyticsState extends State<LabAnalytics>
                         vertical: 6,
                       ),
                       decoration: BoxDecoration(
-                        color: primaryColor.withOpacity(0.1),
+                        color: primaryColor.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: Text(

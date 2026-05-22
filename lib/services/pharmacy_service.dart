@@ -1,4 +1,3 @@
-import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:icare/services/api_service.dart';
 
@@ -180,10 +179,12 @@ class PharmacyService {
     String? search,
   }) async {
     String url = '/pharmacy/products?pharmacyId=$pharmacyId';
-    if (category != null && category != 'All')
+    if (category != null && category != 'All') {
       url += '&category=${Uri.encodeComponent(category)}';
-    if (search != null && search.isNotEmpty)
+    }
+    if (search != null && search.isNotEmpty) {
       url += '&q=${Uri.encodeComponent(search)}';
+    }
     final response = await _apiService.get(url);
     return response.data['medicines'] as List;
   }

@@ -82,7 +82,7 @@ class _PrescriptionTemplatesScreenState
     return ListView.separated(
       padding: const EdgeInsets.all(24),
       itemCount: _templates.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 16),
+      separatorBuilder: (_, _) => const SizedBox(height: 16),
       itemBuilder: (context, index) {
         final template = _templates[index];
         final drugs = (template['drugs'] ?? []) as List<dynamic>;

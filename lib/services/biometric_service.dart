@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:local_auth/local_auth.dart';
+import 'package:icare/models/user.dart';
 import 'package:icare/utils/shared_pref.dart';
 
 /// Handles all device-level biometric authentication.
@@ -41,7 +42,7 @@ class BiometricService {
   Future<String> getBiometricLabel() async {
     try {
       final biometrics = await _auth.getAvailableBiometrics();
-      if (biometrics.contains(BiometricType.face)) return 'Face ID';
+      if (biometrics.contains(BiometricType.face)) return 'Face Unlock';
       if (biometrics.contains(BiometricType.fingerprint)) return 'Fingerprint';
       if (biometrics.contains(BiometricType.iris)) return 'Iris Scan';
       return 'Biometrics';
@@ -54,14 +55,16 @@ class BiometricService {
 
   Future<bool> isBiometricEnabled() => _prefs.getBiometricEnabled();
 
-  Future<void> enableBiometrics(String email) async {
+  Future<void> enableBiometrics(String email, {String? token, User? user}) async {
     await _prefs.setBiometricEnabled(true);
     await _prefs.setBiometricEmail(email);
+    if (token != null) await _prefs.setBiometricToken(token);
+    if (user != null) await _prefs.setBiometricUserData(user);
     debugPrint('✅ Biometric sign-in enabled for $email');
   }
 
   Future<void> disableBiometrics() async {
-    await _prefs.setBiometricEnabled(false);
+    await _prefs.clearBiometricSession();
     debugPrint('🔒 Biometric sign-in disabled');
   }
 

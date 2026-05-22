@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:icare/models/user.dart';
 import 'package:icare/services/lms_service.dart';
 import 'package:icare/utils/theme.dart';
 import 'package:icare/widgets/back_button.dart';
@@ -28,11 +29,11 @@ class _LiveSessionPageState extends State<LiveSessionPage> with SingleTickerProv
   final ScrollController _chatScrollController = ScrollController();
 
   late TabController _tabController;
-  List<dynamic> _chatMessages = [];
-  List<dynamic> _raisedHands = [];
-  List<dynamic> _waitingRoom = [];
-  List<dynamic> _polls = [];
-  Map<String, dynamic>? _currentUser;
+  final List<dynamic> _chatMessages = [];
+  final List<dynamic> _raisedHands = [];
+  final List<dynamic> _waitingRoom = [];
+  final List<dynamic> _polls = [];
+  User? _currentUser;
   Timer? _pollTimer;
   bool _handRaised = false;
   bool _loading = true;
@@ -56,7 +57,7 @@ class _LiveSessionPageState extends State<LiveSessionPage> with SingleTickerProv
   }
 
   Future<void> _loadUser() async {
-    final user = await SharedPref.getUser();
+    final user = await SharedPref().getUserData();
     if (mounted) {
       setState(() => _currentUser = user);
     }
@@ -295,7 +296,7 @@ class _LiveSessionPageState extends State<LiveSessionPage> with SingleTickerProv
                   itemCount: _chatMessages.length,
                   itemBuilder: (context, index) {
                     final msg = _chatMessages[index];
-                    final isMe = msg['userId'] == _currentUser?['_id'];
+                    final isMe = msg['userId'] == _currentUser?.id;
                     return _buildChatMessage(msg, isMe);
                   },
                 ),
@@ -308,7 +309,7 @@ class _LiveSessionPageState extends State<LiveSessionPage> with SingleTickerProv
             color: Colors.white,
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.05),
+                color: Colors.black.withValues(alpha: 0.05),
                 blurRadius: 8,
                 offset: const Offset(0, -2),
               ),
@@ -357,7 +358,7 @@ class _LiveSessionPageState extends State<LiveSessionPage> with SingleTickerProv
           if (!isMe) ...[
             CircleAvatar(
               radius: 16,
-              backgroundColor: AppColors.primaryColor.withOpacity(0.1),
+              backgroundColor: AppColors.primaryColor.withValues(alpha: 0.1),
               child: Text(
                 (msg['userName'] ?? 'U')[0].toUpperCase(),
                 style: const TextStyle(color: AppColors.primaryColor, fontWeight: FontWeight.w700, fontSize: 12),
@@ -373,7 +374,7 @@ class _LiveSessionPageState extends State<LiveSessionPage> with SingleTickerProv
                 borderRadius: BorderRadius.circular(16),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.04),
+                    color: Colors.black.withValues(alpha: 0.04),
                     blurRadius: 4,
                   ),
                 ],
@@ -440,7 +441,7 @@ class _LiveSessionPageState extends State<LiveSessionPage> with SingleTickerProv
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 6),
+          BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 6),
         ],
       ),
       child: Column(
@@ -508,7 +509,7 @@ class _LiveSessionPageState extends State<LiveSessionPage> with SingleTickerProv
                 ),
               ),
             );
-          }).toList(),
+          }),
           const SizedBox(height: 8),
           Text(
             '$totalVotes vote(s)',
@@ -543,14 +544,14 @@ class _LiveSessionPageState extends State<LiveSessionPage> with SingleTickerProv
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(12),
                   boxShadow: [
-                    BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 6),
+                    BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 6),
                   ],
                 ),
                 child: Row(
                   children: [
                     CircleAvatar(
                       radius: 24,
-                      backgroundColor: AppColors.primaryColor.withOpacity(0.1),
+                      backgroundColor: AppColors.primaryColor.withValues(alpha: 0.1),
                       child: Text(
                         (student['name'] ?? 'S')[0].toUpperCase(),
                         style: const TextStyle(

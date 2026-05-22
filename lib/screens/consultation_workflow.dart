@@ -6,7 +6,6 @@ import 'package:icare/widgets/vitals_chart.dart';
 import 'package:icare/screens/intake_notes_redesign.dart';
 import 'package:icare/screens/soap_notes_redesign.dart';
 import 'package:icare/screens/create_medical_record.dart';
-import 'package:icare/screens/prescription_templates_screen.dart';
 import 'package:icare/screens/doctor_assign_program_screen.dart';
 import 'package:icare/screens/video_call.dart';
 import 'package:icare/services/appointment_service.dart';
@@ -14,7 +13,6 @@ import 'package:icare/services/doctor_service.dart';
 import 'package:icare/utils/shared_pref.dart';
 import 'package:icare/utils/theme.dart';
 import 'package:icare/widgets/back_button.dart';
-import 'package:icare/widgets/custom_button.dart';
 import 'package:icare/screens/record_vitals_screen.dart';
 import 'package:intl/intl.dart';
 
@@ -247,7 +245,7 @@ class _ConsultationWorkflowScreenState extends State<ConsultationWorkflowScreen>
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
+              color: color.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(10),
             ),
             child: Icon(icon, color: color, size: 20),
@@ -281,8 +279,9 @@ class _ConsultationWorkflowScreenState extends State<ConsultationWorkflowScreen>
   }
 
   Widget _buildHistoryTab() {
-    if (_isLoadingHistory)
+    if (_isLoadingHistory) {
       return const Center(child: CircularProgressIndicator());
+    }
 
     final records = _patientHistory?['records'] as List? ?? [];
     final vitals = _patientHistory?['vitals'] as List? ?? [];
@@ -353,7 +352,7 @@ class _ConsultationWorkflowScreenState extends State<ConsultationWorkflowScreen>
                 diagnosis,
                 null,
               );
-            }).toList(),
+            }),
         ],
       ),
     );
@@ -406,7 +405,7 @@ class _ConsultationWorkflowScreenState extends State<ConsultationWorkflowScreen>
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
         border: (warning != null || abnormalLabs.isNotEmpty)
-            ? Border.all(color: Colors.red.withOpacity(0.5), width: 2)
+            ? Border.all(color: Colors.red.withValues(alpha: 0.5), width: 2)
             : null,
       ),
       child: Column(
@@ -593,7 +592,7 @@ class _ConsultationWorkflowScreenState extends State<ConsultationWorkflowScreen>
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: AppColors.primaryColor.withOpacity(0.1),
+              color: AppColors.primaryColor.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(10),
             ),
             child: const Icon(
@@ -677,7 +676,7 @@ class _ConsultationWorkflowScreenState extends State<ConsultationWorkflowScreen>
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: color.withOpacity(0.1),
+                color: color.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Icon(icon, color: color, size: 28),

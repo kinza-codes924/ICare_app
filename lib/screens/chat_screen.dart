@@ -419,7 +419,7 @@ class _ChatScreenState extends State<ChatScreen> {
           children: [
             CircleAvatar(
               radius: 20,
-              backgroundColor: AppColors.primaryColor.withOpacity(0.1),
+              backgroundColor: AppColors.primaryColor.withValues(alpha: 0.1),
               backgroundImage: widget.userImage != null
                   ? NetworkImage(widget.userImage!)
                   : null,
@@ -616,7 +616,7 @@ class _ChatScreenState extends State<ChatScreen> {
           ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.05),
+              color: Colors.black.withValues(alpha: 0.05),
               blurRadius: 5,
               offset: const Offset(0, 2),
             ),
@@ -639,7 +639,7 @@ class _ChatScreenState extends State<ChatScreen> {
                           att['url'],
                           width: 200,
                           fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) =>
+                          errorBuilder: (_, _, _) =>
                               const Icon(Icons.broken_image),
                         ),
                       ),
@@ -677,7 +677,7 @@ class _ChatScreenState extends State<ChatScreen> {
                     ),
                   );
                 }
-              }).toList(),
+              }),
             Text(
               message['message'],
               style: TextStyle(
@@ -720,7 +720,7 @@ class _ChatScreenState extends State<ChatScreen> {
         color: Colors.white,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 10,
             offset: const Offset(0, -2),
           ),
@@ -783,7 +783,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   shape: BoxShape.circle,
                   boxShadow: [
                     BoxShadow(
-                      color: AppColors.primaryColor.withOpacity(0.3),
+                      color: AppColors.primaryColor.withValues(alpha: 0.3),
                       blurRadius: 8,
                       offset: const Offset(0, 2),
                     ),

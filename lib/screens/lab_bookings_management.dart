@@ -319,7 +319,7 @@ class _LabBookingsManagementState extends State<LabBookingsManagement>
                         width: 40,
                         height: 40,
                         decoration: BoxDecoration(
-                          color: primaryColor.withOpacity(0.1),
+                          color: primaryColor.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(10),
                         ),
                         child: const Icon(Icons.add_circle_rounded, color: primaryColor, size: 22),
@@ -364,7 +364,7 @@ class _LabBookingsManagementState extends State<LabBookingsManagement>
                             const Text('Gender', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF475569))),
                             const SizedBox(height: 6),
                             DropdownButtonFormField<String>(
-                              value: gender,
+                              initialValue: gender,
                               decoration: InputDecoration(
                                 prefixIcon: const Icon(Icons.wc_rounded, size: 18, color: primaryColor),
                                 contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
@@ -460,7 +460,7 @@ class _LabBookingsManagementState extends State<LabBookingsManagement>
                         ],
                       ),
                     );
-                  }).toList(),
+                  }),
                   TextButton.icon(
                     onPressed: () => setModalState(() => specimenControllers.add(TextEditingController())),
                     icon: const Icon(Icons.add_circle_rounded, size: 18),
@@ -504,7 +504,7 @@ class _LabBookingsManagementState extends State<LabBookingsManagement>
                       const Text('Is this test urgent?', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF0F172A))),
                       Switch(
                         value: isUrgent,
-                        activeColor: const Color(0xFFFF4D00),
+                        activeThumbColor: const Color(0xFFFF4D00),
                         onChanged: (v) => setModalState(() => isUrgent = v),
                       ),
                     ],
@@ -519,7 +519,7 @@ class _LabBookingsManagementState extends State<LabBookingsManagement>
                             const Text('Normal Turnaround', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF475569))),
                             const SizedBox(height: 6),
                             DropdownButtonFormField<String>(
-                              value: normalTurnaround,
+                              initialValue: normalTurnaround,
                               decoration: InputDecoration(
                                 contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.grey.shade200)),
@@ -543,11 +543,11 @@ class _LabBookingsManagementState extends State<LabBookingsManagement>
                               const Text('Urgent Turnaround', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFFFF4D00))),
                               const SizedBox(height: 6),
                               DropdownButtonFormField<String>(
-                                value: urgentTurnaround,
+                                initialValue: urgentTurnaround,
                                 decoration: InputDecoration(
                                   contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: const Color(0xFFFF4D00).withOpacity(0.5))),
-                                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: const Color(0xFFFF4D00).withOpacity(0.5))),
+                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: const Color(0xFFFF4D00).withValues(alpha: 0.5))),
+                                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: const Color(0xFFFF4D00).withValues(alpha: 0.5))),
                                   filled: true,
                                   fillColor: const Color(0xFFFFF5F0),
                                 ),
@@ -738,7 +738,7 @@ class _LabBookingsManagementState extends State<LabBookingsManagement>
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: primaryColor.withOpacity(0.3),
+            color: primaryColor.withValues(alpha: 0.3),
             blurRadius: 20,
             offset: const Offset(0, 8),
           ),
@@ -763,7 +763,7 @@ class _LabBookingsManagementState extends State<LabBookingsManagement>
                   'Manage and track all test bookings',
                   style: TextStyle(
                     fontSize: 14,
-                    color: Colors.white.withOpacity(0.8),
+                    color: Colors.white.withValues(alpha: 0.8),
                   ),
                 ),
               ],
@@ -821,7 +821,7 @@ class _LabBookingsManagementState extends State<LabBookingsManagement>
         ),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
-          side: BorderSide(color: color.withOpacity(0.2)),
+          side: BorderSide(color: color.withValues(alpha: 0.2)),
         ),
       ),
     );
@@ -920,15 +920,15 @@ class _LabBookingsManagementState extends State<LabBookingsManagement>
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
             color: isUrgent
-                ? Colors.red.withOpacity(0.4)
+                ? Colors.red.withValues(alpha: 0.4)
                 : isDoctorOrdered
-                ? const Color(0xFF8B5CF6).withOpacity(0.3)
-                : Colors.grey.withOpacity(0.1),
+                ? const Color(0xFF8B5CF6).withValues(alpha: 0.3)
+                : Colors.grey.withValues(alpha: 0.1),
             width: isUrgent || isDoctorOrdered ? 2 : 1,
           ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.03),
+              color: Colors.black.withValues(alpha: 0.03),
               blurRadius: 10,
               offset: const Offset(0, 4),
             ),
@@ -946,7 +946,7 @@ class _LabBookingsManagementState extends State<LabBookingsManagement>
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                     decoration: BoxDecoration(
-                      color: Colors.red.withOpacity(0.1),
+                      color: Colors.red.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: const Row(
@@ -962,7 +962,7 @@ class _LabBookingsManagementState extends State<LabBookingsManagement>
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF8B5CF6).withOpacity(0.1),
+                      color: const Color(0xFF8B5CF6).withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Row(
@@ -982,8 +982,8 @@ class _LabBookingsManagementState extends State<LabBookingsManagement>
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
                     color: isHomeCollection
-                        ? const Color(0xFF0EA5E9).withOpacity(0.1)
-                        : const Color(0xFF10B981).withOpacity(0.1),
+                        ? const Color(0xFF0EA5E9).withValues(alpha: 0.1)
+                        : const Color(0xFF10B981).withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Row(
@@ -1015,7 +1015,7 @@ class _LabBookingsManagementState extends State<LabBookingsManagement>
                   width: 50,
                   height: 50,
                   decoration: BoxDecoration(
-                    color: statusColor.withOpacity(0.1),
+                    color: statusColor.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Icon(_getTestIcon(testName), color: statusColor),
@@ -1048,7 +1048,7 @@ class _LabBookingsManagementState extends State<LabBookingsManagement>
                     vertical: 4,
                   ),
                   decoration: BoxDecoration(
-                    color: statusColor.withOpacity(0.1),
+                    color: statusColor.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(

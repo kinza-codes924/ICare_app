@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_size_matters/flutter_size_matters.dart';
 import 'package:icare/screens/select_payment_method.dart';
-import 'package:icare/utils/imagePaths.dart';
 import 'package:icare/utils/theme.dart';
 import 'package:icare/utils/utils.dart';
 import 'package:icare/widgets/back_button.dart';
@@ -69,7 +68,7 @@ class REceiptScreen extends StatelessWidget {
                   borderRadius: BorderRadius.circular(20),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.05),
+                      color: Colors.black.withValues(alpha: 0.05),
                       blurRadius: 15,
                       offset: const Offset(0, 5),
                     ),

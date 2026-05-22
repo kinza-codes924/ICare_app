@@ -31,7 +31,7 @@ class CustomInputField extends StatefulWidget {
   final int? maxLines;
   final BoxBorder? borderType;
   const CustomInputField({
-    Key? key,
+    super.key,
     this.title,
     required this.hintText,
     this.leadingIcon,
@@ -60,7 +60,7 @@ class CustomInputField extends StatefulWidget {
     this.titleFontSize = 15,
     this.titleFontWeight = FontWeight.w600,
     this.margin,
-  }) : super(key: key);
+  });
 
   @override
   State<CustomInputField> createState() => _CustomInputFieldState();

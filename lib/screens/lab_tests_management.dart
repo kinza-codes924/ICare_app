@@ -354,7 +354,7 @@ class _LabTestsManagementState extends State<LabTestsManagement>
                       width: 40,
                       height: 5,
                       decoration: BoxDecoration(
-                        color: Colors.grey.withOpacity(0.3),
+                        color: Colors.grey.withValues(alpha: 0.3),
                         borderRadius: BorderRadius.circular(10),
                       ),
                     ),
@@ -365,7 +365,7 @@ class _LabTestsManagementState extends State<LabTestsManagement>
                       Container(
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
-                          color: primaryColor.withOpacity(0.1),
+                          color: primaryColor.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(20),
                         ),
                         child: const Icon(
@@ -439,11 +439,11 @@ class _LabTestsManagementState extends State<LabTestsManagement>
                                       title: Text(test['name']!, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
                                       subtitle: Text('${test['shortForm']!} • ${test['category']!}', style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
                                       selected: selectedTest == test['name'],
-                                      selectedTileColor: primaryColor.withOpacity(0.1),
+                                      selectedTileColor: primaryColor.withValues(alpha: 0.1),
                                       leading: Container(
                                         padding: const EdgeInsets.all(6),
                                         decoration: BoxDecoration(
-                                          color: selectedTest == test['name'] ? primaryColor.withOpacity(0.15) : const Color(0xFFF1F5F9),
+                                          color: selectedTest == test['name'] ? primaryColor.withValues(alpha: 0.15) : const Color(0xFFF1F5F9),
                                           borderRadius: BorderRadius.circular(8),
                                         ),
                                         child: Text(test['shortForm']!, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: selectedTest == test['name'] ? primaryColor : const Color(0xFF64748B))),
@@ -461,7 +461,7 @@ class _LabTestsManagementState extends State<LabTestsManagement>
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: primaryColor.withOpacity(0.1),
+                        color: primaryColor.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Row(
@@ -516,7 +516,7 @@ class _LabTestsManagementState extends State<LabTestsManagement>
                   const Text('NORMAL TURNAROUND TIME', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Color(0xFF64748B), letterSpacing: 1.0)),
                   const SizedBox(height: 8),
                   DropdownButtonFormField<String>(
-                    value: normalTurnaround,
+                    initialValue: normalTurnaround,
                     decoration: InputDecoration(
                       prefixIcon: const Icon(Icons.schedule_rounded, color: primaryColor),
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
@@ -533,7 +533,7 @@ class _LabTestsManagementState extends State<LabTestsManagement>
                       const Text('Urgent Test Available?', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
                       Switch(
                         value: urgentAvailable,
-                        activeColor: const Color(0xFFFF4D00),
+                        activeThumbColor: const Color(0xFFFF4D00),
                         onChanged: (v) => setModalState(() => urgentAvailable = v),
                       ),
                     ],
@@ -543,7 +543,7 @@ class _LabTestsManagementState extends State<LabTestsManagement>
                     const Text('URGENT TURNAROUND TIME', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Color(0xFFFF4D00), letterSpacing: 1.0)),
                     const SizedBox(height: 8),
                     DropdownButtonFormField<String>(
-                      value: urgentTurnaround,
+                      initialValue: urgentTurnaround,
                       decoration: InputDecoration(
                         prefixIcon: const Icon(Icons.priority_high_rounded, color: Color(0xFFFF4D00)),
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: Color(0xFFFF4D00))),
@@ -767,7 +767,7 @@ class _LabTestsManagementState extends State<LabTestsManagement>
           borderRadius: BorderRadius.circular(14),
           border: Border.all(color: const Color(0xFFE8ECF5), width: 1.5),
           boxShadow: [
-            BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 8, offset: const Offset(0, 2)),
+            BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8, offset: const Offset(0, 2)),
           ],
         ),
         child: TextField(
@@ -820,7 +820,7 @@ class _LabTestsManagementState extends State<LabTestsManagement>
             decoration: BoxDecoration(
               color: const Color(0xFFF1F5F9),
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: Colors.grey.withOpacity(0.1)),
+              border: Border.all(color: Colors.grey.withValues(alpha: 0.1)),
             ),
             child: Icon(
               Icons.science_outlined,
@@ -896,7 +896,7 @@ class _LabTestsManagementState extends State<LabTestsManagement>
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: const Color(0xFFE8ECF5), width: 1.5),
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 10, offset: const Offset(0, 4)),
+          BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 10, offset: const Offset(0, 4)),
         ],
       ),
       child: Padding(
@@ -907,7 +907,7 @@ class _LabTestsManagementState extends State<LabTestsManagement>
               width: 52,
               height: 52,
               decoration: BoxDecoration(
-                color: primaryColor.withOpacity(0.1),
+                color: primaryColor.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(14),
               ),
               child: Center(child: Icon(testIcon, color: primaryColor, size: 26)),
@@ -955,7 +955,7 @@ class _LabTestsManagementState extends State<LabTestsManagement>
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Row(
@@ -1061,16 +1061,21 @@ class _LabTestsManagementState extends State<LabTestsManagement>
     final name = testName.toLowerCase();
     if (name.contains('blood')) return Icons.bloodtype_rounded;
     if (name.contains('urine')) return Icons.local_hospital_rounded;
-    if (name.contains('x-ray') || name.contains('xray'))
+    if (name.contains('x-ray') || name.contains('xray')) {
       return Icons.medical_services_rounded;
-    if (name.contains('mri') || name.contains('scan'))
+    }
+    if (name.contains('mri') || name.contains('scan')) {
       return Icons.scanner_rounded;
-    if (name.contains('covid') || name.contains('pcr'))
+    }
+    if (name.contains('covid') || name.contains('pcr')) {
       return Icons.coronavirus_rounded;
-    if (name.contains('heart') || name.contains('ecg'))
+    }
+    if (name.contains('heart') || name.contains('ecg')) {
       return Icons.favorite_rounded;
-    if (name.contains('liver') || name.contains('kidney'))
+    }
+    if (name.contains('liver') || name.contains('kidney')) {
       return Icons.healing_rounded;
+    }
     return Icons.science_rounded;
   }
 }

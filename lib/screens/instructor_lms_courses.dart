@@ -231,7 +231,7 @@ class _InstructorLmsCoursesScreenState extends State<InstructorLmsCoursesScreen>
         });
       },
       backgroundColor: Colors.white,
-      selectedColor: AppColors.primaryColor.withOpacity(0.1),
+      selectedColor: AppColors.primaryColor.withValues(alpha: 0.1),
       labelStyle: TextStyle(
         color: isSelected ? AppColors.primaryColor : const Color(0xFF64748B),
         fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
@@ -338,7 +338,7 @@ class _InstructorLmsCoursesScreenState extends State<InstructorLmsCoursesScreen>
       height: 80,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(8),
-        color: AppColors.primaryColor.withOpacity(0.1),
+        color: AppColors.primaryColor.withValues(alpha: 0.1),
         image: course['thumbnail'] != null
             ? DecorationImage(
                 image: NetworkImage(course['thumbnail']),
@@ -376,8 +376,8 @@ class _InstructorLmsCoursesScreenState extends State<InstructorLmsCoursesScreen>
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
               decoration: BoxDecoration(
                 color: course['isPublished'] == true
-                    ? const Color(0xFF10B981).withOpacity(0.1)
-                    : const Color(0xFFF59E0B).withOpacity(0.1),
+                    ? const Color(0xFF10B981).withValues(alpha: 0.1)
+                    : const Color(0xFFF59E0B).withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Text(

@@ -1,4 +1,3 @@
-import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -180,7 +179,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
       } else if (_heightUnit == 'm' && _heightM != null) {
         heightStr = '$_heightM m';
       } else if (_heightUnit == 'ft') {
-        heightStr = "${_heightFt}'${_heightIn}\"";
+        heightStr = "$_heightFt'$_heightIn\"";
       }
 
       // Build weight string
@@ -282,9 +281,9 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
                         height: 120,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          color: AppColors.primaryColor.withOpacity(0.1),
+                          color: AppColors.primaryColor.withValues(alpha: 0.1),
                           border: Border.all(
-                            color: AppColors.primaryColor.withOpacity(0.2),
+                            color: AppColors.primaryColor.withValues(alpha: 0.2),
                             width: 3,
                           ),
                         ),
@@ -366,7 +365,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
                     borderRadius: BorderRadius.circular(20),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.05),
+                        color: Colors.black.withValues(alpha: 0.05),
                         blurRadius: 20,
                         offset: const Offset(0, 4),
                       ),
@@ -646,7 +645,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
                           const SizedBox(height: 16),
                           // Blood Group
                           DropdownButtonFormField<String>(
-                            value: bloodGroupController.text.isEmpty ? null : bloodGroupController.text,
+                            initialValue: bloodGroupController.text.isEmpty ? null : bloodGroupController.text,
                             decoration: InputDecoration(
                               labelText: 'Blood Group',
                               prefixIcon: const Icon(Icons.bloodtype_outlined, color: Color(0xFF94A3B8)),
@@ -776,8 +775,11 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
                               final sel = _selectedConditions.contains(c);
                               return GestureDetector(
                                 onTap: () => setState(() {
-                                  if (sel) _selectedConditions.remove(c);
-                                  else _selectedConditions.add(c);
+                                  if (sel) {
+                                    _selectedConditions.remove(c);
+                                  } else {
+                                    _selectedConditions.add(c);
+                                  }
                                 }),
                                 child: AnimatedContainer(
                                   duration: const Duration(milliseconds: 150),
@@ -802,8 +804,11 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
                               final sel = _selectedGoals.contains(g);
                               return GestureDetector(
                                 onTap: () => setState(() {
-                                  if (sel) _selectedGoals.remove(g);
-                                  else _selectedGoals.add(g);
+                                  if (sel) {
+                                    _selectedGoals.remove(g);
+                                  } else {
+                                    _selectedGoals.add(g);
+                                  }
                                 }),
                                 child: AnimatedContainer(
                                   duration: const Duration(milliseconds: 150),
@@ -910,7 +915,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
     required String Function(T) label,
   }) {
     return DropdownButtonFormField<T>(
-      value: value,
+      initialValue: value,
       isExpanded: true,
       decoration: InputDecoration(
         hintText: hint,

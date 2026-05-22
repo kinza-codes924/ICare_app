@@ -2,9 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:icare/services/laboratory_service.dart';
 import 'package:icare/services/medical_record_service.dart';
-import 'package:icare/services/consultation_service.dart';
 import 'package:icare/utils/shared_pref.dart';
-import 'package:icare/utils/theme.dart';
 import 'package:icare/widgets/back_button.dart';
 import 'package:intl/intl.dart';
 
@@ -320,7 +318,7 @@ class _LabReportsScreenState extends State<LabReportsScreen>
     return ListView.separated(
       padding: const EdgeInsets.all(16),
       itemCount: _advisedPrescriptions.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 10),
+      separatorBuilder: (_, _) => const SizedBox(height: 10),
       itemBuilder: (context, i) {
         final rx = _advisedPrescriptions[i] as Map<String, dynamic>;
         final doctorName = (rx['doctor']?['name'] ?? rx['doctorName'] ?? 'Doctor').toString();
@@ -340,7 +338,7 @@ class _LabReportsScreenState extends State<LabReportsScreen>
               borderRadius: BorderRadius.circular(14),
               border: Border.all(color: const Color(0xFFDDD6FE), width: 1.5),
               boxShadow: [
-                BoxShadow(color: const Color(0xFF8B5CF6).withOpacity(0.06), blurRadius: 12, offset: const Offset(0, 4)),
+                BoxShadow(color: const Color(0xFF8B5CF6).withValues(alpha: 0.06), blurRadius: 12, offset: const Offset(0, 4)),
               ],
             ),
             child: Column(
@@ -484,7 +482,7 @@ class _LabReportsScreenState extends State<LabReportsScreen>
                       ),
                   ]),
                 );
-              }).toList(),
+              }),
             ],
           ),
         ),
@@ -505,7 +503,7 @@ class _LabReportsScreenState extends State<LabReportsScreen>
             Container(
               padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
-                color: primaryColor.withOpacity(0.06),
+                color: primaryColor.withValues(alpha: 0.06),
                 shape: BoxShape.circle,
               ),
               child: Icon(
@@ -513,7 +511,7 @@ class _LabReportsScreenState extends State<LabReportsScreen>
                     ? Icons.receipt_long_rounded
                     : Icons.hourglass_empty_rounded,
                 size: 48,
-                color: primaryColor.withOpacity(0.5),
+                color: primaryColor.withValues(alpha: 0.5),
               ),
             ),
             const SizedBox(height: 16),
@@ -593,7 +591,7 @@ class _LabReportsScreenState extends State<LabReportsScreen>
         border: Border.all(color: const Color(0xFFF1F5F9), width: 1.5),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),
@@ -607,8 +605,8 @@ class _LabReportsScreenState extends State<LabReportsScreen>
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 colors: [
-                  primaryColor.withOpacity(0.04),
-                  secondaryColor.withOpacity(0.02),
+                  primaryColor.withValues(alpha: 0.04),
+                  secondaryColor.withValues(alpha: 0.02),
                 ],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
@@ -626,7 +624,7 @@ class _LabReportsScreenState extends State<LabReportsScreen>
                     borderRadius: BorderRadius.circular(14),
                     boxShadow: [
                       BoxShadow(
-                        color: primaryColor.withOpacity(0.1),
+                        color: primaryColor.withValues(alpha: 0.1),
                         blurRadius: 8,
                         offset: const Offset(0, 3),
                       ),
@@ -782,7 +780,7 @@ class _LabReportsScreenState extends State<LabReportsScreen>
                         Container(
                           padding: const EdgeInsets.all(8),
                           decoration: BoxDecoration(
-                            color: primaryColor.withOpacity(0.08),
+                            color: primaryColor.withValues(alpha: 0.08),
                             borderRadius: BorderRadius.circular(10),
                           ),
                           child: const Icon(

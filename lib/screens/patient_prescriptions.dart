@@ -8,7 +8,6 @@ import 'package:icare/services/pharmacy_service.dart';
 import 'package:icare/widgets/back_button.dart';
 import 'package:icare/screens/labb_details.dart';
 import 'package:icare/screens/pharmacy_prescription_screen.dart';
-import 'package:icare/screens/prescription_detail_screen.dart';
 import 'package:flutter/services.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
@@ -925,7 +924,7 @@ class _PrescriptionPage extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                   decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(8)),
                   child: Image.asset('assets/Asset 1.png', height: 28, fit: BoxFit.contain,
-                      errorBuilder: (_, __, ___) => const Icon(Icons.local_hospital_rounded, color: Color(0xFF0036BC), size: 24)),
+                      errorBuilder: (_, _, _) => const Icon(Icons.local_hospital_rounded, color: Color(0xFF0036BC), size: 24)),
                 ),
                 const SizedBox(width: 10),
                 const Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -940,7 +939,7 @@ class _PrescriptionPage extends StatelessWidget {
               const SizedBox(height: 14),
               Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Expanded(child: _hdrInfo('PATIENT', _patientName, [
-                  if (_patientAge.isNotEmpty || _patientGender.isNotEmpty) '${_patientAge}${_patientAge.isNotEmpty && _patientGender.isNotEmpty ? "  •  " : ""}$_patientGender',
+                  if (_patientAge.isNotEmpty || _patientGender.isNotEmpty) '$_patientAge${_patientAge.isNotEmpty && _patientGender.isNotEmpty ? "  •  " : ""}$_patientGender',
                   _mrNumber,
                 ])),
                 Container(width: 1, height: 55, color: Colors.white.withValues(alpha: 0.25), margin: const EdgeInsets.symmetric(horizontal: 12)),
@@ -1036,7 +1035,7 @@ class _PrescriptionPage extends StatelessWidget {
                   width: 64, height: 64,
                   decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: const Color(0xFF0036BC), width: 1.5), color: const Color(0xFFEFF6FF)),
                   child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-                    Image.asset('assets/Asset 1.png', height: 24, fit: BoxFit.contain, errorBuilder: (_, __, ___) => const Icon(Icons.local_hospital_rounded, color: Color(0xFF0036BC), size: 20)),
+                    Image.asset('assets/Asset 1.png', height: 24, fit: BoxFit.contain, errorBuilder: (_, _, _) => const Icon(Icons.local_hospital_rounded, color: Color(0xFF0036BC), size: 20)),
                     const Text('iCare', style: TextStyle(fontSize: 7, fontWeight: FontWeight.w900, color: Color(0xFF0036BC))),
                   ]),
                 ),
@@ -1578,8 +1577,8 @@ class _FindLabsSheetState extends State<_FindLabsSheet> {
                         borderRadius: BorderRadius.circular(10),
                         border: Border.all(
                           color: _userLat != null
-                              ? const Color(0xFF10B981).withOpacity(0.4)
-                              : const Color(0xFFF59E0B).withOpacity(0.4),
+                              ? const Color(0xFF10B981).withValues(alpha: 0.4)
+                              : const Color(0xFFF59E0B).withValues(alpha: 0.4),
                         ),
                       ),
                       child: Row(
@@ -1856,7 +1855,7 @@ class _FindLabsSheetState extends State<_FindLabsSheet> {
                     decoration: BoxDecoration(
                       color: const Color(0xFFECFDF5),
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: const Color(0xFF10B981).withOpacity(0.3)),
+                      border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.3)),
                     ),
                     child: Text(
                       distance,
@@ -2130,8 +2129,8 @@ class _FindPharmaciesSheetState extends State<_FindPharmaciesSheet> {
                         borderRadius: BorderRadius.circular(10),
                         border: Border.all(
                           color: _userLat != null
-                              ? const Color(0xFF10B981).withOpacity(0.4)
-                              : const Color(0xFFF59E0B).withOpacity(0.4),
+                              ? const Color(0xFF10B981).withValues(alpha: 0.4)
+                              : const Color(0xFFF59E0B).withValues(alpha: 0.4),
                         ),
                       ),
                       child: Row(
@@ -2305,7 +2304,7 @@ class _FindPharmaciesSheetState extends State<_FindPharmaciesSheet> {
       controller: scrollCtrl,
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
       itemCount: _advisedPrescriptions.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 10),
+      separatorBuilder: (_, _) => const SizedBox(height: 10),
       itemBuilder: (context, i) {
         final rx = _advisedPrescriptions[i] as Map<String, dynamic>;
         final doctorName = (rx['doctor']?['name'] ?? rx['doctorName'] ?? 'Doctor').toString();
@@ -2366,7 +2365,7 @@ class _FindPharmaciesSheetState extends State<_FindPharmaciesSheet> {
                     Text(parts.join(' • '), style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
                   ]),
                 );
-              }).toList(),
+              }),
             ],
           ),
         );
@@ -2470,7 +2469,7 @@ class _FindPharmaciesSheetState extends State<_FindPharmaciesSheet> {
                     decoration: BoxDecoration(
                       color: const Color(0xFFECFDF5),
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: const Color(0xFF10B981).withOpacity(0.3)),
+                      border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.3)),
                     ),
                     child: Text(
                       distance,

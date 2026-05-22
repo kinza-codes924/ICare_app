@@ -5,7 +5,6 @@ import 'package:icare/services/connect_now_service.dart';
 import 'package:icare/services/consultation_service.dart';
 import 'package:icare/utils/shared_pref.dart';
 import 'package:icare/utils/theme.dart';
-import 'package:icare/utils/app_keys.dart';
 import 'package:icare/models/appointment_detail.dart';
 import 'package:icare/models/user.dart';
 

@@ -8,7 +8,6 @@ import 'package:icare/utils/imagePaths.dart';
 import 'package:icare/utils/theme.dart';
 import 'package:icare/utils/utils.dart';
 import 'package:icare/widgets/back_button.dart';
-import 'package:icare/widgets/custom_button.dart';
 import 'package:icare/widgets/custom_record_card.dart';
 import 'package:icare/widgets/custom_text.dart';
 import 'package:icare/widgets/svg_wrapper.dart';

@@ -158,7 +158,7 @@ class ReviewsWidget extends StatelessWidget {
     this.rating = 3,
     this.reviewText = '',
     this.timeStamp = '',
-    this.photo = null,
+    this.photo,
   });
   final String name;
   final dynamic rating;

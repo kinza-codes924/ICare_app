@@ -1,15 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_size_matters/flutter_size_matters.dart';
 import 'package:flutter_switch/flutter_switch.dart';
 import 'package:icare/screens/select_test.dart';
-import 'package:icare/utils/imagePaths.dart';
-import 'package:icare/utils/theme.dart';
-import 'package:icare/utils/utils.dart';
 import 'package:icare/widgets/back_button.dart';
-import 'package:icare/widgets/custom_button.dart';
-import 'package:icare/widgets/custom_text.dart';
-import 'package:icare/widgets/custom_text_input.dart';
-import 'package:icare/widgets/svg_wrapper.dart';
 import 'package:intl/intl.dart';
 
 class BookLabScreen extends StatefulWidget {
@@ -86,7 +78,7 @@ class _BookLabScreenState extends State<BookLabScreen> {
                 child: Icon(
                   Icons.biotech_rounded,
                   size: 200,
-                  color: Colors.white.withOpacity(0.05),
+                  color: Colors.white.withValues(alpha: 0.05),
                 ),
               ),
               Padding(
@@ -152,9 +144,9 @@ class _BookLabScreenState extends State<BookLabScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: primaryBlue.withOpacity(0.05),
+        color: primaryBlue.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: primaryBlue.withOpacity(0.1)),
+        border: Border.all(color: primaryBlue.withValues(alpha: 0.1)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -182,7 +174,7 @@ class _BookLabScreenState extends State<BookLabScreen> {
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 20,
             offset: const Offset(0, 10),
           ),
@@ -353,7 +345,7 @@ class _BookLabScreenState extends State<BookLabScreen> {
         Container(
           padding: const EdgeInsets.all(10),
           decoration: BoxDecoration(
-            color: primaryBlue.withOpacity(0.1),
+            color: primaryBlue.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(12),
           ),
           child: const Icon(Icons.home_rounded, color: primaryBlue, size: 20),
@@ -400,7 +392,7 @@ class _BookLabScreenState extends State<BookLabScreen> {
         gradient: const LinearGradient(colors: [primaryBlue, lightBlue]),
         boxShadow: [
           BoxShadow(
-            color: primaryBlue.withOpacity(0.3),
+            color: primaryBlue.withValues(alpha: 0.3),
             blurRadius: 20,
             offset: const Offset(0, 10),
           ),

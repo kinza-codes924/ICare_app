@@ -10,7 +10,6 @@ import 'package:icare/utils/imagePaths.dart';
 import 'package:icare/utils/shared_pref.dart';
 import 'package:icare/utils/theme.dart';
 import 'package:icare/widgets/back_button.dart';
-import 'package:icare/screens/select_payment_method.dart';
 
 class ViewCourse extends ConsumerStatefulWidget {
   final String? enrollmentId;
@@ -762,8 +761,9 @@ class _ViewCourseState extends ConsumerState<ViewCourse> {
     final courseTitle = (titleVal2 is String) ? titleVal2 : 'Course';
     String instructorName = 'Instructor';
     final dynamic instrVal2 = widget.courseData?['instructor'];
-    if (instrVal2 is Map) instructorName = instrVal2['name']?.toString() ?? instructorName;
-    else if (instrVal2 is String) instructorName = instrVal2;
+    if (instrVal2 is Map) {
+      instructorName = instrVal2['name']?.toString() ?? instructorName;
+    } else if (instrVal2 is String) instructorName = instrVal2;
 
     return Column(
       children: modules.asMap().entries.map((mEntry) {

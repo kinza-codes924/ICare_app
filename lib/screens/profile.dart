@@ -5,7 +5,6 @@ import 'package:icare/providers/auth_provider.dart';
 import 'package:icare/screens/create_profile.dart';
 import 'package:icare/widgets/custom_button.dart';
 import 'package:icare/utils/theme.dart';
-import 'package:icare/utils/imagePaths.dart';
 import 'package:icare/widgets/custom_text.dart';
 
 class ProfileScreen extends ConsumerWidget {
@@ -51,7 +50,7 @@ class _WebProfileInitial extends StatelessWidget {
             borderRadius: BorderRadius.circular(32),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.04),
+                color: Colors.black.withValues(alpha: 0.04),
                 blurRadius: 40,
                 offset: const Offset(0, 20),
               ),
@@ -65,7 +64,7 @@ class _WebProfileInitial extends StatelessWidget {
                 width: 160,
                 height: 160,
                 decoration: BoxDecoration(
-                  color: AppColors.primaryColor.withOpacity(0.05),
+                  color: AppColors.primaryColor.withValues(alpha: 0.05),
                   shape: BoxShape.circle,
                 ),
                 child: Center(

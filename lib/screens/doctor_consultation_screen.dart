@@ -36,7 +36,7 @@ class DoctorConsultationScreen extends ConsumerStatefulWidget {
 class _DoctorConsultationScreenState
     extends ConsumerState<DoctorConsultationScreen> {
   int _currentStep = 0;
-  bool _isLoading = false;
+  final bool _isLoading = false;
   bool _isSaving = false;
 
   // Step 1: History
@@ -74,9 +74,9 @@ class _DoctorConsultationScreenState
   DateTime? _followUpDate;
 
   // Plan items (will be managed through dialogs)
-  List<Map<String, dynamic>> _prescriptions = [];
-  List<Map<String, dynamic>> _labTests = [];
-  List<Map<String, dynamic>> _healthPrograms = [];
+  final List<Map<String, dynamic>> _prescriptions = [];
+  final List<Map<String, dynamic>> _labTests = [];
+  final List<Map<String, dynamic>> _healthPrograms = [];
   Map<String, dynamic>? _referral;
 
   // Selected pharmacy & lab for auto-routing
@@ -776,7 +776,7 @@ class _DoctorConsultationScreenState
                   Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFF59E0B).withOpacity(0.1),
+                      color: const Color(0xFFF59E0B).withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: const Icon(Icons.person_search_rounded, color: Color(0xFFF59E0B), size: 20),
@@ -906,7 +906,7 @@ class _DoctorConsultationScreenState
                   Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF6366F1).withOpacity(0.1),
+                      color: const Color(0xFF6366F1).withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: const Icon(Icons.event_repeat_rounded, color: Color(0xFF6366F1), size: 20),
@@ -936,7 +936,7 @@ class _DoctorConsultationScreenState
                   Expanded(
                     flex: 3,
                     child: DropdownButtonFormField<String>(
-                      value: _followUpUnit,
+                      initialValue: _followUpUnit,
                       decoration: InputDecoration(
                         labelText: 'Unit',
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
@@ -988,7 +988,7 @@ class _DoctorConsultationScreenState
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: color.withOpacity(0.1),
+                  color: color.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Icon(icon, color: color, size: 20),
@@ -1017,9 +1017,9 @@ class _DoctorConsultationScreenState
                 margin: const EdgeInsets.only(top: 10),
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                 decoration: BoxDecoration(
-                  color: color.withOpacity(0.05),
+                  color: color.withValues(alpha: 0.05),
                   borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: color.withOpacity(0.2)),
+                  border: Border.all(color: color.withValues(alpha: 0.2)),
                 ),
                 child: Row(
                   children: [
@@ -1070,14 +1070,14 @@ class _DoctorConsultationScreenState
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: color.withOpacity(0.3)),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Row(
         children: [
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
+              color: color.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(10),
             ),
             child: Icon(icon, color: color, size: 20),
@@ -1087,7 +1087,7 @@ class _DoctorConsultationScreenState
             child: isLoading
                 ? const LinearProgressIndicator()
                 : DropdownButtonFormField<String>(
-                    value: selectedId,
+                    initialValue: selectedId,
                     decoration: InputDecoration(
                       hintText: hint,
                       hintStyle: const TextStyle(fontSize: 13),
@@ -1191,7 +1191,7 @@ class _DoctorConsultationScreenState
               TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Test Name')),
               const SizedBox(height: 12),
               DropdownButtonFormField<String>(
-                value: urgency,
+                initialValue: urgency,
                 decoration: const InputDecoration(labelText: 'Urgency'),
                 items: urgencyOptions.map((u) => DropdownMenuItem(value: u, child: Text(u))).toList(),
                 onChanged: (v) => setDlgState(() => urgency = v!),
@@ -1414,7 +1414,7 @@ class _DoctorConsultationScreenState
           children: [
             Container(
               padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(color: const Color(0xFF10B981).withOpacity(0.1), borderRadius: BorderRadius.circular(10)),
+              decoration: BoxDecoration(color: const Color(0xFF10B981).withValues(alpha: 0.1), borderRadius: BorderRadius.circular(10)),
               child: const Icon(Icons.check_circle_rounded, color: Color(0xFF10B981), size: 28),
             ),
             const SizedBox(width: 12),

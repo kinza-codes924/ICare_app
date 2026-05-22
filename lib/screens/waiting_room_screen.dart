@@ -3,7 +3,6 @@ import 'package:icare/utils/theme.dart';
 import 'package:icare/widgets/back_button.dart';
 import 'package:icare/screens/consultation_chat_screen.dart';
 import 'package:icare/services/consultation_service.dart';
-import 'package:intl/intl.dart';
 
 class WaitingRoomScreen extends StatefulWidget {
   const WaitingRoomScreen({super.key});
@@ -118,7 +117,7 @@ class _WaitingRoomScreenState extends State<WaitingRoomScreen> {
             margin: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
             padding: const EdgeInsets.symmetric(horizontal: 12),
             decoration: BoxDecoration(
-              color: Colors.green.withOpacity(0.1),
+              color: Colors.green.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(20),
             ),
             child: const Center(
@@ -213,13 +212,13 @@ class _WaitingRoomScreenState extends State<WaitingRoomScreen> {
         borderRadius: BorderRadius.circular(24),
         border: Border.all(
           color: isEmergency
-              ? Colors.red.withOpacity(0.3)
+              ? Colors.red.withValues(alpha: 0.3)
               : const Color(0xFFE2E8F0),
           width: isEmergency ? 2 : 1,
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.03),
+            color: Colors.black.withValues(alpha: 0.03),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -233,7 +232,7 @@ class _WaitingRoomScreenState extends State<WaitingRoomScreen> {
                 children: [
                   CircleAvatar(
                     radius: 28,
-                    backgroundColor: AppColors.primaryColor.withOpacity(0.1),
+                    backgroundColor: AppColors.primaryColor.withValues(alpha: 0.1),
                     child: Text(
                       patient['name'][0],
                       style: const TextStyle(
@@ -337,8 +336,8 @@ class _WaitingRoomScreenState extends State<WaitingRoomScreen> {
                     ),
                     decoration: BoxDecoration(
                       color: isReady
-                          ? Colors.green.withOpacity(0.1)
-                          : Colors.orange.withOpacity(0.1),
+                          ? Colors.green.withValues(alpha: 0.1)
+                          : Colors.orange.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(

@@ -28,10 +28,10 @@ class _AdminPanelScreenState extends ConsumerState<AdminPanelScreen>
   bool _isLoading = false;
 
   List<Map<String, dynamic>> _pendingDoctors = [];
-  List<Map<String, dynamic>> _laboratories = [];
-  List<Map<String, dynamic>> _pharmacies = [];
-  List<Map<String, dynamic>> _instructors = [];
-  List<Map<String, dynamic>> _students = [];
+  final List<Map<String, dynamic>> _laboratories = [];
+  final List<Map<String, dynamic>> _pharmacies = [];
+  final List<Map<String, dynamic>> _instructors = [];
+  final List<Map<String, dynamic>> _students = [];
   List<Map<String, dynamic>> _leaveRequests = [];
   List<Map<String, dynamic>> _credentials = [];
 
@@ -323,8 +323,8 @@ class _AdminPanelScreenState extends ConsumerState<AdminPanelScreen>
 
   Widget _buildEmptyState(String msg, IconData icon) {
     return Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
-      Container(padding: const EdgeInsets.all(24), decoration: BoxDecoration(color: AppColors.primaryColor.withOpacity(0.06), shape: BoxShape.circle),
-        child: Icon(icon, size: 48, color: AppColors.primaryColor.withOpacity(0.5))),
+      Container(padding: const EdgeInsets.all(24), decoration: BoxDecoration(color: AppColors.primaryColor.withValues(alpha: 0.06), shape: BoxShape.circle),
+        child: Icon(icon, size: 48, color: AppColors.primaryColor.withValues(alpha: 0.5))),
       const SizedBox(height: 16),
       Text(msg, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
     ]));
@@ -546,8 +546,8 @@ class _AdminPanelScreenState extends ConsumerState<AdminPanelScreen>
             padding: const EdgeInsets.all(18),
             decoration: BoxDecoration(
               color: Colors.white, borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: statusColor.withOpacity(0.2)),
-              boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 10, offset: const Offset(0, 3))],
+              border: Border.all(color: statusColor.withValues(alpha: 0.2)),
+              boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 10, offset: const Offset(0, 3))],
             ),
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Row(children: [
@@ -557,7 +557,7 @@ class _AdminPanelScreenState extends ConsumerState<AdminPanelScreen>
                 ])),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(color: statusColor.withOpacity(0.1), borderRadius: BorderRadius.circular(20)),
+                  decoration: BoxDecoration(color: statusColor.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(20)),
                   child: Text(status.toUpperCase(), style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: statusColor)),
                 ),
               ]),
@@ -625,12 +625,12 @@ class _AdminPanelScreenState extends ConsumerState<AdminPanelScreen>
             padding: const EdgeInsets.all(18),
             decoration: BoxDecoration(
               color: Colors.white, borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: statusColor.withOpacity(0.2)),
-              boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 10, offset: const Offset(0, 3))],
+              border: Border.all(color: statusColor.withValues(alpha: 0.2)),
+              boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 10, offset: const Offset(0, 3))],
             ),
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Row(children: [
-                Container(padding: const EdgeInsets.all(10), decoration: BoxDecoration(color: const Color(0xFF3B82F6).withOpacity(0.1), borderRadius: BorderRadius.circular(10)),
+                Container(padding: const EdgeInsets.all(10), decoration: BoxDecoration(color: const Color(0xFF3B82F6).withValues(alpha: 0.1), borderRadius: BorderRadius.circular(10)),
                     child: const Icon(Icons.workspace_premium_rounded, color: Color(0xFF3B82F6), size: 22)),
                 const SizedBox(width: 12),
                 Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -639,7 +639,7 @@ class _AdminPanelScreenState extends ConsumerState<AdminPanelScreen>
                 ])),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(color: statusColor.withOpacity(0.1), borderRadius: BorderRadius.circular(20)),
+                  decoration: BoxDecoration(color: statusColor.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(20)),
                   child: Text(status == 'pending' ? 'UNVERIFIED' : status.toUpperCase(), style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: statusColor)),
                 ),
               ]),

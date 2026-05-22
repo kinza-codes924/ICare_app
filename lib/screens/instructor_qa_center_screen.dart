@@ -59,7 +59,7 @@ class _InstructorQACenterScreenState extends State<InstructorQACenterScreen> {
                   : ListView.separated(
                       padding: const EdgeInsets.all(20),
                       itemCount: _questions.length,
-                      separatorBuilder: (_, __) => const SizedBox(height: 16),
+                      separatorBuilder: (_, _) => const SizedBox(height: 16),
                       itemBuilder: (context, index) {
                         final q = _questions[index];
                         return _buildQuestionCard(q);
@@ -88,7 +88,7 @@ class _InstructorQACenterScreenState extends State<InstructorQACenterScreen> {
                   vertical: 4,
                 ),
                 decoration: BoxDecoration(
-                  color: AppColors.primaryColor.withOpacity(0.1),
+                  color: AppColors.primaryColor.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(

@@ -5,10 +5,7 @@ import 'package:icare/screens/lab_bookings_management.dart';
 import 'package:icare/screens/lab_tests_management.dart';
 import 'package:icare/screens/lab_reports_screen.dart';
 import 'package:icare/screens/lab_analytics.dart';
-import 'package:icare/screens/settings.dart';
-import 'package:icare/screens/lab_settings_screen.dart';
 import 'package:icare/screens/payment_invoices.dart';
-import 'package:icare/screens/tasks.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'dart:async';
 import 'package:icare/screens/lab_supplies_management.dart';
@@ -305,7 +302,7 @@ class _LaboratoryDashboardState extends State<LaboratoryDashboard>
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: primaryColor.withOpacity(0.3),
+            color: primaryColor.withValues(alpha: 0.3),
             blurRadius: 24,
             offset: const Offset(0, 12),
           ),
@@ -319,7 +316,7 @@ class _LaboratoryDashboardState extends State<LaboratoryDashboard>
             child: Icon(
               Icons.science,
               size: 150,
-              color: Colors.white.withOpacity(0.05),
+              color: Colors.white.withValues(alpha: 0.05),
             ),
           ),
           Padding(
@@ -329,9 +326,9 @@ class _LaboratoryDashboardState extends State<LaboratoryDashboard>
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.15),
+                    color: Colors.white.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: Colors.white.withOpacity(0.2)),
+                    border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
                   ),
                   child: Icon(
                     Icons.biotech,
@@ -358,7 +355,7 @@ class _LaboratoryDashboardState extends State<LaboratoryDashboard>
                         'Welcome back! Here\'s your overview',
                         style: TextStyle(
                           fontSize: isMobile ? 14 : 16,
-                          color: Colors.white.withOpacity(0.85),
+                          color: Colors.white.withValues(alpha: 0.85),
                         ),
                       ),
                       if (!isMobile) ...[
@@ -375,7 +372,7 @@ class _LaboratoryDashboardState extends State<LaboratoryDashboard>
                               _labProfile?['city'] ?? 'Location not set',
                               style: TextStyle(
                                 fontSize: 14,
-                                color: Colors.white.withOpacity(0.85),
+                                color: Colors.white.withValues(alpha: 0.85),
                                 fontWeight: FontWeight.w500,
                               ),
                             ),
@@ -400,7 +397,7 @@ class _LaboratoryDashboardState extends State<LaboratoryDashboard>
                     size: 28,
                   ),
                   style: IconButton.styleFrom(
-                    backgroundColor: Colors.white.withOpacity(0.1),
+                    backgroundColor: Colors.white.withValues(alpha: 0.1),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
@@ -425,7 +422,7 @@ class _LaboratoryDashboardState extends State<LaboratoryDashboard>
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.orange.withOpacity(0.3),
+            color: Colors.orange.withValues(alpha: 0.3),
             blurRadius: 15,
             offset: const Offset(0, 8),
           ),
@@ -445,7 +442,7 @@ class _LaboratoryDashboardState extends State<LaboratoryDashboard>
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.2),
+                    color: Colors.white.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: const Icon(
@@ -472,7 +469,7 @@ class _LaboratoryDashboardState extends State<LaboratoryDashboard>
                         '$_lowStockCount ${_lowStockCount == 1 ? 'item needs' : 'items need'} restocking',
                         style: TextStyle(
                           fontSize: isMobile ? 13 : 14,
-                          color: Colors.white.withOpacity(0.9),
+                          color: Colors.white.withValues(alpha: 0.9),
                         ),
                       ),
                     ],
@@ -504,7 +501,7 @@ class _LaboratoryDashboardState extends State<LaboratoryDashboard>
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF0B2D6E).withOpacity(0.25),
+            color: const Color(0xFF0B2D6E).withValues(alpha: 0.25),
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),
@@ -515,7 +512,7 @@ class _LaboratoryDashboardState extends State<LaboratoryDashboard>
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.15),
+              color: Colors.white.withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(12),
             ),
             child: const Icon(Icons.payments_rounded, color: Colors.white, size: 28),
@@ -537,7 +534,7 @@ class _LaboratoryDashboardState extends State<LaboratoryDashboard>
                   'Total Revenue',
                   style: TextStyle(
                     fontSize: 13,
-                    color: Colors.white.withOpacity(0.85),
+                    color: Colors.white.withValues(alpha: 0.85),
                     fontWeight: FontWeight.w500,
                   ),
                 ),
@@ -595,17 +592,17 @@ class _LaboratoryDashboardState extends State<LaboratoryDashboard>
             borderRadius: BorderRadius.circular(20),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.03),
+                color: Colors.black.withValues(alpha: 0.03),
                 blurRadius: 15,
                 offset: const Offset(0, 8),
               ),
               BoxShadow(
-                color: primaryColor.withOpacity(0.02),
+                color: primaryColor.withValues(alpha: 0.02),
                 blurRadius: 4,
                 offset: const Offset(0, 2),
               ),
             ],
-            border: Border.all(color: Colors.grey.withOpacity(0.1)),
+            border: Border.all(color: Colors.grey.withValues(alpha: 0.1)),
           ),
           child: Padding(
             padding: EdgeInsets.all(isMobile ? 16 : 20),
@@ -619,7 +616,7 @@ class _LaboratoryDashboardState extends State<LaboratoryDashboard>
                     Container(
                       padding: EdgeInsets.all(isMobile ? 10 : 12),
                       decoration: BoxDecoration(
-                        color: primaryColor.withOpacity(0.08),
+                        color: primaryColor.withValues(alpha: 0.08),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Icon(
@@ -635,10 +632,10 @@ class _LaboratoryDashboardState extends State<LaboratoryDashboard>
                       ),
                       decoration: BoxDecoration(
                         color: stat['trend'] == 'Needs Action'
-                            ? Colors.orange.withOpacity(0.1)
+                            ? Colors.orange.withValues(alpha: 0.1)
                             : stat['trend'] == 'New'
-                            ? accentColor.withOpacity(0.1)
-                            : Colors.green.withOpacity(0.1),
+                            ? accentColor.withValues(alpha: 0.1)
+                            : Colors.green.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: Text(
@@ -719,12 +716,12 @@ class _LaboratoryDashboardState extends State<LaboratoryDashboard>
             borderRadius: BorderRadius.circular(20),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.03),
+                color: Colors.black.withValues(alpha: 0.03),
                 blurRadius: 15,
                 offset: const Offset(0, 5),
               ),
             ],
-            border: Border.all(color: Colors.grey.withOpacity(0.1)),
+            border: Border.all(color: Colors.grey.withValues(alpha: 0.1)),
           ),
           child: Padding(
             padding: const EdgeInsets.all(20),
@@ -818,8 +815,8 @@ class _LaboratoryDashboardState extends State<LaboratoryDashboard>
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(16),
-        hoverColor: primaryColor.withOpacity(0.05),
-        splashColor: primaryColor.withOpacity(0.1),
+        hoverColor: primaryColor.withValues(alpha: 0.05),
+        splashColor: primaryColor.withValues(alpha: 0.1),
         child: Container(
           width: isMobile ? 140 : 160,
           padding: EdgeInsets.symmetric(
@@ -829,7 +826,7 @@ class _LaboratoryDashboardState extends State<LaboratoryDashboard>
           decoration: BoxDecoration(
             color: backgroundColor,
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: Colors.grey.withOpacity(0.15)),
+            border: Border.all(color: Colors.grey.withValues(alpha: 0.15)),
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -892,12 +889,12 @@ class _LaboratoryDashboardState extends State<LaboratoryDashboard>
             borderRadius: BorderRadius.circular(20),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.03),
+                color: Colors.black.withValues(alpha: 0.03),
                 blurRadius: 15,
                 offset: const Offset(0, 5),
               ),
             ],
-            border: Border.all(color: Colors.grey.withOpacity(0.1)),
+            border: Border.all(color: Colors.grey.withValues(alpha: 0.1)),
           ),
           child: Padding(
             padding: const EdgeInsets.all(8),
@@ -996,7 +993,7 @@ class _LaboratoryDashboardState extends State<LaboratoryDashboard>
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
+              color: color.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Icon(icon, color: color, size: 22),

@@ -390,7 +390,7 @@ class _VideoThumbnailCard extends StatelessWidget {
                 Image.network(
                   thumbUrl,
                   fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => _buildVideoPlaceholder(isCloudinary),
+                  errorBuilder: (_, _, _) => _buildVideoPlaceholder(isCloudinary),
                 )
               else
                 _buildVideoPlaceholder(isCloudinary),
@@ -402,8 +402,8 @@ class _VideoThumbnailCard extends StatelessWidget {
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
                     colors: [
-                      Colors.black.withOpacity(0.2),
-                      Colors.black.withOpacity(0.55),
+                      Colors.black.withValues(alpha: 0.2),
+                      Colors.black.withValues(alpha: 0.55),
                     ],
                   ),
                 ),
@@ -415,11 +415,11 @@ class _VideoThumbnailCard extends StatelessWidget {
                   width: 72,
                   height: 72,
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.92),
+                    color: Colors.white.withValues(alpha: 0.92),
                     shape: BoxShape.circle,
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.3),
+                        color: Colors.black.withValues(alpha: 0.3),
                         blurRadius: 16,
                         offset: const Offset(0, 4),
                       ),

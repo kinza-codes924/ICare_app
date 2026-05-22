@@ -80,7 +80,7 @@ class _WebActiveOrdersScreen extends StatelessWidget {
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: const Color(0xFF0F172A).withOpacity(0.15),
+                    color: const Color(0xFF0F172A).withValues(alpha: 0.15),
                     blurRadius: 30,
                     offset: const Offset(0, 15),
                   ),
@@ -91,10 +91,10 @@ class _WebActiveOrdersScreen extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.all(24),
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.1),
+                      color: Colors.white.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(28),
                       border: Border.all(
-                        color: Colors.white.withOpacity(0.2),
+                        color: Colors.white.withValues(alpha: 0.2),
                         width: 1.5,
                       ),
                     ),
@@ -124,7 +124,7 @@ class _WebActiveOrdersScreen extends StatelessWidget {
                           "Manage and track your ongoing laboratory orders in real-time.",
                           style: TextStyle(
                             fontSize: 18,
-                            color: Colors.white.withOpacity(0.8),
+                            color: Colors.white.withValues(alpha: 0.8),
                             fontWeight: FontWeight.w500,
                             height: 1.5,
                           ),
@@ -146,7 +146,7 @@ class _WebActiveOrdersScreen extends StatelessWidget {
                       borderRadius: BorderRadius.circular(28),
                       boxShadow: [
                         BoxShadow(
-                          color: AppColors.primaryColor.withOpacity(0.4),
+                          color: AppColors.primaryColor.withValues(alpha: 0.4),
                           blurRadius: 20,
                           offset: const Offset(0, 10),
                         ),
@@ -204,7 +204,7 @@ class _WebActiveOrdersScreen extends StatelessWidget {
                         borderRadius: BorderRadius.circular(28),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.04),
+                            color: Colors.black.withValues(alpha: 0.04),
                             blurRadius: 20,
                             offset: const Offset(0, 4),
                           ),
@@ -278,7 +278,7 @@ class _WebOrderCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(28),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.03),
+            color: Colors.black.withValues(alpha: 0.03),
             blurRadius: 25,
             offset: const Offset(0, 10),
           ),
@@ -410,7 +410,7 @@ class CompletedReportCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(18),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),

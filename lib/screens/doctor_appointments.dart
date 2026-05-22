@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:icare/models/appointment_detail.dart';
 import 'package:icare/screens/consultation_chat_screen_v2.dart';
 import 'package:icare/screens/profile_or_appointement_view.dart';
-import 'package:icare/screens/video_call.dart';
 import 'package:icare/services/appointment_service.dart';
 import 'package:icare/services/consultation_service.dart';
 import 'package:icare/services/call_service.dart';

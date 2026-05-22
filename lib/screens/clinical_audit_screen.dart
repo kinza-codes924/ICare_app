@@ -11,7 +11,7 @@ class ClinicalAuditScreen extends StatefulWidget {
 
 class _ClinicalAuditScreenState extends State<ClinicalAuditScreen> {
   bool _isLoading = false;
-  List<Map<String, dynamic>> _auditLogs = [
+  final List<Map<String, dynamic>> _auditLogs = [
     {
       'message': 'Record #21 approved by Senior Medical Officer',
       'status': 'Verified',
@@ -112,7 +112,7 @@ class _ClinicalAuditScreenState extends State<ClinicalAuditScreen> {
                     log['color'],
                   ),
                 )
-                .toList(),
+                ,
           ],
         ),
       ),
@@ -229,7 +229,7 @@ class _ClinicalAuditScreenState extends State<ClinicalAuditScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withOpacity(0.2)),
+        border: Border.all(color: color.withValues(alpha: 0.2)),
       ),
       child: Row(
         children: [

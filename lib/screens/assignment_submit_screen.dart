@@ -235,7 +235,7 @@ class _AssignmentSubmitScreenState extends State<AssignmentSubmitScreen> {
                       border: Border.all(color: const Color(0xFFE2E8F0)),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.04),
+                          color: Colors.black.withValues(alpha: 0.04),
                           blurRadius: 8,
                           offset: const Offset(0, 2),
                         ),
@@ -249,7 +249,7 @@ class _AssignmentSubmitScreenState extends State<AssignmentSubmitScreen> {
                             Container(
                               padding: const EdgeInsets.all(10),
                               decoration: BoxDecoration(
-                                color: AppColors.primaryColor.withOpacity(0.1),
+                                color: AppColors.primaryColor.withValues(alpha: 0.1),
                                 borderRadius: BorderRadius.circular(10),
                               ),
                               child: const Icon(Icons.assignment_rounded,
@@ -285,8 +285,8 @@ class _AssignmentSubmitScreenState extends State<AssignmentSubmitScreen> {
                               borderRadius: BorderRadius.circular(10),
                               border: Border.all(
                                 color: _isLate
-                                    ? const Color(0xFFEF4444).withOpacity(0.3)
-                                    : const Color(0xFFF59E0B).withOpacity(0.3),
+                                    ? const Color(0xFFEF4444).withValues(alpha: 0.3)
+                                    : const Color(0xFFF59E0B).withValues(alpha: 0.3),
                               ),
                             ),
                             child: Row(
@@ -345,7 +345,7 @@ class _AssignmentSubmitScreenState extends State<AssignmentSubmitScreen> {
                       decoration: BoxDecoration(
                         color: const Color(0xFFECFDF5),
                         borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: const Color(0xFF10B981).withOpacity(0.3)),
+                        border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.3)),
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -398,7 +398,7 @@ class _AssignmentSubmitScreenState extends State<AssignmentSubmitScreen> {
                       border: Border.all(color: const Color(0xFFE2E8F0)),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.04),
+                          color: Colors.black.withValues(alpha: 0.04),
                           blurRadius: 8,
                           offset: const Offset(0, 2),
                         ),
@@ -413,8 +413,8 @@ class _AssignmentSubmitScreenState extends State<AssignmentSubmitScreen> {
                               padding: const EdgeInsets.all(8),
                               decoration: BoxDecoration(
                                 color: _isSubmitted
-                                    ? const Color(0xFF10B981).withOpacity(0.1)
-                                    : const Color(0xFF6366F1).withOpacity(0.1),
+                                    ? const Color(0xFF10B981).withValues(alpha: 0.1)
+                                    : const Color(0xFF6366F1).withValues(alpha: 0.1),
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               child: Icon(
@@ -476,7 +476,7 @@ class _AssignmentSubmitScreenState extends State<AssignmentSubmitScreen> {
                             focusedBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
                               borderSide: BorderSide(
-                                color: AppColors.primaryColor.withOpacity(0.6),
+                                color: AppColors.primaryColor.withValues(alpha: 0.6),
                                 width: 1.5,
                               ),
                             ),
@@ -520,7 +520,7 @@ class _AssignmentSubmitScreenState extends State<AssignmentSubmitScreen> {
                             focusedBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
                               borderSide: BorderSide(
-                                color: AppColors.primaryColor.withOpacity(0.6),
+                                color: AppColors.primaryColor.withValues(alpha: 0.6),
                                 width: 1.5,
                               ),
                             ),

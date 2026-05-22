@@ -109,7 +109,7 @@ class ConfirmDetails extends StatelessWidget {
                   borderRadius: BorderRadius.circular(24),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.04),
+                      color: Colors.black.withValues(alpha: 0.04),
                       blurRadius: 24,
                       offset: const Offset(0, 12),
                     ),
@@ -179,7 +179,7 @@ class ConfirmDetails extends StatelessWidget {
                             borderRadius: BorderRadius.circular(16),
                           ),
                           elevation: 10,
-                          shadowColor: AppColors.primaryColor.withOpacity(0.4),
+                          shadowColor: AppColors.primaryColor.withValues(alpha: 0.4),
                         ),
                         child: const Text(
                           "Confirm & Proceed",

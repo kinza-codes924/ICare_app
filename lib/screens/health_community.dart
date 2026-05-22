@@ -3,11 +3,8 @@ import 'dart:io' show File;
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import 'package:icare/utils/imagePaths.dart';
 import 'package:icare/utils/theme.dart';
 import 'package:icare/widgets/back_button.dart';
-import 'package:icare/widgets/icare_app_bar.dart';
-import 'package:icare/widgets/custom_button.dart';
 import 'package:icare/services/course_service.dart';
 import 'package:intl/intl.dart';
 import 'package:image_picker/image_picker.dart';
@@ -337,7 +334,7 @@ class _HealthCommunityScreenState extends State<HealthCommunityScreen> {
                           child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
                         );
                       },
-                      errorBuilder: (_, error, __) {
+                      errorBuilder: (_, error, _) {
                         debugPrint('Image load failed: $error — url: ${post['imageUrl']}');
                         return Container(
                           height: 100,
@@ -385,6 +382,13 @@ class _HealthCommunityScreenState extends State<HealthCommunityScreen> {
                       }
                     });
                   },
+                ),
+                const SizedBox(width: 24),
+                _buildInteractionButton(
+                  Icons.repeat_rounded,
+                  ((post['reshareCount'] ?? post['shares'] ?? 0)).toString(),
+                  const Color(0xFF10B981),
+                  () => _resharePost(post),
                 ),
                 const Spacer(),
               ],
@@ -596,6 +600,46 @@ class _HealthCommunityScreenState extends State<HealthCommunityScreen> {
     );
   }
 
+  Future<void> _resharePost(Map<String, dynamic> post) async {
+    final postId = post['_id']?.toString() ?? post['id']?.toString() ?? '';
+    if (postId.isEmpty) return;
+
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Reshare Post', style: TextStyle(fontWeight: FontWeight.w800)),
+        content: const Text('Share this post with your health community followers?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryColor, foregroundColor: Colors.white),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Reshare'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true || !mounted) return;
+
+    try {
+      await _courseService.reshareForumPost(postId);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Post reshared successfully!'), backgroundColor: Colors.green, duration: Duration(seconds: 2)),
+        );
+        _loadPosts();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to reshare: $e'), backgroundColor: Colors.red, duration: const Duration(seconds: 2)),
+        );
+      }
+    }
+  }
+
   void _showImagePreview(String imageUrl) {
     showDialog(
       context: context,
@@ -624,7 +668,7 @@ class _HealthCommunityScreenState extends State<HealthCommunityScreen> {
                       child: CircularProgressIndicator(color: Colors.white),
                     );
                   },
-                  errorBuilder: (_, __, ___) => const Center(
+                  errorBuilder: (_, _, _) => const Center(
                     child: Text(
                       'Image failed to load',
                       style: TextStyle(color: Colors.white),

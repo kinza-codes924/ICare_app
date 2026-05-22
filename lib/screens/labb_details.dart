@@ -8,7 +8,6 @@ import 'package:icare/widgets/back_button.dart';
 import 'package:icare/widgets/custom_button.dart';
 import 'package:icare/widgets/custom_text.dart';
 import 'package:icare/widgets/svg_wrapper.dart';
-import 'package:icare/widgets/custom_check_box.dart';
 
 class LabDetails extends StatefulWidget {
   const LabDetails({super.key, this.labData, this.prescribedTests});
@@ -144,7 +143,7 @@ class _LabDetailsState extends State<LabDetails> {
                           fit: BoxFit.cover,
                           width: Utils.windowWidth(context) * 0.9,
                           height: Utils.windowWidth(context) * 0.5,
-                          errorBuilder: (_, __, ___) => Container(
+                          errorBuilder: (_, _, _) => Container(
                             width: Utils.windowWidth(context) * 0.9,
                             height: Utils.windowWidth(context) * 0.5,
                             color: const Color(0xFF1D4ED8),
@@ -156,7 +155,7 @@ class _LabDetailsState extends State<LabDetails> {
                           fit: BoxFit.cover,
                           width: Utils.windowWidth(context) * 0.9,
                           height: Utils.windowWidth(context) * 0.5,
-                          errorBuilder: (_, __, ___) => Container(
+                          errorBuilder: (_, _, _) => Container(
                             width: Utils.windowWidth(context) * 0.9,
                             height: Utils.windowWidth(context) * 0.5,
                             color: const Color(0xFF1D4ED8),
@@ -284,7 +283,7 @@ class _LabDetailsState extends State<LabDetails> {
                   ],
                 ),
               );
-            }).toList(),
+            }),
             SizedBox(height: ScallingConfig.scale(12)),
             CustomButton(
               width: Utils.windowWidth(context) * 0.9,
@@ -386,12 +385,12 @@ class _LabDetailsState extends State<LabDetails> {
                                             ? AssetImage(image) as ImageProvider
                                             : NetworkImage(image),
                                         fit: BoxFit.cover,
-                                        onError: (_, __) {},
+                                        onError: (_, _) {},
                                       )
                                     : null,
                                 boxShadow: [
                                   BoxShadow(
-                                    color: Colors.black.withOpacity(0.1),
+                                    color: Colors.black.withValues(alpha: 0.1),
                                     blurRadius: 30,
                                     offset: const Offset(0, 15),
                                   ),
@@ -408,7 +407,7 @@ class _LabDetailsState extends State<LabDetails> {
                                           Container(
                                             padding: const EdgeInsets.all(24),
                                             decoration: BoxDecoration(
-                                              color: Colors.white.withOpacity(0.15),
+                                              color: Colors.white.withValues(alpha: 0.15),
                                               shape: BoxShape.circle,
                                             ),
                                             child: const Icon(
@@ -431,7 +430,7 @@ class _LabDetailsState extends State<LabDetails> {
                                           Container(
                                             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
                                             decoration: BoxDecoration(
-                                              color: Colors.white.withOpacity(0.2),
+                                              color: Colors.white.withValues(alpha: 0.2),
                                               borderRadius: BorderRadius.circular(20),
                                             ),
                                             child: const Text(
@@ -543,7 +542,7 @@ class _LabDetailsState extends State<LabDetails> {
                             borderRadius: BorderRadius.circular(32),
                             boxShadow: [
                               BoxShadow(
-                                color: Colors.black.withOpacity(0.04),
+                                color: Colors.black.withValues(alpha: 0.04),
                                 blurRadius: 40,
                                 offset: const Offset(0, 10),
                               ),
@@ -567,7 +566,7 @@ class _LabDetailsState extends State<LabDetails> {
                               const SizedBox(height: 24),
                               ...availableTests
                                   .map((t) => _buildWebCheckbox(t))
-                                  .toList(),
+                                  ,
                               const SizedBox(height: 32),
 
                               const Divider(
@@ -690,7 +689,7 @@ class _LabDetailsState extends State<LabDetails> {
             Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: color.withOpacity(0.1),
+                color: color.withValues(alpha: 0.1),
                 shape: BoxShape.circle,
               ),
               child: Icon(icon, color: color, size: 20),
@@ -729,7 +728,7 @@ class _LabDetailsState extends State<LabDetails> {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         decoration: BoxDecoration(
           color: isSelected
-              ? AppColors.primaryColor.withOpacity(0.05)
+              ? AppColors.primaryColor.withValues(alpha: 0.05)
               : const Color(0xFFF8FAFC),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
@@ -776,9 +775,9 @@ class _LabDetailsState extends State<LabDetails> {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF8B5CF6).withOpacity(0.1),
+                        color: const Color(0xFF8B5CF6).withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(4),
-                        border: Border.all(color: const Color(0xFF8B5CF6).withOpacity(0.3)),
+                        border: Border.all(color: const Color(0xFF8B5CF6).withValues(alpha: 0.3)),
                       ),
                       child: const Text(
                         'Prescribed',

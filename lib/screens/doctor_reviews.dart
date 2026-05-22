@@ -168,7 +168,7 @@ class _DoctorReviewsState extends ConsumerState<DoctorReviews> {
                         width: 24,
                         height: 24,
                         colorFilter: ColorFilter.mode(
-                          active ? Colors.white : Colors.white.withOpacity(0.35),
+                          active ? Colors.white : Colors.white.withValues(alpha: 0.35),
                           BlendMode.srcIn,
                         ),
                       ),

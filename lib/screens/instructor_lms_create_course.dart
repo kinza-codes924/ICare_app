@@ -391,7 +391,7 @@ class _InstructorLmsCreateCourseScreenState extends State<InstructorLmsCreateCou
                     height: 120,
                     width: double.infinity,
                     fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => Container(
+                    errorBuilder: (_, _, _) => Container(
                       height: 120,
                       color: const Color(0xFFF1F5F9),
                       child: const Icon(Icons.broken_image_outlined, color: Color(0xFF94A3B8), size: 40),
@@ -467,7 +467,7 @@ class _InstructorLmsCreateCourseScreenState extends State<InstructorLmsCreateCou
               const SizedBox(height: 32),
               
               DropdownButtonFormField<String>(
-                value: _category,
+                initialValue: _category,
                 decoration: const InputDecoration(
                   labelText: 'Category',
                   border: OutlineInputBorder(),
@@ -485,7 +485,7 @@ class _InstructorLmsCreateCourseScreenState extends State<InstructorLmsCreateCou
               const SizedBox(height: 20),
               
               DropdownButtonFormField<String>(
-                value: _targetAudience,
+                initialValue: _targetAudience,
                 decoration: const InputDecoration(
                   labelText: 'Target Audience',
                   border: OutlineInputBorder(),
@@ -500,7 +500,7 @@ class _InstructorLmsCreateCourseScreenState extends State<InstructorLmsCreateCou
               const SizedBox(height: 20),
               
               DropdownButtonFormField<String>(
-                value: _difficulty,
+                initialValue: _difficulty,
                 decoration: const InputDecoration(
                   labelText: 'Difficulty Level',
                   border: OutlineInputBorder(),
@@ -654,7 +654,7 @@ class _InstructorLmsCreateCourseScreenState extends State<InstructorLmsCreateCou
                 subtitle: const Text('Make this course visible to students'),
                 value: _isPublished,
                 onChanged: (value) => setState(() => _isPublished = value),
-                activeColor: AppColors.primaryColor,
+                activeThumbColor: AppColors.primaryColor,
               ),
 
               const SizedBox(height: 24),
@@ -665,7 +665,7 @@ class _InstructorLmsCreateCourseScreenState extends State<InstructorLmsCreateCou
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(color: const Color(0xFFE2E8F0)),
-                  boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 6)],
+                  boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 6)],
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -706,7 +706,7 @@ class _InstructorLmsCreateCourseScreenState extends State<InstructorLmsCreateCou
                         const SizedBox(width: 12),
                         Expanded(
                           child: DropdownButtonFormField<int>(
-                            value: _discountPercent,
+                            initialValue: _discountPercent,
                             decoration: const InputDecoration(
                               labelText: 'Discount',
                               border: OutlineInputBorder(),

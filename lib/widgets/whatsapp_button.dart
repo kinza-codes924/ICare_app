@@ -45,13 +45,13 @@ class WhatsAppFloatingButton extends StatelessWidget {
               shape: BoxShape.circle,
               boxShadow: [
                 BoxShadow(
-                  color: const Color(0xFF25D366).withOpacity(0.5),
+                  color: const Color(0xFF25D366).withValues(alpha: 0.5),
                   blurRadius: 16,
                   offset: const Offset(0, 6),
                   spreadRadius: 2,
                 ),
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.15),
+                  color: Colors.black.withValues(alpha: 0.15),
                   blurRadius: 8,
                   offset: const Offset(0, 2),
                 ),

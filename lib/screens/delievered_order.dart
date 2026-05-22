@@ -1,12 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_size_matters/flutter_size_matters.dart';
-import 'package:icare/models/app_enums.dart';
 import 'package:icare/utils/imagePaths.dart';
 import 'package:icare/utils/theme.dart';
 import 'package:icare/widgets/back_button.dart';
-import 'package:icare/widgets/custom_circle_icon_button.dart';
 import 'package:icare/widgets/custom_text.dart';
-import 'package:icare/widgets/order_card.dart';
 
 class DelieveredOrder extends StatelessWidget {
   const DelieveredOrder({super.key});
@@ -73,7 +69,7 @@ class DelieveredOrder extends StatelessWidget {
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     colors: [
-                      const Color(0xFF10B981).withOpacity(0.05),
+                      const Color(0xFF10B981).withValues(alpha: 0.05),
                       Colors.white,
                     ],
                     begin: Alignment.topCenter,
@@ -164,7 +160,7 @@ class DelieveredOrder extends StatelessWidget {
                     _buildStatMiniCard(
                       "Total Delivered",
                       "842",
-                      const Color(10626),
+                      const Color(0x00002982),
                     ),
                     const SizedBox(width: 24),
                     _buildStatMiniCard(
@@ -262,7 +258,7 @@ class DelieveredOrder extends StatelessWidget {
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 20,
             offset: const Offset(0, 8),
           ),

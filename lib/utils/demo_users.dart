@@ -5,6 +5,7 @@
 ///
 /// IMPORTANT: These are for DEMO/TESTING purposes only.
 /// In production, users should create their own accounts.
+library;
 
 class DemoUsers {
   static const String demoPassword = 'Pass@123';

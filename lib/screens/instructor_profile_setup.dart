@@ -3,7 +3,6 @@ import 'package:icare/services/instructor_service.dart';
 import 'package:icare/utils/theme.dart';
 import 'package:icare/widgets/back_button.dart';
 import 'package:icare/widgets/custom_button.dart';
-import 'package:icare/widgets/custom_text.dart';
 import 'package:icare/widgets/custom_text_input.dart';
 
 class InstructorProfileSetupScreen extends StatefulWidget {
@@ -200,7 +199,7 @@ class _InstructorProfileSetupScreenState
                     const SizedBox(width: 16),
                     Expanded(
                       child: DropdownButtonFormField<String>(
-                        value: _selectedGender,
+                        initialValue: _selectedGender,
                         decoration: const InputDecoration(
                           labelText: 'Gender',
                           border: OutlineInputBorder(),

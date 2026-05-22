@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 
 import 'dart:convert';
 
@@ -7,7 +6,6 @@ import 'package:uuid/uuid.dart';
 
 import '../models/appointment.dart';
 import '../models/appointment_detail.dart';
-import '../models/user.dart';
 import '../utils/role_ui.dart';
 import '../utils/shared_pref.dart';
 
@@ -1246,7 +1244,7 @@ class StandaloneCareHubService {
       if (targetDoctor.isEmpty) targetDoctor = null;
     }
     targetDoctor ??= doctors.firstWhere((d) => (d['specialization']?.toString() ?? '').toLowerCase().contains(specialty.toLowerCase()), orElse: () => doctors.isNotEmpty ? doctors.first : <String, dynamic>{});
-    if (patient == null || actor == null || targetDoctor == null || targetDoctor.isEmpty) {
+    if (patient == null || actor == null || targetDoctor.isEmpty) {
       return {'success': false, 'message': 'Unable to create referral at the moment'};
     }
     final referral = {

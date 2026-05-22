@@ -1,4 +1,3 @@
-import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:pdf/pdf.dart';
@@ -119,9 +118,11 @@ class _CertificateTemplateSelectorScreenState extends State<CertificateTemplateS
     } catch (e) {
       // Revert on error
       if (mounted) setState(() => _released = !value);
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Failed: $e'), backgroundColor: Colors.red),
       );
+      }
     }
     if (mounted) setState(() => _savingRelease = false);
   }
@@ -193,7 +194,7 @@ class _CertificateTemplateSelectorScreenState extends State<CertificateTemplateS
                       : Switch(
                           value: _released,
                           onChanged: _toggleRelease,
-                          activeColor: const Color(0xFF10B981),
+                          activeThumbColor: const Color(0xFF10B981),
                         ),
                 ],
               ),
@@ -639,13 +640,13 @@ class _CertificatePreview extends StatelessWidget {
                     children: [
                       Image.asset('assets/images/health.jpeg',
                           height: compact ? 24 : 40, fit: BoxFit.contain,
-                          errorBuilder: (_, __, ___) => Text('RMR', style: TextStyle(fontSize: compact ? 8 : 10, fontWeight: FontWeight.w700, color: const Color(0xFF0036BC)))),
+                          errorBuilder: (_, _, _) => Text('RMR', style: TextStyle(fontSize: compact ? 8 : 10, fontWeight: FontWeight.w700, color: const Color(0xFF0036BC)))),
                       Image.asset('assets/LOGO-IU-01-2048x495-1.png',
                           height: compact ? 24 : 40, width: compact ? 90 : 140, fit: BoxFit.contain,
-                          errorBuilder: (_, __, ___) => Text('Iqra University', style: TextStyle(fontSize: compact ? 8 : 11, fontWeight: FontWeight.w700, color: t.primaryColor))),
+                          errorBuilder: (_, _, _) => Text('Iqra University', style: TextStyle(fontSize: compact ? 8 : 11, fontWeight: FontWeight.w700, color: t.primaryColor))),
                       Image.asset('assets/Asset 1.png',
                           height: compact ? 24 : 40, fit: BoxFit.contain,
-                          errorBuilder: (_, __, ___) => Text('iCare', style: TextStyle(fontSize: compact ? 8 : 10, fontWeight: FontWeight.w700, color: t.primaryColor))),
+                          errorBuilder: (_, _, _) => Text('iCare', style: TextStyle(fontSize: compact ? 8 : 10, fontWeight: FontWeight.w700, color: t.primaryColor))),
                     ],
                   ),
                   SizedBox(height: compact ? 6 : 12),
@@ -668,7 +669,7 @@ class _CertificatePreview extends StatelessWidget {
                       textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis),
                   if (!compact) ...[
                     const SizedBox(height: 20),
-                    Container(height: 1, color: t.accentColor.withOpacity(0.4)),
+                    Container(height: 1, color: t.accentColor.withValues(alpha: 0.4)),
                     const SizedBox(height: 14),
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.end,
@@ -676,7 +677,7 @@ class _CertificatePreview extends StatelessWidget {
                         // QR placeholder
                         Container(
                           width: 56, height: 56,
-                          decoration: BoxDecoration(border: Border.all(color: t.primaryColor.withOpacity(0.3))),
+                          decoration: BoxDecoration(border: Border.all(color: t.primaryColor.withValues(alpha: 0.3))),
                           child: const Icon(Icons.qr_code_2_rounded, size: 48, color: Color(0xFF94A3B8)),
                         ),
                         const Spacer(),
@@ -703,7 +704,7 @@ class _CertificatePreview extends StatelessWidget {
 
   Widget _sigBlock(CertificateTemplate t, String role, String name) {
     return Column(children: [
-      Container(width: 70, height: 1.5, color: t.primaryColor.withOpacity(0.4)),
+      Container(width: 70, height: 1.5, color: t.primaryColor.withValues(alpha: 0.4)),
       const SizedBox(height: 3),
       Text(name, style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: t.primaryColor)),
       Text(role, style: const TextStyle(fontSize: 8, color: Color(0xFF94A3B8))),

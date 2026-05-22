@@ -1,10 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:icare/providers/auth_provider.dart';
-import 'package:icare/screens/lab_profile_setup.dart';
-import 'package:icare/screens/pharmacy_profile_setup.dart';
 import 'package:icare/services/auth_service.dart';
 import 'package:icare/services/user_service.dart';
 import 'package:icare/models/user.dart' as app_user;

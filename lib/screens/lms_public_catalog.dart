@@ -23,7 +23,7 @@ class _LmsPublicCatalogState extends State<LmsPublicCatalog> {
   List<dynamic> _filteredCourses = [];
   bool _isLoading = true;
   String _selectedCategory = 'All';
-  String _selectedDifficulty = 'All';
+  final String _selectedDifficulty = 'All';
   
   final List<String> _categories = [
     'All',
@@ -83,7 +83,9 @@ class _LmsPublicCatalogState extends State<LmsPublicCatalog> {
           // 'doctor' or 'professional' → show doctor/professional courses
           if (filterAudience == 'patient' && !courseAudience.contains('patient')) return false;
           if ((filterAudience == 'doctor' || filterAudience == 'professional') &&
-              courseAudience.contains('patient')) return false;
+              courseAudience.contains('patient')) {
+            return false;
+          }
         }
 
         // Category filter
@@ -367,7 +369,7 @@ class _CourseCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.06),
+              color: Colors.black.withValues(alpha: 0.06),
               blurRadius: 12,
               offset: const Offset(0, 4),
             ),
@@ -385,7 +387,7 @@ class _CourseCard extends StatelessWidget {
                       height: 140,
                       width: double.infinity,
                       fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => _buildPlaceholder(),
+                      errorBuilder: (_, _, _) => _buildPlaceholder(),
                     )
                   : _buildPlaceholder(),
             ),
@@ -491,7 +493,7 @@ class _CourseCard extends StatelessWidget {
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
-            AppColors.primaryColor.withOpacity(0.7),
+            AppColors.primaryColor.withValues(alpha: 0.7),
             AppColors.primaryColor,
           ],
         ),
@@ -512,7 +514,7 @@ class _Badge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(6),
       ),
       child: Text(

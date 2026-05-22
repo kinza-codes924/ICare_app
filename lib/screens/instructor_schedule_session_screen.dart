@@ -1,7 +1,6 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:icare/services/lms_service.dart';
 import 'package:icare/utils/theme.dart';
-import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 /// Live Session Scheduling Screen - Zoom/Google Meet style
@@ -36,7 +35,7 @@ class _InstructorScheduleSessionScreenState extends State<InstructorScheduleSess
   DateTime? _scheduledAt;
   int _duration = 60; // minutes
   int _maxParticipants = 100;
-  String _platform = 'zoom'; // zoom, meet, teams, custom
+  final String _platform = 'zoom'; // zoom, meet, teams, custom
 
   List<Map<String, dynamic>> _courses = [];
 
@@ -228,7 +227,7 @@ class _InstructorScheduleSessionScreenState extends State<InstructorScheduleSess
                 children: [
                   if (widget.courseId == null)
                     DropdownButtonFormField<String>(
-                      value: _selectedCourseId,
+                      initialValue: _selectedCourseId,
                       decoration: const InputDecoration(
                         labelText: 'Course *',
                         border: OutlineInputBorder(),
@@ -322,9 +321,9 @@ class _InstructorScheduleSessionScreenState extends State<InstructorScheduleSess
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: AppColors.primaryColor.withOpacity(0.08),
+                  color: AppColors.primaryColor.withValues(alpha: 0.08),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: AppColors.primaryColor.withOpacity(0.3)),
+                  border: Border.all(color: AppColors.primaryColor.withValues(alpha: 0.3)),
                 ),
                 child: const Row(children: [
                   Icon(Icons.videocam_rounded, color: AppColors.primaryColor, size: 28),
@@ -385,7 +384,7 @@ class _InstructorScheduleSessionScreenState extends State<InstructorScheduleSess
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 10,
             offset: const Offset(0, 2),
           ),

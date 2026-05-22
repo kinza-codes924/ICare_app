@@ -3,7 +3,6 @@ import 'package:flutter_size_matters/flutter_size_matters.dart';
 import 'package:icare/models/lab.dart';
 import 'package:icare/screens/select_payment_method.dart';
 import 'package:icare/utils/imagePaths.dart';
-import 'package:icare/utils/theme.dart';
 import 'package:icare/widgets/back_button.dart';
 import 'package:icare/widgets/custom_text.dart';
 import 'package:icare/widgets/lab_widget.dart';
@@ -13,7 +12,7 @@ class LabAppointments extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final List<Lab> lab_orders = [
+    final List<Lab> labOrders = [
       Lab(
         id: "1",
         title: "Green Lab",
@@ -33,12 +32,12 @@ class LabAppointments extends StatelessWidget {
       ),
 
       body: ListView.builder(
-        itemCount: lab_orders.length,
+        itemCount: labOrders.length,
         padding: EdgeInsets.symmetric(horizontal: ScallingConfig.scale(15)),
 
         itemBuilder: (ctx, i) {
           return (LabWidget(
-            lab: lab_orders[i],
+            lab: labOrders[i],
             actionText: "Pay Now",
             onActionBtnPressed: () {
               Navigator.of(context).push(

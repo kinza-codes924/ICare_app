@@ -586,6 +586,34 @@ class ConsultationService {
     }
   }
 
+  // ==================== COMPATIBILITY WRAPPERS ====================
+  // Used by older screens that haven't been updated to V2 signatures yet.
+
+  Future<Map<String, dynamic>> sendMessage({
+    required String consultationId,
+    required String message,
+    String? attachmentUrl,
+  }) async {
+    final user = await _sharedPref.getUserData();
+    return sendMessageV2(
+      consultationId: consultationId,
+      senderId: user?.id ?? '',
+      senderName: user?.name ?? 'User',
+      senderRole: user?.role ?? 'unknown',
+      message: message,
+      attachmentUrl: attachmentUrl,
+    );
+  }
+
+  Future<Map<String, dynamic>> getMessages(String consultationId) async {
+    final messages = await getMessagesV2(consultationId: consultationId);
+    return {'success': true, 'messages': messages};
+  }
+
+  Future<Map<String, dynamic>> endConsultation(String consultationId) async {
+    return endConsultationV2(consultationId: consultationId, duration: 0);
+  }
+
   /// Recursively remove null values to prevent backend 500 errors
   Map<String, dynamic> _removeNulls(Map<String, dynamic> map) {
     final result = <String, dynamic>{};

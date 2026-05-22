@@ -141,7 +141,7 @@ class _CommunityForumScreenState extends State<CommunityForumScreen> {
                   style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
               const SizedBox(height: 16),
               DropdownButtonFormField<String>(
-                value: postCategories.contains(selectedCat) ? selectedCat : postCategories.first,
+                initialValue: postCategories.contains(selectedCat) ? selectedCat : postCategories.first,
                 items: postCategories
                     .map((c) => DropdownMenuItem(value: c, child: Text(c)))
                     .toList(),
@@ -236,7 +236,7 @@ class _CommunityForumScreenState extends State<CommunityForumScreen> {
                   icon: Container(
                     padding: const EdgeInsets.all(6),
                     decoration: BoxDecoration(
-                      color: AppColors.primaryColor.withOpacity(0.1),
+                      color: AppColors.primaryColor.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: const Icon(Icons.add_circle_outline_rounded,
@@ -268,7 +268,7 @@ class _CommunityForumScreenState extends State<CommunityForumScreen> {
                         child: ListView.separated(
                           padding: const EdgeInsets.fromLTRB(20, 16, 20, 100),
                           itemCount: _posts.length,
-                          separatorBuilder: (_, __) => const SizedBox(height: 16),
+                          separatorBuilder: (_, _) => const SizedBox(height: 16),
                           itemBuilder: (_, i) => _buildPostCard(_posts[i]),
                         ),
                       ),
@@ -348,7 +348,7 @@ class _CommunityForumScreenState extends State<CommunityForumScreen> {
           color: Colors.white,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(color: const Color(0xFFE2E8F0)),
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 12, offset: const Offset(0, 4))],
+          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 12, offset: const Offset(0, 4))],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -396,7 +396,7 @@ class _CommunityForumScreenState extends State<CommunityForumScreen> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
-                    color: AppColors.primaryColor.withOpacity(0.08),
+                    color: AppColors.primaryColor.withValues(alpha: 0.08),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(category,
@@ -606,7 +606,7 @@ class _CommunityPostDetailScreenState extends State<_CommunityPostDetailScreen> 
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                             decoration: BoxDecoration(
-                              color: AppColors.primaryColor.withOpacity(0.08),
+                              color: AppColors.primaryColor.withValues(alpha: 0.08),
                               borderRadius: BorderRadius.circular(20),
                             ),
                             child: Text(category,
@@ -699,7 +699,7 @@ class _CommunityPostDetailScreenState extends State<_CommunityPostDetailScreen> 
             ),
             decoration: BoxDecoration(
               color: Colors.white,
-              boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 12, offset: const Offset(0, -4))],
+              boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.06), blurRadius: 12, offset: const Offset(0, -4))],
             ),
             child: Row(
               children: [

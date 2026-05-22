@@ -1,7 +1,6 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:icare/services/lms_service.dart';
 import 'package:icare/utils/theme.dart';
-import 'package:go_router/go_router.dart';
 
 /// Student Progress Monitoring - Google Classroom style
 class InstructorStudentProgressScreen extends StatefulWidget {
@@ -183,7 +182,7 @@ class _InstructorStudentProgressScreenState extends State<InstructorStudentProgr
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Row(
@@ -246,7 +245,7 @@ class _InstructorStudentProgressScreenState extends State<InstructorStudentProgr
         border: Border.all(color: const Color(0xFFE2E8F0)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -261,7 +260,7 @@ class _InstructorStudentProgressScreenState extends State<InstructorStudentProgr
               children: [
                 CircleAvatar(
                   radius: 24,
-                  backgroundColor: AppColors.primaryColor.withOpacity(0.1),
+                  backgroundColor: AppColors.primaryColor.withValues(alpha: 0.1),
                   child: Text(
                     name[0].toUpperCase(),
                     style: TextStyle(
@@ -298,7 +297,7 @@ class _InstructorStudentProgressScreenState extends State<InstructorStudentProgr
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
-                    color: progressColor.withOpacity(0.1),
+                    color: progressColor.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(

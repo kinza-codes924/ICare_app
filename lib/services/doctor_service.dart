@@ -156,10 +156,12 @@ class DoctorService {
     try {
       // Build query string
       final queryParams = <String>[];
-      if (specialization != null)
+      if (specialization != null) {
         queryParams.add('specialization=$specialization');
-      if (consultationType != null)
+      }
+      if (consultationType != null) {
         queryParams.add('consultationType=$consultationType');
+      }
       if (language != null) queryParams.add('language=$language');
       if (minRating != null) queryParams.add('minRating=$minRating');
 

@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:icare/screens/instructor_analytics.dart';
 import 'package:icare/screens/instructor_assign_course_screen.dart';
 import 'package:icare/screens/instructor_courses_management.dart';
-import 'package:icare/screens/instructor_create_course.dart';
 import 'package:icare/screens/instructor_learners_screen.dart';
 import 'package:icare/screens/instructor_lms_screen.dart';
 import 'package:icare/screens/instructor_precautions_management.dart';
@@ -173,10 +172,10 @@ class _InstructorDashboardScreenState extends State<InstructorDashboardScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: color.withOpacity(0.15)),
+        border: Border.all(color: color.withValues(alpha: 0.15)),
         boxShadow: [
           BoxShadow(
-            color: color.withOpacity(0.08),
+            color: color.withValues(alpha: 0.08),
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),
@@ -187,7 +186,7 @@ class _InstructorDashboardScreenState extends State<InstructorDashboardScreen> {
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
+              color: color.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(10),
             ),
             child: Icon(icon, color: color, size: 22),
@@ -240,7 +239,7 @@ class _InstructorDashboardScreenState extends State<InstructorDashboardScreen> {
         border: Border.all(color: const Color(0xFFF1F5F9)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -268,7 +267,7 @@ class _InstructorDashboardScreenState extends State<InstructorDashboardScreen> {
                         width: 44,
                         height: 44,
                         decoration: BoxDecoration(
-                          color: a.color.withOpacity(0.1),
+                          color: a.color.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Icon(a.icon, color: a.color, size: 22),
@@ -327,10 +326,10 @@ class _InstructorDashboardScreenState extends State<InstructorDashboardScreen> {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: color.withOpacity(0.15)),
+          border: Border.all(color: color.withValues(alpha: 0.15)),
           boxShadow: [
             BoxShadow(
-              color: color.withOpacity(0.08),
+              color: color.withValues(alpha: 0.08),
               blurRadius: 12,
               offset: const Offset(0, 4),
             ),
@@ -341,7 +340,7 @@ class _InstructorDashboardScreenState extends State<InstructorDashboardScreen> {
             Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: color.withOpacity(0.1),
+                color: color.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Icon(icon, color: color, size: 22),

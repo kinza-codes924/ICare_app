@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:icare/services/instructor_service.dart';
-import 'package:icare/utils/theme.dart';
 import 'package:icare/widgets/back_button.dart';
 import 'package:intl/intl.dart';
 
@@ -97,7 +96,7 @@ class _InstructorEarningsScreenState extends State<InstructorEarningsScreen> {
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF0F172A).withOpacity(0.3),
+            color: const Color(0xFF0F172A).withValues(alpha: 0.3),
             blurRadius: 20,
             offset: const Offset(0, 10),
           ),
@@ -194,7 +193,7 @@ class _InstructorEarningsScreenState extends State<InstructorEarningsScreen> {
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       itemCount: _payouts.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 12),
+      separatorBuilder: (_, _) => const SizedBox(height: 12),
       itemBuilder: (context, index) {
         final payout = _payouts[index];
         final date = DateTime.parse(
@@ -212,7 +211,7 @@ class _InstructorEarningsScreenState extends State<InstructorEarningsScreen> {
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: Colors.green.withOpacity(0.1),
+                  color: Colors.green.withValues(alpha: 0.1),
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(

@@ -326,7 +326,7 @@ class _ConsultationChatScreenState extends State<ConsultationChatScreen> {
           margin: const EdgeInsets.symmetric(vertical: 8),
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
           decoration: BoxDecoration(
-            color: Colors.grey.withOpacity(0.2),
+            color: Colors.grey.withValues(alpha: 0.2),
             borderRadius: BorderRadius.circular(12),
           ),
           child: Text(
@@ -350,7 +350,7 @@ class _ConsultationChatScreenState extends State<ConsultationChatScreen> {
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.05),
+              color: Colors.black.withValues(alpha: 0.05),
               blurRadius: 5,
               offset: const Offset(0, 2),
             ),

@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:icare/models/clinical_audit.dart';
 import 'package:icare/models/consultation.dart';
 import 'package:icare/models/prescription.dart';
@@ -84,7 +83,7 @@ class ClinicalAuditService {
     // Examination section (30 points)
     maxScore += 30;
     if (consultation.examination != null) {
-      if (consultation.examination!.vitalSigns != null) score += 15;
+      score += 15;
       if (consultation.examination!.notes.isNotEmpty) score += 15;
     }
 
@@ -206,7 +205,7 @@ class ClinicalAuditService {
     }
 
     // Check for missing vital signs
-    if (consultation.examination == null || consultation.examination!.vitalSigns == null) {
+    if (consultation.examination == null) {
       flags.add(QualityFlag(
         type: QualityFlagType.missingVitalSigns,
         description: 'Vital signs not recorded',

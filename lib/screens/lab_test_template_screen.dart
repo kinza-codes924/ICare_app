@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:icare/utils/theme.dart';
 import 'package:icare/widgets/back_button.dart';
 
 // Full list of common lab tests for search
@@ -246,7 +245,7 @@ class _LabTestTemplateScreenState extends State<LabTestTemplateScreen> {
     return ListView.separated(
       padding: const EdgeInsets.all(16),
       itemCount: _templates.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 12),
+      separatorBuilder: (_, _) => const SizedBox(height: 12),
       itemBuilder: (context, index) {
         final template = _templates[index];
         final tests = (template['tests'] ?? []) as List<dynamic>;
@@ -265,7 +264,7 @@ class _LabTestTemplateScreenState extends State<LabTestTemplateScreen> {
                   Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF8B5CF6).withOpacity(0.1),
+                      color: const Color(0xFF8B5CF6).withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: const Icon(Icons.biotech_rounded,
@@ -309,7 +308,7 @@ class _LabTestTemplateScreenState extends State<LabTestTemplateScreen> {
                     decoration: BoxDecoration(
                       color: const Color(0xFFF5F3FF),
                       borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: const Color(0xFF8B5CF6).withOpacity(0.3)),
+                      border: Border.all(color: const Color(0xFF8B5CF6).withValues(alpha: 0.3)),
                     ),
                     child: Text(t['name'] ?? '',
                         style: const TextStyle(
@@ -651,7 +650,7 @@ class _LabTestBuilderScreenState extends State<_LabTestBuilderScreen> {
                       border: Border.all(color: const Color(0xFFE2E8F0)),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.08),
+                          color: Colors.black.withValues(alpha: 0.08),
                           blurRadius: 12,
                           offset: const Offset(0, 4),
                         ),
@@ -734,7 +733,7 @@ class _LabTestBuilderScreenState extends State<_LabTestBuilderScreen> {
                               height: 32,
                               decoration: BoxDecoration(
                                 color: const Color(0xFF8B5CF6)
-                                    .withOpacity(0.1),
+                                    .withValues(alpha: 0.1),
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               child: Center(
@@ -784,7 +783,7 @@ class _LabTestBuilderScreenState extends State<_LabTestBuilderScreen> {
                     padding: const EdgeInsets.symmetric(
                         horizontal: 12, vertical: 6),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF8B5CF6).withOpacity(0.1),
+                      color: const Color(0xFF8B5CF6).withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Text(

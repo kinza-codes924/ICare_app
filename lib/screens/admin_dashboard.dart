@@ -4,7 +4,6 @@ import 'package:icare/models/consultation_timer.dart';
 import 'package:icare/services/api_service.dart';
 import 'package:icare/services/medical_record_service.dart';
 import 'package:icare/utils/theme.dart';
-import 'package:icare/widgets/custom_button.dart';
 import 'package:intl/intl.dart';
 
 class AdminDashboard extends ConsumerStatefulWidget {
@@ -670,7 +669,7 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
               const SizedBox(height: 12),
               // Doctor filter dropdown
               DropdownButtonFormField<String>(
-                value: _selectedDoctorFilter,
+                initialValue: _selectedDoctorFilter,
                 decoration: InputDecoration(
                   labelText: 'Filter by Doctor',
                   prefixIcon: const Icon(Icons.person_search_rounded),
@@ -1046,7 +1045,7 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2),
+                        color: Colors.white.withValues(alpha: 0.2),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: const Icon(Icons.monetization_on_rounded, color: Colors.white, size: 28),
@@ -1177,7 +1176,7 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
                           ListTile(
                             leading: Container(
                               padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(color: const Color(0xFF10B981).withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
+                              decoration: BoxDecoration(color: const Color(0xFF10B981).withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)),
                               child: const Icon(Icons.receipt_rounded, color: Color(0xFF10B981), size: 18),
                             ),
                             title: Text(t['doctorName']?.toString() ?? 'Doctor', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
@@ -1202,9 +1201,9 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.06),
+        color: color.withValues(alpha: 0.06),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withOpacity(0.2)),
+        border: Border.all(color: color.withValues(alpha: 0.2)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1267,9 +1266,11 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
                   setState(() {}); // refresh
                 }
               } catch (_) {
-                if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(content: Text('Failed to update rate'), backgroundColor: Colors.red),
                 );
+                }
               }
             },
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryColor, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)), elevation: 0),

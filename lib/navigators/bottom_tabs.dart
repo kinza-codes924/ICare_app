@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:icare/utils/imagePaths.dart';
 import 'package:icare/utils/theme.dart';
 import 'package:icare/widgets/custom_tab_button.dart';
-import 'package:icare/models/app_enums.dart';
 
 List<Widget> _doctorTabs(
   BuildContext context,

@@ -29,7 +29,7 @@ class _DoctorReferralScreenState extends State<DoctorReferralScreen> {
 
   // Requirement 13.3: Record Sharing
   List<dynamic> _patientRecords = [];
-  List<String> _selectedRecordIds = [];
+  final List<String> _selectedRecordIds = [];
   bool _isLoadingRecords = true;
 
   @override
@@ -205,7 +205,7 @@ class _DoctorReferralScreenState extends State<DoctorReferralScreen> {
                   child: ListView.separated(
                     padding: const EdgeInsets.all(8),
                     itemCount: _filteredDoctors.length,
-                    separatorBuilder: (_, __) => const Divider(),
+                    separatorBuilder: (_, _) => const Divider(),
                     itemBuilder: (ctx, i) {
                       final doc = _filteredDoctors[i];
                       final isSelected =
@@ -213,8 +213,8 @@ class _DoctorReferralScreenState extends State<DoctorReferralScreen> {
                           _selectedSpecialist['_id'] == doc['_id'];
                       return ListTile(
                         selected: isSelected,
-                        selectedTileColor: AppColors.primaryColor.withOpacity(
-                          0.05,
+                        selectedTileColor: AppColors.primaryColor.withValues(
+                          alpha: 0.05,
                         ),
                         title: Text(
                           doc['user']['name'] ?? 'Doctor',
@@ -252,7 +252,7 @@ class _DoctorReferralScreenState extends State<DoctorReferralScreen> {
                         child: ListView.separated(
                           padding: const EdgeInsets.all(8),
                           itemCount: _patientRecords.length,
-                          separatorBuilder: (_, __) => const Divider(),
+                          separatorBuilder: (_, _) => const Divider(),
                           itemBuilder: (ctx, i) {
                             final record = _patientRecords[i];
                             final id = record['_id'];
@@ -402,7 +402,7 @@ class _DoctorReferralScreenState extends State<DoctorReferralScreen> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
             decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
+              color: color.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Text(

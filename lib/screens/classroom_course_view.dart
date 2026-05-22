@@ -8,10 +8,7 @@ import 'package:icare/screens/instructor_create_quiz_screen.dart';
 import 'package:icare/screens/instructor_schedule_session_screen.dart';
 import 'package:icare/screens/instructor_grading_screen.dart';
 import 'package:icare/screens/instructor_course_content_screen.dart';
-import 'package:icare/screens/instructor_student_progress_screen.dart';
-import 'package:icare/screens/instructor_course_analytics_screen.dart';
 import 'package:icare/services/lms_service.dart';
-import 'package:icare/utils/shared_pref.dart';
 import 'package:icare/screens/lms_live_session_screen.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -186,20 +183,26 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
     try {
       final result = await _lms.postAnnouncement(_courseId, text);
       if (result['success'] == false) {
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Failed: ${result['message'] ?? 'Unknown error'}'), backgroundColor: Colors.red),
         );
+        }
         return;
       }
       _postCtrl.clear();
       await _loadStream();
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Announcement posted!'), backgroundColor: Colors.green, duration: Duration(seconds: 2)),
       );
+      }
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Failed to post: $e'), backgroundColor: Colors.red),
       );
+      }
     }
   }
 
@@ -353,7 +356,7 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
                       colors: [Color(0xFFB91C1C), Color(0xFFEF4444)],
                     ),
                     borderRadius: BorderRadius.circular(12),
-                    boxShadow: [BoxShadow(color: Colors.red.withOpacity(0.4), blurRadius: 12, offset: const Offset(0, 4))],
+                    boxShadow: [BoxShadow(color: Colors.red.withValues(alpha: 0.4), blurRadius: 12, offset: const Offset(0, 4))],
                   ),
                   child: Row(children: [
                     const Icon(Icons.live_tv_rounded, color: Colors.white, size: 28),
@@ -1105,7 +1108,7 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
           ),
           borderRadius: BorderRadius.circular(10),
           boxShadow: [
-            BoxShadow(color: Colors.red.withOpacity(0.35), blurRadius: 10, offset: const Offset(0, 4)),
+            BoxShadow(color: Colors.red.withValues(alpha: 0.35), blurRadius: 10, offset: const Offset(0, 4)),
           ],
         ),
         child: Row(
@@ -1114,7 +1117,7 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
               width: 40,
               height: 40,
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.2),
+                color: Colors.white.withValues(alpha: 0.2),
                 shape: BoxShape.circle,
               ),
               child: const Icon(Icons.live_tv_rounded, color: Colors.white, size: 22),
@@ -1241,7 +1244,7 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
             ),
             borderRadius: BorderRadius.circular(10),
             boxShadow: [
-              BoxShadow(color: Colors.red.withOpacity(0.35), blurRadius: 10, offset: const Offset(0, 4)),
+              BoxShadow(color: Colors.red.withValues(alpha: 0.35), blurRadius: 10, offset: const Offset(0, 4)),
             ],
           ),
           child: Row(
@@ -1250,7 +1253,7 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
                 width: 40,
                 height: 40,
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.2),
+                  color: Colors.white.withValues(alpha: 0.2),
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(Icons.live_tv_rounded, color: Colors.white, size: 22),

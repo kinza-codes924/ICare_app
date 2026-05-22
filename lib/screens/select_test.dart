@@ -3,7 +3,6 @@ import 'package:icare/models/lab_test.dart';
 import 'package:icare/screens/confirm_booking.dart';
 import 'package:icare/services/laboratory_service.dart';
 import 'package:icare/utils/theme.dart';
-import 'package:icare/utils/utils.dart';
 import 'package:icare/widgets/back_button.dart';
 import 'package:icare/widgets/custom_text.dart';
 
@@ -155,7 +154,7 @@ class _SelectTestState extends State<SelectTest> {
             borderRadius: BorderRadius.circular(16),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.04),
+                color: Colors.black.withValues(alpha: 0.04),
                 blurRadius: 10,
                 offset: const Offset(0, 4),
               ),
@@ -243,7 +242,7 @@ class _SelectTestState extends State<SelectTest> {
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             color: isSelected
-                ? AppColors.primaryColor.withOpacity(0.05)
+                ? AppColors.primaryColor.withValues(alpha: 0.05)
                 : Colors.white,
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
@@ -255,7 +254,7 @@ class _SelectTestState extends State<SelectTest> {
             boxShadow: isSelected
                 ? [
                     BoxShadow(
-                      color: AppColors.primaryColor.withOpacity(0.1),
+                      color: AppColors.primaryColor.withValues(alpha: 0.1),
                       blurRadius: 10,
                       offset: const Offset(0, 4),
                     ),
@@ -305,7 +304,7 @@ class _SelectTestState extends State<SelectTest> {
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
                         color: isSelected
-                            ? AppColors.primaryColor.withOpacity(0.7)
+                            ? AppColors.primaryColor.withValues(alpha: 0.7)
                             : const Color(0xFF64748B),
                       ),
                     ),
@@ -331,7 +330,7 @@ class _SelectTestState extends State<SelectTest> {
           borderRadius: BorderRadius.circular(24),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.2),
+              color: Colors.black.withValues(alpha: 0.2),
               blurRadius: 20,
               offset: const Offset(0, 10),
             ),

@@ -65,9 +65,9 @@ class _StarClickGameState extends State<StarClickGame>
   Future<void> _saveScore() async {
     if (_score > 0) {
       String badgeName = '';
-      if (_score >= 100)
+      if (_score >= 100) {
         badgeName = 'Star Master';
-      else if (_score >= 50)
+      } else if (_score >= 50)
         badgeName = 'Star Hunter';
 
       await _gamificationService.awardPoints(

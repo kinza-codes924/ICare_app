@@ -218,7 +218,7 @@ class _InstructorAssignCourseScreenState
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
                 itemCount: _foundUsers.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 8),
+                separatorBuilder: (_, _) => const SizedBox(height: 8),
                 itemBuilder: (ctx, i) {
                   final user = _foundUsers[i];
                   final isSelected =
@@ -226,7 +226,7 @@ class _InstructorAssignCourseScreenState
                       _selectedUser['_id'] == user['_id'];
                   return ListTile(
                     selected: isSelected,
-                    selectedTileColor: AppColors.primaryColor.withOpacity(0.05),
+                    selectedTileColor: AppColors.primaryColor.withValues(alpha: 0.05),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                       side: BorderSide(
@@ -236,7 +236,7 @@ class _InstructorAssignCourseScreenState
                       ),
                     ),
                     leading: CircleAvatar(
-                      backgroundColor: AppColors.primaryColor.withOpacity(0.1),
+                      backgroundColor: AppColors.primaryColor.withValues(alpha: 0.1),
                       child: Text(
                         user['name']?[0] ?? 'U',
                         style: const TextStyle(color: AppColors.primaryColor),

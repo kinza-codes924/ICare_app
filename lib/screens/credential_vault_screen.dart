@@ -174,7 +174,7 @@ class _CredentialVaultScreenState extends State<CredentialVaultScreen> {
                             loadingBuilder: (_, child, prog) => prog == null
                                 ? child
                                 : const Center(child: CircularProgressIndicator()),
-                            errorBuilder: (_, __, ___) => _urlFallback(ctx, docUrl),
+                            errorBuilder: (_, _, _) => _urlFallback(ctx, docUrl),
                           ),
                         ),
                       )
@@ -222,7 +222,7 @@ class _CredentialVaultScreenState extends State<CredentialVaultScreen> {
                 loadingBuilder: (_, child, prog) => prog == null
                     ? child
                     : const Center(child: CircularProgressIndicator()),
-                errorBuilder: (_, __, ___) => Column(
+                errorBuilder: (_, _, _) => Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Container(
@@ -388,7 +388,7 @@ class _CredentialVaultScreenState extends State<CredentialVaultScreen> {
               ),
               const SizedBox(height: 8),
               DropdownButtonFormField<String>(
-                value: type,
+                initialValue: type,
                 items:
                     [
                           'Medical License',
@@ -462,7 +462,7 @@ class _CredentialVaultScreenState extends State<CredentialVaultScreen> {
                     color: pickedFileName != null ? const Color(0xFFEFF6FF) : const Color(0xFFF1F5F9),
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(
-                      color: pickedFileName != null ? AppColors.primaryColor : AppColors.primaryColor.withOpacity(0.2),
+                      color: pickedFileName != null ? AppColors.primaryColor : AppColors.primaryColor.withValues(alpha: 0.2),
                       width: 2,
                     ),
                   ),
@@ -472,7 +472,7 @@ class _CredentialVaultScreenState extends State<CredentialVaultScreen> {
                       Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: AppColors.primaryColor.withOpacity(0.1),
+                          color: AppColors.primaryColor.withValues(alpha: 0.1),
                           shape: BoxShape.circle,
                         ),
                         child: Icon(
@@ -524,12 +524,14 @@ class _CredentialVaultScreenState extends State<CredentialVaultScreen> {
                               pickedBytes!, pickedFileName ?? 'document');
                             if (url == null || url.isEmpty) {
                               setModalState(() => isUploading = false);
-                              if (ctx.mounted) ScaffoldMessenger.of(ctx).showSnackBar(
+                              if (ctx.mounted) {
+                                ScaffoldMessenger.of(ctx).showSnackBar(
                                 const SnackBar(
                                   content: Text('File upload failed. Check your connection and try again.'),
                                   backgroundColor: Colors.red,
                                 ),
                               );
+                              }
                               return;
                             }
                             // Step 2: save credential record with the returned URL
@@ -542,8 +544,10 @@ class _CredentialVaultScreenState extends State<CredentialVaultScreen> {
                             _fetchCredentials();
                           } catch (e) {
                             setModalState(() => isUploading = false);
-                            if (ctx.mounted) ScaffoldMessenger.of(ctx).showSnackBar(
+                            if (ctx.mounted) {
+                              ScaffoldMessenger.of(ctx).showSnackBar(
                               SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red));
+                            }
                           }
                         },
                 ),
@@ -653,9 +657,9 @@ class _CredentialVaultScreenState extends State<CredentialVaultScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.05),
+        color: color.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withOpacity(0.1)),
+        border: Border.all(color: color.withValues(alpha: 0.1)),
       ),
       child: Row(
         children: [
@@ -757,10 +761,10 @@ class _CredentialVaultScreenState extends State<CredentialVaultScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: statusColor.withOpacity(0.2)),
+        border: Border.all(color: statusColor.withValues(alpha: 0.2)),
         boxShadow: [
           BoxShadow(
-            color: statusColor.withOpacity(0.05),
+            color: statusColor.withValues(alpha: 0.05),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -771,7 +775,7 @@ class _CredentialVaultScreenState extends State<CredentialVaultScreen> {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: statusColor.withOpacity(0.1),
+              color: statusColor.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(16),
             ),
             child: Icon(
@@ -806,9 +810,9 @@ class _CredentialVaultScreenState extends State<CredentialVaultScreen> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                   decoration: BoxDecoration(
-                    color: statusColor.withOpacity(0.1),
+                    color: statusColor.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: statusColor.withOpacity(0.3)),
+                    border: Border.all(color: statusColor.withValues(alpha: 0.3)),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,

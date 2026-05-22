@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_size_matters/flutter_size_matters.dart';
 import 'package:icare/screens/labb_details.dart';
-import 'package:icare/utils/imagePaths.dart';
 import 'package:icare/utils/theme.dart';
-import 'package:icare/utils/utils.dart';
 import 'package:icare/widgets/back_button.dart';
 import 'package:icare/widgets/custom_text.dart';
 import 'package:icare/widgets/laboratory.dart';
@@ -124,7 +122,7 @@ class _LaboratoriesScreenState extends State<LaboratoriesScreen> {
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     colors: [
-                      AppColors.primaryColor.withOpacity(0.05),
+                      AppColors.primaryColor.withValues(alpha: 0.05),
                       Colors.white,
                     ],
                     begin: Alignment.topCenter,
@@ -214,7 +212,7 @@ class _LaboratoriesScreenState extends State<LaboratoriesScreen> {
                       border: Border.all(color: const Color(0xFFE2E8F0)),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.04),
+                          color: Colors.black.withValues(alpha: 0.04),
                           blurRadius: 12,
                           offset: const Offset(0, 4),
                         ),
@@ -279,9 +277,9 @@ class _LaboratoriesScreenState extends State<LaboratoriesScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.08),
+        color: color.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withOpacity(0.2)),
+        border: Border.all(color: color.withValues(alpha: 0.2)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -313,7 +311,7 @@ class _LaboratoriesScreenState extends State<LaboratoriesScreen> {
         boxShadow: isActive
             ? [
                 BoxShadow(
-                  color: AppColors.primaryColor.withOpacity(0.25),
+                  color: AppColors.primaryColor.withValues(alpha: 0.25),
                   blurRadius: 10,
                   offset: const Offset(0, 4),
                 ),
@@ -342,7 +340,7 @@ class _LaboratoriesScreenState extends State<LaboratoriesScreen> {
           borderRadius: BorderRadius.circular(24),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.05),
+              color: Colors.black.withValues(alpha: 0.05),
               blurRadius: 24,
               offset: const Offset(0, 10),
             ),
@@ -414,7 +412,7 @@ class _LaboratoriesScreenState extends State<LaboratoriesScreen> {
                               (lab['tagColor'] != null
                                       ? (lab['tagColor'] as Color)
                                       : Colors.blue)
-                                  .withOpacity(0.4),
+                                  .withValues(alpha: 0.4),
                           blurRadius: 8,
                           offset: const Offset(0, 3),
                         ),
@@ -440,7 +438,7 @@ class _LaboratoriesScreenState extends State<LaboratoriesScreen> {
                       vertical: 6,
                     ),
                     decoration: BoxDecoration(
-                      color: Colors.black.withOpacity(0.55),
+                      color: Colors.black.withValues(alpha: 0.55),
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Row(

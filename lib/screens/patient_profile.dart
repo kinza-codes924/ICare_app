@@ -347,9 +347,9 @@ class PatientProfile extends ConsumerWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
         decoration: BoxDecoration(
-          color: AppColors.primaryColor.withOpacity(0.06),
+          color: AppColors.primaryColor.withValues(alpha: 0.06),
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: AppColors.primaryColor.withOpacity(0.15)),
+          border: Border.all(color: AppColors.primaryColor.withValues(alpha: 0.15)),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,

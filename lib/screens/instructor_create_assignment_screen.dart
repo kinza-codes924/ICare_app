@@ -1,7 +1,6 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:icare/services/lms_service.dart';
 import 'package:icare/utils/theme.dart';
-import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 /// Assignment Creation Screen - Google Classroom style
@@ -211,7 +210,7 @@ class _InstructorCreateAssignmentScreenState extends State<InstructorCreateAssig
                 children: [
                   if (widget.courseId == null)
                     DropdownButtonFormField<String>(
-                      value: _selectedCourseId,
+                      initialValue: _selectedCourseId,
                       decoration: const InputDecoration(
                         labelText: 'Course *',
                         border: OutlineInputBorder(),
@@ -300,7 +299,7 @@ class _InstructorCreateAssignmentScreenState extends State<InstructorCreateAssig
                   const SizedBox(height: 16),
 
                   DropdownButtonFormField<String>(
-                    value: _submissionType,
+                    initialValue: _submissionType,
                     decoration: const InputDecoration(
                       labelText: 'Submission Type',
                       border: OutlineInputBorder(),
@@ -319,7 +318,7 @@ class _InstructorCreateAssignmentScreenState extends State<InstructorCreateAssig
                     subtitle: const Text('Students can view and submit'),
                     value: _isPublished,
                     onChanged: (value) => setState(() => _isPublished = value),
-                    activeColor: AppColors.primaryColor,
+                    activeThumbColor: AppColors.primaryColor,
                   ),
                 ],
               ),
@@ -370,7 +369,7 @@ class _InstructorCreateAssignmentScreenState extends State<InstructorCreateAssig
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 10,
             offset: const Offset(0, 2),
           ),

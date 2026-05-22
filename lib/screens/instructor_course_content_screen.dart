@@ -5,7 +5,6 @@ import 'package:dio/dio.dart';
 import 'package:icare/screens/certificate_templates_screen.dart';
 import 'package:icare/services/lms_service.dart';
 import 'package:icare/services/api_service.dart';
-import 'package:icare/utils/shared_pref.dart';
 import 'package:icare/utils/theme.dart';
 import 'package:icare/screens/lms_live_session_screen.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -252,7 +251,7 @@ class _InstructorCourseContentScreenState extends State<InstructorCourseContentS
                   height: 300,
                   child: ListView.separated(
                     itemCount: completions.length,
-                    separatorBuilder: (_, __) => const Divider(height: 1),
+                    separatorBuilder: (_, _) => const Divider(height: 1),
                     itemBuilder: (_, i) {
                       final c = completions[i];
                       return ListTile(
@@ -522,7 +521,7 @@ class _InstructorCourseContentScreenState extends State<InstructorCourseContentS
         border: Border.all(color: const Color(0xFFE2E8F0)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -1277,7 +1276,7 @@ class _LessonDialogState extends State<_LessonDialog> {
                                 width: double.infinity,
                                 height: 160,
                                 fit: BoxFit.cover,
-                                errorBuilder: (_, __, ___) => const SizedBox(),
+                                errorBuilder: (_, _, _) => const SizedBox(),
                               ),
                             ),
                             Container(

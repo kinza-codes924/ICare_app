@@ -283,7 +283,7 @@ class _WebCreateProfile extends StatelessWidget {
                     width: 300,
                     height: 300,
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.05),
+                      color: Colors.white.withValues(alpha: 0.05),
                       shape: BoxShape.circle,
                     ),
                   ),
@@ -295,7 +295,7 @@ class _WebCreateProfile extends StatelessWidget {
                     width: 250,
                     height: 250,
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.05),
+                      color: Colors.white.withValues(alpha: 0.05),
                       shape: BoxShape.circle,
                     ),
                   ),
@@ -318,7 +318,7 @@ class _WebCreateProfile extends StatelessWidget {
                       Text(
                         "Your profile is your digital business card in the ICare platform. Fill out the details to get started with patients.",
                         style: TextStyle(
-                          color: Colors.white.withOpacity(0.8),
+                          color: Colors.white.withValues(alpha: 0.8),
                           fontSize: 18,
                           height: 1.6,
                         ),

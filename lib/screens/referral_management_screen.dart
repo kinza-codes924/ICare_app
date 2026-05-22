@@ -20,9 +20,9 @@ class _ReferralManagementScreenState extends ConsumerState<ReferralManagementScr
   late TabController _tabController;
   bool _isLoading = true;
 
-  List<Referral> _pendingReferrals = [];
-  List<Referral> _acceptedReferrals = [];
-  List<Referral> _completedReferrals = [];
+  final List<Referral> _pendingReferrals = [];
+  final List<Referral> _acceptedReferrals = [];
+  final List<Referral> _completedReferrals = [];
 
   @override
   void initState() {
@@ -138,9 +138,9 @@ class _ReferralManagementScreenState extends ConsumerState<ReferralManagementScr
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.1),
+          color: color.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: color.withOpacity(0.3)),
+          border: Border.all(color: color.withValues(alpha: 0.3)),
         ),
         child: Column(
           children: [
@@ -196,10 +196,10 @@ class _ReferralManagementScreenState extends ConsumerState<ReferralManagementScr
           Container(
             padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
-              color: AppColors.primaryColor.withOpacity(0.06),
+              color: AppColors.primaryColor.withValues(alpha: 0.06),
               shape: BoxShape.circle,
             ),
-            child: Icon(icon, size: 48, color: AppColors.primaryColor.withOpacity(0.5)),
+            child: Icon(icon, size: 48, color: AppColors.primaryColor.withValues(alpha: 0.5)),
           ),
           const SizedBox(height: 16),
           Text(message, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Color(0xFF64748B))),
@@ -222,7 +222,7 @@ class _ReferralManagementScreenState extends ConsumerState<ReferralManagementScr
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
               gradient: LinearGradient(
-                colors: [const Color(0xFFF59E0B).withOpacity(0.1), const Color(0xFFF59E0B).withOpacity(0.05)],
+                colors: [const Color(0xFFF59E0B).withValues(alpha: 0.1), const Color(0xFFF59E0B).withValues(alpha: 0.05)],
               ),
               borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
             ),
@@ -258,7 +258,7 @@ class _ReferralManagementScreenState extends ConsumerState<ReferralManagementScr
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                       decoration: BoxDecoration(
-                        color: _getUrgencyColor(referral.urgency).withOpacity(0.1),
+                        color: _getUrgencyColor(referral.urgency).withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
