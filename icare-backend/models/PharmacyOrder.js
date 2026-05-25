@@ -9,7 +9,7 @@ const orderItemSchema = new mongoose.Schema({
 }, { _id: false });
 
 const pharmacyOrderSchema = new mongoose.Schema({
-  patient_id:       { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  patient_id:       { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   pharmacy_id:      { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   prescription_id:  String,
   delivery_address: { type: String, default: '' },
@@ -20,12 +20,18 @@ const pharmacyOrderSchema = new mongoose.Schema({
     enum: ['pending', 'confirmed', 'preparing', 'out-for-delivery', 'delivered', 'cancelled', 'completed', 'rejected'],
     default: 'pending',
   },
-  order_number:         { type: String },   // always set at creation — no unique constraint here
+  order_number:           { type: String },
   expected_delivery_time: String,
-  cancellation_reason:  { type: String, default: '' },
-  /** Set when pharmacy rejects the order (distinct from patient cancellation). */
-  rejection_reason:     { type: String, default: '' },
-  items:               [orderItemSchema],
+  cancellation_reason:    { type: String, default: '' },
+  rejection_reason:       { type: String, default: '' },
+  items:                  [orderItemSchema],
+  // Walk-in order fields
+  orderType:       { type: String, enum: ['cart', 'prescription', 'walk-in'], default: 'cart' },
+  patientName:     { type: String, default: '' },
+  contact:         { type: String, default: '' },
+  medicines:       { type: String, default: '' },
+  deliveryOption:  { type: String, enum: ['pickup', 'delivery'], default: 'pickup' },
+  notes:           { type: String, default: '' },
 }, { timestamps: true });
 
 // ── Self-healing: drop the stale unique index on orderNumber that causes

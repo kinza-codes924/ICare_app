@@ -569,6 +569,15 @@ class _PharmacyOrdersState extends State<PharmacyOrders>
           ],
         ),
       ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => _showCreateWalkInOrderDialog(context),
+        backgroundColor: AppColors.primaryColor,
+        icon: const Icon(Icons.add_rounded, color: Colors.white),
+        label: const Text(
+          'Create Order',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        ),
+      ),
       body: TabBarView(
         controller: _tabController,
         children: [
@@ -577,6 +586,191 @@ class _PharmacyOrdersState extends State<PharmacyOrders>
           _buildOrdersList(_getOrdersByStatus('processing'), isDesktop),
           _buildOrdersList(_getOrdersByStatus('completed'), isDesktop),
         ],
+      ),
+    );
+  }
+
+  void _showCreateWalkInOrderDialog(BuildContext context) {
+    final formKey = GlobalKey<FormState>();
+    final nameController = TextEditingController();
+    final phoneController = TextEditingController();
+    final addressController = TextEditingController();
+    final notesController = TextEditingController();
+    final medicinesController = TextEditingController();
+    bool isSubmitting = false;
+    String deliveryOption = 'pickup';
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setModalState) => Container(
+          padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24),
+            child: Form(
+              key: formKey,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 40, height: 4,
+                      margin: const EdgeInsets.only(bottom: 20),
+                      decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2)),
+                    ),
+                  ),
+                  Row(children: [
+                    Container(
+                      width: 40, height: 40,
+                      decoration: BoxDecoration(color: AppColors.primaryColor.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(10)),
+                      child: Icon(Icons.add_circle_rounded, color: AppColors.primaryColor, size: 22),
+                    ),
+                    const SizedBox(width: 12),
+                    const Text('Create Walk-in Order', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: Color(0xFF0F172A))),
+                  ]),
+                  const SizedBox(height: 24),
+                  _buildWalkInField(controller: nameController, label: 'Patient Name', icon: Icons.person_rounded,
+                    validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null),
+                  const SizedBox(height: 12),
+                  _buildWalkInField(controller: phoneController, label: 'Contact Number', icon: Icons.phone_rounded,
+                    keyboardType: TextInputType.phone,
+                    validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null),
+                  const SizedBox(height: 12),
+                  _buildWalkInField(controller: medicinesController, label: 'Medicines Required', icon: Icons.medication_rounded,
+                    maxLines: 3, hint: 'List medicines or paste prescription details',
+                    validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null),
+                  const SizedBox(height: 20),
+                  const Text('Delivery Option', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: Color(0xFF0F172A))),
+                  const SizedBox(height: 10),
+                  Row(children: [
+                    Expanded(child: _buildDeliveryOption(
+                      label: 'Pickup', icon: Icons.store_rounded, value: 'pickup',
+                      selected: deliveryOption, onTap: () => setModalState(() => deliveryOption = 'pickup'),
+                    )),
+                    const SizedBox(width: 12),
+                    Expanded(child: _buildDeliveryOption(
+                      label: 'Delivery', icon: Icons.delivery_dining_rounded, value: 'delivery',
+                      selected: deliveryOption, onTap: () => setModalState(() => deliveryOption = 'delivery'),
+                    )),
+                  ]),
+                  if (deliveryOption == 'delivery') ...[
+                    const SizedBox(height: 12),
+                    _buildWalkInField(controller: addressController, label: 'Delivery Address', icon: Icons.location_on_rounded),
+                  ],
+                  const SizedBox(height: 12),
+                  _buildWalkInField(controller: notesController, label: 'Notes (optional)', icon: Icons.notes_rounded, maxLines: 2),
+                  const SizedBox(height: 24),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: isSubmitting ? null : () async {
+                        if (!formKey.currentState!.validate()) return;
+                        setModalState(() => isSubmitting = true);
+                        try {
+                          await _pharmacyService.createWalkInOrder(
+                            patientName: nameController.text.trim(),
+                            contact: phoneController.text.trim(),
+                            medicines: medicinesController.text.trim(),
+                            deliveryOption: deliveryOption,
+                            address: addressController.text.trim(),
+                            notes: notesController.text.trim(),
+                          );
+                          if (ctx.mounted) {
+                            Navigator.pop(ctx);
+                            ScaffoldMessenger.of(ctx).showSnackBar(
+                              const SnackBar(content: Text('Walk-in order created successfully'), backgroundColor: Colors.green, behavior: SnackBarBehavior.floating),
+                            );
+                          }
+                          _loadOrders();
+                        } catch (e) {
+                          setModalState(() => isSubmitting = false);
+                          if (ctx.mounted) {
+                            ScaffoldMessenger.of(ctx).showSnackBar(
+                              SnackBar(content: Text(e.toString()), backgroundColor: Colors.red),
+                            );
+                          }
+                        }
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primaryColor,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                        elevation: 0,
+                      ),
+                      child: isSubmitting
+                          ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                          : const Text('Create Order', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildWalkInField({
+    required TextEditingController controller,
+    required String label,
+    required IconData icon,
+    String? hint,
+    int maxLines = 1,
+    TextInputType keyboardType = TextInputType.text,
+    String? Function(String?)? validator,
+  }) {
+    return TextFormField(
+      controller: controller,
+      maxLines: maxLines,
+      keyboardType: keyboardType,
+      validator: validator,
+      decoration: InputDecoration(
+        labelText: label,
+        hintText: hint,
+        prefixIcon: Icon(icon, color: AppColors.primaryColor, size: 20),
+        filled: true,
+        fillColor: const Color(0xFFF8FAFC),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: AppColors.primaryColor, width: 2)),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      ),
+    );
+  }
+
+  Widget _buildDeliveryOption({
+    required String label,
+    required IconData icon,
+    required String value,
+    required String selected,
+    required VoidCallback onTap,
+  }) {
+    final isSelected = selected == value;
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+        decoration: BoxDecoration(
+          color: isSelected ? AppColors.primaryColor.withValues(alpha: 0.08) : const Color(0xFFF8FAFC),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: isSelected ? AppColors.primaryColor : const Color(0xFFE2E8F0), width: isSelected ? 2 : 1),
+        ),
+        child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+          Icon(icon, size: 18, color: isSelected ? AppColors.primaryColor : const Color(0xFF64748B)),
+          const SizedBox(width: 8),
+          Text(label, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700,
+              color: isSelected ? AppColors.primaryColor : const Color(0xFF64748B))),
+        ]),
       ),
     );
   }

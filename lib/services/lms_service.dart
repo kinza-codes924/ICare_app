@@ -250,9 +250,42 @@ class LmsService {
   Future<List<dynamic>> getCourseAttendance(String courseId) async {
     try {
       final response = await _api.get('/lms/attendance/course/$courseId');
-      return response.data['attendance'] ?? [];
+      return response.data['sessions'] ?? [];
     } catch (e) {
       return [];
+    }
+  }
+
+  Future<Map<String, dynamic>> getMyAttendance(String courseId) async {
+    try {
+      final response = await _api.get('/lms/attendance/course/$courseId/my');
+      return {
+        'attendance': response.data['attendance'] ?? [],
+        'total': response.data['total'] ?? 0,
+        'present': response.data['present'] ?? 0,
+        'percentage': response.data['percentage'] ?? 0,
+      };
+    } catch (e) {
+      return {'attendance': [], 'total': 0, 'present': 0, 'percentage': 0};
+    }
+  }
+
+  Future<Map<String, dynamic>> createAttendanceSession({
+    required String courseId,
+    required String sessionTitle,
+    required String sessionDate,
+    List<Map<String, dynamic>>? records,
+  }) async {
+    try {
+      final response = await _api.post('/lms/attendance', {
+        'courseId': courseId,
+        'sessionTitle': sessionTitle,
+        'sessionDate': sessionDate,
+        if (records != null) 'records': records,
+      });
+      return response.data;
+    } catch (e) {
+      return {'success': false, 'message': e.toString()};
     }
   }
 
@@ -267,6 +300,18 @@ class LmsService {
       'status': status,
     });
     return response.data;
+  }
+
+  Future<Map<String, dynamic>> updateSessionAttendance({
+    required String sessionId,
+    required List<Map<String, dynamic>> records,
+  }) async {
+    try {
+      final response = await _api.put('/lms/attendance/$sessionId', {'records': records});
+      return response.data;
+    } catch (e) {
+      return {'success': false, 'message': e.toString()};
+    }
   }
 
   // ═══════════════════════════════════════════════════════════════════════

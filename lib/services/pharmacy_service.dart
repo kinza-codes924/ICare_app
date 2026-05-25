@@ -382,4 +382,30 @@ class PharmacyService {
       rethrow;
     }
   }
+
+  Future<Map<String, dynamic>> createWalkInOrder({
+    required String patientName,
+    required String contact,
+    required String medicines,
+    required String deliveryOption,
+    String? address,
+    String? notes,
+  }) async {
+    try {
+      final response = await _apiService.post('/pharmacy/orders/walk-in', {
+        'patientName': patientName,
+        'contact': contact,
+        'medicines': medicines,
+        'deliveryOption': deliveryOption,
+        if (address != null && address.isNotEmpty) 'deliveryAddress': address,
+        if (notes != null && notes.isNotEmpty) 'notes': notes,
+        'orderType': 'walk-in',
+        'status': 'pending',
+      });
+      return response.data as Map<String, dynamic>;
+    } catch (e) {
+      debugPrint('Error creating walk-in order: $e');
+      rethrow;
+    }
+  }
 }

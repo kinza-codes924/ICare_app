@@ -9,6 +9,7 @@ import 'package:icare/utils/theme.dart';
 import 'package:icare/widgets/whatsapp_button.dart';
 import 'package:icare/utils/shared_pref.dart';
 import 'package:icare/widgets/doctor_search_bar.dart';
+import 'package:icare/services/doctor_service.dart';
 
 // ── Auth guard — show sign-in/sign-up dialog if not logged in ─────────────────
 Future<bool> _requireAuth(BuildContext context) async {
@@ -162,11 +163,6 @@ class PublicHome extends StatelessWidget {
                             );
                           },
                         ),
-                        const SizedBox(height: 16),
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 20),
-                          child: DoctorSearchBar(isMobile: MediaQuery.of(context).size.width < 700),
-                        ),
                         const SizedBox(height: 24),
                         _DoctorsSlider(),
                         const SizedBox(height: 40),
@@ -195,6 +191,16 @@ class PublicHome extends StatelessWidget {
                         _SpecialtySearchBar(),
                         const SizedBox(height: 14),
                         _SpecialtyGrid(),
+                        const SizedBox(height: 16),
+                        Center(
+                          child: _GlowingViewAllButton(
+                            label: 'See All Speciality',
+                            color: const Color(0xFF7C3AED),
+                            onTap: () => Navigator.of(context).push(
+                              MaterialPageRoute(builder: (_) => const DoctorsList()),
+                            ),
+                          ),
+                        ),
                         const SizedBox(height: 28),
                         // Browse by Condition
                         const Padding(
@@ -230,6 +236,35 @@ class PublicHome extends StatelessWidget {
                             onTap: () => Navigator.of(context).push(
                               MaterialPageRoute(builder: (_) => const DoctorsList()),
                             ),
+                          ),
+                        ),
+                        const SizedBox(height: 32),
+                        // Doctor search bar — placed below browse sections
+                        const Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 20),
+                          child: Text(
+                            'Search Doctors',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF0F172A),
+                              fontFamily: 'Gilroy-Bold',
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        const Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 20),
+                          child: Text(
+                            'Search by doctor name, specialty, or condition',
+                            style: TextStyle(fontSize: 13, color: Color(0xFF64748B)),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Builder(
+                          builder: (ctx) => Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 20),
+                            child: DoctorSearchBar(isMobile: MediaQuery.of(ctx).size.width < 700),
                           ),
                         ),
                         const SizedBox(height: 8),
@@ -1398,28 +1433,31 @@ class _DoctorsSliderState extends State<_DoctorsSlider> {
   late final PageController _pageController;
   int _currentPage = 0;
   Timer? _autoPlayTimer;
+  List<Map<String, dynamic>> _doctors = [];
+  bool _loading = true;
+  bool _isMobile = false;
 
-  static const _doctors = [
-    {'name': 'Dr. Ahmed Khan', 'spec': 'Cardiologist', 'exp': '15 years experience', 'rating': '4.9', 'reviews': '342', 'img': 'assets/images/user5.png'},
-    {'name': 'Dr. Sara Malik', 'spec': 'Gynecologist', 'exp': '12 years experience', 'rating': '4.8', 'reviews': '289', 'img': 'assets/images/user1.png'},
-    {'name': 'Dr. Bilal Ahmed', 'spec': 'Neurologist', 'exp': '10 years experience', 'rating': '4.7', 'reviews': '198', 'img': 'assets/images/user7.png'},
-    {'name': 'Dr. Hina Raza', 'spec': 'Dermatologist', 'exp': '8 years experience', 'rating': '4.9', 'reviews': '412', 'img': 'assets/images/user10.png'},
-    {'name': 'Dr. Usman Ali', 'spec': 'Pediatrician', 'exp': '14 years experience', 'rating': '4.8', 'reviews': '320', 'img': 'assets/images/user11.png'},
-    {'name': 'Dr. Ayesha Noor', 'spec': 'Psychiatrist', 'exp': '11 years experience', 'rating': '4.6', 'reviews': '175', 'img': 'assets/images/user12.png'},
-    {'name': 'Dr. Kamran Baig', 'spec': 'Orthopedic Surgeon', 'exp': '18 years experience', 'rating': '4.9', 'reviews': '511', 'img': 'assets/images/user5.png'},
-    {'name': 'Dr. Zara Sheikh', 'spec': 'ENT Specialist', 'exp': '9 years experience', 'rating': '4.8', 'reviews': '230', 'img': 'assets/images/user13.png'},
+  static const List<Map<String, dynamic>> _fallbackDoctors = [
+    {'name': 'Dr. Ahmed Khan', 'spec': 'Cardiologist', 'exp': '15 years experience', 'rating': '4.9', 'reviews': '342', 'img': 'assets/images/user5.png', 'isOnline': true},
+    {'name': 'Dr. Sara Malik', 'spec': 'Gynecologist', 'exp': '12 years experience', 'rating': '4.8', 'reviews': '289', 'img': 'assets/images/user1.png', 'isOnline': true},
+    {'name': 'Dr. Bilal Ahmed', 'spec': 'Neurologist', 'exp': '10 years experience', 'rating': '4.7', 'reviews': '198', 'img': 'assets/images/user7.png', 'isOnline': true},
+    {'name': 'Dr. Hina Raza', 'spec': 'Dermatologist', 'exp': '8 years experience', 'rating': '4.9', 'reviews': '412', 'img': 'assets/images/user10.png', 'isOnline': true},
+    {'name': 'Dr. Usman Ali', 'spec': 'Pediatrician', 'exp': '14 years experience', 'rating': '4.8', 'reviews': '320', 'img': 'assets/images/user11.png', 'isOnline': true},
+    {'name': 'Dr. Ayesha Noor', 'spec': 'Psychiatrist', 'exp': '11 years experience', 'rating': '4.6', 'reviews': '175', 'img': 'assets/images/user12.png', 'isOnline': true},
+    {'name': 'Dr. Kamran Baig', 'spec': 'Orthopedic Surgeon', 'exp': '18 years experience', 'rating': '4.9', 'reviews': '511', 'img': 'assets/images/user5.png', 'isOnline': true},
+    {'name': 'Dr. Zara Sheikh', 'spec': 'ENT Specialist', 'exp': '9 years experience', 'rating': '4.8', 'reviews': '230', 'img': 'assets/images/user13.png', 'isOnline': true},
   ];
 
-  // Mobile: 1 card per page → 8 dots
-  // Desktop: 4 cards per page → 2 dots
-  int get _totalPages => _isMobile ? _doctors.length : (_doctors.length / 4).ceil();
-  bool _isMobile = false;
+  int get _totalPages {
+    if (_doctors.isEmpty) return 1;
+    return _isMobile ? _doctors.length : (_doctors.length / 4).ceil();
+  }
 
   @override
   void initState() {
     super.initState();
     _pageController = PageController();
-    _startAutoPlay();
+    _fetchOnlineDoctors();
   }
 
   @override
@@ -1429,9 +1467,41 @@ class _DoctorsSliderState extends State<_DoctorsSlider> {
     super.dispose();
   }
 
+  Future<void> _fetchOnlineDoctors() async {
+    try {
+      final result = await DoctorService().getAllDoctors();
+      if (result['success'] == true) {
+        final all = (result['doctors'] as List? ?? []).cast<Map<String, dynamic>>();
+        final online = all.where((d) => d['isOnline'] == true).toList();
+        if (mounted) {
+          setState(() {
+            _doctors = online.isNotEmpty ? online : List<Map<String, dynamic>>.from(_fallbackDoctors);
+            _loading = false;
+          });
+          _startAutoPlay();
+        }
+      } else {
+        _useFallback();
+      }
+    } catch (_) {
+      _useFallback();
+    }
+  }
+
+  void _useFallback() {
+    if (mounted) {
+      setState(() {
+        _doctors = List<Map<String, dynamic>>.from(_fallbackDoctors);
+        _loading = false;
+      });
+      _startAutoPlay();
+    }
+  }
+
   void _startAutoPlay() {
+    _autoPlayTimer?.cancel();
     _autoPlayTimer = Timer.periodic(const Duration(seconds: 4), (_) {
-      if (!mounted) return;
+      if (!mounted || _doctors.isEmpty) return;
       final next = (_currentPage + 1) % _totalPages;
       _pageController.animateToPage(
         next,
@@ -1454,11 +1524,25 @@ class _DoctorsSliderState extends State<_DoctorsSlider> {
     final screenWidth = MediaQuery.of(context).size.width;
     _isMobile = screenWidth < 700;
 
+    if (_loading) {
+      return SizedBox(
+        height: 280,
+        child: Center(
+          child: CircularProgressIndicator(
+            color: const Color(0xFF0036BC),
+            strokeWidth: 2,
+          ),
+        ),
+      );
+    }
+
+    if (_doctors.isEmpty) return const SizedBox.shrink();
+
     if (_isMobile) {
       return Column(
         children: [
           SizedBox(
-            height: 270,
+            height: 290,
             child: PageView.builder(
               controller: _pageController,
               onPageChanged: (p) => setState(() => _currentPage = p),
@@ -1479,7 +1563,7 @@ class _DoctorsSliderState extends State<_DoctorsSlider> {
       );
     }
 
-    // Desktop: 4 cards per page, smooth PageView slide
+    // Desktop: 4 cards per page
     final totalPages = (_doctors.length / 4).ceil();
 
     return Padding(
@@ -1492,7 +1576,7 @@ class _DoctorsSliderState extends State<_DoctorsSlider> {
               ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 1080),
                 child: SizedBox(
-                  height: 280,
+                  height: 295,
                   child: PageView.builder(
                     controller: _pageController,
                     onPageChanged: (p) => setState(() => _currentPage = p),
@@ -1511,7 +1595,6 @@ class _DoctorsSliderState extends State<_DoctorsSlider> {
                   ),
                 ),
               ),
-              // Prev button
               Positioned(
                 left: 0,
                 child: _SliderButton(
@@ -1520,7 +1603,6 @@ class _DoctorsSliderState extends State<_DoctorsSlider> {
                   enabled: _currentPage > 0,
                 ),
               ),
-              // Next button
               Positioned(
                 right: 0,
                 child: _SliderButton(
@@ -1635,7 +1717,7 @@ class _SliderDots extends StatelessWidget {
 }
 
 class _DoctorCard extends StatefulWidget {
-  final Map<String, String> doctor;
+  final Map<String, dynamic> doctor;
 
   const _DoctorCard({required this.doctor});
 
@@ -1648,6 +1730,18 @@ class _DoctorCardState extends State<_DoctorCard> {
 
   @override
   Widget build(BuildContext context) {
+    final d = widget.doctor;
+    final name = d['name']?.toString() ?? 'Doctor';
+    final spec = d['spec']?.toString() ?? d['specialization']?.toString() ?? 'Specialist';
+    final exp = d['exp']?.toString() ??
+        (d['experience'] != null ? '${d['experience']} years experience' : 'Experienced');
+    final rating = d['rating']?.toString() ?? '4.5';
+    final reviews = d['reviews']?.toString() ?? d['totalReviews']?.toString() ?? '0';
+    final isOnline = d['isOnline'] == true || d['isOnline'] == 'true';
+    final imgAsset = d['img']?.toString();
+    final imgUrl = d['profilePicture']?.toString();
+    final ratingVal = double.tryParse(rating) ?? 4.5;
+
     return MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),
       onExit: (_) => setState(() => _hovered = false),
@@ -1675,30 +1769,63 @@ class _DoctorCardState extends State<_DoctorCard> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Container(
-              width: 68,
-              height: 68,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: const Color(0xFF14B1FF),
-                  width: 2.5,
-                ),
-              ),
-              child: ClipOval(
-                child: Image.asset(
-                  widget.doctor['img']!,
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, _, _) => Container(
-                    color: const Color(0xFF0036BC),
-                    child: const Icon(Icons.person, size: 36, color: Colors.white),
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Container(
+                  width: 68,
+                  height: 68,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: isOnline ? Colors.green : const Color(0xFF14B1FF),
+                      width: 2.5,
+                    ),
+                  ),
+                  child: ClipOval(
+                    child: imgUrl != null && imgUrl.isNotEmpty
+                        ? Image.network(
+                            imgUrl,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, _, _) => Container(
+                              color: const Color(0xFF0036BC),
+                              child: const Icon(Icons.person, size: 36, color: Colors.white),
+                            ),
+                          )
+                        : imgAsset != null && imgAsset.isNotEmpty
+                            ? Image.asset(
+                                imgAsset,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, _, _) => Container(
+                                  color: const Color(0xFF0036BC),
+                                  child: const Icon(Icons.person, size: 36, color: Colors.white),
+                                ),
+                              )
+                            : Container(
+                                color: const Color(0xFF0036BC),
+                                child: const Icon(Icons.person, size: 36, color: Colors.white),
+                              ),
                   ),
                 ),
-              ),
+                if (isOnline)
+                  Positioned(
+                    right: 1,
+                    bottom: 1,
+                    child: Container(
+                      width: 16,
+                      height: 16,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF22C55E),
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white, width: 2),
+                      ),
+                    ),
+                  ),
+              ],
             ),
             const SizedBox(height: 10),
             Text(
-              widget.doctor['name']!,
+              name,
               style: const TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w700,
@@ -1711,17 +1838,34 @@ class _DoctorCardState extends State<_DoctorCard> {
             ),
             const SizedBox(height: 3),
             Text(
-              widget.doctor['spec']!,
+              spec,
               style: TextStyle(fontSize: 13, color: Colors.grey[600]),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 3),
             Text(
-              widget.doctor['exp']!,
+              exp,
               style: TextStyle(fontSize: 12, color: Colors.grey[500]),
               textAlign: TextAlign.center,
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 6),
+            if (isOnline)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF22C55E).withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(width: 6, height: 6, decoration: const BoxDecoration(color: Color(0xFF22C55E), shape: BoxShape.circle)),
+                    const SizedBox(width: 4),
+                    const Text('Online', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Color(0xFF16A34A))),
+                  ],
+                ),
+              ),
+            const SizedBox(height: 6),
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
@@ -1730,15 +1874,13 @@ class _DoctorCardState extends State<_DoctorCard> {
                 const Icon(Icons.star, color: Color(0xFFF5A623), size: 13),
                 const Icon(Icons.star, color: Color(0xFFF5A623), size: 13),
                 Icon(
-                  double.parse(widget.doctor['rating']!) >= 4.8
-                      ? Icons.star
-                      : Icons.star_border,
+                  ratingVal >= 4.8 ? Icons.star : Icons.star_border,
                   color: const Color(0xFFF5A623),
                   size: 13,
                 ),
                 const SizedBox(width: 4),
                 Text(
-                  '${widget.doctor['rating']} (${widget.doctor['reviews']})',
+                  '$rating ($reviews)',
                   style: const TextStyle(fontSize: 10.5, color: Colors.grey),
                 ),
               ],
@@ -3101,12 +3243,6 @@ class PublicHomeBody extends StatelessWidget {
                   subtitle: 'Talk to a verified doctor within minutes from the comfort of your home',
                 ),
                 const SizedBox(height: 24),
-                // Search bar moved here from banner
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: DoctorSearchBar(isMobile: MediaQuery.of(context).size.width < 700),
-                ),
-                const SizedBox(height: 40),
                 _DoctorsSlider(),
               ],
             ),
@@ -3130,11 +3266,42 @@ class PublicHomeBody extends StatelessWidget {
               const SizedBox(height: 24),
               Center(
                 child: _GlowingViewAllButton(
-                  label: 'View All Specialties',
+                  label: 'See All Speciality',
                   color: const Color(0xFF7C3AED),
                   onTap: () => Navigator.of(context).push(
                     MaterialPageRoute(builder: (_) => const DoctorsList()),
                   ),
+                ),
+              ),
+              const SizedBox(height: 32),
+              const Align(
+                alignment: Alignment.centerLeft,
+                child: Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 20),
+                  child: Text(
+                    'Search Doctors',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF0F172A),
+                      fontFamily: 'Gilroy-Bold',
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 4),
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 20),
+                child: Text(
+                  'Search by doctor name, specialty, or condition',
+                  style: TextStyle(fontSize: 13, color: Color(0xFF64748B)),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Builder(
+                builder: (ctx) => Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: DoctorSearchBar(isMobile: MediaQuery.of(ctx).size.width < 700),
                 ),
               ),
             ],

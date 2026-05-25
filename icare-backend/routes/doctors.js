@@ -367,80 +367,31 @@ router.get('/:id', async (req, res) => {
 });
 
 // ─── GET PATIENT HISTORY ──────────────────────────────────────────────────────
-router.get('/patients/:patientId/history', authMiddleware, async (req, res) => {
-  try {
-    await connectMongoDB();
-    const patientId = toId(req.params.patientId);
-    if (!patientId) {
-      return res.status(400).json({ success: false, message: 'Invalid patient ID' });
-    }
-
-    // Get patient basic info
-    const patient = await User.findById(patientId).lean();
-    if (!patient) {
-      return res.status(404).json({ success: false, message: 'Patient not found' });
-    }
-
-    // Get all appointments for this patient
-    const appointments = await Appointment.find({ patient_id: patientId })
-      .sort({ appointment_date: -1 })
-      .limit(50)
-      .lean();
-
-    // Get SOAP notes for these appointments
-    const appointmentIds = appointments.map(a => a._id);
-    const SoapNote = mongoose.models.SoapNote || mongoose.model('SoapNote', new mongoose.Schema({
-      appointment_id: mongoose.Schema.Types.ObjectId,
-      subjective: String,
-      objective: String,
-      assessment: String,
-      plan: String,
-      icdCodes: Array,
-    }, { collection: 'soap_notes' }));
-
-    const soapNotes = await SoapNote.find({ appointment_id: { $in: appointmentIds } }).lean();
-    const soapNotesMap = {};
-    soapNotes.forEach(note => {
-      soapNotesMap[note.appointment_id.toString()] = note;
-    });
-
-    // Build history timeline
-    const history = appointments.map(apt => {
-      const soap = soapNotesMap[apt._id.toString()];
-      return {
-        appointmentId: apt._id.toString(),
-        date: apt.appointment_date,
-        status: apt.status,
-        chiefComplaint: apt.reason || apt.chief_complaint,
-        diagnosis: soap?.assessment || '',
-        icdCodes: soap?.icdCodes || [],
-        treatment: soap?.plan || '',
-      };
-    });
-
-    res.json({
-      success: true,
-      patient: {
-        id: patient._id.toString(),
-        name: patient.username || patient.name,
-        email: patient.email,
-        phone: patient.phone,
-      },
-      history,
-      totalAppointments: appointments.length,
-    });
-  } catch (error) {
-    console.error('Get patient history error:', error);
-    res.status(500).json({ success: false, message: 'Failed to fetch patient history' });
-  }
-});
-
 // ─── PATIENT HISTORY (for doctor viewing patient records) ────────────────────
+// Access is allowed only if this doctor has at least one non-cancelled appointment
+// with the patient. After consultation ends, doctors lose access unless another
+// appointment exists.
 router.get('/patients/:patientId/history', authMiddleware, async (req, res) => {
   try {
     await connectMongoDB();
     const patientId = toId(req.params.patientId);
     if (!patientId) return res.status(400).json({ success: false, message: 'Invalid patient ID' });
+
+    const doctorId = toId(req.user.id);
+
+    // Verify this doctor has an appointment with this patient (any non-cancelled status)
+    const hasAccess = await Appointment.exists({
+      doctor_id: doctorId,
+      patient_id: patientId,
+      status: { $nin: ['cancelled', 'rejected'] },
+    });
+
+    if (!hasAccess) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied. No active appointment found with this patient.',
+      });
+    }
 
     // Get completed appointments for this patient
     const appointments = await Appointment.find({

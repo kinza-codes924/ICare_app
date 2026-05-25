@@ -32,7 +32,7 @@ class _LmsCoursePageState extends State<LmsCoursePage> with SingleTickerProvider
   @override
   void initState() {
     super.initState();
-    _tabs = TabController(length: widget.isInstructor ? 4 : 4, vsync: this);
+    _tabs = TabController(length: 5, vsync: this);
   }
 
   @override
@@ -83,6 +83,7 @@ class _LmsCoursePageState extends State<LmsCoursePage> with SingleTickerProvider
                 Tab(text: 'Classwork'),
                 Tab(text: 'Grades'),
                 Tab(text: 'People'),
+                Tab(text: 'Attendance'),
               ],
             ),
           ),
@@ -94,6 +95,7 @@ class _LmsCoursePageState extends State<LmsCoursePage> with SingleTickerProvider
             _ClassworkTab(courseId: _courseId, lms: _lms, isInstructor: widget.isInstructor, course: widget.course, enrollmentId: widget.enrollmentId),
             _GradesTab(courseId: _courseId, lms: _lms, isInstructor: widget.isInstructor),
             _PeopleTab(courseId: _courseId, lms: _lms, course: widget.course, isInstructor: widget.isInstructor),
+            _AttendanceTab(courseId: _courseId, lms: _lms, isInstructor: widget.isInstructor),
           ],
         ),
       ),
@@ -585,10 +587,12 @@ class _AssignmentCard extends StatelessWidget {
           onPressed: () async {
             Navigator.pop(ctx);
             final result = await lms.submitAssignment(assignmentId: assignment['_id'], content: ctrl.text.trim());
-            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-              content: Text(result['success'] == true ? 'Submitted successfully!' : (result['message'] ?? 'Failed')),
-              backgroundColor: result['success'] == true ? Colors.green : Colors.red,
-            ));
+            if (context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                content: Text(result['success'] == true ? 'Submitted successfully!' : (result['message'] ?? 'Failed')),
+                backgroundColor: result['success'] == true ? Colors.green : Colors.red,
+              ));
+            }
           },
           child: const Text('Submit'),
         ),
@@ -812,8 +816,7 @@ class _SubmissionsPageState extends State<_SubmissionsPage> {
                 final marks = int.tryParse(marksCtrl.text);
                 if (marks == null) return;
 
-                // Call backend with rubric data
-                final response = await widget.lms.gradeSubmission(
+                await widget.lms.gradeSubmission(
                   sub['_id'],
                   marks,
                   feedback: feedbackCtrl.text.trim(),
@@ -1077,6 +1080,336 @@ class _PersonTile extends StatelessWidget {
           ),
       ]),
     );
+  }
+}
+
+// ─── ATTENDANCE TAB ───────────────────────────────────────────────────────────
+class _AttendanceTab extends StatefulWidget {
+  final String courseId;
+  final LmsService lms;
+  final bool isInstructor;
+  const _AttendanceTab({required this.courseId, required this.lms, required this.isInstructor});
+
+  @override
+  State<_AttendanceTab> createState() => _AttendanceTabState();
+}
+
+class _AttendanceTabState extends State<_AttendanceTab> {
+  bool _loading = true;
+  List<dynamic> _sessions = [];
+  Map<String, dynamic> _myAttendance = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _loadAttendance();
+  }
+
+  Future<void> _loadAttendance() async {
+    setState(() => _loading = true);
+    if (widget.isInstructor) {
+      final sessions = await widget.lms.getCourseAttendance(widget.courseId);
+      if (mounted) {
+        setState(() {
+          _sessions = sessions;
+          _loading = false;
+        });
+      }
+    } else {
+      final data = await widget.lms.getMyAttendance(widget.courseId);
+      if (mounted) {
+        setState(() {
+          _myAttendance = data;
+          _loading = false;
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_loading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (widget.isInstructor) {
+      return _buildInstructorView();
+    } else {
+      return _buildStudentView();
+    }
+  }
+
+  Widget _buildStudentView() {
+    final attendance = _myAttendance['attendance'] as List? ?? [];
+    final total = _myAttendance['total'] ?? 0;
+    final present = _myAttendance['present'] ?? 0;
+    final percentage = _myAttendance['percentage'] ?? 0;
+
+    if (attendance.isEmpty) {
+      return const _EmptyState(icon: Icons.event_available, text: 'No attendance records yet');
+    }
+
+    return Column(
+      children: [
+        Container(
+          margin: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [AppColors.primaryColor, AppColors.primaryColor.withValues(alpha: 0.8)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [BoxShadow(color: AppColors.primaryColor.withValues(alpha: 0.3), blurRadius: 12, offset: const Offset(0, 4))],
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _buildStatCard('Total', total.toString(), Icons.calendar_today),
+              Container(width: 1, height: 40, color: Colors.white.withValues(alpha: 0.3)),
+              _buildStatCard('Present', present.toString(), Icons.check_circle),
+              Container(width: 1, height: 40, color: Colors.white.withValues(alpha: 0.3)),
+              _buildStatCard('Attendance', '$percentage%', Icons.trending_up),
+            ],
+          ),
+        ),
+        Expanded(
+          child: ListView.builder(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            itemCount: attendance.length,
+            itemBuilder: (ctx, i) {
+              final record = attendance[i];
+              final status = record['status'] ?? 'absent';
+              final isPresent = status == 'present';
+              return Container(
+                margin: const EdgeInsets.only(bottom: 12),
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: isPresent ? Colors.green.withValues(alpha: 0.3) : Colors.red.withValues(alpha: 0.3)),
+                  boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 6)],
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: isPresent ? Colors.green.withValues(alpha: 0.1) : Colors.red.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Icon(
+                        isPresent ? Icons.check_circle : Icons.cancel,
+                        color: isPresent ? Colors.green : Colors.red,
+                        size: 24,
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            record['sessionTitle'] ?? 'Class Session',
+                            style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            _formatDate(record['sessionDate']),
+                            style: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: isPresent ? Colors.green : Colors.red,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        isPresent ? 'Present' : 'Absent',
+                        style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildStatCard(String label, String value, IconData icon) {
+    return Column(
+      children: [
+        Icon(icon, color: Colors.white, size: 28),
+        const SizedBox(height: 8),
+        Text(value, style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w900)),
+        const SizedBox(height: 4),
+        Text(label, style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: 12)),
+      ],
+    );
+  }
+
+  Widget _buildInstructorView() {
+    if (_sessions.isEmpty) {
+      return Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const _EmptyState(icon: Icons.event_available, text: 'No attendance sessions yet'),
+          const SizedBox(height: 16),
+          ElevatedButton.icon(
+            onPressed: _showCreateSessionDialog,
+            icon: const Icon(Icons.add),
+            label: const Text('Create Session'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primaryColor,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+            ),
+          ),
+        ],
+      );
+    }
+
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('${_sessions.length} Sessions', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+              ElevatedButton.icon(
+                onPressed: _showCreateSessionDialog,
+                icon: const Icon(Icons.add, size: 18),
+                label: const Text('New Session'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primaryColor,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                ),
+              ),
+            ],
+          ),
+        ),
+        Expanded(
+          child: ListView.builder(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            itemCount: _sessions.length,
+            itemBuilder: (ctx, i) {
+              final session = _sessions[i];
+              final records = session['records'] as List? ?? [];
+              final presentCount = records.where((r) => r['status'] == 'present').length;
+              return Container(
+                margin: const EdgeInsets.only(bottom: 12),
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 6)],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                session['sessionTitle'] ?? 'Class Session',
+                                style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                _formatDate(session['sessionDate']),
+                                style: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: AppColors.primaryColor.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            '$presentCount/${records.length} Present',
+                            style: TextStyle(color: AppColors.primaryColor, fontSize: 12, fontWeight: FontWeight.w700),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _showCreateSessionDialog() {
+    final titleController = TextEditingController();
+    final dateController = TextEditingController(text: DateTime.now().toIso8601String().split('T')[0]);
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Create Attendance Session'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: titleController,
+              decoration: const InputDecoration(labelText: 'Session Title', hintText: 'e.g., Lecture 1'),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: dateController,
+              decoration: const InputDecoration(labelText: 'Date (YYYY-MM-DD)'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () async {
+              if (titleController.text.isEmpty) return;
+              Navigator.pop(ctx);
+              final result = await widget.lms.createAttendanceSession(
+                courseId: widget.courseId,
+                sessionTitle: titleController.text,
+                sessionDate: dateController.text,
+              );
+              if (result['success'] == true) {
+                _loadAttendance();
+              }
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryColor, foregroundColor: Colors.white),
+            child: const Text('Create'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _formatDate(dynamic date) {
+    if (date == null) return 'N/A';
+    try {
+      final dt = DateTime.parse(date.toString());
+      return '${dt.day}/${dt.month}/${dt.year}';
+    } catch (e) {
+      return date.toString();
+    }
   }
 }
 

@@ -19,12 +19,16 @@ class _LabResultEntryScreenState extends State<LabResultEntryScreen>
   late TabController _tabController;
   bool _isSubmitting = false;
 
+  // Step-by-step manual entry (3 steps)
+  int _currentStep = 0; // 0=Verify, 1=Results, 2=Approve&Submit
+
   // Manual entry
   final List<Map<String, TextEditingController>> _parameters = [];
 
   // File upload
   PlatformFile? _selectedFile;
   final TextEditingController _notesController = TextEditingController();
+  final TextEditingController _specimenIdController = TextEditingController();
 
   // Doctor approval
   String? _selectedDoctor;
@@ -35,7 +39,6 @@ class _LabResultEntryScreenState extends State<LabResultEntryScreen>
   ];
 
   static const Color primaryColor = Color(0xFF0B2D6E);
-  static const Color secondaryColor = Color(0xFF1565C0);
   static const Color backgroundColor = Color(0xFFF8FAFC);
 
   @override
@@ -49,6 +52,7 @@ class _LabResultEntryScreenState extends State<LabResultEntryScreen>
   void dispose() {
     _tabController.dispose();
     _notesController.dispose();
+    _specimenIdController.dispose();
     for (final p in _parameters) {
       for (var c in p.values) {
         c.dispose();
@@ -268,141 +272,302 @@ class _LabResultEntryScreenState extends State<LabResultEntryScreen>
   }
 
   Widget _buildManualEntryTab() {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
+    return Column(
+      children: [
+        _buildStepIndicator(),
+        Expanded(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 300),
+              child: _currentStep == 0
+                  ? _buildStep1()
+                  : _currentStep == 1
+                      ? _buildStep2()
+                      : _buildStep3(),
+            ),
+          ),
+        ),
+        _buildStepNavigation(),
+      ],
+    );
+  }
+
+  Widget _buildStepIndicator() {
+    const steps = ['Sample Verify', 'Enter Results', 'Approve & Submit'];
+    return Container(
+      color: Colors.white,
+      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+      child: Row(
+        children: steps.asMap().entries.map((entry) {
+          final i = entry.key;
+          final label = entry.value;
+          final isDone = i < _currentStep;
+          final isActive = i == _currentStep;
+          return Expanded(
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    children: [
+                      AnimatedContainer(
+                        duration: const Duration(milliseconds: 250),
+                        width: 30, height: 30,
+                        decoration: BoxDecoration(
+                          color: isDone ? const Color(0xFF22C55E) : isActive ? primaryColor : const Color(0xFFE2E8F0),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Center(
+                          child: isDone
+                              ? const Icon(Icons.check_rounded, color: Colors.white, size: 16)
+                              : Text('${i + 1}', style: TextStyle(
+                                  color: isActive ? Colors.white : const Color(0xFF94A3B8),
+                                  fontWeight: FontWeight.w800, fontSize: 13)),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(label, style: TextStyle(
+                          fontSize: 10, fontWeight: FontWeight.w600,
+                          color: isActive ? primaryColor : isDone ? const Color(0xFF22C55E) : const Color(0xFF94A3B8))),
+                    ],
+                  ),
+                ),
+                if (i < steps.length - 1)
+                  Container(height: 2, width: 12, color: i < _currentStep ? const Color(0xFF22C55E) : const Color(0xFFE2E8F0)),
+              ],
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  Widget _buildStep1() {
+    final booking = widget.booking;
+    final patientName = booking['patient_name'] ?? booking['patientName'] ?? booking['patient']?['name'] ?? 'Patient';
+    final testName = booking['test_type'] ?? booking['testName'] ?? 'Lab Test';
+    final collectionType = (booking['collectionType'] ?? booking['collection_type'] ?? 'In-Lab').toString();
+    return Column(
+      key: const ValueKey('step1'),
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 8),
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14), border: Border.all(color: const Color(0xFFE2E8F0))),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('Test Parameters', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: Color(0xFF0F172A))),
-              const Spacer(),
-              TextButton.icon(
-                onPressed: _addParameter,
-                icon: const Icon(Icons.add_circle_outline_rounded, size: 18),
-                label: const Text('Add Row'),
-                style: TextButton.styleFrom(foregroundColor: primaryColor),
+              const Text('Booking Verification', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: Color(0xFF0F172A))),
+              const Divider(height: 20),
+              _infoRow(Icons.person_rounded, 'Patient', patientName),
+              _infoRow(Icons.biotech_rounded, 'Test', testName),
+              _infoRow(Icons.location_on_rounded, 'Collection', collectionType),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14), border: Border.all(color: const Color(0xFFE2E8F0))),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Sample Receipt', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: Color(0xFF0F172A))),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _specimenIdController,
+                decoration: InputDecoration(
+                  labelText: 'Specimen ID / Barcode',
+                  hintText: 'Scan or type specimen ID',
+                  prefixIcon: const Icon(Icons.qr_code_rounded, color: primaryColor, size: 20),
+                  filled: true, fillColor: const Color(0xFFF8FAFC),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                  focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: primaryColor, width: 2)),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(color: const Color(0xFFF0FDF4), borderRadius: BorderRadius.circular(10), border: Border.all(color: const Color(0xFF86EFAC))),
+                child: Row(children: [
+                  const Icon(Icons.check_circle_rounded, color: Color(0xFF22C55E), size: 18),
+                  const SizedBox(width: 8),
+                  const Expanded(child: Text('Confirm sample is received and ready for testing', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF16A34A)))),
+                ]),
               ),
             ],
           ),
-          const SizedBox(height: 12),
-          ..._parameters.asMap().entries.map((entry) {
-            final i = entry.key;
-            final p = entry.value;
-            return _buildParameterRow(i, p);
-          }),
-          const SizedBox(height: 20),
-          const Text('Approved by Doctor', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF64748B))),
-          const SizedBox(height: 8),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFFE8ECF5)),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildStep2() {
+    return Column(
+      key: const ValueKey('step2'),
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 8),
+        Row(children: [
+          const Text('Test Parameters', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: Color(0xFF0F172A))),
+          const Spacer(),
+          TextButton.icon(
+            onPressed: _addParameter,
+            icon: const Icon(Icons.add_circle_outline_rounded, size: 18),
+            label: const Text('Add Row'),
+            style: TextButton.styleFrom(foregroundColor: primaryColor),
+          ),
+        ]),
+        const SizedBox(height: 8),
+        ..._parameters.asMap().entries.map((entry) => _buildParameterRow(entry.key, entry.value)),
+      ],
+    );
+  }
+
+  Widget _buildStep3() {
+    return Column(
+      key: const ValueKey('step3'),
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 8),
+        const Text('Approved by Doctor', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF64748B))),
+        const SizedBox(height: 8),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+          decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xFFE8ECF5))),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<String>(
+              value: _selectedDoctor,
+              hint: const Text('Select verifying doctor', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 13)),
+              isExpanded: true,
+              icon: const Icon(Icons.arrow_drop_down_rounded, color: primaryColor),
+              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF0F172A)),
+              items: _doctors.map((doctor) => DropdownMenuItem<String>(
+                value: doctor['name'],
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+                  Text(doctor['name']!, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+                  Text('${doctor['qualification']} - ${doctor['designation']}', style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+                ]),
+              )).toList(),
+              onChanged: (value) => setState(() => _selectedDoctor = value),
             ),
-            child: DropdownButtonHideUnderline(
-              child: DropdownButton<String>(
-                value: _selectedDoctor,
-                hint: const Text('Select verifying doctor', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 13)),
-                isExpanded: true,
-                icon: const Icon(Icons.arrow_drop_down_rounded, color: primaryColor),
-                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF0F172A)),
-                items: _doctors.map((doctor) {
-                  return DropdownMenuItem<String>(
-                    value: doctor['name'],
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(doctor['name']!, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
-                        Text('${doctor['qualification']} - ${doctor['designation']}',
-                            style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
-                      ],
-                    ),
-                  );
-                }).toList(),
-                onChanged: (value) {
-                  setState(() => _selectedDoctor = value);
-                },
+          ),
+        ),
+        const SizedBox(height: 16),
+        const Text('Notes (Optional)', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF64748B))),
+        const SizedBox(height: 8),
+        Container(
+          decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xFFE8ECF5))),
+          child: TextField(
+            controller: _notesController,
+            maxLines: 3,
+            decoration: const InputDecoration(
+              hintText: 'Any additional observations or notes...',
+              hintStyle: TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
+              border: InputBorder.none,
+              contentPadding: EdgeInsets.all(14),
+            ),
+          ),
+        ),
+        if (_selectedDoctor != null) ...[
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: primaryColor.withValues(alpha: 0.05),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: primaryColor.withValues(alpha: 0.2)),
+            ),
+            child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Icon(Icons.verified_rounded, color: primaryColor, size: 20),
+              const SizedBox(width: 10),
+              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                const Text('Electronic Verification', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: Color(0xFF0F172A))),
+                const SizedBox(height: 4),
+                Text(
+                  'Report verified by ${_doctors.firstWhere((d) => d['name'] == _selectedDoctor)['name']}, ${_doctors.firstWhere((d) => d['name'] == _selectedDoctor)['qualification']}',
+                  style: const TextStyle(fontSize: 12, color: Color(0xFF64748B), height: 1.4),
+                ),
+              ])),
+            ]),
+          ),
+        ],
+        const SizedBox(height: 20),
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton.icon(
+            onPressed: _isSubmitting ? null : _submitManualEntry,
+            icon: _isSubmitting
+                ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                : const Icon(Icons.send_rounded, color: Colors.white),
+            label: Text(_isSubmitting ? 'Submitting...' : 'Submit Results & Notify Patient',
+                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Colors.white)),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: primaryColor,
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              elevation: 0,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _infoRow(IconData icon, String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(children: [
+        Icon(icon, size: 16, color: const Color(0xFF64748B)),
+        const SizedBox(width: 8),
+        Text('$label: ', style: const TextStyle(fontSize: 13, color: Color(0xFF64748B), fontWeight: FontWeight.w600)),
+        Expanded(child: Text(value, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700))),
+      ]),
+    );
+  }
+
+  Widget _buildStepNavigation() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 8, offset: const Offset(0, -2))],
+      ),
+      child: Row(children: [
+        if (_currentStep > 0)
+          Expanded(
+            child: OutlinedButton.icon(
+              onPressed: () => setState(() => _currentStep--),
+              icon: const Icon(Icons.arrow_back_rounded, size: 18),
+              label: const Text('Back'),
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                side: BorderSide(color: primaryColor),
+                foregroundColor: primaryColor,
               ),
             ),
           ),
-          const SizedBox(height: 20),
-          const Text('Notes (Optional)', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF64748B))),
-          const SizedBox(height: 8),
-          Container(
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFFE8ECF5)),
-            ),
-            child: TextField(
-              controller: _notesController,
-              maxLines: 3,
-              decoration: const InputDecoration(
-                hintText: 'Any additional observations or notes...',
-                hintStyle: TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
-                border: InputBorder.none,
-                contentPadding: EdgeInsets.all(14),
-              ),
-            ),
-          ),
-          if (_selectedDoctor != null) ...[
-            const SizedBox(height: 20),
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: primaryColor.withValues(alpha: 0.05),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: primaryColor.withValues(alpha: 0.2)),
-              ),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Icon(Icons.verified_rounded, color: primaryColor, size: 20),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Electronic Report Verification',
-                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          'This is an electronically generated report verified by ${_doctors.firstWhere((d) => d['name'] == _selectedDoctor)['name']}, ${_doctors.firstWhere((d) => d['name'] == _selectedDoctor)['qualification']}, ${_doctors.firstWhere((d) => d['name'] == _selectedDoctor)['designation']}',
-                          style: const TextStyle(fontSize: 12, color: Color(0xFF64748B), height: 1.4),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-          const SizedBox(height: 24),
-          SizedBox(
-            width: double.infinity,
+        if (_currentStep > 0) const SizedBox(width: 12),
+        if (_currentStep < 2)
+          Expanded(
             child: ElevatedButton.icon(
-              onPressed: _isSubmitting ? null : _submitManualEntry,
-              icon: _isSubmitting
-                  ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                  : const Icon(Icons.send_rounded, color: Colors.white),
-              label: Text(_isSubmitting ? 'Submitting...' : 'Submit Results & Notify Patient',
-                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Colors.white)),
+              onPressed: () => setState(() => _currentStep++),
+              icon: const Icon(Icons.arrow_forward_rounded, size: 18, color: Colors.white),
+              label: Text(_currentStep == 0 ? 'Proceed to Entry' : 'Review & Submit',
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
               style: ElevatedButton.styleFrom(
                 backgroundColor: primaryColor,
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 elevation: 0,
               ),
             ),
           ),
-          const SizedBox(height: 80),
-        ],
-      ),
+      ]),
     );
   }
 

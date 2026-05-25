@@ -738,6 +738,47 @@ router.post('/:id/end-and-save', authMiddleware, async (req, res) => {
   }
 });
 
+// PATCH /live-sessions/:id/set-recording-url — save Cloudinary recording URL after browser upload
+router.patch('/:id/set-recording-url', authMiddleware, async (req, res) => {
+  try {
+    await connectMongoDB();
+    const { recordingUrl } = req.body;
+    if (!recordingUrl) return res.status(400).json({ success: false, message: 'recordingUrl required' });
+
+    const session = await LiveSession.findByIdAndUpdate(
+      toId(req.params.id),
+      { recordingUrl, isRecorded: true, recordingEndedAt: new Date() },
+      { new: true }
+    );
+    if (!session) return res.status(404).json({ success: false, message: 'Session not found' });
+
+    // Also update linked lesson if any
+    if (session.linkedLessonId || session.lessonId) {
+      const lId = session.linkedLessonId || session.lessonId;
+      try {
+        const Course = require('../models/Course');
+        const course = await Course.findById(session.courseId);
+        if (course) {
+          course.modules = course.modules.map(mod => ({
+            ...mod.toObject(),
+            lessons: mod.lessons.map(lesson => {
+              if (lesson._id?.toString() === lId) {
+                return { ...lesson.toObject(), videoUrl: recordingUrl, recordingAvailable: true };
+              }
+              return lesson;
+            }),
+          }));
+          await course.save();
+        }
+      } catch (_) {}
+    }
+
+    res.json({ success: true, recordingUrl });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
 // GET /live-sessions/:id/transcript — fetch saved chat transcript for a session
 router.get('/:id/transcript', authMiddleware, async (req, res) => {
   try {

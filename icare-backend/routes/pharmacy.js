@@ -663,6 +663,48 @@ router.delete('/products/:id', authMiddleware, async (req, res) => {
   }
 });
 
+// ─── WALK-IN ORDER (created by pharmacy for walk-in patients) ─────────────────
+router.post('/orders/walk-in', authMiddleware, async (req, res) => {
+  try {
+    await connectMongoDB();
+    const pharmacyUserId = toId(req.user.id);
+
+    // Resolve pharmacy _id from the logged-in user
+    const PharmacyProfile = require('../models/PharmacyProfile');
+    const pharmacyProfile = await PharmacyProfile.findOne({ user_id: pharmacyUserId }).lean();
+    const pharmacyId = pharmacyProfile ? pharmacyProfile._id : pharmacyUserId;
+
+    const { patientName, contact, medicines, deliveryOption, deliveryAddress, notes } = req.body;
+    if (!patientName || !medicines) {
+      return res.status(400).json({ success: false, message: 'patientName and medicines are required' });
+    }
+
+    const orderNumber = `WO-${Date.now().toString().slice(-8)}-${Math.random().toString(36).slice(-4).toUpperCase()}`;
+
+    const order = await PharmacyOrder.create({
+      pharmacy_id: pharmacyId,
+      patient_id: pharmacyUserId,
+      orderType: 'walk-in',
+      patientName,
+      contact,
+      medicines,
+      delivery_address: deliveryAddress || '',
+      deliveryOption: deliveryOption || 'pickup',
+      notes: notes || '',
+      status: 'pending',
+      order_number: orderNumber,
+      orderNumber,
+      total_amount: 0,
+      items: [],
+    });
+
+    res.status(201).json({ success: true, message: 'Walk-in order created', order: { ...order.toObject(), _id: order._id.toString() } });
+  } catch (err) {
+    console.error('POST /pharmacy/orders/walk-in error:', err.message);
+    res.status(500).json({ success: false, message: err.message || 'Failed to create walk-in order' });
+  }
+});
+
 // ─── ORDER RATING ─────────────────────────────────────────────────────────────
 router.post('/orders/:id/rating', authMiddleware, async (req, res) => {
   try {

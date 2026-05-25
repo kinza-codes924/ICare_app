@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:icare/models/doctor.dart';
 import 'package:icare/providers/auth_provider.dart';
-import 'package:icare/screens/add_card.dart';
+import 'package:icare/screens/select_payment_method.dart';
 import 'package:icare/services/appointment_service.dart';
 import 'package:icare/services/doctor_service.dart';
 import 'package:icare/utils/theme.dart';
@@ -89,7 +89,7 @@ class _BookAppointmentScreenState extends ConsumerState<BookAppointmentScreen> {
     try {
       final doctorId = widget.doctor.user.id.isNotEmpty
           ? widget.doctor.user.id
-          : widget.doctor.id ?? '';
+          : widget.doctor.id;
       if (doctorId.isEmpty) return;
       final response = await DoctorService().getDoctorById(doctorId);
       final doctor = response['doctor'];
@@ -224,8 +224,21 @@ class _BookAppointmentScreenState extends ConsumerState<BookAppointmentScreen> {
 
     if (result['success']) {
       final fee = _actualFee ?? widget.doctor.consultationFee ?? 0;
-      // Show Pay Now bottom sheet popup
-      if (mounted) _showPayNowPopup(fee.toDouble());
+      final appointmentId = result['appointment']?.id ?? '';
+      if (mounted) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => SelectPaymentMethod(
+              appointmentId: appointmentId,
+              amount: fee.toDouble(),
+              onPaymentSuccess: () {
+                Navigator.of(context).popUntil((route) => route.isFirst);
+              },
+            ),
+          ),
+        );
+      }
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -261,240 +274,6 @@ class _BookAppointmentScreenState extends ConsumerState<BookAppointmentScreen> {
     } catch (_) {
       return false;
     }
-  }
-
-  // ── Pay Now Popup ─────────────────────────────────────────────────────────
-  void _showPayNowPopup(double amount) {
-    // Saved cards (dummy — replace with real saved cards from backend)
-    final List<Map<String, String>> savedCards = [
-      {'type': 'VISA', 'number': '**** **** **** 1313', 'expiry': '08/26'},
-      {'type': 'MasterCard', 'number': '**** **** **** 4242', 'expiry': '12/27'},
-    ];
-    String? selectedCard = savedCards.first['number'];
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setSheet) => Container(
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-          ),
-          padding: EdgeInsets.only(
-            left: 24, right: 24, top: 24,
-            bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
-          ),
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Handle bar
-                Center(
-                  child: Container(
-                    width: 40, height: 4,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFE2E8F0),
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 20),
-                // Title
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: AppColors.primaryColor.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: const Icon(Icons.payment_rounded, color: AppColors.primaryColor, size: 22),
-                    ),
-                    const SizedBox(width: 12),
-                    const Text('Pay Now',
-                        style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: Color(0xFF0F172A))),
-                    const Spacer(),
-                    if (amount > 0)
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: AppColors.primaryColor.withValues(alpha: 0.08),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Text('Rs. ${amount.toInt()}',
-                            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: AppColors.primaryColor)),
-                      ),
-                  ],
-                ),
-                const SizedBox(height: 24),
-
-                // Existing Payment Methods
-                const Text('Existing Payment Method',
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Color(0xFF64748B))),
-                const SizedBox(height: 12),
-                ...savedCards.map((card) {
-                  final isSelected = selectedCard == card['number'];
-                  return GestureDetector(
-                    onTap: () => setSheet(() => selectedCard = card['number']),
-                    child: Container(
-                      margin: const EdgeInsets.only(bottom: 10),
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: isSelected ? AppColors.primaryColor.withValues(alpha: 0.05) : const Color(0xFFF8FAFC),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: isSelected ? AppColors.primaryColor : const Color(0xFFE2E8F0),
-                          width: isSelected ? 2 : 1,
-                        ),
-                      ),
-                      child: Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(6),
-                              border: Border.all(color: const Color(0xFFE2E8F0)),
-                            ),
-                            child: Text(card['type'] ?? '',
-                                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Color(0xFF0F172A))),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(card['number'] ?? '',
-                                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF0F172A), letterSpacing: 1)),
-                                Text('Expires ${card['expiry']}',
-                                    style: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8))),
-                              ],
-                            ),
-                          ),
-                          if (isSelected)
-                            const Icon(Icons.check_circle_rounded, color: AppColors.primaryColor, size: 20),
-                        ],
-                      ),
-                    ),
-                  );
-                }),
-
-                const SizedBox(height: 8),
-                // Add new card option
-                GestureDetector(
-                  onTap: () {
-                    Navigator.pop(ctx);
-                    Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => const AddCard()),
-                    );
-                  },
-                  child: Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: AppColors.primaryColor.withValues(alpha: 0.3),
-                        style: BorderStyle.solid,
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.add_circle_outline_rounded, color: AppColors.primaryColor, size: 20),
-                        const SizedBox(width: 10),
-                        Text('Add Card Details',
-                            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.primaryColor)),
-                      ],
-                    ),
-                  ),
-                ),
-
-                const SizedBox(height: 24),
-                // Pay button
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: () {
-                      Navigator.pop(ctx);
-                      // Show success
-                      _showBookingSuccess();
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primaryColor,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      elevation: 0,
-                    ),
-                    child: Text(
-                      amount > 0 ? 'Pay Rs. ${amount.toInt()}' : 'Confirm Payment',
-                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _showBookingSuccess() {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => Dialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        child: Padding(
-          padding: const EdgeInsets.all(32),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.green.withValues(alpha: 0.1),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Icons.check_circle_rounded, color: Colors.green, size: 52),
-              ),
-              const SizedBox(height: 20),
-              const Text('Appointment Confirmed!',
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: Color(0xFF0F172A))),
-              const SizedBox(height: 8),
-              const Text(
-                'Your appointment has been booked and payment received. You will receive a confirmation shortly.',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 14, color: Color(0xFF64748B), height: 1.5),
-              ),
-              const SizedBox(height: 28),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () {
-                    Navigator.pop(ctx);
-                    Navigator.of(context).pop(true);
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primaryColor,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    elevation: 0,
-                  ),
-                  child: const Text('Done', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
   }
 
   @override
@@ -816,7 +595,6 @@ class _BookAppointmentScreenState extends ConsumerState<BookAppointmentScreen> {
 
   // ── STEP 1: Reviews ────────────────────────────────────────────────────────
   Widget _buildReviews() {
-    final averageRating = widget.doctor.averageRating;
     final reviewCount = widget.doctor.reviewCount;
 
     return SingleChildScrollView(

@@ -93,7 +93,7 @@ class LabBookingDetails extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             if (hasCriticalAlert) _buildCriticalAlert(),
-            _buildInfoCard(testName, status, date, patientName),
+            _buildInfoCard(testName, status, date, patientName, isLab, context),
             const SizedBox(height: 24),
             if (isLab) _buildActionButtons(context, status),
             if (!isLab && status.toLowerCase() == 'completed')
@@ -183,7 +183,14 @@ class LabBookingDetails extends ConsumerWidget {
     String status,
     DateTime date,
     String patientName,
+    bool isLab,
+    BuildContext context,
   ) {
+    final labName = booking['lab']?['name']?.toString() ??
+        booking['labName']?.toString() ??
+        booking['laboratory']?['name']?.toString() ??
+        '';
+
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -208,6 +215,79 @@ class LabBookingDetails extends ConsumerWidget {
               _buildStatusBadge(status),
             ],
           ),
+          if (labName.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            GestureDetector(
+              onTap: isLab ? null : () {
+                showModalBottomSheet(
+                  context: context,
+                  shape: const RoundedRectangleBorder(
+                    borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                  ),
+                  builder: (_) => Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(children: [
+                          Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF0B2D6E).withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: const Icon(Icons.local_hospital_rounded, color: Color(0xFF0B2D6E), size: 22),
+                          ),
+                          const SizedBox(width: 12),
+                          Text(labName, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
+                        ]),
+                        const SizedBox(height: 12),
+                        const Text('Laboratory', style: TextStyle(fontSize: 13, color: Color(0xFF64748B))),
+                        const SizedBox(height: 16),
+                        if ((booking['lab']?['address'] ?? booking['labAddress'] ?? '').toString().isNotEmpty)
+                          Row(children: [
+                            const Icon(Icons.location_on_rounded, size: 16, color: Color(0xFF64748B)),
+                            const SizedBox(width: 6),
+                            Text(booking['lab']?['address'] ?? booking['labAddress'] ?? '', style: const TextStyle(fontSize: 13)),
+                          ]),
+                        if ((booking['lab']?['phone'] ?? booking['labPhone'] ?? '').toString().isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 8),
+                            child: Row(children: [
+                              const Icon(Icons.phone_rounded, size: 16, color: Color(0xFF64748B)),
+                              const SizedBox(width: 6),
+                              Text(booking['lab']?['phone'] ?? booking['labPhone'] ?? '', style: const TextStyle(fontSize: 13)),
+                            ]),
+                          ),
+                        const SizedBox(height: 20),
+                      ],
+                    ),
+                  ),
+                );
+              },
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.local_hospital_rounded, size: 14, color: Color(0xFF0B2D6E)),
+                  const SizedBox(width: 4),
+                  Text(
+                    labName,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: isLab ? const Color(0xFF64748B) : const Color(0xFF0B2D6E),
+                      decoration: isLab ? null : TextDecoration.underline,
+                    ),
+                  ),
+                  if (!isLab) ...[
+                    const SizedBox(width: 2),
+                    const Icon(Icons.open_in_new_rounded, size: 12, color: Color(0xFF0B2D6E)),
+                  ],
+                ],
+              ),
+            ),
+          ],
           const Divider(height: 24),
           if ((booking['doctor']?['name'] ?? booking['orderedBy'] ?? '').toString().isNotEmpty)
             _buildInfoRow(

@@ -130,7 +130,7 @@ ________________________________________
 During Consultation:
 •	<span style="color:green">**[DONE]**</span> Doctor can view patient's past consultation history
 •	<span style="color:green">**[DONE]**</span> Includes: previous prescriptions, SOAP notes, diagnoses
-•	<span style="color:red">**[PENDING]**</span> After Consultation: Doctor loses access to patient records
+•	<span style="color:green">**[DONE]**</span> After Consultation: Doctor loses access to patient records
 Past Consultations Tab:
 •	<span style="color:green">**[DONE]**</span> Rename "Patient History" → "Past Consultations"
 •	<span style="color:green">**[DONE]**</span> Shows all previous consultations with this patient
@@ -170,7 +170,8 @@ o	Visit Lab (lab address shown)
 •	Payment
 Direct Lab Booking (without prescription):
 •	<span style="color:green">**[DONE]**</span> Patient can search and book tests directly
-•	<span style="color:red">**[PENDING]**</span> Same flow as above
+•	<span style="color:green">**[DONE]**</span> Lab booking detail view with clickable Lab Name
+•	<span style="color:green">**[DONE]**</span> Lab result entry step-by-step flow (3-step wizard: Sample Verify → Enter Results → Approve & Submit)
 4.3 Pharmacy/Medicine Ordering
 From Prescription:
 1.	<span style="color:red">**[PENDING]**</span> Patient clicks "Order Medicine"
@@ -184,7 +185,7 @@ o	Self Pickup (pharmacy address shown)
 •	Payment
 Direct Medicine Order:
 •	<span style="color:green">**[DONE]**</span> E-commerce functionality for browsing medicines
-•	<span style="color:red">**[PENDING]**</span> Upload prescription option
+•	<span style="color:green">**[DONE]**</span> Walk-in order creation (Create Order button with full form)
 •	<span style="color:green">**[DONE]**</span> Cart functionality
 4.4 Order Tracking
 New Sections Required:
@@ -222,7 +223,7 @@ ________________________________________
 6.1 Sign-in Page
 Single Sign-in for All Roles:
 •	<span style="color:green">**[DONE]**</span> Email/Password
-•	<span style="color:red">**[PENDING]**</span> Sign in with Google
+•	<span style="color:red">**[PENDING]**</span> Sign in with Google (requires google_sign_in package installation)
 •	<span style="color:red">**[PENDING]**</span> Sign in with Apple ID (add this option)
 •	<span style="color:green">**[DONE]**</span> Backend auto-detects user role and opens appropriate dashboard
 6.2 Sign-up Options
@@ -342,7 +343,7 @@ For Students:
 •	<span style="color:green">**[DONE]**</span> Quizzes/Assessments
 •	<span style="color:green">**[DONE]**</span> Live Sessions
 •	<span style="color:green">**[DONE]**</span> Course Progress Tracking
-•	<span style="color:red">**[PENDING]**</span> Attendance Tracking
+•	<span style="color:green">**[DONE]**</span> Attendance Tracking (view attendance records, percentage, present/absent status)
 For Instructors:
 •	<span style="color:green">**[DONE]**</span> Course Creation
 •	<span style="color:green">**[DONE]**</span> Content Upload (videos, documents, presentations)
@@ -350,6 +351,7 @@ For Instructors:
 •	<span style="color:red">**[PENDING]**</span> Grading System
 •	<span style="color:green">**[DONE]**</span> Student Progress Monitoring
 •	<span style="color:green">**[DONE]**</span> Live Session Scheduling
+•	<span style="color:green">**[DONE]**</span> Attendance Management (create sessions, view attendance records)
 •	<span style="color:red">**[PENDING]**</span> Feedback System
 For Admin:
 •	<span style="color:green">**[DONE]**</span> Student Verification
@@ -476,11 +478,20 @@ ________________________________________
 •	<span style="color:green">**[DONE]**</span> Chat-first consultation flow
 •	<span style="color:green">**[DONE]**</span> In-consultation prescription form
 •	<span style="color:green">**[DONE]**</span> Prescription PDF generation
+•	<span style="color:green">**[DONE]**</span> Doctor loses access to patient records after consultation
+•	<span style="color:green">**[DONE]**</span> Lab booking detail view (Lab Name clickable)
+•	<span style="color:green">**[DONE]**</span> Lab result entry step-by-step flow (3-step wizard)
+•	<span style="color:green">**[DONE]**</span> Walk-in pharmacy order creation
+•	<span style="color:green">**[DONE]**</span> Booking confirmation → Payment screen navigation
+•	<span style="color:green">**[DONE]**</span> Online doctors filter on home page
+•	<span style="color:green">**[DONE]**</span> LMS Attendance tab (student view + instructor management)
 •	<span style="color:red">**[PENDING]**</span> Lab/Pharmacy unified flow
 •	<span style="color:red">**[PENDING]**</span> Health Tracker implementation
 •	<span style="color:green">**[DONE]**</span> Health Journey with toggle
 •	<span style="color:green">**[DONE]**</span> Role-based registration
-•	<span style="color:red">**[PENDING]**</span> LMS integration (80% target for next meeting)
+•	<span style="color:red">**[PENDING]**</span> LMS integration (currently ~70% complete, target 80% for next meeting)
+•	<span style="color:red">**[PENDING]**</span> Sign in with Google (requires google_sign_in package + OAuth setup)
+•	<span style="color:red">**[PENDING]**</span> Sign in with Apple ID (requires sign_in_with_apple package + OAuth setup)
 •	<span style="color:red">**[PENDING]**</span> Email/SMS verification
 •	<span style="color:red">**[PENDING]**</span> Payment gateway integration
 •	<span style="color:red">**[PENDING]**</span> Multi-language support
