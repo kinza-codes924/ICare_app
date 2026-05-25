@@ -294,14 +294,24 @@
       });
     };
 
+    // meet.ffmuc.net — public Jitsi server without moderator-auth enforcement
+    var JITSI_SERVER = 'meet.ffmuc.net';
+
     // Dynamically load Jitsi External API (only when LMS session starts)
     window._lmsLoadJitsi = function() {
       return new Promise(function(resolve) {
         if (window.JitsiMeetExternalAPI) { resolve(); return; }
         var s = document.createElement('script');
-        s.src = 'https://meet.jit.si/external_api.js';
+        s.src = 'https://' + JITSI_SERVER + '/external_api.js';
         s.onload = resolve;
-        s.onerror = resolve; // graceful fallback to plain iframe
+        s.onerror = function() {
+          // Fallback to meet.jit.si script if ffmuc is unreachable
+          var s2 = document.createElement('script');
+          s2.src = 'https://meet.jit.si/external_api.js';
+          s2.onload = resolve;
+          s2.onerror = resolve;
+          document.head.appendChild(s2);
+        };
         document.head.appendChild(s);
       });
     };
@@ -334,7 +344,7 @@
         setTimeout(window.lmsRaiseFlutterLayer, 800);
 
         if (window.JitsiMeetExternalAPI) {
-          window._jitsiApi = new JitsiMeetExternalAPI('meet.jit.si', {
+          window._jitsiApi = new JitsiMeetExternalAPI(JITSI_SERVER, {
             roomName: roomName,
             parentNode: host,
             width: '100%',
@@ -364,6 +374,9 @@
               startAudioOnly: false,
               startScreenSharing: false,
               enableEmailInStats: false,
+              // Disable lobby and moderator requirement
+              lobby: { enable: false, autoKnock: false },
+              securityUi: { hideLobbyButton: true },
             },
             interfaceConfigOverwrite: {
               SHOW_JITSI_WATERMARK: false,
@@ -394,12 +407,13 @@
             },
             userInfo: { displayName: displayName },
           });
-          console.log('LMS: Jitsi joined room', roomName);
+          console.log('LMS: Jitsi joined room', roomName, 'on', JITSI_SERVER);
         } else {
-          // Fallback: plain iframe
+          // Fallback: plain iframe using ffmuc server
           var iframe = document.createElement('iframe');
-          iframe.src = 'https://meet.jit.si/' + roomName
+          iframe.src = 'https://' + JITSI_SERVER + '/' + roomName
             + '#config.prejoinPageEnabled=false&config.toolbarButtons=[]'
+            + '&config.lobby.enable=false'
             + '&userInfo.displayName=' + encodeURIComponent(displayName);
           iframe.style.cssText = 'width:100%;height:100%;border:none;';
           iframe.allow = 'camera; microphone; display-capture; fullscreen; autoplay';
