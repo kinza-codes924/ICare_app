@@ -1,67 +1,56 @@
-// Web-only — uses dart:js_interop + dart:ui_web (same as doctor-patient video_call_web.dart)
+// Web-only — Agora RTC + MediaRecorder for LMS live sessions
 import 'dart:js_interop';
 import 'dart:ui_web' as ui;
 import 'package:flutter/widgets.dart';
 import 'package:web/web.dart' as web;
 
-@JS('lmsJoin')
-external JSPromise _lmsJoinJS(String appId, String channelId, String? token, int uid);
+@JS('lmsAgoraJoin')
+external JSPromise<JSString> _lmsAgoraJoinJS(
+    JSString appId, JSString channel, JSString token, JSNumber uid, JSBoolean isInstructor);
 
-@JS('lmsLeave')
-external void _lmsLeaveJS();
+@JS('lmsAgoraLeave')
+external JSPromise<JSAny?> _lmsAgoraLeaveJS();
 
-@JS('lmsMuteMic')
-external void _lmsMuteMicJS(bool mute);
+@JS('lmsAgoraMuteMic')
+external void _lmsAgoraMuteMicJS(JSBoolean mute);
 
-@JS('lmsMuteCamera')
-external void _lmsMuteCameraJS(bool mute);
+@JS('lmsAgoraMuteCamera')
+external void _lmsAgoraMuteCameraJS(JSBoolean mute);
 
-@JS('lmsSetPanelWidth')
-external void _lmsSetPanelWidthJS(bool panelOpen);
+@JS('lmsStartRecording')
+external void _lmsStartRecordingJS();
 
-Future<void> lmsJoinChannel(String appId, String channelId, String? token, int uid) async {
-  _lmsJoinJS(appId, channelId, token, uid);
+@JS('lmsStopRecordingAndUpload')
+external void _lmsStopRecordingAndUploadJS(JSString sessionId, JSString backendUrl, JSString authToken);
+
+// appId and token fetched by caller from AgoraService
+Future<void> lmsJoinChannel(String roomName, String appId, String token, bool isInstructor) async {
+  await _lmsAgoraJoinJS(appId.toJS, roomName.toJS, token.toJS, 0.toJS, isInstructor.toJS).toDart;
 }
 
-void lmsLeaveChannel() => _lmsLeaveJS();
-void lmsMuteMic(bool mute) => _lmsMuteMicJS(mute);
-void lmsMuteCamera(bool mute) => _lmsMuteCameraJS(mute);
-void lmsSetPanelWidth(bool panelOpen) => _lmsSetPanelWidthJS(panelOpen);
+void lmsLeaveChannel() { _lmsAgoraLeaveJS(); }
+void lmsMuteMic(bool mute) => _lmsAgoraMuteMicJS(mute.toJS);
+void lmsMuteCamera(bool mute) => _lmsAgoraMuteCameraJS(mute.toJS);
+void lmsSetPanelWidth(bool panelOpen) {}
+void lmsStartRecording() => _lmsStartRecordingJS();
+void lmsStopRecordingAndUpload(String sessionId, String backendUrl, String authToken) =>
+    _lmsStopRecordingAndUploadJS(sessionId.toJS, backendUrl.toJS, authToken.toJS);
 
-// No-ops on web — video is handled via HtmlElementView + JS Agora SDK
 void lmsSetCallbacks({void Function(int, bool)? onRemote, void Function()? onJoined}) {}
 Widget lmsGetLocalVideoWidget(String? viewName) => const SizedBox.shrink();
 Widget lmsGetRemoteVideoWidget(int uid, String channelId) => const SizedBox.shrink();
 
-/// Register the video container as a Flutter platform view
-/// This is the SAME approach as the working doctor-patient video_call_web.dart
+/// Register the LMS host container as a Flutter platform view
 String registerLmsVideoView() {
-  const viewId = 'lms-video-view';
+  const viewId = 'lms-jitsi-view';
   try {
     ui.platformViewRegistry.registerViewFactory(viewId, (int id) {
       final container = web.document.createElement('div') as web.HTMLDivElement;
-      container.id = 'lms-video-grid';
+      container.id = 'lms-jitsi-host';
       container.style.width = '100%';
       container.style.height = '100%';
       container.style.background = '#1C2333';
-      container.style.position = 'relative';
-
-      // Remote video — full area
-      final remote = web.document.createElement('div') as web.HTMLDivElement;
-      remote.id = 'lms-remote-main';
-      remote.style.width = '100%';
-      remote.style.height = '100%';
-      remote.style.background = '#1C2333';
-      container.appendChild(remote);
-
-      // Local PiP — bottom right
-      final local = web.document.createElement('div') as web.HTMLDivElement;
-      local.id = 'lms-local-video';
-      local.style.cssText = 'position:absolute;bottom:16px;right:16px;width:180px;height:135px;'
-          'border-radius:10px;overflow:hidden;background:#2D3748;z-index:10;'
-          'border:2px solid rgba(255,255,255,0.5);';
-      container.appendChild(local);
-
+      container.style.overflow = 'hidden';
       return container;
     });
   } catch (_) {}

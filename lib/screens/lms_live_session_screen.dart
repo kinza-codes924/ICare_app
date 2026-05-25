@@ -1,10 +1,10 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
+import 'package:icare/services/agora_service.dart';
 import 'package:icare/services/lms_service.dart';
 import 'package:icare/utils/shared_pref.dart';
 import 'package:icare/utils/theme.dart';
-// Use dart:js_interop for web (same approach as working doctor-patient call)
 import '../utils/lms_agora_stub.dart'
     if (dart.library.js_interop) '../utils/lms_agora_web.dart';
 
@@ -305,15 +305,17 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
       final viewId = registerLmsVideoView();
       if (mounted) setState(() => _cameraViewName = viewId);
 
-      // Use sessionDocId for unique room per live session (avoids meet.jit.si members-only lock)
       final sessionRoom = _sessionDocId.isNotEmpty ? _sessionDocId : widget.sessionId;
-      final roomName = 'icare-${sessionRoom.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '').substring(0, sessionRoom.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '').length.clamp(0, 20))}';
+      final roomName = 'icare${sessionRoom.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '').substring(0, sessionRoom.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '').length.clamp(0, 20))}';
 
       // Join after the platform view is in the DOM
-      WidgetsBinding.instance.addPostFrameCallback((_) {
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        final tokenData = await AgoraService().getToken(channelName: roomName, uid: 0);
+        final agoraToken = tokenData['data']?['token'] as String? ?? '';
+        final agoraAppId = tokenData['data']?['appId'] as String? ?? '';
         Future.delayed(const Duration(milliseconds: 400), () {
-          lmsJoinChannel(roomName, _currentUserName, widget.isInstructor);
-          debugPrint('LMS Jitsi join: room=$roomName user=$_currentUserName');
+          lmsJoinChannel(roomName, agoraAppId, agoraToken, widget.isInstructor);
+          debugPrint('LMS Agora join: room=$roomName');
         });
       });
 
@@ -369,8 +371,11 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
     );
 
     final sessionRoom = _sessionDocId.isNotEmpty ? _sessionDocId : widget.sessionId;
-    final roomName = 'icare-${sessionRoom.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '').substring(0, sessionRoom.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '').length.clamp(0, 20))}';
-    await lmsJoinChannel(roomName, _currentUserName, widget.isInstructor);
+    final roomName = 'icare${sessionRoom.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '').substring(0, sessionRoom.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '').length.clamp(0, 20))}';
+    final tokenData = await AgoraService().getToken(channelName: roomName, uid: 0);
+    final agoraToken = tokenData['data']?['token'] as String? ?? '';
+    final agoraAppId = tokenData['data']?['appId'] as String? ?? '';
+    await lmsJoinChannel(roomName, agoraAppId, agoraToken, widget.isInstructor);
 
     // Fallback: mark joined after 2s
     await Future.delayed(const Duration(seconds: 2));

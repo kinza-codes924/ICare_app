@@ -275,177 +275,136 @@
   </script>
   <script src="flutter_bootstrap.js" async></script>
 
-  <!-- LMS Live Session — Jitsi Meet + MediaRecorder (no Agora) -->
+  <!-- LMS Live Session — Agora RTC + MediaRecorder -->
   <!-- Optional: set these to enable Cloudinary cloud backup of recordings -->
   <script>
     window.LMS_CLOUDINARY_CLOUD = '';   // your Cloudinary cloud name (e.g. 'my-cloud')
     window.LMS_CLOUDINARY_PRESET = 'lms_recordings'; // unsigned upload preset name
   </script>
   <script>
-    window._jitsiApi = null;
+    window._lmsAgoraClient = null;
+    window._lmsLocalAudio = null;
+    window._lmsLocalVideo = null;
     window._lmsRecorder = null;
     window._lmsChunks = [];
     window._lmsStream = null;
 
-    // Raise Flutter glass pane above Jitsi iframe so Flutter buttons work
+    // Raise Flutter glass pane above video so Flutter buttons work
     window.lmsRaiseFlutterLayer = function() {
       document.querySelectorAll('flt-glass-pane,flt-text-editing-host').forEach(function(el) {
         el.style.zIndex = '99999';
       });
     };
 
-    var JITSI_SERVER = 'meet.jit.si';
+    // ── LMS Agora Video (no login, no branding) ───────────────────────────────
 
-    // Dynamically load Jitsi External API (only when LMS session starts)
-    window._lmsLoadJitsi = function() {
-      return new Promise(function(resolve) {
-        if (window.JitsiMeetExternalAPI) { resolve(); return; }
-        var s = document.createElement('script');
-        s.src = 'https://meet.jit.si/external_api.js';
-        s.onload = resolve;
-        s.onerror = resolve;
-        document.head.appendChild(s);
-      });
-    };
-
-    // Called from Flutter: join room via Jitsi Meet
-    window.lmsJoin = async function(roomName, displayName, isInstructor) {
+    window.lmsAgoraJoin = async function(appId, channel, token, uid, isInstructor) {
       try {
-        await window._lmsLoadJitsi();
+        // Clean up previous session
+        if (window._lmsLocalAudio) { try { window._lmsLocalAudio.stop(); window._lmsLocalAudio.close(); } catch(_){} window._lmsLocalAudio = null; }
+        if (window._lmsLocalVideo) { try { window._lmsLocalVideo.stop(); window._lmsLocalVideo.close(); } catch(_){} window._lmsLocalVideo = null; }
+        if (window._lmsAgoraClient) { try { await window._lmsAgoraClient.leave(); } catch(_){} window._lmsAgoraClient = null; }
 
-        // Wait up to 4s for the HtmlElementView div to appear in DOM
+        AgoraRTC.setLogLevel(4);
+        try { AgoraRTC.disableLogUpload(); } catch(_) {}
+
+        window._lmsAgoraClient = AgoraRTC.createClient({ mode: 'rtc', codec: 'vp8' });
+
+        // Wait up to 4s for host div to appear
         var host = null;
         for (var i = 0; i < 20; i++) {
           host = document.getElementById('lms-jitsi-host');
           if (host) break;
           await new Promise(function(r) { setTimeout(r, 200); });
         }
-
         if (!host) {
-          console.warn('LMS: lms-jitsi-host not found, creating fallback container');
           host = document.createElement('div');
           host.id = 'lms-jitsi-host';
           host.style.cssText = 'position:fixed;top:52px;left:0;right:0;bottom:70px;z-index:9999;background:#1C2333;';
           document.body.appendChild(host);
         }
-
-        // Clear any previous Jitsi instance
-        if (window._jitsiApi) { try { window._jitsiApi.dispose(); } catch(_){} window._jitsiApi = null; }
         host.innerHTML = '';
+
+        // Remote video fills the area
+        var remoteDiv = document.createElement('div');
+        remoteDiv.id = 'lms-agora-remote';
+        remoteDiv.style.cssText = 'width:100%;height:100%;background:#1C2333;display:flex;align-items:center;justify-content:center;';
+        host.appendChild(remoteDiv);
+
+        // Local video in bottom-right corner
+        var localDiv = document.createElement('div');
+        localDiv.id = 'lms-agora-local';
+        localDiv.style.cssText = 'position:absolute;bottom:8px;right:8px;width:130px;height:98px;background:#000;border-radius:8px;overflow:hidden;z-index:20;border:2px solid rgba(255,255,255,0.2);';
+        host.appendChild(localDiv);
+
+        // Subscribe to remote users
+        window._lmsAgoraClient.on('user-published', async function(user, mediaType) {
+          await window._lmsAgoraClient.subscribe(user, mediaType);
+          if (mediaType === 'video') {
+            remoteDiv.innerHTML = '';
+            user.videoTrack.play('lms-agora-remote');
+          }
+          if (mediaType === 'audio') {
+            try { user.audioTrack.play(); } catch(_) {}
+          }
+        });
+
+        window._lmsAgoraClient.on('user-unpublished', function(user, mediaType) {
+          if (mediaType === 'video') { remoteDiv.innerHTML = ''; }
+        });
+
+        await window._lmsAgoraClient.join(appId, channel, token || null, uid || null);
+
+        // Subscribe to anyone already in channel
+        for (var j = 0; j < window._lmsAgoraClient.remoteUsers.length; j++) {
+          var ru = window._lmsAgoraClient.remoteUsers[j];
+          if (ru.hasVideo) { try { await window._lmsAgoraClient.subscribe(ru,'video'); ru.videoTrack.play('lms-agora-remote'); } catch(_){} }
+          if (ru.hasAudio) { try { await window._lmsAgoraClient.subscribe(ru,'audio'); ru.audioTrack.play(); } catch(_){} }
+        }
+
+        // Create local tracks
+        try { window._lmsLocalAudio = await AgoraRTC.createMicrophoneAudioTrack(); } catch(e) { console.warn('LMS mic error:', e.message); }
+        try { window._lmsLocalVideo = await AgoraRTC.createCameraVideoTrack(); } catch(e) { console.warn('LMS cam error:', e.message); }
+
+        var tracks = [];
+        if (window._lmsLocalAudio) tracks.push(window._lmsLocalAudio);
+        if (window._lmsLocalVideo) tracks.push(window._lmsLocalVideo);
+        if (tracks.length > 0) await window._lmsAgoraClient.publish(tracks);
+        if (window._lmsLocalVideo) window._lmsLocalVideo.play('lms-agora-local');
 
         setTimeout(window.lmsRaiseFlutterLayer, 800);
 
-        if (window.JitsiMeetExternalAPI) {
-          window._jitsiApi = new JitsiMeetExternalAPI(JITSI_SERVER, {
-            roomName: roomName,
-            parentNode: host,
-            width: '100%',
-            height: '100%',
-            configOverwrite: {
-              prejoinPageEnabled: false,
-              disableDeepLinking: true,
-              startWithAudioMuted: false,
-              startWithVideoMuted: false,
-              toolbarButtons: [],
-              disableProfile: true,
-              disableRemoteMute: true,
-              enableNoisyMicDetection: false,
-              p2p: { enabled: true },
-              hideConferenceSubject: true,
-              hideConferenceTimer: false,
-              hideParticipantsStats: true,
-              defaultLocalDisplayName: 'Me',
-              defaultRemoteDisplayName: 'Participant',
-              enableLobbyChat: false,
-              disableLobbyPassword: true,
-              requireDisplayName: false,
-              enableWelcomePage: false,
-              enableClosePage: false,
-              disableInviteFunctions: true,
-              doNotStoreRoom: true,
-              startAudioOnly: false,
-              startScreenSharing: false,
-              enableEmailInStats: false,
-              // Disable lobby and moderator requirement
-              lobby: { enable: false, autoKnock: false },
-              securityUi: { hideLobbyButton: true },
-            },
-            interfaceConfigOverwrite: {
-              SHOW_JITSI_WATERMARK: false,
-              SHOW_BRAND_WATERMARK: false,
-              SHOW_WATERMARK_FOR_GUESTS: false,
-              SHOW_CHROME_EXTENSION_BANNER: false,
-              MOBILE_APP_PROMO: false,
-              DISABLE_JOIN_LEAVE_NOTIFICATIONS: true,
-              HIDE_INVITE_MORE_HEADER: true,
-              DISABLE_VIDEO_BACKGROUND: false,
-              DISABLE_FOCUS_INDICATOR: false,
-              DISABLE_DOMINANT_SPEAKER_INDICATOR: false,
-              DISABLE_TRANSCRIPTION_SUBTITLES: false,
-              DISABLE_RINGING: false,
-              AUDIO_LEVEL_PRIMARY_COLOR: 'rgba(255,255,255,0.4)',
-              AUDIO_LEVEL_SECONDARY_COLOR: 'rgba(255,255,255,0.2)',
-              POLICY_LOGO: null,
-              PROVIDER_NAME: 'iCare',
-              NATIVE_APP_NAME: 'iCare Live Session',
-              APP_NAME: 'iCare',
-              JITSI_WATERMARK_LINK: '',
-              DEFAULT_BACKGROUND: '#1C2333',
-              DEFAULT_LOGO_URL: '',
-              DEFAULT_WELCOME_PAGE_LOGO_URL: '',
-              AUTHENTICATION_ENABLE: false,
-              TOOLBAR_ALWAYS_VISIBLE: false,
-              SETTINGS_SECTIONS: [],
-            },
-            userInfo: { displayName: displayName },
-          });
-          console.log('LMS: Jitsi joined room', roomName, 'on', JITSI_SERVER);
-        } else {
-          // Fallback: plain iframe
-          var iframe = document.createElement('iframe');
-          iframe.src = 'https://meet.jit.si/' + roomName
-            + '#config.prejoinPageEnabled=false&config.toolbarButtons=[]'
-            + '&config.lobby.enable=false'
-            + '&userInfo.displayName=' + encodeURIComponent(displayName);
-          iframe.style.cssText = 'width:100%;height:100%;border:none;';
-          iframe.allow = 'camera; microphone; display-capture; fullscreen; autoplay';
-          host.appendChild(iframe);
-          console.log('LMS: Jitsi iframe fallback for room', roomName);
-        }
-
-        // Auto-start recording for instructor after 3 seconds
+        // Auto-start recording for instructor after 3s (MediaRecorder — unchanged)
         if (isInstructor) {
           setTimeout(function() { window.lmsStartRecording(); }, 3000);
         }
+
+        console.log('LMS: Agora joined channel', channel);
+        return 'ok';
       } catch(e) {
-        console.warn('LMS lmsJoin error:', e.message || String(e));
+        console.warn('lmsAgoraJoin error:', e.message || String(e));
+        return 'error:' + (e.message || String(e));
       }
     };
 
-    window.lmsLeave = function() {
+    window.lmsAgoraLeave = async function() {
       try {
-        if (window._jitsiApi) { window._jitsiApi.dispose(); window._jitsiApi = null; }
-        // Remove fallback host if it was appended to body
+        if (window._lmsLocalAudio) { window._lmsLocalAudio.stop(); window._lmsLocalAudio.close(); window._lmsLocalAudio = null; }
+        if (window._lmsLocalVideo) { window._lmsLocalVideo.stop(); window._lmsLocalVideo.close(); window._lmsLocalVideo = null; }
+        if (window._lmsAgoraClient) { await window._lmsAgoraClient.leave(); window._lmsAgoraClient = null; }
         var h = document.getElementById('lms-jitsi-host');
         if (h && h.parentNode === document.body) h.remove();
       } catch(_) {}
     };
 
-    window.lmsMuteMic = function(mute) {
-      if (!window._jitsiApi) return;
-      window._jitsiApi.isAudioMuted().then(function(muted) {
-        if (muted !== mute) window._jitsiApi.executeCommand('toggleAudio');
-      }).catch(function() { window._jitsiApi.executeCommand('toggleAudio'); });
+    window.lmsAgoraMuteMic = function(mute) {
+      if (window._lmsLocalAudio) { try { window._lmsLocalAudio.setMuted(mute); } catch(_) {} }
     };
 
-    window.lmsMuteCamera = function(mute) {
-      if (!window._jitsiApi) return;
-      window._jitsiApi.isVideoMuted().then(function(muted) {
-        if (muted !== mute) window._jitsiApi.executeCommand('toggleVideo');
-      }).catch(function() { window._jitsiApi.executeCommand('toggleVideo'); });
+    window.lmsAgoraMuteCamera = function(mute) {
+      if (window._lmsLocalVideo) { try { window._lmsLocalVideo.setMuted(mute); } catch(_) {} }
     };
 
-    // Panel open/close — no-op since Flutter layout handles the resize natively
     window.lmsSetPanelWidth = function(panelOpen) {};
 
     // Start recording the instructor's camera + mic
