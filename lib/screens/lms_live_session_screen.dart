@@ -2,14 +2,13 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:icare/services/lms_service.dart';
-import 'package:icare/services/agora_service.dart';
 import 'package:icare/utils/shared_pref.dart';
 import 'package:icare/utils/theme.dart';
 // Use dart:js_interop for web (same approach as working doctor-patient call)
 import '../utils/lms_agora_stub.dart'
     if (dart.library.js_interop) '../utils/lms_agora_web.dart';
 
-/// LMS Live Session Screen — Google Meet style, Agora-based
+/// LMS Live Session Screen — Google Meet style, Jitsi Meet + MediaRecorder
 /// Completely separate from doctor-patient consultation
 class LmsLiveSessionScreen extends StatefulWidget {
   final String sessionId;
@@ -38,19 +37,12 @@ class LmsLiveSessionScreen extends StatefulWidget {
 
 class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
     with SingleTickerProviderStateMixin {
-  // Agora engine (mobile only — null on web)
-  dynamic _engine;
   bool _joined = false;
   bool _micOn = true;
   bool _cameraOn = true;
 
-  // Web camera
-  dynamic _localStream;
-  dynamic _localVideo;
-  static final int _viewId = 0;
   bool _loading = true;
   String? _error;
-  int? _remoteUid;
   final List<int> _remoteUids = [];
 
   // UI State
@@ -99,8 +91,7 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
     _chatScroll.dispose();
     _panelTab.dispose();
     LmsLiveSessionScreen.activeCourseId = null; // allow popup again after leaving
-    lmsLeaveChannel(); // works on both web and mobile
-    _localStream?.getTracks().forEach((t) => t.stop());
+    lmsLeaveChannel();
     super.dispose();
   }
 
@@ -152,33 +143,36 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
       // Step 5: Start polling for real-time sync
       _startSyncPolling();
 
-      await _initAgora();
+      await _initVideoSession();
     } catch (e) {
       if (mounted) setState(() { _error = e.toString(); _loading = false; });
     }
   }
 
   Future<void> _toggleRecording() async {
-    if (_sessionDocId.isEmpty) return;
+    if (!kIsWeb) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Recording is only available on web'), duration: Duration(seconds: 2)),
+      );
+      return;
+    }
     if (!_isRecording) {
-      // Start recording
-      final result = await _lms.startRecording(_sessionDocId);
-      if (result['success'] == true && mounted) {
-        setState(() => _isRecording = true);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('🔴 Recording started'), backgroundColor: Colors.red, duration: Duration(seconds: 2)),
-        );
-      }
+      lmsStartRecording();
+      if (mounted) setState(() => _isRecording = true);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Recording started'), backgroundColor: Colors.red, duration: Duration(seconds: 2)),
+      );
     } else {
-      // Stop recording
-      final result = await _lms.stopRecording(_sessionDocId);
-      if (mounted) {
-        setState(() => _isRecording = false);
-        final dur = result['recording']?['durationFormatted'] ?? '';
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('⏹ Recording stopped. Duration: $dur'), backgroundColor: Colors.green, duration: const Duration(seconds: 3)),
-        );
-      }
+      final token = await SharedPref().getToken();
+      lmsStopRecordingAndUpload(
+        _sessionDocId,
+        'https://icare-backend-inky.vercel.app/api',
+        token ?? '',
+      );
+      if (mounted) setState(() => _isRecording = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Recording stopped — saving to your device...'), backgroundColor: Colors.green, duration: Duration(seconds: 3)),
+      );
     }
   }
 
@@ -307,36 +301,30 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
   Future<void> _initWebCamera() async {
     if (!kIsWeb) return;
     try {
-      final channelId = 'lms_${widget.courseId}';
-      final int uid = _currentUserId.hashCode.abs() % 100000 + 1;
-
-      // Step 1: Register platform view (same as doctor-patient video_call_web.dart)
+      // Register Jitsi host div as Flutter platform view
       final viewId = registerLmsVideoView();
       if (mounted) setState(() => _cameraViewName = viewId);
 
-      // Step 2: Get Agora token
-      String? token;
-      try {
-        final tokenData = await AgoraService().getToken(channelName: channelId, uid: uid);
-        if (tokenData['success'] == true) {
-          token = tokenData['data']?['token']?.toString()
-              ?? tokenData['token']?.toString();
-        }
-        debugPrint('LMS token: ${token != null ? "ok" : "FAILED"}');
-      } catch (e) {
-        debugPrint('LMS token error: $e');
-      }
+      // Use sessionDocId for unique room per live session (avoids meet.jit.si members-only lock)
+      final sessionRoom = _sessionDocId.isNotEmpty ? _sessionDocId : widget.sessionId;
+      final roomName = 'icare-${sessionRoom.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '').substring(0, sessionRoom.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '').length.clamp(0, 20))}';
 
-      // Step 3: Join Agora after view renders
+      // Join after the platform view is in the DOM
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        Future.delayed(const Duration(milliseconds: 300), () {
-          lmsJoinChannel('82a63a65663c49f0bb973707b4c09f5f', channelId, token, uid);
-          debugPrint('LMS Agora join: channel=$channelId uid=$uid');
+        Future.delayed(const Duration(milliseconds: 400), () {
+          lmsJoinChannel(roomName, _currentUserName, widget.isInstructor);
+          debugPrint('LMS Jitsi join: room=$roomName user=$_currentUserName');
         });
       });
 
+      // Auto-show recording indicator for instructor (recording starts in JS after 3s)
+      if (widget.isInstructor) {
+        Future.delayed(const Duration(seconds: 4), () {
+          if (mounted) setState(() => _isRecording = true);
+        });
+      }
     } catch (e) {
-      debugPrint('LMS camera error: $e');
+      debugPrint('LMS Jitsi init error: $e');
     }
   }
 
@@ -362,57 +350,32 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
     }
   }
 
-  Future<void> _initAgora() async {
+  Future<void> _initVideoSession() async {
     if (kIsWeb) {
-      // Web: Agora JS SDK handles video via lmsJoinChannel (called in _initWebCamera)
+      // Web: Jitsi loads via _initWebCamera which was called before this
       if (mounted) setState(() { _joined = true; _loading = false; });
       _startSessionTimer();
       return;
     }
 
-    // Mobile: use real Agora RTC via lms_agora_stub.dart
-    try {
-      final channelId = 'lms_${widget.courseId}';
-      final int uid = _currentUserId.hashCode.abs() % 100000 + 1;
-
-      String? token;
-      try {
-        final tokenData = await AgoraService().getToken(channelName: channelId, uid: uid);
-        if (tokenData['success'] == true) {
-          token = tokenData['data']?['token']?.toString() ?? tokenData['token']?.toString();
+    // Mobile: lmsJoinChannel (stub) opens Jitsi in external browser
+    lmsSetCallbacks(
+      onJoined: () {
+        if (mounted && !_joined) {
+          setState(() { _joined = true; _loading = false; });
+          _startSessionTimer();
         }
-      } catch (_) {}
+      },
+    );
 
-      // Register callbacks so the screen updates when remote users join/leave
-      lmsSetCallbacks(
-        onRemote: (remoteUid, joining) {
-          if (!mounted) return;
-          setState(() {
-            if (joining && !_remoteUids.contains(remoteUid)) {
-              _remoteUids.add(remoteUid);
-            } else {
-              _remoteUids.remove(remoteUid);
-            }
-          });
-        },
-        onJoined: () {
-          if (mounted && !_joined) {
-            setState(() { _joined = true; _loading = false; });
-            _startSessionTimer();
-          }
-        },
-      );
+    final sessionRoom = _sessionDocId.isNotEmpty ? _sessionDocId : widget.sessionId;
+    final roomName = 'icare-${sessionRoom.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '').substring(0, sessionRoom.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '').length.clamp(0, 20))}';
+    await lmsJoinChannel(roomName, _currentUserName, widget.isInstructor);
 
-      await lmsJoinChannel('82a63a65663c49f0bb973707b4c09f5f', channelId, token, uid);
-
-      // Fallback: mark joined after 4 sec in case the callback doesn't fire
-      await Future.delayed(const Duration(seconds: 4));
-      if (mounted && !_joined) {
-        setState(() { _joined = true; _loading = false; });
-        _startSessionTimer();
-      }
-    } catch (e) {
-      if (mounted) setState(() { _joined = true; _loading = false; });
+    // Fallback: mark joined after 2s
+    await Future.delayed(const Duration(seconds: 2));
+    if (mounted && !_joined) {
+      setState(() { _joined = true; _loading = false; });
       _startSessionTimer();
     }
   }
@@ -431,13 +394,9 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
     return '${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
   }
 
-  Future<void> _toggleMic() async {
+  void _toggleMic() {
     _micOn = !_micOn;
-    if (kIsWeb) {
-      lmsMuteMic(!_micOn);
-    } else {
-      await _engine?.muteLocalAudioStream(!_micOn);
-    }
+    lmsMuteMic(!_micOn);
     setState(() {});
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
       content: Text(_micOn ? 'Microphone on' : 'Microphone muted'),
@@ -446,19 +405,12 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
     ));
   }
 
-  Future<void> _toggleCamera() async {
+  void _toggleCamera() {
     _cameraOn = !_cameraOn;
-    if (kIsWeb) {
-      lmsMuteCamera(!_cameraOn);
-    } else {
-      await _engine?.muteLocalVideoStream(!_cameraOn);
-    }
+    lmsMuteCamera(!_cameraOn);
     setState(() {});
   }
 
-  Future<void> _flipCamera() async {
-    await _engine?.switchCamera();
-  }
 
   void _toggleHand() {
     setState(() => _handRaised = !_handRaised);
@@ -524,9 +476,19 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
       ),
     );
     if (confirm == true && mounted) {
-      lmsLeaveChannel(); // handles both web (JS) and mobile (Agora RTC)
+      lmsLeaveChannel();
 
       if (widget.isInstructor) {
+        // Stop recording + save to device (auto-download) + upload if Cloudinary configured
+        if (kIsWeb && _isRecording && _sessionDocId.isNotEmpty) {
+          final token = await SharedPref().getToken();
+          lmsStopRecordingAndUpload(
+            _sessionDocId,
+            'https://icare-backend-inky.vercel.app/api',
+            token ?? '',
+          );
+        }
+
         // Auto-save: end session + save chat transcript to lesson
         if (_sessionDocId.isNotEmpty && _sessionDocId != widget.courseId) {
           final result = await _lms.endAndSaveSession(
