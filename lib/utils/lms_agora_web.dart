@@ -40,7 +40,9 @@ void lmsSetCallbacks({void Function(int, bool)? onRemote, void Function()? onJoi
 Widget lmsGetLocalVideoWidget(String? viewName) => const SizedBox.shrink();
 Widget lmsGetRemoteVideoWidget(int uid, String channelId) => const SizedBox.shrink();
 
-/// Register the LMS host container as a Flutter platform view
+/// Register the LMS host container as a Flutter platform view.
+/// Creates agora-remote and lms-agora-local divs INSIDE the platform view
+/// (same pattern as the working doctor-patient call in video_call_web.dart).
 String registerLmsVideoView() {
   const viewId = 'lms-jitsi-view';
   try {
@@ -50,7 +52,31 @@ String registerLmsVideoView() {
       container.style.width = '100%';
       container.style.height = '100%';
       container.style.background = '#1C2333';
-      container.style.overflow = 'hidden';
+      container.style.position = 'relative';
+
+      // Remote video — fills entire area
+      final remote = web.document.createElement('div') as web.HTMLDivElement;
+      remote.id = 'lms-agora-remote';
+      remote.style.width = '100%';
+      remote.style.height = '100%';
+      remote.style.background = '#1C2333';
+      container.appendChild(remote);
+
+      // Local video — small preview in bottom-right corner
+      final local = web.document.createElement('div') as web.HTMLDivElement;
+      local.id = 'lms-agora-local';
+      local.style.position = 'absolute';
+      local.style.bottom = '8px';
+      local.style.right = '8px';
+      local.style.width = '130px';
+      local.style.height = '98px';
+      local.style.background = '#000';
+      local.style.borderRadius = '8px';
+      local.style.overflow = 'hidden';
+      local.style.zIndex = '20';
+      local.style.border = '2px solid rgba(255,255,255,0.2)';
+      container.appendChild(local);
+
       return container;
     });
   } catch (_) {}

@@ -439,7 +439,7 @@ class _FillLabFormState extends State<FillLabForm> {
                 ),
                 const SizedBox(width: 10),
                 const CustomText(
-                  text: "Schedule Laboratory Appointment",
+                  text: "Book a Lab Test",
                   fontSize: 24,
                   fontWeight: FontWeight.w900,
                   fontFamily: "Gilroy-Bold",

@@ -29,6 +29,7 @@ class AuthService {
         try {
           final body = <String, dynamic>{
             'name': name,
+            'username': name,
             'email': email,
             'password': password,
             'role': _capitalizeRole(role),

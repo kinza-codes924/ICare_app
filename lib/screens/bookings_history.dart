@@ -726,7 +726,10 @@ class _BookingsHistoryScreenState extends State<BookingsHistoryScreen> {
                   controller: sc,
                   padding: const EdgeInsets.all(16),
                   itemCount: list.length,
-                  itemBuilder: (_, i) => _apptCard(list[i], color),
+                  itemBuilder: (ctx, i) => _apptCard(list[i], color, onCancelled: () {
+                    if (Navigator.of(ctx).canPop()) Navigator.of(ctx).pop();
+                    _loadAppointments();
+                  }),
                 ),
               ),
             ],
@@ -736,8 +739,8 @@ class _BookingsHistoryScreenState extends State<BookingsHistoryScreen> {
     );
   }
 
-  Widget _apptCard(AppointmentDetail appt, Color color) {
-    return _ApptCard(appt: appt, color: color);
+  Widget _apptCard(AppointmentDetail appt, Color color, {VoidCallback? onCancelled}) {
+    return _ApptCard(appt: appt, color: color, onCancelled: onCancelled);
   }
 }
 
@@ -745,12 +748,64 @@ class _BookingsHistoryScreenState extends State<BookingsHistoryScreen> {
 class _ApptCard extends StatefulWidget {
   final AppointmentDetail appt;
   final Color color;
-  const _ApptCard({required this.appt, required this.color});
+  final VoidCallback? onCancelled;
+  const _ApptCard({required this.appt, required this.color, this.onCancelled});
   @override
   State<_ApptCard> createState() => _ApptCardState();
 }
 
 class _ApptCardState extends State<_ApptCard> {
+  bool _cancelling = false;
+
+  Future<void> _cancelAppointment() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Cancel Appointment',
+            style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
+        content: const Text(
+            'Are you sure you want to cancel this appointment? This cannot be undone.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('No', style: TextStyle(color: Color(0xFF64748B))),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFEF4444),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10)),
+            ),
+            child: const Text('Yes, Cancel'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    setState(() => _cancelling = true);
+    final result = await AppointmentService().updateAppointmentStatus(
+      appointmentId: widget.appt.id,
+      status: 'cancelled',
+    );
+    if (!mounted) return;
+    setState(() => _cancelling = false);
+
+    if (result['success'] == true) {
+      widget.onCancelled?.call();
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(result['message'] ?? 'Failed to cancel appointment'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
   Future<void> _viewPrescription() async {
     showDialog(
       context: context,
@@ -826,6 +881,7 @@ class _ApptCardState extends State<_ApptCard> {
     final appt = widget.appt;
     final color = widget.color;
     final isCompleted = appt.status.toLowerCase() == 'completed';
+    final canCancel = ['pending', 'confirmed'].contains(appt.status.toLowerCase());
 
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
@@ -942,6 +998,41 @@ class _ApptCardState extends State<_ApptCard> {
               ],
             ),
           ),
+
+          // Cancel button — only for pending / confirmed appointments
+          if (canCancel) ...[
+            const Divider(height: 1, color: Color(0xFFF1F5F9)),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
+              child: SizedBox(
+                width: double.infinity,
+                height: 38,
+                child: OutlinedButton.icon(
+                  onPressed: _cancelling ? null : _cancelAppointment,
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFFEF4444),
+                    side: const BorderSide(color: Color(0xFFEF4444), width: 1.2),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10)),
+                    padding: EdgeInsets.zero,
+                  ),
+                  icon: _cancelling
+                      ? const SizedBox(
+                          width: 14,
+                          height: 14,
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Color(0xFFEF4444)))
+                      : const Icon(Icons.cancel_outlined, size: 15),
+                  label: Text(
+                    _cancelling ? 'Cancelling...' : 'Cancel Appointment',
+                    style: const TextStyle(
+                        fontSize: 12, fontWeight: FontWeight.w700),
+                  ),
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );

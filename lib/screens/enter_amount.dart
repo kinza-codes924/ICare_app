@@ -197,7 +197,7 @@ class _EnterAmountScreenState extends State<EnterAmountScreen> {
                 ),
                 child: Center(
                   child: Text(
-                    amount.isEmpty ? "\$0.00" : "\$$amount",
+                    amount.isEmpty ? "PKR 0.00" : "PKR $amount",
                     style: TextStyle(
                       fontSize: 48,
                       fontWeight: FontWeight.w900,

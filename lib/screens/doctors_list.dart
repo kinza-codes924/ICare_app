@@ -347,7 +347,8 @@ class _DoctorsListState extends State<DoctorsList> {
                                 ),
                                 items: [
                                   const DropdownMenuItem(value: null, child: Text('All')),
-                                  ..._specializations.map((s) => DropdownMenuItem(value: s, child: Text(s))),
+                                  const DropdownMenuItem(value: 'General Practitioner', child: Text('General Practitioner')),
+                                  ..._specializations.where((s) => s != 'General Practitioner').map((s) => DropdownMenuItem(value: s, child: Text(s))),
                                 ],
                                 onChanged: (v) {
                                   setState(() {

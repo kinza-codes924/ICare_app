@@ -159,11 +159,11 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
           if (profileResult['success'] == true && profileResult['user'] != null) {
             try {
               final profileUser = app_user.User.fromJson(profileResult['user'] as Map<String, dynamic>);
-              // Fill in any missing fields from captured signup data
+              // Always use captured form name — backend may return a default/username value
               user = profileUser.copyWith(
-                name: profileUser.name.isNotEmpty ? profileUser.name : capturedName,
-                gender: profileUser.gender?.isNotEmpty == true ? profileUser.gender : (_isPatient ? capturedGender : null),
-                age: profileUser.age?.isNotEmpty == true ? profileUser.age : (_isPatient ? _computeAgeFrom(capturedDob) : null),
+                name: capturedName.isNotEmpty ? capturedName : profileUser.name,
+                gender: capturedGender?.isNotEmpty == true ? capturedGender : profileUser.gender,
+                age: (_isPatient && capturedDob != null) ? _computeAgeFrom(capturedDob) : profileUser.age,
               );
             } catch (_) {}
           }

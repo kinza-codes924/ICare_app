@@ -142,6 +142,11 @@ class _ConsultationChatScreenV2State extends State<ConsultationChatScreenV2> {
           return;
         }
 
+        // Doctor sends consent message automatically at consultation start
+        if (widget.isDoctor) {
+          await _sendConsentMessage().catchError((_) {});
+        }
+
         await _loadMessages();
         if (mounted) {
           setState(() => _isLoading = false);
@@ -820,21 +825,22 @@ class _ConsultationChatScreenV2State extends State<ConsultationChatScreenV2> {
                     tooltip: 'Video Call',
                   ),
                   const Spacer(),
-                  // ── End Session button (both doctor and patient) ──
-                  ElevatedButton(
+                  // ── End Consultation button (purple — permanently ends) ──
+                  ElevatedButton.icon(
                     onPressed: _endConsultation,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFE91E63),
+                      backgroundColor: const Color(0xFF7C3AED),
                       foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(10),
                       ),
                       elevation: 2,
                     ),
-                    child: const Text(
-                      'End Session',
-                      style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+                    icon: const Icon(Icons.videocam_off_rounded, size: 16),
+                    label: const Text(
+                      'End Consultation',
+                      style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
                     ),
                   ),
                 ],

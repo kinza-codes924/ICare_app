@@ -116,7 +116,7 @@ class _InstructorEarningsScreenState extends State<InstructorEarningsScreen> {
           ),
           const SizedBox(height: 8),
           Text(
-            '\$${_summary['availableBalance'] ?? '0.00'}',
+            'PKR ${_summary['availableBalance'] ?? '0.00'}',
             style: const TextStyle(
               color: Colors.white,
               fontSize: 36,
@@ -128,12 +128,12 @@ class _InstructorEarningsScreenState extends State<InstructorEarningsScreen> {
             children: [
               _buildMiniStat(
                 'Lifetime',
-                '\$${_summary['lifetimeEarnings'] ?? '0.00'}',
+                'PKR ${_summary['lifetimeEarnings'] ?? '0.00'}',
               ),
               const SizedBox(width: 40),
               _buildMiniStat(
                 'This Month',
-                '\$${_summary['monthlyEarnings'] ?? '0.00'}',
+                'PKR ${_summary['monthlyEarnings'] ?? '0.00'}',
               ),
             ],
           ),
@@ -246,7 +246,7 @@ class _InstructorEarningsScreenState extends State<InstructorEarningsScreen> {
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   Text(
-                    '\$${payout['amount']}',
+                    'PKR ${payout['amount']}',
                     style: const TextStyle(
                       fontWeight: FontWeight.w900,
                       color: Color(0xFF0F172A),

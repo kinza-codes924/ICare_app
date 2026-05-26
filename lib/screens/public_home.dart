@@ -163,6 +163,13 @@ class PublicHome extends StatelessWidget {
                             );
                           },
                         ),
+                        const SizedBox(height: 16),
+                        Builder(
+                          builder: (ctx) => Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 20),
+                            child: DoctorSearchBar(isMobile: MediaQuery.of(ctx).size.width < 700),
+                          ),
+                        ),
                         const SizedBox(height: 24),
                         _DoctorsSlider(),
                         const SizedBox(height: 40),
@@ -236,35 +243,6 @@ class PublicHome extends StatelessWidget {
                             onTap: () => Navigator.of(context).push(
                               MaterialPageRoute(builder: (_) => const DoctorsList()),
                             ),
-                          ),
-                        ),
-                        const SizedBox(height: 32),
-                        // Doctor search bar — placed below browse sections
-                        const Padding(
-                          padding: EdgeInsets.symmetric(horizontal: 20),
-                          child: Text(
-                            'Search Doctors',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w700,
-                              color: Color(0xFF0F172A),
-                              fontFamily: 'Gilroy-Bold',
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        const Padding(
-                          padding: EdgeInsets.symmetric(horizontal: 20),
-                          child: Text(
-                            'Search by doctor name, specialty, or condition',
-                            style: TextStyle(fontSize: 13, color: Color(0xFF64748B)),
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        Builder(
-                          builder: (ctx) => Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 20),
-                            child: DoctorSearchBar(isMobile: MediaQuery.of(ctx).size.width < 700),
                           ),
                         ),
                         const SizedBox(height: 8),

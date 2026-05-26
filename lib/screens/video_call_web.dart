@@ -846,6 +846,33 @@ class _VideoCallWebState extends State<VideoCall> {
 
   /// Red button — leave video but keep consultation "in progress"
   Future<void> _leaveVideo() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('Leave Video?',
+            style: TextStyle(fontWeight: FontWeight.w800)),
+        content: const Text(
+            'Do you want to leave the video? You can rejoin from the chat screen.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            child: const Text('Leave Video'),
+          ),
+        ],
+      ),
+    );
+    if (confirm != true) return;
+
     try { await _agoraLeave().toDart; } catch (_) {}
 
     // Mark appointment as in_progress so patient can rejoin
@@ -1302,7 +1329,7 @@ class _VideoCallWebState extends State<VideoCall> {
                             tooltip: _micMuted ? 'Unmute' : 'Mute',
                           ),
                           const SizedBox(width: 16),
-                          // Red button — leave video only
+                          // Red button — leave video only (can rejoin)
                           _controlBtn(
                             icon: Icons.call_end_rounded,
                             color: Colors.white,
@@ -1322,11 +1349,21 @@ class _VideoCallWebState extends State<VideoCall> {
                               onTap: _toggleCam,
                               tooltip: _camOff ? 'Start Camera' : 'Stop Camera',
                             ),
+                          const SizedBox(width: 16),
+                          // Purple button — end consultation permanently
+                          _controlBtn(
+                            icon: Icons.videocam_off_rounded,
+                            color: Colors.white,
+                            bg: const Color(0xFF7C3AED),
+                            onTap: _endConsultation,
+                            size: 56,
+                            tooltip: 'End Consultation',
+                          ),
                         ],
                       ),
                       const SizedBox(height: 8),
                       const Text(
-                        'Red = Leave Video',
+                        'Red = Leave Video  •  Purple = End Consultation',
                         style: TextStyle(color: Colors.white38, fontSize: 11),
                       ),
                     ],

@@ -59,10 +59,10 @@ class _InstructorFiltersScreenState extends State<InstructorFiltersScreen> {
   ];
 
   final List<String> priceRangeList = [
-    'Under \$10',
-    '\$10 – \$25',
-    '\$25 – \$50',
-    'Above \$50',
+    'Under PKR 10',
+    'PKR 10 – PKR 25',
+    'PKR 25 – PKR 50',
+    'Above PKR 50',
   ];
 
   final List<String> reviewsList = [

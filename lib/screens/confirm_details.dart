@@ -148,7 +148,7 @@ class ConfirmDetails extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 48),
-                    _buildWebSummaryItem("Course Amount", "\$2,000.00"),
+                    _buildWebSummaryItem("Course Amount", "PKR 2,000"),
                     _buildWebSummaryItem(
                       "Discount Offer",
                       "5% Off",
@@ -157,7 +157,7 @@ class ConfirmDetails extends StatelessWidget {
                     const Divider(height: 48, color: Color(0xFFF1F5F9)),
                     _buildWebSummaryItem(
                       "Total Amount",
-                      "\$2,100.00",
+                      "PKR 2,100",
                       isTotal: true,
                     ),
                     const SizedBox(height: 48),

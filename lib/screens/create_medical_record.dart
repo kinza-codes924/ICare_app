@@ -164,6 +164,8 @@ class _CreateMedicalRecordScreenState extends State<CreateMedicalRecordScreen> {
 
   String? _referSpecialty;
   final _referReasonController = TextEditingController();
+  bool _referToEmergency = false;
+  String? _emergencyReason;
   int _followUpDays = 0;
   int _followUpMonths = 0;
 
@@ -1166,6 +1168,12 @@ class _CreateMedicalRecordScreenState extends State<CreateMedicalRecordScreen> {
     // Build prescription object
     final Map<String, dynamic> prescriptionObj = {};
     if (cleanPrescription.isNotEmpty) prescriptionObj['medicines'] = cleanPrescription;
+    if (_referToEmergency) {
+      prescriptionObj['emergencyReferral'] = {
+        'referred': true,
+        if (_emergencyReason != null) 'reason': _emergencyReason,
+      };
+    }
     if (_referSpecialty != null) {
       prescriptionObj['referral'] = {
         'specialty': _referSpecialty,
@@ -1614,6 +1622,55 @@ class _CreateMedicalRecordScreenState extends State<CreateMedicalRecordScreen> {
                     controller: _notesController,
                     decoration: _inputDecoration('Enter any additional notes'),
                     maxLines: 4,
+                  ),
+
+                  const SizedBox(height: 20),
+
+                  // Refer to Emergency / Hospital
+                  _buildModernSectionCard(
+                    'Refer to Emergency / Hospital',
+                    Icons.local_hospital_rounded,
+                    const Color(0xFFEF4444),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Switch(
+                              value: _referToEmergency,
+                              onChanged: (val) => setState(() => _referToEmergency = val),
+                              activeColor: const Color(0xFFEF4444),
+                            ),
+                            const SizedBox(width: 8),
+                            const Text(
+                              'Refer patient to Emergency / Hospital',
+                              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                            ),
+                          ],
+                        ),
+                        if (_referToEmergency) ...[
+                          const SizedBox(height: 12),
+                          DropdownButtonFormField<String>(
+                            value: _emergencyReason,
+                            isExpanded: true,
+                            decoration: _modernInputDecoration(
+                              'Select Reason',
+                              Icons.warning_amber_rounded,
+                            ),
+                            dropdownColor: Colors.white,
+                            items: [
+                              'Emergency Care Required',
+                              'Immediate Hospitalization',
+                              'Surgical Intervention',
+                              'ICU Admission',
+                              'Life-Threatening Condition',
+                              'Other',
+                            ].map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
+                            onChanged: (val) => setState(() => _emergencyReason = val),
+                          ),
+                        ],
+                      ],
+                    ),
                   ),
 
                   const SizedBox(height: 20),

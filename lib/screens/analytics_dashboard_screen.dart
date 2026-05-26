@@ -134,7 +134,7 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen> {
         ),
         _buildStatCard(
           'Total Revenue',
-          '\$${_stats['totalRevenue']?.toString() ?? '0'}',
+          'PKR ${_stats['totalRevenue']?.toString() ?? '0'}',
           Icons.payments_rounded,
           Colors.green,
         ),

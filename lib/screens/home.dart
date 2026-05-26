@@ -13,7 +13,9 @@ import 'package:icare/screens/pharmacy_home.dart';
 import 'package:icare/screens/profile_edit.dart';
 import 'package:icare/screens/upcoming_appointments.dart';
 import 'package:icare/screens/video_call.dart';
+import 'package:icare/models/user.dart' as app_user;
 import 'package:icare/services/doctor_service.dart';
+import 'package:icare/services/user_service.dart';
 import 'package:icare/utils/imagePaths.dart';
 import 'package:icare/utils/theme.dart';
 import 'package:icare/utils/utils.dart';
@@ -41,6 +43,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   final PageController _pageController = PageController();
   int _currentSlide = 0;
   final DoctorService _doctorService = DoctorService();
+  final UserService _userService = UserService();
   List<Doctor> _topDoctors = [];
   bool _loadingDoctors = false;
 
@@ -48,6 +51,29 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   void initState() {
     super.initState();
     _loadTopDoctors();
+    _refreshUserProfile();
+  }
+
+  Future<void> _refreshUserProfile() async {
+    final auth = ref.read(authProvider);
+    final token = auth.token;
+    if (token == null || token.isEmpty) return;
+
+    final result = await _userService.getUserProfile(token: token);
+    if (result['success'] == true && result['user'] != null && mounted) {
+      try {
+        final fetched = app_user.User.fromJson(result['user'] as Map<String, dynamic>);
+        final current = auth.user;
+        // Use fetched name only if current name is empty/default; always keep captured if better
+        final bestName = (current?.name.isNotEmpty == true && current!.name != 'User')
+            ? current.name
+            : fetched.name;
+        final updated = fetched.copyWith(
+          name: bestName.isNotEmpty ? bestName : (current?.name ?? ''),
+        );
+        await ref.read(authProvider.notifier).setUser(updated);
+      } catch (_) {}
+    }
   }
 
   Future<void> _loadTopDoctors() async {
@@ -687,7 +713,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           child: _buildPremiumStatCard(
                             context: context,
                             label: "Revenue",
-                            number: "\$4.2K",
+                            number: "PKR 4.2K",
                             subtitle: "+8% this week",
                             icon: Icons.trending_up_rounded,
                             gradientColors: [

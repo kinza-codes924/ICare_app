@@ -1113,11 +1113,11 @@ class _PrescriptionPage extends StatelessWidget {
                   ),
                 Row(children: [
                   if (medicines.isNotEmpty) Expanded(child: ElevatedButton.icon(
-                    onPressed: onFindPharmacies,
+                    onPressed: isWithin30Days ? onFindPharmacies : null,
                     icon: const Icon(Icons.local_pharmacy_rounded, size: 15),
                     label: const Text('Order Medicines', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12)),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: isWithin30Days ? const Color(0xFF0036BC) : const Color(0xFF94A3B8),
+                      backgroundColor: const Color(0xFF0036BC),
                       foregroundColor: Colors.white,
                       disabledBackgroundColor: const Color(0xFFE2E8F0),
                       disabledForegroundColor: const Color(0xFF94A3B8),
@@ -1128,11 +1128,11 @@ class _PrescriptionPage extends StatelessWidget {
                   )),
                   if (medicines.isNotEmpty && labTests.isNotEmpty) const SizedBox(width: 8),
                   if (labTests.isNotEmpty) Expanded(child: ElevatedButton.icon(
-                    onPressed: onFindLabs,
+                    onPressed: isWithin30Days ? onFindLabs : null,
                     icon: const Icon(Icons.science_rounded, size: 15),
                     label: const Text('Order Lab Tests', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12)),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: isWithin30Days ? const Color(0xFF10B981) : const Color(0xFF94A3B8),
+                      backgroundColor: const Color(0xFF10B981),
                       foregroundColor: Colors.white,
                       disabledBackgroundColor: const Color(0xFFE2E8F0),
                       disabledForegroundColor: const Color(0xFF94A3B8),

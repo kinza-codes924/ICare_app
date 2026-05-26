@@ -310,39 +310,35 @@
 
         window._lmsAgoraClient = AgoraRTC.createClient({ mode: 'rtc', codec: 'vp8' });
 
-        // Wait up to 4s for host div to appear
-        var host = null;
-        for (var i = 0; i < 20; i++) {
-          host = document.getElementById('lms-jitsi-host');
-          if (host) break;
-          await new Promise(function(r) { setTimeout(r, 200); });
+        // ── Helper: play remote video with retry until div is in DOM ──────
+        async function lmsPlayRemoteVideo(videoTrack, retries) {
+          retries = retries || 0;
+          var remoteDiv = document.getElementById('lms-agora-remote');
+          if (remoteDiv) {
+            try {
+              remoteDiv.innerHTML = '';
+              videoTrack.play('lms-agora-remote');
+              console.log('LMS: remote video playing (attempt ' + retries + ')');
+            } catch(e) {
+              console.warn('LMS remote video play error:', e.message);
+              if (retries < 5) setTimeout(function() { lmsPlayRemoteVideo(videoTrack, retries + 1); }, 500);
+            }
+          } else {
+            if (retries < 20) {
+              console.warn('lms-agora-remote div not found, retry ' + retries);
+              setTimeout(function() { lmsPlayRemoteVideo(videoTrack, retries + 1); }, 300);
+            } else {
+              console.error('lms-agora-remote div never appeared');
+            }
+          }
         }
-        if (!host) {
-          host = document.createElement('div');
-          host.id = 'lms-jitsi-host';
-          host.style.cssText = 'position:fixed;top:52px;left:0;right:0;bottom:70px;z-index:9999;background:#1C2333;';
-          document.body.appendChild(host);
-        }
-        host.innerHTML = '';
-
-        // Remote video fills the area
-        var remoteDiv = document.createElement('div');
-        remoteDiv.id = 'lms-agora-remote';
-        remoteDiv.style.cssText = 'width:100%;height:100%;background:#1C2333;display:flex;align-items:center;justify-content:center;';
-        host.appendChild(remoteDiv);
-
-        // Local video in bottom-right corner
-        var localDiv = document.createElement('div');
-        localDiv.id = 'lms-agora-local';
-        localDiv.style.cssText = 'position:absolute;bottom:8px;right:8px;width:130px;height:98px;background:#000;border-radius:8px;overflow:hidden;z-index:20;border:2px solid rgba(255,255,255,0.2);';
-        host.appendChild(localDiv);
 
         // Subscribe to remote users
+        // (lms-agora-remote and lms-agora-local divs are created by Dart registerViewFactory)
         window._lmsAgoraClient.on('user-published', async function(user, mediaType) {
           await window._lmsAgoraClient.subscribe(user, mediaType);
           if (mediaType === 'video') {
-            remoteDiv.innerHTML = '';
-            user.videoTrack.play('lms-agora-remote');
+            lmsPlayRemoteVideo(user.videoTrack, 0);
           }
           if (mediaType === 'audio') {
             try { user.audioTrack.play(); } catch(_) {}
@@ -350,15 +346,18 @@
         });
 
         window._lmsAgoraClient.on('user-unpublished', function(user, mediaType) {
-          if (mediaType === 'video') { remoteDiv.innerHTML = ''; }
+          if (mediaType === 'video') {
+            var remoteDiv = document.getElementById('lms-agora-remote');
+            if (remoteDiv) remoteDiv.innerHTML = '';
+          }
         });
 
         await window._lmsAgoraClient.join(appId, channel, token || null, uid || null);
 
-        // Subscribe to anyone already in channel
+        // Subscribe to anyone already in channel when joining late
         for (var j = 0; j < window._lmsAgoraClient.remoteUsers.length; j++) {
           var ru = window._lmsAgoraClient.remoteUsers[j];
-          if (ru.hasVideo) { try { await window._lmsAgoraClient.subscribe(ru,'video'); ru.videoTrack.play('lms-agora-remote'); } catch(_){} }
+          if (ru.hasVideo) { try { await window._lmsAgoraClient.subscribe(ru,'video'); lmsPlayRemoteVideo(ru.videoTrack, 0); } catch(_){} }
           if (ru.hasAudio) { try { await window._lmsAgoraClient.subscribe(ru,'audio'); ru.audioTrack.play(); } catch(_){} }
         }
 
@@ -370,7 +369,10 @@
         if (window._lmsLocalAudio) tracks.push(window._lmsLocalAudio);
         if (window._lmsLocalVideo) tracks.push(window._lmsLocalVideo);
         if (tracks.length > 0) await window._lmsAgoraClient.publish(tracks);
-        if (window._lmsLocalVideo) window._lmsLocalVideo.play('lms-agora-local');
+        if (window._lmsLocalVideo) {
+          var localDiv = document.getElementById('lms-agora-local');
+          if (localDiv) window._lmsLocalVideo.play('lms-agora-local');
+        }
 
         setTimeout(window.lmsRaiseFlutterLayer, 800);
 
