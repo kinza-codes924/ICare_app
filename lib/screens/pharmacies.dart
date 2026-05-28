@@ -30,6 +30,9 @@ class _PharmaciesScreenState extends State<PharmaciesScreen> {
   List<dynamic> _pharmacies = [];
   List<dynamic> _filteredPharmacies = [];
   bool _isLoading = true;
+  final FocusNode _searchFocus = FocusNode();
+  List<Map<String, dynamic>> _pharmacySuggestions = [];
+  bool _showPharmacySuggestions = false;
 
   // View mode: 'all', 'nearest', 'search_location'
   String _viewMode = 'all';
@@ -45,12 +48,20 @@ class _PharmaciesScreenState extends State<PharmaciesScreen> {
       _searchController.text = widget.initialSearch!;
     }
     _fetchPharmacies();
+    _searchFocus.addListener(() {
+      if (!_searchFocus.hasFocus) {
+        Future.delayed(const Duration(milliseconds: 200), () {
+          if (mounted) setState(() => _showPharmacySuggestions = false);
+        });
+      }
+    });
   }
 
   @override
   void dispose() {
     _searchController.dispose();
     _locationController.dispose();
+    _searchFocus.dispose();
     super.dispose();
   }
 
@@ -107,6 +118,22 @@ class _PharmaciesScreenState extends State<PharmaciesScreen> {
         final name = (p['pharmacy_name'] ?? p['pharmacyName'] ?? p['name'] ?? '').toString().toLowerCase();
         return address.contains(q) || city.contains(q) || area.contains(q) || name.contains(q);
       }).toList();
+    });
+  }
+
+  void _updatePharmacySuggestions(String query) {
+    if (query.isEmpty) {
+      setState(() { _pharmacySuggestions = []; _showPharmacySuggestions = false; });
+      return;
+    }
+    final q = query.toLowerCase();
+    final suggestions = _pharmacies.where((p) {
+      final name = (p['pharmacyName'] ?? p['pharmacy_name'] ?? p['name'] ?? '').toString().toLowerCase();
+      return name.contains(q);
+    }).cast<Map<String, dynamic>>().take(6).toList();
+    setState(() {
+      _pharmacySuggestions = suggestions;
+      _showPharmacySuggestions = suggestions.isNotEmpty;
     });
   }
 
@@ -192,6 +219,8 @@ class _PharmaciesScreenState extends State<PharmaciesScreen> {
       _locationStatus = null;
       _userLat = null;
       _userLng = null;
+      _pharmacySuggestions = [];
+      _showPharmacySuggestions = false;
     });
 
     if (mode == 'all') {
@@ -266,18 +295,25 @@ class _PharmaciesScreenState extends State<PharmaciesScreen> {
                               ),
                               const SizedBox(height: 14),
                               // Contextual search field
-                              if (_viewMode == 'all')
+                              if (_viewMode == 'all') ...[
                                 CustomInputField(
                                   width: double.infinity,
                                   hintText: "Search pharmacies or medicines...",
                                   controller: _searchController,
-                                  onChanged: _filterPharmacies,
+                                  focusNode: _searchFocus,
+                                  onChanged: (v) {
+                                    _filterPharmacies(v);
+                                    _updatePharmacySuggestions(v);
+                                  },
                                   leadingIcon: const Icon(
                                     Icons.search_rounded,
                                     color: Color(0xFF94A3B8),
                                     size: 22,
                                   ),
                                 ),
+                                if (_showPharmacySuggestions && _pharmacySuggestions.isNotEmpty)
+                                  _buildPharmacySuggestions(),
+                              ],
                               if (_viewMode == 'search_location')
                                 CustomInputField(
                                   width: double.infinity,
@@ -416,6 +452,83 @@ class _PharmaciesScreenState extends State<PharmaciesScreen> {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPharmacySuggestions() {
+    return Container(
+      margin: const EdgeInsets.only(top: 4),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.08),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: _pharmacySuggestions.asMap().entries.map((entry) {
+            final i = entry.key;
+            final p = entry.value;
+            final name = (p['pharmacyName'] ?? p['pharmacy_name'] ?? p['name'] ?? 'Pharmacy').toString();
+            final address = (p['address'] ?? p['city'] ?? '').toString();
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (i > 0) const Divider(height: 1, color: Color(0xFFF1F5F9)),
+                InkWell(
+                  onTap: () {
+                    setState(() {
+                      _searchController.text = name;
+                      _showPharmacySuggestions = false;
+                    });
+                    Navigator.of(context).push(MaterialPageRoute(
+                      builder: (ctx) => PharmacyDetailsScreen(
+                        pharmacy: p,
+                        prescribedMedicines: widget.prescribedMedicines,
+                      ),
+                    ));
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: AppColors.primaryColor.withValues(alpha: 0.08),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Icon(Icons.local_pharmacy_outlined, size: 16, color: AppColors.primaryColor),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(name, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: Color(0xFF0F172A))),
+                              if (address.isNotEmpty)
+                                Text(address, style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                            ],
+                          ),
+                        ),
+                        const Icon(Icons.arrow_forward_ios_rounded, size: 12, color: Color(0xFFCBD5E1)),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            );
+          }).toList(),
         ),
       ),
     );

@@ -34,6 +34,9 @@ class _LabsListScreenState extends State<LabsListScreen> {
   List<Lab> _filteredLabs = [];
   List<Map<String, dynamic>> _rawLabsData = [];
   bool _isLoading = true;
+  final FocusNode _searchFocus = FocusNode();
+  List<_LabSuggestionItem> _labSuggestions = [];
+  bool _showLabSuggestions = false;
 
   // View mode: 'all', 'nearest', 'search_location'
   String _viewMode = 'all';
@@ -49,6 +52,21 @@ class _LabsListScreenState extends State<LabsListScreen> {
       _searchController.text = widget.initialSearch!;
     }
     _fetchLabs();
+    _searchFocus.addListener(() {
+      if (!_searchFocus.hasFocus) {
+        Future.delayed(const Duration(milliseconds: 200), () {
+          if (mounted) setState(() => _showLabSuggestions = false);
+        });
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    _locationController.dispose();
+    _searchFocus.dispose();
+    super.dispose();
   }
 
   Future<void> _fetchLabs() async {
@@ -142,6 +160,29 @@ class _LabsListScreenState extends State<LabsListScreen> {
     });
   }
 
+  void _updateLabSuggestions(String query) {
+    if (query.isEmpty) {
+      setState(() { _labSuggestions = []; _showLabSuggestions = false; });
+      return;
+    }
+    final q = query.toLowerCase();
+    final items = <_LabSuggestionItem>[];
+    for (final lab in _labs) {
+      if (items.length >= 6) break;
+      if ((lab.title?.toLowerCase() ?? '').contains(q)) {
+        items.add(_LabSuggestionItem(label: lab.title ?? 'Laboratory', sublabel: lab.address ?? '', isTest: false, lab: lab));
+      } else {
+        for (final test in (lab.tests ?? [])) {
+          if (test.toLowerCase().contains(q)) {
+            items.add(_LabSuggestionItem(label: test, sublabel: lab.title ?? 'Laboratory', isTest: true, lab: lab));
+            break;
+          }
+        }
+      }
+    }
+    setState(() { _labSuggestions = items; _showLabSuggestions = items.isNotEmpty; });
+  }
+
   double _haversineDistance(double lat1, double lon1, double lat2, double lon2) {
     const R = 6371.0;
     final dLat = (lat2 - lat1) * math.pi / 180;
@@ -221,6 +262,8 @@ class _LabsListScreenState extends State<LabsListScreen> {
       _locationStatus = null;
       _userLat = null;
       _userLng = null;
+      _labSuggestions = [];
+      _showLabSuggestions = false;
     });
 
     if (mode == 'all') {
@@ -289,12 +332,16 @@ class _LabsListScreenState extends State<LabsListScreen> {
                               ),
                               const SizedBox(height: 14),
                               // Search field (for All and Search by Location modes)
-                              if (_viewMode == 'all')
+                              if (_viewMode == 'all') ...[
                                 CustomInputField(
                                   width: double.infinity,
                                   hintText: "Search laboratories or clinics...",
                                   controller: _searchController,
-                                  onChanged: _filterLabs,
+                                  focusNode: _searchFocus,
+                                  onChanged: (v) {
+                                    _filterLabs(v);
+                                    _updateLabSuggestions(v);
+                                  },
                                   trailingIcon: SvgWrapper(
                                     assetPath: ImagePaths.filters,
                                     onPress: () {
@@ -311,6 +358,9 @@ class _LabsListScreenState extends State<LabsListScreen> {
                                     size: 22,
                                   ),
                                 ),
+                                if (_showLabSuggestions && _labSuggestions.isNotEmpty)
+                                  _buildLabSuggestions(),
+                              ],
                               if (_viewMode == 'search_location')
                                 CustomInputField(
                                   width: double.infinity,
@@ -409,6 +459,89 @@ class _LabsListScreenState extends State<LabsListScreen> {
     );
   }
 
+  Widget _buildLabSuggestions() {
+    return Container(
+      margin: const EdgeInsets.only(top: 4),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.08),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: _labSuggestions.asMap().entries.map((entry) {
+            final i = entry.key;
+            final s = entry.value;
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (i > 0) const Divider(height: 1, color: Color(0xFFF1F5F9)),
+                InkWell(
+                  onTap: () {
+                    setState(() {
+                      _searchController.text = s.label;
+                      _showLabSuggestions = false;
+                    });
+                    Navigator.of(context).push(MaterialPageRoute(
+                      builder: (ctx) => BookLabScreen(
+                        labId: s.lab.id,
+                        labTitle: s.lab.title,
+                        labProfileId: s.lab.profileId,
+                      ),
+                    ));
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: AppColors.primaryColor.withValues(alpha: 0.08),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Icon(
+                            s.isTest ? Icons.biotech_outlined : Icons.science_outlined,
+                            size: 16,
+                            color: AppColors.primaryColor,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(s.label, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: Color(0xFF0F172A))),
+                              if (s.sublabel.isNotEmpty)
+                                Text(
+                                  s.isTest ? 'Available at: ${s.sublabel}' : s.sublabel,
+                                  style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                                ),
+                            ],
+                          ),
+                        ),
+                        const Icon(Icons.arrow_forward_ios_rounded, size: 12, color: Color(0xFFCBD5E1)),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            );
+          }).toList(),
+        ),
+      ),
+    );
+  }
+
   Widget _buildEmptyState() {
     return Center(
       child: Column(
@@ -486,4 +619,12 @@ class _LabWithDist {
   final Lab lab;
   final double dist;
   const _LabWithDist({required this.lab, required this.dist});
+}
+
+class _LabSuggestionItem {
+  final String label;
+  final String sublabel;
+  final bool isTest;
+  final Lab lab;
+  const _LabSuggestionItem({required this.label, required this.sublabel, required this.isTest, required this.lab});
 }
