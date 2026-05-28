@@ -1,7 +1,4 @@
 import 'dart:typed_data';
-// ignore: avoid_web_libraries_in_flutter
-import '../utils/html_stub.dart' as html
-    if (dart.library.html) 'dart:html';
 import 'package:dio/dio.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -9,6 +6,7 @@ import 'package:icare/services/api_service.dart';
 import 'package:icare/utils/theme.dart';
 import 'package:icare/widgets/back_button.dart';
 import 'package:icare/widgets/custom_button.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class CredentialVaultScreen extends StatefulWidget {
   const CredentialVaultScreen({super.key});
@@ -70,30 +68,30 @@ class _CredentialVaultScreenState extends State<CredentialVaultScreen> {
     }
   }
 
-  /// Opens a URL in a new browser tab.
-  void _openDocUrl(String url) {
+  /// Opens a URL in a new browser tab using url_launcher.
+  Future<void> _openDocUrl(String url) async {
     if (url.isEmpty) return;
     try {
-      html.window.open(url, '_blank');
+      final uri = Uri.parse(url);
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
     } catch (e) {
       debugPrint('Cannot open URL: $e');
     }
   }
 
-  /// Downloads a file via Cloudinary fl_attachment flag (forces Content-Disposition: attachment).
-  /// The browser `download` attribute is ignored for cross-origin URLs, so we add fl_attachment
-  /// to the Cloudinary URL to make the CDN serve it as a download instead.
-  void _downloadDocUrl(String url) {
+  /// Downloads via Cloudinary fl_attachment flag so CDN forces Content-Disposition: attachment.
+  Future<void> _downloadDocUrl(String url) async {
     if (url.isEmpty) return;
     try {
       String dlUrl = _cloudinaryCleanUrl(url);
-      // Insert fl_attachment into Cloudinary URL so the CDN forces a file download
+      // fl_attachment makes Cloudinary send Content-Disposition: attachment → browser saves the file
       if (dlUrl.contains('cloudinary.com') && dlUrl.contains('/upload/')) {
         dlUrl = dlUrl.replaceFirst('/upload/', '/upload/fl_attachment/');
       }
-      html.window.open(dlUrl, '_blank');
+      final uri = Uri.parse(dlUrl);
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
     } catch (e) {
-      _openDocUrl(url);
+      await _openDocUrl(url);
     }
   }
 
@@ -181,7 +179,7 @@ class _CredentialVaultScreenState extends State<CredentialVaultScreen> {
                   child: SizedBox(
                     width: double.infinity,
                     child: ElevatedButton.icon(
-                      onPressed: () { Navigator.pop(ctx); _openDocUrl(docUrl); },
+                      onPressed: () { _openDocUrl(docUrl); Navigator.pop(ctx); },
                       icon: const Icon(Icons.download_rounded),
                       label: const Text('Open / Download', style: TextStyle(fontWeight: FontWeight.bold)),
                       style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryColor, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 14), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
@@ -237,8 +235,8 @@ class _CredentialVaultScreenState extends State<CredentialVaultScreen> {
           child: Row(children: [
             Expanded(
               child: OutlinedButton.icon(
-                // Clean URL → browser opens PDF in its built-in viewer
-                onPressed: () { Navigator.pop(ctx); _openDocUrl(_cloudinaryCleanUrl(pdfUrl)); },
+                // Open FIRST then close dialog — preserves user-gesture for url_launcher/popup
+                onPressed: () { _openDocUrl(_cloudinaryCleanUrl(pdfUrl)); Navigator.pop(ctx); },
                 icon: const Icon(Icons.open_in_new_rounded, size: 16),
                 label: const Text('Open PDF', style: TextStyle(fontWeight: FontWeight.w700)),
                 style: OutlinedButton.styleFrom(
@@ -252,8 +250,8 @@ class _CredentialVaultScreenState extends State<CredentialVaultScreen> {
             const SizedBox(width: 10),
             Expanded(
               child: ElevatedButton.icon(
-                // anchor download attr → saves as filename.pdf
-                onPressed: () { Navigator.pop(ctx); _downloadDocUrl(_cloudinaryCleanUrl(pdfUrl)); },
+                // Download FIRST then close dialog — preserves user-gesture for url_launcher/popup
+                onPressed: () { _downloadDocUrl(_cloudinaryCleanUrl(pdfUrl)); Navigator.pop(ctx); },
                 icon: const Icon(Icons.download_rounded, size: 16),
                 label: const Text('Download', style: TextStyle(fontWeight: FontWeight.w700)),
                 style: ElevatedButton.styleFrom(
@@ -280,7 +278,7 @@ class _CredentialVaultScreenState extends State<CredentialVaultScreen> {
       const Text('Could not render preview.', style: TextStyle(color: Color(0xFF94A3B8))),
       const SizedBox(height: 16),
       ElevatedButton.icon(
-        onPressed: () { Navigator.pop(ctx); _openDocUrl(url); },
+        onPressed: () { _openDocUrl(url); Navigator.pop(ctx); },
         icon: const Icon(Icons.open_in_new_rounded, size: 16),
         label: const Text('Open in Browser'),
         style: ElevatedButton.styleFrom(
