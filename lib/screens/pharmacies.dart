@@ -80,13 +80,15 @@ class _PharmaciesScreenState extends State<PharmaciesScreen> {
       setState(() => _filteredPharmacies = _pharmacies);
       return;
     }
+    final q = query.toLowerCase();
     setState(() {
       _filteredPharmacies = _pharmacies.where((p) {
-        final name = (p['pharmacyName'] ?? p['name'] ?? '').toString().toLowerCase();
-        final address = (p['address'] ?? '').toString().toLowerCase();
+        final name = (p['pharmacyName'] ?? p['pharmacy_name'] ?? p['name'] ?? '').toString().toLowerCase();
+        final address = (p['address'] ?? p['location'] ?? '').toString().toLowerCase();
         final city = (p['city'] ?? '').toString().toLowerCase();
-        final q = query.toLowerCase();
-        return name.contains(q) || address.contains(q) || city.contains(q);
+        final area = (p['area'] ?? '').toString().toLowerCase();
+        final owner = (p['ownerName'] ?? p['owner_name'] ?? p['contactPerson'] ?? '').toString().toLowerCase();
+        return name.contains(q) || address.contains(q) || city.contains(q) || area.contains(q) || owner.contains(q);
       }).toList();
     });
   }
@@ -96,14 +98,13 @@ class _PharmaciesScreenState extends State<PharmaciesScreen> {
       setState(() => _filteredPharmacies = _pharmacies);
       return;
     }
+    final q = query.toLowerCase();
     setState(() {
       _filteredPharmacies = _pharmacies.where((p) {
-        final address = (p['address'] ?? '').toString().toLowerCase();
+        final address = (p['address'] ?? p['location'] ?? '').toString().toLowerCase();
         final city = (p['city'] ?? '').toString().toLowerCase();
         final area = (p['area'] ?? '').toString().toLowerCase();
-        // Also match pharmacy name so "Clifton Pharmacy" search works
         final name = (p['pharmacy_name'] ?? p['pharmacyName'] ?? p['name'] ?? '').toString().toLowerCase();
-        final q = query.toLowerCase();
         return address.contains(q) || city.contains(q) || area.contains(q) || name.contains(q);
       }).toList();
     });

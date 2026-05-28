@@ -98,12 +98,24 @@ class _LabsListScreenState extends State<LabsListScreen> {
       setState(() => _filteredLabs = _labs);
       return;
     }
+    final q = query.toLowerCase();
     setState(() {
       _filteredLabs = _labs.where((lab) {
-        final title = lab.title?.toLowerCase() ?? "";
-        final address = lab.address?.toLowerCase() ?? "";
-        final searchQuery = query.toLowerCase();
-        return title.contains(searchQuery) || address.contains(searchQuery);
+        // Match lab name
+        if ((lab.title?.toLowerCase() ?? '').contains(q)) return true;
+        // Match address
+        if ((lab.address?.toLowerCase() ?? '').contains(q)) return true;
+        // Match test names
+        if ((lab.tests ?? []).any((t) => t.toLowerCase().contains(q))) return true;
+        // Match any raw field (city, area, labName variants, etc.)
+        final idx = _labs.indexOf(lab);
+        if (idx >= 0 && idx < _rawLabsData.length) {
+          final raw = _rawLabsData[idx];
+          for (final val in raw.values) {
+            if (val is String && val.toLowerCase().contains(q)) return true;
+          }
+        }
+        return false;
       }).toList();
     });
   }
