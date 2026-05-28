@@ -212,7 +212,7 @@ class PublicHome extends StatelessWidget {
                             ),
                           ),
                         ),
-                        const SizedBox(height: 28),
+                        const SizedBox(height: 60),
                         // Browse by Condition
                         const Padding(
                           padding: EdgeInsets.symmetric(horizontal: 20),

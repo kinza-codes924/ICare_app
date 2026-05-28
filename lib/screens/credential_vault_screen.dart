@@ -70,39 +70,29 @@ class _CredentialVaultScreenState extends State<CredentialVaultScreen> {
     }
   }
 
-  /// Opens a URL in a new browser tab via an anchor element click.
-  /// More reliable than window.open() and not blocked by popup blockers.
+  /// Opens a URL in a new browser tab.
   void _openDocUrl(String url) {
     if (url.isEmpty) return;
     try {
-      final a = html.AnchorElement()
-        ..href = url
-        ..target = '_blank'
-        ..rel = 'noopener noreferrer';
-      html.document.body!.append(a);
-      a.click();
-      a.remove();
+      html.window.open(url, '_blank');
     } catch (e) {
       debugPrint('Cannot open URL: $e');
     }
   }
 
-  /// Downloads a file with proper .pdf extension.
+  /// Downloads a file via Cloudinary fl_attachment flag (forces Content-Disposition: attachment).
+  /// The browser `download` attribute is ignored for cross-origin URLs, so we add fl_attachment
+  /// to the Cloudinary URL to make the CDN serve it as a download instead.
   void _downloadDocUrl(String url) {
     if (url.isEmpty) return;
     try {
-      // Ensure the filename ends with .pdf so the browser saves it correctly
-      final filename = url.split('/').last.split('?').first;
-      final downloadName = filename.endsWith('.pdf') ? filename : '$filename.pdf';
-      final a = html.AnchorElement()
-        ..href = url
-        ..download = downloadName
-        ..target = '_blank';
-      html.document.body!.append(a);
-      a.click();
-      a.remove();
+      String dlUrl = _cloudinaryCleanUrl(url);
+      // Insert fl_attachment into Cloudinary URL so the CDN forces a file download
+      if (dlUrl.contains('cloudinary.com') && dlUrl.contains('/upload/')) {
+        dlUrl = dlUrl.replaceFirst('/upload/', '/upload/fl_attachment/');
+      }
+      html.window.open(dlUrl, '_blank');
     } catch (e) {
-      // Fallback: just open the URL
       _openDocUrl(url);
     }
   }
@@ -541,6 +531,8 @@ class _CredentialVaultScreenState extends State<CredentialVaultScreen> {
                               'documentUrl': url,
                             });
                             if (ctx.mounted) Navigator.pop(ctx);
+                            // Small delay so the backend finishes writing before we re-fetch
+                            await Future.delayed(const Duration(milliseconds: 400));
                             _fetchCredentials();
                           } catch (e) {
                             setModalState(() => isUploading = false);

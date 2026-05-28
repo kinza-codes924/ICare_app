@@ -71,6 +71,7 @@ class Navigator {
 
 class Window {
   Navigator get navigator => Navigator();
+  void open(String url, String target) {}
 }
 
 class Body {
