@@ -48,6 +48,11 @@ class _DoctorProfileSetupState extends ConsumerState<DoctorProfileSetup> {
     'Diabetologist', 'General Physician', 'Dentist', 'Nutritionist',
   ];
 
+  // Specialty search + custom entry
+  String _specialtySearch = '';
+  final TextEditingController _specialtySearchCtrl = TextEditingController();
+  final TextEditingController _specialtyCustomCtrl = TextEditingController();
+
   // Conditions treated — doctor selects what conditions they handle
   final List<String> _conditionsTreated = [];
   final TextEditingController _conditionInputCtrl = TextEditingController();
@@ -100,6 +105,8 @@ class _DoctorProfileSetupState extends ConsumerState<DoctorProfileSetup> {
     clinicAddressController.dispose();
     startTimeController.dispose();
     endTimeController.dispose();
+    _specialtySearchCtrl.dispose();
+    _specialtyCustomCtrl.dispose();
     _conditionInputCtrl.dispose();
     super.dispose();
   }
@@ -809,24 +816,90 @@ class _DoctorProfileSetupState extends ConsumerState<DoctorProfileSetup> {
   }
 
   Widget _buildSpecialtiesSelector() {
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      children: _commonSpecialties.map((s) {
-        final isSelected = _selectedSpecialties.contains(s);
-        return FilterChip(
-          label: Text(s, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: isSelected ? Colors.white : const Color(0xFF475569))),
-          selected: isSelected,
-          onSelected: (v) => setState(() {
-            if (v) { _selectedSpecialties.add(s); } else { _selectedSpecialties.remove(s); }
-          }),
-          selectedColor: AppColors.primaryColor,
-          backgroundColor: const Color(0xFFF1F5F9),
-          checkmarkColor: Colors.white,
-          side: BorderSide(color: isSelected ? AppColors.primaryColor : const Color(0xFFE2E8F0)),
-          padding: const EdgeInsets.symmetric(horizontal: 4),
-        );
-      }).toList(),
+    final filtered = _specialtySearch.isEmpty
+        ? _commonSpecialties
+        : _commonSpecialties
+            .where((s) => s.toLowerCase().contains(_specialtySearch.toLowerCase()))
+            .toList();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Search bar to filter chips
+        TextField(
+          controller: _specialtySearchCtrl,
+          decoration: InputDecoration(
+            hintText: 'Search specialties...',
+            hintStyle: TextStyle(fontSize: 13, color: Colors.grey[400]),
+            prefixIcon: Icon(Icons.search_rounded, color: Colors.grey[400], size: 18),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            filled: true, fillColor: const Color(0xFFF8FAFC),
+          ),
+          onChanged: (v) => setState(() => _specialtySearch = v),
+        ),
+        const SizedBox(height: 12),
+        // Filtered specialty chips
+        if (filtered.isEmpty)
+          Text('No matching specialties. Add a custom one below.', style: TextStyle(fontSize: 12, color: Colors.grey[500]))
+        else
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: filtered.map((s) {
+              final isSelected = _selectedSpecialties.contains(s);
+              return FilterChip(
+                label: Text(s, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: isSelected ? Colors.white : const Color(0xFF475569))),
+                selected: isSelected,
+                onSelected: (v) => setState(() {
+                  if (v) { _selectedSpecialties.add(s); } else { _selectedSpecialties.remove(s); }
+                }),
+                selectedColor: AppColors.primaryColor,
+                backgroundColor: const Color(0xFFF1F5F9),
+                checkmarkColor: Colors.white,
+                side: BorderSide(color: isSelected ? AppColors.primaryColor : const Color(0xFFE2E8F0)),
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+              );
+            }).toList(),
+          ),
+        const SizedBox(height: 12),
+        // Add custom specialty
+        Row(
+          children: [
+            Expanded(
+              child: TextField(
+                controller: _specialtyCustomCtrl,
+                decoration: InputDecoration(
+                  hintText: 'Add custom specialty...',
+                  hintStyle: TextStyle(fontSize: 13, color: Colors.grey[400]),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  filled: true, fillColor: const Color(0xFFF8FAFC),
+                ),
+                onSubmitted: (v) {
+                  if (v.trim().isNotEmpty && !_selectedSpecialties.contains(v.trim())) {
+                    setState(() { _selectedSpecialties.add(v.trim()); _specialtyCustomCtrl.clear(); });
+                  }
+                },
+              ),
+            ),
+            const SizedBox(width: 8),
+            IconButton(
+              icon: const Icon(Icons.add_circle_rounded, color: AppColors.primaryColor),
+              onPressed: () {
+                final v = _specialtyCustomCtrl.text.trim();
+                if (v.isNotEmpty && !_selectedSpecialties.contains(v)) {
+                  setState(() { _selectedSpecialties.add(v); _specialtyCustomCtrl.clear(); });
+                }
+              },
+            ),
+          ],
+        ),
+        if (_selectedSpecialties.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          Text('${_selectedSpecialties.length} specialty(ies) selected', style: const TextStyle(fontSize: 12, color: AppColors.primaryColor, fontWeight: FontWeight.w600)),
+        ],
+      ],
     );
   }
 
