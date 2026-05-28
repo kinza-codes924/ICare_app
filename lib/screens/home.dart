@@ -55,23 +55,26 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   Future<void> _refreshUserProfile() async {
-    final auth = ref.read(authProvider);
-    final token = auth.token;
+    final token = ref.read(authProvider).token;
     if (token == null || token.isEmpty) return;
 
+    final currentName = ref.read(authProvider).user?.name ?? '';
+    // Skip refresh if we already have a real name stored
+    final hasRealName = currentName.isNotEmpty &&
+        currentName.toLowerCase() != 'user' &&
+        currentName.length > 1;
+    if (hasRealName) return;
+
+    // Only refresh when name is missing/default
     final result = await _userService.getUserProfile(token: token);
     if (result['success'] == true && result['user'] != null && mounted) {
       try {
         final fetched = app_user.User.fromJson(result['user'] as Map<String, dynamic>);
-        final current = auth.user;
-        // Use fetched name only if current name is empty/default; always keep captured if better
-        final bestName = (current?.name.isNotEmpty == true && current!.name != 'User')
-            ? current.name
-            : fetched.name;
-        final updated = fetched.copyWith(
-          name: bestName.isNotEmpty ? bestName : (current?.name ?? ''),
-        );
-        await ref.read(authProvider.notifier).setUser(updated);
+        final fetchedName = fetched.name;
+        // Only update if backend has a real name
+        if (fetchedName.isNotEmpty && fetchedName.toLowerCase() != 'user') {
+          await ref.read(authProvider.notifier).setUser(fetched);
+        }
       } catch (_) {}
     }
   }

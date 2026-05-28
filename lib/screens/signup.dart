@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:icare/providers/auth_provider.dart';
 import 'package:icare/services/auth_service.dart';
-import 'package:icare/services/user_service.dart';
 import 'package:icare/models/user.dart' as app_user;
 import 'package:icare/utils/imagePaths.dart';
 import 'package:icare/utils/theme.dart';
@@ -37,7 +36,6 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
   final _confirmPassword = TextEditingController();
 
   final AuthService _authService = AuthService();
-  final UserService _userService = UserService();
 
   @override
   void initState() {
@@ -152,48 +150,27 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
           await ref.read(authProvider.notifier).setUserToken(token);
         }
 
-        // Try to get full profile; fallback to registration data
-        app_user.User? user;
-        if (token.isNotEmpty) {
-          final profileResult = await _userService.getUserProfile(token: token);
-          if (profileResult['success'] == true && profileResult['user'] != null) {
-            try {
-              final profileUser = app_user.User.fromJson(profileResult['user'] as Map<String, dynamic>);
-              // Always use captured form name — backend may return a default/username value
-              user = profileUser.copyWith(
-                name: capturedName.isNotEmpty ? capturedName : profileUser.name,
-                gender: capturedGender?.isNotEmpty == true ? capturedGender : profileUser.gender,
-                age: (_isPatient && capturedDob != null) ? _computeAgeFrom(capturedDob) : profileUser.age,
-              );
-            } catch (_) {}
-          }
-        }
+        // Get user id from registration response if available
+        final userData = rawData['user'] as Map<String, dynamic>?
+            ?? rawData['data']?['user'] as Map<String, dynamic>?;
+        final userId = userData?['_id']?.toString()
+            ?? userData?['id']?.toString()
+            ?? rawData['_id']?.toString()
+            ?? rawData['id']?.toString()
+            ?? '';
 
-        // Fallback: build user from registration response
-        if (user == null) {
-          final userData = rawData['user'] as Map<String, dynamic>?
-              ?? rawData['data']?['user'] as Map<String, dynamic>?;
-          if (userData != null) {
-            try { user = app_user.User.fromJson(userData); } catch (_) {}
-          }
-        }
-
-        // If we have a user object, set it; otherwise use minimal info
-        if (user != null) {
-          await ref.read(authProvider.notifier).setUser(user);
-        } else {
-          // Create minimal user from captured form data (controllers may be disposed)
-          final minUser = app_user.User(
-            id: rawData['_id']?.toString() ?? rawData['id']?.toString() ?? '',
-            name: capturedName,
-            email: capturedEmail,
-            phoneNumber: capturedPhone,
-            role: widget.role,
-            gender: _isPatient ? capturedGender : null,
-            age: _isPatient ? _computeAgeFrom(capturedDob) : null,
-          );
-          await ref.read(authProvider.notifier).setUser(minUser);
-        }
+        // Always build user from captured form data — never trust backend name
+        // (backend may store username/default instead of the entered name)
+        final newUser = app_user.User(
+          id: userId,
+          name: capturedName,
+          email: capturedEmail,
+          phoneNumber: capturedPhone,
+          role: widget.role,
+          gender: _isPatient ? capturedGender : null,
+          age: _isPatient ? _computeAgeFrom(capturedDob) : null,
+        );
+        await ref.read(authProvider.notifier).setUser(newUser);
 
         if (!mounted) return;
         context.go('/dashboard');

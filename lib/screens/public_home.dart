@@ -414,7 +414,11 @@ class _SpecialtySearchBarState extends State<_SpecialtySearchBar> {
   void initState() {
     super.initState();
     _focus.addListener(() {
-      if (!_focus.hasFocus) setState(() => _showDropdown = false);
+      if (!_focus.hasFocus) {
+        Future.delayed(const Duration(milliseconds: 200), () {
+          if (mounted) setState(() => _showDropdown = false);
+        });
+      }
     });
   }
 
@@ -519,7 +523,11 @@ class _ConditionOnlySearchBarState extends State<_ConditionOnlySearchBar> {
   void initState() {
     super.initState();
     _focus.addListener(() {
-      if (!_focus.hasFocus) setState(() => _showDropdown = false);
+      if (!_focus.hasFocus) {
+        Future.delayed(const Duration(milliseconds: 200), () {
+          if (mounted) setState(() => _showDropdown = false);
+        });
+      }
     });
   }
 
@@ -770,7 +778,11 @@ class _ConditionSearchBarState extends State<_ConditionSearchBar> {
                 onSubmitted: (value) {
                   if (value.trim().isNotEmpty) {
                     Navigator.of(context).push(
-                      MaterialPageRoute(builder: (ctx) => const DoctorsList()),
+                      MaterialPageRoute(
+                        builder: (ctx) => _filter == 'specialty'
+                            ? DoctorsList(initialSpecialty: value.trim())
+                            : DoctorsList(initialCondition: value.trim()),
+                      ),
                     );
                   }
                 },

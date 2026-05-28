@@ -1925,7 +1925,7 @@ class _DoctorDashboardState extends ConsumerState<DoctorDashboard> {
               },
             ),
             _buildFeatureCard(
-              'Certificate',
+              'Certificates',
               Icons.workspace_premium_rounded,
               const Color(0xFF10B981),
               () {

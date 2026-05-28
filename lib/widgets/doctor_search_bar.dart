@@ -39,7 +39,11 @@ class _DoctorSearchBarState extends State<DoctorSearchBar> {
   void initState() {
     super.initState();
     _focus.addListener(() {
-      if (!_focus.hasFocus) setState(() => _showDrop = false);
+      if (!_focus.hasFocus) {
+        Future.delayed(const Duration(milliseconds: 200), () {
+          if (mounted) setState(() => _showDrop = false);
+        });
+      }
     });
     _loadDoctorNames();
   }
