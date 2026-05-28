@@ -37,6 +37,17 @@ class _DoctorProfileSetupState extends ConsumerState<DoctorProfileSetup> {
   Uint8List? _imageBytes;
   final ImagePicker _picker = ImagePicker();
 
+  // Specialties — doctor selects which specialties they practice
+  final List<String> _selectedSpecialties = [];
+
+  static const _commonSpecialties = [
+    'Cardiologist', 'Dermatologist', 'Neurologist', 'Orthopedic Surgeon',
+    'Gynecologist', 'Pediatrician', 'Psychiatrist', 'Ophthalmologist',
+    'ENT Specialist', 'Urologist', 'Gastroenterologist', 'Endocrinologist',
+    'Pulmonologist', 'Oncologist', 'Nephrologist', 'Rheumatologist',
+    'Diabetologist', 'General Physician', 'Dentist', 'Nutritionist',
+  ];
+
   // Conditions treated — doctor selects what conditions they handle
   final List<String> _conditionsTreated = [];
   final TextEditingController _conditionInputCtrl = TextEditingController();
@@ -178,6 +189,15 @@ class _DoctorProfileSetupState extends ConsumerState<DoctorProfileSetup> {
       endTime: endTimeController.text,
       profileImage: _imageBytes,
     );
+
+    // Save specialties separately
+    if (_selectedSpecialties.isNotEmpty) {
+      try {
+        await ApiService().post('/doctors/add_doctor_details', {
+          'specialties': _selectedSpecialties,
+        });
+      } catch (_) {}
+    }
 
     // Save conditions treated separately
     if (_conditionsTreated.isNotEmpty) {
@@ -410,6 +430,15 @@ class _DoctorProfileSetupState extends ConsumerState<DoctorProfileSetup> {
                     ),
                   ],
                 ),
+                const SizedBox(height: 24),
+                _buildSectionTitle("Your Specialties"),
+                const SizedBox(height: 8),
+                Text(
+                  'Select all specialties you practice. Patients will find you based on these.',
+                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                ),
+                const SizedBox(height: 12),
+                _buildSpecialtiesSelector(),
                 const SizedBox(height: 24),
                 _buildSectionTitle("Conditions You Treat"),
                 const SizedBox(height: 8),
@@ -651,6 +680,22 @@ class _DoctorProfileSetupState extends ConsumerState<DoctorProfileSetup> {
                         _buildValidTillField(),
                         const SizedBox(height: 40),
                         const Text(
+                          "Your Specialties",
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF1E293B),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'Select all specialties you practice. Patients will find you based on these.',
+                          style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+                        ),
+                        const SizedBox(height: 12),
+                        _buildSpecialtiesSelector(),
+                        const SizedBox(height: 40),
+                        const Text(
                           "Conditions You Treat",
                           style: TextStyle(
                             fontSize: 20,
@@ -760,6 +805,28 @@ class _DoctorProfileSetupState extends ConsumerState<DoctorProfileSetup> {
         fontWeight: FontWeight.w700,
         color: Color(0xFF1E293B),
       ),
+    );
+  }
+
+  Widget _buildSpecialtiesSelector() {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: _commonSpecialties.map((s) {
+        final isSelected = _selectedSpecialties.contains(s);
+        return FilterChip(
+          label: Text(s, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: isSelected ? Colors.white : const Color(0xFF475569))),
+          selected: isSelected,
+          onSelected: (v) => setState(() {
+            if (v) { _selectedSpecialties.add(s); } else { _selectedSpecialties.remove(s); }
+          }),
+          selectedColor: AppColors.primaryColor,
+          backgroundColor: const Color(0xFFF1F5F9),
+          checkmarkColor: Colors.white,
+          side: BorderSide(color: isSelected ? AppColors.primaryColor : const Color(0xFFE2E8F0)),
+          padding: const EdgeInsets.symmetric(horizontal: 4),
+        );
+      }).toList(),
     );
   }
 

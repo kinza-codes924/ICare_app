@@ -834,18 +834,46 @@ class _MedicineSearchBarState extends State<_MedicineSearchBar> {
     super.dispose();
   }
 
+  static const _medicineCategories = [
+    'Antibiotic', 'Painkiller / Analgesic', 'Antacid', 'Antifungal',
+    'Antihistamine', 'Vitamin & Supplement', 'Blood Pressure Medicine',
+    'Diabetes Medicine', 'Antiseptic', 'Cough Syrup', 'Eye Drops',
+    'Skin Cream / Ointment', 'Injection', 'Antiviral',
+  ];
+  static const _medicineConditions = [
+    'Fever', 'Cold & Flu', 'Cough', 'Headache', 'Diabetes', 'Hypertension',
+    'Stomach Pain', 'Allergy', 'Skin Problem', 'Eye Infection',
+    'Ear Infection', 'Anxiety / Depression', 'Asthma', 'Back Pain',
+  ];
+
   void _updateSuggestions(String query) {
     if (query.isEmpty) {
       setState(() { _suggestions = []; _showSuggestions = false; });
       return;
     }
     final q = query.toLowerCase();
-    final results = _allPharmacies.where((p) {
-      final name = (p['pharmacyName'] ?? p['pharmacy_name'] ?? p['name'] ?? '').toString().toLowerCase();
-      final city = (p['city'] ?? '').toString().toLowerCase();
-      final area = (p['area'] ?? '').toString().toLowerCase();
-      return name.contains(q) || city.contains(q) || area.contains(q);
-    }).cast<Map<String, dynamic>>().take(6).toList();
+    List<Map<String, dynamic>> results = [];
+
+    if (_filter == 'name') {
+      results = _allPharmacies.where((p) {
+        final name = (p['pharmacyName'] ?? p['pharmacy_name'] ?? p['name'] ?? '').toString().toLowerCase();
+        final city = (p['city'] ?? '').toString().toLowerCase();
+        final area = (p['area'] ?? '').toString().toLowerCase();
+        return name.contains(q) || city.contains(q) || area.contains(q);
+      }).cast<Map<String, dynamic>>().take(6).toList();
+    } else if (_filter == 'category') {
+      results = _medicineCategories
+          .where((c) => c.toLowerCase().contains(q))
+          .take(6)
+          .map((c) => {'_staticType': 'category', '_label': c})
+          .toList();
+    } else if (_filter == 'condition') {
+      results = _medicineConditions
+          .where((c) => c.toLowerCase().contains(q))
+          .take(6)
+          .map((c) => {'_staticType': 'condition', '_label': c})
+          .toList();
+    }
     setState(() { _suggestions = results; _showSuggestions = results.isNotEmpty; });
   }
 
@@ -942,10 +970,18 @@ class _MedicineSearchBarState extends State<_MedicineSearchBar> {
                         if (i > 0) const Divider(height: 1, color: Color(0xFFF1F5F9)),
                         InkWell(
                           onTap: () {
-                            setState(() { _controller.text = name; _showSuggestions = false; });
-                            Navigator.of(context).push(MaterialPageRoute(
-                              builder: (ctx) => PharmacyDetailsScreen(pharmacy: p),
-                            ));
+                            final isStatic = p.containsKey('_staticType');
+                            final label = isStatic ? (p['_label'] as String) : name;
+                            setState(() { _controller.text = label; _showSuggestions = false; });
+                            if (isStatic) {
+                              Navigator.of(context).push(MaterialPageRoute(
+                                builder: (ctx) => PharmaciesScreen(initialSearch: label),
+                              ));
+                            } else {
+                              Navigator.of(context).push(MaterialPageRoute(
+                                builder: (ctx) => PharmacyDetailsScreen(pharmacy: p),
+                              ));
+                            }
                           },
                           child: Padding(
                             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
@@ -957,15 +993,23 @@ class _MedicineSearchBarState extends State<_MedicineSearchBar> {
                                     color: const Color(0xFF95BF47).withValues(alpha: 0.1),
                                     borderRadius: BorderRadius.circular(8),
                                   ),
-                                  child: const Icon(Icons.local_pharmacy_rounded, size: 15, color: Color(0xFF95BF47)),
+                                  child: Icon(
+                                    p.containsKey('_staticType')
+                                        ? (p['_staticType'] == 'condition' ? Icons.medical_services_outlined : Icons.category_outlined)
+                                        : Icons.local_pharmacy_rounded,
+                                    size: 15, color: const Color(0xFF95BF47),
+                                  ),
                                 ),
                                 const SizedBox(width: 12),
                                 Expanded(
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      Text(name, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: Color(0xFF0F172A))),
-                                      if (address.isNotEmpty)
+                                      Text(
+                                        p.containsKey('_staticType') ? (p['_label'] as String) : name,
+                                        style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: Color(0xFF0F172A)),
+                                      ),
+                                      if (!p.containsKey('_staticType') && address.isNotEmpty)
                                         Text(address, style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
                                     ],
                                   ),
@@ -1022,6 +1066,20 @@ class _LabSearchBarState extends State<_LabSearchBar> {
     super.dispose();
   }
 
+  static const _labCategories = [
+    'Blood Tests', 'Urine Analysis', 'X-Ray / Imaging', 'MRI / CT Scan',
+    'Pathology', 'Microbiology', 'Serology', 'Hormone Tests',
+    'Lipid Profile', 'Liver Function Tests', 'Kidney Function Tests',
+    'Cardiac Tests', 'Thyroid Tests', 'Diabetes Tests', 'Allergy Tests',
+  ];
+  static const _commonTests = [
+    'CBC (Complete Blood Count)', 'HbA1c', 'Blood Sugar (Fasting)',
+    'Lipid Profile', 'Thyroid Panel (TSH/T3/T4)', 'Liver Function Test (LFT)',
+    'Kidney Function Test (KFT)', 'Urine Complete Examination', 'ECG',
+    'Chest X-Ray', 'Ultrasound Abdomen', 'COVID-19 PCR',
+    'Hepatitis B (HBsAg)', 'Hepatitis C (HCV)',
+  ];
+
   void _updateSuggestions(String query) {
     if (query.isEmpty) {
       setState(() { _suggestions = []; _showSuggestions = false; });
@@ -1029,21 +1087,43 @@ class _LabSearchBarState extends State<_LabSearchBar> {
     }
     final q = query.toLowerCase();
     final results = <_HomeSuggestion>[];
-    for (final lab in _allLabs) {
-      if (results.length >= 6) break;
-      final name = (lab['labName'] ?? lab['name'] ?? '').toString();
-      final address = (lab['address'] ?? lab['city'] ?? '').toString();
-      if (name.toLowerCase().contains(q)) {
-        results.add(_HomeSuggestion(label: name, sublabel: address, isTest: false, raw: lab));
-      } else {
+
+    if (_filter == 'lab') {
+      for (final lab in _allLabs) {
+        if (results.length >= 6) break;
+        final name = (lab['labName'] ?? lab['name'] ?? '').toString();
+        final address = (lab['address'] ?? lab['city'] ?? '').toString();
+        if (name.toLowerCase().contains(q)) {
+          results.add(_HomeSuggestion(label: name, sublabel: address, isTest: false, raw: lab));
+        }
+      }
+    } else if (_filter == 'test') {
+      for (final lab in _allLabs) {
+        if (results.length >= 6) break;
         final tests = lab['availableTests'] as List? ?? [];
         for (final t in tests) {
           final tName = (t['name'] ?? t.toString()).toString();
           if (tName.toLowerCase().contains(q)) {
-            results.add(_HomeSuggestion(label: tName, sublabel: name, isTest: true, raw: lab));
+            final labName = (lab['labName'] ?? lab['name'] ?? '').toString();
+            results.add(_HomeSuggestion(label: tName, sublabel: 'At: $labName', isTest: true, raw: lab));
             break;
           }
         }
+      }
+      if (results.length < 3) {
+        for (final t in _commonTests) {
+          if (t.toLowerCase().contains(q) && !results.any((r) => r.label.toLowerCase() == t.toLowerCase())) {
+            results.add(_HomeSuggestion(label: t, sublabel: 'Search all labs', isTest: true, raw: {}));
+          }
+          if (results.length >= 6) break;
+        }
+      }
+    } else if (_filter == 'category') {
+      for (final cat in _labCategories) {
+        if (cat.toLowerCase().contains(q)) {
+          results.add(_HomeSuggestion(label: cat, sublabel: 'Browse labs by category', isTest: false, raw: {}));
+        }
+        if (results.length >= 6) break;
       }
     }
     setState(() { _suggestions = results; _showSuggestions = results.isNotEmpty; });
@@ -1141,13 +1221,20 @@ class _LabSearchBarState extends State<_LabSearchBar> {
                         InkWell(
                           onTap: () {
                             setState(() { _controller.text = s.label; _showSuggestions = false; });
-                            Navigator.of(context).push(MaterialPageRoute(
-                              builder: (ctx) => BookLabScreen(
-                                labId: s.raw['_id']?.toString() ?? '',
-                                labTitle: (s.raw['labName'] ?? s.raw['name'] ?? '').toString(),
-                                labProfileId: s.raw['profileId']?.toString(),
-                              ),
-                            ));
+                            final hasId = s.raw.containsKey('_id');
+                            if (hasId) {
+                              Navigator.of(context).push(MaterialPageRoute(
+                                builder: (ctx) => BookLabScreen(
+                                  labId: s.raw['_id']?.toString() ?? '',
+                                  labTitle: (s.raw['labName'] ?? s.raw['name'] ?? '').toString(),
+                                  labProfileId: s.raw['profileId']?.toString(),
+                                ),
+                              ));
+                            } else {
+                              Navigator.of(context).push(MaterialPageRoute(
+                                builder: (ctx) => LabsListScreen(initialSearch: s.label),
+                              ));
+                            }
                           },
                           child: Padding(
                             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
@@ -1172,7 +1259,7 @@ class _LabSearchBarState extends State<_LabSearchBar> {
                                       Text(s.label, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: Color(0xFF0F172A))),
                                       if (s.sublabel.isNotEmpty)
                                         Text(
-                                          s.isTest ? 'Available at: ${s.sublabel}' : s.sublabel,
+                                          s.sublabel,
                                           style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
                                         ),
                                     ],
