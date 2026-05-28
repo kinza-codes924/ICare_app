@@ -10,6 +10,10 @@ import 'package:icare/widgets/whatsapp_button.dart';
 import 'package:icare/utils/shared_pref.dart';
 import 'package:icare/widgets/doctor_search_bar.dart';
 import 'package:icare/services/doctor_service.dart';
+import 'package:icare/services/pharmacy_service.dart';
+import 'package:icare/services/laboratory_service.dart';
+import 'package:icare/screens/pharmacy_details.dart';
+import 'package:icare/screens/book_lab.dart';
 
 // ── Auth guard — show sign-in/sign-up dialog if not logged in ─────────────────
 Future<bool> _requireAuth(BuildContext context) async {
@@ -802,70 +806,182 @@ class _MedicineSearchBar extends StatefulWidget {
 
 class _MedicineSearchBarState extends State<_MedicineSearchBar> {
   String _filter = 'name';
+  final TextEditingController _controller = TextEditingController();
+  final FocusNode _focusNode = FocusNode();
+  List<Map<String, dynamic>> _suggestions = [];
+  bool _showSuggestions = false;
+  List<dynamic> _allPharmacies = [];
+
+  @override
+  void initState() {
+    super.initState();
+    PharmacyService().getAllPharmacies().then((data) {
+      if (mounted) setState(() => _allPharmacies = data);
+    });
+    _focusNode.addListener(() {
+      if (!_focusNode.hasFocus) {
+        Future.delayed(const Duration(milliseconds: 200), () {
+          if (mounted) setState(() => _showSuggestions = false);
+        });
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  void _updateSuggestions(String query) {
+    if (query.isEmpty) {
+      setState(() { _suggestions = []; _showSuggestions = false; });
+      return;
+    }
+    final q = query.toLowerCase();
+    final results = _allPharmacies.where((p) {
+      final name = (p['pharmacyName'] ?? p['pharmacy_name'] ?? p['name'] ?? '').toString().toLowerCase();
+      final city = (p['city'] ?? '').toString().toLowerCase();
+      final area = (p['area'] ?? '').toString().toLowerCase();
+      return name.contains(q) || city.contains(q) || area.contains(q);
+    }).cast<Map<String, dynamic>>().take(6).toList();
+    setState(() { _suggestions = results; _showSuggestions = results.isNotEmpty; });
+  }
 
   @override
   Widget build(BuildContext context) {
     final hintMap = {
-      'name': 'Search by medicine name (e.g. Panadol...)',
+      'name': 'Search by medicine name or pharmacy...',
       'category': 'Search by category (e.g. Antibiotic...)',
       'condition': 'Search by condition (e.g. Fever, Pain...)',
     };
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Container(
-        height: 50,
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: const Color(0xFFE8ECF5), width: 1.5),
-          boxShadow: [
-            BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 8, offset: const Offset(0, 2)),
-          ],
-        ),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10),
-              decoration: const BoxDecoration(
-                border: Border(right: BorderSide(color: Color(0xFFE8ECF5), width: 1.5)),
-              ),
-              child: DropdownButton<String>(
-                value: _filter,
-                underline: const SizedBox(),
-                icon: const Icon(Icons.arrow_drop_down, size: 20),
-                style: const TextStyle(fontSize: 12, color: Color(0xFF95BF47), fontWeight: FontWeight.w600),
-                items: const [
-                  DropdownMenuItem(value: 'name', child: Text('Medicine Name')),
-                  DropdownMenuItem(value: 'category', child: Text('Category')),
-                  DropdownMenuItem(value: 'condition', child: Text('Condition')),
-                ],
-                onChanged: (v) => setState(() => _filter = v!),
-              ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            height: 50,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFE8ECF5), width: 1.5),
+              boxShadow: [
+                BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 8, offset: const Offset(0, 2)),
+              ],
             ),
-            Expanded(
-              child: TextField(
-                decoration: InputDecoration(
-                  hintText: hintMap[_filter],
-                  hintStyle: TextStyle(fontSize: 13, color: Colors.grey[400]),
-                  prefixIcon: const Icon(Icons.local_pharmacy_rounded, color: Color(0xFF95BF47), size: 20),
-                  border: InputBorder.none,
-                  contentPadding: const EdgeInsets.symmetric(vertical: 15),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  decoration: const BoxDecoration(
+                    border: Border(right: BorderSide(color: Color(0xFFE8ECF5), width: 1.5)),
+                  ),
+                  child: DropdownButton<String>(
+                    value: _filter,
+                    underline: const SizedBox(),
+                    icon: const Icon(Icons.arrow_drop_down, size: 20),
+                    style: const TextStyle(fontSize: 12, color: Color(0xFF95BF47), fontWeight: FontWeight.w600),
+                    items: const [
+                      DropdownMenuItem(value: 'name', child: Text('Medicine Name')),
+                      DropdownMenuItem(value: 'category', child: Text('Category')),
+                      DropdownMenuItem(value: 'condition', child: Text('Condition')),
+                    ],
+                    onChanged: (v) => setState(() { _filter = v!; _suggestions = []; _showSuggestions = false; }),
+                  ),
                 ),
-                onSubmitted: (value) {
-                  if (value.trim().isNotEmpty) {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (ctx) => PharmaciesScreen(
-                          initialSearch: value.trim(),
+                Expanded(
+                  child: TextField(
+                    controller: _controller,
+                    focusNode: _focusNode,
+                    decoration: InputDecoration(
+                      hintText: hintMap[_filter],
+                      hintStyle: TextStyle(fontSize: 13, color: Colors.grey[400]),
+                      prefixIcon: const Icon(Icons.local_pharmacy_rounded, color: Color(0xFF95BF47), size: 20),
+                      border: InputBorder.none,
+                      contentPadding: const EdgeInsets.symmetric(vertical: 15),
+                    ),
+                    onChanged: _updateSuggestions,
+                    onSubmitted: (value) {
+                      setState(() => _showSuggestions = false);
+                      if (value.trim().isNotEmpty) {
+                        Navigator.of(context).push(MaterialPageRoute(
+                          builder: (ctx) => PharmaciesScreen(initialSearch: value.trim()),
+                        ));
+                      }
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (_showSuggestions && _suggestions.isNotEmpty)
+            Container(
+              margin: const EdgeInsets.only(top: 4),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFE8ECF5), width: 1.5),
+                boxShadow: [
+                  BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 16, offset: const Offset(0, 4)),
+                ],
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: _suggestions.asMap().entries.map((entry) {
+                    final i = entry.key;
+                    final p = entry.value;
+                    final name = (p['pharmacyName'] ?? p['pharmacy_name'] ?? p['name'] ?? 'Pharmacy').toString();
+                    final address = (p['address'] ?? p['city'] ?? '').toString();
+                    return Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (i > 0) const Divider(height: 1, color: Color(0xFFF1F5F9)),
+                        InkWell(
+                          onTap: () {
+                            setState(() { _controller.text = name; _showSuggestions = false; });
+                            Navigator.of(context).push(MaterialPageRoute(
+                              builder: (ctx) => PharmacyDetailsScreen(pharmacy: p),
+                            ));
+                          },
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
+                            child: Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(7),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF95BF47).withValues(alpha: 0.1),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: const Icon(Icons.local_pharmacy_rounded, size: 15, color: Color(0xFF95BF47)),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(name, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: Color(0xFF0F172A))),
+                                      if (address.isNotEmpty)
+                                        Text(address, style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+                                    ],
+                                  ),
+                                ),
+                                const Icon(Icons.arrow_forward_ios_rounded, size: 11, color: Color(0xFFCBD5E1)),
+                              ],
+                            ),
+                          ),
                         ),
-                      ),
+                      ],
                     );
-                  }
-                },
+                  }).toList(),
+                ),
               ),
             ),
-          ],
-        ),
+        ],
       ),
     );
   }
@@ -878,6 +994,60 @@ class _LabSearchBar extends StatefulWidget {
 
 class _LabSearchBarState extends State<_LabSearchBar> {
   String _filter = 'test';
+  final TextEditingController _controller = TextEditingController();
+  final FocusNode _focusNode = FocusNode();
+  List<_HomeSuggestion> _suggestions = [];
+  bool _showSuggestions = false;
+  List<Map<String, dynamic>> _allLabs = [];
+
+  @override
+  void initState() {
+    super.initState();
+    LaboratoryService().getAllLaboratories().then((data) {
+      if (mounted) setState(() => _allLabs = data.cast<Map<String, dynamic>>());
+    });
+    _focusNode.addListener(() {
+      if (!_focusNode.hasFocus) {
+        Future.delayed(const Duration(milliseconds: 200), () {
+          if (mounted) setState(() => _showSuggestions = false);
+        });
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  void _updateSuggestions(String query) {
+    if (query.isEmpty) {
+      setState(() { _suggestions = []; _showSuggestions = false; });
+      return;
+    }
+    final q = query.toLowerCase();
+    final results = <_HomeSuggestion>[];
+    for (final lab in _allLabs) {
+      if (results.length >= 6) break;
+      final name = (lab['labName'] ?? lab['name'] ?? '').toString();
+      final address = (lab['address'] ?? lab['city'] ?? '').toString();
+      if (name.toLowerCase().contains(q)) {
+        results.add(_HomeSuggestion(label: name, sublabel: address, isTest: false, raw: lab));
+      } else {
+        final tests = lab['availableTests'] as List? ?? [];
+        for (final t in tests) {
+          final tName = (t['name'] ?? t.toString()).toString();
+          if (tName.toLowerCase().contains(q)) {
+            results.add(_HomeSuggestion(label: tName, sublabel: name, isTest: true, raw: lab));
+            break;
+          }
+        }
+      }
+    }
+    setState(() { _suggestions = results; _showSuggestions = results.isNotEmpty; });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -888,61 +1058,149 @@ class _LabSearchBarState extends State<_LabSearchBar> {
     };
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Container(
-        height: 50,
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: const Color(0xFFE8ECF5), width: 1.5),
-          boxShadow: [
-            BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 8, offset: const Offset(0, 2)),
-          ],
-        ),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10),
-              decoration: const BoxDecoration(
-                border: Border(right: BorderSide(color: Color(0xFFE8ECF5), width: 1.5)),
-              ),
-              child: DropdownButton<String>(
-                value: _filter,
-                underline: const SizedBox(),
-                icon: const Icon(Icons.arrow_drop_down, size: 20),
-                style: const TextStyle(fontSize: 12, color: Color(0xFFFF4D00), fontWeight: FontWeight.w600),
-                items: const [
-                  DropdownMenuItem(value: 'test', child: Text('Test Name')),
-                  DropdownMenuItem(value: 'category', child: Text('Category')),
-                  DropdownMenuItem(value: 'lab', child: Text('Lab Name')),
-                ],
-                onChanged: (v) => setState(() => _filter = v!),
-              ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            height: 50,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFE8ECF5), width: 1.5),
+              boxShadow: [
+                BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 8, offset: const Offset(0, 2)),
+              ],
             ),
-            Expanded(
-              child: TextField(
-                decoration: InputDecoration(
-                  hintText: hintMap[_filter],
-                  hintStyle: TextStyle(fontSize: 13, color: Colors.grey[400]),
-                  prefixIcon: const Icon(Icons.biotech_rounded, color: Color(0xFFFF4D00), size: 20),
-                  border: InputBorder.none,
-                  contentPadding: const EdgeInsets.symmetric(vertical: 15),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  decoration: const BoxDecoration(
+                    border: Border(right: BorderSide(color: Color(0xFFE8ECF5), width: 1.5)),
+                  ),
+                  child: DropdownButton<String>(
+                    value: _filter,
+                    underline: const SizedBox(),
+                    icon: const Icon(Icons.arrow_drop_down, size: 20),
+                    style: const TextStyle(fontSize: 12, color: Color(0xFFFF4D00), fontWeight: FontWeight.w600),
+                    items: const [
+                      DropdownMenuItem(value: 'test', child: Text('Test Name')),
+                      DropdownMenuItem(value: 'category', child: Text('Category')),
+                      DropdownMenuItem(value: 'lab', child: Text('Lab Name')),
+                    ],
+                    onChanged: (v) => setState(() { _filter = v!; _suggestions = []; _showSuggestions = false; }),
+                  ),
                 ),
-                onSubmitted: (value) {
-                  if (value.trim().isNotEmpty) {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (ctx) => LabsListScreen(initialSearch: value.trim()),
-                      ),
+                Expanded(
+                  child: TextField(
+                    controller: _controller,
+                    focusNode: _focusNode,
+                    decoration: InputDecoration(
+                      hintText: hintMap[_filter],
+                      hintStyle: TextStyle(fontSize: 13, color: Colors.grey[400]),
+                      prefixIcon: const Icon(Icons.biotech_rounded, color: Color(0xFFFF4D00), size: 20),
+                      border: InputBorder.none,
+                      contentPadding: const EdgeInsets.symmetric(vertical: 15),
+                    ),
+                    onChanged: _updateSuggestions,
+                    onSubmitted: (value) {
+                      setState(() => _showSuggestions = false);
+                      if (value.trim().isNotEmpty) {
+                        Navigator.of(context).push(MaterialPageRoute(
+                          builder: (ctx) => LabsListScreen(initialSearch: value.trim()),
+                        ));
+                      }
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (_showSuggestions && _suggestions.isNotEmpty)
+            Container(
+              margin: const EdgeInsets.only(top: 4),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFE8ECF5), width: 1.5),
+                boxShadow: [
+                  BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 16, offset: const Offset(0, 4)),
+                ],
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: _suggestions.asMap().entries.map((entry) {
+                    final i = entry.key;
+                    final s = entry.value;
+                    return Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (i > 0) const Divider(height: 1, color: Color(0xFFF1F5F9)),
+                        InkWell(
+                          onTap: () {
+                            setState(() { _controller.text = s.label; _showSuggestions = false; });
+                            Navigator.of(context).push(MaterialPageRoute(
+                              builder: (ctx) => BookLabScreen(
+                                labId: s.raw['_id']?.toString() ?? '',
+                                labTitle: (s.raw['labName'] ?? s.raw['name'] ?? '').toString(),
+                                labProfileId: s.raw['profileId']?.toString(),
+                              ),
+                            ));
+                          },
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
+                            child: Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(7),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFFF4D00).withValues(alpha: 0.08),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Icon(
+                                    s.isTest ? Icons.biotech_outlined : Icons.science_outlined,
+                                    size: 15, color: const Color(0xFFFF4D00),
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(s.label, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: Color(0xFF0F172A))),
+                                      if (s.sublabel.isNotEmpty)
+                                        Text(
+                                          s.isTest ? 'Available at: ${s.sublabel}' : s.sublabel,
+                                          style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                                        ),
+                                    ],
+                                  ),
+                                ),
+                                const Icon(Icons.arrow_forward_ios_rounded, size: 11, color: Color(0xFFCBD5E1)),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
                     );
-                  }
-                },
+                  }).toList(),
+                ),
               ),
             ),
-          ],
-        ),
+        ],
       ),
     );
   }
+}
+
+class _HomeSuggestion {
+  final String label;
+  final String sublabel;
+  final bool isTest;
+  final Map<String, dynamic> raw;
+  const _HomeSuggestion({required this.label, required this.sublabel, required this.isTest, required this.raw});
 }
 
 // ── Courses Section ───────────────────────────────────────────────────────────
