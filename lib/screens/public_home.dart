@@ -204,7 +204,7 @@ class PublicHome extends StatelessWidget {
                             label: 'See All Speciality',
                             color: const Color(0xFF7C3AED),
                             onTap: () => Navigator.of(context).push(
-                              MaterialPageRoute(builder: (_) => const DoctorsList()),
+                              MaterialPageRoute(builder: (_) => const DoctorsList(initialSearchMode: 'specialty')),
                             ),
                           ),
                         ),
@@ -241,7 +241,7 @@ class PublicHome extends StatelessWidget {
                             label: 'View All Conditions',
                             color: const Color(0xFF0891B2),
                             onTap: () => Navigator.of(context).push(
-                              MaterialPageRoute(builder: (_) => const DoctorsList()),
+                              MaterialPageRoute(builder: (_) => const DoctorsList(initialSearchMode: 'condition')),
                             ),
                           ),
                         ),
@@ -853,11 +853,10 @@ class _MedicineSearchBarState extends State<_MedicineSearchBar> {
                 ),
                 onSubmitted: (value) {
                   if (value.trim().isNotEmpty) {
-                    // Navigate to pharmacies with the medicine pre-searched
                     Navigator.of(context).push(
                       MaterialPageRoute(
                         builder: (ctx) => PharmaciesScreen(
-                          prescribedMedicines: [value.trim()],
+                          initialSearch: value.trim(),
                         ),
                       ),
                     );
@@ -931,7 +930,9 @@ class _LabSearchBarState extends State<_LabSearchBar> {
                 onSubmitted: (value) {
                   if (value.trim().isNotEmpty) {
                     Navigator.of(context).push(
-                      MaterialPageRoute(builder: (ctx) => LabsListScreen()),
+                      MaterialPageRoute(
+                        builder: (ctx) => LabsListScreen(initialSearch: value.trim()),
+                      ),
                     );
                   }
                 },
@@ -3259,7 +3260,7 @@ class PublicHomeBody extends StatelessWidget {
                   label: 'See All Speciality',
                   color: const Color(0xFF7C3AED),
                   onTap: () => Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const DoctorsList()),
+                    MaterialPageRoute(builder: (_) => const DoctorsList(initialSearchMode: 'specialty')),
                   ),
                 ),
               ),

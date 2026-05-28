@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:icare/models/user.dart' as app_user;
 import 'package:icare/providers/auth_provider.dart';
 import 'package:icare/services/user_service.dart';
+import 'package:icare/services/doctor_service.dart';
 import 'package:icare/utils/theme.dart';
 import 'package:icare/widgets/custom_text_input.dart';
 import 'package:image_picker/image_picker.dart';
@@ -36,7 +37,27 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
   String? _weightKg;
   String? _weightLbs;
 
-  // Conditions & Goals
+  // Doctor-specific fields
+  String? _selectedSpecialization;
+  final Set<String> _selectedDoctorConditions = {};
+
+  static const _specializations = [
+    'Cardiologist','Dermatologist','Neurologist','Orthopedic','Gynecologist',
+    'Pediatrician','Psychiatrist','Ophthalmologist','ENT Specialist','Urologist',
+    'Gastroenterologist','Endocrinologist','Pulmonologist','Oncologist','Nephrologist',
+    'Rheumatologist','Diabetologist','General Physician','Dentist','Nutritionist',
+  ];
+
+  static const _doctorConditions = [
+    'Diabetes','Hypertension','Fever','Heart Disease','Asthma','Back Pain',
+    'Arthritis','Anxiety','Depression','Migraine','Obesity','Thyroid',
+    'Kidney Disease','Liver Disease','Cancer','Skin Problem','Eye Problem',
+    'Ear Infection','Stomach Pain','Chest Pain','Shortness of Breath',
+    'Joint Pain','Allergies','Insomnia','PCOS','Hepatitis','Dengue',
+    'Typhoid','Anemia','Vitamin Deficiency',
+  ];
+
+  // Patient Conditions & Goals
   final Set<String> _selectedConditions = {};
   final Set<String> _selectedGoals = {};
 
@@ -67,6 +88,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
     {'name': TextEditingController(), 'phone': TextEditingController()},
   ];
   final UserService _userService = UserService();
+  final DoctorService _doctorService = DoctorService();
   bool isLoading = false;
   Uint8List? _imageBytes;
   final ImagePicker _picker = ImagePicker();
@@ -139,7 +161,6 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
       nameController.text = user.name;
       phoneController.text = user.phoneNumber;
       ageController.text = user.age ?? '';
-      // Normalize gender to match our options
       final g = user.gender?.trim() ?? '';
       if (g.toLowerCase() == 'male') {
         _selectedGender = 'Male';
@@ -148,6 +169,24 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
       } else if (g.isNotEmpty) {
         _selectedGender = 'Other';
       }
+    }
+    final role = ref.read(authProvider).userRole ?? '';
+    if (role != 'Patient') _loadDoctorProfile();
+  }
+
+  Future<void> _loadDoctorProfile() async {
+    final result = await _doctorService.getMyDoctorProfile();
+    if (!mounted) return;
+    if (result['success'] == true && result['doctor'] != null) {
+      final doc = result['doctor'] as Map<String, dynamic>;
+      setState(() {
+        final spec = doc['specialization']?.toString();
+        if (spec != null && spec.isNotEmpty) _selectedSpecialization = spec;
+        final conds = doc['conditionsTreated'];
+        if (conds is List) {
+          _selectedDoctorConditions.addAll(conds.map((c) => c.toString()));
+        }
+      });
     }
   }
 
@@ -172,6 +211,17 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
     setState(() => isLoading = true);
 
     try {
+      final role = ref.read(authProvider).userRole ?? '';
+      final isDoctor = role != 'Patient';
+
+      // For doctors: save specialization + conditions to doctor profile
+      if (isDoctor && _selectedSpecialization != null && _selectedSpecialization!.isNotEmpty) {
+        await _doctorService.updateDoctorSpecialization(
+          specialization: _selectedSpecialization!,
+          conditionsTreated: _selectedDoctorConditions.toList(),
+        );
+      }
+
       // Build height string
       String? heightStr;
       if (_heightUnit == 'cm' && _heightCm != null) {
@@ -440,11 +490,59 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
                         const SizedBox(height: 8),
                         const Text(
                           'Email cannot be changed',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Color(0xFF64748B),
-                          ),
+                          style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
                         ),
+                        if (!isPatient) ...[
+                          const SizedBox(height: 24),
+                          const Text(
+                            'Doctor Profile',
+                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
+                          ),
+                          const SizedBox(height: 16),
+                          _buildSectionLabel('Specialization', Icons.medical_services_outlined),
+                          const SizedBox(height: 8),
+                          DropdownButtonFormField<String>(
+                            value: _selectedSpecialization,
+                            isExpanded: true,
+                            decoration: InputDecoration(
+                              hintText: 'Select your specialization',
+                              prefixIcon: const Icon(Icons.local_hospital_outlined, color: Color(0xFF94A3B8)),
+                              filled: true,
+                              fillColor: const Color(0xFFF8FAFC),
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: Color(0xFFE2E8F0), width: 1.5)),
+                              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: Color(0xFFE2E8F0), width: 1.5)),
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                            ),
+                            items: _specializations.map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
+                            onChanged: (v) => setState(() => _selectedSpecialization = v),
+                          ),
+                          const SizedBox(height: 16),
+                          _buildSectionLabel('Conditions Treated', Icons.healing_outlined),
+                          const SizedBox(height: 8),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: _doctorConditions.map((c) {
+                              final sel = _selectedDoctorConditions.contains(c);
+                              return GestureDetector(
+                                onTap: () => setState(() {
+                                  if (sel) _selectedDoctorConditions.remove(c);
+                                  else _selectedDoctorConditions.add(c);
+                                }),
+                                child: AnimatedContainer(
+                                  duration: const Duration(milliseconds: 150),
+                                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                                  decoration: BoxDecoration(
+                                    color: sel ? AppColors.primaryColor : const Color(0xFFF1F5F9),
+                                    borderRadius: BorderRadius.circular(20),
+                                    border: Border.all(color: sel ? AppColors.primaryColor : const Color(0xFFE2E8F0)),
+                                  ),
+                                  child: Text(c, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: sel ? Colors.white : const Color(0xFF475569))),
+                                ),
+                              );
+                            }).toList(),
+                          ),
+                        ],
                         if (isPatient) ...[
                           const SizedBox(height: 16),
                           TextFormField(

@@ -19,7 +19,8 @@ import 'package:icare/services/laboratory_service.dart';
 
 class LabsListScreen extends StatefulWidget {
   final List<dynamic>? recommendedTests;
-  const LabsListScreen({super.key, this.recommendedTests});
+  final String? initialSearch;
+  const LabsListScreen({super.key, this.recommendedTests, this.initialSearch});
 
   @override
   State<LabsListScreen> createState() => _LabsListScreenState();
@@ -44,6 +45,9 @@ class _LabsListScreenState extends State<LabsListScreen> {
   @override
   void initState() {
     super.initState();
+    if (widget.initialSearch != null && widget.initialSearch!.isNotEmpty) {
+      _searchController.text = widget.initialSearch!;
+    }
     _fetchLabs();
   }
 
@@ -77,6 +81,9 @@ class _LabsListScreenState extends State<LabsListScreen> {
           _filteredLabs = loadedLabs;
           _isLoading = false;
         });
+        if (widget.initialSearch != null && widget.initialSearch!.isNotEmpty) {
+          _filterLabs(widget.initialSearch!);
+        }
       }
     } catch (e) {
       debugPrint('Error fetching labs: $e');

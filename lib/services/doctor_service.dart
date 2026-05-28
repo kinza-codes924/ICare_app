@@ -34,6 +34,37 @@ class DoctorService {
     }
   }
 
+  Future<Map<String, dynamic>> getMyDoctorProfile() async {
+    try {
+      final response = await _apiService.get('/doctors/my-profile');
+      if (response.statusCode == 200) {
+        return {'success': true, 'doctor': response.data['doctor'] ?? response.data};
+      }
+      return {'success': false};
+    } catch (_) {
+      return {'success': false};
+    }
+  }
+
+  Future<Map<String, dynamic>> updateDoctorSpecialization({
+    required String specialization,
+    List<String>? conditionsTreated,
+  }) async {
+    try {
+      final data = <String, dynamic>{'specialization': specialization};
+      if (conditionsTreated != null) data['conditionsTreated'] = conditionsTreated;
+      final response = await _apiService.post('/doctors/add_doctor_details', data);
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        return {'success': true};
+      }
+      return {'success': false, 'message': 'Failed to update'};
+    } on DioException catch (e) {
+      return {'success': false, 'message': e.response?.data['message'] ?? 'Network error'};
+    } catch (e) {
+      return {'success': false, 'message': 'Unexpected error: $e'};
+    }
+  }
+
   Future<Map<String, dynamic>> updateDoctorProfile({
     required String specialization,
     List<String>? consultationType,

@@ -12,7 +12,8 @@ class DoctorsList extends StatefulWidget {
   final String? initialSpecialty;
   final String? initialCondition;
   final String? initialName;
-  const DoctorsList({super.key, this.initialSpecialty, this.initialCondition, this.initialName});
+  final String? initialSearchMode;
+  const DoctorsList({super.key, this.initialSpecialty, this.initialCondition, this.initialName, this.initialSearchMode});
 
   @override
   State<DoctorsList> createState() => _DoctorsListState();
@@ -51,6 +52,8 @@ class _DoctorsListState extends State<DoctorsList> {
     } else if (widget.initialCondition != null) {
       _searchQuery = widget.initialCondition!;
       _searchMode = 'condition';
+    } else if (widget.initialSearchMode != null) {
+      _searchMode = widget.initialSearchMode!;
     }
     _searchController = TextEditingController(text: _searchQuery);
     _loadDoctors();
@@ -93,12 +96,11 @@ class _DoctorsListState extends State<DoctorsList> {
 
       setState(() {
         _doctors = doctorsList;
-        _filteredDoctors = doctorsList;
         _specializations = specs;
         _languages = langs;
-        _sortDoctors();
         _isLoading = false;
       });
+      _filterDoctors();
     } else {
       debugPrint('❌ Failed to load doctors: ${result['message']}');
       setState(() => _isLoading = false);

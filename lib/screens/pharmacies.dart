@@ -15,7 +15,8 @@ import 'package:icare/widgets/custom_text_input.dart';
 
 class PharmaciesScreen extends StatefulWidget {
   final List<dynamic>? prescribedMedicines;
-  const PharmaciesScreen({super.key, this.prescribedMedicines});
+  final String? initialSearch;
+  const PharmaciesScreen({super.key, this.prescribedMedicines, this.initialSearch});
 
   @override
   State<PharmaciesScreen> createState() => _PharmaciesScreenState();
@@ -40,6 +41,9 @@ class _PharmaciesScreenState extends State<PharmaciesScreen> {
   @override
   void initState() {
     super.initState();
+    if (widget.initialSearch != null && widget.initialSearch!.isNotEmpty) {
+      _searchController.text = widget.initialSearch!;
+    }
     _fetchPharmacies();
   }
 
@@ -59,6 +63,9 @@ class _PharmaciesScreenState extends State<PharmaciesScreen> {
           _filteredPharmacies = data;
           _isLoading = false;
         });
+        if (widget.initialSearch != null && widget.initialSearch!.isNotEmpty) {
+          _filterPharmacies(widget.initialSearch!);
+        }
       }
     } catch (e) {
       debugPrint('Error fetching pharmacies: $e');

@@ -81,16 +81,24 @@ class Doctor {
     }
 
     // Support both nested-user format and flat format from API
-    final userJson = json['user'] is Map
-        ? Map<String, dynamic>.from(json['user'] as Map)
-        : <String, dynamic>{
-            '_id': json['_id'] ?? json['id'] ?? '',
-            'name': json['name'] ?? '',
-            'email': json['email'] ?? '',
-            'phoneNumber': json['phoneNumber'] ?? json['phone'] ?? '',
-            'role': json['role'] ?? '',
-            'profilePicture': json['profilePicture'],
-          };
+    Map<String, dynamic> userJson;
+    if (json['user'] is Map) {
+      userJson = Map<String, dynamic>.from(json['user'] as Map);
+      // If nested user lacks profilePicture, try top-level field as fallback
+      if ((userJson['profilePicture'] == null || (userJson['profilePicture'] as String?) == '') &&
+          json['profilePicture'] != null) {
+        userJson = {...userJson, 'profilePicture': json['profilePicture']};
+      }
+    } else {
+      userJson = <String, dynamic>{
+        '_id': json['_id'] ?? json['id'] ?? '',
+        'name': json['name'] ?? '',
+        'email': json['email'] ?? '',
+        'phoneNumber': json['phoneNumber'] ?? json['phone'] ?? '',
+        'role': json['role'] ?? '',
+        'profilePicture': json['profilePicture'],
+      };
+    }
 
     // availableTime can be a Map or a plain String like "9:00 AM - 5:00 PM"
     AvailableTime? parseAvailableTime(dynamic value) {
