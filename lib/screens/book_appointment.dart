@@ -323,12 +323,15 @@ class _BookAppointmentScreenState extends ConsumerState<BookAppointmentScreen> {
                 CircleAvatar(
                   radius: 28,
                   backgroundColor: AppColors.primaryColor.withValues(alpha: 0.1),
-                  child: Text(
-                    widget.doctor.user.name.isNotEmpty
-                        ? widget.doctor.user.name.substring(0, 1).toUpperCase()
-                        : 'D',
-                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: AppColors.primaryColor),
-                  ),
+                  backgroundImage: (widget.doctor.user.profilePicture != null && widget.doctor.user.profilePicture!.isNotEmpty)
+                      ? NetworkImage(widget.doctor.user.profilePicture!)
+                      : null,
+                  child: (widget.doctor.user.profilePicture == null || widget.doctor.user.profilePicture!.isEmpty)
+                      ? Text(
+                          widget.doctor.user.name.isNotEmpty ? widget.doctor.user.name.substring(0, 1).toUpperCase() : 'D',
+                          style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: AppColors.primaryColor),
+                        )
+                      : null,
                 ),
                 const SizedBox(width: 14),
                 Expanded(

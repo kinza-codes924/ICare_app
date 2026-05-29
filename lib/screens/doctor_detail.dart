@@ -70,19 +70,16 @@ class DoctorDetailScreen extends ConsumerWidget {
                   // Avatar
                   CircleAvatar(
                     radius: 50,
-                    backgroundColor: AppColors.primaryColor.withValues(
-                      alpha: 0.1,
-                    ),
-                    child: Text(
-                      doctor.user.name.isNotEmpty
-                          ? doctor.user.name.substring(0, 1).toUpperCase()
-                          : 'D',
-                      style: TextStyle(
-                        fontSize: 40,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.primaryColor,
-                      ),
-                    ),
+                    backgroundColor: AppColors.primaryColor.withValues(alpha: 0.1),
+                    backgroundImage: (doctor.user.profilePicture != null && doctor.user.profilePicture!.isNotEmpty)
+                        ? NetworkImage(doctor.user.profilePicture!)
+                        : null,
+                    child: (doctor.user.profilePicture == null || doctor.user.profilePicture!.isEmpty)
+                        ? Text(
+                            doctor.user.name.isNotEmpty ? doctor.user.name.substring(0, 1).toUpperCase() : 'D',
+                            style: TextStyle(fontSize: 40, fontWeight: FontWeight.bold, color: AppColors.primaryColor),
+                          )
+                        : null,
                   ),
                   const SizedBox(height: 16),
                   // Name
@@ -442,7 +439,7 @@ class DoctorDetailScreen extends ConsumerWidget {
                 ),
                 child: Center(
                   child: IconButton(
-                    icon: const Icon(Icons.arrow_back_ios_new, size: 20),
+                    icon: const Icon(Icons.arrow_back_ios_new, size: 20, color: AppColors.primaryColor),
                     onPressed: () => Navigator.of(context).pop(),
                     padding: EdgeInsets.zero,
                   ),
@@ -545,18 +542,15 @@ class DoctorDetailScreen extends ConsumerWidget {
                               child: CircleAvatar(
                                 radius: isDesktop ? 65 : 55,
                                 backgroundColor: const Color(0xFFF0F9FF),
-                                child: Text(
-                                  doctor.user.name.isNotEmpty
-                                      ? doctor.user.name
-                                            .substring(0, 1)
-                                            .toUpperCase()
-                                      : 'D',
-                                  style: TextStyle(
-                                    fontSize: isDesktop ? 56 : 48,
-                                    fontWeight: FontWeight.w900,
-                                    color: AppColors.primaryColor,
-                                  ),
-                                ),
+                                backgroundImage: (doctor.user.profilePicture != null && doctor.user.profilePicture!.isNotEmpty)
+                                    ? NetworkImage(doctor.user.profilePicture!)
+                                    : null,
+                                child: (doctor.user.profilePicture == null || doctor.user.profilePicture!.isEmpty)
+                                    ? Text(
+                                        doctor.user.name.isNotEmpty ? doctor.user.name.substring(0, 1).toUpperCase() : 'D',
+                                        style: TextStyle(fontSize: isDesktop ? 56 : 48, fontWeight: FontWeight.w900, color: AppColors.primaryColor),
+                                      )
+                                    : null,
                               ),
                             ),
                           ),

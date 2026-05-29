@@ -204,6 +204,30 @@ class _PharmacyDetailsScreenState extends State<PharmacyDetailsScreen> {
   }
 
   Future<void> _pickPrescription() async {
+    final token = await SharedPref().getToken();
+    if (token == null || token.isEmpty) {
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('Login Required'),
+            content: const Text('Please log in to upload a prescription.'),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  Navigator.push(context, MaterialPageRoute(builder: (_) => const LoginScreen()));
+                },
+                style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryColor, foregroundColor: Colors.white),
+                child: const Text('Login'),
+              ),
+            ],
+          ),
+        );
+      }
+      return;
+    }
     final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
     if (image != null) {
       setState(() {
