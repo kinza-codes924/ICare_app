@@ -520,9 +520,8 @@ class _WebPatientProfileViewState extends State<_WebPatientProfileView> {
   @override
   void initState() {
     super.initState();
-    // Fetch doctor profile for completed patient-view appointments
+    // Fetch doctor profile for all patient-view appointments (for picture + credentials)
     if (widget.selectedRole == 'Patient' &&
-        widget.appointment.status.toLowerCase() == 'completed' &&
         widget.appointment.doctor?.id.isNotEmpty == true) {
       _fetchDoctorProfile();
     }
@@ -591,33 +590,33 @@ class _WebPatientProfileViewState extends State<_WebPatientProfileView> {
                     ),
                     child: Column(
                       children: [
-                        // Patient Avatar
-                        Container(
-                          width: 200,
-                          height: 200,
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(
-                              color: AppColors.primaryColor,
-                              width: 3,
+                        // Doctor/Patient Avatar
+                        Builder(builder: (_) {
+                          final picUrl = selectedRole == 'Patient'
+                              ? (_doctorProfile?['profilePicture']?.toString() ?? appointment.doctor?.profilePicture ?? '')
+                              : (appointment.patient?.profilePicture ?? '');
+                          return Container(
+                            width: 200,
+                            height: 200,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              border: Border.all(color: AppColors.primaryColor, width: 3),
+                              color: AppColors.primaryColor.withValues(alpha: 0.1),
                             ),
-                            color: AppColors.primaryColor.withValues(
-                              alpha: 0.1,
+                            child: ClipOval(
+                              child: picUrl.isNotEmpty
+                                  ? Image.network(picUrl, fit: BoxFit.cover,
+                                      errorBuilder: (_, _, _) => Center(
+                                        child: Text(profileName.isNotEmpty ? profileName[0].toUpperCase() : 'U',
+                                          style: const TextStyle(fontSize: 80, fontWeight: FontWeight.bold, color: AppColors.primaryColor)),
+                                      ))
+                                  : Center(
+                                      child: Text(profileName.isNotEmpty ? profileName[0].toUpperCase() : 'U',
+                                        style: const TextStyle(fontSize: 80, fontWeight: FontWeight.bold, color: AppColors.primaryColor)),
+                                    ),
                             ),
-                          ),
-                          child: Center(
-                            child: Text(
-                              profileName.isNotEmpty
-                                  ? profileName[0].toUpperCase()
-                                  : 'U',
-                              style: const TextStyle(
-                                fontSize: 80,
-                                fontWeight: FontWeight.bold,
-                                color: AppColors.primaryColor,
-                              ),
-                            ),
-                          ),
-                        ),
+                          );
+                        }),
                         const SizedBox(height: 24),
                         Text(
                           profileName,
@@ -629,8 +628,9 @@ class _WebPatientProfileViewState extends State<_WebPatientProfileView> {
                           ),
                         ),
                         const SizedBox(height: 16),
-                        // Patient contact details are NOT shown to doctors
-                        if (selectedRole != 'Doctor') ...[
+                        // Doctor contact details (email/phone) never shown to patient
+                        // Patient contact details shown only to doctor
+                        if (selectedRole == 'Doctor') ...[
                           _buildInfoRow(Icons.email_outlined, otherPerson?.email ?? 'N/A'),
                           const SizedBox(height: 8),
                           _buildInfoRow(Icons.phone_outlined, otherPerson?.phoneNumber ?? 'N/A'),
@@ -706,15 +706,17 @@ class _WebPatientProfileViewState extends State<_WebPatientProfileView> {
                             ? {
                                 "Name": otherPerson?.name ?? 'N/A',
                                 if (_doctorProfile != null) ...{
-                                  if (_doctorProfile!['specialization'] != null)
+                                  if (_doctorProfile!['specialization'] != null &&
+                                      _doctorProfile!['specialization'].toString().isNotEmpty)
                                     "Specialization": _doctorProfile!['specialization'].toString(),
                                   if (_doctorProfile!['licenseNumber'] != null &&
                                       _doctorProfile!['licenseNumber'].toString().isNotEmpty)
-                                    "License No.": _doctorProfile!['licenseNumber'].toString(),
+                                    "PMDC No.": _doctorProfile!['licenseNumber'].toString(),
+                                  if (_doctorProfile!['experience'] != null &&
+                                      _doctorProfile!['experience'].toString().isNotEmpty)
+                                    "Experience": "${_doctorProfile!['experience']} yrs",
                                   if (_doctorProfile!['rating'] != null)
                                     "Rating": "${_doctorProfile!['rating']} ★ (${_doctorProfile!['totalReviews'] ?? 0} reviews)",
-                                  if (_doctorProfile!['experience'] != null)
-                                    "Experience": "${_doctorProfile!['experience']} years",
                                 },
                                 if (appointment.reason != null &&
                                     appointment.reason!.isNotEmpty &&

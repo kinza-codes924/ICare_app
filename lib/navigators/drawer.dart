@@ -165,6 +165,11 @@ class _CustomDrawerState extends ConsumerState<CustomDrawer> {
             MaterialPageRoute(builder: (ctx) => const BookingsHistoryScreen()),
           );
         }),
+        _drawerItem('My Prescriptions', Icons.medication_liquid_outlined, () {
+          Navigator.of(context).push(
+            MaterialPageRoute(builder: (ctx) => const PatientPrescriptions()),
+          );
+        }),
         _drawerItem('Order Medicines', Icons.medication_outlined, () {
           Navigator.of(context).push(
             MaterialPageRoute(builder: (ctx) => const PharmaciesScreen()),
@@ -173,11 +178,6 @@ class _CustomDrawerState extends ConsumerState<CustomDrawer> {
         _drawerItem('Book a Lab Test', Icons.science_outlined, () {
           Navigator.of(context).push(
             MaterialPageRoute(builder: (ctx) => const PatientBookLabFlow()),
-          );
-        }),
-        _drawerItem('My Prescriptions', Icons.medication_liquid_outlined, () {
-          Navigator.of(context).push(
-            MaterialPageRoute(builder: (ctx) => const PatientPrescriptions()),
           );
         }),
         _drawerItem('Health Journey', Icons.history_outlined, () {

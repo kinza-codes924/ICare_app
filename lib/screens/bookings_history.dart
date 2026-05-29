@@ -303,14 +303,14 @@ class _BookingsHistoryScreenState extends State<BookingsHistoryScreen> {
         const SizedBox(height: 12),
       ],
 
-      // Categories: Upcoming → Pending → Completed → Cancelled
-      _categoryTile('Upcoming', 'Confirmed & scheduled',
-          _upcoming.length, const Color(0xFF0EA5E9),
-          Icons.access_time_rounded, _upcoming),
-      const SizedBox(height: 10),
+      // Categories: Pending → Upcoming → Completed → Cancelled
       _categoryTile('Pending', 'Awaiting confirmation',
           _count('pending'), const Color(0xFFF59E0B),
           Icons.hourglass_empty_rounded, _byStatus('pending')),
+      const SizedBox(height: 10),
+      _categoryTile('Upcoming', 'Confirmed & scheduled',
+          _upcoming.length, const Color(0xFF0EA5E9),
+          Icons.access_time_rounded, _upcoming),
       const SizedBox(height: 10),
       _categoryTile('Completed', 'Past successful visits',
           _count('completed'), const Color(0xFF10B981),
