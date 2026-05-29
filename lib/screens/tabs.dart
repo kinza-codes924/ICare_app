@@ -651,7 +651,18 @@ class _WebSidebarState extends ConsumerState<_WebSidebar> {
                 // ── Role-specific extra nav items ──────────────────────────
                 if (role == 'Patient') ...[
                   const SizedBox(height: 8),
-                  // TOP 3 per client: Order Medicines, Book Lab, My Appointments
+                  _buildExtraNavItem(
+                    context,
+                    Icons.calendar_month_outlined,
+                    'My Appointments',
+                    () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const BookingsHistoryScreen())),
+                  ),
+                  _buildExtraNavItem(
+                    context,
+                    Icons.medication_liquid_outlined,
+                    'My Prescriptions',
+                    () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const PatientPrescriptions())),
+                  ),
                   _buildExtraNavItem(
                     context,
                     Icons.medication_outlined,
@@ -663,24 +674,6 @@ class _WebSidebarState extends ConsumerState<_WebSidebar> {
                     Icons.science_outlined,
                     'Book a Lab Test',
                     () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const PatientBookLabFlow())),
-                  ),
-                  _buildExtraNavItem(
-                    context,
-                    Icons.calendar_month_outlined,
-                    'My Appointments',
-                    () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const BookingsHistoryScreen())),
-                  ),
-                  _buildExtraNavItem(
-                    context,
-                    Icons.medication_liquid_outlined,
-                    'My Prescriptions',
-                    () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (ctx) => const PatientPrescriptions(),
-                        ),
-                      );
-                    },
                   ),
                   Padding(
                     padding: const EdgeInsets.symmetric(

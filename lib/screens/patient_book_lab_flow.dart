@@ -105,7 +105,7 @@ class _PatientBookLabFlowState extends State<PatientBookLabFlow> {
         id: json['_id'] ?? '',
         title: json['labName'] ?? json['name'] ?? 'Laboratory',
         photo: json['image'] ?? ImagePaths.lab1,
-        delivery: json['homeSample'] == true ? 'Home Sample Available' : 'Walk-in Only',
+        delivery: (json['homeSample'] ?? json['home_sample'] ?? true) == true ? 'Home Sample Available' : 'Walk-in Only',
         address: json['address'] ?? json['location'] ?? 'Location not available',
         rating: (json['rating'] ?? 4.5).toString(),
         tests: (json['availableTests'] as List?)?.map((t) => t['name'].toString()).toList() ?? [],

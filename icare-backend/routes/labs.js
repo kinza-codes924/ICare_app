@@ -41,6 +41,8 @@ async function getAllLabs() {
       latitude: p.latitude ?? null, longitude: p.longitude ?? null,
       lat: p.latitude ?? null, lng: p.longitude ?? null,
       drap_compliance: p.drap_compliance, createdAt: u.createdAt,
+      homeSample: p.home_sample ?? true,
+      home_sample: p.home_sample ?? true,
     };
   });
 }
