@@ -124,9 +124,13 @@ class _PatientBookLabFlowState extends State<PatientBookLabFlow> {
     ).toList();
   }
 
-  double get _totalPrice => _allTests
-      .where((t) => _selectedTests.contains(t['name']))
-      .fold(0.0, (sum, t) => sum + (t['price'] as double));
+  List<Lab> get _filteredLabs {
+    if (_sampleType == 'home') {
+      return _labs.where((l) => (l.delivery ?? '').contains('Home')).toList();
+    } else {
+      return _labs.where((l) => !(l.delivery ?? '').contains('Home')).toList();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -401,10 +405,6 @@ class _PatientBookLabFlowState extends State<PatientBookLabFlow> {
                   style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.primaryColor),
                 ),
                 const Spacer(),
-                Text(
-                  'Total: Rs. ${_totalPrice.toStringAsFixed(0)}',
-                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF059669)),
-                ),
               ],
             ),
           ),
@@ -476,11 +476,7 @@ class _PatientBookLabFlowState extends State<PatientBookLabFlow> {
                                 ],
                               ),
                             ),
-                            Text(
-                              'Rs. ${(test['price'] as double).toStringAsFixed(0)}',
-                              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF059669)),
-                            ),
-                          ],
+                                      ],
                         ),
                       ),
                     );
@@ -548,7 +544,7 @@ class _PatientBookLabFlowState extends State<PatientBookLabFlow> {
                     SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        'Select a lab below to book your test. Address shown on each card.',
+                        'Select a lab below to book your test.',
                         style: TextStyle(fontSize: 12, color: Color(0xFF1D4ED8)),
                       ),
                     ),
@@ -558,39 +554,16 @@ class _PatientBookLabFlowState extends State<PatientBookLabFlow> {
             ],
           ),
         ),
-        // Selected tests summary
-        Container(
-          color: const Color(0xFFF0FDF4),
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-          child: Row(
-            children: [
-              const Icon(Icons.science_outlined, color: Color(0xFF059669), size: 16),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  'Tests: ${_selectedTests.join(', ')}',
-                  style: const TextStyle(fontSize: 12, color: Color(0xFF065F46), fontWeight: FontWeight.w600),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              Text(
-                'Rs. ${_totalPrice.toStringAsFixed(0)}',
-                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: Color(0xFF059669)),
-              ),
-            ],
-          ),
-        ),
         // Labs list
         Expanded(
           child: _loadingLabs
               ? const Center(child: CircularProgressIndicator())
-              : _labs.isEmpty
+              : _filteredLabs.isEmpty
                   ? _buildNoLabs()
                   : ListView.builder(
                       padding: const EdgeInsets.all(16),
-                      itemCount: _labs.length,
-                      itemBuilder: (context, i) => _buildLabCard(_labs[i]),
+                      itemCount: _filteredLabs.length,
+                      itemBuilder: (context, i) => _buildLabCard(_filteredLabs[i]),
                     ),
         ),
       ],
