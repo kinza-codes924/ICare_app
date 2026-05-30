@@ -183,6 +183,21 @@ exports.completePrescription = async (req, res) => {
 
     await prescription.save();
 
+    // Notify patient that a new prescription is ready
+    if (prescription.patientId) {
+      try {
+        const Notification = require('../models/Notification');
+        await Notification.create({
+          userId: prescription.patientId,
+          type: 'prescription',
+          title: 'New Prescription',
+          message: 'Your doctor has sent you a new prescription. Tap to view details.',
+          data: { prescriptionId: prescription._id.toString(), consultationId },
+          read: false,
+        });
+      } catch (notifErr) { console.error('Prescription notification error:', notifErr.message); }
+    }
+
     // Update consultation — non-blocking
     Consultation.findByIdAndUpdate(
       consultationId,

@@ -24,11 +24,12 @@ class NotificationSettings extends ConsumerWidget {
 
     if (isPatient) {
       settingsList = [
-        {"id": "1", "title": "Booking Updates", "onPress": () {}},
-        {"id": "2", "title": "Doctor Messages", "onPress": () {}},
-        {"id": "3", "title": "Promotions", "onPress": () {}},
-        {"id": "4", "title": "Notification Sound", "onPress": () {}, "isToggle": true, "value": true},
-        {"id": "5", "title": "Send prescription to email automatically", "onPress": () {}, "isToggle": true, "value": false},
+        {"id": "1", "title": "Appointment Confirmed", "onPress": () {}},
+        {"id": "2", "title": "Lab Results Ready", "onPress": () {}},
+        {"id": "3", "title": "New Prescription", "onPress": () {}},
+        {"id": "4", "title": "Medication Reminder", "onPress": () {}},
+        {"id": "5", "title": "Notification Sound", "onPress": () {}, "isToggle": true, "value": true},
+        {"id": "6", "title": "Send prescription to email automatically", "onPress": () {}, "isToggle": true, "value": false},
       ];
     } else if (isStudent) {
       settingsList = [
@@ -199,9 +200,10 @@ class _WebNotificationSettingsScreenState
       };
     } else if (widget.isPatient) {
       settingsState = {
-        "Booking Updates": true,
-        "Doctor Messages": true,
-        "Promotions": false,
+        "Appointment Confirmed": true,
+        "Lab Results Ready": true,
+        "New Prescription": true,
+        "Medication Reminder": true,
         "Notification Sound": true,
         "Send prescription to email automatically": false,
       };
@@ -238,12 +240,14 @@ class _WebNotificationSettingsScreenState
       };
     } else if (widget.isPatient) {
       return {
-        "Booking Updates":
-            "Get notified when your appointments are confirmed, rescheduled, or canceled.",
-        "Doctor Messages":
-            "Receive alerts when your doctor sends you a message or update.",
-        "Promotions":
-            "Stay informed about health campaigns, offers, and platform updates.",
+        "Appointment Confirmed":
+            "Get notified as soon as your doctor confirms your appointment.",
+        "Lab Results Ready":
+            "Receive an alert when your lab test results are ready to view.",
+        "New Prescription":
+            "Be notified the moment your doctor sends you a new prescription.",
+        "Medication Reminder":
+            "Get in-app and browser reminders to take your prescribed medications on time.",
         "Notification Sound":
             "Play a sound when you receive a new notification.",
         "Send prescription to email automatically":
@@ -287,9 +291,10 @@ class _WebNotificationSettingsScreenState
       };
     } else if (widget.isPatient) {
       return {
-        "Booking Updates": Icons.event_available_rounded,
-        "Doctor Messages": Icons.chat_bubble_outline_rounded,
-        "Promotions": Icons.campaign_rounded,
+        "Appointment Confirmed": Icons.event_available_rounded,
+        "Lab Results Ready": Icons.biotech_rounded,
+        "New Prescription": Icons.medication_rounded,
+        "Medication Reminder": Icons.alarm_rounded,
         "Notification Sound": Icons.volume_up_rounded,
         "Send prescription to email automatically": Icons.email_outlined,
       };

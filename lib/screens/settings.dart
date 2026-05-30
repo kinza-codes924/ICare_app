@@ -476,11 +476,19 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     showDialog(context: ctx, builder: (dc) => StatefulBuilder(builder: (ctx2, setS) => AlertDialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       title: const Row(children: [Icon(Icons.translate_rounded, color: Color(0xFF64748B), size: 22), SizedBox(width: 10), Text('Language', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16))]),
-      content: SizedBox(width: 300, child: Column(mainAxisSize: MainAxisSize.min, children: List.generate(languages.length, (i) {
+      content: SizedBox(width: 320, child: Column(mainAxisSize: MainAxisSize.min, children: [
+        ...List.generate(languages.length, (i) {
         final lang = languages[i];
         final isSel = selected == lang;
         return Padding(padding: const EdgeInsets.only(bottom: 8), child: InkWell(onTap: () => setS(() => selected = lang), borderRadius: BorderRadius.circular(10), child: Container(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14), decoration: BoxDecoration(color: isSel ? const Color(0xFFEFF6FF) : const Color(0xFFF8FAFC), borderRadius: BorderRadius.circular(10), border: Border.all(color: isSel ? AppColors.primaryColor : const Color(0xFFE2E8F0), width: isSel ? 1.5 : 1)), child: Row(children: [Icon(isSel ? Icons.radio_button_checked : Icons.radio_button_off, color: isSel ? AppColors.primaryColor : const Color(0xFFCBD5E1), size: 20), const SizedBox(width: 12), Text(lang, style: TextStyle(fontSize: 14, fontWeight: isSel ? FontWeight.w700 : FontWeight.w500, color: isSel ? const Color(0xFF1E293B) : const Color(0xFF64748B)))]))));
-      }))),
+      }),
+        if (setS != null) const SizedBox(height: 4),
+        Container(padding: const EdgeInsets.all(10), decoration: BoxDecoration(color: const Color(0xFFFFF7ED), borderRadius: BorderRadius.circular(8)), child: const Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Icon(Icons.info_outline, size: 14, color: Color(0xFFF59E0B)),
+          SizedBox(width: 8),
+          Expanded(child: Text('Urdu translation uses Google Translate. For best results, use Chrome browser — it will offer to translate the page automatically.', style: TextStyle(fontSize: 11, color: Color(0xFF92400E), height: 1.4))),
+        ])),
+      ])),
       actions: [TextButton(onPressed: () => Navigator.pop(dc), child: const Text('Cancel', style: TextStyle(color: Color(0xFF64748B)))), ElevatedButton(onPressed: () { setState(() => _selectedLanguage = selected); Navigator.pop(dc); ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text('Language set to $selected'), backgroundColor: Colors.green)); activateLanguage(selected); }, style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryColor, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))), child: const Text('Apply'))],
     )));
   }
@@ -624,7 +632,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 
   void _showOrderHistoryDialog(BuildContext ctx) {
-    final future = ApiService().get('/pharmacy/orders/my');
+    final future = ApiService().get('/pharmacy/orders');
     showDialog(context: ctx, builder: (dc) => AlertDialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       title: const Row(children: [Icon(Icons.shopping_bag_outlined, color: Color(0xFF3B82F6), size: 22), SizedBox(width: 10), Text('Order History', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16))]),
@@ -686,9 +694,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         TextButton(onPressed: () => Navigator.pop(dc), child: const Text('Cancel', style: TextStyle(color: Color(0xFF64748B)))),
         ElevatedButton(
           onPressed: () async {
-            setState(() => _savedDeliveryInstructions = ctrl.text.trim());
-            try { final prefs = await SharedPreferences.getInstance(); await prefs.setString('delivery_instructions', _savedDeliveryInstructions); } catch (_) {}
-            if (dc.mounted) { Navigator.pop(dc); ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(content: Text('Delivery preferences saved!'), backgroundColor: Colors.green, duration: Duration(seconds: 2))); }
+            final text = ctrl.text.trim();
+            setState(() => _savedDeliveryInstructions = text);
+            if (dc.mounted) Navigator.pop(dc);
+            if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Delivery preferences saved!'), backgroundColor: Colors.green, duration: Duration(seconds: 2)));
+            try { final prefs = await SharedPreferences.getInstance(); await prefs.setString('delivery_instructions', text); } catch (_) {}
           },
           style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryColor, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
           child: const Text('Save'),

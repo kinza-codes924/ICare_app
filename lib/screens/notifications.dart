@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_size_matters/flutter_size_matters.dart';
+import 'package:icare/screens/bookings_history.dart';
+import 'package:icare/screens/lab_reports_screen.dart';
+import 'package:icare/screens/patient_prescriptions.dart';
+import 'package:icare/screens/reminder_list.dart';
 import 'package:icare/services/notification_service.dart';
 import 'package:icare/utils/theme.dart';
 import 'package:icare/utils/utils.dart';
@@ -103,14 +107,6 @@ class _NotificationScreenState extends State<NotificationScreen> {
         'read': true,
         'createdAt': DateTime.now().subtract(const Duration(days: 2)).toIso8601String(),
       },
-      {
-        '_id': '5',
-        'type': 'message',
-        'title': 'New Message',
-        'message': 'You have a new message from Dr. Bilal Ahmed regarding your consultation.',
-        'read': true,
-        'createdAt': DateTime.now().subtract(const Duration(days: 3)).toIso8601String(),
-      },
     ];
   }
 
@@ -122,6 +118,27 @@ class _NotificationScreenState extends State<NotificationScreen> {
   Future<void> _markAsRead(String id) async {
     await _notificationService.markAsRead(id);
     _loadNotifications();
+  }
+
+  void _navigateToContent(Map notif, String id, bool isUnread) {
+    if (isUnread) _markAsRead(id);
+    final String type = notif['type'] ?? '';
+    switch (type) {
+      case 'appointment':
+        Navigator.of(context).push(MaterialPageRoute(builder: (_) => const BookingsHistoryScreen()));
+        break;
+      case 'lab':
+        Navigator.of(context).push(MaterialPageRoute(builder: (_) => const LabReportsScreen()));
+        break;
+      case 'prescription':
+        Navigator.of(context).push(MaterialPageRoute(builder: (_) => const PatientPrescriptions()));
+        break;
+      case 'reminder':
+        Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ReminderList()));
+        break;
+      default:
+        if (isUnread) _markAsRead(id);
+    }
   }
 
   int get _unreadCount =>
@@ -348,7 +365,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
 
           if (isDesktop) {
             return GestureDetector(
-              onTap: () => isUnread ? _markAsRead(id) : null,
+              onTap: () => _navigateToContent(notif, id, isUnread),
               child: Container(
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
@@ -441,7 +458,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
 
           // Mobile item
           return GestureDetector(
-            onTap: () => isUnread ? _markAsRead(id) : null,
+            onTap: () => _navigateToContent(notif, id, isUnread),
             child: Container(
               color: isUnread
                   ? AppColors.primaryColor.withValues(alpha: 0.05)

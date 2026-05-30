@@ -238,6 +238,22 @@ router.put('/:id', authMiddleware, async (req, res) => {
     appt.status = status;
     await appt.save();
 
+    // Notify patient when doctor confirms the appointment
+    if (status === 'confirmed' && appt.patient_id) {
+      try {
+        const Notification = require('../models/Notification');
+        const doctorName = appt.doctor_name || 'your doctor';
+        await Notification.create({
+          userId: appt.patient_id,
+          type: 'appointment',
+          title: 'Appointment Confirmed',
+          message: `Your appointment with Dr. ${doctorName} has been confirmed.`,
+          data: { appointmentId: appt._id.toString() },
+          read: false,
+        });
+      } catch (notifErr) { console.error('Appointment confirm notification error:', notifErr.message); }
+    }
+
     res.json({ success: true, message: 'Appointment updated successfully', appointment: { ...appt.toObject(), id: appt._id.toString() } });
   } catch (error) {
     console.error('Update appointment error:', error);

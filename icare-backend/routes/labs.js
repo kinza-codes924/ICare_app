@@ -347,6 +347,21 @@ router.put('/bookings/:bookingId', authMiddleware, async (req, res) => {
 
     if (!booking) return res.status(404).json({ success: false, message: 'Booking not found or access denied' });
 
+    // ── Notify patient when results are ready ─────────────────────────────────────
+    if ((update.status === 'reporting_done' || update.status === 'completed') && booking.patient_id) {
+      try {
+        const Notification = require('../models/Notification');
+        const testName = booking.testType || booking.test_type || 'Lab Test';
+        await Notification.create({
+          userId: booking.patient_id,
+          type: 'lab',
+          title: 'Lab Results Ready',
+          message: `Your ${testName} results are now available. Please check your lab reports.`,
+          data: { bookingId: booking._id.toString() },
+          read: false,
+        });
+      } catch (notifyErr) { console.error('⚠️  Lab results notification failed:', notifyErr.message); }
+    }
     // ── Notify doctor when results are submitted ─────────────────────────────────
     if (update.status === 'completed' && booking.medical_record_id) {
       try {
