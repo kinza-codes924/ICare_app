@@ -20,8 +20,12 @@ import 'package:icare/services/biometric_service.dart';
 import 'package:icare/services/health_settings_service.dart';
 import 'package:icare/services/api_service.dart';
 import 'package:icare/utils/shared_pref.dart';
+import 'dart:js_interop';
 import '../utils/js_stub.dart'
     if (dart.library.html) 'dart:js' as js;
+
+@JS('Notification.requestPermission')
+external JSPromise<JSString> _jsRequestNotificationPermission();
 
 // ═══════════════════════════════════════════════════════════════════════════
 // SETTINGS SCREEN
@@ -358,8 +362,19 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           return Padding(padding: const EdgeInsets.only(bottom: 8), child: InkWell(onTap: () => setS(() => selected = intervals[i]), borderRadius: BorderRadius.circular(10), child: Container(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14), decoration: BoxDecoration(color: isSel ? const Color(0xFFEFF6FF) : const Color(0xFFF8FAFC), borderRadius: BorderRadius.circular(10), border: Border.all(color: isSel ? const Color(0xFF3B82F6) : const Color(0xFFE2E8F0), width: isSel ? 1.5 : 1)), child: Row(children: [Icon(isSel ? Icons.radio_button_checked : Icons.radio_button_off, color: isSel ? const Color(0xFF3B82F6) : const Color(0xFFCBD5E1), size: 20), const SizedBox(width: 12), Text(labels[i], style: TextStyle(fontSize: 14, fontWeight: isSel ? FontWeight.w700 : FontWeight.w500, color: isSel ? const Color(0xFF1E293B) : const Color(0xFF64748B)))]))));
         }),
       ])),
-      actions: [TextButton(onPressed: () => Navigator.pop(dc), child: const Text('Cancel', style: TextStyle(color: Color(0xFF64748B)))), ElevatedButton(onPressed: () { setState(() => _waterReminderMinutes = selected); Navigator.pop(dc); try { js.context.callMethod('setupWaterReminder', [selected]); } catch (_) {} ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text('Water reminder set to every ${labels[intervals.indexOf(selected)]}'), backgroundColor: Colors.green)); }, style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryColor, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))), child: const Text('Set Reminder'))],
+      actions: [TextButton(onPressed: () => Navigator.pop(dc), child: const Text('Cancel', style: TextStyle(color: Color(0xFF64748B)))), ElevatedButton(onPressed: () { setState(() => _waterReminderMinutes = selected); Navigator.pop(dc); _setupWaterReminder(selected); ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text('Water reminder set to every ${labels[intervals.indexOf(selected)]}'), backgroundColor: Colors.green)); }, style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryColor, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))), child: const Text('Set Reminder'))],
     )));
+  }
+
+  Future<void> _setupWaterReminder(int minutes) async {
+    if (!kIsWeb) return;
+    try {
+      final permJs = await _jsRequestNotificationPermission().toDart;
+      final permission = permJs.toDart;
+      if (permission == 'granted') {
+        js.context.callMethod('scheduleWaterReminderInterval', [minutes]);
+      }
+    } catch (_) {}
   }
 
   void _showLanguageDialog(BuildContext ctx) {

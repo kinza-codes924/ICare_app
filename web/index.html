@@ -277,25 +277,10 @@
     // ── Water Reminder Notifications ─────────────────────────────────────────
     var _waterReminderTimer = null;
 
-    window.setupWaterReminder = async function(intervalMinutes) {
+    // Called from Dart after permission is already granted
+    window.scheduleWaterReminderInterval = function(intervalMinutes) {
       try {
-        if (!('Notification' in window)) {
-          console.warn('Browser does not support notifications');
-          return;
-        }
-        var permission = Notification.permission;
-        if (permission === 'default') {
-          permission = await Notification.requestPermission();
-        }
-        if (permission !== 'granted') {
-          console.warn('Water reminder: notification permission not granted');
-          return;
-        }
-        // Clear any existing timer
-        if (_waterReminderTimer) {
-          clearInterval(_waterReminderTimer);
-          _waterReminderTimer = null;
-        }
+        if (_waterReminderTimer) { clearInterval(_waterReminderTimer); _waterReminderTimer = null; }
         var ms = intervalMinutes * 60 * 1000;
         _waterReminderTimer = setInterval(function() {
           try {
@@ -305,18 +290,12 @@
             });
           } catch(e) { console.warn('Water notification error:', e); }
         }, ms);
-        console.log('Water reminder set every', intervalMinutes, 'minutes');
-      } catch(e) {
-        console.warn('setupWaterReminder error:', e);
-      }
+        console.log('Water reminder scheduled every', intervalMinutes, 'minutes');
+      } catch(e) { console.warn('scheduleWaterReminderInterval error:', e); }
     };
 
     window.cancelWaterReminder = function() {
-      if (_waterReminderTimer) {
-        clearInterval(_waterReminderTimer);
-        _waterReminderTimer = null;
-        console.log('Water reminder cancelled');
-      }
+      if (_waterReminderTimer) { clearInterval(_waterReminderTimer); _waterReminderTimer = null; }
     };
   </script>
   <script src="flutter_bootstrap.js" async></script>
