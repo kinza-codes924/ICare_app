@@ -21,6 +21,7 @@ import 'package:icare/services/health_settings_service.dart';
 import 'package:icare/services/api_service.dart';
 import 'package:icare/utils/shared_pref.dart';
 import 'dart:js_interop';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import '../utils/js_stub.dart'
     if (dart.library.html) 'dart:js' as js;
 
