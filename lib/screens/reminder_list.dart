@@ -185,11 +185,7 @@ class _ReminderListState extends State<ReminderList> with SingleTickerProviderSt
               : IconButton(
                   onPressed: _syncToGoogleCalendar,
                   tooltip: 'Sync to Google Calendar',
-                  icon: Image.network(
-                    'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a5/Google_Calendar_icon_%282020%29.svg/64px-Google_Calendar_icon_%282020%29.svg.png',
-                    width: 24, height: 24,
-                    errorBuilder: (_, _, _) => const Icon(Icons.calendar_month_outlined, color: Color(0xFF0036BC)),
-                  ),
+                  icon: const Icon(Icons.calendar_month_outlined, color: Color(0xFF0036BC)),
                 ),
           const SizedBox(width: 4),
         ],
