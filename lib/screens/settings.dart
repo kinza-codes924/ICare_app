@@ -396,45 +396,63 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     if (!mounted) return;
     setState(() => _billingLoading = true);
     final items = <Map<String, dynamic>>[];
+    final api = ApiService();
+
+    // Consultations (raw JSON to access consultation_fee)
     try {
-      final apptResult = await AppointmentService().getMyAppointmentsDetailed();
-      final appts = apptResult['appointments'] as List? ?? [];
+      final res = await api.get('/appointments/getAppointments');
+      final appts = (res.data['appointments'] as List? ?? []);
       for (final a in appts) {
+        final fee = a['consultation_fee'];
+        final doctor = a['doctor_name'] ?? a['doctorName'] ?? 'Doctor';
         items.add({
-          'id': a.id,
+          'id': a['_id'] ?? a['id'] ?? '',
           'type': 'consultation',
-          'title': 'Consultation with ${a.doctorName}',
-          'amount': 0,
-          'date': a.date.toIso8601String(),
+          'title': 'Consultation with Dr. $doctor',
+          'amount': fee != null && fee != 0 ? 'PKR $fee' : '',
+          'amountNum': fee ?? 0,
+          'date': a['date'] ?? a['created_at'] ?? a['createdAt'] ?? '',
           'icon': Icons.medical_services_outlined,
           'color': const Color(0xFF3B82F6),
         });
       }
     } catch (_) {}
+
+    // Lab bookings
     try {
-      final labBookings = await LaboratoryService().getMyBookings();
-      for (final b in labBookings) {
-        final tests = (b['tests'] as List? ?? []).map((t) => t['name'] ?? t).join(', ');
+      final res = await api.get('/laboratories/bookings/my');
+      final bookings = (res.data['bookings'] as List? ?? []);
+      for (final b in bookings) {
+        final testName = b['testType'] ?? b['test_type'] ?? 'Lab Test';
+        final lab = (b['laboratory'] is Map ? b['laboratory']['labName'] : null) ?? b['labName'] ?? 'Laboratory';
+        final price = b['price'] ?? 0;
         items.add({
           'id': b['_id'] ?? '',
           'type': 'lab_test',
-          'title': 'Lab Test${tests.isNotEmpty ? ': $tests' : ''}',
-          'amount': b['totalAmount'] ?? b['total'] ?? b['price'] ?? 0,
-          'date': b['createdAt'] ?? b['scheduledDate'] ?? '',
+          'title': '$testName — $lab',
+          'amount': price != 0 ? 'PKR $price' : '',
+          'amountNum': price,
+          'date': b['createdAt'] ?? b['test_date'] ?? b['date'] ?? '',
           'icon': Icons.science_outlined,
           'color': const Color(0xFF10B981),
         });
       }
     } catch (_) {}
+
+    // Medicine orders
     try {
-      final orders = await OrderService().getMyOrders();
+      final res = await api.get('/pharmacy/orders/my');
+      final orders = (res.data['orders'] as List? ?? []);
       for (final o in orders) {
+        final amount = o['total_amount'] ?? o['totalAmount'] ?? 0;
+        final itemNames = (o['items'] as List? ?? []).take(3).map((i) => i is Map ? (i['name'] ?? i['product_name'] ?? '') : '').where((s) => s.toString().isNotEmpty).join(', ');
         items.add({
           'id': o['_id'] ?? '',
           'type': 'medicine',
-          'title': 'Medicine Order',
-          'amount': o['totalAmount'] ?? o['total'] ?? 0,
-          'date': o['createdAt'] ?? '',
+          'title': itemNames.isNotEmpty ? 'Medicine: $itemNames' : 'Medicine Order #${(o['order_number'] ?? '').toString().split('-').last}',
+          'amount': amount != 0 ? 'PKR $amount' : '',
+          'amountNum': amount,
+          'date': o['createdAt'] ?? o['created_at'] ?? '',
           'icon': Icons.medication_outlined,
           'color': const Color(0xFF8B5CF6),
         });
@@ -442,9 +460,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     } catch (_) {}
 
     items.sort((a, b) {
-      try {
-        return DateTime.parse(b['date']).compareTo(DateTime.parse(a['date']));
-      } catch (_) { return 0; }
+      try { return DateTime.parse(b['date'].toString()).compareTo(DateTime.parse(a['date'].toString())); }
+      catch (_) { return 0; }
     });
 
     if (mounted) setState(() { _billingItems = items; _billingLoading = false; });
@@ -545,11 +562,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     try {
       ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(content: Text('Preparing your health data PDF...'), backgroundColor: Colors.blue, duration: Duration(seconds: 3)));
 
-      // Fetch all data
-      final apptResult = await AppointmentService().getMyAppointmentsDetailed();
-      final appts = apptResult['appointments'] as List? ?? [];
-      final labBookings = await LaboratoryService().getMyBookings().catchError((_) => <dynamic>[]);
-      final orders = await OrderService().getMyOrders().catchError((_) => <dynamic>[]);
+      final api = ApiService();
+
+      // Fetch all data using raw JSON to access all backend fields
+      List appts = [];
+      List labBookings = [];
+      List orders = [];
+      try { final r = await api.get('/appointments/getAppointments'); appts = r.data['appointments'] as List? ?? []; } catch (_) {}
+      try { final r = await api.get('/laboratories/bookings/my'); labBookings = r.data['bookings'] as List? ?? []; } catch (_) {}
+      try { final r = await api.get('/pharmacy/orders/my'); orders = r.data['orders'] as List? ?? []; } catch (_) {}
 
       final user = ref.read(authProvider).user;
       final patientName = user?.name ?? 'Patient';
@@ -557,54 +578,51 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       final dateStr = '${now.day}/${now.month}/${now.year}';
 
       pw.ImageProvider? logoImage;
-      try {
-        final logoBytes = await rootBundle.load('assets/Asset 1.png');
-        logoImage = pw.MemoryImage(logoBytes.buffer.asUint8List());
-      } catch (_) {}
+      try { final bytes = await rootBundle.load('assets/Asset 1.png'); logoImage = pw.MemoryImage(bytes.buffer.asUint8List()); } catch (_) {}
+
+      String _fmt(dynamic rawDate) {
+        try { final dt = DateTime.parse(rawDate.toString()); return '${dt.day}/${dt.month}/${dt.year}'; } catch (_) { return rawDate?.toString() ?? ''; }
+      }
 
       final pdf = pw.Document();
       pdf.addPage(pw.MultiPage(
         pageFormat: PdfPageFormat.a4,
         margin: const pw.EdgeInsets.all(32),
-        header: (ctx2) => pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
-          if (logoImage != null)
-            pw.Container(width: 50, height: 50, child: pw.Image(logoImage, fit: pw.BoxFit.contain))
-          else
-            pw.Text('iCare', style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold, color: PdfColors.blue800)),
-          pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.end, children: [
-            pw.Text('Health Data Report', style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold)),
-            pw.Text(patientName, style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey)),
-            pw.Text('Generated: $dateStr', style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey)),
+        header: (_) => pw.Column(children: [
+          pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
+            logoImage != null
+              ? pw.Container(width: 50, height: 50, child: pw.Image(logoImage, fit: pw.BoxFit.contain))
+              : pw.Text('iCare', style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold, color: PdfColors.blue800)),
+            pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.end, children: [
+              pw.Text('Health Data Report', style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold)),
+              pw.Text(patientName, style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey)),
+              pw.Text('Generated: $dateStr', style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey)),
+            ]),
           ]),
+          pw.Divider(),
         ]),
-        build: (ctx2) {
+        build: (_) {
           final widgets = <pw.Widget>[];
-
-          widgets.add(pw.SizedBox(height: 16));
-          widgets.add(pw.Divider());
           widgets.add(pw.SizedBox(height: 8));
 
           // ── Consultations ──
           if (appts.isNotEmpty) {
-            widgets.add(pw.Text('Consultations', style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold, color: PdfColors.blue800)));
+            widgets.add(pw.Text('Consultations (${appts.length})', style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold, color: PdfColors.blue800)));
             widgets.add(pw.SizedBox(height: 8));
             for (final a in appts) {
-              final doctor = a.doctorName;
-              final rawDate = a.date.toIso8601String();
-              String fmtDate = rawDate;
-              try { final dt = DateTime.parse(fmtDate); fmtDate = '${dt.day}/${dt.month}/${dt.year}'; } catch (_) {}
-              final status = a.status;
-              const fee = '';
+              final doctor = a['doctor_name'] ?? a['doctorName'] ?? 'Doctor';
+              final fee = a['consultation_fee'];
+              final feeStr = fee != null && fee != 0 ? 'PKR $fee' : 'N/A';
               widgets.add(pw.Container(
-                margin: const pw.EdgeInsets.only(bottom: 6),
+                margin: const pw.EdgeInsets.only(bottom: 5),
                 padding: const pw.EdgeInsets.all(8),
                 decoration: pw.BoxDecoration(border: pw.Border.all(color: PdfColors.grey300), borderRadius: pw.BorderRadius.circular(4)),
                 child: pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
                   pw.Expanded(child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
                     pw.Text('Dr. $doctor', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 11)),
-                    pw.Text('Date: $fmtDate  |  Status: $status', style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey)),
+                    pw.Text('Date: ${_fmt(a['date'] ?? a['createdAt'])}  |  Status: ${a['status'] ?? ''}', style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey)),
                   ])),
-                  pw.Text(status, style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey600)),
+                  pw.Text(feeStr, style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold, color: PdfColors.blue800)),
                 ]),
               ));
             }
@@ -613,25 +631,22 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
           // ── Lab Tests ──
           if (labBookings.isNotEmpty) {
-            widgets.add(pw.Text('Lab Tests', style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold, color: PdfColors.green800)));
+            widgets.add(pw.Text('Lab Tests (${labBookings.length})', style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold, color: PdfColors.green800)));
             widgets.add(pw.SizedBox(height: 8));
             for (final b in labBookings) {
-              final tests = (b['tests'] as List? ?? []).map((t) => t is Map ? (t['name'] ?? '') : t.toString()).join(', ');
-              final lab = (b['lab'] is Map ? b['lab']['name'] : b['labName']) ?? 'Lab';
-              final amount = b['totalAmount'] ?? b['total'] ?? b['price'] ?? 0;
-              final rawDate = b['createdAt'] ?? b['scheduledDate'] ?? '';
-              String fmtDate = rawDate.toString();
-              try { final dt = DateTime.parse(fmtDate); fmtDate = '${dt.day}/${dt.month}/${dt.year}'; } catch (_) {}
+              final testName = b['testType'] ?? b['test_type'] ?? 'Lab Test';
+              final labName = (b['laboratory'] is Map ? b['laboratory']['labName'] : null) ?? b['labName'] ?? 'Lab';
+              final price = b['price'] ?? 0;
               widgets.add(pw.Container(
-                margin: const pw.EdgeInsets.only(bottom: 6),
+                margin: const pw.EdgeInsets.only(bottom: 5),
                 padding: const pw.EdgeInsets.all(8),
                 decoration: pw.BoxDecoration(border: pw.Border.all(color: PdfColors.grey300), borderRadius: pw.BorderRadius.circular(4)),
                 child: pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
                   pw.Expanded(child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
-                    pw.Text(tests.isNotEmpty ? tests : 'Lab Test', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 11)),
-                    pw.Text('Lab: $lab  |  Date: $fmtDate', style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey)),
+                    pw.Text(testName.toString(), style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 11)),
+                    pw.Text('Lab: $labName  |  Date: ${_fmt(b['createdAt'] ?? b['test_date'])}', style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey)),
                   ])),
-                  pw.Text('PKR $amount', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold, color: PdfColors.green800)),
+                  pw.Text(price != 0 ? 'PKR $price' : 'N/A', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold, color: PdfColors.green800)),
                 ]),
               ));
             }
@@ -640,25 +655,22 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
           // ── Medicine Orders ──
           if (orders.isNotEmpty) {
-            widgets.add(pw.Text('Medicine Orders', style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold, color: PdfColors.purple)));
+            widgets.add(pw.Text('Medicine Orders (${orders.length})', style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold, color: PdfColors.purple)));
             widgets.add(pw.SizedBox(height: 8));
             for (final o in orders) {
-              final amount = o['totalAmount'] ?? o['total'] ?? 0;
-              final rawDate = o['createdAt'] ?? '';
-              String fmtDate = rawDate.toString();
-              try { final dt = DateTime.parse(fmtDate); fmtDate = '${dt.day}/${dt.month}/${dt.year}'; } catch (_) {}
+              final amount = o['total_amount'] ?? o['totalAmount'] ?? 0;
               final status = o['status'] ?? 'placed';
-              final items = (o['items'] as List? ?? []).take(3).map((i) => i['name'] ?? '').where((s) => s.isNotEmpty).join(', ');
+              final itemNames = (o['items'] as List? ?? []).take(3).map((i) => i is Map ? (i['name'] ?? i['product_name'] ?? '') : '').where((s) => s.toString().isNotEmpty).join(', ');
               widgets.add(pw.Container(
-                margin: const pw.EdgeInsets.only(bottom: 6),
+                margin: const pw.EdgeInsets.only(bottom: 5),
                 padding: const pw.EdgeInsets.all(8),
                 decoration: pw.BoxDecoration(border: pw.Border.all(color: PdfColors.grey300), borderRadius: pw.BorderRadius.circular(4)),
                 child: pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
                   pw.Expanded(child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
-                    pw.Text(items.isNotEmpty ? items : 'Medicine Order', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 11)),
-                    pw.Text('Date: $fmtDate  |  Status: $status', style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey)),
+                    pw.Text(itemNames.isNotEmpty ? itemNames : 'Medicine Order', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 11)),
+                    pw.Text('Date: ${_fmt(o['createdAt'])}  |  Status: $status', style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey)),
                   ])),
-                  pw.Text('PKR $amount', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold, color: PdfColors.purple)),
+                  pw.Text(amount != 0 ? 'PKR $amount' : 'N/A', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold, color: PdfColors.purple)),
                 ]),
               ));
             }
@@ -792,8 +804,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 final rawDate = item['date'] as String? ?? '';
                 String fmtDate = '';
                 try { final dt = DateTime.parse(rawDate); fmtDate = '${dt.day}/${dt.month}/${dt.year}'; } catch (_) { fmtDate = rawDate; }
-                final amount = item['amount'];
-                final amtStr = amount != null && amount != 0 ? 'PKR $amount' : '';
+                final amount = item['amount'] as String? ?? '';
+                final amtStr = amount.isNotEmpty ? amount : '';
                 return ListTile(
                   contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
                   leading: Container(
@@ -833,8 +845,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       final rawDate = item['date'] as String? ?? '';
       String txnDate = '';
       try { final dt = DateTime.parse(rawDate); txnDate = '${dt.day}/${dt.month}/${dt.year}'; } catch (_) { txnDate = rawDate; }
-      final amount = item['amount'];
-      final amtStr = amount != null && amount != 0 ? 'PKR $amount' : 'N/A';
+      final amount = item['amount'] as String? ?? '';
+      final amtStr = amount.isNotEmpty ? amount : 'N/A';
       final user = ref.read(authProvider).user;
       final patientName = user?.name ?? 'Patient';
 
