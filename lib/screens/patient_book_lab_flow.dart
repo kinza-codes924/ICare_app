@@ -127,9 +127,8 @@ class _PatientBookLabFlowState extends State<PatientBookLabFlow> {
   List<Lab> get _filteredLabs {
     if (_sampleType == 'home') {
       return _labs.where((l) => (l.delivery ?? '').contains('Home')).toList();
-    } else {
-      return _labs.where((l) => !(l.delivery ?? '').contains('Home')).toList();
     }
+    return _labs;
   }
 
   @override
