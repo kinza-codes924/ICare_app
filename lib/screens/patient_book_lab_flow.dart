@@ -648,17 +648,17 @@ class _PatientBookLabFlowState extends State<PatientBookLabFlow> {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                           decoration: BoxDecoration(
-                            color: (lab.delivery ?? '').contains('Home')
+                            color: _sampleType == 'home'
                                 ? const Color(0xFFECFDF5)
                                 : const Color(0xFFF1F5F9),
                             borderRadius: BorderRadius.circular(6),
                           ),
                           child: Text(
-                            lab.delivery ?? 'Walk-in',
+                            _sampleType == 'home' ? 'Home Sample' : 'Walk-in',
                             style: TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.w600,
-                              color: (lab.delivery ?? '').contains('Home')
+                              color: _sampleType == 'home'
                                   ? const Color(0xFF059669)
                                   : const Color(0xFF64748B),
                             ),
