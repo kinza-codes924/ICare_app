@@ -6,7 +6,7 @@ import 'package:dio/dio.dart';
 // Steps: console.cloud.google.com → APIs & Services → Credentials → OAuth 2.0
 // Authorized origins: https://icare-app-ten.vercel.app  and  http://localhost
 const String _kGoogleClientId =
-    'GOOGLE_CLIENT_ID_PLACEHOLDER.apps.googleusercontent.com';
+    '1076307742101-avj49igc93qipdcnqbqsk3u14gdcb2oh.apps.googleusercontent.com';
 
 const String _kCalendarScope = 'https://www.googleapis.com/auth/calendar';
 
