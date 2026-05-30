@@ -20,15 +20,16 @@ import 'package:icare/services/biometric_service.dart';
 import 'package:icare/services/health_settings_service.dart';
 import 'package:icare/services/api_service.dart';
 import 'package:icare/utils/shared_pref.dart';
-import 'package:icare/services/appointment_service.dart';
-import 'package:icare/services/laboratory_service.dart';
-import 'package:icare/services/order_service.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:flutter/services.dart';
+import 'dart:convert';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../utils/water_notif_stub.dart'
     if (dart.library.html) '../utils/water_notif_web.dart';
+import '../utils/translate_stub.dart'
+    if (dart.library.html) '../utils/translate_web.dart';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // SETTINGS SCREEN
@@ -56,7 +57,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   int _waterReminderMinutes = 60;
   String _selectedLanguage = 'English';
   String _selectedCountry = 'Pakistan';
-  String _savedDeliveryAddress = '';
+  List<Map<String, String>> _savedAddresses = [];
+  String _savedDeliveryInstructions = '';
 
   final Map<String, bool> _trackerToggles = {
     'bloodPressure': true, 'bloodSugar': true, 'weight': false, 'water': true,
@@ -81,6 +83,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     _loadUserData();
     _loadBiometricState();
     _loadBillingItems();
+    _loadSavedAddresses();
   }
 
   Future<void> _loadBiometricState() async {
@@ -478,7 +481,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         final isSel = selected == lang;
         return Padding(padding: const EdgeInsets.only(bottom: 8), child: InkWell(onTap: () => setS(() => selected = lang), borderRadius: BorderRadius.circular(10), child: Container(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14), decoration: BoxDecoration(color: isSel ? const Color(0xFFEFF6FF) : const Color(0xFFF8FAFC), borderRadius: BorderRadius.circular(10), border: Border.all(color: isSel ? AppColors.primaryColor : const Color(0xFFE2E8F0), width: isSel ? 1.5 : 1)), child: Row(children: [Icon(isSel ? Icons.radio_button_checked : Icons.radio_button_off, color: isSel ? AppColors.primaryColor : const Color(0xFFCBD5E1), size: 20), const SizedBox(width: 12), Text(lang, style: TextStyle(fontSize: 14, fontWeight: isSel ? FontWeight.w700 : FontWeight.w500, color: isSel ? const Color(0xFF1E293B) : const Color(0xFF64748B)))]))));
       }))),
-      actions: [TextButton(onPressed: () => Navigator.pop(dc), child: const Text('Cancel', style: TextStyle(color: Color(0xFF64748B)))), ElevatedButton(onPressed: () { setState(() => _selectedLanguage = selected); Navigator.pop(dc); ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text('Language set to $selected'), backgroundColor: Colors.green)); }, style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryColor, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))), child: const Text('Apply'))],
+      actions: [TextButton(onPressed: () => Navigator.pop(dc), child: const Text('Cancel', style: TextStyle(color: Color(0xFF64748B)))), ElevatedButton(onPressed: () { setState(() => _selectedLanguage = selected); Navigator.pop(dc); ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text('Language set to $selected'), backgroundColor: Colors.green)); activateLanguage(selected); }, style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryColor, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))), child: const Text('Apply'))],
     )));
   }
 
@@ -532,16 +535,165 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     )));
   }
 
-  void _showDeliveryAddressDialog(BuildContext ctx) {
-    final c = TextEditingController(text: _savedDeliveryAddress);
+  Future<void> _loadSavedAddresses() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString('saved_delivery_addresses') ?? '[]';
+      final decoded = jsonDecode(raw) as List? ?? [];
+      if (mounted) setState(() => _savedAddresses = decoded.map((e) => Map<String, String>.from(e as Map)).toList());
+      final instr = prefs.getString('delivery_instructions') ?? '';
+      if (mounted) setState(() => _savedDeliveryInstructions = instr);
+    } catch (_) {}
+  }
+
+  Future<void> _saveSavedAddresses() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('saved_delivery_addresses', jsonEncode(_savedAddresses));
+    } catch (_) {}
+  }
+
+  void _showDeliveryAddressesDialog(BuildContext ctx) {
+    showDialog(context: ctx, builder: (dc) => StatefulBuilder(builder: (dc2, setS) => AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      title: const Row(children: [Icon(Icons.location_on_outlined, color: Color(0xFF10B981), size: 22), SizedBox(width: 10), Expanded(child: Text('Saved Addresses', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16)))]),
+      content: SizedBox(width: 440, height: 340, child: _savedAddresses.isEmpty
+        ? const Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+            Icon(Icons.location_off_outlined, size: 48, color: Color(0xFFCBD5E1)),
+            SizedBox(height: 12),
+            Text('No saved addresses yet', style: TextStyle(fontSize: 14, color: Color(0xFF94A3B8))),
+            SizedBox(height: 6),
+            Text('Tap "+ Add New" to add an address', style: TextStyle(fontSize: 12, color: Color(0xFFCBD5E1))),
+          ]))
+        : ListView.separated(
+            itemCount: _savedAddresses.length,
+            separatorBuilder: (_, __) => const Divider(height: 1),
+            itemBuilder: (_, i) {
+              final addr = _savedAddresses[i];
+              return ListTile(
+                contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                leading: Container(width: 34, height: 34, decoration: BoxDecoration(color: const Color(0xFF10B981).withOpacity(0.1), borderRadius: BorderRadius.circular(8)), child: const Icon(Icons.location_on_outlined, color: Color(0xFF10B981), size: 18)),
+                title: Text(addr['label'] ?? 'Address ${i + 1}', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                subtitle: Text('${addr['street'] ?? ''}${(addr['city'] ?? '').isNotEmpty ? ', ${addr['city']}' : ''}', style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8))),
+                trailing: IconButton(icon: const Icon(Icons.delete_outline, size: 18, color: Color(0xFFEF4444)), onPressed: () {
+                  setState(() => _savedAddresses.removeAt(i));
+                  setS(() {});
+                  _saveSavedAddresses();
+                }),
+              );
+            },
+          )),
+      actions: [
+        TextButton(onPressed: () { Navigator.pop(dc); _showAddAddressDialog(ctx); }, child: const Text('+ Add New', style: TextStyle(color: Color(0xFF0036BC), fontWeight: FontWeight.w600))),
+        TextButton(onPressed: () => Navigator.pop(dc), child: const Text('Close', style: TextStyle(color: Color(0xFF64748B)))),
+      ],
+    )));
+  }
+
+  void _showAddAddressDialog(BuildContext ctx) {
+    final labelCtrl = TextEditingController();
+    final streetCtrl = TextEditingController();
+    final cityCtrl = TextEditingController();
     showDialog(context: ctx, builder: (dc) => AlertDialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      title: const Row(children: [Icon(Icons.location_on_outlined, color: Color(0xFF10B981), size: 22), SizedBox(width: 10), Text('Delivery Address', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16))]),
-      content: SizedBox(width: 400, child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-        const Text('Enter your delivery address', style: TextStyle(fontSize: 13, color: Color(0xFF64748B))), const SizedBox(height: 12),
-        TextField(controller: c, maxLines: 4, decoration: InputDecoration(hintText: 'House #, Street, City', border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)), contentPadding: const EdgeInsets.all(12))),
+      title: const Row(children: [Icon(Icons.add_location_alt_outlined, color: Color(0xFF10B981), size: 22), SizedBox(width: 10), Text('Add New Address', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16))]),
+      content: SizedBox(width: 420, child: Column(mainAxisSize: MainAxisSize.min, children: [
+        TextField(controller: labelCtrl, decoration: InputDecoration(labelText: 'Label (e.g. Home, Office)', border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)), contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10))),
+        const SizedBox(height: 12),
+        TextField(controller: streetCtrl, maxLines: 2, decoration: InputDecoration(labelText: 'Street Address', hintText: 'House #, Street, Area', border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)), contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10))),
+        const SizedBox(height: 12),
+        TextField(controller: cityCtrl, decoration: InputDecoration(labelText: 'City', hintText: 'e.g. Lahore', border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)), contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10))),
       ])),
-      actions: [TextButton(onPressed: () => Navigator.pop(dc), child: const Text('Cancel', style: TextStyle(color: Color(0xFF64748B)))), ElevatedButton(onPressed: () { setState(() => _savedDeliveryAddress = c.text.trim()); Navigator.pop(dc); ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(content: Text('Delivery address saved'), backgroundColor: Colors.green)); }, style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryColor, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))), child: const Text('Save'))],
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(dc), child: const Text('Cancel', style: TextStyle(color: Color(0xFF64748B)))),
+        ElevatedButton(
+          onPressed: () {
+            final street = streetCtrl.text.trim();
+            if (street.isEmpty) return;
+            final label = labelCtrl.text.trim().isEmpty ? 'Address ${_savedAddresses.length + 1}' : labelCtrl.text.trim();
+            setState(() => _savedAddresses.add({'label': label, 'street': street, 'city': cityCtrl.text.trim()}));
+            _saveSavedAddresses();
+            Navigator.pop(dc);
+            ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(content: Text('Address saved!'), backgroundColor: Colors.green, duration: Duration(seconds: 2)));
+          },
+          style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryColor, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
+          child: const Text('Save Address'),
+        ),
+      ],
+    ));
+  }
+
+  void _showOrderHistoryDialog(BuildContext ctx) {
+    final future = ApiService().get('/pharmacy/orders/my');
+    showDialog(context: ctx, builder: (dc) => AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      title: const Row(children: [Icon(Icons.shopping_bag_outlined, color: Color(0xFF3B82F6), size: 22), SizedBox(width: 10), Text('Order History', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16))]),
+      content: SizedBox(width: 480, height: 400, child: FutureBuilder(
+        future: future,
+        builder: (_, snap) {
+          if (snap.connectionState != ConnectionState.done) return const Center(child: CircularProgressIndicator());
+          final orders = snap.data?.data['orders'] as List? ?? [];
+          if (orders.isEmpty) return const Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+            Icon(Icons.shopping_bag_outlined, size: 48, color: Color(0xFFCBD5E1)),
+            SizedBox(height: 12),
+            Text('No pharmacy orders yet', style: TextStyle(fontSize: 14, color: Color(0xFF94A3B8))),
+          ]));
+          return ListView.separated(
+            itemCount: orders.length,
+            separatorBuilder: (_, __) => const Divider(height: 1),
+            itemBuilder: (_, i) {
+              final o = orders[i];
+              final amount = o['total_amount'] ?? o['totalAmount'] ?? 0;
+              final status = (o['status'] ?? 'placed').toString();
+              final rawDate = o['createdAt'] ?? o['created_at'] ?? '';
+              String fmtDate = '';
+              try { final dt = DateTime.parse(rawDate.toString()); fmtDate = '${dt.day}/${dt.month}/${dt.year}'; } catch (_) { fmtDate = rawDate.toString(); }
+              final itemNames = (o['items'] as List? ?? []).take(2).map((item) => item is Map ? (item['name'] ?? item['product_name'] ?? '').toString() : '').where((s) => s.isNotEmpty).join(', ');
+              final statusColor = status == 'delivered' ? Colors.green : (status == 'cancelled' ? Colors.red : const Color(0xFFF59E0B));
+              return ListTile(
+                contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                leading: Container(width: 36, height: 36, decoration: BoxDecoration(color: const Color(0xFF3B82F6).withOpacity(0.1), borderRadius: BorderRadius.circular(8)), child: const Icon(Icons.medication_outlined, color: Color(0xFF3B82F6), size: 18)),
+                title: Text(itemNames.isNotEmpty ? itemNames : 'Order #${(o['order_number'] ?? o['_id'] ?? '').toString().split('-').last}', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                subtitle: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(fmtDate, style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8))),
+                  const SizedBox(height: 3),
+                  Container(padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2), decoration: BoxDecoration(color: statusColor.withOpacity(0.1), borderRadius: BorderRadius.circular(4)), child: Text(status.toUpperCase(), style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: statusColor))),
+                ]),
+                trailing: amount != 0 ? Text('PKR $amount', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF1E293B))) : null,
+                isThreeLine: true,
+              );
+            },
+          );
+        },
+      )),
+      actions: [TextButton(onPressed: () => Navigator.pop(dc), child: const Text('Close', style: TextStyle(color: Color(0xFF64748B))))],
+    ));
+  }
+
+  void _showDeliveryPreferencesDialog(BuildContext ctx) {
+    final ctrl = TextEditingController(text: _savedDeliveryInstructions);
+    showDialog(context: ctx, builder: (dc) => AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      title: const Row(children: [Icon(Icons.local_shipping_outlined, color: Color(0xFF8B5CF6), size: 22), SizedBox(width: 10), Text('Delivery Preferences', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16))]),
+      content: SizedBox(width: 420, child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+        const Text('Delivery Instructions', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+        const SizedBox(height: 4),
+        const Text('e.g. Leave at door, Ring bell twice, Call on arrival', style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8))),
+        const SizedBox(height: 12),
+        TextField(controller: ctrl, maxLines: 3, decoration: InputDecoration(hintText: 'Add special instructions for delivery...', border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)), contentPadding: const EdgeInsets.all(12))),
+      ])),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(dc), child: const Text('Cancel', style: TextStyle(color: Color(0xFF64748B)))),
+        ElevatedButton(
+          onPressed: () async {
+            setState(() => _savedDeliveryInstructions = ctrl.text.trim());
+            try { final prefs = await SharedPreferences.getInstance(); await prefs.setString('delivery_instructions', _savedDeliveryInstructions); } catch (_) {}
+            if (dc.mounted) { Navigator.pop(dc); ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(content: Text('Delivery preferences saved!'), backgroundColor: Colors.green, duration: Duration(seconds: 2))); }
+          },
+          style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryColor, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
+          child: const Text('Save'),
+        ),
+      ],
     ));
   }
 
@@ -950,7 +1102,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       currentMedications: _currentMedications, healthGoals: _healthGoals,
       waterReminderMinutes: _waterReminderMinutes, selectedLanguage: _selectedLanguage,
       selectedCountry: _selectedCountry,
-      savedDeliveryAddress: _savedDeliveryAddress,
+      savedAddressSubtitle: _savedAddresses.isEmpty ? 'Tap to add' : '${_savedAddresses.length} address${_savedAddresses.length == 1 ? '' : 'es'} saved',
       savedPaymentMethods: _savedPaymentMethods, billingHistory: _billingHistory,
       onToggle2FA: _toggle2FA, onToggleBiometrics: _toggleBiometrics,
       onTrackerToggle: _updateTrackerToggle, onHealthModeToggle: _toggleHealthMode,
@@ -961,8 +1113,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       onShowCurrentMedications: _showCurrentMedicationsDialog, onShowHealthGoals: _showHealthGoalsDialog,
       onShowWaterReminder: _showWaterReminderDialog, onShowLanguage: _showLanguageDialog,
       onShowCountryRegion: _showCountryRegionDialog,
-      onShowDeliveryAddress: _showDeliveryAddressDialog, onDownloadHealthData: _downloadHealthData,
+      onShowDeliveryAddress: _showDeliveryAddressesDialog, onDownloadHealthData: _downloadHealthData,
       onShowPaymentMethods: _showPaymentMethodsDialog, onShowBillingHistory: _showBillingHistoryDialog,
+      onShowOrderHistory: _showOrderHistoryDialog, onShowDeliveryPreferences: _showDeliveryPreferencesDialog,
     );
 
     if (isWide) return _WebSettingsLayout(p: params);
@@ -982,7 +1135,7 @@ class _SettingsLayoutParams {
   final List<String> selectedConditions;
   final String medicalConditions, allergies, currentMedications, healthGoals;
   final int waterReminderMinutes;
-  final String selectedLanguage, selectedCountry, savedDeliveryAddress;
+  final String selectedLanguage, selectedCountry, savedAddressSubtitle;
   final List<String> savedPaymentMethods, billingHistory;
   final Map<String, bool> trackerToggles;
   final void Function(bool) onToggle2FA, onToggleBiometrics;
@@ -995,6 +1148,7 @@ class _SettingsLayoutParams {
   final void Function(BuildContext) onShowCountryRegion;
   final void Function(BuildContext) onShowDeliveryAddress, onDownloadHealthData;
   final void Function(BuildContext) onShowPaymentMethods, onShowBillingHistory;
+  final void Function(BuildContext) onShowOrderHistory, onShowDeliveryPreferences;
 
   const _SettingsLayoutParams({
     required this.role, required this.user,
@@ -1007,7 +1161,7 @@ class _SettingsLayoutParams {
     required this.currentMedications, required this.healthGoals,
     required this.waterReminderMinutes, required this.selectedLanguage,
     required this.selectedCountry,
-    required this.savedDeliveryAddress, required this.savedPaymentMethods,
+    required this.savedAddressSubtitle, required this.savedPaymentMethods,
     required this.billingHistory, required this.trackerToggles,
     required this.onToggle2FA, required this.onToggleBiometrics,
     required this.onTrackerToggle, required this.onHealthModeToggle,
@@ -1020,6 +1174,7 @@ class _SettingsLayoutParams {
     required this.onShowDeliveryAddress,
     required this.onDownloadHealthData, required this.onShowPaymentMethods,
     required this.onShowBillingHistory,
+    required this.onShowOrderHistory, required this.onShowDeliveryPreferences,
   });
 }
 
@@ -1184,11 +1339,11 @@ class _WebSettingsLayout extends StatelessWidget {
     return Card(elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Padding(padding: const EdgeInsets.all(20), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         _sectionLabel('Pharmacy Settings'), const SizedBox(height: 16),
-        _settingsTile(icon: Icons.location_on_outlined, iconColor: const Color(0xFF10B981), title: 'Save Delivery Address', subtitle: p.savedDeliveryAddress.isEmpty ? 'Tap to add' : p.savedDeliveryAddress, onTap: () => p.onShowDeliveryAddress(context)),
+        _settingsTile(icon: Icons.location_on_outlined, iconColor: const Color(0xFF10B981), title: 'Saved Addresses', subtitle: p.savedAddressSubtitle, onTap: () => p.onShowDeliveryAddress(context)),
         const Divider(height: 1),
-        _settingsTile(icon: Icons.shopping_bag_outlined, iconColor: const Color(0xFF3B82F6), title: 'Order History', subtitle: 'View all pharmacy orders', onTap: () => p.onComingSoon(context, 'Order History')),
+        _settingsTile(icon: Icons.shopping_bag_outlined, iconColor: const Color(0xFF3B82F6), title: 'Order History', subtitle: 'View all pharmacy orders', onTap: () => p.onShowOrderHistory(context)),
         const Divider(height: 1),
-        _settingsTile(icon: Icons.local_shipping_outlined, iconColor: const Color(0xFF8B5CF6), title: 'Delivery Preferences', subtitle: 'Set delivery instructions', onTap: () => p.onShowDeliveryAddress(context)),
+        _settingsTile(icon: Icons.local_shipping_outlined, iconColor: const Color(0xFF8B5CF6), title: 'Delivery Preferences', subtitle: 'Set delivery instructions', onTap: () => p.onShowDeliveryPreferences(context)),
       ])));
   }
 
@@ -1556,9 +1711,9 @@ class _MobileSettingsLayout extends StatelessWidget {
     return Card(elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Padding(padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         _sectionLabel('Pharmacy Settings'), const SizedBox(height: 12),
-        _settingsTile(icon: Icons.location_on_outlined, iconColor: const Color(0xFF10B981), title: 'Save Delivery Address', subtitle: p.savedDeliveryAddress.isEmpty ? 'Tap to add' : p.savedDeliveryAddress, onTap: () => p.onShowDeliveryAddress(context)),
-        const Divider(height: 1), _settingsTile(icon: Icons.shopping_bag_outlined, iconColor: const Color(0xFF3B82F6), title: 'Order History', subtitle: 'View orders', onTap: () => p.onComingSoon(context, 'Order History')),
-        const Divider(height: 1), _settingsTile(icon: Icons.local_shipping_outlined, iconColor: const Color(0xFF8B5CF6), title: 'Delivery Preferences', subtitle: 'Set instructions', onTap: () => p.onShowDeliveryAddress(context)),
+        _settingsTile(icon: Icons.location_on_outlined, iconColor: const Color(0xFF10B981), title: 'Saved Addresses', subtitle: p.savedAddressSubtitle, onTap: () => p.onShowDeliveryAddress(context)),
+        const Divider(height: 1), _settingsTile(icon: Icons.shopping_bag_outlined, iconColor: const Color(0xFF3B82F6), title: 'Order History', subtitle: 'View orders', onTap: () => p.onShowOrderHistory(context)),
+        const Divider(height: 1), _settingsTile(icon: Icons.local_shipping_outlined, iconColor: const Color(0xFF8B5CF6), title: 'Delivery Preferences', subtitle: 'Set delivery instructions', onTap: () => p.onShowDeliveryPreferences(context)),
       ])));
   }
 

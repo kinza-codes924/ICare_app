@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:icare/screens/login.dart';
@@ -5,6 +6,7 @@ import 'package:icare/services/cart_service.dart';
 import 'package:icare/utils/shared_pref.dart';
 import 'package:icare/utils/theme.dart';
 import 'package:icare/widgets/back_button.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class MyCartScreen extends StatefulWidget {
   const MyCartScreen({super.key});
@@ -662,6 +664,50 @@ class _CheckoutScreenState extends State<_CheckoutScreen> {
   final _cityCtrl = TextEditingController();
   String _paymentMethod = 'Cash on Delivery';
   bool _isPlacing = false;
+  List<Map<String, String>> _savedAddresses = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadAddresses();
+  }
+
+  Future<void> _loadAddresses() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString('saved_delivery_addresses') ?? '[]';
+      final decoded = jsonDecode(raw) as List? ?? [];
+      if (mounted) setState(() => _savedAddresses = decoded.map((e) => Map<String, String>.from(e as Map)).toList());
+    } catch (_) {}
+  }
+
+  void _showSavedAddressesSheet() {
+    if (_savedAddresses.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No saved addresses. Add one in Settings → Pharmacy.'), backgroundColor: Colors.orange, duration: Duration(seconds: 3)));
+      return;
+    }
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const Text('Select Saved Address', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+          const SizedBox(height: 12),
+          ..._savedAddresses.map((addr) => ListTile(
+            leading: const Icon(Icons.location_on_outlined, color: Color(0xFF10B981)),
+            title: Text(addr['label'] ?? '', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+            subtitle: Text('${addr['street'] ?? ''}${(addr['city'] ?? '').isNotEmpty ? ', ${addr['city']}' : ''}', style: const TextStyle(fontSize: 12)),
+            onTap: () {
+              _addressCtrl.text = addr['street'] ?? '';
+              _cityCtrl.text = addr['city'] ?? '';
+              Navigator.pop(ctx);
+            },
+          )),
+        ]),
+      ),
+    );
+  }
 
   @override
   void dispose() {
@@ -927,9 +973,17 @@ class _CheckoutScreenState extends State<_CheckoutScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('Delivery Address',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Color(0xFF0F172A))),
-        const SizedBox(height: 16),
+        Row(children: [
+          const Text('Delivery Address', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Color(0xFF0F172A))),
+          const Spacer(),
+          TextButton.icon(
+            onPressed: _showSavedAddressesSheet,
+            icon: const Icon(Icons.bookmarks_outlined, size: 16),
+            label: const Text('Saved', style: TextStyle(fontSize: 13)),
+            style: TextButton.styleFrom(foregroundColor: AppColors.primaryColor),
+          ),
+        ]),
+        const SizedBox(height: 12),
         _formField(_addressCtrl, 'Street Address', Icons.home_outlined,
             validator: (v) => v == null || v.isEmpty ? 'Address is required' : null),
         const SizedBox(height: 12),
