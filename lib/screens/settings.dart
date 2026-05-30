@@ -20,13 +20,15 @@ import 'package:icare/services/biometric_service.dart';
 import 'package:icare/services/health_settings_service.dart';
 import 'package:icare/services/api_service.dart';
 import 'package:icare/utils/shared_pref.dart';
-import 'dart:js_interop';
-import 'package:flutter/foundation.dart' show kIsWeb;
-import '../utils/js_stub.dart'
-    if (dart.library.html) 'dart:js' as js;
-
-@JS('Notification.requestPermission')
-external JSPromise<JSString> _jsRequestNotificationPermission();
+import 'package:icare/services/appointment_service.dart';
+import 'package:icare/services/laboratory_service.dart';
+import 'package:icare/services/order_service.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
+import 'package:flutter/services.dart';
+import '../utils/water_notif_stub.dart'
+    if (dart.library.html) '../utils/water_notif_web.dart';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // SETTINGS SCREEN
@@ -67,12 +69,18 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   final List<String> _savedPaymentMethods = [];
   final List<String> _billingHistory = [];
 
+  // Billing & payment
+  List<Map<String, dynamic>> _billingItems = [];
+  bool _billingLoading = false;
+  final List<Map<String, String>> _savedCards = [];
+
   @override
   void initState() {
     super.initState();
     _loadHealthSettings();
     _loadUserData();
     _loadBiometricState();
+    _loadBillingItems();
   }
 
   Future<void> _loadBiometricState() async {
@@ -368,14 +376,78 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 
   Future<void> _setupWaterReminder(int minutes) async {
-    if (!kIsWeb) return;
     try {
-      final permJs = await _jsRequestNotificationPermission().toDart;
-      final permission = permJs.toDart;
+      final permission = await requestWaterNotifPermission();
       if (permission == 'granted') {
-        js.context.callMethod('scheduleWaterReminderInterval', [minutes]);
+        scheduleWaterReminderInterval(minutes);
+      } else if (permission == 'denied') {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('Notifications blocked. Please enable in browser site settings.'),
+            backgroundColor: Colors.orange,
+            duration: Duration(seconds: 5),
+          ));
+        }
       }
     } catch (_) {}
+  }
+
+  Future<void> _loadBillingItems() async {
+    if (!mounted) return;
+    setState(() => _billingLoading = true);
+    final items = <Map<String, dynamic>>[];
+    try {
+      final apptResult = await AppointmentService().getMyAppointmentsDetailed();
+      final appts = apptResult['appointments'] as List? ?? [];
+      for (final a in appts) {
+        items.add({
+          'id': a.id,
+          'type': 'consultation',
+          'title': 'Consultation with ${a.doctorName}',
+          'amount': 0,
+          'date': a.date.toIso8601String(),
+          'icon': Icons.medical_services_outlined,
+          'color': const Color(0xFF3B82F6),
+        });
+      }
+    } catch (_) {}
+    try {
+      final labBookings = await LaboratoryService().getMyBookings();
+      for (final b in labBookings) {
+        final tests = (b['tests'] as List? ?? []).map((t) => t['name'] ?? t).join(', ');
+        items.add({
+          'id': b['_id'] ?? '',
+          'type': 'lab_test',
+          'title': 'Lab Test${tests.isNotEmpty ? ': $tests' : ''}',
+          'amount': b['totalAmount'] ?? b['total'] ?? b['price'] ?? 0,
+          'date': b['createdAt'] ?? b['scheduledDate'] ?? '',
+          'icon': Icons.science_outlined,
+          'color': const Color(0xFF10B981),
+        });
+      }
+    } catch (_) {}
+    try {
+      final orders = await OrderService().getMyOrders();
+      for (final o in orders) {
+        items.add({
+          'id': o['_id'] ?? '',
+          'type': 'medicine',
+          'title': 'Medicine Order',
+          'amount': o['totalAmount'] ?? o['total'] ?? 0,
+          'date': o['createdAt'] ?? '',
+          'icon': Icons.medication_outlined,
+          'color': const Color(0xFF8B5CF6),
+        });
+      }
+    } catch (_) {}
+
+    items.sort((a, b) {
+      try {
+        return DateTime.parse(b['date']).compareTo(DateTime.parse(a['date']));
+      } catch (_) { return 0; }
+    });
+
+    if (mounted) setState(() { _billingItems = items; _billingLoading = false; });
   }
 
   void _showLanguageDialog(BuildContext ctx) {
@@ -461,38 +533,371 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       title: const Row(children: [Icon(Icons.download_outlined, color: Color(0xFF8B5CF6), size: 22), SizedBox(width: 10), Text('Download Health Data', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16))]),
       content: const SizedBox(width: 400, child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text('Your health data will be downloaded.', style: TextStyle(fontSize: 13, color: Color(0xFF64748B))),
+        Text('A PDF will be generated with all your health records sorted by date.', style: TextStyle(fontSize: 13, color: Color(0xFF64748B))),
         SizedBox(height: 12),
-        Text('Includes: Consultations, Prescriptions, Lab Reports, Vitals', style: TextStyle(fontSize: 13, color: Color(0xFF475569))),
+        Text('Includes: Consultations, Prescriptions, Lab Tests, Medicine Orders', style: TextStyle(fontSize: 13, color: Color(0xFF475569))),
       ])),
-      actions: [TextButton(onPressed: () => Navigator.pop(dc), child: const Text('Cancel', style: TextStyle(color: Color(0xFF64748B)))), ElevatedButton.icon(onPressed: () { Navigator.pop(dc); ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(content: Text('Your health data is being prepared for download.'), backgroundColor: Colors.green, duration: Duration(seconds: 4))); }, icon: const Icon(Icons.download_rounded, size: 16), label: const Text('Download'), style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF8B5CF6), foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))))],
+      actions: [TextButton(onPressed: () => Navigator.pop(dc), child: const Text('Cancel', style: TextStyle(color: Color(0xFF64748B)))), ElevatedButton.icon(onPressed: () { Navigator.pop(dc); _generateHealthDataPdf(ctx); }, icon: const Icon(Icons.download_rounded, size: 16), label: const Text('Download PDF'), style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF8B5CF6), foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))))],
     ));
   }
 
+  Future<void> _generateHealthDataPdf(BuildContext ctx) async {
+    try {
+      ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(content: Text('Preparing your health data PDF...'), backgroundColor: Colors.blue, duration: Duration(seconds: 3)));
+
+      // Fetch all data
+      final apptResult = await AppointmentService().getMyAppointmentsDetailed();
+      final appts = apptResult['appointments'] as List? ?? [];
+      final labBookings = await LaboratoryService().getMyBookings().catchError((_) => <dynamic>[]);
+      final orders = await OrderService().getMyOrders().catchError((_) => <dynamic>[]);
+
+      final user = ref.read(authProvider).user;
+      final patientName = user?.name ?? 'Patient';
+      final now = DateTime.now();
+      final dateStr = '${now.day}/${now.month}/${now.year}';
+
+      pw.ImageProvider? logoImage;
+      try {
+        final logoBytes = await rootBundle.load('assets/Asset 1.png');
+        logoImage = pw.MemoryImage(logoBytes.buffer.asUint8List());
+      } catch (_) {}
+
+      final pdf = pw.Document();
+      pdf.addPage(pw.MultiPage(
+        pageFormat: PdfPageFormat.a4,
+        margin: const pw.EdgeInsets.all(32),
+        header: (ctx2) => pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
+          if (logoImage != null)
+            pw.Container(width: 50, height: 50, child: pw.Image(logoImage, fit: pw.BoxFit.contain))
+          else
+            pw.Text('iCare', style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold, color: PdfColors.blue800)),
+          pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.end, children: [
+            pw.Text('Health Data Report', style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold)),
+            pw.Text(patientName, style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey)),
+            pw.Text('Generated: $dateStr', style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey)),
+          ]),
+        ]),
+        build: (ctx2) {
+          final widgets = <pw.Widget>[];
+
+          widgets.add(pw.SizedBox(height: 16));
+          widgets.add(pw.Divider());
+          widgets.add(pw.SizedBox(height: 8));
+
+          // ── Consultations ──
+          if (appts.isNotEmpty) {
+            widgets.add(pw.Text('Consultations', style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold, color: PdfColors.blue800)));
+            widgets.add(pw.SizedBox(height: 8));
+            for (final a in appts) {
+              final doctor = a.doctorName;
+              final rawDate = a.date.toIso8601String();
+              String fmtDate = rawDate;
+              try { final dt = DateTime.parse(fmtDate); fmtDate = '${dt.day}/${dt.month}/${dt.year}'; } catch (_) {}
+              final status = a.status;
+              const fee = '';
+              widgets.add(pw.Container(
+                margin: const pw.EdgeInsets.only(bottom: 6),
+                padding: const pw.EdgeInsets.all(8),
+                decoration: pw.BoxDecoration(border: pw.Border.all(color: PdfColors.grey300), borderRadius: pw.BorderRadius.circular(4)),
+                child: pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
+                  pw.Expanded(child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+                    pw.Text('Dr. $doctor', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 11)),
+                    pw.Text('Date: $fmtDate  |  Status: $status', style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey)),
+                  ])),
+                  pw.Text(status, style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey600)),
+                ]),
+              ));
+            }
+            widgets.add(pw.SizedBox(height: 12));
+          }
+
+          // ── Lab Tests ──
+          if (labBookings.isNotEmpty) {
+            widgets.add(pw.Text('Lab Tests', style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold, color: PdfColors.green800)));
+            widgets.add(pw.SizedBox(height: 8));
+            for (final b in labBookings) {
+              final tests = (b['tests'] as List? ?? []).map((t) => t is Map ? (t['name'] ?? '') : t.toString()).join(', ');
+              final lab = (b['lab'] is Map ? b['lab']['name'] : b['labName']) ?? 'Lab';
+              final amount = b['totalAmount'] ?? b['total'] ?? b['price'] ?? 0;
+              final rawDate = b['createdAt'] ?? b['scheduledDate'] ?? '';
+              String fmtDate = rawDate.toString();
+              try { final dt = DateTime.parse(fmtDate); fmtDate = '${dt.day}/${dt.month}/${dt.year}'; } catch (_) {}
+              widgets.add(pw.Container(
+                margin: const pw.EdgeInsets.only(bottom: 6),
+                padding: const pw.EdgeInsets.all(8),
+                decoration: pw.BoxDecoration(border: pw.Border.all(color: PdfColors.grey300), borderRadius: pw.BorderRadius.circular(4)),
+                child: pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
+                  pw.Expanded(child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+                    pw.Text(tests.isNotEmpty ? tests : 'Lab Test', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 11)),
+                    pw.Text('Lab: $lab  |  Date: $fmtDate', style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey)),
+                  ])),
+                  pw.Text('PKR $amount', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold, color: PdfColors.green800)),
+                ]),
+              ));
+            }
+            widgets.add(pw.SizedBox(height: 12));
+          }
+
+          // ── Medicine Orders ──
+          if (orders.isNotEmpty) {
+            widgets.add(pw.Text('Medicine Orders', style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold, color: PdfColors.purple)));
+            widgets.add(pw.SizedBox(height: 8));
+            for (final o in orders) {
+              final amount = o['totalAmount'] ?? o['total'] ?? 0;
+              final rawDate = o['createdAt'] ?? '';
+              String fmtDate = rawDate.toString();
+              try { final dt = DateTime.parse(fmtDate); fmtDate = '${dt.day}/${dt.month}/${dt.year}'; } catch (_) {}
+              final status = o['status'] ?? 'placed';
+              final items = (o['items'] as List? ?? []).take(3).map((i) => i['name'] ?? '').where((s) => s.isNotEmpty).join(', ');
+              widgets.add(pw.Container(
+                margin: const pw.EdgeInsets.only(bottom: 6),
+                padding: const pw.EdgeInsets.all(8),
+                decoration: pw.BoxDecoration(border: pw.Border.all(color: PdfColors.grey300), borderRadius: pw.BorderRadius.circular(4)),
+                child: pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
+                  pw.Expanded(child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+                    pw.Text(items.isNotEmpty ? items : 'Medicine Order', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 11)),
+                    pw.Text('Date: $fmtDate  |  Status: $status', style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey)),
+                  ])),
+                  pw.Text('PKR $amount', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold, color: PdfColors.purple)),
+                ]),
+              ));
+            }
+          }
+
+          if (appts.isEmpty && labBookings.isEmpty && orders.isEmpty) {
+            widgets.add(pw.Center(child: pw.Text('No health records found.', style: const pw.TextStyle(color: PdfColors.grey))));
+          }
+
+          return widgets;
+        },
+      ));
+
+      await Printing.layoutPdf(
+        onLayout: (_) async => pdf.save(),
+        name: 'iCare_Health_Data_${patientName.replaceAll(' ', '_')}_$dateStr.pdf',
+      );
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text('PDF generation failed: $e'), backgroundColor: Colors.red));
+    }
+  }
+
   void _showPaymentMethodsDialog(BuildContext ctx) {
-    showDialog(context: ctx, builder: (dc) => AlertDialog(
+    showDialog(context: ctx, builder: (dc) => StatefulBuilder(builder: (dc2, setS) => AlertDialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       title: const Row(children: [Icon(Icons.credit_card_outlined, color: Color(0xFF10B981), size: 22), SizedBox(width: 10), Text('Payment Methods', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16))]),
-      content: SizedBox(width: 400, child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-        const Text('Your saved payment methods', style: TextStyle(fontSize: 13, color: Color(0xFF64748B))), const SizedBox(height: 16),
-        if (_savedPaymentMethods.isEmpty) const Padding(padding: EdgeInsets.symmetric(vertical: 20), child: Center(child: Text('No payment methods saved yet', style: TextStyle(fontSize: 14, color: Color(0xFF94A3B8))))) else ...List.generate(_savedPaymentMethods.length, (i) => ListTile(leading: const Icon(Icons.credit_card_rounded, color: Color(0xFF10B981)), title: Text(_savedPaymentMethods[i]), trailing: IconButton(icon: const Icon(Icons.delete_outline, color: Color(0xFFEF4444)), onPressed: () { setState(() => _savedPaymentMethods.removeAt(i)); Navigator.pop(dc); }))),
+      content: SizedBox(width: 420, child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+        const Text('Saved cards', style: TextStyle(fontSize: 13, color: Color(0xFF64748B))), const SizedBox(height: 12),
+        if (_savedCards.isEmpty)
+          const Padding(padding: EdgeInsets.symmetric(vertical: 12), child: Center(child: Text('No cards saved yet', style: TextStyle(fontSize: 13, color: Color(0xFF94A3B8)))))
+        else
+          ...List.generate(_savedCards.length, (i) {
+            final card = _savedCards[i];
+            return Container(
+              margin: const EdgeInsets.only(bottom: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(color: const Color(0xFFF8FAFC), borderRadius: BorderRadius.circular(10), border: Border.all(color: const Color(0xFFE2E8F0))),
+              child: Row(children: [
+                const Icon(Icons.credit_card_rounded, color: Color(0xFF10B981), size: 22),
+                const SizedBox(width: 10),
+                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text('**** **** **** ${card['last4']}', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                  Text('${card['name']}  |  Exp: ${card['expiry']}', style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+                ])),
+                IconButton(icon: const Icon(Icons.delete_outline, color: Color(0xFFEF4444), size: 18), onPressed: () { setState(() => _savedCards.removeAt(i)); setS(() {}); }),
+              ]),
+            );
+          }),
         const SizedBox(height: 12),
-        ElevatedButton.icon(onPressed: () { Navigator.pop(dc); ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(content: Text('Add payment method'), backgroundColor: Colors.green)); }, icon: const Icon(Icons.add_rounded, size: 16), label: const Text('Add Payment Method'), style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryColor, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)))),
+        ElevatedButton.icon(
+          onPressed: () { Navigator.pop(dc); _showAddCardDialog(ctx); },
+          icon: const Icon(Icons.add_rounded, size: 16),
+          label: const Text('Add Payment Method'),
+          style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryColor, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
+        ),
       ])),
       actions: [TextButton(onPressed: () => Navigator.pop(dc), child: const Text('Close', style: TextStyle(color: Color(0xFF64748B))))],
-    ));
+    )));
+  }
+
+  void _showAddCardDialog(BuildContext ctx) {
+    final cardNumberCtrl = TextEditingController();
+    final nameCtrl = TextEditingController();
+    final expiryCtrl = TextEditingController();
+    final cvvCtrl = TextEditingController();
+    String selectedType = 'Visa';
+    final cardTypes = ['Visa', 'Mastercard', 'PayPak', 'UnionPay'];
+
+    showDialog(context: ctx, builder: (dc) => StatefulBuilder(builder: (dc2, setS) => AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      title: const Row(children: [Icon(Icons.add_card_outlined, color: Color(0xFF10B981), size: 22), SizedBox(width: 10), Text('Add Payment Method', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16))]),
+      content: SizedBox(width: 420, child: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+        const Text('Card Type', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF475569))), const SizedBox(height: 8),
+        Wrap(spacing: 8, children: cardTypes.map((t) => ChoiceChip(
+          label: Text(t, style: TextStyle(fontSize: 12, color: selectedType == t ? Colors.white : const Color(0xFF475569))),
+          selected: selectedType == t,
+          onSelected: (_) => setS(() => selectedType = t),
+          selectedColor: AppColors.primaryColor,
+          backgroundColor: const Color(0xFFF1F5F9),
+        )).toList()),
+        const SizedBox(height: 14),
+        TextField(controller: cardNumberCtrl, keyboardType: TextInputType.number, maxLength: 19, decoration: InputDecoration(labelText: 'Card Number', hintText: '0000 0000 0000 0000', counterText: '', border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)), contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12), prefixIcon: const Icon(Icons.credit_card_rounded, size: 18))),
+        const SizedBox(height: 10),
+        TextField(controller: nameCtrl, decoration: InputDecoration(labelText: 'Card Holder Name', hintText: 'Ali Ahmed', border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)), contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12), prefixIcon: const Icon(Icons.person_outline_rounded, size: 18))),
+        const SizedBox(height: 10),
+        Row(children: [
+          Expanded(child: TextField(controller: expiryCtrl, keyboardType: TextInputType.number, maxLength: 5, decoration: InputDecoration(labelText: 'Expiry (MM/YY)', hintText: '12/28', counterText: '', border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)), contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12)))),
+          const SizedBox(width: 12),
+          Expanded(child: TextField(controller: cvvCtrl, keyboardType: TextInputType.number, maxLength: 4, obscureText: true, decoration: InputDecoration(labelText: 'CVV', hintText: '***', counterText: '', border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)), contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12)))),
+        ]),
+        const SizedBox(height: 8),
+        const Row(children: [Icon(Icons.lock_outline_rounded, size: 14, color: Color(0xFF94A3B8)), SizedBox(width: 4), Text('Your card details are stored securely', style: TextStyle(fontSize: 11, color: Color(0xFF94A3B8)))]),
+      ]))),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(dc), child: const Text('Cancel', style: TextStyle(color: Color(0xFF64748B)))),
+        ElevatedButton(
+          onPressed: () {
+            final num = cardNumberCtrl.text.replaceAll(' ', '');
+            if (num.length < 13 || nameCtrl.text.isEmpty || expiryCtrl.text.isEmpty) {
+              ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(content: Text('Please fill in all fields'), backgroundColor: Colors.red));
+              return;
+            }
+            setState(() => _savedCards.add({'last4': num.length >= 4 ? num.substring(num.length - 4) : num, 'name': nameCtrl.text, 'expiry': expiryCtrl.text, 'type': selectedType}));
+            Navigator.pop(dc);
+            ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text('$selectedType card added successfully'), backgroundColor: Colors.green));
+          },
+          style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryColor, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
+          child: const Text('Save Card'),
+        ),
+      ],
+    )));
   }
 
   void _showBillingHistoryDialog(BuildContext ctx) {
     showDialog(context: ctx, builder: (dc) => AlertDialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      title: const Row(children: [Icon(Icons.receipt_long_outlined, color: Color(0xFF10B981), size: 22), SizedBox(width: 10), Text('Billing History', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16))]),
-      content: SizedBox(width: 400, child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-        const Text('All your payment transactions', style: TextStyle(fontSize: 13, color: Color(0xFF64748B))), const SizedBox(height: 16),
-        if (_billingHistory.isEmpty) const Padding(padding: EdgeInsets.symmetric(vertical: 20), child: Center(child: Column(children: [Icon(Icons.receipt_long_outlined, size: 40, color: Color(0xFFCBD5E1)), SizedBox(height: 8), Text('No billing history yet', style: TextStyle(fontSize: 14, color: Color(0xFF94A3B8)))]))) else ...List.generate(_billingHistory.length, (i) => ListTile(leading: const Icon(Icons.receipt_rounded, color: Color(0xFF10B981)), title: Text(_billingHistory[i]), trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: Color(0xFFCBD5E1)))),
-      ])),
-      actions: [TextButton(onPressed: () => Navigator.pop(dc), child: const Text('Close', style: TextStyle(color: Color(0xFF64748B))))],
+      title: Row(children: [
+        const Icon(Icons.receipt_long_outlined, color: Color(0xFF10B981), size: 22), const SizedBox(width: 10),
+        const Expanded(child: Text('Billing History', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16))),
+        if (_billingLoading) const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)),
+      ]),
+      content: SizedBox(width: 480, height: 400, child: _billingLoading
+        ? const Center(child: CircularProgressIndicator())
+        : _billingItems.isEmpty
+          ? const Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.receipt_long_outlined, size: 48, color: Color(0xFFCBD5E1)), SizedBox(height: 12), Text('No billing history yet', style: TextStyle(fontSize: 14, color: Color(0xFF94A3B8)))]))
+          : ListView.separated(
+              itemCount: _billingItems.length,
+              separatorBuilder: (_, __) => const Divider(height: 1),
+              itemBuilder: (_, i) {
+                final item = _billingItems[i];
+                final rawDate = item['date'] as String? ?? '';
+                String fmtDate = '';
+                try { final dt = DateTime.parse(rawDate); fmtDate = '${dt.day}/${dt.month}/${dt.year}'; } catch (_) { fmtDate = rawDate; }
+                final amount = item['amount'];
+                final amtStr = amount != null && amount != 0 ? 'PKR $amount' : '';
+                return ListTile(
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                  leading: Container(
+                    width: 36, height: 36,
+                    decoration: BoxDecoration(color: (item['color'] as Color? ?? const Color(0xFF10B981)).withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
+                    child: Icon(item['icon'] as IconData? ?? Icons.receipt_rounded, color: item['color'] as Color? ?? const Color(0xFF10B981), size: 18),
+                  ),
+                  title: Text(item['title'] as String? ?? '', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                  subtitle: Text(fmtDate, style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8))),
+                  trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+                    if (amtStr.isNotEmpty) Text(amtStr, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF1E293B))),
+                    const SizedBox(width: 6),
+                    InkWell(
+                      onTap: () { Navigator.pop(dc); _downloadSingleReceipt(ctx, item); },
+                      borderRadius: BorderRadius.circular(6),
+                      child: const Padding(padding: EdgeInsets.all(4), child: Icon(Icons.download_outlined, size: 18, color: Color(0xFF0036BC))),
+                    ),
+                  ]),
+                );
+              },
+            ),
+      ),
+      actions: [
+        TextButton(onPressed: () { Navigator.pop(dc); _loadBillingItems(); }, child: const Text('Refresh', style: TextStyle(color: Color(0xFF64748B)))),
+        TextButton(onPressed: () => Navigator.pop(dc), child: const Text('Close', style: TextStyle(color: Color(0xFF64748B)))),
+      ],
     ));
+  }
+
+  Future<void> _downloadSingleReceipt(BuildContext ctx, Map<String, dynamic> item) async {
+    try {
+      pw.ImageProvider? logoImage;
+      try { final bytes = await rootBundle.load('assets/Asset 1.png'); logoImage = pw.MemoryImage(bytes.buffer.asUint8List()); } catch (_) {}
+
+      final now = DateTime.now();
+      final dateStr = '${now.day}/${now.month}/${now.year}';
+      final rawDate = item['date'] as String? ?? '';
+      String txnDate = '';
+      try { final dt = DateTime.parse(rawDate); txnDate = '${dt.day}/${dt.month}/${dt.year}'; } catch (_) { txnDate = rawDate; }
+      final amount = item['amount'];
+      final amtStr = amount != null && amount != 0 ? 'PKR $amount' : 'N/A';
+      final user = ref.read(authProvider).user;
+      final patientName = user?.name ?? 'Patient';
+
+      final pdf = pw.Document();
+      pdf.addPage(pw.Page(pageFormat: PdfPageFormat.a4, margin: const pw.EdgeInsets.all(40), build: (ctx2) => pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+        pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
+          pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+            if (logoImage != null) pw.Container(width: 50, height: 50, child: pw.Image(logoImage)) else pw.Text('iCare', style: pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold, color: PdfColors.blue800)),
+            pw.SizedBox(height: 4),
+            pw.Text('RM Health Solutions (Private) Limited', style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey)),
+          ]),
+          pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.end, children: [
+            pw.Text('RECEIPT', style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold, color: PdfColors.blue800)),
+            pw.Text('Issued: $dateStr', style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey)),
+          ]),
+        ]),
+        pw.SizedBox(height: 20),
+        pw.Divider(),
+        pw.SizedBox(height: 16),
+        pw.Row(children: [
+          pw.Expanded(child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+            pw.Text('Billed To:', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold, color: PdfColors.grey600)),
+            pw.SizedBox(height: 4),
+            pw.Text(patientName, style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold)),
+          ])),
+          pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.end, children: [
+            pw.Text('Transaction Date:', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold, color: PdfColors.grey600)),
+            pw.SizedBox(height: 4),
+            pw.Text(txnDate.isNotEmpty ? txnDate : 'N/A', style: const pw.TextStyle(fontSize: 12)),
+          ]),
+        ]),
+        pw.SizedBox(height: 20),
+        pw.Container(
+          padding: const pw.EdgeInsets.all(14),
+          decoration: pw.BoxDecoration(color: PdfColors.grey100, borderRadius: pw.BorderRadius.circular(6)),
+          child: pw.Column(children: [
+            pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
+              pw.Text('Description', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 11, color: PdfColors.grey700)),
+              pw.Text('Amount', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 11, color: PdfColors.grey700)),
+            ]),
+            pw.Divider(color: PdfColors.grey400),
+            pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
+              pw.Expanded(child: pw.Text(item['title'] as String? ?? '', style: const pw.TextStyle(fontSize: 12))),
+              pw.Text(amtStr, style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold)),
+            ]),
+            pw.Divider(color: PdfColors.grey400),
+            pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
+              pw.Text('Total', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 12)),
+              pw.Text(amtStr, style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold, color: PdfColors.blue800)),
+            ]),
+          ]),
+        ),
+        pw.SizedBox(height: 30),
+        pw.Center(child: pw.Text('Thank you for using iCare.', style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey))),
+      ])));
+
+      await Printing.layoutPdf(
+        onLayout: (_) async => pdf.save(),
+        name: 'iCare_Receipt_${(item['title'] as String? ?? 'receipt').replaceAll(' ', '_')}.pdf',
+      );
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text('Receipt download failed: $e'), backgroundColor: Colors.red));
+    }
   }
 
   void _showFeeDialog(BuildContext ctx) {
