@@ -93,10 +93,6 @@ class _SelectPaymentMethodState extends State<SelectPaymentMethod> {
             "Appointment Confirmed!",
             "Your appointment has been booked and payment received. You will receive a confirmation shortly.",
           );
-          // Call the callback after showing dialog if provided
-          if (widget.onPaymentSuccess != null) {
-            widget.onPaymentSuccess!();
-          }
         }
       } else if (widget.courseId != null) {
         log("Attempting to buy course with ID: ${widget.courseId}");

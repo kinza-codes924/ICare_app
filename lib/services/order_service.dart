@@ -19,7 +19,7 @@ class OrderService {
 
   // Get user's orders
   Future<List<dynamic>> getMyOrders({String? status}) async {
-    String url = '/pharmacy/orders/my';
+    String url = '/pharmacy/orders';
     if (status != null && status.isNotEmpty) {
       url += '?status=$status';
     }

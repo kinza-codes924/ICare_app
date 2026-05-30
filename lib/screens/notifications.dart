@@ -111,17 +111,40 @@ class _NotificationScreenState extends State<NotificationScreen> {
   }
 
   Future<void> _markAllAsRead() async {
+    setState(() {
+      for (final n in _notifications) {
+        n['read'] = true;
+      }
+    });
     await _notificationService.markAllAsRead();
-    _loadNotifications();
+    _loadNotificationsQuiet();
   }
 
-  Future<void> _markAsRead(String id) async {
-    await _notificationService.markAsRead(id);
-    _loadNotifications();
+  void _markAsReadOptimistic(String id) {
+    // Update local state immediately so the dot disappears without a reload flash
+    setState(() {
+      for (final n in _notifications) {
+        if (n['_id'] == id) n['read'] = true;
+      }
+    });
+    // Fire backend call in background, reload list silently when done
+    _notificationService.markAsRead(id).then((_) {
+      if (mounted) _loadNotificationsQuiet();
+    });
+  }
+
+  Future<void> _loadNotificationsQuiet() async {
+    try {
+      final result = await _notificationService.getNotifications();
+      if (mounted && result['success'] == true) {
+        final fresh = result['notifications'] as List? ?? [];
+        if (fresh.isNotEmpty) setState(() => _notifications = fresh);
+      }
+    } catch (_) {}
   }
 
   void _navigateToContent(Map notif, String id, bool isUnread) {
-    if (isUnread) _markAsRead(id);
+    if (isUnread) _markAsReadOptimistic(id);
     final String type = notif['type'] ?? '';
     switch (type) {
       case 'appointment':
@@ -137,7 +160,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
         Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ReminderList()));
         break;
       default:
-        if (isUnread) _markAsRead(id);
+        break;
     }
   }
 
