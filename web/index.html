@@ -273,6 +273,51 @@
         if (_ringtoneCtx) { _ringtoneCtx.close(); _ringtoneCtx = null; }
       } catch(_) {}
     };
+
+    // ── Water Reminder Notifications ─────────────────────────────────────────
+    var _waterReminderTimer = null;
+
+    window.setupWaterReminder = async function(intervalMinutes) {
+      try {
+        if (!('Notification' in window)) {
+          console.warn('Browser does not support notifications');
+          return;
+        }
+        var permission = Notification.permission;
+        if (permission === 'default') {
+          permission = await Notification.requestPermission();
+        }
+        if (permission !== 'granted') {
+          console.warn('Water reminder: notification permission not granted');
+          return;
+        }
+        // Clear any existing timer
+        if (_waterReminderTimer) {
+          clearInterval(_waterReminderTimer);
+          _waterReminderTimer = null;
+        }
+        var ms = intervalMinutes * 60 * 1000;
+        _waterReminderTimer = setInterval(function() {
+          try {
+            new Notification('Drink Water', {
+              body: 'Time to drink a glass of water! Stay hydrated.',
+              icon: '/icons/Icon-192.png',
+            });
+          } catch(e) { console.warn('Water notification error:', e); }
+        }, ms);
+        console.log('Water reminder set every', intervalMinutes, 'minutes');
+      } catch(e) {
+        console.warn('setupWaterReminder error:', e);
+      }
+    };
+
+    window.cancelWaterReminder = function() {
+      if (_waterReminderTimer) {
+        clearInterval(_waterReminderTimer);
+        _waterReminderTimer = null;
+        console.log('Water reminder cancelled');
+      }
+    };
   </script>
   <script src="flutter_bootstrap.js" async></script>
 
