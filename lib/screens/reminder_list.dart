@@ -4,6 +4,7 @@ import 'package:icare/utils/theme.dart';
 import 'package:icare/widgets/back_button.dart';
 import 'package:intl/intl.dart';
 import 'package:icare/services/reminder_service.dart';
+import 'package:icare/services/google_calendar_service.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -15,8 +16,10 @@ class ReminderList extends StatefulWidget {
 
 class _ReminderListState extends State<ReminderList> with SingleTickerProviderStateMixin {
   final ReminderService _reminderService = ReminderService();
+  final GoogleCalendarService _gcal = GoogleCalendarService();
   List<Map<String, dynamic>> _reminders = [];
   bool _isLoading = true;
+  bool _isSyncing = false;
 
   @override
   void initState() {
@@ -68,6 +71,52 @@ class _ReminderListState extends State<ReminderList> with SingleTickerProviderSt
   Future<void> _delete(String id) async {
     await _reminderService.deleteReminder(id);
     _load();
+  }
+
+  Future<void> _syncToGoogleCalendar() async {
+    if (_isSyncing) return;
+    setState(() => _isSyncing = true);
+    try {
+      final signedIn = _gcal.isSignedIn || await _gcal.signIn();
+      if (!signedIn) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Google sign-in cancelled'), backgroundColor: Colors.orange),
+          );
+        }
+        return;
+      }
+      if (_reminders.isEmpty) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('No reminders to sync'), backgroundColor: Colors.orange),
+          );
+        }
+        return;
+      }
+      final result = await _gcal.syncReminders(_reminders);
+      if (mounted) {
+        final s = result['success'] ?? 0;
+        final f = result['failed'] ?? 0;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(f == 0
+                ? '$s reminder${s == 1 ? '' : 's'} synced to Google Calendar'
+                : '$s synced, $f failed'),
+            backgroundColor: f == 0 ? const Color(0xFF059669) : Colors.orange,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Sync failed: $e'), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isSyncing = false);
+    }
   }
 
   // ── Grouping ──────────────────────────────────────────────────────────────
@@ -128,18 +177,21 @@ class _ReminderListState extends State<ReminderList> with SingleTickerProviderSt
         ),
         shape: const Border(bottom: BorderSide(color: Color(0xFFE2E8F0))),
         actions: [
-          TextButton.icon(
-            onPressed: () async {
-              final res = await Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const CreateReminder()),
-              );
-              if (res == true) _load();
-            },
-            icon: const Icon(Icons.add_rounded, size: 18),
-            label: const Text('Add Reminder', style: TextStyle(fontWeight: FontWeight.w700)),
-            style: TextButton.styleFrom(foregroundColor: AppColors.primaryColor),
-          ),
-          const SizedBox(width: 8),
+          _isSyncing
+              ? const Padding(
+                  padding: EdgeInsets.all(16),
+                  child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)),
+                )
+              : IconButton(
+                  onPressed: _syncToGoogleCalendar,
+                  tooltip: 'Sync to Google Calendar',
+                  icon: Image.network(
+                    'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a5/Google_Calendar_icon_%282020%29.svg/64px-Google_Calendar_icon_%282020%29.svg.png',
+                    width: 24, height: 24,
+                    errorBuilder: (_, _, _) => const Icon(Icons.calendar_month_outlined, color: Color(0xFF0036BC)),
+                  ),
+                ),
+          const SizedBox(width: 4),
         ],
       ),
       body: _isLoading
