@@ -30,6 +30,7 @@ class CustomInputField extends StatefulWidget {
   final EdgeInsetsGeometry? margin;
   final int? maxLines;
   final BoxBorder? borderType;
+  final VoidCallback? onEditingComplete;
   const CustomInputField({
     super.key,
     this.title,
@@ -60,6 +61,7 @@ class CustomInputField extends StatefulWidget {
     this.titleFontSize = 15,
     this.titleFontWeight = FontWeight.w600,
     this.margin,
+    this.onEditingComplete,
   });
 
   @override
@@ -127,6 +129,7 @@ class _CustomInputFieldState extends State<CustomInputField> {
                     focusNode: widget.focusNode,
                     autofocus: widget.autoFocus,
                     enabled: widget.enabled,
+                    onEditingComplete: widget.onEditingComplete,
                     style:
                         widget.textStyle ??
                         const TextStyle(

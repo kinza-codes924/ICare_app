@@ -801,6 +801,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                                 borderRadius: 14,
                                 borderColor: const Color(0xFFE2E8F0),
                                 borderWidth: 1.5,
+                                textInputAction: isLogin ? TextInputAction.done : TextInputAction.next,
+                                onEditingComplete: isLogin && !isLoading ? _handleSubmit : null,
                                 validator: (val) {
                                   if (val == null || val.isEmpty) {
                                     return "Please enter your password";
@@ -1326,6 +1328,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                             borderRadius: 30,
                             borderColor: AppColors.veryLightGrey,
                             borderWidth: 2,
+                            textInputAction: isLogin ? TextInputAction.done : TextInputAction.next,
+                            onEditingComplete: isLogin && !isLoading ? _handleSubmit : null,
                             validator: (val) {
                               if (val == null || val.isEmpty) {
                                 return "Please enter your password";

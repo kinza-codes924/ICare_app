@@ -12,8 +12,10 @@ import 'package:icare/screens/video_call.dart';
 import 'package:icare/services/appointment_service.dart';
 import 'package:icare/screens/prescription_detail_screen.dart';
 import 'package:icare/services/consultation_service.dart';
+import 'package:icare/services/review_service.dart';
 import 'package:icare/utils/imagePaths.dart';
 import 'package:icare/utils/shared_pref.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:icare/utils/theme.dart';
 import 'package:icare/utils/utils.dart';
 import 'package:icare/widgets/back_button.dart';
@@ -223,11 +225,245 @@ class ProfileOrAppointmentViewScreen extends ConsumerWidget {
                 ],
               ),
             ],
+            // Patient: Rate & Review after completed appointment
+            if (selectedRole == "Patient" && appointment.status.toLowerCase() == 'completed') ...[
+              const SizedBox(height: 16),
+              Padding(
+                padding: EdgeInsets.symmetric(horizontal: ScallingConfig.scale(16)),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: () => _showReviewDialog(context, appointment),
+                    icon: const Icon(Icons.star_rounded, size: 20),
+                    label: const Text('Rate & Review Doctor', style: TextStyle(fontWeight: FontWeight.w700)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFF59E0B),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      elevation: 0,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+            ],
           ],
         ),
       ),
     );
   }
+}
+
+Future<void> _showReviewDialog(BuildContext context, AppointmentDetail appointment) async {
+  final prefs = await SharedPreferences.getInstance();
+  final reviewedKey = 'reviewed_${appointment.id}';
+  final alreadyReviewed = prefs.getBool(reviewedKey) ?? false;
+  if (!context.mounted) return;
+
+  int selectedStars = 0;
+  bool? satisfied;
+  final reviewController = TextEditingController();
+  bool submitting = false;
+
+  await showDialog(
+    context: context,
+    barrierDismissible: false,
+    builder: (ctx) => StatefulBuilder(
+      builder: (ctx, setDialogState) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFF7ED),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(Icons.star_rounded, color: Color(0xFFF59E0B), size: 24),
+            ),
+            const SizedBox(width: 12),
+            const Expanded(
+              child: Text(
+                'Rate Your Consultation',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+              ),
+            ),
+          ],
+        ),
+        content: alreadyReviewed
+            ? const Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.check_circle_rounded, color: Color(0xFF10B981), size: 48),
+                  SizedBox(height: 12),
+                  Text('You have already reviewed this consultation.', textAlign: TextAlign.center),
+                ],
+              )
+            : SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'How would you rate your doctor?',
+                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF0F172A)),
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: List.generate(5, (i) => GestureDetector(
+                        onTap: () => setDialogState(() => selectedStars = i + 1),
+                        child: Icon(
+                          i < selectedStars ? Icons.star_rounded : Icons.star_outline_rounded,
+                          color: const Color(0xFFF59E0B),
+                          size: 40,
+                        ),
+                      )),
+                    ),
+                    const SizedBox(height: 20),
+                    const Text(
+                      'Are you satisfied with the consultation?',
+                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF0F172A)),
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: GestureDetector(
+                            onTap: () => setDialogState(() => satisfied = true),
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 200),
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              decoration: BoxDecoration(
+                                color: satisfied == true ? const Color(0xFF10B981) : const Color(0xFFF1F5F9),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: satisfied == true ? const Color(0xFF10B981) : const Color(0xFFE2E8F0),
+                                ),
+                              ),
+                              child: Center(
+                                child: Text(
+                                  'Yes',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                    color: satisfied == true ? Colors.white : const Color(0xFF64748B),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: GestureDetector(
+                            onTap: () => setDialogState(() => satisfied = false),
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 200),
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              decoration: BoxDecoration(
+                                color: satisfied == false ? const Color(0xFFEF4444) : const Color(0xFFF1F5F9),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: satisfied == false ? const Color(0xFFEF4444) : const Color(0xFFE2E8F0),
+                                ),
+                              ),
+                              child: Center(
+                                child: Text(
+                                  'No',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                    color: satisfied == false ? Colors.white : const Color(0xFF64748B),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+                    const Text(
+                      'Write a review (optional)',
+                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF0F172A)),
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: reviewController,
+                      maxLines: 3,
+                      decoration: InputDecoration(
+                        hintText: 'Share your experience...',
+                        hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
+                        filled: true,
+                        fillColor: const Color(0xFFF8FAFC),
+                        contentPadding: const EdgeInsets.all(12),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+        actions: alreadyReviewed
+            ? [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('Close'),
+                ),
+              ]
+            : [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('Skip', style: TextStyle(color: Color(0xFF64748B))),
+                ),
+                ElevatedButton(
+                  onPressed: (submitting || selectedStars == 0 || satisfied == null)
+                      ? null
+                      : () async {
+                          setDialogState(() => submitting = true);
+                          final result = await ReviewService().submitReview(
+                            appointmentId: appointment.id,
+                            doctorId: appointment.doctor?.id ?? '',
+                            starRating: selectedStars,
+                            satisfied: satisfied!,
+                            reviewText: reviewController.text.trim(),
+                          );
+                          await prefs.setBool(reviewedKey, true);
+                          if (ctx.mounted) {
+                            Navigator.pop(ctx);
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(result['success'] == true
+                                      ? 'Thank you for your review!'
+                                      : 'Review saved locally.'),
+                                  backgroundColor: const Color(0xFF10B981),
+                                ),
+                              );
+                            }
+                          }
+                        },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFF59E0B),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                  ),
+                  child: submitting
+                      ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                      : const Text('Submit', style: TextStyle(fontWeight: FontWeight.w700)),
+                ),
+              ],
+      ),
+    ),
+  );
+  reviewController.dispose();
 }
 
 class ProfileInfoWidget extends StatelessWidget {
@@ -810,6 +1046,20 @@ class _WebPatientProfileViewState extends State<_WebPatientProfileView> {
                               ),
                               elevation: 0,
                               textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        SizedBox(
+                          width: double.infinity,
+                          child: OutlinedButton.icon(
+                            onPressed: () => _showReviewDialog(context, appointment),
+                            icon: const Icon(Icons.star_rounded, size: 20, color: Color(0xFFF59E0B)),
+                            label: const Text('Rate & Review Doctor', style: TextStyle(fontWeight: FontWeight.w700, color: Color(0xFFF59E0B))),
+                            style: OutlinedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 18),
+                              side: const BorderSide(color: Color(0xFFF59E0B)),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                             ),
                           ),
                         ),

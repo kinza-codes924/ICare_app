@@ -23,6 +23,7 @@ import 'package:icare/services/consultation_service.dart';
 import 'package:icare/screens/medical_record_detail.dart';
 import 'package:icare/screens/prescription_detail_screen.dart';
 import 'package:easy_localization/easy_localization.dart';
+import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class DoctorDashboard extends ConsumerStatefulWidget {
@@ -641,11 +642,7 @@ class _DoctorDashboardState extends ConsumerState<DoctorDashboard> {
             ),
             if (_pendingCount > 5)
               TextButton(
-                onPressed: () {
-                  Navigator.of(context).push(MaterialPageRoute(
-                    builder: (ctx) => const DoctorAppointmentsScreen(),
-                  ));
-                },
+                onPressed: () => context.push('/doctor/appointments'),
                 style: TextButton.styleFrom(foregroundColor: AppColors.primaryColor),
                 child: const Text('View All'),
               ),
@@ -773,9 +770,9 @@ class _DoctorDashboardState extends ConsumerState<DoctorDashboard> {
                 crossAxisCount: 3,
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
-                crossAxisSpacing: 12,
-                mainAxisSpacing: 12,
-                childAspectRatio: 0.82,
+                crossAxisSpacing: 8,
+                mainAxisSpacing: 8,
+                childAspectRatio: 1.45,
                 children: sorted.take(6).map((appointment) {
                   return _buildTodayAppointmentCard(appointment);
                 }).toList(),
@@ -990,7 +987,9 @@ class _DoctorDashboardState extends ConsumerState<DoctorDashboard> {
 
   Widget _buildTodayAppointmentCard(AppointmentDetail appointment) {
     final statusColor = _getStatusColor(appointment.status);
-    final initials = (appointment.patient?.name ?? 'P')
+    final patientName = appointment.patient?.name ?? 'Patient';
+    final patientPhoto = appointment.patient?.profilePicture;
+    final initials = patientName
         .split(' ')
         .take(2)
         .map((w) => w.isNotEmpty ? w[0].toUpperCase() : '')
@@ -1006,10 +1005,10 @@ class _DoctorDashboardState extends ConsumerState<DoctorDashboard> {
         );
       },
       child: Container(
-        padding: const EdgeInsets.all(10),
+        padding: const EdgeInsets.all(7),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: isPending ? const Color(0xFFF59E0B).withValues(alpha: 0.4) : const Color(0xFFE2E8F0),
             width: isPending ? 1.5 : 1,
@@ -1017,128 +1016,108 @@ class _DoctorDashboardState extends ConsumerState<DoctorDashboard> {
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.03),
-              blurRadius: 8,
+              blurRadius: 6,
               offset: const Offset(0, 2),
             ),
           ],
         ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          crossAxisAlignment: CrossAxisAlignment.start,
+        child: Row(
           children: [
-            // Time chip at top
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-              decoration: BoxDecoration(
-                color: statusColor.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.access_time_rounded, size: 10, color: statusColor),
-                  const SizedBox(width: 3),
-                  Flexible(
-                    child: Text(
-                      appointment.timeSlot,
+            // Patient avatar
+            CircleAvatar(
+              radius: 16,
+              backgroundColor: statusColor.withValues(alpha: 0.15),
+              backgroundImage: (patientPhoto != null && patientPhoto.isNotEmpty)
+                  ? NetworkImage(patientPhoto) as ImageProvider
+                  : null,
+              child: (patientPhoto == null || patientPhoto.isEmpty)
+                  ? Text(
+                      initials.isEmpty ? 'P' : initials,
                       style: TextStyle(
                         fontSize: 10,
-                        fontWeight: FontWeight.w700,
+                        fontWeight: FontWeight.w900,
                         color: statusColor,
                       ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                ],
-              ),
+                    )
+                  : null,
             ),
-            // Avatar
-            Center(
-              child: Container(
-                width: 34,
-                height: 34,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [statusColor, statusColor.withValues(alpha: 0.7)],
-                  ),
-                  shape: BoxShape.circle,
-                ),
-                child: Center(
-                  child: Text(
-                    initials.isEmpty ? 'P' : initials,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w900,
-                      color: Colors.white,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            // Patient name
-            Text(
-              appointment.patient?.name ?? 'Patient',
-              style: const TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
-                color: Color(0xFF0F172A),
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-            // For pending: accept/reject mini buttons; for others: status badge
-            if (isPending)
-              Row(
+            const SizedBox(width: 6),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Expanded(
-                    child: GestureDetector(
-                      onTap: () => _updateAppointmentStatus(appointment.id, 'cancelled'),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(vertical: 4),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFEF4444).withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(6),
+                  Text(
+                    patientName,
+                    style: const TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF0F172A),
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    appointment.timeSlot,
+                    style: TextStyle(
+                      fontSize: 9,
+                      fontWeight: FontWeight.w600,
+                      color: statusColor,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  if (isPending)
+                    Row(
+                      children: [
+                        Expanded(
+                          child: GestureDetector(
+                            onTap: () => _updateAppointmentStatus(appointment.id, 'cancelled'),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 2),
+                              margin: const EdgeInsets.only(top: 3),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFEF4444).withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: const Center(child: Icon(Icons.close_rounded, size: 10, color: Color(0xFFEF4444))),
+                            ),
+                          ),
                         ),
-                        child: const Center(
-                          child: Icon(Icons.close_rounded, size: 12, color: Color(0xFFEF4444)),
+                        const SizedBox(width: 3),
+                        Expanded(
+                          child: GestureDetector(
+                            onTap: () => _updateAppointmentStatus(appointment.id, 'confirmed'),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 2),
+                              margin: const EdgeInsets.only(top: 3),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF059669).withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: const Center(child: Icon(Icons.check_rounded, size: 10, color: Color(0xFF059669))),
+                            ),
+                          ),
                         ),
+                      ],
+                    )
+                  else
+                    Container(
+                      margin: const EdgeInsets.only(top: 3),
+                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: statusColor.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        appointment.status.toUpperCase(),
+                        style: TextStyle(fontSize: 8, fontWeight: FontWeight.w900, color: statusColor),
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 4),
-                  Expanded(
-                    child: GestureDetector(
-                      onTap: () => _updateAppointmentStatus(appointment.id, 'confirmed'),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(vertical: 4),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF059669).withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: const Center(
-                          child: Icon(Icons.check_rounded, size: 12, color: Color(0xFF059669)),
-                        ),
-                      ),
-                    ),
-                  ),
                 ],
-              )
-            else
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                decoration: BoxDecoration(
-                  color: statusColor.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Text(
-                  appointment.status.toUpperCase(),
-                  style: TextStyle(
-                    fontSize: 9,
-                    fontWeight: FontWeight.w900,
-                    color: statusColor,
-                  ),
-                ),
               ),
+            ),
           ],
         ),
       ),
@@ -1147,13 +1126,7 @@ class _DoctorDashboardState extends ConsumerState<DoctorDashboard> {
 
   Widget _buildPendingAppointmentsCard() {
     return GestureDetector(
-      onTap: () {
-        Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (ctx) => const DoctorAppointmentsScreen(initialFilter: 'pending'),
-          ),
-        );
-      },
+      onTap: () => context.push('/doctor/appointments?filter=pending'),
       child: Container(
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(

@@ -9,6 +9,7 @@ import 'package:icare/screens/public_home.dart';
 import 'package:icare/screens/signup.dart';
 import 'package:icare/screens/splash.dart';
 import 'package:icare/screens/tabs.dart';
+import 'package:icare/screens/doctor_appointments.dart';
 import 'package:icare/screens/work_with_us_signup.dart';
 import 'package:icare/screens/lms_public_catalog.dart';
 import 'package:icare/screens/admin_verification_panel.dart';
@@ -95,6 +96,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/signup', builder: (_, _) => const SignupScreen()),
       GoRoute(path: '/work-with-us', builder: (_, _) => const WorkWithUsSignup()),
       GoRoute(path: '/dashboard', builder: (_, _) => const TabsScreen()),
+      GoRoute(path: '/doctor/appointments', builder: (_, state) {
+        final filter = state.uri.queryParameters['filter'] ?? 'all';
+        return DoctorAppointmentsScreen(initialFilter: filter);
+      }),
       GoRoute(
         path: '/lms/catalog',
         builder: (_, state) {
