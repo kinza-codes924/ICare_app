@@ -36,6 +36,7 @@ import 'package:icare/screens/lab_analytics.dart';
 import 'package:icare/screens/prescriptions.dart';
 import 'package:icare/screens/reminder_list.dart';
 import 'package:icare/screens/emergency_contacts_screen.dart';
+import 'package:icare/screens/my_learning.dart';
 import 'package:icare/screens/settings.dart';
 import 'package:icare/screens/tabs.dart';
 import 'package:icare/screens/tasks.dart';
@@ -178,6 +179,11 @@ class _CustomDrawerState extends ConsumerState<CustomDrawer> {
         _drawerItem('Book a Lab Test', Icons.science_outlined, () {
           Navigator.of(context).push(
             MaterialPageRoute(builder: (ctx) => const PatientBookLabFlow()),
+          );
+        }),
+        _drawerItem('My Learning', Icons.school_outlined, () {
+          Navigator.of(context).push(
+            MaterialPageRoute(builder: (ctx) => const MyLearningScreen()),
           );
         }),
         _drawerItem('Health Journey', Icons.history_outlined, () {

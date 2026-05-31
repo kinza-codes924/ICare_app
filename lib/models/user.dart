@@ -30,7 +30,7 @@ class User {
       email: (json['email'] ?? '').toString(),
       phoneNumber: (json['phoneNumber'] ?? json['phone'] ?? '').toString(),
       role: (json['role'] ?? '').toString(),
-      profilePicture: json['profilePicture']?.toString(),
+      profilePicture: (json['profilePicture'] ?? json['profile_picture'] ?? json['image'] ?? json['avatar'] ?? json['photo'])?.toString(),
       createdAt: json['createdAt'] != null
           ? DateTime.tryParse(json['createdAt'].toString())
           : null,

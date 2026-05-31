@@ -85,7 +85,8 @@ final routerProvider = Provider<GoRouter>((ref) {
       if (!isLoggedIn && !isPublic) return '/home';
 
       // Logged in trying to visit public route → dashboard.
-      if (isLoggedIn && isPublic && path != '/splash') return '/dashboard';
+      // /lms/catalog is accessible to both logged-in and logged-out users.
+      if (isLoggedIn && isPublic && path != '/splash' && path != '/lms/catalog') return '/dashboard';
 
       return null;
     },

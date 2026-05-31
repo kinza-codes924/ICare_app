@@ -1811,17 +1811,21 @@ class _DoctorsSliderState extends State<_DoctorsSlider> {
         final online = all.where((d) => d['isOnline'] == true).toList();
         if (mounted) {
           setState(() {
-            _doctors = online.isNotEmpty ? online : List<Map<String, dynamic>>.from(_fallbackDoctors);
+            _doctors = online;
             _loading = false;
           });
-          _startAutoPlay();
+          if (online.isNotEmpty) _startAutoPlay();
         }
       } else {
-        _useFallback();
+        _useEmpty();
       }
     } catch (_) {
-      _useFallback();
+      _useEmpty();
     }
+  }
+
+  void _useEmpty() {
+    if (mounted) setState(() { _doctors = []; _loading = false; });
   }
 
   void _useFallback() {

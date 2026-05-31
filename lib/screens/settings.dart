@@ -28,6 +28,7 @@ import 'package:printing/printing.dart';
 import 'package:flutter/services.dart';
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../utils/water_notif_stub.dart'
     if (dart.library.html) '../utils/water_notif_web.dart';
 
@@ -271,18 +272,54 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   void _showReportIssueDialog(BuildContext ctx) {
     final titleC = TextEditingController();
     final descC = TextEditingController();
+    final phoneC = TextEditingController();
     final fk = GlobalKey<FormState>();
+    final authState = ref.read(authProvider);
+    final user = authState.user;
+    final userRole = authState.userRole ?? 'Patient';
+    final userName = user?.name ?? '';
+    final userEmail = user?.email ?? '';
+
     showDialog(context: ctx, builder: (dc) => AlertDialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       title: const Row(children: [Icon(Icons.bug_report_outlined, color: Color(0xFFEF4444), size: 22), SizedBox(width: 10), Text('Report an Issue', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16))]),
-      content: SizedBox(width: 400, child: Form(key: fk, child: Column(mainAxisSize: MainAxisSize.min, children: [
-        const Text('Describe the issue you encountered.', style: TextStyle(fontSize: 13, color: Color(0xFF64748B))), const SizedBox(height: 16),
-        TextFormField(controller: titleC, decoration: InputDecoration(labelText: 'Issue Title', hintText: 'e.g. Login not working', border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)), contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12)), validator: (v) => (v == null || v.trim().isEmpty) ? 'Please enter a title' : null), const SizedBox(height: 12),
-        TextFormField(controller: descC, maxLines: 4, decoration: InputDecoration(labelText: 'Description', hintText: 'Tell us what happened...', border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)), contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12), alignLabelWithHint: true), validator: (v) => (v == null || v.trim().isEmpty) ? 'Please describe the issue' : null),
-      ]))),
+      content: SizedBox(width: 400, child: Form(key: fk, child: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
+        const Text('Describe the issue you encountered and we\'ll investigate.', style: TextStyle(fontSize: 13, color: Color(0xFF64748B))), const SizedBox(height: 16),
+        TextFormField(controller: TextEditingController(text: userRole)..selection = TextSelection.collapsed(offset: userRole.length), enabled: false, decoration: InputDecoration(labelText: 'Account Type', prefixIcon: const Icon(Icons.badge_outlined, size: 18), border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)), contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12))), const SizedBox(height: 12),
+        TextFormField(controller: TextEditingController(text: userName)..selection = TextSelection.collapsed(offset: userName.length), enabled: false, decoration: InputDecoration(labelText: 'Name', prefixIcon: const Icon(Icons.person_outline, size: 18), border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)), contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12))), const SizedBox(height: 12),
+        TextFormField(controller: TextEditingController(text: userEmail)..selection = TextSelection.collapsed(offset: userEmail.length), enabled: false, decoration: InputDecoration(labelText: 'Email', prefixIcon: const Icon(Icons.email_outlined, size: 18), border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)), contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12))), const SizedBox(height: 12),
+        TextFormField(controller: phoneC, keyboardType: TextInputType.phone, decoration: InputDecoration(labelText: 'Phone Number', hintText: 'e.g. +923001234567', prefixIcon: const Icon(Icons.phone_outlined, size: 18), border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)), contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12))), const SizedBox(height: 12),
+        TextFormField(controller: titleC, decoration: InputDecoration(labelText: 'Issue Title', hintText: 'e.g. Login not working', prefixIcon: const Icon(Icons.title_outlined, size: 18), border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)), contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12)), validator: (v) => (v == null || v.trim().isEmpty) ? 'Please enter a title' : null), const SizedBox(height: 12),
+        TextFormField(controller: descC, maxLines: 4, decoration: InputDecoration(labelText: 'Description', hintText: 'Tell us what happened in detail...', border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)), contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12), alignLabelWithHint: true), validator: (v) => (v == null || v.trim().isEmpty) ? 'Please describe the issue' : null),
+      ])))),
       actions: [
         TextButton(onPressed: () => Navigator.pop(dc), child: const Text('Cancel', style: TextStyle(color: Color(0xFF64748B)))),
-        ElevatedButton.icon(onPressed: () { if (fk.currentState!.validate()) { Navigator.pop(dc); ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(content: Text('Issue reported. Thank you!'), duration: Duration(seconds: 3))); } }, icon: const Icon(Icons.send_rounded, size: 16), label: const Text('Submit'), style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryColor, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)))),
+        ElevatedButton.icon(
+          onPressed: () async {
+            if (!fk.currentState!.validate()) return;
+            Navigator.pop(dc);
+            final subject = Uri.encodeComponent('[ICare Issue] ${titleC.text.trim()}');
+            final body = Uri.encodeComponent(
+              'Account Type: $userRole\n'
+              'Name: $userName\n'
+              'Email: $userEmail\n'
+              'Phone: ${phoneC.text.trim()}\n\n'
+              'Issue Title: ${titleC.text.trim()}\n\n'
+              'Description:\n${descC.text.trim()}',
+            );
+            final mailUri = Uri.parse('mailto:icareofficialapp@gmail.com?subject=$subject&body=$body');
+            if (await canLaunchUrl(mailUri)) {
+              await launchUrl(mailUri);
+            } else {
+              if (ctx.mounted) {
+                ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(content: Text('Could not open email app. Please email icareofficialapp@gmail.com directly.'), duration: Duration(seconds: 4)));
+              }
+            }
+          },
+          icon: const Icon(Icons.send_rounded, size: 16),
+          label: const Text('Send via Email'),
+          style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryColor, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
+        ),
       ],
     ));
   }

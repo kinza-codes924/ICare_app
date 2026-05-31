@@ -6,6 +6,7 @@ import 'package:icare/utils/shared_pref.dart';
 import 'package:icare/widgets/back_button.dart';
 import 'package:icare/services/health_tracker_service.dart';
 import 'package:icare/services/gamification_service.dart';
+import 'package:icare/services/consultation_service.dart';
 import 'package:intl/intl.dart';
 
 class LifestyleTrackerScreen extends StatefulWidget {
@@ -35,9 +36,11 @@ class _LifestyleTrackerScreenState extends State<LifestyleTrackerScreen>
   double _sleepHours = 7.0;
   String _mealQuality = 'Good';
 
-  // Medication
-  final bool _medicationTaken = true;
-  final bool _missedDose = false;
+  // Medication — real prescription data
+  List<Map<String, dynamic>> _rxMeds = [];
+  List<bool> _rxMedTaken = [];
+  bool _rxLoading = true;
+  bool _medsAwardedToday = false;
 
   // Condition-specific
   String _conditionMode = 'General Wellness';
@@ -112,6 +115,7 @@ class _LifestyleTrackerScreenState extends State<LifestyleTrackerScreen>
     _loadLatestVitals();
     _loadAllLogs();
     _loadPoints();
+    _loadRxMeds();
   }
 
   Future<void> _loadAllLogs() async {
@@ -223,6 +227,66 @@ class _LifestyleTrackerScreenState extends State<LifestyleTrackerScreen>
       setState(() {
         _userName = user?.name ?? '';
       });
+    }
+  }
+
+  Future<void> _loadRxMeds() async {
+    if (mounted) setState(() => _rxLoading = true);
+    try {
+      final patientId = await SharedPref().getUserId() ?? '';
+      if (patientId.isEmpty) {
+        if (mounted) setState(() => _rxLoading = false);
+        return;
+      }
+      final prescriptions = await ConsultationService()
+          .getPatientPrescriptions(patientId: patientId, limit: 5);
+
+      // Collect all medicines from completed prescriptions (most recent first)
+      final allMeds = <Map<String, dynamic>>[];
+      final seenNames = <String>{};
+      for (final rx in prescriptions) {
+        if (rx is! Map) continue;
+        final presMap = rx['prescription'];
+        final medsRaw = (presMap is Map ? presMap['medicines'] : null) as List? ?? [];
+        for (final m in medsRaw) {
+          if (m is! Map) continue;
+          final name = (m['name'] ?? '').toString().trim();
+          if (name.isEmpty || seenNames.contains(name.toLowerCase())) continue;
+          seenNames.add(name.toLowerCase());
+          allMeds.add({
+            'name': name,
+            'dosage': (m['dosage'] ?? '').toString(),
+            'frequency': (m['frequency'] ?? '').toString(),
+            'duration': (m['duration'] ?? '').toString(),
+            'instructions': (m['instructions'] ?? m['notes'] ?? '').toString(),
+          });
+        }
+        if (allMeds.isNotEmpty) break; // use medicines from the latest prescription only
+      }
+
+      if (mounted) {
+        setState(() {
+          _rxMeds = allMeds;
+          _rxMedTaken = List<bool>.filled(allMeds.length, false);
+          _rxLoading = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _rxLoading = false);
+    }
+  }
+
+  void _onMedToggle(int index, bool val) {
+    setState(() => _rxMedTaken[index] = val);
+    final allTaken = _rxMedTaken.isNotEmpty && _rxMedTaken.every((t) => t);
+    if (allTaken && !_medsAwardedToday) {
+      setState(() {
+        _medsAwardedToday = true;
+        _pointsToday += 10;
+      });
+      _saveVital('Medication Adherence', '100', '%');
+    } else if (!allTaken) {
+      _saveVital('Medication Adherence', val ? '50' : '0', '%');
     }
   }
 
@@ -590,7 +654,7 @@ class _LifestyleTrackerScreenState extends State<LifestyleTrackerScreen>
                                 crossAxisCount: 3,
                                 crossAxisSpacing: 8,
                                 mainAxisSpacing: 8,
-                                childAspectRatio: 1.05,
+                                childAspectRatio: 1.55,
                               ),
                               itemCount: entries.length,
                               itemBuilder: (_, i) {
@@ -1085,31 +1149,18 @@ class _LifestyleTrackerScreenState extends State<LifestyleTrackerScreen>
             icon: Icons.medication_outlined,
             iconColor: const Color(0xFF10B981),
             onViewAll: () => _tabController.animateTo(3),
-            child: Row(
-              children: [
-                Expanded(
-                  child: _miniTile(
-                    _medicationTaken ? '✅' : '⏰',
-                    _medicationTaken ? 'Taken' : 'Pending',
-                    'Today\'s Dose',
-                    _medicationTaken
-                        ? const Color(0xFFECFDF5)
-                        : const Color(0xFFFFFBEB),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: _miniTile(
-                    _missedDose ? '❌' : '✅',
-                    _missedDose ? 'Missed' : 'On Track',
-                    'Adherence',
-                    _missedDose
-                        ? const Color(0xFFFEF2F2)
-                        : const Color(0xFFECFDF5),
-                  ),
-                ),
-              ],
-            ),
+            child: () {
+              final takenC = _rxMedTaken.where((t) => t).length;
+              final totalC = _rxMeds.length;
+              final allDone = totalC > 0 && takenC == totalC;
+              return Row(
+                children: [
+                  Expanded(child: _miniTile(allDone ? '✅' : '⏰', allDone ? 'Taken' : '$takenC/$totalC', "Today's Dose", allDone ? const Color(0xFFECFDF5) : const Color(0xFFFFFBEB))),
+                  const SizedBox(width: 10),
+                  Expanded(child: _miniTile(allDone ? '✅' : '❌', allDone ? 'On Track' : 'Pending', 'Adherence', allDone ? const Color(0xFFECFDF5) : const Color(0xFFFEF2F2))),
+                ],
+              );
+            }(),
           ),
           const SizedBox(height: 16),
 
@@ -1809,11 +1860,13 @@ class _LifestyleTrackerScreenState extends State<LifestyleTrackerScreen>
   // Tab 3 — MEDICATION
   // ════════════════════════════════════════════════════════════════════════
   Widget _buildMedicationTab() {
-    final meds = [
-      _MedItem('Metformin 500mg', 'Twice daily — After meals', true),
-      _MedItem('Lisinopril 10mg', 'Once daily — Morning', false),
-      _MedItem('Atorvastatin 20mg', 'Once daily — Night', false),
-    ];
+    if (_rxLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    final takenCount = _rxMedTaken.where((t) => t).length;
+    final total = _rxMeds.length;
+    final allTaken = total > 0 && takenCount == total;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
@@ -1826,24 +1879,52 @@ class _LifestyleTrackerScreenState extends State<LifestyleTrackerScreen>
           // Summary chips
           Row(
             children: [
-              _medChip('💊', '${meds.where((m) => m.taken).length}/${meds.length}',
-                  'Taken', const Color(0xFFECFDF5), Colors.green),
+              _medChip('💊', '$takenCount/$total', 'Taken', const Color(0xFFECFDF5), Colors.green),
               const SizedBox(width: 10),
-              _medChip('⚠️', _missedDose ? '1' : '0', 'Missed',
-                  const Color(0xFFFEF2F2), Colors.red),
+              _medChip('⚠️', '${total - takenCount}', 'Pending', const Color(0xFFFEF2F2), Colors.red),
             ],
           ),
           const SizedBox(height: 16),
 
+          // All taken banner
+          if (allTaken)
+            Container(
+              margin: const EdgeInsets.only(bottom: 12),
+              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+              decoration: BoxDecoration(
+                color: const Color(0xFFECFDF5),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: const Color(0xFF86EFAC)),
+              ),
+              child: Row(children: const [
+                Icon(Icons.check_circle_rounded, color: Colors.green, size: 20),
+                SizedBox(width: 10),
+                Expanded(child: Text('All medications taken today! +10 pts', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF166534)))),
+              ]),
+            ),
+
+          // No prescriptions state
+          if (total == 0)
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+              ),
+              child: Column(children: [
+                Icon(Icons.medication_outlined, size: 48, color: Colors.grey.shade400),
+                const SizedBox(height: 12),
+                const Text('No active prescriptions', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: Color(0xFF64748B))),
+                const SizedBox(height: 6),
+                const Text('Your doctor-prescribed medications will appear here', textAlign: TextAlign.center, style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8))),
+              ]),
+            ),
+
           // Medication list
-          ...meds.asMap().entries.map((entry) {
-            final i = entry.key;
-            final med = entry.value;
-            return _medCard(med, i);
-          }),
+          ..._rxMeds.asMap().entries.map((e) => _rxMedCard(e.key, e.value)),
 
           const SizedBox(height: 16),
-          // Add medication note
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
@@ -1853,22 +1934,74 @@ class _LifestyleTrackerScreenState extends State<LifestyleTrackerScreen>
             ),
             child: Row(
               children: const [
-                Icon(Icons.info_outline_rounded,
-                    color: Color(0xFFB45309), size: 20),
+                Icon(Icons.info_outline_rounded, color: Color(0xFFB45309), size: 20),
                 SizedBox(width: 10),
                 Expanded(
                   child: Text(
                     'Prescription tracking is for reminders only. Always follow your doctor\'s advice.',
-                    style: TextStyle(
-                        fontSize: 12,
-                        color: Color(0xFFB45309),
-                        fontWeight: FontWeight.w500),
+                    style: TextStyle(fontSize: 12, color: Color(0xFFB45309), fontWeight: FontWeight.w500),
                   ),
                 ),
               ],
             ),
           ),
           const SizedBox(height: 80),
+        ],
+      ),
+    );
+  }
+
+  Widget _rxMedCard(int index, Map<String, dynamic> med) {
+    final taken = _rxMedTaken.length > index ? _rxMedTaken[index] : false;
+    final frequency = (med['frequency'] as String? ?? '').isNotEmpty ? med['frequency'] as String : null;
+    final dosage = (med['dosage'] as String? ?? '').isNotEmpty ? med['dosage'] as String : null;
+    final instructions = (med['instructions'] as String? ?? '').isNotEmpty ? med['instructions'] as String : null;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: taken ? const Color(0xFF86EFAC) : const Color(0xFFE2E8F0)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 44, height: 44,
+            decoration: BoxDecoration(
+              color: taken ? const Color(0xFFECFDF5) : const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(
+              taken ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded,
+              color: taken ? Colors.green : const Color(0xFFCBD5E1),
+              size: 24,
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('${med['name']}${dosage != null ? ' — $dosage' : ''}',
+                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Color(0xFF0F172A))),
+                if (frequency != null) ...[
+                  const SizedBox(height: 2),
+                  Text(frequency, style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                ],
+                if (instructions != null) ...[
+                  const SizedBox(height: 2),
+                  Text(instructions, style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8))),
+                ],
+              ],
+            ),
+          ),
+          Switch(
+            value: taken,
+            activeThumbColor: AppColors.primaryColor,
+            onChanged: (v) => _onMedToggle(index, v),
+          ),
         ],
       ),
     );
@@ -1906,66 +2039,6 @@ class _LifestyleTrackerScreenState extends State<LifestyleTrackerScreen>
     );
   }
 
-  Widget _medCard(_MedItem med, int index) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: med.taken
-                  ? const Color(0xFFECFDF5)
-                  : const Color(0xFFF8FAFC),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(
-              med.taken
-                  ? Icons.check_circle_rounded
-                  : Icons.radio_button_unchecked_rounded,
-              color:
-                  med.taken ? Colors.green : const Color(0xFFCBD5E1),
-              size: 24,
-            ),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(med.name,
-                    style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                        color: Color(0xFF0F172A))),
-                const SizedBox(height: 2),
-                Text(med.schedule,
-                    style: const TextStyle(
-                        fontSize: 12, color: Color(0xFF64748B))),
-              ],
-            ),
-          ),
-          Switch(
-            value: med.taken,
-            activeThumbColor: AppColors.primaryColor,
-            onChanged: (v) {
-              setState(() => med.taken = v);
-              // Calculate adherence % and save to backend
-              // Count taken after this change
-              _saveVital('Medication Adherence', v ? '100' : '0', '%');
-            },
-          ),
-        ],
-      ),
-    );
-  }
 
   // ════════════════════════════════════════════════════════════════════════
   // Tab 4 — CONDITION-SPECIFIC
@@ -2781,12 +2854,6 @@ class _TabMeta {
   const _TabMeta(this.label, this.icon);
 }
 
-class _MedItem {
-  final String name;
-  final String schedule;
-  bool taken;
-  _MedItem(this.name, this.schedule, this.taken);
-}
 
 class _CondItem {
   final String emoji;
@@ -2835,32 +2902,37 @@ class _HistoryCard extends StatelessWidget {
     final icon = _vitalIcons[type] ?? Icons.monitor_heart_outlined;
 
     return Container(
-      padding: const EdgeInsets.all(10),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(color: color.withValues(alpha: 0.2)),
-        boxShadow: [BoxShadow(color: color.withValues(alpha: 0.07), blurRadius: 8, offset: const Offset(0, 2))],
+        boxShadow: [BoxShadow(color: color.withValues(alpha: 0.07), blurRadius: 6, offset: const Offset(0, 2))],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
             Container(
-              padding: const EdgeInsets.all(5),
-              decoration: BoxDecoration(color: color.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(7)),
-              child: Icon(icon, color: color, size: 13),
+              padding: const EdgeInsets.all(4),
+              decoration: BoxDecoration(color: color.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(6)),
+              child: Icon(icon, color: color, size: 11),
             ),
-            Text(time, style: const TextStyle(fontSize: 8, fontWeight: FontWeight.w600, color: Color(0xFF94A3B8))),
+            Flexible(child: Text(time, style: const TextStyle(fontSize: 7, fontWeight: FontWeight.w600, color: Color(0xFF94A3B8)), overflow: TextOverflow.ellipsis)),
           ]),
-          const Spacer(),
-          Text(type, style: const TextStyle(fontSize: 9, color: Color(0xFF64748B), fontWeight: FontWeight.w600),
-              maxLines: 1, overflow: TextOverflow.ellipsis),
-          const SizedBox(height: 2),
-          Text(value, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: color),
-              maxLines: 1, overflow: TextOverflow.ellipsis),
-          if (unit.isNotEmpty)
-            Text(unit, style: const TextStyle(fontSize: 8, color: Color(0xFF94A3B8), fontWeight: FontWeight.w500)),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(type, style: const TextStyle(fontSize: 8, color: Color(0xFF64748B), fontWeight: FontWeight.w600),
+                  maxLines: 1, overflow: TextOverflow.ellipsis),
+              const SizedBox(height: 1),
+              Text(value, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w900, color: color),
+                  maxLines: 1, overflow: TextOverflow.ellipsis),
+              if (unit.isNotEmpty)
+                Text(unit, style: const TextStyle(fontSize: 7, color: Color(0xFF94A3B8), fontWeight: FontWeight.w500)),
+            ],
+          ),
         ],
       ),
     );
