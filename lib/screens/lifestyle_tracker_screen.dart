@@ -66,10 +66,12 @@ class _LifestyleTrackerScreenState extends State<LifestyleTrackerScreen>
 
   double get _dailyGoalProgress => (_loggedToday / _totalVitals).clamp(0.0, 1.0);
 
-  // All logs timeline (for My Logs sheet)
+  // All logs timeline (for History sheet)
   List<Map<String, dynamic>> _allLogs = [];
   bool _logsLoading = false;
   String _logFilter = 'all';
+  String _dateRangeFilter = 'all';
+  DateTime? _customDate;
 
   // Weekly / monthly goal progress (derived from _allLogs)
   double get _weeklyGoalProgress {
@@ -194,7 +196,10 @@ class _LifestyleTrackerScreenState extends State<LifestyleTrackerScreen>
     try {
       final result = await _gamificationService.getMyStats();
       if (result['success'] == true && mounted) {
-        setState(() => _pointsToday = result['points'] ?? 0);
+        final fetched = (result['points'] ?? 0) as int;
+        setState(() {
+          if (fetched > _pointsToday) _pointsToday = fetched;
+        });
       }
     } catch (_) {}
   }
@@ -366,7 +371,89 @@ class _LifestyleTrackerScreenState extends State<LifestyleTrackerScreen>
     );
   }
 
-  // ── My Logs Sheet ─────────────────────────────────────────────────────
+  // ── History Sheet ─────────────────────────────────────────────────────
+  List<Map<String, dynamic>> get _filteredAllLogs {
+    var logs = _logFilter == 'all'
+        ? List<Map<String, dynamic>>.from(_allLogs)
+        : _allLogs.where((l) => (l['vitalType'] ?? '') == _logFilter).toList();
+
+    if (_dateRangeFilter == 'custom' && _customDate != null) {
+      final key = DateFormat('yyyy-MM-dd').format(_customDate!);
+      logs = logs.where((l) {
+        final ts = DateTime.tryParse(l['timestamp'] as String? ?? '');
+        return ts != null && DateFormat('yyyy-MM-dd').format(ts) == key;
+      }).toList();
+    } else if (_dateRangeFilter != 'all') {
+      final days = _dateRangeFilter == '7days' ? 7
+          : _dateRangeFilter == '30days' ? 30
+          : _dateRangeFilter == '60days' ? 60
+          : 90;
+      final cutoff = DateTime.now().subtract(Duration(days: days));
+      logs = logs.where((l) {
+        final ts = DateTime.tryParse(l['timestamp'] as String? ?? '');
+        return ts != null && ts.isAfter(cutoff);
+      }).toList();
+    }
+    return logs;
+  }
+
+  Widget _buildDateChip(String label, String value, StateSetter setModal) {
+    final selected = _dateRangeFilter == value;
+    return InkWell(
+      onTap: () {
+        setState(() { _dateRangeFilter = value; if (value != 'custom') _customDate = null; });
+        setModal(() {});
+      },
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+        decoration: BoxDecoration(
+          color: selected ? AppColors.primaryColor : Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: selected ? AppColors.primaryColor : const Color(0xFFE2E8F0)),
+        ),
+        child: Text(label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700,
+            color: selected ? Colors.white : const Color(0xFF64748B))),
+      ),
+    );
+  }
+
+  Widget _buildCalChip(StateSetter setModal) {
+    final selected = _dateRangeFilter == 'custom';
+    return InkWell(
+      onTap: () async {
+        final picked = await showDatePicker(
+          context: context,
+          initialDate: _customDate ?? DateTime.now(),
+          firstDate: DateTime.now().subtract(const Duration(days: 365)),
+          lastDate: DateTime.now(),
+        );
+        if (picked != null) {
+          setState(() { _dateRangeFilter = 'custom'; _customDate = picked; });
+          setModal(() {});
+        }
+      },
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+        decoration: BoxDecoration(
+          color: selected ? AppColors.primaryColor : Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: selected ? AppColors.primaryColor : const Color(0xFFE2E8F0)),
+        ),
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          Icon(Icons.calendar_today_rounded, size: 14,
+              color: selected ? Colors.white : const Color(0xFF64748B)),
+          if (selected && _customDate != null) ...[
+            const SizedBox(width: 4),
+            Text(DateFormat('MMM d').format(_customDate!),
+                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.white)),
+          ],
+        ]),
+      ),
+    );
+  }
+
   void _showMyLogs() {
     const vitalTypes = ['all', 'Blood Pressure', 'Blood Glucose', 'Weight',
       'Heart Rate', 'Oxygen Level', 'Steps', 'Water Intake', 'Sleep', 'Calories'];
@@ -379,9 +466,7 @@ class _LifestyleTrackerScreenState extends State<LifestyleTrackerScreen>
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => StatefulBuilder(builder: (ctx, setModal) {
-        final filtered = _logFilter == 'all'
-            ? _allLogs
-            : _allLogs.where((l) => (l['vitalType'] ?? '') == _logFilter).toList();
+        final filtered = _filteredAllLogs;
 
         // Group by date key (yyyy-MM-dd)
         final grouped = <String, List<Map<String, dynamic>>>{};
@@ -416,16 +501,16 @@ class _LifestyleTrackerScreenState extends State<LifestyleTrackerScreen>
               Padding(
                 padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
                 child: Row(children: [
-                  const Text('My Logs', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Color(0xFF0F172A))),
+                  const Text('History', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Color(0xFF0F172A))),
                   const Spacer(),
-                  Text('${filtered.length} entries', style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                  Text('${_allLogs.length} entries', style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
                 ]),
               ),
-              // Log By dropdown
+              // Vital type dropdown
               Padding(
-                padding: const EdgeInsets.fromLTRB(20, 10, 20, 8),
+                padding: const EdgeInsets.fromLTRB(20, 10, 20, 6),
                 child: Row(children: [
-                  const Text('Log By:', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF475569))),
+                  const Text('Filter:', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF475569))),
                   const SizedBox(width: 10),
                   Expanded(child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -442,6 +527,26 @@ class _LifestyleTrackerScreenState extends State<LifestyleTrackerScreen>
                     )),
                   )),
                 ]),
+              ),
+              // Date range chips
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 4, 20, 8),
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(children: [
+                    _buildDateChip('All', 'all', setModal),
+                    const SizedBox(width: 6),
+                    _buildDateChip('7 Days', '7days', setModal),
+                    const SizedBox(width: 6),
+                    _buildDateChip('30 Days', '30days', setModal),
+                    const SizedBox(width: 6),
+                    _buildDateChip('60 Days', '60days', setModal),
+                    const SizedBox(width: 6),
+                    _buildDateChip('90 Days', '90days', setModal),
+                    const SizedBox(width: 6),
+                    _buildCalChip(setModal),
+                  ]),
+                ),
               ),
               const Divider(height: 1, color: Color(0xFFE2E8F0)),
               Expanded(
@@ -477,41 +582,28 @@ class _LifestyleTrackerScreenState extends State<LifestyleTrackerScreen>
                                   style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8), fontWeight: FontWeight.w600)),
                               ]),
                             ),
-                            // Log entries
-                            ...entries.map((log) {
-                              final ts  = DateTime.tryParse(log['timestamp'] as String? ?? '');
-                              final time = ts != null ? DateFormat('hh:mm a').format(ts) : '';
-                              final type = log['vitalType'] as String? ?? '';
-                              final val  = log['value']    as String? ?? '';
-                              final unit = log['unit']     as String? ?? '';
-                              return Container(
-                                margin: const EdgeInsets.only(bottom: 8),
-                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                                decoration: BoxDecoration(
-                                  color: Colors.white,
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(color: const Color(0xFFE2E8F0)),
-                                ),
-                                child: Row(children: [
-                                  Container(
-                                    padding: const EdgeInsets.all(8),
-                                    decoration: BoxDecoration(
-                                      color: AppColors.primaryColor.withValues(alpha: 0.08),
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    child: const Icon(Icons.monitor_heart_outlined, color: AppColors.primaryColor, size: 16),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                                    Text(type, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF0F172A))),
-                                    Text('$val${unit.isNotEmpty ? ' $unit' : ''}',
-                                      style: TextStyle(fontSize: 12, color: AppColors.primaryColor, fontWeight: FontWeight.w600)),
-                                  ])),
-                                  Text(time, style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8), fontWeight: FontWeight.w600)),
-                                ]),
-                              );
-                            }),
-                            const SizedBox(height: 4),
+                            // Card grid
+                            GridView.builder(
+                              shrinkWrap: true,
+                              physics: const NeverScrollableScrollPhysics(),
+                              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                                crossAxisCount: 3,
+                                crossAxisSpacing: 8,
+                                mainAxisSpacing: 8,
+                                childAspectRatio: 1.05,
+                              ),
+                              itemCount: entries.length,
+                              itemBuilder: (_, i) {
+                                final log = entries[i];
+                                final ts  = DateTime.tryParse(log['timestamp'] as String? ?? '');
+                                final time = ts != null ? DateFormat('hh:mm a').format(ts) : '';
+                                final type = log['vitalType'] as String? ?? '';
+                                final val  = log['value']    as String? ?? '';
+                                final unit = log['unit']     as String? ?? '';
+                                return _HistoryCard(type: type, value: val, unit: unit, time: time);
+                              },
+                            ),
+                            const SizedBox(height: 8),
                           ]);
                         },
                       ),
@@ -612,7 +704,7 @@ class _LifestyleTrackerScreenState extends State<LifestyleTrackerScreen>
           TextButton.icon(
             onPressed: _showMyLogs,
             icon: const Icon(Icons.history_rounded, size: 16),
-            label: const Text('My Logs', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+            label: const Text('History', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
             style: TextButton.styleFrom(foregroundColor: AppColors.primaryColor),
           ),
           Container(
@@ -1867,7 +1959,6 @@ class _LifestyleTrackerScreenState extends State<LifestyleTrackerScreen>
               setState(() => med.taken = v);
               // Calculate adherence % and save to backend
               // Count taken after this change
-              final takenCount = v ? 1 : 0; // simplified: 100% if taken, 0% if not
               _saveVital('Medication Adherence', v ? '100' : '0', '%');
             },
           ),
@@ -2703,4 +2794,75 @@ class _CondItem {
   final String subtitle;
   bool checked;
   _CondItem(this.emoji, this.title, this.subtitle, this.checked);
+}
+
+// ── History card (card-style grid item) ──────────────────────────────────
+class _HistoryCard extends StatelessWidget {
+  final String type, value, unit, time;
+  const _HistoryCard({required this.type, required this.value, required this.unit, required this.time});
+
+  static const _vitalColors = <String, int>{
+    'Blood Pressure': 0xFFEF4444,
+    'Blood Glucose':  0xFFF59E0B,
+    'Weight':         0xFF8B5CF6,
+    'Heart Rate':     0xFFEC4899,
+    'Oxygen Level':   0xFF3B82F6,
+    'Steps':          0xFF10B981,
+    'Water Intake':   0xFF3B82F6,
+    'Sleep':          0xFF6366F1,
+    'Calories':       0xFFF97316,
+    'Temperature':    0xFFFF6B35,
+    'Medication Adherence': 0xFF10B981,
+  };
+
+  static const _vitalIcons = <String, IconData>{
+    'Blood Pressure': Icons.favorite_rounded,
+    'Blood Glucose':  Icons.bloodtype_rounded,
+    'Weight':         Icons.monitor_weight_rounded,
+    'Heart Rate':     Icons.show_chart_rounded,
+    'Oxygen Level':   Icons.air_rounded,
+    'Steps':          Icons.directions_walk_rounded,
+    'Water Intake':   Icons.water_drop_rounded,
+    'Sleep':          Icons.nights_stay_rounded,
+    'Calories':       Icons.local_fire_department_rounded,
+    'Temperature':    Icons.thermostat_rounded,
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    final colorHex = _vitalColors[type] ?? 0xFF6366F1;
+    final color = Color(colorHex);
+    final icon = _vitalIcons[type] ?? Icons.monitor_heart_outlined;
+
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: color.withValues(alpha: 0.2)),
+        boxShadow: [BoxShadow(color: color.withValues(alpha: 0.07), blurRadius: 8, offset: const Offset(0, 2))],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+            Container(
+              padding: const EdgeInsets.all(5),
+              decoration: BoxDecoration(color: color.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(7)),
+              child: Icon(icon, color: color, size: 13),
+            ),
+            Text(time, style: const TextStyle(fontSize: 8, fontWeight: FontWeight.w600, color: Color(0xFF94A3B8))),
+          ]),
+          const Spacer(),
+          Text(type, style: const TextStyle(fontSize: 9, color: Color(0xFF64748B), fontWeight: FontWeight.w600),
+              maxLines: 1, overflow: TextOverflow.ellipsis),
+          const SizedBox(height: 2),
+          Text(value, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: color),
+              maxLines: 1, overflow: TextOverflow.ellipsis),
+          if (unit.isNotEmpty)
+            Text(unit, style: const TextStyle(fontSize: 8, color: Color(0xFF94A3B8), fontWeight: FontWeight.w500)),
+        ],
+      ),
+    );
+  }
 }
