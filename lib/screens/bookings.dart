@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_size_matters/flutter_size_matters.dart';
@@ -83,7 +84,7 @@ class _BookingsScreenState extends ConsumerState<BookingsScreen> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Consultation Started!',
+                  Text('Consultation Started!'.tr(),
                       style: TextStyle(fontWeight: FontWeight.w800, color: Colors.white, fontSize: 15)),
                   Text('$doctorName is waiting — tap "In Progress" to join',
                       style: const TextStyle(fontSize: 12, color: Colors.white70)),
@@ -215,8 +216,8 @@ class _BookingsScreenState extends ConsumerState<BookingsScreen> {
     final List<Map<String, dynamic>> bookingMenu = [
       {
         "id": 1,
-        "title": "In Progress Bookings",
-        "subtitle": "Currently active appointments",
+        "title": "In Progress Bookings".tr(),
+        "subtitle": "Currently active appointments".tr(),
         "icon": Icons.play_circle_outline_rounded,
         "color": const Color(0xFF8B5CF6),
         "bgColor": const Color(0xFF8B5CF6).withValues(alpha: 0.08),
@@ -238,8 +239,8 @@ class _BookingsScreenState extends ConsumerState<BookingsScreen> {
       },
       {
         "id": 2,
-        "title": "Upcoming Bookings",
-        "subtitle": "Confirmed & scheduled",
+        "title": "Upcoming Bookings".tr(),
+        "subtitle": "Confirmed & scheduled".tr(),
         "icon": Icons.schedule_rounded,
         "color": const Color(0xFF14B1FF),
         "bgColor": const Color(0xFF14B1FF).withValues(alpha: 0.08),
@@ -258,8 +259,8 @@ class _BookingsScreenState extends ConsumerState<BookingsScreen> {
       },
       {
         "id": 3,
-        "title": "Pending Bookings",
-        "subtitle": "Awaiting confirmation",
+        "title": "Pending Bookings".tr(),
+        "subtitle": "Awaiting confirmation".tr(),
         "icon": Icons.hourglass_empty_rounded,
         "color": const Color(0xFFF59E0B),
         "bgColor": const Color(0xFFF59E0B).withValues(alpha: 0.08),
@@ -278,8 +279,8 @@ class _BookingsScreenState extends ConsumerState<BookingsScreen> {
       },
       {
         "id": 4,
-        "title": "Completed Bookings",
-        "subtitle": "Past successful visits",
+        "title": "Completed Bookings".tr(),
+        "subtitle": "Past successful visits".tr(),
         "icon": Icons.check_circle_outline_rounded,
         "color": const Color(0xFF22C55E),
         "bgColor": const Color(0xFF22C55E).withValues(alpha: 0.08),
@@ -298,8 +299,8 @@ class _BookingsScreenState extends ConsumerState<BookingsScreen> {
       },
       {
         "id": 5,
-        "title": "Cancelled Bookings",
-        "subtitle": "Appointments you cancelled",
+        "title": "Cancelled Bookings".tr(),
+        "subtitle": "Appointments you cancelled".tr(),
         "icon": Icons.cancel_outlined,
         "color": const Color(0xFFEF4444),
         "bgColor": const Color(0xFFEF4444).withValues(alpha: 0.08),
@@ -345,7 +346,7 @@ class _BookingsScreenState extends ConsumerState<BookingsScreen> {
                 SizedBox(height: ScallingConfig.scale(20)),
                 Center(
                   child: CustomText(
-                    text: "Bookings History",
+                    text: "Bookings History".tr(),
                     fontSize: 25.27,
                     padding: EdgeInsets.only(
                       left: ScallingConfig.moderateScale(12),
@@ -359,7 +360,7 @@ class _BookingsScreenState extends ConsumerState<BookingsScreen> {
                 Center(
                   child: CustomText(
                     text:
-                        "Stay on top of your schedule with real-time updates on patient bookings.",
+                        "Stay on top of your schedule with real-time updates on patient bookings.".tr(),
                     padding: EdgeInsets.only(
                       top: ScallingConfig.verticalScale(10),
                       left: ScallingConfig.moderateScale(12),
@@ -489,7 +490,7 @@ class _BookingsScreenState extends ConsumerState<BookingsScreen> {
                       ),
                       const SizedBox(height: 16),
                       CustomText(
-                        text: "Bookings History",
+                        text: "Bookings History".tr(),
                         fontSize: 32,
                         color: Colors.white,
                         fontWeight: FontWeight.w900,
@@ -498,7 +499,7 @@ class _BookingsScreenState extends ConsumerState<BookingsScreen> {
                       const SizedBox(height: 8),
                       CustomText(
                         text:
-                            "Stay on top of your schedule with real-time updates",
+                            "Stay on top of your schedule with real-time updates".tr(),
                         fontSize: 15,
                         color: Colors.white.withValues(alpha: 0.6),
                         fontWeight: FontWeight.w400,
@@ -510,13 +511,13 @@ class _BookingsScreenState extends ConsumerState<BookingsScreen> {
                         children: [
                           _buildStatChip(
                             _appointments.length.toString(),
-                            "Total",
+                            "Total".tr(),
                             Colors.white,
                           ),
                           const SizedBox(width: 12),
                           _buildStatChip(
                             _getCount('In Progress').toString(),
-                            "Active",
+                            "Active".tr(),
                             const Color(0xFF3B82F6),
                           ),
                           const SizedBox(width: 12),

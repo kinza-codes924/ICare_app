@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:icare/models/appointment_detail.dart';
 import 'package:icare/models/user.dart';
@@ -261,7 +262,7 @@ class _MyAppointmentsListScreenState extends State<MyAppointmentsListScreen> {
         elevation: 0,
         centerTitle: true,
         title: CustomText(
-          text: "Patient Bookings",
+          text: "Patient Bookings".tr(),
           fontFamily: "Gilroy-Bold",
           fontSize: 18,
           fontWeight: FontWeight.w900,
@@ -277,7 +278,7 @@ class _MyAppointmentsListScreenState extends State<MyAppointmentsListScreen> {
                 );
               },
               icon: const Icon(Icons.biotech_rounded, size: 18),
-              label: const Text('Book Lab Test'),
+              label: Text('Book Lab Test'.tr()),
               style: TextButton.styleFrom(
                 foregroundColor: AppColors.primaryColor,
                 backgroundColor: AppColors.primaryColor.withValues(alpha: 0.1),
@@ -310,18 +311,18 @@ class _MyAppointmentsListScreenState extends State<MyAppointmentsListScreen> {
                     ),
                   ),
                   const SizedBox(height: 24),
-                  const Text(
-                    'No appointments yet',
-                    style: TextStyle(
+                  Text(
+                    'No appointments yet'.tr(),
+                    style: const TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.w900,
                       color: Color(0xFF0F172A),
                     ),
                   ),
                   const SizedBox(height: 8),
-                  const Text(
-                    'Book an appointment with a doctor',
-                    style: TextStyle(fontSize: 14, color: Color(0xFF94A3B8)),
+                  Text(
+                    'Book an appointment with a doctor'.tr(),
+                    style: const TextStyle(fontSize: 14, color: Color(0xFF94A3B8)),
                   ),
                 ],
               ),
@@ -432,9 +433,9 @@ class _MyAppointmentsListScreenState extends State<MyAppointmentsListScreen> {
                                       ).withValues(alpha: 0.1),
                                       borderRadius: BorderRadius.circular(8),
                                     ),
-                                    child: const Text(
-                                      'Past',
-                                      style: TextStyle(
+                                    child: Text(
+                                      'Past'.tr(),
+                                      style: const TextStyle(
                                         fontSize: 11,
                                         fontWeight: FontWeight.w700,
                                         color: Color(0xFF64748B),
@@ -524,9 +525,9 @@ class _MyAppointmentsListScreenState extends State<MyAppointmentsListScreen> {
                                       crossAxisAlignment:
                                           CrossAxisAlignment.start,
                                       children: [
-                                        const Text(
-                                          'Time Slot',
-                                          style: TextStyle(
+                                        Text(
+                                          'Time Slot'.tr(),
+                                          style: const TextStyle(
                                             fontSize: 12,
                                             fontWeight: FontWeight.w600,
                                             color: Color(0xFF64748B),
@@ -566,9 +567,9 @@ class _MyAppointmentsListScreenState extends State<MyAppointmentsListScreen> {
                                         ).then((_) => _loadAppointments());
                                       },
                                       icon: const Icon(Icons.video_call_rounded, size: 20),
-                                      label: const Text(
-                                        'Join Video Call',
-                                        style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
+                                      label: Text(
+                                        'Join Video Call'.tr(),
+                                        style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
                                       ),
                                       style: ElevatedButton.styleFrom(
                                         backgroundColor: AppColors.primaryColor,
@@ -589,9 +590,9 @@ class _MyAppointmentsListScreenState extends State<MyAppointmentsListScreen> {
                                     child: OutlinedButton.icon(
                                       onPressed: () => _rateDoctor(appointment),
                                       icon: const Icon(Icons.star_rounded, size: 18, color: Color(0xFFF59E0B)),
-                                      label: const Text(
-                                        'Rate Doctor',
-                                        style: TextStyle(fontWeight: FontWeight.w700, color: Color(0xFFF59E0B)),
+                                      label: Text(
+                                        'Rate Doctor'.tr(),
+                                        style: const TextStyle(fontWeight: FontWeight.w700, color: Color(0xFFF59E0B)),
                                       ),
                                       style: OutlinedButton.styleFrom(
                                         padding: const EdgeInsets.symmetric(vertical: 12),
@@ -616,10 +617,10 @@ class _MyAppointmentsListScreenState extends State<MyAppointmentsListScreen> {
                                       children: [
                                         const Icon(Icons.video_call_rounded, color: Color(0xFF8B5CF6), size: 20),
                                         const SizedBox(width: 10),
-                                        const Expanded(
+                                        Expanded(
                                           child: Text(
-                                            'Consultation in Progress',
-                                            style: TextStyle(
+                                            'Consultation in Progress'.tr(),
+                                            style: const TextStyle(
                                               fontSize: 13,
                                               fontWeight: FontWeight.w700,
                                               color: Color(0xFF8B5CF6),
@@ -706,7 +707,7 @@ class _MyAppointmentsListScreenState extends State<MyAppointmentsListScreen> {
                                             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                                           ),
-                                          child: const Text('Rejoin', style: TextStyle(fontWeight: FontWeight.w700)),
+                                          child: Text('Rejoin'.tr(), style: const TextStyle(fontWeight: FontWeight.w700)),
                                         ),
                                       ],
                                     ),
@@ -729,16 +730,16 @@ class _MyAppointmentsListScreenState extends State<MyAppointmentsListScreen> {
                                           CrossAxisAlignment.start,
                                       children: [
                                         Row(
-                                          children: const [
-                                            Icon(
+                                          children: [
+                                            const Icon(
                                               Icons.note_rounded,
                                               size: 16,
                                               color: Color(0xFF64748B),
                                             ),
-                                            SizedBox(width: 8),
+                                            const SizedBox(width: 8),
                                             Text(
-                                              'Reason for Visit',
-                                              style: TextStyle(
+                                              'Reason for Visit'.tr(),
+                                              style: const TextStyle(
                                                 fontSize: 12,
                                                 fontWeight: FontWeight.w700,
                                                 color: Color(0xFF64748B),

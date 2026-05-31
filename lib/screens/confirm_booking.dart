@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:icare/models/lab_test.dart';
 import 'package:icare/screens/tabs.dart';
@@ -62,7 +63,7 @@ class _ConfirmBookingScreenState extends State<ConfirmBookingScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Text('Booking failed. Please try again.'),
+          content: Text('Booking failed. Please try again.'.tr()),
           backgroundColor: Colors.red,
         ),
       );
@@ -86,15 +87,15 @@ class _ConfirmBookingScreenState extends State<ConfirmBookingScreen> {
               size: 80,
             ),
             const SizedBox(height: 16),
-            const Text(
-              'Booking Successful!',
-              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+            Text(
+              'Booking Successful!'.tr(),
+              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
-            const Text(
-              'Your lab test has been booked successfully. You can track it in your profile.',
+            Text(
+              'Your lab test has been booked successfully. You can track it in your profile.'.tr(),
               textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.grey),
+              style: const TextStyle(color: Colors.grey),
             ),
             const SizedBox(height: 24),
             SizedBox(
@@ -115,7 +116,7 @@ class _ConfirmBookingScreenState extends State<ConfirmBookingScreen> {
                   ),
                   padding: const EdgeInsets.symmetric(vertical: 16),
                 ),
-                child: const Text('Go to Home'),
+                child: Text('Go to Home'.tr()),
               ),
             ),
           ],
@@ -134,9 +135,9 @@ class _ConfirmBookingScreenState extends State<ConfirmBookingScreen> {
         backgroundColor: Colors.white,
         elevation: 0,
         leading: const CustomBackButton(),
-        title: const Text(
-          'Booking Summary',
-          style: TextStyle(color: primaryColor, fontWeight: FontWeight.bold),
+        title: Text(
+          'Booking Summary'.tr(),
+          style: const TextStyle(color: primaryColor, fontWeight: FontWeight.bold),
         ),
       ),
       body: SingleChildScrollView(
@@ -145,44 +146,44 @@ class _ConfirmBookingScreenState extends State<ConfirmBookingScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildSectionHeader('Laboratory Information'),
+              _buildSectionHeader('Laboratory Information'.tr()),
               _buildDetailCard([
                 _buildInfoLine(
                   Icons.business_rounded,
-                  'Lab Name',
+                  'Lab Name'.tr(),
                   widget.bookingData['labTitle'] ?? 'Green Lab',
                 ),
                 _buildInfoLine(
                   Icons.location_on_rounded,
-                  'Location',
+                  'Location'.tr(),
                   widget.bookingData['city'] ?? 'Default City',
                 ),
               ]),
               const SizedBox(height: 24),
 
-              _buildSectionHeader('Schedule Details'),
+              _buildSectionHeader('Schedule Details'.tr()),
               _buildDetailCard([
                 _buildInfoLine(
                   Icons.calendar_today_rounded,
-                  'Date',
+                  'Date'.tr(),
                   widget.bookingData['date'] ?? 'Jan 1, 2024',
                 ),
                 _buildInfoLine(
                   Icons.access_time_rounded,
-                  'Time',
+                  'Time'.tr(),
                   widget.bookingData['time'] ?? '10:00 AM',
                 ),
                 _buildInfoLine(
                   Icons.home_rounded,
-                  'Sample Type',
+                  'Sample Type'.tr(),
                   widget.bookingData['homeSample']
-                      ? 'Home Collection'
-                      : 'Walk-in',
+                      ? 'Home Collection'.tr()
+                      : 'Walk-in'.tr(),
                 ),
               ]),
               const SizedBox(height: 24),
 
-              _buildSectionHeader('Selected Tests'),
+              _buildSectionHeader('Selected Tests'.tr()),
               _buildDetailCard(
                 widget.selectedTests
                     .map((t) => _buildTestLine(t.name, 'PKR ${(t.price as num) > 0 ? t.price : 3000}'))
@@ -190,13 +191,13 @@ class _ConfirmBookingScreenState extends State<ConfirmBookingScreen> {
               ),
               const SizedBox(height: 24),
 
-              _buildSectionHeader('Payment Summary'),
+              _buildSectionHeader('Payment Summary'.tr()),
               _buildDetailCard([
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text(
-                      'Total Amount',
+                    Text(
+                      'Total Amount'.tr(),
                       style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
@@ -236,9 +237,9 @@ class _ConfirmBookingScreenState extends State<ConfirmBookingScreen> {
                             strokeWidth: 2,
                           ),
                         )
-                      : const Text(
-                          'Confirm & Pay',
-                          style: TextStyle(
+                      : Text(
+                          'Confirm & Pay'.tr(),
+                          style: const TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
                           ),

@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import '../services/laboratory_service.dart';
 import '../widgets/back_button.dart';
@@ -169,8 +170,8 @@ class _LabAnalyticsState extends State<LabAnalytics>
         backgroundColor: Colors.white,
         elevation: 0,
         leading: const CustomBackButton(),
-        title: const Text(
-          'Revenue & Analytics',
+        title: Text(
+          'Revenue & Analytics'.tr(),
           style: TextStyle(
             fontSize: 18,
             fontFamily: 'Gilroy-Bold',

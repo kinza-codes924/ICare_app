@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:icare/screens/lms_public_course_detail.dart';
 import 'package:icare/services/api_service.dart';

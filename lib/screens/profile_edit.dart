@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -117,7 +118,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
           children: [
             ListTile(
               leading: const Icon(Icons.photo_library),
-              title: const Text('Gallery'),
+              title: Text('Gallery'.tr()),
               onTap: () async {
                 Navigator.pop(context);
                 final picked = await _picker.pickImage(
@@ -133,7 +134,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
             ),
             ListTile(
               leading: const Icon(Icons.camera_alt),
-              title: const Text('Camera'),
+              title: Text('Camera'.tr()),
               onTap: () async {
                 Navigator.pop(context);
                 final picked = await _picker.pickImage(
@@ -305,9 +306,9 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
           icon: const Icon(Icons.arrow_back_ios_new, color: Color(0xFF0F172A)),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text(
-          'Edit Profile',
-          style: TextStyle(
+        title: Text(
+          'Edit Profile'.tr(),
+          style: const TextStyle(
             color: Color(0xFF0F172A),
             fontWeight: FontWeight.w700,
             fontSize: 18,
@@ -436,7 +437,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
                         ),
                         const SizedBox(height: 20),
                         CustomInputField(
-                          hintText: 'Full Name',
+                          hintText: 'Full Name'.tr(),
                           leadingIcon: const Icon(
                             Icons.person_outline,
                             color: Color(0xFF94A3B8),
@@ -455,7 +456,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
                         ),
                         const SizedBox(height: 16),
                         CustomInputField(
-                          hintText: 'Phone Number',
+                          hintText: 'Phone Number'.tr(),
                           leadingIcon: const Icon(
                             Icons.phone_outlined,
                             color: Color(0xFF94A3B8),
@@ -505,7 +506,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
                             value: _selectedSpecialization,
                             isExpanded: true,
                             decoration: InputDecoration(
-                              hintText: 'Select your specialization',
+                              hintText: 'Select your specialization'.tr(),
                               prefixIcon: const Icon(Icons.local_hospital_outlined, color: Color(0xFF94A3B8)),
                               filled: true,
                               fillColor: const Color(0xFFF8FAFC),
@@ -640,7 +641,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
                           const SizedBox(height: 16),
                           // Age
                           CustomInputField(
-                            hintText: 'Age',
+                            hintText: 'Age'.tr(),
                             leadingIcon: const Icon(Icons.cake_outlined, color: Color(0xFF94A3B8)),
                             controller: ageController,
                             bgColor: const Color(0xFFF8FAFC),
@@ -848,7 +849,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
                                     ),
                                     const SizedBox(height: 10),
                                     CustomInputField(
-                                      hintText: 'Phone Number',
+                                      hintText: 'Phone Number'.tr(),
                                       leadingIcon: const Icon(
                                           Icons.phone_outlined,
                                           color: Color(0xFF94A3B8)),
@@ -946,9 +947,9 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
                                       strokeWidth: 2,
                                     ),
                                   )
-                                : const Text(
-                                    'Update Profile',
-                                    style: TextStyle(
+                                : Text(
+                                    'Update Profile'.tr(),
+                                    style: const TextStyle(
                                       fontSize: 16,
                                       fontWeight: FontWeight.w700,
                                     ),

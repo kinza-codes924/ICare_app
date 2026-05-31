@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'dart:async';
@@ -360,7 +361,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 Icons.camera_alt,
                 color: AppColors.primaryColor,
               ),
-              title: const Text('Camera'),
+              title: Text('Camera'.tr()),
               onTap: () {
                 Navigator.pop(context);
                 _pickAndSendMessage(ImageSource.camera);
@@ -371,7 +372,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 Icons.photo_library,
                 color: AppColors.primaryColor,
               ),
-              title: const Text('Gallery'),
+              title: Text('Gallery'.tr()),
               onTap: () {
                 Navigator.pop(context);
                 _pickAndSendMessage(ImageSource.gallery);
@@ -382,7 +383,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 Icons.insert_drive_file,
                 color: AppColors.primaryColor,
               ),
-              title: const Text('Document'),
+              title: Text('Document'.tr()),
               onTap: () {
                 Navigator.pop(context);
                 _pickAndSendFile();
@@ -761,8 +762,8 @@ class _ChatScreenState extends State<ChatScreen> {
                 child: TextField(
                   controller: _messageController,
                   focusNode: _messageFocusNode,
-                  decoration: const InputDecoration(
-                    hintText: 'Type a message...',
+                  decoration: InputDecoration(
+                    hintText: 'Type a message...'.tr(),
                     border: InputBorder.none,
                     hintStyle: TextStyle(color: Colors.grey),
                   ),

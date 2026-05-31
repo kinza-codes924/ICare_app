@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_size_matters/flutter_size_matters.dart';
 import 'package:icare/screens/top-up.dart';
@@ -23,7 +24,7 @@ class WalletScreen extends StatelessWidget {
         automaticallyImplyLeading: false,
         leading: CustomBackButton(),
         title: CustomText(
-          text: "Wallet",
+          text: "Wallet".tr(),
           fontWeight: FontWeight.bold,
           letterSpacing: -0.31,
           lineHeight: 1.0,
@@ -47,12 +48,12 @@ class WalletScreen extends StatelessWidget {
                     context,
                   ).push(MaterialPageRoute(builder: (ctx) => TopUpScreen()));
                 },
-                label: "Top Up",
+                label: "Top Up".tr(),
                 width: Utils.windowWidth(context) * 0.85,
               ),
               SizedBox(height: ScallingConfig.scale(20)),
               CustomText(
-                text: "Recieved Amounts",
+                text: "Received Amounts".tr(),
                 textAlign: TextAlign.start,
                 width: Utils.windowWidth(context) * 0.8,
               ),

@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:icare/utils/theme.dart';
 import 'package:icare/utils/utils.dart';
@@ -17,7 +18,7 @@ class PrivacyPolicy extends StatelessWidget {
         automaticallyImplyLeading: false,
         leading: CustomBackButton(),
         title: CustomText(
-          text: "Privacy Policy",
+          text: "Privacy Policy".tr(),
           fontSize: 16.78,
           fontFamily: "Gilroy-Bold",
           fontWeight: FontWeight.bold,
@@ -142,7 +143,7 @@ class _WebPrivacyPolicy extends StatelessWidget {
         automaticallyImplyLeading: false,
         leading: CustomBackButton(),
         title: CustomText(
-          text: "Privacy Policy",
+          text: "Privacy Policy".tr(),
           fontFamily: "Gilroy-Bold",
           fontSize: 20,
           color: AppColors.primaryColor,

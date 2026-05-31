@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_size_matters/flutter_size_matters.dart';
 import 'package:icare/screens/create_profile.dart';
@@ -21,7 +22,7 @@ class DoctorProfile extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: CustomText(
-          text: fromViewProfile ? "Doctor's Profile" : "Create Profile",
+          text: fromViewProfile ? "Doctor's Profile".tr() : "Create Profile".tr(),
           fontSize: 16.78,
           fontFamily: "Gilroy-Bold",
           fontWeight: FontWeight.w400,
@@ -67,7 +68,7 @@ class DoctorProfile extends StatelessWidget {
                 fontSize: 34.78,
               ),
               CustomText(
-                text: "Experience",
+                text: "Experience".tr(),
                 color: AppColors.primary500,
                 fontFamily: "Gilroy-Regular",
                 // fontWeight: FontWeight.w400,
@@ -81,7 +82,7 @@ class DoctorProfile extends StatelessWidget {
                     color: AppColors.primaryColor,
                     icon: SvgWrapper(assetPath: ImagePaths.profile2User),
                     number: "150",
-                    label: fromViewProfile ? "Patients" : "Total Consultations",
+                    label: fromViewProfile ? "Patients".tr() : "Total Consultations".tr(),
                   ),
                   SizedBox(width: ScallingConfig.scale(15)),
                   CustomRecordCard(
@@ -92,7 +93,7 @@ class DoctorProfile extends StatelessWidget {
                     },
                     icon: SvgWrapper(assetPath: ImagePaths.star),
                     number: "4.9",
-                    label: "Ratings",
+                    label: "Ratings".tr(),
                   ),
                 ],
               ),
@@ -139,7 +140,7 @@ class DoctorProfile extends StatelessWidget {
 
               SizedBox(height: ScallingConfig.scale(5)),
               CustomText(
-                text: "Bio:",
+                text: "Bio:".tr(),
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
                 color: AppColors.primary500,
@@ -220,7 +221,7 @@ class _ProfilePickerState extends State<ProfilePicker> {
             children: [
               ListTile(
                 leading: const Icon(Icons.photo_library),
-                title: const Text('Gallery'),
+                title: Text('Gallery'.tr()),
                 onTap: () {
                   Navigator.pop(context);
                   _pickImage(ImageSource.gallery);
@@ -228,7 +229,7 @@ class _ProfilePickerState extends State<ProfilePicker> {
               ),
               ListTile(
                 leading: const Icon(Icons.camera_alt),
-                title: const Text('Camera'),
+                title: Text('Camera'.tr()),
                 onTap: () {
                   Navigator.pop(context);
                   _pickImage(ImageSource.camera);

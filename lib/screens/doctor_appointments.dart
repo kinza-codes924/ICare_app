@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:icare/models/appointment_detail.dart';
 import 'package:icare/screens/consultation_chat_screen_v2.dart';
@@ -148,7 +149,7 @@ class _DoctorAppointmentsScreenState extends State<DoctorAppointmentsScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             CustomText(
-              text: "My Appointments",
+              text: "My Appointments".tr(),
               fontFamily: "Gilroy-Bold",
               fontSize: 18,
               fontWeight: FontWeight.w900,
@@ -186,34 +187,34 @@ class _DoctorAppointmentsScreenState extends State<DoctorAppointmentsScreen> {
               scrollDirection: Axis.horizontal,
               child: Row(
                 children: [
-                  _buildFilterChip('All', 'all', _appointments.length),
+                  _buildFilterChip('All'.tr(), 'all', _appointments.length),
                   const SizedBox(width: 8),
                   _buildFilterChip(
-                    'Pending',
+                    'Pending'.tr(),
                     'pending',
                     _appointments.where((a) => a.status == 'pending').length,
                   ),
                   const SizedBox(width: 8),
                   _buildFilterChip(
-                    'Confirmed',
+                    'Confirmed'.tr(),
                     'confirmed',
                     _appointments.where((a) => a.status == 'confirmed').length,
                   ),
                   const SizedBox(width: 8),
                   _buildFilterChip(
-                    'In Progress',
+                    'In Progress'.tr(),
                     'in_progress',
                     _appointments.where((a) => a.status.toLowerCase() == 'in_progress' || a.status.toLowerCase() == 'in-progress').length,
                   ),
                   const SizedBox(width: 8),
                   _buildFilterChip(
-                    'Completed',
+                    'Completed'.tr(),
                     'completed',
                     _appointments.where((a) => a.status == 'completed').length,
                   ),
                   const SizedBox(width: 8),
                   _buildFilterChip(
-                    'Missed',
+                    'Missed'.tr(),
                     'missed',
                     _appointments.where((a) => a.status.toLowerCase() == 'missed').length,
                   ),
@@ -600,8 +601,8 @@ class _DoctorAppointmentsScreenState extends State<DoctorAppointmentsScreen> {
                                 color: statusColor,
                               ),
                               const SizedBox(width: 8),
-                              const Text(
-                                'Reason for Visit',
+                              Text(
+                                'Reason for Visit'.tr(),
                                 style: TextStyle(
                                   fontSize: 13,
                                   fontWeight: FontWeight.w700,
@@ -639,9 +640,9 @@ class _DoctorAppointmentsScreenState extends State<DoctorAppointmentsScreen> {
                                 borderRadius: BorderRadius.circular(10),
                               ),
                               alignment: Alignment.center,
-                              child: const Text(
-                                'Accept',
-                                style: TextStyle(
+                              child: Text(
+                                'Accept'.tr(),
+                                style: const TextStyle(
                                   fontSize: 14,
                                   fontWeight: FontWeight.w700,
                                   color: Colors.white,
@@ -663,9 +664,9 @@ class _DoctorAppointmentsScreenState extends State<DoctorAppointmentsScreen> {
                                 border: Border.all(color: const Color(0xFFEF4444), width: 1.5),
                               ),
                               alignment: Alignment.center,
-                              child: const Text(
-                                'Reject',
-                                style: TextStyle(
+                              child: Text(
+                                'Reject'.tr(),
+                                style: const TextStyle(
                                   fontSize: 14,
                                   fontWeight: FontWeight.w700,
                                   color: Color(0xFFEF4444),
@@ -756,8 +757,8 @@ class _DoctorAppointmentsScreenState extends State<DoctorAppointmentsScreen> {
                                 borderRadius: BorderRadius.circular(10),
                               ),
                               alignment: Alignment.center,
-                              child: const Text(
-                                'Start Consultation',
+                              child: Text(
+                                'Start Consultation'.tr(),
                                 style: TextStyle(
                                   fontSize: 14,
                                   fontWeight: FontWeight.w700,
@@ -800,9 +801,9 @@ class _DoctorAppointmentsScreenState extends State<DoctorAppointmentsScreen> {
                         children: [
                           const Icon(Icons.video_call_rounded, color: Color(0xFF8B5CF6), size: 22),
                           const SizedBox(width: 10),
-                          const Expanded(
+                          Expanded(
                             child: Text(
-                              'Active Session',
+                              'Active Session'.tr(),
                               style: TextStyle(
                                 fontSize: 13,
                                 fontWeight: FontWeight.w700,
@@ -837,8 +838,8 @@ class _DoctorAppointmentsScreenState extends State<DoctorAppointmentsScreen> {
 
                                   if (consultationId.isEmpty) {
                                     ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                        content: Text('Consultation not found. Please start a new consultation.'),
+                                      SnackBar(
+                                        content: Text('Consultation not found. Please start a new consultation.'.tr()),
                                         backgroundColor: Colors.orange,
                                       ),
                                     );
@@ -880,7 +881,7 @@ class _DoctorAppointmentsScreenState extends State<DoctorAppointmentsScreen> {
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                             ),
                             icon: const Icon(Icons.chat_rounded, size: 18),
-                            label: const Text('Rejoin', style: TextStyle(fontWeight: FontWeight.w700)),
+                            label: Text('Rejoin'.tr(), style: const TextStyle(fontWeight: FontWeight.w700)),
                           ),
                         ],
                       ),
@@ -896,9 +897,9 @@ class _DoctorAppointmentsScreenState extends State<DoctorAppointmentsScreen> {
                           padding: const EdgeInsets.symmetric(vertical: 12),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                         ),
-                        child: const Text(
-                          'Mark as Completed',
-                          style: TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.w600),
+                        child: Text(
+                          'Mark as Completed'.tr(),
+                          style: const TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.w600),
                         ),
                       ),
                     ),

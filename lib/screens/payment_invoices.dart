@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_size_matters/flutter_size_matters.dart';
 import 'package:icare/utils/theme.dart';
@@ -221,7 +222,7 @@ class _PaymentInvoicesState extends State<PaymentInvoices>
         elevation: 0,
         centerTitle: true,
         title: CustomText(
-          text: widget.isPharmacy ? "Order Invoices" : "Payment Invoices",
+          text: widget.isPharmacy ? "Order Invoices".tr() : "Payment Invoices".tr(),
           fontFamily: "Gilroy-Bold",
           fontSize: 18,
           fontWeight: FontWeight.w900,
@@ -281,7 +282,7 @@ class _PaymentInvoicesState extends State<PaymentInvoices>
                 children: [
                   Expanded(
                     child: _buildSummaryCard(
-                      title: "Total Revenue",
+                      title: "Total Revenue".tr(),
                       amount: "PKR ${_totalRevenue.toStringAsFixed(0)}",
                       subtitle:
                           "${_invoices.where((i) => i['status'] == 'Paid').length} invoices paid",
@@ -296,9 +297,9 @@ class _PaymentInvoicesState extends State<PaymentInvoices>
                   const SizedBox(width: 20),
                   Expanded(
                     child: _buildSummaryCard(
-                      title: "Total Invoices",
+                      title: "Total Invoices".tr(),
                       amount: "${_invoices.length}",
-                      subtitle: "This month",
+                      subtitle: "This month".tr(),
                       icon: Icons.receipt_long_rounded,
                       gradientColors: [
                         const Color(0xFF3B82F6),
@@ -332,9 +333,9 @@ class _PaymentInvoicesState extends State<PaymentInvoices>
                       padding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
                       child: Row(
                         children: [
-                          const Text(
-                            "Invoice List",
-                            style: TextStyle(
+                          Text(
+                            "Invoice List".tr(),
+                            style: const TextStyle(
                               fontWeight: FontWeight.w800,
                               fontSize: 20,
                               color: Color(0xFF0F172A),

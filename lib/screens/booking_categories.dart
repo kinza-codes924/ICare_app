@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_size_matters/flutter_size_matters.dart';
@@ -51,20 +52,20 @@ class _BookingCategoriesState extends State<BookingCategories>
       appBar: AppBar(
         automaticallyImplyLeading: false,
         leading: CustomBackButton(),
-        title: CustomText(text: "Upcoming"),
+        title: CustomText(text: "Upcoming".tr()),
         bottom: TabBar(
           controller: controller,
           indicatorWeight: 6,
           indicatorColor: AppColors.themeBlack,
           tabs: [
             CustomText(
-              text: "Upcoming",
+              text: "Upcoming".tr(),
               padding: EdgeInsets.only(bottom: 5),
               width: Utils.windowWidth(context) * 0.25,
               textAlign: TextAlign.center,
             ),
             CustomText(
-              text: "Pending",
+              text: "Pending".tr(),
               padding: EdgeInsets.only(bottom: 5),
               width: Utils.windowWidth(context) * 0.25,
               textAlign: TextAlign.center,
@@ -73,10 +74,10 @@ class _BookingCategoriesState extends State<BookingCategories>
               padding: EdgeInsets.only(bottom: 5),
               width: Utils.windowWidth(context) * 0.25,
               textAlign: TextAlign.center,
-              text: "Completed",
+              text: "Completed".tr(),
             ),
             CustomText(
-              text: "Cancelled",
+              text: "Cancelled".tr(),
               padding: EdgeInsets.only(bottom: 5),
               width: Utils.windowWidth(context) * 0.25,
               textAlign: TextAlign.center,
@@ -160,12 +161,12 @@ class UpcomingBOokingsList extends ConsumerWidget {
                         borderRadius: BorderRadius.circular(10),
                         border: Border.all(color: const Color(0xFF8B5CF6).withValues(alpha: 0.4)),
                       ),
-                      child: const Row(
+                      child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Icon(Icons.fiber_manual_record, color: Color(0xFF8B5CF6), size: 10),
                           SizedBox(width: 8),
-                          Text('Consultation in Progress',
+                          Text('Consultation in Progress'.tr(),
                             style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF8B5CF6))),
                         ],
                       ),
@@ -193,7 +194,7 @@ class UpcomingBOokingsList extends ConsumerWidget {
                         );
                       },
                       icon: const Icon(Icons.video_call_rounded, size: 18),
-                      label: const Text('Rejoin Consultation'),
+                      label: Text('Rejoin Consultation'.tr()),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF8B5CF6),
                         foregroundColor: Colors.white,
@@ -280,7 +281,7 @@ class _WebBookingCategoriesState extends State<_WebBookingCategories> {
         automaticallyImplyLeading: false,
         leading: CustomBackButton(),
         title: CustomText(
-          text: "Booking Details",
+          text: "Booking Details".tr(),
           fontFamily: "Gilroy-Bold",
           fontSize: 20,
           color: AppColors.primaryColor,
@@ -304,9 +305,9 @@ class _WebBookingCategoriesState extends State<_WebBookingCategories> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
-                          "Filter by Status",
-                          style: TextStyle(
+                        Text(
+                          "Filter by Status".tr(),
+                          style: const TextStyle(
                             fontSize: 22,
                             fontWeight: FontWeight.w700,
                             color: Color(0xFF1E293B),
@@ -314,8 +315,8 @@ class _WebBookingCategoriesState extends State<_WebBookingCategories> {
                           ),
                         ),
                         const SizedBox(height: 8),
-                        const Text(
-                          "Select a category to view your bookings",
+                        Text(
+                          "Select a category to view your bookings".tr(),
                           style: TextStyle(
                             fontSize: 14,
                             color: Color(0xFF64748B),
@@ -392,7 +393,7 @@ class _WebBookingCategoriesState extends State<_WebBookingCategories> {
                                       const SizedBox(width: 14),
                                       Expanded(
                                         child: Text(
-                                          tab["label"],
+                                          (tab["label"] as String).tr(),
                                           style: TextStyle(
                                             fontSize: 15,
                                             fontWeight: FontWeight.w600,
@@ -465,9 +466,9 @@ class _WebBookingCategoriesState extends State<_WebBookingCategories> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text(
-                                "Quick Stats",
-                                style: TextStyle(
+                              Text(
+                                "Quick Stats".tr(),
+                                style: const TextStyle(
                                   fontSize: 15,
                                   fontWeight: FontWeight.w700,
                                   color: Color(0xFF1E293B),
@@ -476,13 +477,13 @@ class _WebBookingCategoriesState extends State<_WebBookingCategories> {
                               ),
                               const SizedBox(height: 16),
                               _buildStatRow(
-                                "Total Bookings",
+                                "Total Bookings".tr(),
                                 widget.appointments.length.toString(),
                                 const Color(0xFF3B82F6),
                               ),
                               const SizedBox(height: 12),
                               _buildStatRow(
-                                "In Progress",
+                                "In Progress".tr(),
                                 widget.appointments
                                     .where((a) => a.status.toLowerCase() == 'in_progress')
                                     .length
@@ -491,7 +492,7 @@ class _WebBookingCategoriesState extends State<_WebBookingCategories> {
                               ),
                               const SizedBox(height: 12),
                               _buildStatRow(
-                                "Upcoming",
+                                "Upcoming".tr(),
                                 widget.appointments
                                     .where(
                                       (a) =>
@@ -504,7 +505,7 @@ class _WebBookingCategoriesState extends State<_WebBookingCategories> {
                               ),
                               const SizedBox(height: 12),
                               _buildStatRow(
-                                "Cancelled",
+                                "Cancelled".tr(),
                                 widget.appointments
                                     .where(
                                       (a) =>
@@ -516,7 +517,7 @@ class _WebBookingCategoriesState extends State<_WebBookingCategories> {
                               ),
                               const SizedBox(height: 12),
                               _buildStatRow(
-                                "Completed",
+                                "Completed".tr(),
                                 widget.appointments
                                     .where(
                                       (a) =>
@@ -565,7 +566,7 @@ class _WebBookingCategoriesState extends State<_WebBookingCategories> {
                               ),
                               const SizedBox(width: 12),
                               Text(
-                                "${_tabs[_selectedTab]["label"]} Bookings",
+                                "${(_tabs[_selectedTab]["label"] as String).tr()} ${'Bookings'.tr()}",
                                 style: const TextStyle(
                                   fontSize: 18,
                                   fontWeight: FontWeight.w700,
@@ -590,7 +591,7 @@ class _WebBookingCategoriesState extends State<_WebBookingCategories> {
                                     if (_selectedTab == 1) return a.status.toLowerCase() == 'pending';
                                     if (_selectedTab == 2) return a.status.toLowerCase() == 'completed';
                                     return a.status.toLowerCase() == 'cancelled';
-                                  }).length} bookings",
+                                  }).length} ${'bookings'.tr()}",
                                   style: TextStyle(
                                     fontSize: 13,
                                     fontWeight: FontWeight.w600,

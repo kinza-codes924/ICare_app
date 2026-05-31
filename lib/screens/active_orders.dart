@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:icare/utils/theme.dart';
@@ -27,7 +28,7 @@ class ActiveOrdersScreen extends StatelessWidget {
         automaticallyImplyLeading: false,
         leading: const CustomBackButton(),
         title: CustomText(
-          text: "Active Orders",
+          text: "Active Orders".tr(),
           fontSize: 16.78,
           fontFamily: "Gilroy-Bold",
           fontWeight: FontWeight.bold,

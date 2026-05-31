@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:icare/models/doctor.dart';
@@ -188,8 +189,8 @@ class _BookAppointmentScreenState extends ConsumerState<BookAppointmentScreen> {
     // Validate reason
     if (_reasonController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please enter Reason for Consultation'),
+        SnackBar(
+          content: Text('Please enter Reason for Consultation'.tr()),
           backgroundColor: Colors.red,
           behavior: SnackBarBehavior.floating,
         ),
@@ -200,8 +201,8 @@ class _BookAppointmentScreenState extends ConsumerState<BookAppointmentScreen> {
     // Validate certification checkbox
     if (!_certifyChecked) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please confirm that all details are correct'),
+        SnackBar(
+          content: Text('Please confirm that all details are correct'.tr()),
           backgroundColor: Colors.red,
           behavior: SnackBarBehavior.floating,
         ),
@@ -291,7 +292,7 @@ class _BookAppointmentScreenState extends ConsumerState<BookAppointmentScreen> {
         elevation: 0,
         centerTitle: true,
         title: Text(
-          _step == 2 ? 'Checkout' : 'Book Appointment',
+          _step == 2 ? 'Checkout'.tr() : 'Book Appointment'.tr(),
           style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
         ),
       ),
@@ -462,9 +463,9 @@ class _BookAppointmentScreenState extends ConsumerState<BookAppointmentScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('Emergency Booking', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: Color(0xFF1A1A2E))),
+                        Text('Emergency Booking'.tr(), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: Color(0xFF1A1A2E))),
                         const SizedBox(height: 2),
-                        const Text('Book outside regular hours. Doctor will confirm.', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                        Text('Book outside regular hours. Doctor will confirm.'.tr(), style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
                       ],
                     ),
                   ),
@@ -487,16 +488,16 @@ class _BookAppointmentScreenState extends ConsumerState<BookAppointmentScreen> {
 
           // Morning Slots (hidden when emergency mode on)
           if (!_isEmergency) ...[
-          _buildSlotSection('Morning Slots', Icons.wb_sunny_outlined, _morningSlots),
+          _buildSlotSection('Morning Slots'.tr(), Icons.wb_sunny_outlined, _morningSlots),
           const SizedBox(height: 8),
 
           // Afternoon Slots
-          _buildSlotSection('Afternoon Slots', Icons.wb_twilight_outlined, _afternoonSlots),
+          _buildSlotSection('Afternoon Slots'.tr(), Icons.wb_twilight_outlined, _afternoonSlots),
           const SizedBox(height: 8),
 
           // Evening Slots
           if (_eveningSlots.isNotEmpty) ...[
-            _buildSlotSection('Evening Slots', Icons.nights_stay_outlined, _eveningSlots),
+            _buildSlotSection('Evening Slots'.tr(), Icons.nights_stay_outlined, _eveningSlots),
             const SizedBox(height: 8),
           ],
           ],
@@ -518,7 +519,7 @@ class _BookAppointmentScreenState extends ConsumerState<BookAppointmentScreen> {
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   elevation: 0,
                 ),
-                child: const Text('Continue to Book', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+                child: Text('Continue to Book'.tr(), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
               ),
             ),
           ),
@@ -612,18 +613,18 @@ class _BookAppointmentScreenState extends ConsumerState<BookAppointmentScreen> {
               borderRadius: BorderRadius.circular(12),
               border: Border.all(color: const Color(0xFFFDE68A)),
             ),
-            child: const Row(
+            child: Row(
               children: [
-                Icon(Icons.shield_rounded, color: Color(0xFFF59E0B), size: 28),
-                SizedBox(width: 12),
+                const Icon(Icons.shield_rounded, color: Color(0xFFF59E0B), size: 28),
+                const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('95% patients feel satisfied after booking',
-                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF92400E))),
-                      Text('It takes only 30 sec to book an appointment',
-                          style: TextStyle(fontSize: 12, color: Color(0xFFB45309))),
+                      Text('95% patients feel satisfied after booking'.tr(),
+                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF92400E))),
+                      Text('It takes only 30 sec to book an appointment'.tr(),
+                          style: const TextStyle(fontSize: 12, color: Color(0xFFB45309))),
                     ],
                   ),
                 ),
@@ -657,12 +658,12 @@ class _BookAppointmentScreenState extends ConsumerState<BookAppointmentScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Row(
+                Row(
                   children: [
-                    Icon(Icons.thumb_up_outlined, size: 16, color: Color(0xFF3B82F6)),
-                    SizedBox(width: 6),
-                    Text('I recommend the doctor',
-                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF0F172A))),
+                    const Icon(Icons.thumb_up_outlined, size: 16, color: Color(0xFF3B82F6)),
+                    const SizedBox(width: 6),
+                    Text('I recommend the doctor'.tr(),
+                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF0F172A))),
                   ],
                 ),
                 const SizedBox(height: 8),
@@ -691,7 +692,7 @@ class _BookAppointmentScreenState extends ConsumerState<BookAppointmentScreen> {
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   elevation: 0,
                 ),
-                child: const Text('Continue to Book', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+                child: Text('Continue to Book'.tr(), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
               ),
             ),
           ),
@@ -763,9 +764,9 @@ class _BookAppointmentScreenState extends ConsumerState<BookAppointmentScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('Consultation Fee', style: TextStyle(fontSize: 13, color: Color(0xFF64748B))),
+              Text('Consultation Fee'.tr(), style: const TextStyle(fontSize: 13, color: Color(0xFF64748B))),
               Text(
-                fee > 0 ? 'Rs. ${fee.toInt()}' : 'Free / As per clinic',
+                fee > 0 ? 'Rs. ${fee.toInt()}' : 'Free / As per clinic'.tr(),
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w800,
@@ -801,10 +802,10 @@ class _BookAppointmentScreenState extends ConsumerState<BookAppointmentScreen> {
                       : null,
                 ),
                 const SizedBox(width: 10),
-                const Expanded(
+                Expanded(
                   child: Text(
-                    'I certify that all the information I provided is correct.',
-                    style: TextStyle(fontSize: 13, color: Color(0xFF334155), height: 1.4),
+                    'I certify that all the information I provided is correct.'.tr(),
+                    style: const TextStyle(fontSize: 13, color: Color(0xFF334155), height: 1.4),
                   ),
                 ),
               ],
@@ -826,7 +827,7 @@ class _BookAppointmentScreenState extends ConsumerState<BookAppointmentScreen> {
               ),
               child: _isBooking
                   ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                  : const Text('Confirm Booking', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800)),
+                  : Text('Confirm Booking'.tr(), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800)),
             ),
           ),
         ],
@@ -847,17 +848,17 @@ class _BookAppointmentScreenState extends ConsumerState<BookAppointmentScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('Appointment For',
-                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: Color(0xFF0F172A))),
+              Text('Appointment For'.tr(),
+                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: Color(0xFF0F172A))),
               const SizedBox(height: 12),
               Row(
                 children: [
-                  _forChip('Myself', _appointmentForMyself, () {
+                  _forChip('Myself'.tr(), _appointmentForMyself, () {
                     setState(() => _appointmentForMyself = true);
                     _fillMyselfDetails();
                   }),
                   const SizedBox(width: 10),
-                  _forChip('+ Someone else', !_appointmentForMyself, () {
+                  _forChip('+ Someone else'.tr(), !_appointmentForMyself, () {
                     setState(() {
                       _appointmentForMyself = false;
                       _nameController.clear();
@@ -869,14 +870,14 @@ class _BookAppointmentScreenState extends ConsumerState<BookAppointmentScreen> {
               ),
               const SizedBox(height: 16),
               // Patient Name
-              const Text('Patient Name',
-                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF64748B))),
+              Text('Patient Name'.tr(),
+                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF64748B))),
               const SizedBox(height: 8),
               TextField(
                 controller: _nameController,
                 readOnly: _appointmentForMyself,
                 decoration: InputDecoration(
-                  hintText: 'Enter patient name',
+                  hintText: 'Enter patient name'.tr(),
                   hintStyle: const TextStyle(color: Color(0xFF94A3B8)),
                   prefixIcon: const Icon(Icons.person_outline_rounded, color: Color(0xFF94A3B8)),
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
@@ -894,14 +895,14 @@ class _BookAppointmentScreenState extends ConsumerState<BookAppointmentScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('Gender',
-                            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF64748B))),
+                        Text('Gender'.tr(),
+                            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF64748B))),
                         const SizedBox(height: 8),
                         TextField(
                           controller: _genderController,
                           readOnly: _appointmentForMyself,
                           decoration: InputDecoration(
-                            hintText: 'Male / Female',
+                            hintText: 'Male / Female'.tr(),
                             hintStyle: const TextStyle(color: Color(0xFF94A3B8)),
                             border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
                             enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
@@ -918,15 +919,15 @@ class _BookAppointmentScreenState extends ConsumerState<BookAppointmentScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('Age',
-                            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF64748B))),
+                        Text('Age'.tr(),
+                            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF64748B))),
                         const SizedBox(height: 8),
                         TextField(
                           controller: _ageController,
                           readOnly: _appointmentForMyself,
                           keyboardType: TextInputType.number,
                           decoration: InputDecoration(
-                            hintText: 'e.g. 30',
+                            hintText: 'e.g. 30'.tr(),
                             hintStyle: const TextStyle(color: Color(0xFF94A3B8)),
                             border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
                             enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
@@ -944,8 +945,8 @@ class _BookAppointmentScreenState extends ConsumerState<BookAppointmentScreen> {
               // Reason for Consultation — MANDATORY
               Row(
                 children: [
-                  const Text('Reason for Consultation',
-                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF64748B))),
+                  Text('Reason for Consultation'.tr(),
+                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF64748B))),
                   const SizedBox(width: 6),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
@@ -953,8 +954,8 @@ class _BookAppointmentScreenState extends ConsumerState<BookAppointmentScreen> {
                       color: Colors.red.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(4),
                     ),
-                    child: const Text('Mandatory',
-                        style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Colors.red)),
+                    child: Text('Mandatory'.tr(),
+                        style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Colors.red)),
                   ),
                 ],
               ),
@@ -963,7 +964,7 @@ class _BookAppointmentScreenState extends ConsumerState<BookAppointmentScreen> {
                 controller: _reasonController,
                 maxLines: 3,
                 decoration: InputDecoration(
-                  hintText: 'Describe your symptoms or reason for visit...',
+                  hintText: 'Describe your symptoms or reason for visit...'.tr(),
                   hintStyle: const TextStyle(color: Color(0xFF94A3B8)),
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
                   enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
@@ -989,8 +990,8 @@ class _BookAppointmentScreenState extends ConsumerState<BookAppointmentScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('Select Payment Method',
-                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: Color(0xFF0F172A))),
+              Text('Select Payment Method'.tr(),
+                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: Color(0xFF0F172A))),
               const SizedBox(height: 12),
               // Online Payment option
               Container(
@@ -1004,7 +1005,7 @@ class _BookAppointmentScreenState extends ConsumerState<BookAppointmentScreen> {
                   children: [
                     Icon(Icons.radio_button_checked_rounded, color: AppColors.primaryColor, size: 20),
                     const SizedBox(width: 10),
-                    const Expanded(child: Text('Online Payment', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700))),
+                    Expanded(child: Text('Online Payment'.tr(), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700))),
                     if (fee > 0)
                       Text('Rs. ${fee.toInt()}',
                           style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: Color(0xFF0F172A))),
@@ -1020,14 +1021,14 @@ class _BookAppointmentScreenState extends ConsumerState<BookAppointmentScreen> {
                     borderRadius: BorderRadius.circular(10),
                     border: Border.all(color: const Color(0xFFFDE68A)),
                   ),
-                  child: const Row(
+                  child: Row(
                     children: [
                       Icon(Icons.info_outline_rounded, color: Color(0xFFF59E0B), size: 16),
                       SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          'Consultation fee will be confirmed by the doctor.',
-                          style: TextStyle(fontSize: 12, color: Color(0xFF92400E)),
+                          'Consultation fee will be confirmed by the doctor.'.tr(),
+                          style: const TextStyle(fontSize: 12, color: Color(0xFF92400E)),
                         ),
                       ),
                     ],

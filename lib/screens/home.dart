@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_size_matters/flutter_size_matters.dart';
@@ -134,7 +135,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             CustomText(
-                              text: "Welcome back,",
+                              text: "Welcome back,".tr(),
                               fontSize: 15,
                               color: const Color(0xFF64748B),
                               fontWeight: FontWeight.w500,
@@ -167,7 +168,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                             width: 450,
                             height: 52,
                             margin: EdgeInsets.zero,
-                            hintText: "Search for doctors, labs, courses...",
+                            hintText: "Search for doctors, labs, courses...".tr(),
                             trailingIcon: SvgWrapper(
                               assetPath: ImagePaths.filters,
                               onPress: () => Navigator.of(context).push(
@@ -191,7 +192,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 // Mobile: Original search bar
                 CustomInputField(
                   width: Utils.windowWidth(context) * 0.9,
-                  hintText: "Search",
+                  hintText: "Search".tr(),
                   trailingIcon: SvgWrapper(
                     assetPath: ImagePaths.filters,
                     onPress: () {
@@ -370,7 +371,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 child: Row(
                   children: [
                     CustomText(
-                      text: "Today’s Appointments",
+                      text: "Today’s Appointments".tr(),
                       fontSize: 20,
                       fontWeight: FontWeight.w800,
                       color: AppColors.primary500,
@@ -386,7 +387,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: CustomText(
-                        text: "20 min left",
+                        text: "20 min left".tr(),
                         fontSize: 12,
                         color: AppColors.themeRed,
                         fontWeight: FontWeight.w700,
@@ -495,7 +496,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         CustomText(
-                          text: "View All Upcoming Appointments",
+                          text: "View All Upcoming Appointments".tr(),
                           fontSize: 15,
                           fontWeight: FontWeight.w700,
                           color: AppColors.primaryColor,
@@ -554,11 +555,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           children: [
                             CustomText(
                               text:
-                                  "Good ${TimeOfDay.now().hour < 12
-                                      ? 'Morning'
+                                  "${'Good'.tr()} ${TimeOfDay.now().hour < 12
+                                      ? 'Morning'.tr()
                                       : TimeOfDay.now().hour < 17
-                                      ? 'Afternoon'
-                                      : 'Evening'},",
+                                      ? 'Afternoon'.tr()
+                                      : 'Evening'.tr()},",
                               fontSize: 14,
                               color: const Color(0xFF64748B),
                               fontWeight: FontWeight.w500,
@@ -629,7 +630,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                             width: 380,
                             height: 48,
                             margin: EdgeInsets.zero,
-                            hintText: "Search tests, patients...",
+                            hintText: "Search tests, patients...".tr(),
                             trailingIcon: SvgWrapper(
                               assetPath: ImagePaths.filters,
                               onPress: () => Navigator.of(context).push(
@@ -658,9 +659,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         Expanded(
                           child: _buildPremiumStatCard(
                             context: context,
-                            label: "Active Orders",
+                            label: "Active Orders".tr(),
                             number: "120",
-                            subtitle: "+12 from yesterday",
+                            subtitle: "+12 from yesterday".tr(),
                             icon: Icons.science_rounded,
                             gradientColors: [
                               const Color(0xFF3B82F6),
@@ -678,9 +679,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         Expanded(
                           child: _buildPremiumStatCard(
                             context: context,
-                            label: "Completed",
+                            label: "Completed".tr(),
                             number: "32",
-                            subtitle: "This month",
+                            subtitle: "This month".tr(),
                             icon: Icons.check_circle_rounded,
                             gradientColors: [
                               const Color(0xFF10B981),
@@ -699,9 +700,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         Expanded(
                           child: _buildPremiumStatCard(
                             context: context,
-                            label: "Pending Tests",
+                            label: "Pending Tests".tr(),
                             number: "15",
-                            subtitle: "3 urgent",
+                            subtitle: "3 urgent".tr(),
                             icon: Icons.pending_actions_rounded,
                             gradientColors: [
                               const Color(0xFFF59E0B),
@@ -715,9 +716,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         Expanded(
                           child: _buildPremiumStatCard(
                             context: context,
-                            label: "Revenue",
+                            label: "Revenue".tr(),
                             number: "PKR 4.2K",
-                            subtitle: "+8% this week",
+                            subtitle: "+8% this week".tr(),
                             icon: Icons.trending_up_rounded,
                             gradientColors: [
                               const Color(0xFF8B5CF6),
@@ -746,8 +747,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                             children: [
                               // ─── Laboratories Section ─────────────────
                               _buildSectionHeader(
-                                "Laboratories",
-                                "Browse All",
+                                "Laboratories".tr(),
+                                "Browse All".tr(),
                                 () {},
                               ),
                               const SizedBox(height: 16),
@@ -767,8 +768,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
                               // ─── New Test Requests ───────────────────
                               _buildSectionHeader(
-                                "New Test Requests",
-                                "View All",
+                                "New Test Requests".tr(),
+                                "View All".tr(),
                                 () {},
                               ),
                               const SizedBox(height: 16),
@@ -810,7 +811,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                           Expanded(
                                             flex: 3,
                                             child: Text(
-                                              "Patient",
+                                              "Patient".tr(),
                                               style: TextStyle(
                                                 fontWeight: FontWeight.w700,
                                                 fontSize: 12,
@@ -822,7 +823,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                           Expanded(
                                             flex: 2,
                                             child: Text(
-                                              "Test",
+                                              "Test".tr(),
                                               style: TextStyle(
                                                 fontWeight: FontWeight.w700,
                                                 fontSize: 12,
@@ -834,7 +835,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                           Expanded(
                                             flex: 2,
                                             child: Text(
-                                              "Date & Time",
+                                              "Date & Time".tr(),
                                               style: TextStyle(
                                                 fontWeight: FontWeight.w700,
                                                 fontSize: 12,
@@ -846,7 +847,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                           Expanded(
                                             flex: 1,
                                             child: Text(
-                                              "Status",
+                                              "Status".tr(),
                                               style: TextStyle(
                                                 fontWeight: FontWeight.w700,
                                                 fontSize: 12,
@@ -901,9 +902,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    const Text(
-                                      "Quick Actions",
-                                      style: TextStyle(
+                                    Text(
+                                      "Quick Actions".tr(),
+                                      style: const TextStyle(
                                         color: Colors.white,
                                         fontWeight: FontWeight.w800,
                                         fontSize: 18,
@@ -912,7 +913,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                     ),
                                     const SizedBox(height: 6),
                                     Text(
-                                      "Frequently used shortcuts",
+                                      "Frequently used shortcuts".tr(),
                                       style: TextStyle(
                                         color: Colors.white.withValues(alpha: 0.6),
                                         fontSize: 12,
@@ -922,28 +923,28 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                     const SizedBox(height: 20),
                                     _buildQuickActionBtn(
                                       icon: Icons.add_circle_rounded,
-                                      label: "New Lab Report",
+                                      label: "New Lab Report".tr(),
                                       color: const Color(0xFF6366F1),
                                       onTap: () {},
                                     ),
                                     const SizedBox(height: 10),
                                     _buildQuickActionBtn(
                                       icon: Icons.person_add_rounded,
-                                      label: "Register Patient",
+                                      label: "Register Patient".tr(),
                                       color: const Color(0xFF10B981),
                                       onTap: () {},
                                     ),
                                     const SizedBox(height: 10),
                                     _buildQuickActionBtn(
                                       icon: Icons.upload_file_rounded,
-                                      label: "Upload Results",
+                                      label: "Upload Results".tr(),
                                       color: const Color(0xFF0EA5E9),
                                       onTap: () {},
                                     ),
                                     const SizedBox(height: 10),
                                     _buildQuickActionBtn(
                                       icon: Icons.video_call_rounded,
-                                      label: "Start Video Call",
+                                      label: "Start Video Call".tr(),
                                       color: const Color(0xFFF59E0B),
                                       onTap: () => Navigator.of(context).push(
                                         MaterialPageRoute(
@@ -981,9 +982,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                       mainAxisAlignment:
                                           MainAxisAlignment.spaceBetween,
                                       children: [
-                                        const Text(
-                                          "Recent Activity",
-                                          style: TextStyle(
+                                        Text(
+                                          "Recent Activity".tr(),
+                                          style: const TextStyle(
                                             fontWeight: FontWeight.w800,
                                             fontSize: 18,
                                             color: Color(0xFF0F172A),
@@ -1001,9 +1002,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                               8,
                                             ),
                                           ),
-                                          child: const Text(
-                                            "Today",
-                                            style: TextStyle(
+                                          child: Text(
+                                            "Today".tr(),
+                                            style: const TextStyle(
                                               fontSize: 11,
                                               color: Color(0xFF3B82F6),
                                               fontWeight: FontWeight.w700,
@@ -1016,26 +1017,26 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                     _buildActivityItem(
                                       icon: Icons.check_circle_rounded,
                                       color: const Color(0xFF10B981),
-                                      title: "CBC Report completed",
-                                      sub: "Patient: Alyana · 15 min ago",
+                                      title: "CBC Report completed".tr(),
+                                      sub: "Patient: Alyana · 15 min ago".tr(),
                                     ),
                                     _buildActivityItem(
                                       icon: Icons.science_rounded,
                                       color: const Color(0xFF3B82F6),
-                                      title: "New blood test sample",
-                                      sub: "Patient: Hamza · 42 min ago",
+                                      title: "New blood test sample".tr(),
+                                      sub: "Patient: Hamza · 42 min ago".tr(),
                                     ),
                                     _buildActivityItem(
                                       icon: Icons.notifications_rounded,
                                       color: const Color(0xFFF59E0B),
-                                      title: "Urgent: X-Ray pending",
-                                      sub: "Patient: Sara · 1 hr ago",
+                                      title: "Urgent: X-Ray pending".tr(),
+                                      sub: "Patient: Sara · 1 hr ago".tr(),
                                     ),
                                     _buildActivityItem(
                                       icon: Icons.upload_file_rounded,
                                       color: const Color(0xFF8B5CF6),
-                                      title: "Report uploaded to portal",
-                                      sub: "Patient: Ali · 2 hrs ago",
+                                      title: "Report uploaded to portal".tr(),
+                                      sub: "Patient: Ali · 2 hrs ago".tr(),
                                       isLast: true,
                                     ),
                                   ],
@@ -1063,7 +1064,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             children: [
               CustomInputField(
                 width: Utils.windowWidth(context) * 0.9,
-                hintText: "Search",
+                hintText: "Search".tr(),
                 trailingIcon: SvgWrapper(
                   assetPath: ImagePaths.filters,
                   onPress: () {
@@ -1086,7 +1087,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         ),
                       );
                     },
-                    label: "Active Orders",
+                    label: "Active Orders".tr(),
                     number: "120",
                     icon: SvgWrapper(assetPath: ImagePaths.lab_tech),
                   ),
@@ -1100,7 +1101,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       );
                     },
                     color: AppColors.primaryColor,
-                    label: "Completed Reports",
+                    label: "Completed Reports".tr(),
                     number: "32",
                     icon: SvgWrapper(assetPath: ImagePaths.lab_tech),
                   ),
@@ -1109,7 +1110,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               SizedBox(height: ScallingConfig.scale(20)),
               CustomText(
                 width: Utils.windowWidth(context) * 0.85,
-                text: "Laboratories",
+                text: "Laboratories".tr(),
                 fontFamily: "Gilroy-Bold",
                 fontSize: 16.78,
                 color: AppColors.primary500,
@@ -1126,14 +1127,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     CustomText(
-                      text: "New Test Requests",
+                      text: "New Test Requests".tr(),
                       fontFamily: "Gilroy-Bold",
                       fontSize: 16.78,
                       color: AppColors.primary500,
                       fontWeight: FontWeight.bold,
                     ),
                     CustomText(
-                      text: "View All",
+                      text: "View All".tr(),
                       fontFamily: "Gilroy-SemiBold",
                       fontSize: 14.78,
                       underline: true,
@@ -1177,13 +1178,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           color: AppColors.themeDarkGrey,
                         ),
                         SizedBox(height: ScallingConfig.scale(10)),
-                        const Row(
+                        Row(
                           mainAxisAlignment: MainAxisAlignment.start,
                           children: [
-                            TimeStampWidget(title: "Date", data: "01-AUG-2025"),
-                            SizedBox(width: 10),
+                            TimeStampWidget(title: "Date".tr(), data: "01-AUG-2025"),
+                            const SizedBox(width: 10),
                             TimeStampWidget(
-                              title: "Time",
+                              title: "Time".tr(),
                               data: "07 PM - 08 PM",
                             ),
                           ],
@@ -1759,10 +1760,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         ),
                       ],
                     ),
-                    child: const Center(
+                    child: Center(
                       child: Text(
-                        "View",
-                        style: TextStyle(
+                        "View".tr(),
+                        style: const TextStyle(
                           color: Colors.white,
                           fontSize: 12,
                           fontWeight: FontWeight.w700,
@@ -1837,7 +1838,7 @@ class ProfileInfoWidget extends ConsumerWidget {
                     ),
                     const SizedBox(width: 50),
                     CustomText(
-                      text: "View Profile",
+                      text: "View Profile".tr(),
                       underline: true,
                       onTap: () {
                         Navigator.of(context).push(
@@ -1855,8 +1856,8 @@ class ProfileInfoWidget extends ConsumerWidget {
                   children: [
                     const SvgWrapper(assetPath: ImagePaths.location),
                     SizedBox(width: Utils.windowWidth(context) * 0.025),
-                    const CustomText(
-                      text: "20 Cooper Square, USA",
+                    CustomText(
+                      text: "20 Cooper Square, USA".tr(),
                       fontSize: 12,
                       color: AppColors.darkGreyColor,
                     ),
@@ -1920,7 +1921,7 @@ class DoctorConsultationCard extends StatelessWidget {
                   borderRadius: BorderRadius.circular(15),
                 ),
                 child: CustomText(
-                  text: "Video Consultation",
+                  text: "Video Consultation".tr(),
                   fontWeight: FontWeight.w400,
                 ),
               ),
@@ -1972,7 +1973,7 @@ class DoctorConsultationCard extends StatelessWidget {
                         width: Utils.windowWidth(context) * 0.2,
                         height: ScallingConfig.verticalScale(25),
                         borderRadius: 20,
-                        label: "Join",
+                        label: "Join".tr(),
                         labelSize: 14,
                         onPressed: () {
                           Navigator.of(context).push(
@@ -2074,7 +2075,7 @@ class DoctorConsultationCard extends StatelessWidget {
                         ),
                         const SizedBox(width: 10),
                         CustomText(
-                          text: "LIVE SESSION",
+                          text: "LIVE SESSION".tr(),
                           fontSize: 12,
                           color: AppColors.themeGreen,
                           fontWeight: FontWeight.w900,
@@ -2147,7 +2148,7 @@ class DoctorConsultationCard extends StatelessWidget {
                                     ),
                                     const SizedBox(width: 10),
                                     CustomText(
-                                      text: "Starts in 20 min",
+                                      text: "Starts in 20 min".tr(),
                                       fontSize: 15,
                                       color: AppColors.primaryColor,
                                       fontWeight: FontWeight.w700,
@@ -2165,7 +2166,7 @@ class DoctorConsultationCard extends StatelessWidget {
                               width: isDesktop ? 220 : 130,
                               height: 64,
                               borderRadius: 20,
-                              label: isDesktop ? "Join Session Now" : "Join",
+                              label: isDesktop ? "Join Session Now".tr() : "Join".tr(),
                               labelSize: 18,
                               gradient: const LinearGradient(
                                 begin: Alignment.topLeft,

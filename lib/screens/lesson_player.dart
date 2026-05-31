@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:icare/screens/certificate_templates_screen.dart';
 import 'package:icare/utils/shared_pref.dart';

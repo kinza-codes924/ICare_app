@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_size_matters/flutter_size_matters.dart';
@@ -78,7 +79,7 @@ class _SelectUserTypeState extends ConsumerState<SelectUserType> {
           children: [
             SizedBox(height: ScallingConfig.scale(50)),
             CustomText(
-              text: "Welcome to Your Healthcare Journey",
+              text: "Welcome to Your Healthcare Journey".tr(),
               fontSize: 28,
               maxLines: 2,
               padding: EdgeInsets.only(left: ScallingConfig.moderateScale(12)),
@@ -88,7 +89,7 @@ class _SelectUserTypeState extends ConsumerState<SelectUserType> {
               isBold: true,
             ),
             CustomText(
-              text: "Your role helps personalize your experience",
+              text: "Your role helps personalize your experience".tr(),
               padding: EdgeInsets.only(
                 top: ScallingConfig.verticalScale(8),
                 left: ScallingConfig.moderateScale(12),
@@ -147,7 +148,7 @@ class _SelectUserTypeState extends ConsumerState<SelectUserType> {
                       left: ScallingConfig.scale(20),
                       child: CustomButton(
                         width: Utils.windowWidth(context) * 0.9,
-                        label: "Continue to Login",
+                        label: "Continue to Login".tr(),
                         borderRadius: ScallingConfig.moderateScale(30),
                         onPressed: () {
                           Navigator.of(context).push(
@@ -234,9 +235,9 @@ class _SelectUserTypeState extends ConsumerState<SelectUserType> {
                             child: Image.asset('assets/Asset 1.png', fit: BoxFit.contain, filterQuality: FilterQuality.high),
                           ),
                           const SizedBox(height: 32),
-                          const Text(
-                            "Welcome to iCare",
-                            style: TextStyle(
+                          Text(
+                            "Welcome to iCare".tr(),
+                            style: const TextStyle(
                               fontSize: 40,
                               fontWeight: FontWeight.w800,
                               color: Colors.white,
@@ -246,7 +247,7 @@ class _SelectUserTypeState extends ConsumerState<SelectUserType> {
                           ),
                           const SizedBox(height: 8),
                           Text(
-                            "Your Virtual Healthcare Platform",
+                            "Your Virtual Healthcare Platform".tr(),
                             textAlign: TextAlign.center,
                             style: TextStyle(
                               fontSize: 18,
@@ -257,7 +258,7 @@ class _SelectUserTypeState extends ConsumerState<SelectUserType> {
                           ),
                           const SizedBox(height: 12),
                           Text(
-                            "Secure consultations, prescriptions & health records",
+                            "Secure consultations, prescriptions & health records".tr(),
                             textAlign: TextAlign.center,
                             style: TextStyle(
                               fontSize: 15,
@@ -272,17 +273,17 @@ class _SelectUserTypeState extends ConsumerState<SelectUserType> {
                             children: [
                               _buildTrustIndicator(
                                 Icons.shield_rounded,
-                                "HIPAA Compliant & Secure",
+                                "HIPAA Compliant & Secure".tr(),
                               ),
                               const SizedBox(height: 12),
                               _buildTrustIndicator(
                                 Icons.verified_user_rounded,
-                                "Licensed Healthcare Providers",
+                                "Licensed Healthcare Providers".tr(),
                               ),
                               const SizedBox(height: 12),
                               _buildTrustIndicator(
                                 Icons.star_rounded,
-                                "Trusted by 10,000+ Patients",
+                                "Trusted by 10,000+ Patients".tr(),
                               ),
                             ],
                           ),

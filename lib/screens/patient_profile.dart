@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_size_matters/flutter_size_matters.dart';
@@ -21,7 +22,7 @@ class PatientProfile extends ConsumerWidget {
         leading: CustomBackButton(),
         automaticallyImplyLeading: false,
         title: CustomText(
-          text: "Patient Profile",
+          text: "Patient Profile".tr(),
           fontSize: 16.78,
           fontFamily: "Gilroy-Bold",
           fontWeight: FontWeight.bold,

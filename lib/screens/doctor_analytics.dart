@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:icare/services/appointment_service.dart';
 import 'package:icare/services/doctor_service.dart';
@@ -221,7 +222,7 @@ class _DoctorAnalyticsState extends State<DoctorAnalytics> {
         backgroundColor: Colors.white,
         elevation: 0,
         leading: const CustomBackButton(),
-        title: const Text('Revenue & Analytics',
+        title: Text('Revenue & Analytics'.tr(),
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Color(0xFF0F172A))),
         actions: [
           IconButton(icon: const Icon(Icons.refresh_rounded, color: Color(0xFF64748B)), onPressed: _load),

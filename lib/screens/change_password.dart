@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_size_matters/flutter_size_matters.dart';
 import 'package:icare/utils/imagePaths.dart';
@@ -28,7 +29,7 @@ class _ChangePasswordState extends State<ChangePassword> {
         automaticallyImplyLeading: false,
         leading: CustomBackButton(),
         title: CustomText(
-          text: "Change password",
+          text: "Change Password".tr(),
           fontFamily: "Gilroy-Bold",
           fontSize: 16,
         ),
@@ -47,7 +48,7 @@ class _ChangePasswordState extends State<ChangePassword> {
               children: [
                 CustomInputField(
                   maxLines: 1,
-                  hintText: "Current Password",
+                  hintText: "Current Password".tr(),
                   leadingIcon: SvgWrapper(assetPath: ImagePaths.key),
                   isPassword: true,
                   bgColor: AppColors.white,
@@ -58,7 +59,7 @@ class _ChangePasswordState extends State<ChangePassword> {
                 SizedBox(height: ScallingConfig.scale(10)),
                 CustomInputField(
                   maxLines: 1,
-                  hintText: "New Password",
+                  hintText: "New Password".tr(),
                   leadingIcon: SvgWrapper(assetPath: ImagePaths.key),
                   isPassword: true,
                   bgColor: AppColors.white,
@@ -69,7 +70,7 @@ class _ChangePasswordState extends State<ChangePassword> {
                 SizedBox(height: ScallingConfig.scale(10)),
                 CustomInputField(
                   maxLines: 1,
-                  hintText: "Confirm Password",
+                  hintText: "Confirm Password".tr(),
                   leadingIcon: SvgWrapper(assetPath: ImagePaths.key),
                   isPassword: true,
                   bgColor: AppColors.white,
@@ -102,7 +103,7 @@ class _ChangePasswordState extends State<ChangePassword> {
                       _showSuccessModal(context);
                     },
                     child: Text(
-                      "Confirm",
+                      "Confirm".tr(),
                       style: TextStyle(color: Colors.white, fontSize: 16),
                     ),
                   ),
@@ -132,7 +133,7 @@ class _WebChangePassword extends StatelessWidget {
         automaticallyImplyLeading: false,
         leading: CustomBackButton(),
         title: CustomText(
-          text: "Change Password",
+          text: "Change Password".tr(),
           fontFamily: "Gilroy-Bold",
           fontSize: 20,
           color: AppColors.primaryColor,
@@ -179,9 +180,9 @@ class _WebChangePassword extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 24),
-                    const Text(
-                      "Update your Password",
-                      style: TextStyle(
+                    Text(
+                      "Update your Password".tr(),
+                      style: const TextStyle(
                         fontSize: 22,
                         fontWeight: FontWeight.w700,
                         color: Color(0xFF1E293B),
@@ -189,10 +190,10 @@ class _WebChangePassword extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 8),
-                    const Text(
-                      "Choose a strong password to keep your account safe and secure.",
+                    Text(
+                      "Choose a strong password to keep your account safe and secure.".tr(),
                       textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: 15, color: Color(0xFF64748B)),
+                      style: const TextStyle(fontSize: 15, color: Color(0xFF64748B)),
                     ),
 
                     const SizedBox(height: 32),
@@ -200,9 +201,9 @@ class _WebChangePassword extends StatelessWidget {
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
-                          "Current Password",
-                          style: TextStyle(
+                        Text(
+                          "Current Password".tr(),
+                          style: const TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w600,
                             color: Color(0xFF64748B),
@@ -211,7 +212,7 @@ class _WebChangePassword extends StatelessWidget {
                         const SizedBox(height: 8),
                         CustomInputField(
                           maxLines: 1,
-                          hintText: "Enter current password",
+                          hintText: "Enter current password".tr(),
                           leadingIcon: SvgWrapper(assetPath: ImagePaths.key),
                           isPassword: true,
                           bgColor: const Color(0xFFF8FAFC),
@@ -227,9 +228,9 @@ class _WebChangePassword extends StatelessWidget {
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
-                          "New Password",
-                          style: TextStyle(
+                        Text(
+                          "New Password".tr(),
+                          style: const TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w600,
                             color: Color(0xFF64748B),
@@ -238,7 +239,7 @@ class _WebChangePassword extends StatelessWidget {
                         const SizedBox(height: 8),
                         CustomInputField(
                           maxLines: 1,
-                          hintText: "Enter new password",
+                          hintText: "Enter new password".tr(),
                           leadingIcon: SvgWrapper(assetPath: ImagePaths.key),
                           isPassword: true,
                           bgColor: const Color(0xFFF8FAFC),
@@ -254,9 +255,9 @@ class _WebChangePassword extends StatelessWidget {
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
-                          "Confirm Password",
-                          style: TextStyle(
+                        Text(
+                          "Confirm Password".tr(),
+                          style: const TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w600,
                             color: Color(0xFF64748B),
@@ -265,7 +266,7 @@ class _WebChangePassword extends StatelessWidget {
                         const SizedBox(height: 8),
                         CustomInputField(
                           maxLines: 1,
-                          hintText: "Confirm your password",
+                          hintText: "Confirm your password".tr(),
                           leadingIcon: SvgWrapper(assetPath: ImagePaths.key),
                           isPassword: true,
                           bgColor: const Color(0xFFF8FAFC),
@@ -293,9 +294,9 @@ class _WebChangePassword extends StatelessWidget {
                         onPressed: () {
                           _showSuccessModal(context);
                         },
-                        child: const Text(
-                          "Confirm Changes",
-                          style: TextStyle(
+                        child: Text(
+                          "Confirm Changes".tr(),
+                          style: const TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.w600,
                             fontFamily: "Gilroy-SemiBold",
@@ -345,7 +346,7 @@ void _showSuccessModal(BuildContext context) {
               ),
               const SizedBox(height: 24),
               Text(
-                "Password Changed",
+                "Password Changed".tr(),
                 style: TextStyle(
                   fontSize: isWeb ? 22 : 18,
                   fontWeight: FontWeight.w700,
@@ -355,7 +356,7 @@ void _showSuccessModal(BuildContext context) {
               ),
               const SizedBox(height: 8),
               Text(
-                "You've successfully changed your password",
+                "You've successfully changed your password".tr(),
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: isWeb ? 15 : 13,
@@ -376,9 +377,9 @@ void _showSuccessModal(BuildContext context) {
                   onPressed: () {
                     Navigator.of(ctx).pop();
                   },
-                  child: const Text(
-                    "Go Back",
-                    style: TextStyle(
+                  child: Text(
+                    "Go Back".tr(),
+                    style: const TextStyle(
                       color: Colors.white,
                       fontSize: 16,
                       fontWeight: FontWeight.w600,

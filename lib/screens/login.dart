@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -693,7 +694,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
 
                         // Welcome Text
                         Text(
-                          isLogin ? "Welcome Back!" : "Create Your Account",
+                          isLogin ? "Welcome Back!".tr() : "Create Your Account".tr(),
                           style: const TextStyle(
                             fontSize: 28,
                             fontWeight: FontWeight.w900,
@@ -705,8 +706,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                         const SizedBox(height: 8),
                         Text(
                           isLogin
-                              ? "Access your health dashboard securely"
-                              : "Join iCare for a better healthcare experience",
+                              ? "Access your health dashboard securely".tr()
+                              : "Join iCare for a better healthcare experience".tr(),
                           style: TextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.w500,
@@ -724,8 +725,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                               // Username field (always shown)
                               CustomInputField(
                                 hintText: isLogin
-                                    ? "Username or Email"
-                                    : "Full Name",
+                                    ? "Username or Email".tr()
+                                    : "Full Name".tr(),
                                 leadingIcon: const Icon(
                                   Icons.person_outline_rounded,
                                   color: Color(0xFF94A3B8),
@@ -746,7 +747,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                               if (!isLogin) ...[
                                 const SizedBox(height: 16),
                                 CustomInputField(
-                                  hintText: "Email Address",
+                                  hintText: "Email Address".tr(),
                                   leadingIcon: const Icon(
                                     Icons.email_outlined,
                                     color: Color(0xFF94A3B8),
@@ -766,7 +767,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                                 ),
                                 const SizedBox(height: 16),
                                 CustomInputField(
-                                  hintText: "Phone Number",
+                                  hintText: "Phone Number".tr(),
                                   leadingIcon: const Icon(
                                     Icons.phone_outlined,
                                     color: Color(0xFF94A3B8),
@@ -788,7 +789,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                               const SizedBox(height: 16),
 
                               CustomInputField(
-                                hintText: "Password",
+                                hintText: "Password".tr(),
                                 leadingIcon: const Icon(
                                   Icons.lock_outline_rounded,
                                   color: Color(0xFF94A3B8),
@@ -815,7 +816,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                                 const SizedBox(height: 16),
                                 CustomInputField(
                                   controller: confirmPasswordController,
-                                  hintText: "Confirm Password",
+                                  hintText: "Confirm Password".tr(),
                                   leadingIcon: const Icon(
                                     Icons.lock_outline_rounded,
                                     color: Color(0xFF94A3B8),
@@ -940,8 +941,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                                           ),
                                         ),
                                         const SizedBox(width: 8),
-                                        const Text(
-                                          "Remember me",
+                                        Text(
+                                          "Remember me".tr(),
                                           style: TextStyle(
                                             fontSize: 13,
                                             fontWeight: FontWeight.w500,
@@ -965,8 +966,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                                         tapTargetSize:
                                             MaterialTapTargetSize.shrinkWrap,
                                       ),
-                                      child: const Text(
-                                        "Forgot Password?",
+                                      child: Text(
+                                        "Forgot Password?".tr(),
                                         style: TextStyle(
                                           color: AppColors.primaryColor,
                                           fontWeight: FontWeight.w600,
@@ -1007,8 +1008,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                                         )
                                       : Text(
                                           isLogin
-                                              ? "Sign In"
-                                              : "Create Account",
+                                              ? "Sign In".tr()
+                                              : "Create Account".tr(),
                                           style: const TextStyle(
                                             color: Colors.white,
                                             fontSize: 16,
@@ -1034,7 +1035,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                                         horizontal: 16,
                                       ),
                                       child: Text(
-                                        "Or continue with",
+                                        "Or continue with".tr(),
                                         style: TextStyle(
                                           color: Colors.grey[500],
                                           fontSize: 13,
@@ -1254,7 +1255,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                           if (!isLogin) SizedBox(height: 5),
                           if (!isLogin)
                             CustomInputField(
-                              hintText: "Email Address",
+                              hintText: "Email Address".tr(),
                               leadingIcon: Icon(
                                 Icons.email_outlined,
                                 color: AppColors.primary500,
@@ -1274,7 +1275,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                           if (!isLogin) SizedBox(height: 5),
                           if (!isLogin)
                             CustomInputField(
-                              hintText: "Phone Number",
+                              hintText: "Phone Number".tr(),
                               leadingIcon: Icon(
                                 Icons.phone_outlined,
                                 color: AppColors.primary500,
@@ -1314,7 +1315,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                           SizedBox(height: 5),
 
                           CustomInputField(
-                            hintText: "Enter Your Password",
+                            hintText: "Enter Your Password".tr(),
                             leadingIcon: Icon(
                               Icons.key,
                               color: AppColors.primary500,
@@ -1340,7 +1341,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                             SizedBox(height: 5),
                             CustomInputField(
                               controller: confirmPasswordController,
-                              hintText: "Confirm Password",
+                              hintText: "Confirm Password".tr(),
                               leadingIcon: Icon(
                                 Icons.key,
                                 color: AppColors.primary500,
@@ -1458,7 +1459,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                                       ),
                                     ),
                                     CustomText(
-                                      text: "Remember me",
+                                      text: "Remember me".tr(),
                                       fontSize: isTablet ? 12 : 15,
                                       color: isTablet
                                           ? AppColors.white
@@ -1513,7 +1514,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                                       ),
                                     )
                                   : Text(
-                                      isLogin ? "Sign In" : "Sign Up",
+                                      isLogin ? "Sign In".tr() : "Sign Up".tr(),
                                       style: const TextStyle(
                                         color: Colors.white,
                                         fontSize: 16,
@@ -1610,7 +1611,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     return Column(
       children: [
         const SizedBox(height: 25),
-        const Text("Or Continue With", style: TextStyle(color: Colors.grey)),
+        Text("Or Continue With".tr(), style: const TextStyle(color: Colors.grey)),
         const SizedBox(height: 15),
         _socialButton(ImagePaths.google_icon, "Google"),
         // Biometric / Face Unlock sign-in button — show whenever hardware is available
@@ -1781,9 +1782,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     // Terms & Conditions check for signup
     if (!isLogin && !agreedToTerms) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please agree to the Terms & Conditions to continue.'),
-          backgroundColor: Color(0xFFEF4444),
+        SnackBar(
+          content: Text('Please agree to the Terms & Conditions to continue.'.tr()),
+          backgroundColor: const Color(0xFFEF4444),
         ),
       );
       return;

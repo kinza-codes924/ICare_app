@@ -1,4 +1,5 @@
-﻿import 'package:flutter/material.dart';
+﻿import 'package:easy_localization/easy_localization.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:icare/providers/auth_provider.dart';
 import 'package:icare/services/consultation_service.dart';
@@ -168,9 +169,9 @@ class _PatientPrescriptionsState extends ConsumerState<PatientPrescriptions> {
         backgroundColor: Colors.white,
         elevation: 0,
         leading: const CustomBackButton(),
-        title: const Text(
-          'My Prescriptions',
-          style: TextStyle(
+        title: Text(
+          'My Prescriptions'.tr(),
+          style: const TextStyle(
             fontSize: 18,
             fontFamily: 'Gilroy-Bold',
             fontWeight: FontWeight.w900,
@@ -277,8 +278,8 @@ class _PatientPrescriptionsState extends ConsumerState<PatientPrescriptions> {
                                       size: 64,
                                       color: Colors.grey.shade300),
                                   const SizedBox(height: 16),
-                                  const Text('No prescriptions yet',
-                                      style: TextStyle(
+                                                  Text('No prescriptions yet'.tr(),
+                                      style: const TextStyle(
                                           fontSize: 15,
                                           color: Color(0xFF64748B))),
                                 ],
@@ -419,17 +420,17 @@ class _PatientPrescriptionsState extends ConsumerState<PatientPrescriptions> {
                           color: Color(0xFF3B82F6), size: 24),
                     ),
                     const SizedBox(width: 12),
-                    const Expanded(
+                    Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('Prescribed Medicines',
-                              style: TextStyle(
+                          Text('Prescribed Medicines'.tr(),
+                              style: const TextStyle(
                                   fontSize: 18,
                                   fontWeight: FontWeight.w900,
                                   color: Color(0xFF0F172A))),
-                          Text('Tap "Find Pharmacies" to order',
-                              style: TextStyle(
+                          Text('Tap "Find Pharmacies" to order'.tr(),
+                              style: const TextStyle(
                                   fontSize: 13, color: Color(0xFF64748B))),
                         ],
                       ),
@@ -459,8 +460,8 @@ class _PatientPrescriptionsState extends ConsumerState<PatientPrescriptions> {
                       _showFindPharmacies(context, medicines);
                     },
                     icon: const Icon(Icons.local_pharmacy_rounded),
-                    label: const Text('Find Pharmacies',
-                        style: TextStyle(
+                    label: Text('Find Pharmacies'.tr(),
+                        style: const TextStyle(
                             fontSize: 15, fontWeight: FontWeight.w800)),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF3B82F6),
@@ -517,17 +518,17 @@ class _PatientPrescriptionsState extends ConsumerState<PatientPrescriptions> {
                           color: Color(0xFF8B5CF6), size: 24),
                     ),
                     const SizedBox(width: 12),
-                    const Expanded(
+                    Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('Ordered Lab Tests',
-                              style: TextStyle(
+                          Text('Ordered Lab Tests'.tr(),
+                              style: const TextStyle(
                                   fontSize: 18,
                                   fontWeight: FontWeight.w900,
                                   color: Color(0xFF0F172A))),
-                          Text('Tap "Find Labs" to book',
-                              style: TextStyle(
+                          Text('Tap "Find Labs" to book'.tr(),
+                              style: const TextStyle(
                                   fontSize: 13, color: Color(0xFF64748B))),
                         ],
                       ),
@@ -556,8 +557,8 @@ class _PatientPrescriptionsState extends ConsumerState<PatientPrescriptions> {
                       _showFindLabs(context, labTests);
                     },
                     icon: const Icon(Icons.science_rounded),
-                    label: const Text('Find Labs',
-                        style: TextStyle(
+                    label: Text('Find Labs'.tr(),
+                        style: const TextStyle(
                             fontSize: 15, fontWeight: FontWeight.w800)),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF8B5CF6),
@@ -1075,14 +1076,14 @@ class _PrescriptionPage extends StatelessWidget {
                 Expanded(child: OutlinedButton.icon(
                   onPressed: () => _printPrescription(context),
                   icon: const Icon(Icons.print_rounded, size: 16),
-                  label: const Text('Print / Download', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+                  label: Text('Print / Download'.tr(), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
                   style: OutlinedButton.styleFrom(foregroundColor: const Color(0xFF0036BC), side: const BorderSide(color: Color(0xFF0036BC)), padding: const EdgeInsets.symmetric(vertical: 10), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
                 )),
                 const SizedBox(width: 8),
                 OutlinedButton.icon(
                   onPressed: () => _shareText(context),
                   icon: const Icon(Icons.share_rounded, size: 16),
-                  label: const Text('Share', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+                  label: Text('Share'.tr(), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
                   style: OutlinedButton.styleFrom(foregroundColor: const Color(0xFF10B981), side: const BorderSide(color: Color(0xFF10B981)), padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
                 ),
               ]),
@@ -1115,7 +1116,7 @@ class _PrescriptionPage extends StatelessWidget {
                   if (medicines.isNotEmpty) Expanded(child: ElevatedButton.icon(
                     onPressed: isWithin30Days ? onFindPharmacies : null,
                     icon: const Icon(Icons.local_pharmacy_rounded, size: 15),
-                    label: const Text('Order Medicines', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12)),
+                    label: Text('Order Medicines'.tr(), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12)),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF0036BC),
                       foregroundColor: Colors.white,
@@ -1130,7 +1131,7 @@ class _PrescriptionPage extends StatelessWidget {
                   if (labTests.isNotEmpty) Expanded(child: ElevatedButton.icon(
                     onPressed: isWithin30Days ? onFindLabs : null,
                     icon: const Icon(Icons.science_rounded, size: 15),
-                    label: const Text('Order Lab Tests', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12)),
+                    label: Text('Order Lab Tests'.tr(), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12)),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF10B981),
                       foregroundColor: Colors.white,

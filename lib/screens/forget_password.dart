@@ -1,3 +1,4 @@
+﻿import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_size_matters/flutter_size_matters.dart';
 import 'package:icare/screens/verify_code.dart';
@@ -147,9 +148,9 @@ class _ForgetPasswordState extends State<ForgetPassword> {
                         ),
                         const SizedBox(height: 24),
                         // Header
-                        const Text(
-                          "Forgot Password?",
-                          style: TextStyle(
+                        Text(
+                          "Forgot Password?".tr(),
+                          style: const TextStyle(
                             fontSize: 26,
                             fontWeight: FontWeight.w800,
                             color: Color(0xFF0B2D6E),
@@ -158,7 +159,7 @@ class _ForgetPasswordState extends State<ForgetPassword> {
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          "Enter your email or phone to receive a verification code",
+                          "Enter your email or phone to receive a verification code".tr(),
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             fontSize: 14,
@@ -175,7 +176,7 @@ class _ForgetPasswordState extends State<ForgetPassword> {
                           child: Column(
                             children: [
                               CustomInputField(
-                                hintText: "Email or Phone Number",
+                                hintText: "Email or Phone Number".tr(),
                                 leadingIcon: const Icon(
                                   Icons.mail_outline_rounded,
                                   color: Color(0xFF94A3B8),
@@ -188,7 +189,7 @@ class _ForgetPasswordState extends State<ForgetPassword> {
                                 borderWidth: 1.5,
                                 validator: (val) {
                                   if (val == null || val.isEmpty) {
-                                    return "This field is required";
+                                    return "This field is required".tr();
                                   }
                                   return null;
                                 },
@@ -221,9 +222,9 @@ class _ForgetPasswordState extends State<ForgetPassword> {
                                             strokeWidth: 2,
                                           ),
                                         )
-                                      : const Text(
-                                          "Send Verification Code",
-                                          style: TextStyle(
+                                      : Text(
+                                          "Send Verification Code".tr(),
+                                          style: const TextStyle(
                                             color: Colors.white,
                                             fontSize: 16,
                                             fontWeight: FontWeight.w700,
@@ -236,9 +237,9 @@ class _ForgetPasswordState extends State<ForgetPassword> {
                               // Back to Login link for those who don't see the top button
                               TextButton(
                                 onPressed: () => Navigator.pop(context),
-                                child: const Text(
-                                  "Back to Login",
-                                  style: TextStyle(
+                                child: Text(
+                                  "Back to Login".tr(),
+                                  style: const TextStyle(
                                     color: Color(0xFF64748B),
                                     fontWeight: FontWeight.w600,
                                     fontSize: 14,
@@ -360,7 +361,7 @@ class _ForgetPasswordState extends State<ForgetPassword> {
             children: [
               SizedBox(height: ScallingConfig.moderateScale(30)),
               CustomText(
-                text: "Forget Password",
+                text: "Forget Password".tr(),
                 fontWeight: FontWeight.w900,
                 textAlign: TextAlign.center,
                 fontSize: 22,
@@ -371,7 +372,7 @@ class _ForgetPasswordState extends State<ForgetPassword> {
                 maxLines: 2,
                 textAlign: TextAlign.center,
                 text:
-                    "Please enter your email or phone number to reset password",
+                    "Please enter your email or phone number to reset password".tr(),
                 fontSize: 13,
                 width: Utils.windowHeight(context) * 0.4,
                 color: AppColors.themeBlack,
@@ -409,7 +410,7 @@ class _ForgetPasswordState extends State<ForgetPassword> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     CustomInputField(
-                      hintText: "Email or Phone Number",
+                      hintText: "Email or Phone Number".tr(),
                       leadingIcon: Icon(
                         Icons.person_outline,
                         color: AppColors.primary500,
@@ -421,7 +422,7 @@ class _ForgetPasswordState extends State<ForgetPassword> {
                       borderWidth: 2,
                       validator: (val) {
                         if (val == null || val.isEmpty) {
-                          return "Please enter your username";
+                          return "Please enter your username".tr();
                         }
                         return null;
                       },
@@ -451,9 +452,9 @@ class _ForgetPasswordState extends State<ForgetPassword> {
                                   strokeWidth: 2,
                                 ),
                               )
-                            : const Text(
-                                "Send",
-                                style: TextStyle(
+                            : Text(
+                                "Send".tr(),
+                                style: const TextStyle(
                                   color: Colors.white,
                                   fontSize: 16,
                                 ),
@@ -464,9 +465,9 @@ class _ForgetPasswordState extends State<ForgetPassword> {
                     Center(
                       child: TextButton(
                         onPressed: () => Navigator.pop(context),
-                        child: const Text(
-                          "Back to Login",
-                          style: TextStyle(
+                        child: Text(
+                          "Back to Login".tr(),
+                          style: const TextStyle(
                             color: AppColors.primaryColor,
                             fontWeight: FontWeight.w500,
                           ),

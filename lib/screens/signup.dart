@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -104,7 +105,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
   void _submit() async {
     if (!_formKey.currentState!.validate()) return;
     if (!_agreedToTerms) {
-      _showError('Please agree to the Terms & Conditions to continue.');
+      _showError('Please agree to the Terms & Conditions to continue.'.tr());
       return;
     }
     setState(() => _isLoading = true);
@@ -192,10 +193,10 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         icon: const Icon(Icons.check_circle_rounded, color: Color(0xFF10B981), size: 52),
-        title: const Text(
-          'Application Submitted',
+        title: Text(
+          'Application Submitted'.tr(),
           textAlign: TextAlign.center,
-          style: TextStyle(fontWeight: FontWeight.w800, fontFamily: 'Gilroy-Bold'),
+          style: const TextStyle(fontWeight: FontWeight.w800, fontFamily: 'Gilroy-Bold'),
         ),
         content: Text(
           'Your ${widget.role} application has been submitted for admin review. You will be notified once approved.',
@@ -215,7 +216,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
               elevation: 0,
             ),
-            child: const Text('OK', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+            child: Text('OK'.tr(), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
           ),
         ],
       ),
@@ -308,11 +309,11 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _strengthRow('At least 8 characters', _hasMinLength),
-          _strengthRow('One uppercase letter (A–Z)', _hasUppercase),
-          _strengthRow('One lowercase letter (a–z)', _hasLowercase),
-          _strengthRow('One number (0–9)', _hasDigit),
-          _strengthRow('One special character (!@#\$...)', _hasSpecial),
+          _strengthRow('At least 8 characters'.tr(), _hasMinLength),
+          _strengthRow('One uppercase letter (A–Z)'.tr(), _hasUppercase),
+          _strengthRow('One lowercase letter (a–z)'.tr(), _hasLowercase),
+          _strengthRow('One number (0–9)'.tr(), _hasDigit),
+          _strengthRow('One special character (!@#\$...)'.tr(), _hasSpecial),
         ],
       ),
     );
@@ -343,11 +344,11 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Padding(
-            padding: EdgeInsets.only(left: 2, bottom: 8),
+          Padding(
+            padding: const EdgeInsets.only(left: 2, bottom: 8),
             child: Text(
-              'Gender',
-              style: TextStyle(fontSize: 13, fontFamily: 'Gilroy-Medium', color: Color(0xFF64748B)),
+              'Gender'.tr(),
+              style: const TextStyle(fontSize: 13, fontFamily: 'Gilroy-Medium', color: Color(0xFF64748B)),
             ),
           ),
           Row(
@@ -422,7 +423,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
               Text(
                 _dob != null
                     ? '${_dob!.day}/${_dob!.month}/${_dob!.year}'
-                    : 'Date of Birth',
+                    : 'Date of Birth'.tr(),
                 style: TextStyle(
                   fontSize: 15,
                   fontFamily: 'Gilroy-Medium',
@@ -443,7 +444,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
     return [
       _field(
         controller: _fullName,
-        label: 'Full Name',
+        label: 'Full Name'.tr(),
         icon: Icons.person_outline_rounded,
         autofillHints: const [AutofillHints.name],
       ),
@@ -457,7 +458,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
         ),
       _field(
         controller: _email,
-        label: 'Email Address',
+        label: 'Email Address'.tr(),
         icon: Icons.email_outlined,
         keyboard: TextInputType.emailAddress,
         autofillHints: const [AutofillHints.email],
@@ -469,7 +470,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
       ),
       _field(
         controller: _phone,
-        label: 'Phone Number',
+        label: 'Phone Number'.tr(),
         icon: Icons.phone_outlined,
         keyboard: TextInputType.phone,
         autofillHints: const [AutofillHints.telephoneNumber],
@@ -486,7 +487,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
       ],
       _field(
         controller: _password,
-        label: 'Password',
+        label: 'Password'.tr(),
         icon: Icons.lock_outline_rounded,
         obscure: _obscurePass,
         autofillHints: const [AutofillHints.newPassword],
@@ -500,7 +501,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
       _buildPasswordStrength(),
       _field(
         controller: _confirmPassword,
-        label: 'Confirm Password',
+        label: 'Confirm Password'.tr(),
         icon: Icons.lock_outline_rounded,
         obscure: _obscureConfirm,
         autofillHints: const [AutofillHints.newPassword],
@@ -532,11 +533,11 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
             Expanded(
               child: RichText(
                 text: TextSpan(
-                  text: 'I agree to the ',
+                  text: 'I agree to the '.tr(),
                   style: const TextStyle(color: Color(0xFF64748B), fontSize: 13, fontFamily: 'Gilroy-Medium'),
                   children: [
                     TextSpan(
-                      text: 'Terms & Conditions',
+                      text: 'Terms & Conditions'.tr(),
                       style: TextStyle(color: AppColors.primaryColor, fontWeight: FontWeight.w700, fontFamily: 'Gilroy-Bold'),
                     ),
                     const TextSpan(text: ' and '),
@@ -572,7 +573,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                   child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
                 )
               : Text(
-                  _isPatient ? 'Create Account' : 'Create Account',
+                  'Create Account'.tr(),
                   style: const TextStyle(
                     color: Colors.white, fontSize: 16,
                     fontWeight: FontWeight.w700, fontFamily: 'Gilroy-Bold',
@@ -586,11 +587,11 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
           onTap: () => context.go('/login'),
           child: RichText(
             text: TextSpan(
-              text: 'Already have an account? ',
+              text: 'Already have an account? '.tr(),
               style: const TextStyle(color: Color(0xFF64748B), fontSize: 14, fontFamily: 'Gilroy-Medium'),
               children: [
                 TextSpan(
-                  text: 'Sign In',
+                  text: 'Sign In'.tr(),
                   style: TextStyle(color: AppColors.primaryColor, fontWeight: FontWeight.w700, fontFamily: 'Gilroy-Bold'),
                 ),
               ],

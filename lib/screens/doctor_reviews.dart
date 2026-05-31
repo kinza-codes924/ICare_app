@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -67,9 +68,9 @@ class _DoctorReviewsState extends ConsumerState<DoctorReviews> {
         backgroundColor: Colors.white,
         elevation: 0,
         leading: const CustomBackButton(),
-        title: const Text(
-          'Patient Reviews',
-          style: TextStyle(
+        title: Text(
+          'Patient Reviews'.tr(),
+          style: const TextStyle(
             fontSize: 18,
             fontFamily: 'Gilroy-Bold',
             fontWeight: FontWeight.w900,
@@ -124,9 +125,9 @@ class _DoctorReviewsState extends ConsumerState<DoctorReviews> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'Overall Rating',
-                  style: TextStyle(
+                Text(
+                  'Overall Rating'.tr(),
+                  style: const TextStyle(
                     fontSize: 14,
                     color: Colors.white70,
                     fontWeight: FontWeight.w600,
@@ -177,7 +178,7 @@ class _DoctorReviewsState extends ConsumerState<DoctorReviews> {
                 ),
                 const SizedBox(height: 12),
                 Text(
-                  'Based on ${_items.length} reviews',
+                  '${'Based on'.tr()} ${_items.length} ${'reviews'.tr()}',
                   style: const TextStyle(fontSize: 13, color: Colors.white70),
                 ),
               ],
@@ -220,9 +221,9 @@ class _DoctorReviewsState extends ConsumerState<DoctorReviews> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Rating Distribution',
-            style: TextStyle(
+          Text(
+            'Rating Distribution'.tr(),
+            style: const TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.w900,
               color: Color(0xFF0F172A),
@@ -312,9 +313,9 @@ class _DoctorReviewsState extends ConsumerState<DoctorReviews> {
                 color: Colors.grey.shade300,
               ),
               const SizedBox(height: 16),
-              const Text(
-                'No reviews yet',
-                style: TextStyle(fontSize: 15, color: Color(0xFF64748B)),
+              Text(
+                'No reviews yet'.tr(),
+                style: const TextStyle(fontSize: 15, color: Color(0xFF64748B)),
               ),
             ],
           ),
@@ -325,9 +326,9 @@ class _DoctorReviewsState extends ConsumerState<DoctorReviews> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'All reviews (patient-wise)',
-          style: TextStyle(
+        Text(
+          'All reviews (patient-wise)'.tr(),
+          style: const TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.w900,
             color: Color(0xFF0F172A),

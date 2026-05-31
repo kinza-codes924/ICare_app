@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_size_matters/flutter_size_matters.dart';
 import 'package:icare/screens/cancellation_reason.dart';
@@ -24,7 +25,7 @@ class ManageOrders extends StatelessWidget {
         leading: const CustomBackButton(),
         automaticallyImplyLeading: false,
         title: CustomText(
-          text: 'Manage Orders',
+          text: 'Manage Orders'.tr(),
           fontFamily: "Gilroy-Bold",
           fontSize: 16.78,
           fontWeight: FontWeight.bold,

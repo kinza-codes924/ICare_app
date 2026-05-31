@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_size_matters/flutter_size_matters.dart';
 import 'package:icare/screens/login.dart';
@@ -145,9 +146,9 @@ class _ResetPasswordState extends State<ResetPassword> {
                         ),
                         const SizedBox(height: 24),
                         // Header
-                        const Text(
-                          "Reset Password",
-                          style: TextStyle(
+                        Text(
+                          "Reset Password".tr(),
+                          style: const TextStyle(
                             fontSize: 26,
                             fontWeight: FontWeight.w800,
                             color: Color(0xFF0B2D6E),
@@ -156,7 +157,7 @@ class _ResetPasswordState extends State<ResetPassword> {
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          "Set a new password to keep your account secure",
+                          "Set a new password to keep your account secure".tr(),
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             fontSize: 14,
@@ -173,7 +174,7 @@ class _ResetPasswordState extends State<ResetPassword> {
                           child: Column(
                             children: [
                               CustomInputField(
-                                hintText: "New Password",
+                                hintText: "New Password".tr(),
                                 leadingIcon: const Icon(
                                   Icons.lock_outline_rounded,
                                   color: Color(0xFF94A3B8),
@@ -194,7 +195,7 @@ class _ResetPasswordState extends State<ResetPassword> {
                               ),
                               const SizedBox(height: 20),
                               CustomInputField(
-                                hintText: "Confirm Password",
+                                hintText: "Confirm Password".tr(),
                                 leadingIcon: const Icon(
                                   Icons.lock_reset_rounded,
                                   color: Color(0xFF94A3B8),
@@ -241,9 +242,9 @@ class _ResetPasswordState extends State<ResetPassword> {
                                             strokeWidth: 2,
                                           ),
                                         )
-                                      : const Text(
-                                          "Save Password",
-                                          style: TextStyle(
+                                      : Text(
+                                          "Save Password".tr(),
+                                          style: const TextStyle(
                                             color: Colors.white,
                                             fontSize: 16,
                                             fontWeight: FontWeight.w700,
@@ -368,7 +369,7 @@ class _ResetPasswordState extends State<ResetPassword> {
                   height: ScallingConfig.moderateScale(isTablet ? 5 : 30),
                 ),
                 CustomText(
-                  text: "Reset Password",
+                  text: "Reset Password".tr(),
                   fontWeight: FontWeight.bold,
                   maxLines: 2,
                   textAlign: isTablet
@@ -390,7 +391,7 @@ class _ResetPasswordState extends State<ResetPassword> {
                 CustomText(
                   maxLines: 2,
                   text:
-                      "Forgot Password To Enjoy The Best Doctor Consultation Experience",
+                      "Forgot Password To Enjoy The Best Doctor Consultation Experience".tr(),
                   fontSize: 13,
                   textAlign: isTablet ? TextAlign.center : TextAlign.start,
                   width: isTablet
@@ -496,9 +497,9 @@ class _ResetPasswordState extends State<ResetPassword> {
                                         strokeWidth: 2,
                                       ),
                                     )
-                                  : const Text(
-                                      "Confirm",
-                                      style: TextStyle(
+                                  : Text(
+                                      "Confirm".tr(),
+                                      style: const TextStyle(
                                         color: Colors.white,
                                         fontSize: 16,
                                       ),
@@ -568,9 +569,9 @@ class _ResetPasswordState extends State<ResetPassword> {
                   ),
                 ),
                 const SizedBox(height: 28),
-                const Text(
-                  "Password Changed!",
-                  style: TextStyle(
+                Text(
+                  "Password Changed!".tr(),
+                  style: const TextStyle(
                     fontSize: 24,
                     fontWeight: FontWeight.w800,
                     color: Color(0xFF0B2D6E),
@@ -578,10 +579,10 @@ class _ResetPasswordState extends State<ResetPassword> {
                   ),
                 ),
                 const SizedBox(height: 12),
-                const Text(
-                  "Your password has been successfully updated. You can now log in with your new credentials.",
+                Text(
+                  "Your password has been successfully updated. You can now log in with your new credentials.".tr(),
                   textAlign: TextAlign.center,
-                  style: TextStyle(
+                  style: const TextStyle(
                     fontSize: 14,
                     color: Color(0xFF64748B),
                     fontFamily: "Gilroy-Medium",
@@ -610,9 +611,9 @@ class _ResetPasswordState extends State<ResetPassword> {
                         (route) => false,
                       );
                     },
-                    child: const Text(
-                      "Back to Login",
-                      style: TextStyle(
+                    child: Text(
+                      "Back to Login".tr(),
+                      style: const TextStyle(
                         color: Colors.white,
                         fontSize: 16,
                         fontWeight: FontWeight.w700,

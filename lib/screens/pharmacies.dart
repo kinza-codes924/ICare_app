@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math' as math;
 import '../utils/js_stub.dart'
     if (dart.library.html) 'dart:js' as js;
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:icare/services/pharmacy_service.dart';
 import 'package:icare/screens/pharmacy_details.dart';
@@ -245,7 +246,7 @@ class _PharmaciesScreenState extends State<PharmaciesScreen> {
         elevation: 0,
         centerTitle: true,
         title: CustomText(
-          text: "Pharmacies",
+          text: "Pharmacies".tr(),
           fontFamily: "Gilroy-Bold",
           fontSize: 18,
           fontWeight: FontWeight.w900,
@@ -282,14 +283,14 @@ class _PharmaciesScreenState extends State<PharmaciesScreen> {
                               // Mode toggle chips
                               Row(
                                 children: [
-                                  _modeChip('all', Icons.list_rounded, 'All'),
+                                  _modeChip('all', Icons.list_rounded, 'All'.tr()),
                                   const SizedBox(width: 8),
-                                  _modeChip('nearest', Icons.near_me_rounded, 'Nearest'),
+                                  _modeChip('nearest', Icons.near_me_rounded, 'Nearest'.tr()),
                                   const SizedBox(width: 8),
                                   _modeChip(
                                     'search_location',
                                     Icons.location_searching_rounded,
-                                    'Search by Location',
+                                    'Search by Location'.tr(),
                                   ),
                                 ],
                               ),
@@ -298,7 +299,7 @@ class _PharmaciesScreenState extends State<PharmaciesScreen> {
                               if (_viewMode == 'all') ...[
                                 CustomInputField(
                                   width: double.infinity,
-                                  hintText: "Search pharmacies or medicines...",
+                                  hintText: "Search pharmacies or medicines...".tr(),
                                   controller: _searchController,
                                   focusNode: _searchFocus,
                                   onChanged: (v) {
@@ -317,7 +318,7 @@ class _PharmaciesScreenState extends State<PharmaciesScreen> {
                               if (_viewMode == 'search_location')
                                 CustomInputField(
                                   width: double.infinity,
-                                  hintText: "Enter area, city or address...",
+                                  hintText: "Enter area, city or address...".tr(),
                                   controller: _locationController,
                                   onChanged: _filterByLocation,
                                   leadingIcon: const Icon(
@@ -397,7 +398,7 @@ class _PharmaciesScreenState extends State<PharmaciesScreen> {
                                     ],
                                     CustomText(
                                       text:
-                                          "Available Pharmacies (${_filteredPharmacies.length})",
+                                          "${'Available Pharmacies'.tr()} (${_filteredPharmacies.length})",
                                       fontSize: 18,
                                       fontWeight: FontWeight.w900,
                                       color: const Color(0xFF0F172A),
@@ -542,7 +543,7 @@ class _PharmaciesScreenState extends State<PharmaciesScreen> {
           Icon(Icons.local_pharmacy_outlined, size: 64, color: Colors.grey[300]),
           const SizedBox(height: 16),
           Text(
-            "No pharmacies found",
+            "No pharmacies found".tr(),
             style: TextStyle(
               color: Colors.grey[600],
               fontSize: 16,
@@ -552,7 +553,7 @@ class _PharmaciesScreenState extends State<PharmaciesScreen> {
           if (_viewMode == 'search_location') ...[
             const SizedBox(height: 8),
             Text(
-              "Try a different area or city name",
+              "Try a different area or city name".tr(),
               style: TextStyle(color: Colors.grey[400], fontSize: 13),
             ),
           ],
@@ -563,10 +564,10 @@ class _PharmaciesScreenState extends State<PharmaciesScreen> {
 
   Widget _buildCategories(bool isDesktop) {
     final categories = [
-      {"name": "Baby Care", "icon": Icons.child_care_rounded, "color": const Color(0xFFF472B6)},
-      {"name": "Skin Care", "icon": Icons.face_rounded, "color": const Color(0xFF60A5FA)},
-      {"name": "Vitamins", "icon": Icons.auto_awesome_rounded, "color": const Color(0xFFFBBF24)},
-      {"name": "Pain Relief", "icon": Icons.healing_rounded, "color": const Color(0xFF34D399)},
+      {"name": "Baby Care".tr(), "icon": Icons.child_care_rounded, "color": const Color(0xFFF472B6)},
+      {"name": "Skin Care".tr(), "icon": Icons.face_rounded, "color": const Color(0xFF60A5FA)},
+      {"name": "Vitamins".tr(), "icon": Icons.auto_awesome_rounded, "color": const Color(0xFFFBBF24)},
+      {"name": "Pain Relief".tr(), "icon": Icons.healing_rounded, "color": const Color(0xFF34D399)},
     ];
 
     return Wrap(

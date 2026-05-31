@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_size_matters/flutter_size_matters.dart';
@@ -66,7 +67,7 @@ class NotificationSettings extends ConsumerWidget {
         automaticallyImplyLeading: false,
         leading: CustomBackButton(),
         title: CustomText(
-          text: "Notification Settings",
+          text: "Notification Settings".tr(),
           fontSize: 16.78,
           fontFamily: "Gilroy-Bold",
           color: AppColors.primary500,
@@ -103,7 +104,7 @@ class NotificationSettings extends ConsumerWidget {
                             children: [
                               Expanded(
                                 child: CustomText(
-                                  text: item["title"],
+                                  text: (item["title"] as String).tr(),
                                   fontWeight: FontWeight.bold,
                                   fontSize: 14,
                                   color: AppColors.primary500,
@@ -154,7 +155,7 @@ class NotificationSettings extends ConsumerWidget {
               CustomButton(
                 borderRadius: 30,
                 onPressed: () {},
-                label: "Delete Account",
+                label: "Delete Account".tr(),
               ),
           ],
         ),
@@ -327,7 +328,7 @@ class _WebNotificationSettingsScreenState
         automaticallyImplyLeading: false,
         leading: CustomBackButton(),
         title: CustomText(
-          text: "Notification Settings",
+          text: "Notification Settings".tr(),
           fontFamily: "Gilroy-Bold",
           fontSize: 20,
           color: AppColors.primaryColor,
@@ -364,9 +365,9 @@ class _WebNotificationSettingsScreenState
                           ),
                         ),
                         const SizedBox(height: 24),
-                        const Text(
-                          "Push & Email Alerts",
-                          style: TextStyle(
+                        Text(
+                          "Push & Email Alerts".tr(),
+                          style: const TextStyle(
                             fontSize: 24,
                             fontWeight: FontWeight.w700,
                             fontFamily: "Gilroy-Bold",
@@ -374,8 +375,8 @@ class _WebNotificationSettingsScreenState
                           ),
                         ),
                         const SizedBox(height: 12),
-                        const Text(
-                          "Control exactly what alerts you want to receive and how you receive them so you are never overwhelmed.",
+                        Text(
+                          "Control exactly what alerts you want to receive and how you receive them so you are never overwhelmed.".tr(),
                           style: TextStyle(
                             fontSize: 15,
                             color: Color(0xFF64748B),
@@ -398,18 +399,18 @@ class _WebNotificationSettingsScreenState
                             ),
                             onPressed: () {
                               ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
+                                SnackBar(
                                   content: Text(
-                                    "Preferences saved successfully.",
+                                    "Preferences saved successfully.".tr(),
                                   ),
                                 ),
                               );
                               Navigator.of(context).pop();
                             },
                             icon: const Icon(Icons.save_rounded, size: 20),
-                            label: const Text(
-                              "Save Preferences",
-                              style: TextStyle(
+                            label: Text(
+                              "Save Preferences".tr(),
+                              style: const TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.w600,
                                 fontFamily: "Gilroy-SemiBold",
@@ -488,7 +489,7 @@ class _WebNotificationSettingsScreenState
                                         CrossAxisAlignment.start,
                                     children: [
                                       Text(
-                                        key,
+                                        key.tr(),
                                         style: TextStyle(
                                           fontSize: 16,
                                           fontWeight: FontWeight.w600,

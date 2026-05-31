@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:dio/dio.dart';
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:icare/screens/login.dart';
 import 'package:icare/services/cart_service.dart';
@@ -60,7 +61,7 @@ class _MyCartScreenState extends State<MyCartScreen> {
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to update quantity'), backgroundColor: Colors.red),
+          SnackBar(content: Text('Failed to update quantity'.tr()), backgroundColor: Colors.red),
         );
       }
     }
@@ -72,8 +73,8 @@ class _MyCartScreenState extends State<MyCartScreen> {
       _loadCart();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Item removed from cart'),
+          SnackBar(
+            content: Text('Item removed from cart'.tr()),
             backgroundColor: Colors.orange,
             behavior: SnackBarBehavior.floating,
           ),
@@ -82,7 +83,7 @@ class _MyCartScreenState extends State<MyCartScreen> {
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to remove item'), backgroundColor: Colors.red),
+          SnackBar(content: Text('Failed to remove item'.tr()), backgroundColor: Colors.red),
         );
       }
     }
@@ -92,14 +93,14 @@ class _MyCartScreenState extends State<MyCartScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Clear Cart'),
-        content: const Text('Are you sure you want to remove all items?'),
+        title: Text('Clear Cart'.tr()),
+        content: Text('Are you sure you want to remove all items?'.tr()),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text('Cancel'.tr())),
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx, true),
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            child: const Text('Clear'),
+            child: Text('Clear'.tr()),
           ),
         ],
       ),
@@ -157,9 +158,9 @@ class _MyCartScreenState extends State<MyCartScreen> {
         backgroundColor: Colors.white,
         elevation: 0,
         leading: const CustomBackButton(),
-        title: const Text(
-          'My Cart',
-          style: TextStyle(
+        title: Text(
+          'My Cart'.tr(),
+          style: const TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.w900,
             color: Color(0xFF0F172A),
@@ -169,7 +170,7 @@ class _MyCartScreenState extends State<MyCartScreen> {
           if (_cartItems.isNotEmpty)
             TextButton(
               onPressed: _clearCart,
-              child: const Text('Clear All', style: TextStyle(color: Colors.red)),
+              child: Text('Clear All'.tr(), style: const TextStyle(color: Colors.red)),
             ),
         ],
       ),
@@ -201,15 +202,15 @@ class _MyCartScreenState extends State<MyCartScreen> {
               child: const Icon(Icons.lock_rounded, size: 64, color: AppColors.primaryColor),
             ),
             const SizedBox(height: 24),
-            const Text(
-              'Login Required',
-              style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Color(0xFF0F172A)),
+            Text(
+              'Login Required'.tr(),
+              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Color(0xFF0F172A)),
             ),
             const SizedBox(height: 8),
-            const Text(
-              'Please log in to view your cart and place orders.',
+            Text(
+              'Please log in to view your cart and place orders.'.tr(),
               textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 14, color: Color(0xFF64748B)),
+              style: const TextStyle(fontSize: 14, color: Color(0xFF64748B)),
             ),
             const SizedBox(height: 32),
             ElevatedButton.icon(
@@ -218,7 +219,7 @@ class _MyCartScreenState extends State<MyCartScreen> {
                 MaterialPageRoute(builder: (_) => const LoginScreen()),
               ),
               icon: const Icon(Icons.login_rounded),
-              label: const Text('Log In'),
+              label: Text('Log In'.tr()),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primaryColor,
                 foregroundColor: Colors.white,
@@ -250,24 +251,24 @@ class _MyCartScreenState extends State<MyCartScreen> {
             ),
           ),
           const SizedBox(height: 24),
-          const Text(
-            'Your cart is empty',
-            style: TextStyle(
+          Text(
+            'Your cart is empty'.tr(),
+            style: const TextStyle(
               fontSize: 22,
               fontWeight: FontWeight.w900,
               color: Color(0xFF0F172A),
             ),
           ),
           const SizedBox(height: 8),
-          const Text(
-            'Browse medicines and add them to your cart',
-            style: TextStyle(fontSize: 14, color: Color(0xFF64748B)),
+          Text(
+            'Browse medicines and add them to your cart'.tr(),
+            style: const TextStyle(fontSize: 14, color: Color(0xFF64748B)),
           ),
           const SizedBox(height: 32),
           ElevatedButton.icon(
             onPressed: () => Navigator.pop(context),
             icon: const Icon(Icons.local_pharmacy_rounded),
-            label: const Text('Browse Medicines'),
+            label: Text('Browse Medicines'.tr()),
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.primaryColor,
               foregroundColor: Colors.white,
@@ -475,9 +476,9 @@ class _MyCartScreenState extends State<MyCartScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             if (isDesktop) ...[
-              const Text(
-                'Order Summary',
-                style: TextStyle(
+              Text(
+                'Order Summary'.tr(),
+                style: const TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.w900,
                   color: Color(0xFF0F172A),
@@ -492,7 +493,7 @@ class _MyCartScreenState extends State<MyCartScreen> {
                   child: TextField(
                     onChanged: (v) => setState(() => _promoCode = v),
                     decoration: InputDecoration(
-                      hintText: 'Promo code',
+                      hintText: 'Promo code'.tr(),
                       hintStyle: const TextStyle(fontSize: 13),
                       contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                       border: OutlineInputBorder(
@@ -516,7 +517,7 @@ class _MyCartScreenState extends State<MyCartScreen> {
                       setState(() => _discount = 20);
                     } else {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Invalid promo code'), backgroundColor: Colors.red),
+                        SnackBar(content: Text('Invalid promo code'.tr()), backgroundColor: Colors.red),
                       );
                     }
                   },
@@ -526,16 +527,16 @@ class _MyCartScreenState extends State<MyCartScreen> {
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                     elevation: 0,
                   ),
-                  child: const Text('Apply', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                  child: Text('Apply'.tr(), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                 ),
               ],
             ),
             const SizedBox(height: 16),
-            _summaryRow('Subtotal (${_cartItems.length} items)', 'PKR ${_subtotal.toStringAsFixed(0)}'),
+            _summaryRow('${'Subtotal'.tr()} (${_cartItems.length} ${'items'.tr()})', 'PKR ${_subtotal.toStringAsFixed(0)}'),
             if (_discount > 0)
-              _summaryRow('Discount ($_discount%)', '-PKR ${(_subtotal * _discount / 100).toStringAsFixed(0)}',
+              _summaryRow('${'Discount'.tr()} ($_discount%)', '-PKR ${(_subtotal * _discount / 100).toStringAsFixed(0)}',
                   isNegative: true),
-            _summaryRow('Delivery', 'Free'),
+            _summaryRow('Delivery'.tr(), 'Free'.tr()),
             const Padding(
               padding: EdgeInsets.symmetric(vertical: 12),
               child: Divider(),
@@ -543,9 +544,9 @@ class _MyCartScreenState extends State<MyCartScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text(
-                  'Total',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: Color(0xFF0F172A)),
+                Text(
+                  'Total'.tr(),
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: Color(0xFF0F172A)),
                 ),
                 Text(
                   'PKR ${_total.toStringAsFixed(0)}',
@@ -578,7 +579,7 @@ class _MyCartScreenState extends State<MyCartScreen> {
                         child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                       )
                     : Text(
-                        'Checkout • PKR ${_total.toStringAsFixed(0)}',
+                        '${'Checkout'.tr()} • PKR ${_total.toStringAsFixed(0)}',
                         style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900),
                       ),
               ),
@@ -690,7 +691,7 @@ class _CheckoutScreenState extends State<_CheckoutScreen> {
 
   void _showSavedAddressesSheet() {
     if (_savedAddresses.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No saved addresses. Add one in Settings → Pharmacy.'), backgroundColor: Colors.orange, duration: Duration(seconds: 3)));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('No saved addresses. Add one in Settings → Pharmacy.'.tr()), backgroundColor: Colors.orange, duration: const Duration(seconds: 3)));
       return;
     }
     showModalBottomSheet(
@@ -699,7 +700,7 @@ class _CheckoutScreenState extends State<_CheckoutScreen> {
       builder: (ctx) => Padding(
         padding: const EdgeInsets.all(20),
         child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-          const Text('Select Saved Address', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+          Text('Select Saved Address'.tr(), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
           const SizedBox(height: 12),
           ..._savedAddresses.map((addr) => ListTile(
             leading: const Icon(Icons.location_on_outlined, color: Color(0xFF10B981)),
@@ -787,15 +788,15 @@ class _CheckoutScreenState extends State<_CheckoutScreen> {
                 child: const Icon(Icons.check_circle_rounded, color: Color(0xFF10B981), size: 48),
               ),
               const SizedBox(height: 20),
-              const Text(
-                'Order Placed!',
-                style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Color(0xFF0F172A)),
+              Text(
+                'Order Placed!'.tr(),
+                style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Color(0xFF0F172A)),
               ),
               const SizedBox(height: 8),
-              const Text(
-                'Your order has been placed successfully.\nThe pharmacy will confirm shortly.',
+              Text(
+                'Your order has been placed successfully.\nThe pharmacy will confirm shortly.'.tr(),
                 textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 14, color: Color(0xFF64748B), height: 1.5),
+                style: const TextStyle(fontSize: 14, color: Color(0xFF64748B), height: 1.5),
               ),
               const SizedBox(height: 24),
               SizedBox(
@@ -803,7 +804,7 @@ class _CheckoutScreenState extends State<_CheckoutScreen> {
                 child: ElevatedButton(
                   onPressed: () {
                     Navigator.pop(ctx);
-                    Navigator.pop(context, true); // return true = order placed
+                    Navigator.pop(context, true);
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primaryColor,
@@ -812,7 +813,7 @@ class _CheckoutScreenState extends State<_CheckoutScreen> {
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     elevation: 0,
                   ),
-                  child: const Text('Done', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900)),
+                  child: Text('Done'.tr(), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900)),
                 ),
               ),
             ],
@@ -832,9 +833,9 @@ class _CheckoutScreenState extends State<_CheckoutScreen> {
         backgroundColor: Colors.white,
         elevation: 0,
         leading: const CustomBackButton(),
-        title: const Text(
-          'Checkout',
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Color(0xFF0F172A)),
+        title: Text(
+          'Checkout'.tr(),
+          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Color(0xFF0F172A)),
         ),
       ),
       body: isDesktop ? _buildDesktop() : _buildMobile(),
@@ -913,8 +914,8 @@ class _CheckoutScreenState extends State<_CheckoutScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('Order Items',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Color(0xFF0F172A))),
+        Text('Order Items'.tr(),
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Color(0xFF0F172A))),
         const SizedBox(height: 12),
         Container(
           decoration: BoxDecoration(
@@ -982,31 +983,31 @@ class _CheckoutScreenState extends State<_CheckoutScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(children: [
-          const Text('Delivery Address', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Color(0xFF0F172A))),
+          Text('Delivery Address'.tr(), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Color(0xFF0F172A))),
           const Spacer(),
           TextButton.icon(
             onPressed: _showSavedAddressesSheet,
             icon: const Icon(Icons.bookmarks_outlined, size: 16),
-            label: const Text('Saved', style: TextStyle(fontSize: 13)),
+            label: Text('Saved'.tr(), style: const TextStyle(fontSize: 13)),
             style: TextButton.styleFrom(foregroundColor: AppColors.primaryColor),
           ),
         ]),
         const SizedBox(height: 12),
-        _formField(_addressCtrl, 'Street Address', Icons.home_outlined,
-            validator: (v) => v == null || v.isEmpty ? 'Address is required' : null),
+        _formField(_addressCtrl, 'Street Address'.tr(), Icons.home_outlined,
+            validator: (v) => v == null || v.isEmpty ? 'Address is required'.tr() : null),
         const SizedBox(height: 12),
-        _formField(_cityCtrl, 'City', Icons.location_city_outlined,
-            validator: (v) => v == null || v.isEmpty ? 'City is required' : null),
+        _formField(_cityCtrl, 'City'.tr(), Icons.location_city_outlined,
+            validator: (v) => v == null || v.isEmpty ? 'City is required'.tr() : null),
         const SizedBox(height: 20),
-        const Text('Delivery Instructions', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Color(0xFF0F172A))),
+        Text('Delivery Instructions'.tr(), style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Color(0xFF0F172A))),
         const SizedBox(height: 4),
-        const Text('Optional — pre-filled from your saved preferences', style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8))),
+        Text('Optional — pre-filled from your saved preferences'.tr(), style: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8))),
         const SizedBox(height: 8),
         TextFormField(
           controller: _instructionsCtrl,
           maxLines: 2,
           decoration: InputDecoration(
-            hintText: 'e.g. Leave at door, Ring bell twice...',
+            hintText: 'e.g. Leave at door, Ring bell twice...'.tr(),
             hintStyle: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
             prefixIcon: const Icon(Icons.sticky_note_2_outlined, color: Color(0xFF94A3B8), size: 20),
             filled: true,
@@ -1062,14 +1063,14 @@ class _CheckoutScreenState extends State<_CheckoutScreen> {
   Widget _buildPaymentMethod() {
     // Only Cash on Delivery and Credit/Debit Card
     final methods = [
-      {'label': 'Cash on Delivery', 'icon': Icons.money_rounded, 'color': const Color(0xFF10B981)},
-      {'label': 'Credit / Debit Card', 'icon': Icons.credit_card_rounded, 'color': const Color(0xFF3B82F6)},
+      {'label': 'Cash on Delivery'.tr(), 'icon': Icons.money_rounded, 'color': const Color(0xFF10B981)},
+      {'label': 'Credit / Debit Card'.tr(), 'icon': Icons.credit_card_rounded, 'color': const Color(0xFF3B82F6)},
     ];
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('Payment Method',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Color(0xFF0F172A))),
+        Text('Payment Method'.tr(),
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Color(0xFF0F172A))),
         const SizedBox(height: 12),
         Container(
           decoration: BoxDecoration(
@@ -1153,22 +1154,22 @@ class _CheckoutScreenState extends State<_CheckoutScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Order Summary',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: Color(0xFF0F172A))),
+          Text('Order Summary'.tr(),
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: Color(0xFF0F172A))),
           const SizedBox(height: 16),
-          _row('Subtotal', 'PKR ${widget.subtotal.toStringAsFixed(0)}'),
+          _row('Subtotal'.tr(), 'PKR ${widget.subtotal.toStringAsFixed(0)}'),
           if (widget.discount > 0)
-            _row('Discount (${widget.discount.toInt()}%)',
+            _row('${'Discount'.tr()} (${widget.discount.toInt()}%)',
                 '-PKR ${(widget.subtotal * widget.discount / 100).toStringAsFixed(0)}',
                 color: Colors.red),
-          _row('Delivery', 'Free', color: const Color(0xFF10B981)),
-          _row('Payment', _paymentMethod),
+          _row('Delivery'.tr(), 'Free'.tr(), color: const Color(0xFF10B981)),
+          _row('Payment'.tr(), _paymentMethod),
           const Padding(padding: EdgeInsets.symmetric(vertical: 12), child: Divider()),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('Total',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: Color(0xFF0F172A))),
+              Text('Total'.tr(),
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: Color(0xFF0F172A))),
               Text(
                 'PKR ${widget.total.toStringAsFixed(0)}',
                 style: const TextStyle(
@@ -1222,7 +1223,7 @@ class _CheckoutScreenState extends State<_CheckoutScreen> {
                   const Icon(Icons.shopping_bag_rounded, size: 20),
                   const SizedBox(width: 10),
                   Text(
-                    'Place Order • PKR ${widget.total.toStringAsFixed(0)}',
+                    '${'Place Order'.tr()} • PKR ${widget.total.toStringAsFixed(0)}',
                     style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900),
                   ),
                 ],

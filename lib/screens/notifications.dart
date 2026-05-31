@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_size_matters/flutter_size_matters.dart';
 import 'package:icare/screens/bookings_history.dart';
@@ -46,7 +47,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
             if (result['error'] != null) {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
-                  content: Text('Using sample data - API unavailable'),
+                  content: Text('Using sample data - API unavailable'.tr()),
                   backgroundColor: Colors.orange,
                   duration: const Duration(seconds: 2),
                 ),
@@ -64,7 +65,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
         });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Using sample data - Connection error'),
+            content: Text('Using sample data - Connection error'.tr()),
             backgroundColor: Colors.orange,
             duration: const Duration(seconds: 2),
           ),
@@ -179,7 +180,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
       appBar: AppBar(
         leading: CustomBackButton(),
         title: CustomText(
-          text: "Notifications",
+          text: "Notifications".tr(),
           fontSize: 18,
           fontFamily: "Gilroy-Bold",
         ),
@@ -189,9 +190,9 @@ class _NotificationScreenState extends State<NotificationScreen> {
           if (_unreadCount > 0)
             TextButton(
               onPressed: _markAllAsRead,
-              child: const Text(
-                'Mark all read',
-                style: TextStyle(fontSize: 13),
+              child: Text(
+                'Mark all read'.tr(),
+                style: const TextStyle(fontSize: 13),
               ),
             ),
         ],
@@ -249,7 +250,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           CustomText(
-                            text: "Notifications",
+                            text: "Notifications".tr(),
                             fontSize: 26,
                             fontWeight: FontWeight.w900,
                             color: const Color(0xFF0F172A),
@@ -257,7 +258,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
                           ),
                           const SizedBox(height: 2),
                           CustomText(
-                            text: "Stay updated with your latest activity",
+                            text: "Stay updated with your latest activity".tr(),
                             fontSize: 14,
                             color: const Color(0xFF94A3B8),
                             fontWeight: FontWeight.w500,
@@ -268,7 +269,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
                     if (_unreadCount > 0) ...[
                       TextButton(
                         onPressed: _markAllAsRead,
-                        child: const Text('Mark all read'),
+                        child: Text('Mark all read'.tr()),
                       ),
                       const SizedBox(width: 8),
                       Container(
@@ -326,7 +327,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
             const CircularProgressIndicator(),
             const SizedBox(height: 16),
             CustomText(
-              text: "Loading notifications...",
+              text: "Loading notifications...".tr(),
               fontSize: 14,
               color: const Color(0xFF94A3B8),
               fontWeight: FontWeight.w600,
@@ -348,7 +349,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
             ),
             const SizedBox(height: 16),
             CustomText(
-              text: "No notifications yet",
+              text: "No notifications yet".tr(),
               fontSize: 16,
               color: const Color(0xFF94A3B8),
               fontWeight: FontWeight.w600,

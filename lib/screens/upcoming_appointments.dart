@@ -1,6 +1,7 @@
 import 'dart:developer';
 
 import 'package:easy_date_timeline/easy_date_timeline.dart';
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_size_matters/flutter_size_matters.dart';
 import 'package:icare/utils/theme.dart';
@@ -29,7 +30,7 @@ class _UpcomingAppointmentsState extends State<UpcomingAppointments> {
       return Scaffold(
         appBar: AppBar(
           title: CustomText(
-            text: "Upcoming Appointments",
+            text: "Upcoming Appointments".tr(),
             fontSize: 16.78,
             fontFamily: "Gilroy-Bold",
             letterSpacing: -0.31,
@@ -168,7 +169,7 @@ class _UpcomingAppointmentsState extends State<UpcomingAppointments> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               CustomText(
-                                text: "Upcoming Appointments",
+                                text: "Upcoming Appointments".tr(),
                                 fontSize: 24,
                                 fontWeight: FontWeight.w900,
                                 color: const Color(0xFF0F172A),

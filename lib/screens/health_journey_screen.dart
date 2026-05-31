@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:icare/services/health_tracker_service.dart';
 import 'package:icare/services/health_settings_service.dart';

@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:icare/utils/theme.dart';
 import 'package:icare/utils/utils.dart';
@@ -17,7 +18,7 @@ class TermsAndConditions extends StatelessWidget {
         automaticallyImplyLeading: false,
         leading: CustomBackButton(),
         title: CustomText(
-          text: "Terms & Conditions",
+          text: "Terms & Conditions".tr(),
           fontWeight: FontWeight.bold,
           letterSpacing: -0.31,
           lineHeight: 1.0,
@@ -144,7 +145,7 @@ class _WebTermsAndConditions extends StatelessWidget {
         automaticallyImplyLeading: false,
         leading: CustomBackButton(),
         title: CustomText(
-          text: "Terms & Conditions",
+          text: "Terms & Conditions".tr(),
           fontFamily: "Gilroy-Bold",
           fontSize: 20,
           color: AppColors.primaryColor,

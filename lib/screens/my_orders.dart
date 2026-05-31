@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:icare/services/order_service.dart';
@@ -70,7 +71,7 @@ class _MyOrdersScreenState extends ConsumerState<MyOrdersScreen> {
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: const Text('Unable to load data. Please try again.')));
+        ).showSnackBar(SnackBar(content: Text('Unable to load data. Please try again.'.tr())));
       }
     }
   }
@@ -118,8 +119,8 @@ class _MyOrdersScreenState extends ConsumerState<MyOrdersScreen> {
     if (_isLoading) {
       return Scaffold(
         appBar: AppBar(
-          title: const CustomText(
-            text: "My Orders",
+          title: CustomText(
+            text: "My Orders".tr(),
             fontFamily: "Gilroy-Bold",
             fontSize: 16.78,
             fontWeight: FontWeight.bold,
@@ -135,8 +136,8 @@ class _MyOrdersScreenState extends ConsumerState<MyOrdersScreen> {
     if (_orders.isEmpty) {
       return Scaffold(
         appBar: AppBar(
-          title: const CustomText(
-            text: "My Orders",
+          title: CustomText(
+            text: "My Orders".tr(),
             fontFamily: "Gilroy-Bold",
             fontSize: 16.78,
             fontWeight: FontWeight.bold,
@@ -155,9 +156,9 @@ class _MyOrdersScreenState extends ConsumerState<MyOrdersScreen> {
                 color: Colors.grey.shade300,
               ),
               const SizedBox(height: 16),
-              const Text(
-                'No orders yet',
-                style: TextStyle(fontSize: 16, color: Color(0xFF64748B)),
+              Text(
+                'No orders yet'.tr(),
+                style: const TextStyle(fontSize: 16, color: Color(0xFF64748B)),
               ),
             ],
           ),
@@ -201,7 +202,7 @@ class _MyOrdersScreenState extends ConsumerState<MyOrdersScreen> {
                     mainAxisAlignment: MainAxisAlignment.end,
                     children: [
                       CustomText(
-                        text: "PURCHASE HISTORY",
+                        text: "PURCHASE HISTORY".tr(),
                         fontSize: 12,
                         fontWeight: FontWeight.w900,
                         color: AppColors.primaryColor,
@@ -213,7 +214,7 @@ class _MyOrdersScreenState extends ConsumerState<MyOrdersScreen> {
                         children: [
                           Expanded(
                             child: CustomText(
-                              text: "My Personal Orders",
+                              text: "My Personal Orders".tr(),
                               fontSize: isWeb ? 36 : 24,
                               fontWeight: FontWeight.w900,
                               color: const Color(0xFF0F172A),
@@ -239,11 +240,11 @@ class _MyOrdersScreenState extends ConsumerState<MyOrdersScreen> {
                 ),
                 child: Row(
                   children: [
-                    _buildFilterChip("All Orders", true),
+                    _buildFilterChip("All Orders".tr(), true),
                     const SizedBox(width: 12),
-                    _buildFilterChip("Delivered", false),
+                    _buildFilterChip("Delivered".tr(), false),
                     const SizedBox(width: 12),
-                    _buildFilterChip("Pending", false),
+                    _buildFilterChip("Pending".tr(), false),
                     const Spacer(),
                     _buildSearchBar(),
                   ],
@@ -325,9 +326,9 @@ class _MyOrdersScreenState extends ConsumerState<MyOrdersScreen> {
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: const Color(0xFFE2E8F0)),
       ),
-      child: const TextField(
+      child: TextField(
         decoration: InputDecoration(
-          hintText: "Search an order...",
+          hintText: "Search an order...".tr(),
           prefixIcon: Icon(
             Icons.search_rounded,
             size: 20,
@@ -494,9 +495,9 @@ class _MyOrdersScreenState extends ConsumerState<MyOrdersScreen> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
-                  child: const Text(
-                    "Track Order",
-                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+                  child: Text(
+                    "Track Order".tr(),
+                    style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
                   ),
                 )
               else
@@ -512,9 +513,9 @@ class _MyOrdersScreenState extends ConsumerState<MyOrdersScreen> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
-                  child: const Text(
-                    "Reorder",
-                    style: TextStyle(
+                  child: Text(
+                    "Reorder".tr(),
+                    style: const TextStyle(
                       color: Color(0xFF0F172A),
                       fontWeight: FontWeight.w700,
                       fontSize: 13,

@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:icare/screens/chat_screen.dart';
 import 'package:icare/services/notification_service.dart';

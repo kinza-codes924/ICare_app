@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:icare/screens/view_course.dart';
@@ -63,7 +64,7 @@ class _MyLearningScreenState extends ConsumerState<MyLearningScreen>
         backgroundColor: Colors.white,
         elevation: 0,
         title: Text(
-          isPatient ? 'My Health Journey' : 'My Learning',
+          isPatient ? 'My Health Journey'.tr() : 'My Learning'.tr(),
           style: TextStyle(
             color: Color(0xFF0F172A),
             fontSize: 20,

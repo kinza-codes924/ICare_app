@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_size_matters/flutter_size_matters.dart';
 import 'package:icare/utils/theme.dart';
@@ -34,7 +35,7 @@ class _CancellationReasonState extends State<CancellationReason> {
         automaticallyImplyLeading: false,
         leading: CustomBackButton(),
         title: CustomText(
-          text: 'Cancellation Reason',
+          text: 'Cancellation Reason'.tr(),
           fontFamily: "Gilroy-Bold",
           fontSize: 15,
           fontWeight: FontWeight.bold,
@@ -46,7 +47,7 @@ class _CancellationReasonState extends State<CancellationReason> {
           children: [
             SizedBox(height: ScallingConfig.scale(10)),
             CustomText(
-              text: "Please select the reason for cancellations.",
+              text: "Please select the reason for cancellations.".tr(),
               fontFamily: "Gilroy-Medium",
               fontSize: ScallingConfig.moderateScale(16),
               color: AppColors.themeDarkGrey,
@@ -91,8 +92,8 @@ class _CancellationReasonState extends State<CancellationReason> {
             ),
 
             CustomInputField(
-              title: "Other",
-              hintText: "Enter your reason",
+              title: "Other".tr(),
+              hintText: "Enter your reason".tr(),
               hintStyle: TextStyle(
                 fontFamily: "Gilroy-Medium",
                 color: AppColors.grayColor.withAlpha(85),
@@ -106,14 +107,14 @@ class _CancellationReasonState extends State<CancellationReason> {
             ),
             SizedBox(height: ScallingConfig.scale(12)),
             CustomButton(
-              label: "Cancel",
+              label: "Cancel".tr(),
               width: Utils.windowWidth(context) * 0.9,
               borderRadius: ScallingConfig.moderateScale(30),
               onPressed: () {
                 AppDialogs.showSuccessDialog(
                   context,
-                  title: "Cancelled Order",
-                  description: "You’ve successfully cancelled order.",
+                  title: "Cancelled Order".tr(),
+                  description: "You’ve successfully cancelled order.".tr(),
                 );
               },
             ),

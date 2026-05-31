@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:icare/models/medical_record.dart';
@@ -100,8 +101,8 @@ class _PatientMedicalRecordsState extends ConsumerState<PatientMedicalRecords> {
         backgroundColor: Colors.white,
         elevation: 0,
         leading: const CustomBackButton(),
-        title: const Text(
-          'My Medical Records',
+        title: Text(
+          'My Medical Records'.tr(),
           style: TextStyle(
             fontSize: 18,
             fontFamily: 'Gilroy-Bold',

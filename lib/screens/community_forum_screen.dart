@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:icare/services/community_service.dart';
 import 'package:icare/utils/shared_pref.dart';
@@ -78,7 +79,7 @@ class _CommunityForumScreenState extends State<CommunityForumScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('Add New Topic', style: TextStyle(fontWeight: FontWeight.w900)),
+        title: Text('Add New Topic'.tr(), style: const TextStyle(fontWeight: FontWeight.w900)),
         content: TextField(
           controller: ctrl,
           autofocus: true,

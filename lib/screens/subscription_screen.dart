@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:icare/services/subscription_service.dart';
 import 'package:icare/widgets/back_button.dart';
@@ -82,8 +83,8 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
         backgroundColor: Colors.white,
         elevation: 0,
         leading: const CustomBackButton(),
-        title: const Text(
-          'Subscriptions',
+        title: Text(
+          'Subscriptions'.tr(),
           style: TextStyle(
             fontSize: 18,
             fontFamily: 'Gilroy-Bold',

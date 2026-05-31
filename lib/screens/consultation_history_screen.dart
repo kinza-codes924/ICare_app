@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:icare/models/medical_record.dart';
 import 'package:icare/services/medical_record_service.dart';
@@ -107,8 +108,8 @@ class _ConsultationHistoryScreenState extends State<ConsultationHistoryScreen> {
         backgroundColor: Colors.white,
         elevation: 0,
         leading: const CustomBackButton(),
-        title: const Text(
-          'Consultation History',
+        title: Text(
+          'Consultation History'.tr(),
           style: TextStyle(
             color: Color(0xFF0F172A),
             fontWeight: FontWeight.w900,
@@ -179,7 +180,7 @@ class _ConsultationHistoryScreenState extends State<ConsultationHistoryScreen> {
                         controller: _searchController,
                         decoration: InputDecoration(
                           hintText:
-                              'Search by diagnosis, doctor, medicine, symptom…',
+                              'Search by diagnosis, doctor, medicine, symptom…'.tr(),
                           hintStyle: const TextStyle(
                               fontSize: 13, color: Color(0xFF94A3B8)),
                           prefixIcon: const Icon(Icons.search_rounded,

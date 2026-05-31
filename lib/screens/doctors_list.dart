@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:icare/models/doctor.dart';
 import 'package:icare/models/user.dart';
@@ -213,7 +214,7 @@ class _DoctorsListState extends State<DoctorsList> {
         elevation: 0,
         centerTitle: true,
         title: CustomText(
-          text: "Find Doctors",
+          text: "Find Doctors".tr(),
           fontFamily: "Gilroy-Bold",
           fontSize: 18,
           fontWeight: FontWeight.w900,
@@ -234,7 +235,7 @@ class _DoctorsListState extends State<DoctorsList> {
                           size: 16, color: const Color(0xFF0036BC)),
                       const SizedBox(width: 8),
                       Text(
-                        '${_searchMode == 'condition' ? 'Condition' : 'Speciality'}: $_searchQuery  •  ${_filteredDoctors.length} doctor(s) found',
+                        '${_searchMode == 'condition' ? 'Condition'.tr() : 'Speciality'.tr()}: $_searchQuery  •  ${_filteredDoctors.length} ${'doctor(s) found'.tr()}',
                         style: const TextStyle(fontSize: 13, color: Color(0xFF0036BC), fontWeight: FontWeight.w600),
                       ),
                       const Spacer(),
@@ -271,7 +272,7 @@ class _DoctorsListState extends State<DoctorsList> {
                             ),
                             const SizedBox(width: 8),
                             Text(
-                              '$_onlineDoctorsCount doctors online right now',
+                              '$_onlineDoctorsCount ${'doctors online right now'.tr()}',
                               style: const TextStyle(
                                 fontSize: 13,
                                 fontWeight: FontWeight.w600,
@@ -286,11 +287,11 @@ class _DoctorsListState extends State<DoctorsList> {
                       // Search Mode Tabs
                       Row(
                         children: [
-                          _buildSearchModeTab('name', 'By Name'),
+                          _buildSearchModeTab('name', 'By Name'.tr()),
                           const SizedBox(width: 8),
-                          _buildSearchModeTab('specialty', 'By Speciality'),
+                          _buildSearchModeTab('specialty', 'By Speciality'.tr()),
                           const SizedBox(width: 8),
-                          _buildSearchModeTab('condition', 'By Condition'),
+                          _buildSearchModeTab('condition', 'By Condition'.tr()),
                         ],
                       ),
                       const SizedBox(height: 12),
@@ -302,11 +303,11 @@ class _DoctorsListState extends State<DoctorsList> {
                           _filterDoctors();
                         },
                         decoration: InputDecoration(
-                          hintText: _searchMode == 'name' 
-                            ? 'Search doctors by name' 
+                          hintText: _searchMode == 'name'
+                            ? 'Search doctors by name'.tr()
                             : _searchMode == 'specialty'
-                            ? 'Search by specialization'
-                            : 'Search by condition (e.g., diabetes)',
+                            ? 'Search by specialization'.tr()
+                            : 'Search by condition (e.g., diabetes)'.tr(),
                           prefixIcon: const Icon(Icons.search),
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
@@ -340,7 +341,7 @@ class _DoctorsListState extends State<DoctorsList> {
                               child: DropdownButtonFormField<String>(
                                 initialValue: _selectedSpecialization,
                                 decoration: InputDecoration(
-                                  labelText: 'Speciality',
+                                  labelText: 'Speciality'.tr(),
                                   border: OutlineInputBorder(
                                     borderRadius: BorderRadius.circular(10),
                                   ),
@@ -367,17 +368,17 @@ class _DoctorsListState extends State<DoctorsList> {
                             child: DropdownButtonFormField<String>(
                               initialValue: _availabilityFilter,
                               decoration: InputDecoration(
-                                labelText: 'Availability',
+                                labelText: 'Availability'.tr(),
                                 border: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(10),
                                 ),
                                 contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                                 isDense: true,
                               ),
-                              items: const [
-                                DropdownMenuItem(value: null, child: Text('All')),
-                                DropdownMenuItem(value: 'online', child: Text('Online')),
-                                DropdownMenuItem(value: 'offline', child: Text('Offline')),
+                              items: [
+                                DropdownMenuItem(value: null, child: Text('All'.tr())),
+                                DropdownMenuItem(value: 'online', child: Text('Online'.tr())),
+                                DropdownMenuItem(value: 'offline', child: Text('Offline'.tr())),
                               ],
                               onChanged: (v) {
                                 setState(() {
@@ -394,16 +395,16 @@ class _DoctorsListState extends State<DoctorsList> {
                             child: DropdownButtonFormField<double>(
                               initialValue: _minRating,
                               decoration: InputDecoration(
-                                labelText: 'Min Rating',
+                                labelText: 'Min Rating'.tr(),
                                 border: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(10),
                                 ),
                                 contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                                 isDense: true,
                               ),
-                              items: const [
-                                DropdownMenuItem(value: null, child: Text('All')),
-                                DropdownMenuItem(value: 4.5, child: Text('4.5+')),
+                              items: [
+                                DropdownMenuItem(value: null, child: Text('All'.tr())),
+                                const DropdownMenuItem(value: 4.5, child: Text('4.5+')),
                                 DropdownMenuItem(value: 4.0, child: Text('4.0+')),
                                 DropdownMenuItem(value: 3.5, child: Text('3.5+')),
                                 DropdownMenuItem(value: 3.0, child: Text('3.0+')),
@@ -423,17 +424,17 @@ class _DoctorsListState extends State<DoctorsList> {
                             child: DropdownButtonFormField<String>(
                               initialValue: _genderFilter,
                               decoration: InputDecoration(
-                                labelText: 'Gender',
+                                labelText: 'Gender'.tr(),
                                 border: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(10),
                                 ),
                                 contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                                 isDense: true,
                               ),
-                              items: const [
-                                DropdownMenuItem(value: null, child: Text('All')),
-                                DropdownMenuItem(value: 'male', child: Text('Male')),
-                                DropdownMenuItem(value: 'female', child: Text('Female')),
+                              items: [
+                                DropdownMenuItem(value: null, child: Text('All'.tr())),
+                                DropdownMenuItem(value: 'male', child: Text('Male'.tr())),
+                                DropdownMenuItem(value: 'female', child: Text('Female'.tr())),
                               ],
                               onChanged: (v) {
                                 setState(() {
@@ -450,7 +451,7 @@ class _DoctorsListState extends State<DoctorsList> {
                             child: DropdownButtonFormField<String>(
                               initialValue: _languageFilter,
                               decoration: InputDecoration(
-                                labelText: 'Language',
+                                labelText: 'Language'.tr(),
                                 border: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(10),
                                 ),
@@ -478,20 +479,20 @@ class _DoctorsListState extends State<DoctorsList> {
                       // Sort Options
                       Row(
                         children: [
-                          const Text(
-                            'Sort by:',
-                            style: TextStyle(
+                          Text(
+                            'Sort by:'.tr(),
+                            style: const TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.w600,
                               color: Color(0xFF64748B),
                             ),
                           ),
                           const SizedBox(width: 12),
-                          _buildSortChip('rating', 'Rating'),
+                          _buildSortChip('rating', 'Rating'.tr()),
                           const SizedBox(width: 8),
-                          _buildSortChip('experience', 'Experience'),
+                          _buildSortChip('experience', 'Experience'.tr()),
                           const SizedBox(width: 8),
-                          _buildSortChip('fees', 'Fees'),
+                          _buildSortChip('fees', 'Fees'.tr()),
                         ],
                       ),
                     ],
@@ -502,7 +503,7 @@ class _DoctorsListState extends State<DoctorsList> {
                   child: _filteredDoctors.isEmpty
                       ? Center(
                           child: CustomText(
-                            text: 'No doctors found',
+                            text: 'No doctors found'.tr(),
                             fontSize: 16,
                             color: Colors.grey,
                           ),
@@ -989,7 +990,7 @@ class DoctorProfileCard extends StatelessWidget {
                   ),
                   const SizedBox(width: 6),
                   Text(
-                    displayDoctor.isOnline ? 'Online' : 'Offline',
+                    displayDoctor.isOnline ? 'Online'.tr() : 'Offline'.tr(),
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,

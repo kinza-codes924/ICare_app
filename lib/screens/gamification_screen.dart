@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:icare/services/gamification_service.dart';
 import 'package:icare/widgets/back_button.dart';
@@ -169,9 +170,9 @@ class _GamificationScreenState extends State<GamificationScreen>
         backgroundColor: Colors.white,
         elevation: 0,
         leading: const CustomBackButton(),
-        title: const Text(
-          'Achievements',
-          style: TextStyle(
+        title: Text(
+          'Achievements'.tr(),
+          style: const TextStyle(
             fontSize: 18,
             fontFamily: 'Gilroy-Bold',
             fontWeight: FontWeight.w900,

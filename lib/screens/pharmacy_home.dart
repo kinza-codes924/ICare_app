@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math' as math;
 import '../utils/js_stub.dart'
     if (dart.library.html) 'dart:js' as js;
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_size_matters/flutter_size_matters.dart';
 import 'package:icare/screens/pharmacy_filter.dart';
@@ -63,7 +64,7 @@ class _PharmacyHomeState extends State<PharmacyHome> {
   Future<void> _detectAndSortNearest() async {
     setState(() {
       _detectingLocation = true;
-      _locationStatus = 'Detecting your location...';
+      _locationStatus = 'Detecting your location...'.tr();
     });
 
     await _loadPharmacies();
@@ -109,12 +110,12 @@ class _PharmacyHomeState extends State<PharmacyHome> {
       setState(() {
         _filteredPharmacies = sorted;
         _detectingLocation = false;
-        _locationStatus = 'Showing nearest pharmacies first';
+        _locationStatus = 'Showing nearest pharmacies first'.tr();
       });
     } else {
       setState(() {
         _detectingLocation = false;
-        _locationStatus = 'Could not detect location — showing all';
+        _locationStatus = 'Could not detect location'.tr();
         _filteredPharmacies = List.from(_pharmacies);
       });
     }
@@ -159,11 +160,11 @@ class _PharmacyHomeState extends State<PharmacyHome> {
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
           child: Row(
             children: [
-              _modeChip('all', Icons.local_pharmacy_rounded, 'All'),
+              _modeChip('all', Icons.local_pharmacy_rounded, 'All'.tr()),
               const SizedBox(width: 8),
-              _modeChip('nearest', Icons.near_me_rounded, 'Nearest'),
+              _modeChip('nearest', Icons.near_me_rounded, 'Nearest'.tr()),
               const SizedBox(width: 8),
-              _modeChip('search_location', Icons.location_searching_rounded, 'Search by Location'),
+              _modeChip('search_location', Icons.location_searching_rounded, 'Search by Location'.tr()),
             ],
           ),
         ),
@@ -210,7 +211,7 @@ class _PharmacyHomeState extends State<PharmacyHome> {
           child: _viewMode == 'search_location'
               ? CustomInputField(
                   width: Utils.windowWidth(context) * 0.9,
-                  hintText: "Enter area, city or address...",
+                  hintText: 'Enter area, city or address...'.tr(),
                   controller: _locationController,
                   onChanged: _filterByLocation,
                   leadingIcon: const Icon(
@@ -221,7 +222,7 @@ class _PharmacyHomeState extends State<PharmacyHome> {
                 )
               : CustomInputField(
                   width: Utils.windowWidth(context) * 0.9,
-                  hintText: "Search",
+                  hintText: 'Search'.tr(),
                   controller: _searchController,
                   trailingIcon: SvgWrapper(
                     assetPath: ImagePaths.filters,
@@ -245,10 +246,10 @@ class _PharmacyHomeState extends State<PharmacyHome> {
             debugPrint("Selected Category: $value");
           },
           categories: [
-            {"id": "1", "name": "Pain", "icon": ImagePaths.pain},
-            {"id": "2", "name": "Vitamins", "icon": ImagePaths.vitamins},
-            {"id": "3", "name": "Skincare", "icon": ImagePaths.skin_care},
-            {"id": "4", "name": "Babycare", "icon": ImagePaths.baby_care},
+            {"id": "1", "name": "Pain".tr(), "icon": ImagePaths.pain},
+            {"id": "2", "name": "Vitamins".tr(), "icon": ImagePaths.vitamins},
+            {"id": "3", "name": "Skincare".tr(), "icon": ImagePaths.skin_care},
+            {"id": "4", "name": "Babycare".tr(), "icon": ImagePaths.baby_care},
           ],
         ),
         SizedBox(height: ScallingConfig.scale(20)),

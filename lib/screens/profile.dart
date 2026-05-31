@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -20,7 +21,7 @@ class ProfileScreen extends ConsumerWidget {
 
     return Center(
       child: CustomButton(
-        label: "Create Profile",
+        label: "Create Profile".tr(),
         onPressed: () {
           Navigator.of(
             context,
@@ -76,17 +77,17 @@ class _WebProfileInitial extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 48),
-              const CustomText(
-                text: "Complete Your Profile",
+              CustomText(
+                text: "Complete Your Profile".tr(),
                 fontSize: 32,
                 fontFamily: "Gilroy-Bold",
-                color: Color(0xFF1E293B),
+                color: const Color(0xFF1E293B),
                 fontWeight: FontWeight.w800,
               ),
               const SizedBox(height: 16),
-              const CustomText(
+              CustomText(
                 text:
-                    "To get the most out of ICare, please set up your medical profile. This helps us provide personalized recommendations and seamless care.",
+                    "To get the most out of ICare, please set up your medical profile. This helps us provide personalized recommendations and seamless care.".tr(),
                 fontSize: 16,
                 color: Color(0xFF64748B),
                 textAlign: TextAlign.center,
@@ -111,9 +112,9 @@ class _WebProfileInitial extends StatelessWidget {
                       borderRadius: BorderRadius.circular(20),
                     ),
                   ),
-                  child: const Text(
-                    "Create Profile Now",
-                    style: TextStyle(
+                  child: Text(
+                    "Create Profile Now".tr(),
+                    style: const TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.w700,
                       fontFamily: "Gilroy-Bold",
@@ -131,9 +132,9 @@ class _WebProfileInitial extends StatelessWidget {
                     context.go('/login');
                   },
                   icon: const Icon(Icons.logout_rounded, color: Colors.redAccent),
-                  label: const Text(
-                    'Logout',
-                    style: TextStyle(
+                  label: Text(
+                    'Logout'.tr(),
+                    style: const TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
                       color: Colors.redAccent,
@@ -150,9 +151,9 @@ class _WebProfileInitial extends StatelessWidget {
               const SizedBox(height: 24),
               TextButton(
                 onPressed: () {},
-                child: const Text(
-                  "Why do I need this?",
-                  style: TextStyle(
+                child: Text(
+                  "Why do I need this?".tr(),
+                  style: const TextStyle(
                     color: Color(0xFF94A3B8),
                     fontSize: 14,
                     fontWeight: FontWeight.w600,

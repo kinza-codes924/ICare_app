@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:icare/models/appointment_detail.dart';
 import 'package:icare/screens/doctors_list.dart';
@@ -162,8 +163,8 @@ class _BookingsHistoryScreenState extends State<BookingsHistoryScreen> {
                             color: Colors.white, size: 16),
                       ),
                       const SizedBox(width: 10),
-                      const Text('Home',
-                          style: TextStyle(
+                      Text('Home'.tr(),
+                          style: const TextStyle(
                               color: Colors.white,
                               fontWeight: FontWeight.w600,
                               fontSize: 14)),
@@ -187,10 +188,10 @@ class _BookingsHistoryScreenState extends State<BookingsHistoryScreen> {
                             color: Colors.white, size: 32),
                       ),
                       const SizedBox(height: 12),
-                      const Text(
-                        'Bookings History',
+                      Text(
+                        'Bookings History'.tr(),
                         textAlign: TextAlign.center,
-                        style: TextStyle(
+                        style: const TextStyle(
                           fontSize: 24,
                           fontWeight: FontWeight.w900,
                           color: Colors.white,
@@ -199,7 +200,7 @@ class _BookingsHistoryScreenState extends State<BookingsHistoryScreen> {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        'All your appointments in one place',
+                        'All your appointments in one place'.tr(),
                         textAlign: TextAlign.center,
                         style: TextStyle(
                             fontSize: 13,
@@ -263,13 +264,13 @@ class _BookingsHistoryScreenState extends State<BookingsHistoryScreen> {
       if (!_isLoading)
         Row(
           children: [
-            _statCard('Total', _appointments.length,
+            _statCard('Total'.tr(), _appointments.length,
                 const Color(0xFF60A5FA), Icons.list_alt_rounded),
             const SizedBox(width: 10),
-            _statCard('Live', _inProgress.length,
+            _statCard('Live'.tr(), _inProgress.length,
                 const Color(0xFFF87171), Icons.circle),
             const SizedBox(width: 10),
-            _statCard('Done', _count('completed'),
+            _statCard('Done'.tr(), _count('completed'),
                 const Color(0xFF34D399), Icons.check_circle_rounded),
           ],
         ),
@@ -290,9 +291,8 @@ class _BookingsHistoryScreenState extends State<BookingsHistoryScreen> {
             elevation: 0,
           ),
           icon: const Icon(Icons.add_rounded, size: 20),
-          label: const Text('Book Appointment Now',
-              style:
-                  TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+          label: Text('Book Appointment Now'.tr(),
+              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
         ),
       ),
       const SizedBox(height: 20),
@@ -304,21 +304,21 @@ class _BookingsHistoryScreenState extends State<BookingsHistoryScreen> {
       ],
 
       // Categories: Pending → Upcoming → Completed → Cancelled
-      _categoryTile('Pending', 'Awaiting confirmation',
+      _categoryTile('Pending'.tr(), 'Awaiting confirmation'.tr(),
           _count('pending'), const Color(0xFFF59E0B),
           Icons.hourglass_empty_rounded, _byStatus('pending')),
       const SizedBox(height: 10),
-      _categoryTile('Upcoming', 'Confirmed & scheduled',
+      _categoryTile('Upcoming'.tr(), 'Confirmed & scheduled'.tr(),
           _upcoming.length, const Color(0xFF0EA5E9),
           Icons.access_time_rounded, _upcoming),
       const SizedBox(height: 10),
-      _categoryTile('Completed', 'Past successful visits',
+      _categoryTile('Completed'.tr(), 'Past successful visits'.tr(),
           _count('completed'), const Color(0xFF10B981),
           Icons.check_circle_outline_rounded,
           // Sort completed newest first
           (_byStatus('completed')..sort((a, b) => b.date.compareTo(a.date)))),
       const SizedBox(height: 10),
-      _categoryTile('Cancelled', 'Appointments you cancelled',
+      _categoryTile('Cancelled'.tr(), 'Appointments you cancelled'.tr(),
           _count('cancelled'), const Color(0xFFEF4444),
           Icons.cancel_outlined, _byStatus('cancelled')),
 
@@ -330,8 +330,8 @@ class _BookingsHistoryScreenState extends State<BookingsHistoryScreen> {
               Icon(Icons.calendar_today_rounded,
                   size: 64, color: Colors.grey.shade300),
               const SizedBox(height: 12),
-              const Text('No bookings yet',
-                  style: TextStyle(
+              Text('No bookings yet'.tr(),
+                  style: const TextStyle(
                       fontSize: 16, color: Color(0xFF94A3B8))),
             ],
           ),
@@ -374,18 +374,18 @@ class _BookingsHistoryScreenState extends State<BookingsHistoryScreen> {
                       color: red, size: 24),
                 ),
                 const SizedBox(width: 14),
-                const Expanded(
+                Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Consultation In Progress',
-                          style: TextStyle(
+                      Text('Consultation In Progress'.tr(),
+                          style: const TextStyle(
                               fontSize: 15,
                               fontWeight: FontWeight.w900,
                               color: Color(0xFF0F172A))),
-                      SizedBox(height: 3),
-                      Text('Active video sessions',
-                          style: TextStyle(
+                      const SizedBox(height: 3),
+                      Text('Active video sessions'.tr(),
+                          style: const TextStyle(
                               fontSize: 12, color: Color(0xFF64748B))),
                     ],
                   ),
@@ -486,8 +486,8 @@ class _BookingsHistoryScreenState extends State<BookingsHistoryScreen> {
               tapTargetSize: MaterialTapTargetSize.shrinkWrap,
             ),
             icon: const Icon(Icons.video_call_rounded, size: 17),
-            label: const Text('Rejoin',
-                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+            label: Text('Rejoin'.tr(),
+                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
           ),
         ],
       ),
@@ -762,14 +762,14 @@ class _ApptCardState extends State<_ApptCard> {
       context: context,
       builder: (_) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Cancel Appointment',
-            style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
-        content: const Text(
-            'Are you sure you want to cancel this appointment? This cannot be undone.'),
+        title: Text('Cancel Appointment'.tr(),
+            style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
+        content: Text(
+            'Are you sure you want to cancel this appointment? This cannot be undone.'.tr()),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('No', style: TextStyle(color: Color(0xFF64748B))),
+            child: Text('No'.tr(), style: const TextStyle(color: Color(0xFF64748B))),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
@@ -779,7 +779,7 @@ class _ApptCardState extends State<_ApptCard> {
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(10)),
             ),
-            child: const Text('Yes, Cancel'),
+            child: Text('Yes, Cancel'.tr()),
           ),
         ],
       ),
@@ -862,8 +862,8 @@ class _ApptCardState extends State<_ApptCard> {
       }
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('No prescription found for this appointment'),
+        SnackBar(
+          content: Text('No prescription found for this appointment'.tr()),
           backgroundColor: Colors.orange,
         ),
       );
@@ -965,12 +965,12 @@ class _ApptCardState extends State<_ApptCard> {
                         borderRadius: BorderRadius.circular(8),
                         border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.3)),
                       ),
-                      child: const Row(
+                      child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.description_outlined, size: 12, color: Color(0xFF10B981)),
-                          SizedBox(width: 4),
-                          Text('Prescription', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF10B981))),
+                          const Icon(Icons.description_outlined, size: 12, color: Color(0xFF10B981)),
+                          const SizedBox(width: 4),
+                          Text('Prescription'.tr(), style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF10B981))),
                         ],
                       ),
                     ),
@@ -991,7 +991,7 @@ class _ApptCardState extends State<_ApptCard> {
                       color: color.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: Text('Details',
+                    child: Text('Details'.tr(),
                         style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: color)),
                   ),
                 ),
@@ -1025,7 +1025,7 @@ class _ApptCardState extends State<_ApptCard> {
                               color: Color(0xFFEF4444)))
                       : const Icon(Icons.cancel_outlined, size: 15),
                   label: Text(
-                    _cancelling ? 'Cancelling...' : 'Cancel Appointment',
+                    _cancelling ? 'Cancelling...'.tr() : 'Cancel Appointment'.tr(),
                     style: const TextStyle(
                         fontSize: 12, fontWeight: FontWeight.w700),
                   ),

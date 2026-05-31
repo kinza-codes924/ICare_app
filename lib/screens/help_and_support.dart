@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -29,7 +30,7 @@ class HelpAndSupport extends ConsumerWidget {
         backgroundColor: Colors.white,
         elevation: 0,
         title: CustomText(
-          text: "Help & Support",
+          text: "Help & Support".tr(),
           fontWeight: FontWeight.bold,
           color: AppColors.primaryColor,
         ),
@@ -56,17 +57,17 @@ class HelpAndSupport extends ConsumerWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    "Academic Support",
-                    style: TextStyle(
+                  Text(
+                    "Academic Support".tr(),
+                    style: const TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.w800,
                       color: Color(0xFF0F172A),
                     ),
                   ),
                   const SizedBox(height: 12),
-                  const Text(
-                    "Welcome to the iCare Student Support Center. Our faculty and technical teams are here to ensure your learning journey is seamless.",
+                  Text(
+                    "Welcome to the iCare Student Support Center. Our faculty and technical teams are here to ensure your learning journey is seamless.".tr(),
                     style: TextStyle(
                       fontSize: 14,
                       color: Color(0xFF64748B),
@@ -89,9 +90,9 @@ class HelpAndSupport extends ConsumerWidget {
               ),
             ),
             const SizedBox(height: 32),
-            const Text(
-              "Frequently Asked Questions",
-              style: TextStyle(
+            Text(
+              "Frequently Asked Questions".tr(),
+              style: const TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.w800,
                 color: Color(0xFF0F172A),

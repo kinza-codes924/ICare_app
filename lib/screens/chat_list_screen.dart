@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'dart:async';
@@ -50,7 +51,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
         setState(() => _isLoading = false);
         if (!silent) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: const Text('Unable to load data. Please try again.')),
+            SnackBar(content: Text('Unable to load data. Please try again.'.tr())),
           );
         }
       }
@@ -85,7 +86,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
-          'Messages',
+          'Messages'.tr(),
           style: TextStyle(
             color: Colors.black,
             fontSize: 20.sp,

@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_size_matters/flutter_size_matters.dart';
 import 'package:icare/screens/reset_password.dart';
@@ -184,9 +185,9 @@ class _VerifyCodeState extends State<VerifyCode> {
                         ),
                         const SizedBox(height: 24),
                         // Header
-                        const Text(
-                          "Verification Code",
-                          style: TextStyle(
+                        Text(
+                          "Verification Code".tr(),
+                          style: const TextStyle(
                             fontSize: 26,
                             fontWeight: FontWeight.w800,
                             color: Color(0xFF0B2D6E),
@@ -195,7 +196,7 @@ class _VerifyCodeState extends State<VerifyCode> {
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          "We've sent a 5-digit verification code to your registered account",
+                          "We've sent a 5-digit verification code to your registered account".tr(),
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             fontSize: 14,
@@ -244,7 +245,7 @@ class _VerifyCodeState extends State<VerifyCode> {
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
                                   Text(
-                                    "Didn't receive the code?",
+                                    "Didn't receive the code?".tr(),
                                     style: TextStyle(
                                       color: Colors.grey[500],
                                       fontSize: 14,
@@ -255,9 +256,9 @@ class _VerifyCodeState extends State<VerifyCode> {
                                     onPressed: isLoading
                                         ? null
                                         : _handleResendOTP,
-                                    child: const Text(
-                                      "Resend",
-                                      style: TextStyle(
+                                    child: Text(
+                                      "Resend".tr(),
+                                      style: const TextStyle(
                                         color: AppColors.primaryColor,
                                         fontWeight: FontWeight.w700,
                                         fontSize: 14,
@@ -292,9 +293,9 @@ class _VerifyCodeState extends State<VerifyCode> {
                                             strokeWidth: 2,
                                           ),
                                         )
-                                      : const Text(
-                                          "Confirm & Verify",
-                                          style: TextStyle(
+                                      : Text(
+                                          "Confirm & Verify".tr(),
+                                          style: const TextStyle(
                                             color: Colors.white,
                                             fontSize: 16,
                                             fontWeight: FontWeight.w700,
@@ -415,7 +416,7 @@ class _VerifyCodeState extends State<VerifyCode> {
             children: [
               SizedBox(height: ScallingConfig.moderateScale(30)),
               CustomText(
-                text: "Verification Code",
+                text: "Verification Code".tr(),
                 fontWeight: FontWeight.w900,
                 fontSize: 22,
                 color: AppColors.primaryColor,
@@ -496,7 +497,7 @@ class _VerifyCodeState extends State<VerifyCode> {
                       child: TextButton(
                         onPressed: isLoading ? null : _handleResendOTP,
                         child: Text(
-                          "Resend Code",
+                          "Resend Code".tr(),
                           style: TextStyle(
                             color: isTablet
                                 ? AppColors.white
@@ -529,9 +530,9 @@ class _VerifyCodeState extends State<VerifyCode> {
                                   strokeWidth: 2,
                                 ),
                               )
-                            : const Text(
-                                "Confirm",
-                                style: TextStyle(
+                            : Text(
+                                "Confirm".tr(),
+                                style: const TextStyle(
                                   color: Colors.white,
                                   fontSize: 16,
                                 ),
