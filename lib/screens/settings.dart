@@ -1237,7 +1237,7 @@ class _WebSettingsLayout extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Settings', style: TextStyle(color: AppColors.primaryColor, fontWeight: FontWeight.w700)), centerTitle: true, backgroundColor: Colors.white, foregroundColor: AppColors.primaryColor, elevation: 0, surfaceTintColor: Colors.white),
+      appBar: AppBar(title: Text('settings_title'.tr(), style: const TextStyle(color: AppColors.primaryColor, fontWeight: FontWeight.w700)), centerTitle: true, backgroundColor: Colors.white, foregroundColor: AppColors.primaryColor, elevation: 0, surfaceTintColor: Colors.white),
       body: SingleChildScrollView(padding: const EdgeInsets.all(24), child: Center(child: Container(constraints: const BoxConstraints(maxWidth: 800), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         // Remove any blue background header - using clean white layout
         _ProfileEditCard(p: p), const SizedBox(height: 24),
@@ -1515,8 +1515,8 @@ class _WebSettingsLayout extends StatelessWidget {
               ListTile(
                 contentPadding: EdgeInsets.zero,
                 leading: Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(10)), child: Icon(icon, color: color, size: 20)),
-                title: Text(label, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
-                subtitle: Text(isOn ? 'Currently tracking' : 'Not tracking', style: TextStyle(fontSize: 12, color: isOn ? const Color(0xFF10B981) : const Color(0xFF94A3B8))),
+                title: Text(label.tr(), style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                subtitle: Text(isOn ? 'Currently tracking'.tr() : 'Not tracking'.tr(), style: TextStyle(fontSize: 12, color: isOn ? const Color(0xFF10B981) : const Color(0xFF94A3B8))),
                 trailing: Switch(value: isOn, onChanged: (v) => p.onTrackerToggle(key, v), activeThumbColor: AppColors.primaryColor),
               ),
               if (i < items.length - 1) const Divider(height: 1),
@@ -1553,7 +1553,7 @@ class _WebSettingsLayout extends StatelessWidget {
         child: OutlinedButton.icon(
           onPressed: p.onLogout,
           icon: const Icon(Icons.logout_rounded, color: Color(0xFFEF4444)),
-          label: const Text('Logout', style: TextStyle(color: Color(0xFFEF4444), fontSize: 16, fontWeight: FontWeight.w600)),
+          label: Text('logout'.tr(), style: const TextStyle(color: Color(0xFFEF4444), fontSize: 16, fontWeight: FontWeight.w600)),
           style: OutlinedButton.styleFrom(
             side: const BorderSide(color: Color(0xFFFCA5A5)),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -1567,15 +1567,15 @@ class _WebSettingsLayout extends StatelessWidget {
 
   // ── REUSABLE ──
   Widget _sectionLabel(String title) {
-    return Row(children: [const Icon(Icons.circle, size: 8, color: AppColors.primaryColor), const SizedBox(width: 8), Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700))]);
+    return Row(children: [const Icon(Icons.circle, size: 8, color: AppColors.primaryColor), const SizedBox(width: 8), Text(title.tr(), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700))]);
   }
 
   Widget _settingsTile({required IconData icon, required Color iconColor, required String title, required String subtitle, required VoidCallback onTap}) {
-    return ListTile(contentPadding: EdgeInsets.zero, leading: Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: iconColor.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(10)), child: Icon(icon, color: iconColor, size: 20)), title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)), subtitle: Text(subtitle, style: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8))), trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: Color(0xFFCBD5E1)), onTap: onTap);
+    return ListTile(contentPadding: EdgeInsets.zero, leading: Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: iconColor.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(10)), child: Icon(icon, color: iconColor, size: 20)), title: Text(title.tr(), style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)), subtitle: Text(subtitle.tr(), style: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8))), trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: Color(0xFFCBD5E1)), onTap: onTap);
   }
 
   Widget _switchTile({required IconData icon, required String title, required String subtitle, required bool value, required void Function(bool) onChanged}) {
-    return ListTile(contentPadding: EdgeInsets.zero, leading: Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: AppColors.primaryColor.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(10)), child: Icon(icon, color: AppColors.primaryColor, size: 20)), title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)), subtitle: Text(subtitle, style: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8))), trailing: Switch(value: value, onChanged: onChanged, activeThumbColor: AppColors.primaryColor));
+    return ListTile(contentPadding: EdgeInsets.zero, leading: Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: AppColors.primaryColor.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(10)), child: Icon(icon, color: AppColors.primaryColor, size: 20)), title: Text(title.tr(), style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)), subtitle: Text(subtitle.tr(), style: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8))), trailing: Switch(value: value, onChanged: onChanged, activeThumbColor: AppColors.primaryColor));
   }
 
   Widget _comingSoonBanner(String feature) {
@@ -1594,7 +1594,7 @@ class _MobileSettingsLayout extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Settings', style: TextStyle(color: AppColors.primaryColor, fontWeight: FontWeight.w700)), centerTitle: true, backgroundColor: Colors.white, foregroundColor: AppColors.primaryColor, elevation: 0, surfaceTintColor: Colors.white),
+      appBar: AppBar(title: Text('settings_title'.tr(), style: const TextStyle(color: AppColors.primaryColor, fontWeight: FontWeight.w700)), centerTitle: true, backgroundColor: Colors.white, foregroundColor: AppColors.primaryColor, elevation: 0, surfaceTintColor: Colors.white),
       body: SingleChildScrollView(padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         _ProfileEditCard(p: p), const SizedBox(height: 16),
         if (p.isDoctor) ...[_doctorProfessionalCard(context), const SizedBox(height: 16)],
@@ -1641,8 +1641,8 @@ class _MobileSettingsLayout extends StatelessWidget {
               ListTile(
                 contentPadding: EdgeInsets.zero,
                 leading: Container(padding: const EdgeInsets.all(7), decoration: BoxDecoration(color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)), child: Icon(icon, color: color, size: 18)),
-                title: Text(label, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-                subtitle: Text(isOn ? 'Tracking' : 'Not tracking', style: TextStyle(fontSize: 11, color: isOn ? const Color(0xFF10B981) : const Color(0xFF94A3B8))),
+                title: Text(label.tr(), style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                subtitle: Text(isOn ? 'Tracking'.tr() : 'Not tracking'.tr(), style: TextStyle(fontSize: 11, color: isOn ? const Color(0xFF10B981) : const Color(0xFF94A3B8))),
                 trailing: Switch(value: isOn, onChanged: (v) => p.onTrackerToggle(key, v), activeThumbColor: AppColors.primaryColor, materialTapTargetSize: MaterialTapTargetSize.shrinkWrap),
                 dense: true,
               ),
@@ -1871,7 +1871,7 @@ class _MobileSettingsLayout extends StatelessWidget {
         child: OutlinedButton.icon(
           onPressed: p.onLogout,
           icon: const Icon(Icons.logout_rounded, color: Color(0xFFEF4444)),
-          label: const Text('Logout', style: TextStyle(color: Color(0xFFEF4444), fontSize: 16, fontWeight: FontWeight.w600)),
+          label: Text('logout'.tr(), style: const TextStyle(color: Color(0xFFEF4444), fontSize: 16, fontWeight: FontWeight.w600)),
           style: OutlinedButton.styleFrom(
             side: const BorderSide(color: Color(0xFFFCA5A5)),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -1884,15 +1884,15 @@ class _MobileSettingsLayout extends StatelessWidget {
   }
 
   Widget _sectionLabel(String title) {
-    return Row(children: [const Icon(Icons.circle, size: 7, color: AppColors.primaryColor), const SizedBox(width: 7), Text(title, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.primaryColor))]);
+    return Row(children: [const Icon(Icons.circle, size: 7, color: AppColors.primaryColor), const SizedBox(width: 7), Text(title.tr(), style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.primaryColor))]);
   }
 
   Widget _settingsTile({required IconData icon, required Color iconColor, required String title, required String subtitle, required VoidCallback onTap}) {
-    return ListTile(contentPadding: EdgeInsets.zero, leading: Container(padding: const EdgeInsets.all(7), decoration: BoxDecoration(color: iconColor.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)), child: Icon(icon, color: iconColor, size: 18)), title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)), subtitle: Text(subtitle, style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8))), trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 12, color: Color(0xFFCBD5E1)), onTap: onTap, dense: true);
+    return ListTile(contentPadding: EdgeInsets.zero, leading: Container(padding: const EdgeInsets.all(7), decoration: BoxDecoration(color: iconColor.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)), child: Icon(icon, color: iconColor, size: 18)), title: Text(title.tr(), style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)), subtitle: Text(subtitle.tr(), style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8))), trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 12, color: Color(0xFFCBD5E1)), onTap: onTap, dense: true);
   }
 
   Widget _switchTile({required IconData icon, required String title, required String subtitle, required bool value, required void Function(bool) onChanged}) {
-    return ListTile(contentPadding: EdgeInsets.zero, leading: Container(padding: const EdgeInsets.all(7), decoration: BoxDecoration(color: AppColors.primaryColor.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)), child: Icon(icon, color: AppColors.primaryColor, size: 18)), title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)), subtitle: Text(subtitle, style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8))), trailing: Switch(value: value, onChanged: onChanged, activeThumbColor: AppColors.primaryColor, materialTapTargetSize: MaterialTapTargetSize.shrinkWrap), dense: true);
+    return ListTile(contentPadding: EdgeInsets.zero, leading: Container(padding: const EdgeInsets.all(7), decoration: BoxDecoration(color: AppColors.primaryColor.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)), child: Icon(icon, color: AppColors.primaryColor, size: 18)), title: Text(title.tr(), style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)), subtitle: Text(subtitle.tr(), style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8))), trailing: Switch(value: value, onChanged: onChanged, activeThumbColor: AppColors.primaryColor, materialTapTargetSize: MaterialTapTargetSize.shrinkWrap), dense: true);
   }
 
   Widget _mobileComingSoon(String feature, IconData icon) {
@@ -2034,7 +2034,7 @@ class _ProfileEditCardState extends State<_ProfileEditCard> {
                         }
                       },
                       icon: const Icon(Icons.edit_rounded, size: 15),
-                      label: const Text('Edit', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+                      label: Text('Edit'.tr(), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
                       style: TextButton.styleFrom(
                         foregroundColor: AppColors.primaryColor,
                         backgroundColor: AppColors.primaryColor.withValues(alpha: 0.07),
@@ -2072,10 +2072,10 @@ class _ProfileEditCardState extends State<_ProfileEditCard> {
                 const SizedBox(height: 6),
                 DropdownButtonFormField<String>(
                   initialValue: _gender,
-                  hint: const Text('Select gender', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 14)),
+                  hint: Text('Select gender'.tr(), style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 14)),
                   decoration: _inputDeco(Icons.wc_rounded),
                   items: ['Male', 'Female', 'Other']
-                      .map((g) => DropdownMenuItem(value: g, child: Text(g)))
+                      .map((g) => DropdownMenuItem(value: g, child: Text(g.tr())))
                       .toList(),
                   onChanged: (v) => setState(() => _gender = v),
                 ),
@@ -2093,7 +2093,7 @@ class _ProfileEditCardState extends State<_ProfileEditCard> {
                           side: const BorderSide(color: Color(0xFFE2E8F0)),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                         ),
-                        child: const Text('Cancel', style: TextStyle(fontWeight: FontWeight.w700, color: Color(0xFF64748B))),
+                        child: Text('cancel'.tr(), style: const TextStyle(fontWeight: FontWeight.w700, color: Color(0xFF64748B))),
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -2109,7 +2109,7 @@ class _ProfileEditCardState extends State<_ProfileEditCard> {
                         ),
                         child: _saving
                             ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                            : const Text('Update Profile', style: TextStyle(fontWeight: FontWeight.w700)),
+                            : Text('Update Profile'.tr(), style: const TextStyle(fontWeight: FontWeight.w700)),
                       ),
                     ),
                   ],
@@ -2139,7 +2139,7 @@ class _ProfileEditCardState extends State<_ProfileEditCard> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(label, style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8), fontWeight: FontWeight.w600, letterSpacing: 0.3)),
+                Text(label.tr(), style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8), fontWeight: FontWeight.w600, letterSpacing: 0.3)),
                 const SizedBox(height: 2),
                 Text(value, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF0F172A))),
               ],
@@ -2166,7 +2166,7 @@ class _ProfileEditCardState extends State<_ProfileEditCard> {
   }
 
   Widget _fieldLabel(String label) {
-    return Text(label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF475569)));
+    return Text(label.tr(), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF475569)));
   }
 
   InputDecoration _inputDeco(IconData icon, {String? hint}) {
