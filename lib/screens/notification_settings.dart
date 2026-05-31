@@ -35,20 +35,20 @@ class _NotificationSettingsState extends ConsumerState<NotificationSettings> {
     final prefs = await SharedPreferences.getInstance();
     if (mounted) {
       setState(() {
-        _toggleStates['Notification Sound'] = prefs.getBool('notif_sound') ?? true;
-        _toggleStates['Send prescription to email automatically'] =
-            prefs.getBool('email_prescription_auto') ?? false;
+        for (final key in _toggleStates.keys.toList()) {
+          final prefKey = 'notif_${key.replaceAll(' ', '_').toLowerCase()}';
+          final saved = prefs.getBool(prefKey);
+          if (saved != null) _toggleStates[key] = saved;
+        }
       });
     }
   }
 
   Future<void> _saveToggle(String title, bool value) async {
     final prefs = await SharedPreferences.getInstance();
-    if (title == 'Notification Sound') {
-      await prefs.setBool('notif_sound', value);
-    } else if (title == 'Send prescription to email automatically') {
-      await prefs.setBool('email_prescription_auto', value);
-      // Persist to backend so doctor's prescription form can check it
+    final prefKey = 'notif_${title.replaceAll(' ', '_').toLowerCase()}';
+    await prefs.setBool(prefKey, value);
+    if (title == 'Send prescription to email automatically') {
       final userId = ref.read(authProvider).user?.id ?? '';
       if (userId.isNotEmpty) {
         NotificationService().updateNotificationPreferences(
@@ -289,29 +289,27 @@ class _WebNotificationSettingsScreenState
   }
 
   Future<void> _loadPrefs() async {
-    if (!widget.isPatient) return;
     final prefs = await SharedPreferences.getInstance();
     if (mounted) {
-      setState(() {
-        settingsState['Notification Sound'] = prefs.getBool('notif_sound') ?? true;
-        settingsState['Send prescription to email automatically'] =
-            prefs.getBool('email_prescription_auto') ?? false;
-      });
+      final updated = Map<String, bool>.from(settingsState);
+      for (final key in settingsState.keys) {
+        final prefKey = 'notif_${key.replaceAll(' ', '_').toLowerCase()}';
+        final saved = prefs.getBool(prefKey);
+        if (saved != null) updated[key] = saved;
+      }
+      setState(() => settingsState = updated);
     }
   }
 
   Future<void> _saveToggle(String key, bool value) async {
     final prefs = await SharedPreferences.getInstance();
-    if (key == 'Notification Sound') {
-      await prefs.setBool('notif_sound', value);
-    } else if (key == 'Send prescription to email automatically') {
-      await prefs.setBool('email_prescription_auto', value);
-      if (widget.userId.isNotEmpty) {
-        NotificationService().updateNotificationPreferences(
-          widget.userId,
-          {'emailPrescriptionAuto': value},
-        ).ignore();
-      }
+    final prefKey = 'notif_${key.replaceAll(' ', '_').toLowerCase()}';
+    await prefs.setBool(prefKey, value);
+    if (key == 'Send prescription to email automatically' && widget.userId.isNotEmpty) {
+      NotificationService().updateNotificationPreferences(
+        widget.userId,
+        {'emailPrescriptionAuto': value},
+      ).ignore();
     }
   }
 

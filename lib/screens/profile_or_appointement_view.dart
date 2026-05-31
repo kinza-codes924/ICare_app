@@ -169,7 +169,7 @@ class ProfileOrAppointmentViewScreen extends ConsumerWidget {
                         Navigator.of(context).push(
                           MaterialPageRoute(
                             builder: (ctx) =>
-                                IntakeNotesScreen(appointment: appointment),
+                                IntakeNotesScreen(appointment: appointment, isReadOnly: selectedRole == "Doctor"),
                           ),
                         );
                       },
@@ -862,38 +862,6 @@ class _WebPatientProfileViewState extends State<_WebPatientProfileView> {
                       ],
                       if (selectedRole == "Doctor") ...[
                         const SizedBox(height: 24),
-                        SizedBox(
-                          width: double.infinity,
-                          child: ElevatedButton.icon(
-                            onPressed: () {
-                              Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (ctx) => CreateMedicalRecordScreen(
-                                    appointment: appointment,
-                                  ),
-                                ),
-                              );
-                            },
-                            icon: const Icon(
-                              Icons.medical_services_rounded,
-                              size: 22,
-                            ),
-                            label: const Text("Create Medical Record"),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF3B82F6),
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(vertical: 20),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              elevation: 0,
-                              textStyle: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ),
-                        ),
                         if (appointment.status.toLowerCase() == 'confirmed' ||
                             appointment.status.toLowerCase() == 'in_progress') ...[
                           const SizedBox(height: 16),
@@ -926,8 +894,8 @@ class _WebPatientProfileViewState extends State<_WebPatientProfileView> {
                                   ),
                                 );
                               },
-                              icon: const Icon(Icons.videocam_rounded, size: 22),
-                              label: const Text("Start Video Consultation"),
+                              icon: const Icon(Icons.play_circle_outline_rounded, size: 22),
+                              label: const Text("Start Consultation"),
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: const Color(0xFF6366F1),
                                 foregroundColor: Colors.white,

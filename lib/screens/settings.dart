@@ -12,6 +12,7 @@ import 'package:icare/screens/courses.dart' show Courses;
 import 'package:icare/screens/doctor_availability.dart' show DoctorAvailability;
 import 'package:icare/screens/doctor_profile_setup.dart' show DoctorProfileSetup;
 import 'package:icare/screens/help_and_support.dart' show HelpAndSupport;
+import 'package:icare/screens/current_medications_page.dart';
 import 'package:icare/screens/notification_settings.dart' show NotificationSettings;
 import 'package:icare/screens/privacy_policy.dart' show PrivacyPolicy;
 import 'package:icare/screens/terms_and_conditions.dart' show TermsAndConditions;
@@ -334,16 +335,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 
   void _showCurrentMedicationsDialog(BuildContext ctx) {
-    final c = TextEditingController(text: _currentMedications);
-    showDialog(context: ctx, builder: (dc) => AlertDialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      title: const Row(children: [Icon(Icons.medication_outlined, color: Color(0xFF8B5CF6), size: 22), SizedBox(width: 10), Text('Current Medications', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16))]),
-      content: SizedBox(width: 400, child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-        const Text('List your current medications', style: TextStyle(fontSize: 13, color: Color(0xFF64748B))), const SizedBox(height: 12),
-        TextField(controller: c, maxLines: 3, decoration: InputDecoration(hintText: 'e.g. Metformin 500mg', border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)), contentPadding: const EdgeInsets.all(12))),
-      ])),
-      actions: [TextButton(onPressed: () => Navigator.pop(dc), child: const Text('Cancel', style: TextStyle(color: Color(0xFF64748B)))), ElevatedButton(onPressed: () { setState(() => _currentMedications = c.text.trim()); Navigator.pop(dc); ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(content: Text('Medications saved'), backgroundColor: Colors.green)); }, style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryColor, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))), child: const Text('Save'))],
-    ));
+    Navigator.of(ctx).push(
+      MaterialPageRoute(builder: (_) => const CurrentMedicationsPage()),
+    );
   }
 
   void _showHealthGoalsDialog(BuildContext ctx) {
