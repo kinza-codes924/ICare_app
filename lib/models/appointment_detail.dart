@@ -63,6 +63,9 @@ class AppointmentDetail {
           role: 'patient',
           age: json['patient_age']?.toString(),
           gender: json['patient_gender']?.toString(),
+          profilePicture: json['patient_profilePicture']?.toString() ??
+              json['patient_profile_picture']?.toString() ??
+              json['patientProfilePicture']?.toString(),
         );
       }
     } catch (e) {

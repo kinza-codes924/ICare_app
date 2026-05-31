@@ -183,6 +183,8 @@ class _LifestyleTrackerScreenState extends State<LifestyleTrackerScreen>
   }
 
   Future<void> _saveVital(String vitalType, String value, String unit) async {
+    // Optimistically increment points immediately so user sees change right away
+    setState(() => _pointsToday += 5);
     await _healthTrackerService.addEntry(
       vitalType: vitalType,
       value: value,
@@ -2455,6 +2457,8 @@ class _LogBottomSheet extends StatelessWidget {
               FilteringTextInputFormatter.allow(RegExp(r'[\d.]'))
             ],
             autofocus: true,
+            textInputAction: TextInputAction.done,
+            onSubmitted: (_) => onSave(),
             style: const TextStyle(
                 fontSize: 28, fontWeight: FontWeight.w900),
             decoration: InputDecoration(

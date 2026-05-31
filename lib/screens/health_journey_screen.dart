@@ -569,6 +569,8 @@ class _JourneyVitalSheet extends StatelessWidget {
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
             inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[\d.]'))],
             autofocus: true,
+            textInputAction: TextInputAction.done,
+            onSubmitted: (_) => onSave(),
             style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w900),
             decoration: InputDecoration(
               suffixText: unit,
@@ -666,7 +668,7 @@ class _JourneyBPSheet extends StatelessWidget {
                 padding: EdgeInsets.symmetric(horizontal: 12),
                 child: Text('/', style: TextStyle(fontSize: 32, color: Color(0xFFCBD5E1))),
               ),
-              Expanded(child: _bpField(diaCtrl, 'Diastolic', context)),
+              Expanded(child: _bpField(diaCtrl, 'Diastolic', context, onDone: onSave)),
             ],
           ),
           const SizedBox(height: 20),
@@ -689,13 +691,15 @@ class _JourneyBPSheet extends StatelessWidget {
     );
   }
 
-  Widget _bpField(TextEditingController ctrl, String label, BuildContext context) {
+  Widget _bpField(TextEditingController ctrl, String label, BuildContext context, {VoidCallback? onDone}) {
     return TextField(
       controller: ctrl,
       keyboardType: TextInputType.number,
       inputFormatters: [FilteringTextInputFormatter.digitsOnly],
       textAlign: TextAlign.center,
       autofocus: label == 'Systolic',
+      textInputAction: label == 'Systolic' ? TextInputAction.next : TextInputAction.done,
+      onSubmitted: label == 'Diastolic' ? (_) => onDone?.call() : null,
       style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900),
       decoration: InputDecoration(
         labelText: label,

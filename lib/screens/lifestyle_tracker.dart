@@ -176,29 +176,17 @@ class _LifestyleTrackerScreenState extends State<LifestyleTrackerScreen> {
   List<HealthLog> get _filteredLogs {
     var logs = _logFilter == 'all' ? _logs : _logs.where((l) => l.type == _logFilter).toList();
 
-    // Apply date range filter
-    if (_dateRangeFilter != 'all') {
+    if (_dateRangeFilter == 'custom' && _customDate != null) {
+      final key = DateFormat('yyyy-MM-dd').format(_customDate!);
+      logs = logs.where((l) => l.dateKey == key).toList();
+    } else if (_dateRangeFilter != 'all') {
       final now = DateTime.now();
-      DateTime cutoffDate;
-
-      switch (_dateRangeFilter) {
-        case '7days':
-          cutoffDate = now.subtract(const Duration(days: 7));
-          break;
-        case '30days':
-          cutoffDate = now.subtract(const Duration(days: 30));
-          break;
-        case '60days':
-          cutoffDate = now.subtract(const Duration(days: 60));
-          break;
-        case '90days':
-          cutoffDate = now.subtract(const Duration(days: 90));
-          break;
-        default:
-          return logs;
-      }
-
-      logs = logs.where((l) => l.timestamp.isAfter(cutoffDate)).toList();
+      final days = _dateRangeFilter == '7days' ? 7
+          : _dateRangeFilter == '30days' ? 30
+          : _dateRangeFilter == '60days' ? 60
+          : 90;
+      final cutoff = now.subtract(Duration(days: days));
+      logs = logs.where((l) => l.timestamp.isAfter(cutoff)).toList();
     }
 
     return logs;
@@ -470,8 +458,19 @@ class _LifestyleTrackerScreenState extends State<LifestyleTrackerScreen> {
                                     style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8), fontWeight: FontWeight.w600)),
                                 ]),
                               ),
-                              // Log tiles
-                              ...entries.map((log) => _VitalLogTile(log: log)),
+                              // Card grid layout
+                              GridView.builder(
+                                shrinkWrap: true,
+                                physics: const NeverScrollableScrollPhysics(),
+                                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                                  crossAxisCount: 3,
+                                  crossAxisSpacing: 8,
+                                  mainAxisSpacing: 8,
+                                  childAspectRatio: 1.1,
+                                ),
+                                itemCount: entries.length,
+                                itemBuilder: (_, i) => _VitalLogCard(log: entries[i]),
+                              ),
                               const SizedBox(height: 4),
                             ],
                           );
@@ -489,7 +488,10 @@ class _LifestyleTrackerScreenState extends State<LifestyleTrackerScreen> {
     final isSelected = _dateRangeFilter == value;
     return InkWell(
       onTap: () {
-        setState(() => _dateRangeFilter = value);
+        setState(() {
+          _dateRangeFilter = value;
+          if (value != 'custom') _customDate = null;
+        });
         setModal(() {});
       },
       borderRadius: BorderRadius.circular(20),
@@ -514,21 +516,21 @@ class _LifestyleTrackerScreenState extends State<LifestyleTrackerScreen> {
     );
   }
 
+  DateTime? _customDate;
+
   Widget _buildCalendarChip(StateSetter setModal) {
     return InkWell(
       onTap: () async {
         final picked = await showDatePicker(
           context: context,
-          initialDate: DateTime.now(),
+          initialDate: _customDate ?? DateTime.now(),
           firstDate: DateTime.now().subtract(const Duration(days: 365)),
           lastDate: DateTime.now(),
         );
         if (picked != null) {
           setState(() {
             _dateRangeFilter = 'custom';
-            // Filter logs to show only the selected date
-            final selectedKey = DateFormat('yyyy-MM-dd').format(picked);
-            _logs = _logs.where((l) => l.dateKey == selectedKey).toList();
+            _customDate = picked;
           });
           setModal(() {});
         }
@@ -989,6 +991,94 @@ class _LogEntryDialogState extends State<_LogEntryDialog> {
 // REUSABLE WIDGETS
 // ═══════════════════════════════════════════════════════════════════════════
 
+// ── Card-style history item (matches Health Tracker card design) ─────────────
+class _VitalLogCard extends StatelessWidget {
+  final HealthLog log;
+  const _VitalLogCard({required this.log});
+
+  @override
+  Widget build(BuildContext context) {
+    final vConfig = _vitals.firstWhere((v) => v.id == log.type, orElse: () => _vitals.last);
+    final color = Color(log.colorHex);
+    final displayVal = log.type == 'mood'
+        ? _moodEmoji(log.value?.toString() ?? '')
+        : log.value?.toString() ?? '--';
+    final unitLabel = log.type == 'mood' ? '' : log.unit;
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: color.withValues(alpha: 0.2)),
+        boxShadow: [
+          BoxShadow(color: color.withValues(alpha: 0.07), blurRadius: 8, offset: const Offset(0, 2)),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(vConfig.icon, color: color, size: 14),
+              ),
+              Text(
+                log.timeLabel,
+                style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w600, color: Color(0xFF94A3B8)),
+              ),
+            ],
+          ),
+          const Spacer(),
+          Text(
+            log.name,
+            style: const TextStyle(fontSize: 10, color: Color(0xFF64748B), fontWeight: FontWeight.w600),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: 2),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Expanded(
+                child: Text(
+                  displayVal,
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: color),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+          if (unitLabel.isNotEmpty)
+            Text(
+              unitLabel,
+              style: const TextStyle(fontSize: 9, color: Color(0xFF94A3B8), fontWeight: FontWeight.w500),
+            ),
+        ],
+      ),
+    );
+  }
+
+  static String _moodEmoji(String val) {
+    switch (val) {
+      case 'Great':    return '😊';
+      case 'Good':     return '🙂';
+      case 'Okay':     return '😐';
+      case 'Low':      return '😔';
+      case 'Not Well': return '😢';
+      default:         return '😐';
+    }
+  }
+}
+
+// ── Row-style history item ─────────────────────────────────────────────────
 class _VitalLogTile extends StatelessWidget {
   final HealthLog log;
   const _VitalLogTile({required this.log});
