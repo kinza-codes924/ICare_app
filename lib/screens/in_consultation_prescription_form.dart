@@ -7,6 +7,7 @@ import 'package:icare/models/enhanced_prescription.dart';
 import 'package:icare/models/lifestyle_advice.dart';
 import 'package:icare/screens/patient_history_form_screen.dart';
 import 'package:icare/services/consultation_service.dart';
+import 'package:icare/services/notification_service.dart';
 import 'package:icare/utils/theme.dart';
 import 'package:icare/widgets/back_button.dart';
 import 'package:icare/services/icd_service.dart';
@@ -32,6 +33,7 @@ class InConsultationPrescriptionForm extends StatefulWidget {
 class _InConsultationPrescriptionFormState
     extends State<InConsultationPrescriptionForm> {
   final ConsultationService _consultationService = ConsultationService();
+  final NotificationService _notificationService = NotificationService();
 
   // Accordion expanded state (9 sections)
   // Open: Doctor's Notes (1), Diagnosis (3), Medications (4), Lab Tests (5) by default
@@ -193,6 +195,8 @@ class _InConsultationPrescriptionFormState
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Prescription completed successfully'), backgroundColor: Colors.green),
         );
+        // Feature #68 — send prescription email if patient has opted in
+        _maybeSendPrescriptionEmail();
         Navigator.pop(context);
       } else if (mounted) {
         final msg = result['message']?.toString() ?? result['error']?.toString() ?? 'Server error — please try again';
@@ -209,6 +213,13 @@ class _InConsultationPrescriptionFormState
     } finally {
       if (mounted) setState(() => _isSaving = false);
     }
+  }
+
+  Future<void> _maybeSendPrescriptionEmail() async {
+    // Backend checks patient's email preference before sending
+    await _notificationService.sendPrescriptionEmail(
+      consultationId: widget.consultationId,
+    );
   }
 
   /// Build minimal payload — only send what backend expects for /prescription/complete

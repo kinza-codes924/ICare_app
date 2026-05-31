@@ -4,17 +4,63 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_size_matters/flutter_size_matters.dart';
 import 'package:flutter_switch/flutter_switch.dart';
 import 'package:icare/providers/auth_provider.dart';
+import 'package:icare/services/notification_service.dart';
 import 'package:icare/utils/theme.dart';
 import 'package:icare/utils/utils.dart';
 import 'package:icare/widgets/back_button.dart';
 import 'package:icare/widgets/custom_button.dart';
 import 'package:icare/widgets/custom_text.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
-class NotificationSettings extends ConsumerWidget {
+class NotificationSettings extends ConsumerStatefulWidget {
   const NotificationSettings({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<NotificationSettings> createState() => _NotificationSettingsState();
+}
+
+class _NotificationSettingsState extends ConsumerState<NotificationSettings> {
+  final Map<String, bool> _toggleStates = {
+    'Notification Sound': true,
+    'Send prescription to email automatically': false,
+  };
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPrefs();
+  }
+
+  Future<void> _loadPrefs() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (mounted) {
+      setState(() {
+        _toggleStates['Notification Sound'] = prefs.getBool('notif_sound') ?? true;
+        _toggleStates['Send prescription to email automatically'] =
+            prefs.getBool('email_prescription_auto') ?? false;
+      });
+    }
+  }
+
+  Future<void> _saveToggle(String title, bool value) async {
+    final prefs = await SharedPreferences.getInstance();
+    if (title == 'Notification Sound') {
+      await prefs.setBool('notif_sound', value);
+    } else if (title == 'Send prescription to email automatically') {
+      await prefs.setBool('email_prescription_auto', value);
+      // Persist to backend so doctor's prescription form can check it
+      final userId = ref.read(authProvider).user?.id ?? '';
+      if (userId.isNotEmpty) {
+        NotificationService().updateNotificationPreferences(
+          userId,
+          {'emailPrescriptionAuto': value},
+        ).ignore();
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final role = ref.read(authProvider).userRole ?? '';
     final isPatient = role == 'Patient';
     final isStudent = role == 'Student';
@@ -29,8 +75,8 @@ class NotificationSettings extends ConsumerWidget {
         {"id": "2", "title": "Lab Results Ready", "onPress": () {}},
         {"id": "3", "title": "New Prescription", "onPress": () {}},
         {"id": "4", "title": "Medication Reminder", "onPress": () {}},
-        {"id": "5", "title": "Notification Sound", "onPress": () {}, "isToggle": true, "value": true},
-        {"id": "6", "title": "Send prescription to email automatically", "onPress": () {}, "isToggle": true, "value": false},
+        {"id": "5", "title": "Notification Sound", "onPress": () {}, "isToggle": true},
+        {"id": "6", "title": "Send prescription to email automatically", "onPress": () {}, "isToggle": true},
       ];
     } else if (isStudent) {
       settingsList = [
@@ -59,7 +105,14 @@ class NotificationSettings extends ConsumerWidget {
       ];
     }
     if (MediaQuery.of(context).size.width > 600) {
-      return _WebNotificationSettingsScreen(isStudent: isStudent, isPatient: isPatient, isPharmacy: isPharmacy, isLaboratory: isLaboratory);
+      final userId = ref.read(authProvider).user?.id ?? '';
+      return _WebNotificationSettingsScreen(
+        isStudent: isStudent,
+        isPatient: isPatient,
+        isPharmacy: isPharmacy,
+        isLaboratory: isLaboratory,
+        userId: userId,
+      );
     }
 
     return Scaffold(
@@ -90,6 +143,8 @@ class NotificationSettings extends ConsumerWidget {
               child: Column(
                 children: settingsList.map((item) {
                   final bool isToggle = item['isToggle'] ?? false;
+                  final String title = item['title'] as String;
+                  final bool toggleValue = _toggleStates[title] ?? false;
                   return GestureDetector(
                     onTap: isToggle ? null : item["onPress"],
                     child: Column(
@@ -104,28 +159,27 @@ class NotificationSettings extends ConsumerWidget {
                             children: [
                               Expanded(
                                 child: CustomText(
-                                  text: (item["title"] as String).tr(),
+                                  text: title.tr(),
                                   fontWeight: FontWeight.bold,
                                   fontSize: 14,
                                   color: AppColors.primary500,
                                   fontFamily: "Gilroy-SemiBold",
                                 ),
                               ),
-                              isToggle 
+                              isToggle
                                 ? FlutterSwitch(
                                     width: 50.0,
                                     height: 20.0,
                                     toggleSize: 15.0,
-                                    value: item['value'] ?? false,
+                                    value: toggleValue,
                                     borderRadius: 30.0,
                                     padding: 2.0,
-                                    toggleColor: Color.fromRGBO(225, 225, 225, 1),
+                                    toggleColor: const Color.fromRGBO(225, 225, 225, 1),
                                     activeColor: AppColors.themeBlack,
                                     inactiveColor: AppColors.darkGreyColor,
                                     onToggle: (val) {
-                                      // setState(() {
-                                      // status2 = val;
-                                      // });
+                                      setState(() => _toggleStates[title] = val);
+                                      _saveToggle(title, val);
                                     },
                                   )
                                 : IconButton(
@@ -173,11 +227,13 @@ class _WebNotificationSettingsScreen extends StatefulWidget {
   final bool isPatient;
   final bool isPharmacy;
   final bool isLaboratory;
+  final String userId;
   const _WebNotificationSettingsScreen({
     this.isStudent = false,
     this.isPatient = false,
     this.isPharmacy = false,
     this.isLaboratory = false,
+    this.userId = '',
   });
 
   @override
@@ -192,6 +248,11 @@ class _WebNotificationSettingsScreenState
   @override
   void initState() {
     super.initState();
+    _initDefaults();
+    _loadPrefs();
+  }
+
+  void _initDefaults() {
     if (widget.isStudent) {
       settingsState = {
         "New Course Updates": true,
@@ -224,6 +285,33 @@ class _WebNotificationSettingsScreenState
     } else {
       // Doctor — patient/customer-support messages removed per product spec
       settingsState = { "New Appointment Bookings": true };
+    }
+  }
+
+  Future<void> _loadPrefs() async {
+    if (!widget.isPatient) return;
+    final prefs = await SharedPreferences.getInstance();
+    if (mounted) {
+      setState(() {
+        settingsState['Notification Sound'] = prefs.getBool('notif_sound') ?? true;
+        settingsState['Send prescription to email automatically'] =
+            prefs.getBool('email_prescription_auto') ?? false;
+      });
+    }
+  }
+
+  Future<void> _saveToggle(String key, bool value) async {
+    final prefs = await SharedPreferences.getInstance();
+    if (key == 'Notification Sound') {
+      await prefs.setBool('notif_sound', value);
+    } else if (key == 'Send prescription to email automatically') {
+      await prefs.setBool('email_prescription_auto', value);
+      if (widget.userId.isNotEmpty) {
+        NotificationService().updateNotificationPreferences(
+          widget.userId,
+          {'emailPrescriptionAuto': value},
+        ).ignore();
+      }
     }
   }
 
@@ -528,6 +616,7 @@ class _WebNotificationSettingsScreenState
                                     setState(() {
                                       settingsState[key] = newVal;
                                     });
+                                    _saveToggle(key, newVal);
                                   },
                                 ),
                               ],
