@@ -138,6 +138,8 @@ class _HealthTrackerState extends State<HealthTracker> {
           );
 
           if (res['success']) {
+            // Wait briefly for backend to process points
+            await Future.delayed(const Duration(milliseconds: 500));
             _loadAllData();
             if (mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
@@ -708,6 +710,8 @@ class _AddVitalDialogState extends State<_AddVitalDialog> {
                 keyboardType: _isTextInput
                     ? TextInputType.text
                     : const TextInputType.numberWithOptions(decimal: true),
+                textInputAction: TextInputAction.done,
+                onSubmitted: (_) => _save(),
                 decoration: InputDecoration(
                   labelText: 'Value',
                   hintText: widget.vitalType == 'Blood Pressure'

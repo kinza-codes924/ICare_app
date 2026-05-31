@@ -108,6 +108,7 @@ class _LifestyleTrackerScreenState extends State<LifestyleTrackerScreen> {
 
   // My-Logs filter
   String _logFilter = 'all';
+  String _dateRangeFilter = 'all'; // all, 7days, 30days, 60days, 90days
 
   @override
   void initState() {
@@ -172,8 +173,36 @@ class _LifestyleTrackerScreenState extends State<LifestyleTrackerScreen> {
 
   // ── Grouped logs ──────────────────────────────────────────────────────────
 
-  List<HealthLog> get _filteredLogs =>
-      _logFilter == 'all' ? _logs : _logs.where((l) => l.type == _logFilter).toList();
+  List<HealthLog> get _filteredLogs {
+    var logs = _logFilter == 'all' ? _logs : _logs.where((l) => l.type == _logFilter).toList();
+
+    // Apply date range filter
+    if (_dateRangeFilter != 'all') {
+      final now = DateTime.now();
+      DateTime cutoffDate;
+
+      switch (_dateRangeFilter) {
+        case '7days':
+          cutoffDate = now.subtract(const Duration(days: 7));
+          break;
+        case '30days':
+          cutoffDate = now.subtract(const Duration(days: 30));
+          break;
+        case '60days':
+          cutoffDate = now.subtract(const Duration(days: 60));
+          break;
+        case '90days':
+          cutoffDate = now.subtract(const Duration(days: 90));
+          break;
+        default:
+          return logs;
+      }
+
+      logs = logs.where((l) => l.timestamp.isAfter(cutoffDate)).toList();
+    }
+
+    return logs;
+  }
 
   Map<String, List<HealthLog>> get _groupedLogs {
     final map = <String, List<HealthLog>>{};
@@ -331,18 +360,18 @@ class _LifestyleTrackerScreenState extends State<LifestyleTrackerScreen> {
               Padding(
                 padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
                 child: Row(children: [
-                  const Text('My Logs', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Color(0xFF0F172A))),
+                  const Text('History', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Color(0xFF0F172A))),
                   const Spacer(),
                   if (_logs.isNotEmpty)
                     Text('${_logs.length} entries', style: const TextStyle(fontSize: 13, color: Color(0xFF64748B))),
                 ]),
               ),
 
-              // Log By dropdown
+              // History By dropdown
               Padding(
                 padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
                 child: Row(children: [
-                  const Text('Log By:', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF475569))),
+                  const Text('History By:', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF475569))),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Container(
@@ -377,6 +406,29 @@ class _LifestyleTrackerScreenState extends State<LifestyleTrackerScreen> {
                     ),
                   ),
                 ]),
+              ),
+
+              // Date Range Filter
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      _buildDateRangeChip('All', 'all', setModal),
+                      const SizedBox(width: 8),
+                      _buildDateRangeChip('7 Days', '7days', setModal),
+                      const SizedBox(width: 8),
+                      _buildDateRangeChip('30 Days', '30days', setModal),
+                      const SizedBox(width: 8),
+                      _buildDateRangeChip('60 Days', '60days', setModal),
+                      const SizedBox(width: 8),
+                      _buildDateRangeChip('90 Days', '90days', setModal),
+                      const SizedBox(width: 8),
+                      _buildCalendarChip(setModal),
+                    ],
+                  ),
+                ),
               ),
               const Divider(height: 1, color: Color(0xFFE2E8F0)),
 
@@ -433,6 +485,71 @@ class _LifestyleTrackerScreenState extends State<LifestyleTrackerScreen> {
     );
   }
 
+  Widget _buildDateRangeChip(String label, String value, StateSetter setModal) {
+    final isSelected = _dateRangeFilter == value;
+    return InkWell(
+      onTap: () {
+        setState(() => _dateRangeFilter = value);
+        setModal(() {});
+      },
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected ? AppColors.primaryColor : Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isSelected ? AppColors.primaryColor : const Color(0xFFE2E8F0),
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+            color: isSelected ? Colors.white : const Color(0xFF64748B),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCalendarChip(StateSetter setModal) {
+    return InkWell(
+      onTap: () async {
+        final picked = await showDatePicker(
+          context: context,
+          initialDate: DateTime.now(),
+          firstDate: DateTime.now().subtract(const Duration(days: 365)),
+          lastDate: DateTime.now(),
+        );
+        if (picked != null) {
+          setState(() {
+            _dateRangeFilter = 'custom';
+            // Filter logs to show only the selected date
+            final selectedKey = DateFormat('yyyy-MM-dd').format(picked);
+            _logs = _logs.where((l) => l.dateKey == selectedKey).toList();
+          });
+          setModal(() {});
+        }
+      },
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: const Color(0xFFE2E8F0)),
+        ),
+        child: const Icon(
+          Icons.calendar_today_rounded,
+          size: 18,
+          color: Color(0xFF64748B),
+        ),
+      ),
+    );
+  }
+
   // ── Build ─────────────────────────────────────────────────────────────────
 
   @override
@@ -452,7 +569,7 @@ class _LifestyleTrackerScreenState extends State<LifestyleTrackerScreen> {
           TextButton.icon(
             onPressed: _showMyLogs,
             icon: const Icon(Icons.history_rounded, size: 18),
-            label: const Text('My Logs', style: TextStyle(fontWeight: FontWeight.w700)),
+            label: const Text('History', style: TextStyle(fontWeight: FontWeight.w700)),
             style: TextButton.styleFrom(foregroundColor: AppColors.primaryColor),
           ),
           IconButton(icon: const Icon(Icons.refresh_rounded, color: Color(0xFF64748B)), onPressed: _loadApiData),

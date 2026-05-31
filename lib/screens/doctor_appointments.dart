@@ -140,7 +140,6 @@ class _DoctorAppointmentsScreenState extends State<DoctorAppointmentsScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
-        leading: CustomBackButton(),
         automaticallyImplyLeading: false,
         backgroundColor: Colors.white,
         elevation: 0,

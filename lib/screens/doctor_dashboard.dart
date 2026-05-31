@@ -1005,7 +1005,7 @@ class _DoctorDashboardState extends ConsumerState<DoctorDashboard> {
         );
       },
       child: Container(
-        padding: const EdgeInsets.all(7),
+        padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(12),
@@ -1021,103 +1021,100 @@ class _DoctorDashboardState extends ConsumerState<DoctorDashboard> {
             ),
           ],
         ),
-        child: Row(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Patient avatar
-            CircleAvatar(
-              radius: 16,
-              backgroundColor: statusColor.withValues(alpha: 0.15),
-              backgroundImage: (patientPhoto != null && patientPhoto.isNotEmpty)
-                  ? NetworkImage(patientPhoto) as ImageProvider
-                  : null,
-              child: (patientPhoto == null || patientPhoto.isEmpty)
-                  ? Text(
-                      initials.isEmpty ? 'P' : initials,
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w900,
-                        color: statusColor,
-                      ),
-                    )
-                  : null,
-            ),
-            const SizedBox(width: 6),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.center,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
+            // Top section: Avatar and name
+            Row(
+              children: [
+                CircleAvatar(
+                  radius: 18,
+                  backgroundColor: statusColor.withValues(alpha: 0.15),
+                  backgroundImage: (patientPhoto != null && patientPhoto.isNotEmpty)
+                      ? NetworkImage(patientPhoto) as ImageProvider
+                      : null,
+                  child: (patientPhoto == null || patientPhoto.isEmpty)
+                      ? Text(
+                          initials.isEmpty ? 'P' : initials,
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w900,
+                            color: statusColor,
+                          ),
+                        )
+                      : null,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
                     patientName,
                     style: const TextStyle(
-                      fontSize: 10,
+                      fontSize: 11,
                       fontWeight: FontWeight.w700,
                       color: Color(0xFF0F172A),
                     ),
-                    maxLines: 1,
+                    maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  const SizedBox(height: 2),
-                  Text(
-                    appointment.timeSlot,
-                    style: TextStyle(
-                      fontSize: 9,
-                      fontWeight: FontWeight.w600,
-                      color: statusColor,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  if (isPending)
-                    Row(
-                      children: [
-                        Expanded(
-                          child: GestureDetector(
-                            onTap: () => _updateAppointmentStatus(appointment.id, 'cancelled'),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(vertical: 2),
-                              margin: const EdgeInsets.only(top: 3),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFEF4444).withValues(alpha: 0.1),
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              child: const Center(child: Icon(Icons.close_rounded, size: 10, color: Color(0xFFEF4444))),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 3),
-                        Expanded(
-                          child: GestureDetector(
-                            onTap: () => _updateAppointmentStatus(appointment.id, 'confirmed'),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(vertical: 2),
-                              margin: const EdgeInsets.only(top: 3),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF059669).withValues(alpha: 0.1),
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              child: const Center(child: Icon(Icons.check_rounded, size: 10, color: Color(0xFF059669))),
-                            ),
-                          ),
-                        ),
-                      ],
-                    )
-                  else
-                    Container(
-                      margin: const EdgeInsets.only(top: 3),
-                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: statusColor.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Text(
-                        appointment.status.toUpperCase(),
-                        style: TextStyle(fontSize: 8, fontWeight: FontWeight.w900, color: statusColor),
-                      ),
-                    ),
-                ],
-              ),
+                ),
+              ],
             ),
+            // Middle section: Time
+            Text(
+              appointment.timeSlot,
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w600,
+                color: statusColor,
+              ),
+              overflow: TextOverflow.ellipsis,
+            ),
+            // Bottom section: Status or actions
+            if (isPending)
+              Row(
+                children: [
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () => _updateAppointmentStatus(appointment.id, 'cancelled'),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 4),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFEF4444).withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: const Center(child: Icon(Icons.close_rounded, size: 12, color: Color(0xFFEF4444))),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () => _updateAppointmentStatus(appointment.id, 'confirmed'),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 4),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF059669).withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: const Center(child: Icon(Icons.check_rounded, size: 12, color: Color(0xFF059669))),
+                      ),
+                    ),
+                  ),
+                ],
+              )
+            else
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: statusColor.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  appointment.status.toUpperCase(),
+                  style: TextStyle(fontSize: 9, fontWeight: FontWeight.w900, color: statusColor),
+                ),
+              ),
           ],
         ),
       ),
