@@ -836,6 +836,7 @@ class _WebPatientProfileViewState extends State<_WebPatientProfileView> {
                                 MaterialPageRoute(
                                   builder: (ctx) => IntakeNotesScreen(
                                     appointment: appointment,
+                                    isReadOnly: widget.selectedRole == "Doctor",
                                   ),
                                 ),
                               );
