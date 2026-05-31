@@ -5,6 +5,7 @@ import 'package:icare/utils/theme.dart';
 import 'package:icare/utils/shared_pref.dart';
 import 'package:icare/widgets/back_button.dart';
 import 'package:icare/services/health_tracker_service.dart';
+import 'package:icare/services/gamification_service.dart';
 import 'package:intl/intl.dart';
 
 class LifestyleTrackerScreen extends StatefulWidget {
@@ -54,6 +55,7 @@ class _LifestyleTrackerScreenState extends State<LifestyleTrackerScreen>
 
   // Points
   int _pointsToday = 0;
+  final GamificationService _gamificationService = GamificationService();
 
   // User name (loaded from SharedPref)
   String _userName = '';
@@ -107,6 +109,7 @@ class _LifestyleTrackerScreenState extends State<LifestyleTrackerScreen>
     _loadUserName();
     _loadLatestVitals();
     _loadAllLogs();
+    _loadPoints();
   }
 
   Future<void> _loadAllLogs() async {
@@ -115,6 +118,13 @@ class _LifestyleTrackerScreenState extends State<LifestyleTrackerScreen>
       final result = await _healthTrackerService.getEntries(limit: 500);
       if (result['success'] == true && mounted) {
         final list = (result['entries'] as List? ?? []).cast<Map<String, dynamic>>();
+        // Convert timestamps to local time for display
+        for (final e in list) {
+          if (e['timestamp'] is String) {
+            final utc = DateTime.tryParse(e['timestamp'] as String);
+            if (utc != null) e['timestamp'] = utc.toLocal().toIso8601String();
+          }
+        }
         list.sort((a, b) {
           final ta = DateTime.tryParse(a['timestamp'] as String? ?? '') ?? DateTime(2000);
           final tb = DateTime.tryParse(b['timestamp'] as String? ?? '') ?? DateTime(2000);
@@ -176,21 +186,28 @@ class _LifestyleTrackerScreenState extends State<LifestyleTrackerScreen>
           }
         }
         _loggedToday = logged;
-        // 5 points per logged vital
-        _pointsToday = logged * 5;
       });
     }
   }
 
+  Future<void> _loadPoints() async {
+    try {
+      final result = await _gamificationService.getMyStats();
+      if (result['success'] == true && mounted) {
+        setState(() => _pointsToday = result['points'] ?? 0);
+      }
+    } catch (_) {}
+  }
+
   Future<void> _saveVital(String vitalType, String value, String unit) async {
-    // Optimistically increment points immediately so user sees change right away
+    // Optimistically increment so user sees the change immediately
     setState(() => _pointsToday += 5);
     await _healthTrackerService.addEntry(
       vitalType: vitalType,
       value: value,
       unit: unit,
     );
-    // Reload to reflect updated values and progress
+    // Reload vitals display (does NOT reset points)
     await _loadLatestVitals();
     _loadAllLogs();
   }

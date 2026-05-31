@@ -27,7 +27,7 @@ class HealthTrackerEntry {
       value: json['value'],
       unit: json['unit'],
       notes: json['notes'] ?? '',
-      timestamp: DateTime.parse(json['timestamp']),
+      timestamp: DateTime.parse(json['timestamp']).toLocal(),
       status: json['status'] ?? 'Normal',
     );
   }

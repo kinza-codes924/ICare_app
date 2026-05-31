@@ -48,7 +48,7 @@ class HealthLog {
     name: j['name'] as String,
     value: j['value'],
     unit: j['unit'] as String,
-    timestamp: DateTime.parse(j['timestamp'] as String),
+    timestamp: DateTime.parse(j['timestamp'] as String).toLocal(),
     colorHex: j['colorHex'] as int,
   );
 
