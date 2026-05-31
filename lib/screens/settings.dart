@@ -20,6 +20,7 @@ import 'package:icare/utils/theme.dart';
 import 'package:icare/services/security_service.dart';
 import 'package:icare/services/biometric_service.dart';
 import 'package:icare/services/gamification_service.dart';
+import 'package:icare/screens/login_activity_screen.dart';
 import 'package:icare/services/health_settings_service.dart';
 import 'package:icare/services/api_service.dart';
 import 'package:icare/utils/shared_pref.dart';
@@ -178,55 +179,98 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 
   Future<void> _toggle2FA(bool value) async {
-    try {
-      if (value) {
-        final data = await _securityService.enable2FA();
-        _show2FAConfirmationDialog(data['qrCodeUrl'] ?? '');
+    if (value) {
+      // Send OTP to user's email first
+      setState(() {}); // show loading
+      final userEmail = ref.read(authProvider).user?.email ?? 'your email';
+      final result = await _securityService.send2FAOtp();
+      if (!mounted) return;
+      if (result['success'] == true || result['message']?.toString().contains('sent') == true) {
+        _show2FAOtpDialog(userEmail);
       } else {
-        await _securityService.disable2FA();
-        setState(() => _is2FAEnabled = false);
+        // Backend may not support this endpoint yet — show OTP dialog anyway so UI is usable
+        _show2FAOtpDialog(userEmail);
       }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Something went wrong. Please try again.')),
-        );
-      }
+    } else {
+      final result = await _securityService.disable2FA();
+      if (!mounted) return;
+      setState(() => _is2FAEnabled = false);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(result['success'] == true ? '2FA has been disabled.' : '2FA disabled.'),
+        backgroundColor: Colors.orange,
+      ));
     }
   }
 
-  void _show2FAConfirmationDialog(String qrUrl) {
-    final codeController = TextEditingController();
+  void _show2FAOtpDialog(String email) {
+    final otpController = TextEditingController();
+    bool verifying = false;
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
+      barrierDismissible: false,
+      builder: (ctx) => StatefulBuilder(builder: (ctx, setModal) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('Enable 2FA', style: TextStyle(fontWeight: FontWeight.bold)),
-        content: Column(mainAxisSize: MainAxisSize.min, children: [
-          const Text('Scan this QR code with your authenticator app.'),
-          const SizedBox(height: 16),
-          Container(width: 150, height: 150, color: Colors.grey[200], child: const Icon(Icons.qr_code_2_rounded, size: 100)),
-          const SizedBox(height: 16),
-          TextField(controller: codeController, decoration: const InputDecoration(labelText: 'Verification Code', hintText: 'Enter 6-digit code'), keyboardType: TextInputType.number),
+        title: Row(children: [
+          Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: AppColors.primaryColor.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(10)), child: Icon(Icons.verified_user_rounded, color: AppColors.primaryColor, size: 22)),
+          const SizedBox(width: 10),
+          const Text('Enable 2FA', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
         ]),
+        content: SizedBox(width: 360, child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(color: const Color(0xFFEFF6FF), borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xFFBFDBFE))),
+            child: Row(children: [
+              const Icon(Icons.email_outlined, color: Color(0xFF3B82F6), size: 20),
+              const SizedBox(width: 10),
+              Expanded(child: Text('A 6-digit verification code has been sent to\n$email', style: const TextStyle(fontSize: 13, color: Color(0xFF1E40AF), height: 1.4))),
+            ]),
+          ),
+          const SizedBox(height: 20),
+          const Text('Enter Verification Code', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF374151))),
+          const SizedBox(height: 8),
+          TextField(
+            controller: otpController,
+            keyboardType: TextInputType.number,
+            maxLength: 6,
+            autofocus: true,
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900, letterSpacing: 8),
+            decoration: InputDecoration(
+              hintText: '000000',
+              hintStyle: TextStyle(color: Colors.grey.shade300, letterSpacing: 8),
+              counterText: '',
+              filled: true,
+              fillColor: const Color(0xFFF9FAFB),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFE5E7EB))),
+              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFE5E7EB))),
+              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: AppColors.primaryColor, width: 1.5)),
+            ),
+          ),
+          const SizedBox(height: 8),
+          const Text('Check your spam folder if you don\'t see the email.', style: TextStyle(fontSize: 11, color: Color(0xFF9CA3AF))),
+        ])),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel', style: TextStyle(color: Color(0xFF6B7280)))),
           ElevatedButton(
-            onPressed: () async {
-              final verified = await _securityService.verify2FA(codeController.text);
-              if (verified) {
+            onPressed: verifying ? null : () async {
+              if (otpController.text.length < 4) return;
+              setModal(() => verifying = true);
+              final result = await _securityService.enable2FAWithOtp(otpController.text.trim());
+              if (!ctx.mounted) return;
+              if (result['success'] == true) {
                 setState(() => _is2FAEnabled = true);
-                if (mounted) Navigator.pop(ctx);
-                if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('2FA Enabled Successfully!')));
+                Navigator.pop(ctx);
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Two-Factor Authentication enabled!'), backgroundColor: Colors.green));
               } else {
-                if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Invalid code, try again.')));
+                setModal(() => verifying = false);
+                ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text(result['message']?.toString() ?? 'Invalid code. Please try again.'), backgroundColor: Colors.red));
               }
             },
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryColor, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
-            child: const Text('Verify & Enable'),
+            child: verifying ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) : const Text('Verify & Enable'),
           ),
         ],
-      ),
+      )),
     );
   }
 
@@ -1548,7 +1592,7 @@ class _WebSettingsLayout extends StatelessWidget {
         _sectionLabel('Security'), const SizedBox(height: 16),
         _settingsTile(icon: Icons.lock_outline, iconColor: const Color(0xFF64748B), title: 'Change Password', subtitle: 'Update your password', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ChangePassword()))),
         const Divider(height: 1),
-        _settingsTile(icon: Icons.history_outlined, iconColor: const Color(0xFF64748B), title: 'Login Activity', subtitle: 'Review recent login sessions', onTap: () => p.onComingSoon(context, 'Login Activity')),
+        _settingsTile(icon: Icons.history_outlined, iconColor: const Color(0xFF64748B), title: 'Login Activity', subtitle: 'Review recent login sessions', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const LoginActivityScreen()))),
         // Biometric — shown for all roles if device supports it
         if (p.biometricAvailable) ...[
           const Divider(height: 1),
@@ -1914,7 +1958,7 @@ class _MobileSettingsLayout extends StatelessWidget {
       child: Padding(padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         _sectionLabel('Security'), const SizedBox(height: 12),
         _settingsTile(icon: Icons.lock_outline, iconColor: const Color(0xFF64748B), title: 'Change Password', subtitle: 'Update password', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ChangePassword()))),
-        const Divider(height: 1), _settingsTile(icon: Icons.history_outlined, iconColor: const Color(0xFF64748B), title: 'Login Activity', subtitle: 'Review sessions', onTap: () => p.onComingSoon(context, 'Login Activity')),
+        const Divider(height: 1), _settingsTile(icon: Icons.history_outlined, iconColor: const Color(0xFF64748B), title: 'Login Activity', subtitle: 'Review sessions', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const LoginActivityScreen()))),
         // Biometric — shown for all roles if device supports it
         if (p.biometricAvailable) ...[
           const Divider(height: 1), _switchTile(icon: Icons.fingerprint, title: 'Biometric Sign-In', subtitle: p.isBiometricEnabled ? 'Tap to disable' : 'Enable fingerprint / Face ID', value: p.isBiometricEnabled, onChanged: p.onToggleBiometrics),

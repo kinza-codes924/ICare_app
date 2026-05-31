@@ -76,7 +76,11 @@ class _NotificationSettingsState extends ConsumerState<NotificationSettings> {
         {"id": "3", "title": "New Prescription", "onPress": () {}},
         {"id": "4", "title": "Medication Reminder", "onPress": () {}},
         {"id": "5", "title": "Notification Sound", "onPress": () {}, "isToggle": true},
-        {"id": "6", "title": "Send prescription to email automatically", "onPress": () {}, "isToggle": true},
+        {"id": "6", "title": "Email: Appointment Confirmation", "onPress": () {}, "isToggle": true},
+        {"id": "7", "title": "Email: Lab Report Ready", "onPress": () {}, "isToggle": true},
+        {"id": "8", "title": "Email: Prescription Sent", "onPress": () {}, "isToggle": true},
+        {"id": "9", "title": "Email: Consultation Summary", "onPress": () {}, "isToggle": true},
+        {"id": "10", "title": "Email: Pharmacy Order Receipt", "onPress": () {}, "isToggle": true},
       ];
     } else if (isStudent) {
       settingsList = [
@@ -262,12 +266,18 @@ class _WebNotificationSettingsScreenState
       };
     } else if (widget.isPatient) {
       settingsState = {
+        // Push / in-app
         "Appointment Confirmed": true,
         "Lab Results Ready": true,
         "New Prescription": true,
         "Medication Reminder": true,
         "Notification Sound": true,
-        "Send prescription to email automatically": false,
+        // Email notifications
+        "Email: Appointment Confirmation": true,
+        "Email: Lab Report Ready": true,
+        "Email: Prescription Sent": true,
+        "Email: Consultation Summary": false,
+        "Email: Pharmacy Order Receipt": true,
       };
     } else if (widget.isPharmacy) {
       settingsState = {
@@ -281,6 +291,7 @@ class _WebNotificationSettingsScreenState
         "New Test Requests": true,
         "Result Ready Alerts": true,
         "Customer Support Messages": false,
+        "Email: Send Report to Patient": true,
       };
     } else {
       // Doctor — patient/customer-support messages removed per product spec
@@ -305,11 +316,23 @@ class _WebNotificationSettingsScreenState
     final prefs = await SharedPreferences.getInstance();
     final prefKey = 'notif_${key.replaceAll(' ', '_').toLowerCase()}';
     await prefs.setBool(prefKey, value);
-    if (key == 'Send prescription to email automatically' && widget.userId.isNotEmpty) {
-      NotificationService().updateNotificationPreferences(
-        widget.userId,
-        {'emailPrescriptionAuto': value},
-      ).ignore();
+    // Sync email preferences to backend
+    if (widget.userId.isNotEmpty) {
+      final Map<String, String> emailPrefMap = {
+        'Email: Appointment Confirmation': 'emailAppointmentConfirm',
+        'Email: Lab Report Ready': 'emailLabReport',
+        'Email: Prescription Sent': 'emailPrescriptionAuto',
+        'Email: Consultation Summary': 'emailConsultationSummary',
+        'Email: Pharmacy Order Receipt': 'emailPharmacyReceipt',
+        'Email: Send Report to Patient': 'emailLabReportToPatient',
+      };
+      final backendKey = emailPrefMap[key];
+      if (backendKey != null) {
+        NotificationService().updateNotificationPreferences(
+          widget.userId,
+          {backendKey: value},
+        ).ignore();
+      }
     }
   }
 
@@ -337,8 +360,16 @@ class _WebNotificationSettingsScreenState
             "Get in-app and browser reminders to take your prescribed medications on time.",
         "Notification Sound":
             "Play a sound when you receive a new notification.",
-        "Send prescription to email automatically":
-            "Automatically email your prescription after every completed consultation.",
+        "Email: Appointment Confirmation":
+            "Receive an email confirmation every time an appointment is booked or confirmed.",
+        "Email: Lab Report Ready":
+            "Get your lab report delivered to your inbox as soon as it is ready.",
+        "Email: Prescription Sent":
+            "Receive your prescription by email after every completed consultation.",
+        "Email: Consultation Summary":
+            "Get a full summary of your consultation notes sent to your email.",
+        "Email: Pharmacy Order Receipt":
+            "Receive a receipt by email whenever a pharmacy order is placed or delivered.",
       };
     } else if (widget.isPharmacy) {
       return {
@@ -359,6 +390,8 @@ class _WebNotificationSettingsScreenState
             "Receive alerts when a result entry is completed and ready for review.",
         "Customer Support Messages":
             "Receive instant alerts when the support team responds to your queries.",
+        "Email: Send Report to Patient":
+            "Automatically send the completed lab report to the patient's email address.",
       };
     } else {
       return {
@@ -383,7 +416,11 @@ class _WebNotificationSettingsScreenState
         "New Prescription": Icons.medication_rounded,
         "Medication Reminder": Icons.alarm_rounded,
         "Notification Sound": Icons.volume_up_rounded,
-        "Send prescription to email automatically": Icons.email_outlined,
+        "Email: Appointment Confirmation": Icons.email_rounded,
+        "Email: Lab Report Ready": Icons.science_rounded,
+        "Email: Prescription Sent": Icons.local_pharmacy_rounded,
+        "Email: Consultation Summary": Icons.summarize_rounded,
+        "Email: Pharmacy Order Receipt": Icons.receipt_long_rounded,
       };
     } else if (widget.isPharmacy) {
       return {
@@ -397,6 +434,7 @@ class _WebNotificationSettingsScreenState
         "New Test Requests": Icons.biotech_rounded,
         "Result Ready Alerts": Icons.assignment_turned_in_rounded,
         "Customer Support Messages": Icons.support_agent_rounded,
+        "Email: Send Report to Patient": Icons.forward_to_inbox_rounded,
       };
     } else {
       return { "New Appointment Bookings": Icons.event_available_rounded };

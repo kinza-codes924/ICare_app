@@ -2,6 +2,7 @@
 // Updated: May 11, 2026
 
 import 'package:flutter/material.dart';
+import 'package:icare/utils/shared_pref.dart';
 import 'package:icare/models/appointment_detail.dart';
 import 'package:icare/models/enhanced_prescription.dart';
 import 'package:icare/models/lifestyle_advice.dart';
@@ -216,10 +217,18 @@ class _InConsultationPrescriptionFormState
   }
 
   Future<void> _maybeSendPrescriptionEmail() async {
-    // Backend checks patient's email preference before sending
-    await _notificationService.sendPrescriptionEmail(
-      consultationId: widget.consultationId,
+    // Check if patient has enabled email prescription toggle
+    final patientEmailPreference = await _notificationService.getNotificationPreferences(
+      widget.appointment.patient?.id ?? '',
     );
+    
+    final bool shouldSendEmail = patientEmailPreference['emailPrescriptionAuto'] == true;
+    
+    if (shouldSendEmail) {
+      await _notificationService.sendPrescriptionEmail(
+        consultationId: widget.consultationId,
+      );
+    }
   }
 
   /// Build minimal payload — only send what backend expects for /prescription/complete
