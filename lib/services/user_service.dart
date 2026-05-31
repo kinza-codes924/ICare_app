@@ -58,6 +58,7 @@ class UserService {
     String? address,
     String? existingConditions,
     String? healthGoals,
+    List<Map<String, String>>? emergencyContacts,
   }) async {
     try {
       String? imageBase64;
@@ -78,10 +79,20 @@ class UserService {
         if (address != null) 'address': address,
         if (existingConditions != null) 'existingConditions': existingConditions,
         if (healthGoals != null) 'healthGoals': healthGoals,
+        if (emergencyContacts != null && emergencyContacts.isNotEmpty) 'emergencyContacts': emergencyContacts,
       });
 
       if (response.statusCode == 200) {
-        return {'success': true, 'user': response.data};
+        final data = response.data;
+        Map<String, dynamic> userMap;
+        if (data is Map && data['user'] is Map) {
+          userMap = Map<String, dynamic>.from(data['user'] as Map);
+        } else if (data is Map && (data.containsKey('_id') || data.containsKey('id'))) {
+          userMap = Map<String, dynamic>.from(data);
+        } else {
+          userMap = data is Map ? Map<String, dynamic>.from(data) : {};
+        }
+        return {'success': true, 'user': userMap};
       }
       return {'success': false, 'message': 'Failed to update profile'};
     } on DioException catch (e) {
@@ -89,6 +100,18 @@ class UserService {
         'success': false,
         'message': e.response?.data['message'] ?? 'Network error',
       };
+    }
+  }
+
+  Future<Map<String, dynamic>> updateEmergencyContacts(List<Map<String, String>> contacts) async {
+    try {
+      final response = await _apiService.put('/users/profile', {
+        'emergencyContacts': contacts,
+      });
+      if (response.statusCode == 200) return {'success': true};
+      return {'success': false, 'message': 'Failed to update emergency contacts'};
+    } on DioException catch (e) {
+      return {'success': false, 'message': e.response?.data['message'] ?? 'Network error'};
     }
   }
 

@@ -9,6 +9,7 @@ class User {
   final String? gender;
   final String? age;
   final String? mrNumber; // Auto-generated Medical Record Number (patients only)
+  final String? cnic;
 
   User({
     required this.id,
@@ -21,6 +22,7 @@ class User {
     this.gender,
     this.age,
     this.mrNumber,
+    this.cnic,
   });
 
   factory User.fromJson(Map<String, dynamic> json) {
@@ -37,6 +39,7 @@ class User {
       gender: json['gender']?.toString(),
       age: json['age']?.toString(),
       mrNumber: json['mrNumber']?.toString(),
+      cnic: (json['cnic'] ?? json['idCard'] ?? json['id_card'])?.toString(),
     );
   }
 
@@ -52,6 +55,7 @@ class User {
       if (gender != null) 'gender': gender,
       if (age != null) 'age': age,
       if (mrNumber != null) 'mrNumber': mrNumber,
+      if (cnic != null) 'cnic': cnic,
     };
   }
 
@@ -66,6 +70,7 @@ class User {
     String? gender,
     String? age,
     String? mrNumber,
+    String? cnic,
   }) {
     return User(
       id: id ?? this.id,
@@ -78,6 +83,7 @@ class User {
       gender: gender ?? this.gender,
       age: age ?? this.age,
       mrNumber: mrNumber ?? this.mrNumber,
+      cnic: cnic ?? this.cnic,
     );
   }
 }

@@ -19,6 +19,7 @@ import 'package:icare/screens/terms_and_conditions.dart' show TermsAndConditions
 import 'package:icare/utils/theme.dart';
 import 'package:icare/services/security_service.dart';
 import 'package:icare/services/biometric_service.dart';
+import 'package:icare/services/gamification_service.dart';
 import 'package:icare/services/health_settings_service.dart';
 import 'package:icare/services/api_service.dart';
 import 'package:icare/utils/shared_pref.dart';
@@ -29,6 +30,7 @@ import 'package:flutter/services.dart';
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:intl/intl.dart';
 import '../utils/water_notif_stub.dart'
     if (dart.library.html) '../utils/water_notif_web.dart';
 
@@ -47,6 +49,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   final SecurityService _securityService = SecurityService();
   final HealthSettingsService _healthSettingsService = HealthSettingsService();
   final BiometricService _biometricService = BiometricService();
+  final GamificationService _gamificationService = GamificationService();
+  int _totalPoints = 0;
+  List<dynamic> _pointsHistory = [];
 
   bool _is2FAEnabled = false;
   bool _isBiometricEnabled = false;
@@ -85,6 +90,20 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     _loadBiometricState();
     _loadBillingItems();
     _loadSavedAddresses();
+    _loadPointsData();
+  }
+
+  Future<void> _loadPointsData() async {
+    try {
+      final result = await _gamificationService.getMyStats();
+      if (result['success'] == true && mounted) {
+        setState(() {
+          _totalPoints = (result['points'] ?? result['totalPoints'] ?? 0) as int;
+          final history = result['history'] ?? result['activities'] ?? result['transactions'] ?? [];
+          _pointsHistory = history is List ? history : [];
+        });
+      }
+    } catch (_) {}
   }
 
   Future<void> _loadBiometricState() async {
@@ -1183,6 +1202,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       selectedCountry: _selectedCountry,
       savedAddressSubtitle: _savedAddresses.isEmpty ? 'Tap to add' : '${_savedAddresses.length} address${_savedAddresses.length == 1 ? '' : 'es'} saved',
       savedPaymentMethods: _savedPaymentMethods, billingHistory: _billingHistory,
+      totalPoints: _totalPoints, pointsHistory: _pointsHistory,
       onToggle2FA: _toggle2FA, onToggleBiometrics: _toggleBiometrics,
       onTrackerToggle: _updateTrackerToggle, onHealthModeToggle: _toggleHealthMode,
       onLogout: _handleLogout, onComingSoon: _comingSoon,
@@ -1217,6 +1237,8 @@ class _SettingsLayoutParams {
   final String selectedLanguage, selectedCountry, savedAddressSubtitle;
   final List<String> savedPaymentMethods, billingHistory;
   final Map<String, bool> trackerToggles;
+  final int totalPoints;
+  final List<dynamic> pointsHistory;
   final void Function(bool) onToggle2FA, onToggleBiometrics;
   final void Function(String, bool) onTrackerToggle, onHealthModeToggle;
   final VoidCallback onLogout;
@@ -1242,6 +1264,7 @@ class _SettingsLayoutParams {
     required this.selectedCountry,
     required this.savedAddressSubtitle, required this.savedPaymentMethods,
     required this.billingHistory, required this.trackerToggles,
+    required this.totalPoints, required this.pointsHistory,
     required this.onToggle2FA, required this.onToggleBiometrics,
     required this.onTrackerToggle, required this.onHealthModeToggle,
     required this.onLogout, required this.onComingSoon,
@@ -1368,12 +1391,89 @@ class _WebSettingsLayout extends StatelessWidget {
     return Card(elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Padding(padding: const EdgeInsets.all(20), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         _sectionLabel('Rewards & Points'), const SizedBox(height: 16),
-        _settingsTile(icon: Icons.stars_outlined, iconColor: const Color(0xFFF59E0B), title: 'Reward Points', subtitle: 'Coming soon', onTap: () => p.onComingSoon(context, 'Reward Points')),
+        _rewardPointsBanner(),
+        const SizedBox(height: 12),
+        _settingsTile(icon: Icons.stars_outlined, iconColor: const Color(0xFFF59E0B), title: 'Reward Points', subtitle: '${p.totalPoints} pts total', onTap: () => _showRewardPointsDialog(context)),
         const Divider(height: 1),
-        _settingsTile(icon: Icons.history_outlined, iconColor: const Color(0xFFF59E0B), title: 'Reward History', subtitle: 'Coming soon', onTap: () => p.onComingSoon(context, 'Reward History')),
+        _settingsTile(icon: Icons.history_outlined, iconColor: const Color(0xFFF59E0B), title: 'Reward History', subtitle: p.pointsHistory.isEmpty ? 'No activity yet' : '${p.pointsHistory.length} activities', onTap: () => _showRewardHistoryDialog(context)),
         const Divider(height: 1),
         _settingsTile(icon: Icons.swap_horiz_outlined, iconColor: const Color(0xFFF59E0B), title: 'Redemption History', subtitle: 'Coming soon', onTap: () => p.onComingSoon(context, 'Redemption History')),
       ])));
+  }
+
+  Widget _rewardPointsBanner() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(colors: [Color(0xFFF59E0B), Color(0xFFF97316)], begin: Alignment.topLeft, end: Alignment.bottomRight),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(children: [
+        const Icon(Icons.stars_rounded, color: Colors.white, size: 32),
+        const SizedBox(width: 12),
+        Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('${p.totalPoints}', style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w900, color: Colors.white)),
+          const Text('Total Points', style: TextStyle(fontSize: 12, color: Colors.white70, fontWeight: FontWeight.w600)),
+        ]),
+      ]),
+    );
+  }
+
+  void _showRewardPointsDialog(BuildContext context) {
+    showDialog(context: context, builder: (dc) => AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      title: const Row(children: [Icon(Icons.stars_rounded, color: Color(0xFFF59E0B), size: 24), SizedBox(width: 10), Text('My Points', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18))]),
+      content: SizedBox(width: 360, child: Column(mainAxisSize: MainAxisSize.min, children: [
+        Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(colors: [Color(0xFFF59E0B), Color(0xFFF97316)], begin: Alignment.topLeft, end: Alignment.bottomRight),
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+            const Icon(Icons.stars_rounded, color: Colors.white, size: 40),
+            const SizedBox(width: 12),
+            Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('${p.totalPoints}', style: const TextStyle(fontSize: 36, fontWeight: FontWeight.w900, color: Colors.white)),
+              const Text('Reward Points', style: TextStyle(fontSize: 13, color: Colors.white70)),
+            ]),
+          ]),
+        ),
+        const SizedBox(height: 16),
+        const Text('Points are earned by:\n• Logging vitals (+5 pts each)\n• Completing daily goals (+10 pts)\n• Taking all medications (+10 pts)\n• Attending consultations (+15 pts)', style: TextStyle(fontSize: 13, color: Color(0xFF475569), height: 1.6)),
+      ])),
+      actions: [ElevatedButton(onPressed: () => Navigator.pop(dc), style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFF59E0B), foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))), child: const Text('Close'))],
+    ));
+  }
+
+  void _showRewardHistoryDialog(BuildContext context) {
+    showDialog(context: context, builder: (dc) => AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      title: const Row(children: [Icon(Icons.history_rounded, color: Color(0xFFF59E0B), size: 22), SizedBox(width: 10), Text('Reward History', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16))]),
+      content: SizedBox(width: 360, height: 300, child: p.pointsHistory.isEmpty
+        ? const Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.history_outlined, size: 48, color: Color(0xFFCBD5E1)), SizedBox(height: 12), Text('No reward history yet', style: TextStyle(color: Color(0xFF64748B)))]))
+        : ListView.separated(
+            itemCount: p.pointsHistory.length,
+            separatorBuilder: (_, __) => const Divider(height: 1),
+            itemBuilder: (_, i) {
+              final item = p.pointsHistory[i];
+              final pts = (item is Map ? item['points'] ?? item['amount'] ?? 0 : 0) as num;
+              final reason = (item is Map ? item['reason'] ?? item['activity'] ?? item['description'] ?? 'Activity' : 'Activity').toString();
+              final date = (item is Map ? item['createdAt'] ?? item['date'] ?? '' : '').toString();
+              String dateStr = '';
+              try { dateStr = date.isNotEmpty ? DateFormat('MMM d, yyyy').format(DateTime.parse(date).toLocal()) : ''; } catch (_) {}
+              return ListTile(
+                dense: true,
+                leading: Container(padding: const EdgeInsets.all(6), decoration: BoxDecoration(color: const Color(0xFFFEF3C7), borderRadius: BorderRadius.circular(8)), child: const Icon(Icons.stars_rounded, color: Color(0xFFF59E0B), size: 16)),
+                title: Text(reason, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                subtitle: dateStr.isNotEmpty ? Text(dateStr, style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8))) : null,
+                trailing: Text('+$pts pts', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: Color(0xFFF59E0B))),
+              );
+            },
+          ),
+      ),
+      actions: [ElevatedButton(onPressed: () => Navigator.pop(dc), style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFF59E0B), foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))), child: const Text('Close'))],
+    ));
   }
 
   // ── PRIVACY ──
@@ -1751,8 +1851,10 @@ class _MobileSettingsLayout extends StatelessWidget {
     return Card(elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Padding(padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         _sectionLabel('Rewards & Points'), const SizedBox(height: 12),
-        _settingsTile(icon: Icons.stars_outlined, iconColor: const Color(0xFFF59E0B), title: 'Reward Points', subtitle: 'Coming soon', onTap: () => p.onComingSoon(context, 'Reward Points')),
-        const Divider(height: 1), _settingsTile(icon: Icons.history_outlined, iconColor: const Color(0xFFF59E0B), title: 'Reward History', subtitle: 'Coming soon', onTap: () => p.onComingSoon(context, 'Reward History')),
+        _rewardPointsBanner(),
+        const SizedBox(height: 12),
+        _settingsTile(icon: Icons.stars_outlined, iconColor: const Color(0xFFF59E0B), title: 'Reward Points', subtitle: '${p.totalPoints} pts total', onTap: () => _showRewardPointsDialog(context)),
+        const Divider(height: 1), _settingsTile(icon: Icons.history_outlined, iconColor: const Color(0xFFF59E0B), title: 'Reward History', subtitle: p.pointsHistory.isEmpty ? 'No activity yet' : '${p.pointsHistory.length} activities', onTap: () => _showRewardHistoryDialog(context)),
         const Divider(height: 1), _settingsTile(icon: Icons.swap_horiz_outlined, iconColor: const Color(0xFFF59E0B), title: 'Redemption History', subtitle: 'Coming soon', onTap: () => p.onComingSoon(context, 'Redemption History')),
       ])));
   }
@@ -1928,6 +2030,78 @@ class _MobileSettingsLayout extends StatelessWidget {
 
   Widget _mobileComingSoon(String feature, IconData icon) {
     return Container(width: double.infinity, padding: const EdgeInsets.all(16), decoration: BoxDecoration(color: const Color(0xFFFEFCE8), borderRadius: BorderRadius.circular(16), border: Border.all(color: const Color(0xFFFEF08A))), child: Row(children: [Icon(icon, size: 20, color: const Color(0xFFCA8A04)), const SizedBox(width: 12), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(feature, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: Color(0xFF854D0E))), const SizedBox(height: 2), const Text('Coming soon', style: TextStyle(fontSize: 12, color: Color(0xFFA16207)))])), const Icon(Icons.access_time_rounded, size: 18, color: Color(0xFFCA8A04))]));
+  }
+
+  Widget _rewardPointsBanner() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(colors: [Color(0xFFF59E0B), Color(0xFFF97316)], begin: Alignment.topLeft, end: Alignment.bottomRight),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(children: [
+        const Icon(Icons.stars_rounded, color: Colors.white, size: 32),
+        const SizedBox(width: 12),
+        Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('${p.totalPoints}', style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w900, color: Colors.white)),
+          const Text('Total Points', style: TextStyle(fontSize: 12, color: Colors.white70, fontWeight: FontWeight.w600)),
+        ]),
+      ]),
+    );
+  }
+
+  void _showRewardPointsDialog(BuildContext context) {
+    showDialog(context: context, builder: (dc) => AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      title: const Row(children: [Icon(Icons.stars_rounded, color: Color(0xFFF59E0B), size: 24), SizedBox(width: 10), Text('My Points', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18))]),
+      content: SizedBox(width: 360, child: Column(mainAxisSize: MainAxisSize.min, children: [
+        Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(gradient: const LinearGradient(colors: [Color(0xFFF59E0B), Color(0xFFF97316)], begin: Alignment.topLeft, end: Alignment.bottomRight), borderRadius: BorderRadius.circular(14)),
+          child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+            const Icon(Icons.stars_rounded, color: Colors.white, size: 40),
+            const SizedBox(width: 12),
+            Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('${p.totalPoints}', style: const TextStyle(fontSize: 36, fontWeight: FontWeight.w900, color: Colors.white)),
+              const Text('Reward Points', style: TextStyle(fontSize: 13, color: Colors.white70)),
+            ]),
+          ]),
+        ),
+        const SizedBox(height: 16),
+        const Text('Points are earned by:\n• Logging vitals (+5 pts each)\n• Completing daily goals (+10 pts)\n• Taking all medications (+10 pts)\n• Attending consultations (+15 pts)', style: TextStyle(fontSize: 13, color: Color(0xFF475569), height: 1.6)),
+      ])),
+      actions: [ElevatedButton(onPressed: () => Navigator.pop(dc), style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFF59E0B), foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))), child: const Text('Close'))],
+    ));
+  }
+
+  void _showRewardHistoryDialog(BuildContext context) {
+    showDialog(context: context, builder: (dc) => AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      title: const Row(children: [Icon(Icons.history_rounded, color: Color(0xFFF59E0B), size: 22), SizedBox(width: 10), Text('Reward History', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16))]),
+      content: SizedBox(width: 360, height: 300, child: p.pointsHistory.isEmpty
+        ? const Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.history_outlined, size: 48, color: Color(0xFFCBD5E1)), SizedBox(height: 12), Text('No reward history yet', style: TextStyle(color: Color(0xFF64748B)))]))
+        : ListView.separated(
+            itemCount: p.pointsHistory.length,
+            separatorBuilder: (_, __) => const Divider(height: 1),
+            itemBuilder: (_, i) {
+              final item = p.pointsHistory[i];
+              final pts = (item is Map ? item['points'] ?? item['amount'] ?? 0 : 0) as num;
+              final reason = (item is Map ? item['reason'] ?? item['activity'] ?? item['description'] ?? 'Activity' : 'Activity').toString();
+              final date = (item is Map ? item['createdAt'] ?? item['date'] ?? '' : '').toString();
+              String dateStr = '';
+              try { dateStr = date.isNotEmpty ? DateFormat('MMM d, yyyy').format(DateTime.parse(date).toLocal()) : ''; } catch (_) {}
+              return ListTile(
+                dense: true,
+                leading: Container(padding: const EdgeInsets.all(6), decoration: BoxDecoration(color: const Color(0xFFFEF3C7), borderRadius: BorderRadius.circular(8)), child: const Icon(Icons.stars_rounded, color: Color(0xFFF59E0B), size: 16)),
+                title: Text(reason, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                subtitle: dateStr.isNotEmpty ? Text(dateStr, style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8))) : null,
+                trailing: Text('+$pts pts', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: Color(0xFFF59E0B))),
+              );
+            },
+          ),
+      ),
+      actions: [ElevatedButton(onPressed: () => Navigator.pop(dc), style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFF59E0B), foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))), child: const Text('Close'))],
+    ));
   }
 }
 

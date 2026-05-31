@@ -85,8 +85,8 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
 
   // Emergency contacts — minimum 2, can add more
   final List<Map<String, TextEditingController>> _emergencyContacts = [
-    {'name': TextEditingController(), 'phone': TextEditingController()},
-    {'name': TextEditingController(), 'phone': TextEditingController()},
+    {'name': TextEditingController(), 'relation': TextEditingController(), 'phone': TextEditingController()},
+    {'name': TextEditingController(), 'relation': TextEditingController(), 'phone': TextEditingController()},
   ];
   final UserService _userService = UserService();
   final DoctorService _doctorService = DoctorService();
@@ -162,6 +162,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
       nameController.text = user.name;
       phoneController.text = user.phoneNumber;
       ageController.text = user.age ?? '';
+      cnicController.text = user.cnic ?? '';
       final g = user.gender?.trim() ?? '';
       if (g.toLowerCase() == 'male') {
         _selectedGender = 'Male';
@@ -201,6 +202,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
     bloodGroupController.dispose();
     for (final c in _emergencyContacts) {
       c['name']!.dispose();
+      c['relation']!.dispose();
       c['phone']!.dispose();
     }
     super.dispose();
@@ -241,6 +243,15 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
         weightStr = '$_weightLbs lbs';
       }
 
+      final ecList = _emergencyContacts
+          .where((c) => c['name']!.text.trim().isNotEmpty || c['phone']!.text.trim().isNotEmpty)
+          .map((c) => {
+                'name': c['name']!.text.trim(),
+                'relationship': c['relation']!.text.trim(),
+                'phone': c['phone']!.text.trim(),
+              })
+          .toList();
+
       final result = await _userService.updateProfile(
         name: nameController.text.trim(),
         phoneNumber: phoneController.text.trim(),
@@ -253,6 +264,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
         profileImage: _imageBytes,
         existingConditions: _selectedConditions.isEmpty ? null : _selectedConditions.join(', '),
         healthGoals: _selectedGoals.isEmpty ? null : _selectedGoals.join(', '),
+        emergencyContacts: ecList.isEmpty ? null : ecList,
       );
 
       if (result['success']) {
@@ -782,6 +794,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
                                   setState(() {
                                     _emergencyContacts.add({
                                       'name': TextEditingController(),
+                                      'relation': TextEditingController(),
                                       'phone': TextEditingController(),
                                     });
                                   });
@@ -842,6 +855,18 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
                                           Icons.person_outline,
                                           color: Color(0xFF94A3B8)),
                                       controller: contact['name']!,
+                                      bgColor: Colors.white,
+                                      borderRadius: 10,
+                                      borderColor: const Color(0xFFE2E8F0),
+                                      borderWidth: 1.5,
+                                    ),
+                                    const SizedBox(height: 10),
+                                    CustomInputField(
+                                      hintText: 'Relationship (e.g. Father, Spouse)',
+                                      leadingIcon: const Icon(
+                                          Icons.family_restroom_rounded,
+                                          color: Color(0xFF94A3B8)),
+                                      controller: contact['relation']!,
                                       bgColor: Colors.white,
                                       borderRadius: 10,
                                       borderColor: const Color(0xFFE2E8F0),

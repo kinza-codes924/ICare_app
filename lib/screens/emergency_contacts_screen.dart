@@ -1,5 +1,6 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
+import 'package:icare/services/user_service.dart';
 import 'package:icare/utils/theme.dart';
 import 'package:icare/widgets/back_button.dart';
 import 'package:icare/widgets/custom_text_input.dart';
@@ -26,6 +27,7 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
   final _phone2Controller = TextEditingController();
 
   bool _isSaving = false;
+  final UserService _userService = UserService();
 
   @override
   void dispose() {
@@ -42,18 +44,44 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _isSaving = true);
 
-    // Simulate save (replace with real API call when backend ready)
-    await Future.delayed(const Duration(milliseconds: 800));
+    final contacts = <Map<String, String>>[];
+    if (_name1Controller.text.trim().isNotEmpty || _phone1Controller.text.trim().isNotEmpty) {
+      contacts.add({
+        'name': _name1Controller.text.trim(),
+        'relationship': _relation1Controller.text.trim(),
+        'phone': _phone1Controller.text.trim(),
+      });
+    }
+    if (_name2Controller.text.trim().isNotEmpty || _phone2Controller.text.trim().isNotEmpty) {
+      contacts.add({
+        'name': _name2Controller.text.trim(),
+        'relationship': _relation2Controller.text.trim(),
+        'phone': _phone2Controller.text.trim(),
+      });
+    }
+
+    final result = await _userService.updateEmergencyContacts(contacts);
 
     if (mounted) {
       setState(() => _isSaving = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Emergency contacts saved successfully'),
-          backgroundColor: Colors.green,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      if (result['success'] == true) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Emergency contacts saved successfully'),
+            backgroundColor: Colors.green,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        Navigator.pop(context);
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result['message']?.toString() ?? 'Failed to save contacts'),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
     }
   }
 
