@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:icare/models/user.dart' as app_user;
@@ -469,40 +470,65 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 
   void _showLanguageDialog(BuildContext ctx) {
-    showDialog(context: ctx, builder: (dc) => AlertDialog(
+    final currentLang = ctx.locale.languageCode == 'ur' ? 'ur' : 'en';
+    String selected = currentLang;
+    final langs = [
+      {'code': 'en', 'label': 'English', 'native': 'English'},
+      {'code': 'ur', 'label': 'اردو', 'native': 'Urdu'},
+    ];
+    showDialog(context: ctx, builder: (dc) => StatefulBuilder(builder: (_, setS) => AlertDialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      title: const Row(children: [Icon(Icons.translate_rounded, color: Color(0xFF64748B), size: 22), SizedBox(width: 10), Text('Language', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16))]),
+      title: const Row(children: [Icon(Icons.translate_rounded, color: Color(0xFF64748B), size: 22), SizedBox(width: 10), Text('Language / زبان', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16))]),
       content: SizedBox(width: 340, child: Column(mainAxisSize: MainAxisSize.min, children: [
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(color: const Color(0xFFEFF6FF), borderRadius: BorderRadius.circular(12), border: Border.all(color: AppColors.primaryColor.withValues(alpha: 0.2))),
-          child: Row(children: [
-            Icon(Icons.check_circle_outline_rounded, color: AppColors.primaryColor, size: 20),
-            const SizedBox(width: 12),
-            const Expanded(child: Text('English', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Color(0xFF1E293B)))),
-            Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4), decoration: BoxDecoration(color: AppColors.primaryColor, borderRadius: BorderRadius.circular(20)), child: const Text('Active', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white))),
-          ]),
-        ),
-        const SizedBox(height: 10),
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(color: const Color(0xFFF8FAFC), borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xFFE2E8F0))),
-          child: const Row(children: [
-            Icon(Icons.access_time_rounded, color: Color(0xFF94A3B8), size: 20),
-            SizedBox(width: 12),
-            Expanded(child: Text('اردو (Urdu)', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: Color(0xFF94A3B8)))),
-            Text('Coming Soon', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF94A3B8))),
-          ]),
-        ),
-        const SizedBox(height: 16),
-        Container(padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: const Color(0xFFFFF7ED), borderRadius: BorderRadius.circular(10)), child: const Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Icon(Icons.info_outline, size: 14, color: Color(0xFFF59E0B)),
-          SizedBox(width: 8),
-          Expanded(child: Text('To view iCare in Urdu right now, open Chrome browser, right-click anywhere on the page, and select "Translate to Urdu".', style: TextStyle(fontSize: 11, color: Color(0xFF92400E), height: 1.5))),
-        ])),
+        ...langs.map((lang) {
+          final isSel = selected == lang['code'];
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: InkWell(
+              onTap: () => setS(() => selected = lang['code']!),
+              borderRadius: BorderRadius.circular(12),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                decoration: BoxDecoration(
+                  color: isSel ? const Color(0xFFEFF6FF) : const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: isSel ? AppColors.primaryColor : const Color(0xFFE2E8F0), width: isSel ? 2 : 1),
+                ),
+                child: Row(children: [
+                  Icon(isSel ? Icons.radio_button_checked : Icons.radio_button_off, color: isSel ? AppColors.primaryColor : const Color(0xFFCBD5E1), size: 20),
+                  const SizedBox(width: 14),
+                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(lang['label']!, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: isSel ? const Color(0xFF1E293B) : const Color(0xFF475569))),
+                    if (lang['code'] == 'ur') const Text('All app text will switch to Urdu', style: TextStyle(fontSize: 11, color: Color(0xFF94A3B8))),
+                  ])),
+                  if (isSel) Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4), decoration: BoxDecoration(color: AppColors.primaryColor, borderRadius: BorderRadius.circular(20)), child: const Text('Active', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white))),
+                ]),
+              ),
+            ),
+          );
+        }),
       ])),
-      actions: [ElevatedButton(onPressed: () => Navigator.pop(dc), style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryColor, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))), child: const Text('OK'))],
-    ));
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(dc), child: const Text('Cancel', style: TextStyle(color: Color(0xFF64748B)))),
+        ElevatedButton(
+          onPressed: () async {
+            Navigator.pop(dc);
+            final locale = selected == 'ur' ? const Locale('ur') : const Locale('en');
+            await ctx.setLocale(locale);
+            setState(() => _selectedLanguage = selected == 'ur' ? 'اردو' : 'English');
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                content: Text(selected == 'ur' ? 'زبان اردو میں تبدیل ہو گئی' : 'Language set to English'),
+                backgroundColor: Colors.green,
+                duration: const Duration(seconds: 2),
+              ));
+            }
+          },
+          style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryColor, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
+          child: const Text('Apply'),
+        ),
+      ],
+    )));
   }
 
   void _showCountryRegionDialog(BuildContext ctx) {

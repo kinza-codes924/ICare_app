@@ -662,6 +662,7 @@ class _CheckoutScreenState extends State<_CheckoutScreen> {
   final _formKey = GlobalKey<FormState>();
   final _addressCtrl = TextEditingController();
   final _cityCtrl = TextEditingController();
+  final _instructionsCtrl = TextEditingController();
   String _paymentMethod = 'Cash on Delivery';
   bool _isPlacing = false;
   List<Map<String, String>> _savedAddresses = [];
@@ -669,15 +670,21 @@ class _CheckoutScreenState extends State<_CheckoutScreen> {
   @override
   void initState() {
     super.initState();
-    _loadAddresses();
+    _loadSavedData();
   }
 
-  Future<void> _loadAddresses() async {
+  Future<void> _loadSavedData() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final raw = prefs.getString('saved_delivery_addresses') ?? '[]';
       final decoded = jsonDecode(raw) as List? ?? [];
-      if (mounted) setState(() => _savedAddresses = decoded.map((e) => Map<String, String>.from(e as Map)).toList());
+      final instr = prefs.getString('delivery_instructions') ?? '';
+      if (mounted) {
+        setState(() {
+          _savedAddresses = decoded.map((e) => Map<String, String>.from(e as Map)).toList();
+          _instructionsCtrl.text = instr;
+        });
+      }
     } catch (_) {}
   }
 
@@ -713,6 +720,7 @@ class _CheckoutScreenState extends State<_CheckoutScreen> {
   void dispose() {
     _addressCtrl.dispose();
     _cityCtrl.dispose();
+    _instructionsCtrl.dispose();
     super.dispose();
   }
 
@@ -989,6 +997,26 @@ class _CheckoutScreenState extends State<_CheckoutScreen> {
         const SizedBox(height: 12),
         _formField(_cityCtrl, 'City', Icons.location_city_outlined,
             validator: (v) => v == null || v.isEmpty ? 'City is required' : null),
+        const SizedBox(height: 20),
+        const Text('Delivery Instructions', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Color(0xFF0F172A))),
+        const SizedBox(height: 4),
+        const Text('Optional — pre-filled from your saved preferences', style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8))),
+        const SizedBox(height: 8),
+        TextFormField(
+          controller: _instructionsCtrl,
+          maxLines: 2,
+          decoration: InputDecoration(
+            hintText: 'e.g. Leave at door, Ring bell twice...',
+            hintStyle: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
+            prefixIcon: const Icon(Icons.sticky_note_2_outlined, color: Color(0xFF94A3B8), size: 20),
+            filled: true,
+            fillColor: Colors.white,
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.primaryColor, width: 2)),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          ),
+        ),
       ],
     );
   }
