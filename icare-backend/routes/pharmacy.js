@@ -411,7 +411,20 @@ router.get('/orders', authMiddleware, async (req, res) => {
     if (status && status !== 'all') query.status = status;
 
     const orders = await PharmacyOrder.find(query).sort({ createdAt: -1 }).lean();
-    res.json({ success: true, orders: orders.map(o => ({ ...o, _id: o._id.toString() })) });
+    res.json({
+      success: true,
+      orders: orders.map(o => ({
+        ...o,
+        _id: o._id.toString(),
+        prescriptionId: o.prescription_id?.toString() || null,
+        pharmacyId: o.pharmacy_id?.toString() || null,
+        patientId: o.patient_id?.toString() || null,
+        totalAmount: o.total_amount || 0,
+        deliveryFee: o.delivery_fee || 0,
+        deliveryAddress: o.delivery_address || '',
+        items: o.items || [],
+      })),
+    });
   } catch (err) {
     console.error(err);
     res.json({ success: true, orders: [] });

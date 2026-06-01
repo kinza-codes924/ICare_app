@@ -256,6 +256,8 @@ router.get('/bookings/my', authMiddleware, async (req, res) => {
       ...b,
       _id: b._id.toString(),
       // camelCase aliases for Flutter
+      prescriptionId: b.prescription_id?.toString() || b.medical_record_id?.toString() || null,
+      medicalRecordId: b.prescription_id?.toString() || b.medical_record_id?.toString() || null,
       testName: b.test_type,
       testType: b.test_type,
       date: b.test_date,

@@ -2,6 +2,8 @@ const EnhancedPrescription = require('../models/EnhancedPrescription');
 const { connectMongoDB } = require('../config/mongodb');
 const LifestyleAdvice = require('../models/LifestyleAdvice');
 const Consultation = require('../models/Consultation');
+const User = require('../models/User');
+const { sendEmail } = require('../utils/email');
 
 // Save prescription draft
 exports.savePrescriptionDraft = async (req, res) => {
@@ -196,6 +198,68 @@ exports.completePrescription = async (req, res) => {
           read: false,
         });
       } catch (notifErr) { console.error('Prescription notification error:', notifErr.message); }
+
+      // Send prescription email to patient
+      try {
+        const patient = await User.findById(prescription.patientId).lean();
+        if (patient?.email) {
+          const medsHtml = (prescription.medicines || []).map((m, i) =>
+            `<tr>
+              <td style="padding:8px 12px;border-bottom:1px solid #f1f5f9;">${i + 1}. ${m.name || 'Medicine'}</td>
+              <td style="padding:8px 12px;border-bottom:1px solid #f1f5f9;color:#64748b;">${m.dosage || m.dose || ''}</td>
+              <td style="padding:8px 12px;border-bottom:1px solid #f1f5f9;color:#64748b;">${m.frequency || ''}</td>
+              <td style="padding:8px 12px;border-bottom:1px solid #f1f5f9;color:#64748b;">${m.duration || ''}</td>
+            </tr>`
+          ).join('');
+          const labsHtml = (prescription.labTests || []).map(t =>
+            `<li style="margin-bottom:4px;color:#374151;">${t.name || t.testName || t}</li>`
+          ).join('');
+          const diagnosesHtml = (prescription.diagnoses || []).map(d =>
+            `<span style="display:inline-block;background:#EFF6FF;color:#1D4ED8;padding:3px 10px;border-radius:20px;font-size:13px;margin:2px;">${d.name || d}</span>`
+          ).join('');
+
+          await sendEmail({
+            to: patient.email,
+            subject: 'iCare — Your Prescription is Ready',
+            html: `
+              <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;background:#f8fafc;">
+                <div style="background:#0036BC;padding:28px 32px;border-radius:12px 12px 0 0;">
+                  <h2 style="color:#fff;margin:0;font-size:22px;">iCare Prescription</h2>
+                  <p style="color:rgba(255,255,255,0.8);margin:4px 0 0;font-size:14px;">Your doctor has completed your prescription</p>
+                </div>
+                <div style="background:#fff;padding:32px;border-radius:0 0 12px 12px;box-shadow:0 4px 20px rgba(0,0,0,0.06);">
+                  <p style="color:#374151;font-size:15px;">Dear <strong>${patient.name || patient.username || 'Patient'}</strong>,</p>
+                  <p style="color:#374151;font-size:14px;">Your doctor has issued a prescription for you. Please find the details below.</p>
+                  ${diagnosesHtml ? `<div style="margin:16px 0;"><strong style="color:#0F172A;font-size:14px;">Diagnosis:</strong><br/><div style="margin-top:8px;">${diagnosesHtml}</div></div>` : ''}
+                  ${medsHtml ? `
+                  <div style="margin:20px 0;">
+                    <strong style="color:#0F172A;font-size:14px;">Medicines:</strong>
+                    <table style="width:100%;border-collapse:collapse;margin-top:10px;font-size:13px;">
+                      <thead><tr style="background:#f8fafc;">
+                        <th style="padding:8px 12px;text-align:left;color:#64748b;font-weight:600;">Medicine</th>
+                        <th style="padding:8px 12px;text-align:left;color:#64748b;font-weight:600;">Dosage</th>
+                        <th style="padding:8px 12px;text-align:left;color:#64748b;font-weight:600;">Frequency</th>
+                        <th style="padding:8px 12px;text-align:left;color:#64748b;font-weight:600;">Duration</th>
+                      </tr></thead>
+                      <tbody>${medsHtml}</tbody>
+                    </table>
+                  </div>` : ''}
+                  ${labsHtml ? `
+                  <div style="margin:20px 0;">
+                    <strong style="color:#0F172A;font-size:14px;">Lab Tests Ordered:</strong>
+                    <ul style="margin-top:8px;padding-left:20px;">${labsHtml}</ul>
+                  </div>` : ''}
+                  ${prescription.doctorNotes ? `<div style="background:#f8fafc;border-left:3px solid #0036BC;padding:12px 16px;margin:20px 0;border-radius:4px;"><strong style="color:#0F172A;font-size:13px;">Doctor's Notes:</strong><p style="color:#374151;font-size:13px;margin:4px 0 0;">${prescription.doctorNotes}</p></div>` : ''}
+                  <div style="background:#FEF3C7;border-radius:8px;padding:12px 16px;margin:20px 0;">
+                    <p style="color:#92400E;font-size:13px;margin:0;">This prescription is valid for <strong>30 days</strong>. Open the iCare app to order medicines or book lab tests.</p>
+                  </div>
+                  <p style="color:#94A3B8;font-size:12px;margin-top:24px;">— iCare Health Technologies</p>
+                </div>
+              </div>
+            `,
+          });
+        }
+      } catch (emailErr) { console.error('Prescription email error:', emailErr.message); }
     }
 
     // Update consultation — non-blocking
