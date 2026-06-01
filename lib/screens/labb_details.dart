@@ -10,9 +10,10 @@ import 'package:icare/widgets/custom_text.dart';
 import 'package:icare/widgets/svg_wrapper.dart';
 
 class LabDetails extends StatefulWidget {
-  const LabDetails({super.key, this.labData, this.prescribedTests});
+  const LabDetails({super.key, this.labData, this.prescribedTests, this.prescriptionId});
   final Map<String, dynamic>? labData;
   final List<String>? prescribedTests; // pre-select from prescription
+  final String? prescriptionId;
 
   @override
   State<LabDetails> createState() => _LabDetailsState();
@@ -303,6 +304,7 @@ class _LabDetailsState extends State<LabDetails> {
                     builder: (ctx) => FillLabForm(
                       labData: widget.labData,
                       selectedTests: _selectedTests,
+                      prescriptionId: widget.prescriptionId,
                     ),
                   ),
                 );

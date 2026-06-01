@@ -15,8 +15,9 @@ import 'package:intl/intl.dart';
 class FillLabForm extends StatefulWidget {
   final Map<String, dynamic>? labData;
   final List<String>? selectedTests;
+  final String? prescriptionId;
 
-  const FillLabForm({super.key, this.labData, this.selectedTests});
+  const FillLabForm({super.key, this.labData, this.selectedTests, this.prescriptionId});
 
   @override
   State<FillLabForm> createState() => _FillLabFormState();
@@ -102,6 +103,10 @@ class _FillLabFormState extends State<FillLabForm> {
         'collectionType': _homeSample ? 'home' : 'in-lab',
         'collection_type': _homeSample ? 'home' : 'in-lab',
         'notes': 'Requester: ${_nameController.text.trim()}, Time: ${_timeController.text}',
+        if (widget.prescriptionId != null && widget.prescriptionId!.isNotEmpty)
+          'prescriptionId': widget.prescriptionId,
+        if (widget.prescriptionId != null && widget.prescriptionId!.isNotEmpty)
+          'medicalRecordId': widget.prescriptionId,
       };
 
       debugPrint('🔍 LAB BOOKING DEBUG - Booking data: $bookingData');

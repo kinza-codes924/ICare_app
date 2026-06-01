@@ -8,11 +8,13 @@ import 'package:icare/widgets/back_button.dart';
 class PharmacyPrescriptionScreen extends StatefulWidget {
   final Map<String, dynamic> pharmacy;
   final List<dynamic>? prescribedMedicines; // from doctor's prescription
+  final String? medicalRecordId;
 
   const PharmacyPrescriptionScreen({
     super.key,
     required this.pharmacy,
     this.prescribedMedicines,
+    this.medicalRecordId,
   });
 
   @override
@@ -157,6 +159,7 @@ class _PharmacyPrescriptionScreenState
                   'duration': m['duration'] ?? '',
                 })
             .toList(),
+        medicalRecordId: widget.medicalRecordId,
       );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

@@ -352,8 +352,8 @@ class _PatientPrescriptionsState extends ConsumerState<PatientPrescriptions> {
       isWithin30Days: isWithin30Days,
       linkedLabBookings: linkedBookings,
       linkedPharmacyOrders: linkedOrders,
-      onFindPharmacies: isWithin30Days ? () => _showFindPharmacies(context, medicines) : null,
-      onFindLabs: isWithin30Days ? () => _showFindLabs(context, labTests) : null,
+      onFindPharmacies: isWithin30Days ? () => _showFindPharmacies(context, medicines, prescriptionId: recordId) : null,
+      onFindLabs: isWithin30Days ? () => _showFindLabs(context, labTests, prescriptionId: recordId) : null,
     );
   }
 
@@ -814,22 +814,22 @@ class _PatientPrescriptionsState extends ConsumerState<PatientPrescriptions> {
   }
 
   // â”€â”€ FIND LABS BOTTOM SHEET â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  void _showFindLabs(BuildContext context, List<dynamic> tests) {
+  void _showFindLabs(BuildContext context, List<dynamic> tests, {String? prescriptionId}) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (ctx) => _FindLabsSheet(tests: tests),
+      builder: (ctx) => _FindLabsSheet(tests: tests, prescriptionId: prescriptionId),
     );
   }
 
   // â”€â”€ FIND PHARMACIES BOTTOM SHEET â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  void _showFindPharmacies(BuildContext context, List<dynamic> medicines) {
+  void _showFindPharmacies(BuildContext context, List<dynamic> medicines, {String? prescriptionId}) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (ctx) => _FindPharmaciesSheet(medicines: medicines),
+      builder: (ctx) => _FindPharmaciesSheet(medicines: medicines, prescriptionId: prescriptionId),
     );
   }
 }
@@ -1580,7 +1580,8 @@ class _PrescriptionPage extends StatelessWidget {
 }
 class _FindLabsSheet extends StatefulWidget {
   final List<dynamic> tests;
-  const _FindLabsSheet({required this.tests});
+  final String? prescriptionId;
+  const _FindLabsSheet({required this.tests, this.prescriptionId});
 
   @override
   State<_FindLabsSheet> createState() => _FindLabsSheetState();
@@ -1989,6 +1990,7 @@ class _FindLabsSheetState extends State<_FindLabsSheet> {
                 if (t is Map) return (t['name'] ?? t['testName'] ?? t['test_name'] ?? '').toString();
                 return t.toString();
               }).where((n) => n.isNotEmpty).toList(),
+              prescriptionId: widget.prescriptionId,
             ),
           ),
         );
@@ -2095,7 +2097,8 @@ class _FindLabsSheetState extends State<_FindLabsSheet> {
 // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 class _FindPharmaciesSheet extends StatefulWidget {
   final List<dynamic> medicines;
-  const _FindPharmaciesSheet({required this.medicines});
+  final String? prescriptionId;
+  const _FindPharmaciesSheet({required this.medicines, this.prescriptionId});
 
   @override
   State<_FindPharmaciesSheet> createState() => _FindPharmaciesSheetState();
@@ -2603,6 +2606,7 @@ class _FindPharmaciesSheetState extends State<_FindPharmaciesSheet> {
             builder: (_) => PharmacyPrescriptionScreen(
               pharmacy: Map<String, dynamic>.from(pharmacy is Map ? pharmacy : {}),
               prescribedMedicines: widget.medicines,
+              medicalRecordId: widget.prescriptionId,
             ),
           ),
         );
