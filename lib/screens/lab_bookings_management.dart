@@ -195,6 +195,14 @@ class _LabBookingsManagementState extends State<LabBookingsManagement>
             behavior: SnackBarBehavior.floating,
           ),
         );
+
+        if (newStatus == 'completed') {
+          final patientName = _bookings.firstWhere(
+            (b) => b['_id'] == bookingId,
+            orElse: () => <String, dynamic>{},
+          )['patient']?['name']?.toString() ?? 'Patient';
+          await _showRatePatientDialog(bookingId, patientName);
+        }
       }
       _loadBookings();
     } catch (e) {
@@ -216,6 +224,71 @@ class _LabBookingsManagementState extends State<LabBookingsManagement>
         );
       }
     }
+  }
+
+  Future<void> _showRatePatientDialog(String bookingId, String patientName) async {
+    double rating = 0;
+    final commentCtrl = TextEditingController();
+    bool submitting = false;
+
+    await showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSt) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: const Row(children: [
+            Icon(Icons.star_rounded, color: Color(0xFFF59E0B), size: 22),
+            SizedBox(width: 10),
+            Text('Rate Patient', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+          ]),
+          content: SizedBox(
+            width: 340,
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              Text('How was your experience with $patientName?', textAlign: TextAlign.center, style: const TextStyle(fontSize: 13, color: Color(0xFF64748B))),
+              const SizedBox(height: 20),
+              Row(mainAxisAlignment: MainAxisAlignment.center, children: List.generate(5, (i) => GestureDetector(
+                onTap: () => setSt(() => rating = i + 1.0),
+                child: Icon(rating > i ? Icons.star_rounded : Icons.star_border_rounded, color: const Color(0xFFF59E0B), size: 40),
+              ))),
+              const SizedBox(height: 16),
+              TextField(
+                controller: commentCtrl,
+                maxLines: 2,
+                decoration: InputDecoration(
+                  hintText: 'Leave a comment (optional)',
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                ),
+              ),
+            ]),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Skip')),
+            ElevatedButton(
+              onPressed: (submitting || rating == 0) ? null : () async {
+                setSt(() => submitting = true);
+                try {
+                  await _labService.submitBookingRating(bookingId, rating.toInt(), commentCtrl.text.trim());
+                } catch (_) {}
+                if (ctx.mounted) Navigator.pop(ctx);
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Patient rated successfully!'), backgroundColor: Color(0xFF10B981)),
+                  );
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF8B5CF6),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+              child: const Text('Submit Rating'),
+            ),
+          ],
+        ),
+      ),
+    );
+    commentCtrl.dispose();
   }
 
   @override

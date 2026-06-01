@@ -14,6 +14,7 @@ class PdfInvoiceGenerator {
     required double totalAmount,
     required DateTime orderDate,
     required String pharmacyName,
+    String patientEmail = '',
   }) async {
     final pdf = pw.Document();
 
@@ -123,6 +124,13 @@ class PdfInvoiceGenerator {
                       'Phone: $patientPhone',
                       style: const pw.TextStyle(fontSize: 12),
                     ),
+                    if (patientEmail.isNotEmpty) ...[
+                      pw.SizedBox(height: 4),
+                      pw.Text(
+                        'Email: $patientEmail',
+                        style: const pw.TextStyle(fontSize: 12),
+                      ),
+                    ],
                     pw.SizedBox(height: 4),
                     pw.Text(
                       'Address: $patientAddress',

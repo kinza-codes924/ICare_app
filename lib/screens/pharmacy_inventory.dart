@@ -250,14 +250,15 @@ class _PharmacyInventoryState extends State<PharmacyInventory> {
   }
 
   void _downloadTemplate() {
-    const content = 'Name,Brand,Category,Type,Power,Price (PKR),Stock Quantity,Unit,Details,Precautions\n'
-        'Panadol,GSK,Pain Relief,Tablet,500mg,45,100,tablets,Paracetamol for fever and pain,Do not exceed 8 tablets per day\n';
+    const content =
+        'Name,Brand,Category,Type,Power,Price (PKR),Stock Quantity,Unit,Details,Precautions,Controlled Medicine (Yes/No),Medicine Permission (OTC/Prescription Only),Delivery Option (both/pickup/delivery)\n'
+        'Panadol,GSK,Pain Relief,Tablet,500mg,45,100,tablets,Paracetamol for fever and pain,Do not exceed 8 tablets per day,No,OTC,both\n';
     _triggerDownload(content, 'icare_inventory_template.csv');
   }
 
   void _exportCSV() {
     final buffer = StringBuffer();
-    buffer.writeln('Name,Brand,Category,Type,Power,Price (PKR),Stock Quantity,Unit,Details,Precautions');
+    buffer.writeln('Name,Brand,Category,Type,Power,Price (PKR),Stock Quantity,Unit,Details,Precautions,Controlled Medicine (Yes/No),Medicine Permission (OTC/Prescription Only),Delivery Option (both/pickup/delivery)');
     for (final p in _products) {
       buffer.writeln([
         _esc(p['name'] ?? ''),
@@ -270,6 +271,9 @@ class _PharmacyInventoryState extends State<PharmacyInventory> {
         _esc(p['amount'] ?? ''),
         _esc(p['details'] ?? ''),
         _esc(p['precautions'] ?? ''),
+        (p['isControlled'] == true) ? 'Yes' : 'No',
+        _esc(p['medicinePermission'] ?? 'OTC'),
+        _esc(p['deliveryOption'] ?? 'both'),
       ].join(','));
     }
     _triggerDownload(buffer.toString(), 'icare_inventory_export.csv');
@@ -577,6 +581,7 @@ class _MedicineCard extends StatelessWidget {
     final stock = product['stock'] as int;
     final isLow = stock < 30;
     final isControlled = product['isControlled'] == true;
+    final isPrescriptionOnly = (product['medicinePermission'] ?? '').toString() == 'Prescription Only';
     final expiry = product['expiry'] as DateTime;
     final expiringSoon = expiry.difference(DateTime.now()).inDays < 90;
     final color = _categoryColor;
@@ -636,6 +641,21 @@ class _MedicineCard extends StatelessWidget {
                       child: const Text('Low', style: TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.w700)),
                     ),
                   ),
+                // OTC / Rx badge — bottom right
+                Positioned(
+                  bottom: 6, right: 6,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: isPrescriptionOnly ? const Color(0xFFF59E0B) : const Color(0xFF10B981),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      isPrescriptionOnly ? 'Rx Only' : 'OTC',
+                      style: const TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                ),
               ],
             ),
           ),
@@ -710,6 +730,7 @@ class _AddMedicineModalState extends State<_AddMedicineModal> {
   String _category = 'Pain Relief';
   String _type = 'Tablet';
   String _delivery = 'both';
+  String _medicinePermission = 'OTC';
   bool _isControlled = false;
   bool _saving = false;
 
@@ -754,6 +775,7 @@ class _AddMedicineModalState extends State<_AddMedicineModal> {
       'precautions': _precautions.text.trim(),
       'deliveryOption': _delivery,
       'isControlled': _isControlled,
+      'medicinePermission': _medicinePermission,
       'isAvailable': true,
       'expiry': DateTime.now().add(const Duration(days: 365)).toIso8601String(),
     });
@@ -842,6 +864,25 @@ class _AddMedicineModalState extends State<_AddMedicineModal> {
                       TextFormField(controller: _details, decoration: _dec('Description', Icons.description_rounded), maxLines: 2),
                       const SizedBox(height: 12),
                       TextFormField(controller: _precautions, decoration: _dec('Precautions', Icons.warning_amber_rounded), maxLines: 2),
+                      const SizedBox(height: 12),
+                      // Medicine Permission
+                      const Text('Medicine Permission', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF374151))),
+                      const SizedBox(height: 6),
+                      Row(children: [
+                        for (final opt in [('OTC', 'OTC (Over-the-Counter)'), ('Prescription Only', 'Prescription Only')])
+                          Expanded(
+                            child: Padding(
+                              padding: const EdgeInsets.only(right: 8),
+                              child: ChoiceChip(
+                                label: Text(opt.$1, style: TextStyle(fontSize: 11,
+                                    color: _medicinePermission == opt.$1 ? Colors.white : const Color(0xFF64748B))),
+                                selected: _medicinePermission == opt.$1,
+                                selectedColor: opt.$1 == 'OTC' ? const Color(0xFF10B981) : const Color(0xFFF59E0B),
+                                onSelected: (_) => setState(() => _medicinePermission = opt.$1),
+                              ),
+                            ),
+                          ),
+                      ]),
                       const SizedBox(height: 12),
                       // Controlled medicine toggle
                       Container(

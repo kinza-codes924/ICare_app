@@ -27,7 +27,7 @@ class WhatsAppFloatingButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Positioned(
-      bottom: 20,
+      bottom: 90,
       right: 20,
       child: Tooltip(
         message: 'Chat on WhatsApp',

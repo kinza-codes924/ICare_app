@@ -989,12 +989,69 @@ class _PharmacyDetailsScreenState extends State<PharmacyDetailsScreen> {
     );
   }
 
+  void _showPrescriptionRequiredDialog(dynamic med) {
+    final name = (med['productName'] ?? med['name'] ?? 'This medicine').toString();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Row(children: [
+          Icon(Icons.medical_services_rounded, color: Color(0xFFEF4444), size: 22),
+          SizedBox(width: 10),
+          Expanded(child: Text('Prescription Required', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700))),
+        ]),
+        content: Column(mainAxisSize: MainAxisSize.min, children: [
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFEF3C7),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(children: [
+              const Icon(Icons.warning_rounded, color: Color(0xFFB45309), size: 20),
+              const SizedBox(width: 12),
+              Expanded(child: Text(
+                '$name is a prescription-only medicine. A valid prescription from a licensed doctor is required.',
+                style: const TextStyle(fontSize: 13, color: Color(0xFF78350F), height: 1.5),
+              )),
+            ]),
+          ),
+          const SizedBox(height: 16),
+          const Text(
+            'Please consult with a doctor to get a prescription before purchasing this medicine.',
+            style: TextStyle(fontSize: 13, color: Color(0xFF64748B), height: 1.5),
+            textAlign: TextAlign.center,
+          ),
+        ]),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          ElevatedButton.icon(
+            onPressed: () {
+              Navigator.pop(ctx);
+              Navigator.pop(context); // go back from pharmacy details
+              // Navigate to doctor list — user can find a doctor from home
+            },
+            icon: const Icon(Icons.medical_services_rounded, size: 16),
+            label: const Text('Connect to a Doctor Now'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primaryColor,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildMedicineCard(dynamic med) {
     final id = med['_id']?.toString() ?? '';
     final isAdding = _addingToCart.contains(id);
     _quantities.putIfAbsent(id, () => 0);
     _qtyControllers.putIfAbsent(id, () => TextEditingController(text: _quantities[id].toString()));
     final qty = _quantities[id] ?? 0;
+    final permission = (med['medicinePermission'] ?? 'OTC').toString();
+    final isPrescriptionOnly = permission == 'Prescription Only';
 
     return GestureDetector(
       // Tap card body → open details dialog
@@ -1041,7 +1098,23 @@ class _PharmacyDetailsScreenState extends State<PharmacyDetailsScreen> {
               fontWeight: FontWeight.w900,
               fontSize: 15,
             ),
-            const SizedBox(height: 6),
+            const SizedBox(height: 4),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: isPrescriptionOnly ? const Color(0xFFFEF3C7) : const Color(0xFFD1FAE5),
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Text(
+                isPrescriptionOnly ? 'Rx Only' : 'OTC',
+                style: TextStyle(
+                  fontSize: 9,
+                  fontWeight: FontWeight.w800,
+                  color: isPrescriptionOnly ? const Color(0xFFB45309) : const Color(0xFF065F46),
+                ),
+              ),
+            ),
+            const SizedBox(height: 4),
             // Quantity controls: - | qty (typeable) | +
             GestureDetector(
               onTap: () {}, // absorb tap so card tap doesn't trigger
@@ -1123,6 +1196,10 @@ class _PharmacyDetailsScreenState extends State<PharmacyDetailsScreen> {
               const SizedBox(height: 6),
               GestureDetector(
                 onTap: isAdding ? null : () async {
+                  if (isPrescriptionOnly) {
+                    _showPrescriptionRequiredDialog(med);
+                    return;
+                  }
                   setState(() => _addingToCart.add(id));
                   // Add qty times to cart
                   await _addToCart(med, quantity: qty);

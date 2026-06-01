@@ -313,4 +313,16 @@ class LaboratoryService {
       rethrow;
     }
   }
+
+  Future<void> submitBookingRating(String bookingId, int rating, String comment) async {
+    try {
+      await _apiService.post('/laboratories/bookings/$bookingId/rating', {
+        'rating': rating,
+        'comment': comment,
+      });
+    } catch (e, stackTrace) {
+      ErrorHandler.logError(e, stackTrace, context: 'submitBookingRating');
+      rethrow;
+    }
+  }
 }

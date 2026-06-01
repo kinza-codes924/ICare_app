@@ -6,7 +6,7 @@ import 'package:icare/screens/pharmacy_inventory.dart';
 import 'package:icare/screens/pharmacy_orders.dart';
 import 'package:icare/screens/payment_invoices.dart';
 import 'package:icare/services/pharmacy_service.dart';
-import 'package:intl/intl.dart';
+import 'package:intl/intl.dart'; // DateFormat
 
 class PharmacistDashboard extends ConsumerStatefulWidget {
   const PharmacistDashboard({super.key});
@@ -29,7 +29,6 @@ class _PharmacistDashboardState extends ConsumerState<PharmacistDashboard> {
     'completedOrders': 0,
     'totalProducts': 0,
     'lowStock': 0,
-    'revenue': 0,
   };
 
   @override
@@ -59,10 +58,9 @@ class _PharmacistDashboardState extends ConsumerState<PharmacistDashboard> {
         _isLoading = false;
       });
     } catch (e) {
-      // Show dashboard with zero stats instead of error
       setState(() {
         _isLoading = false;
-        _hasError = false; // Don't show error, just show empty dashboard
+        _hasError = false;
         _stats = {
           'todayOrders': 0,
           'totalOrders': 0,
@@ -70,7 +68,6 @@ class _PharmacistDashboardState extends ConsumerState<PharmacistDashboard> {
           'completedOrders': 0,
           'totalProducts': 0,
           'lowStock': 0,
-          'revenue': 0,
         };
       });
     }
@@ -220,7 +217,7 @@ class _PharmacistDashboardState extends ConsumerState<PharmacistDashboard> {
               const SizedBox(width: 16),
               Expanded(
                 child: _buildStatCard(
-                  'Total'.tr(),
+                  'All Time'.tr(),
                   _stats['totalOrders'] ?? 0,
                   Icons.receipt_long_rounded,
                   const Color(0xFF3B82F6),
@@ -244,10 +241,6 @@ class _PharmacistDashboardState extends ConsumerState<PharmacistDashboard> {
                   const Color(0xFF10B981),
                 ),
               ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: _buildRevenueCard(_stats['revenue'] ?? 0),
-              ),
             ],
           );
         }
@@ -267,7 +260,7 @@ class _PharmacistDashboardState extends ConsumerState<PharmacistDashboard> {
                 const SizedBox(width: 12),
                 Expanded(
                   child: _buildStatCard(
-                    'Total'.tr(),
+                    'All Time'.tr(),
                     _stats['totalOrders'] ?? 0,
                     Icons.receipt_long_rounded,
                     const Color(0xFF3B82F6),
@@ -297,8 +290,6 @@ class _PharmacistDashboardState extends ConsumerState<PharmacistDashboard> {
                 ),
               ],
             ),
-            const SizedBox(height: 12),
-            _buildRevenueCard(_stats['revenue'] ?? 0),
           ],
         );
       },
@@ -346,58 +337,6 @@ class _PharmacistDashboardState extends ConsumerState<PharmacistDashboard> {
             style: const TextStyle(
               fontSize: 13,
               color: Color(0xFF64748B),
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildRevenueCard(int revenue) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF10B981), Color(0xFF059669)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF10B981).withValues(alpha: 0.25),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.2),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: const Icon(Icons.payments_rounded, color: Colors.white, size: 24),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            'Rs. ${NumberFormat('#,##0').format(revenue)}',
-            style: const TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.w900,
-              color: Colors.white,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'Total Revenue'.tr(),
-            style: TextStyle(
-              fontSize: 13,
-              color: Colors.white.withValues(alpha: 0.85),
               fontWeight: FontWeight.w600,
             ),
           ),

@@ -32,6 +32,7 @@ class _PharmacyProfileSetupState extends State<PharmacyProfileSetup> {
 
   bool _deliveryAvailable = false;
   bool _drapCompliance = false;
+  final _deliveryFeeController = TextEditingController();
   double? _latitude;
   double? _longitude;
   bool _gettingLocation = false;
@@ -59,6 +60,7 @@ class _PharmacyProfileSetupState extends State<PharmacyProfileSetup> {
     _cityController.dispose();
     _openHoursFromController.dispose();
     _openHoursToController.dispose();
+    _deliveryFeeController.dispose();
     super.dispose();
   }
 
@@ -79,6 +81,7 @@ class _PharmacyProfileSetupState extends State<PharmacyProfileSetup> {
         _openHoursFromController.text = profile['openHours']?['from'] ?? '';
         _openHoursToController.text = profile['openHours']?['to'] ?? '';
         _deliveryAvailable = profile['deliveryAvailable'] ?? false;
+        _deliveryFeeController.text = (profile['deliveryFee'] ?? '').toString() == '0' ? '' : (profile['deliveryFee'] ?? '').toString();
         _latitude = (profile['latitude'] as num?)?.toDouble();
         _longitude = (profile['longitude'] as num?)?.toDouble();
         _isLoading = false;
@@ -140,6 +143,7 @@ class _PharmacyProfileSetupState extends State<PharmacyProfileSetup> {
           'to': _openHoursToController.text,
         },
         'deliveryAvailable': _deliveryAvailable,
+        'deliveryFee': double.tryParse(_deliveryFeeController.text.trim()) ?? 0,
         if (_latitude != null) 'latitude': _latitude,
         if (_longitude != null) 'longitude': _longitude,
       });
@@ -328,6 +332,15 @@ class _PharmacyProfileSetupState extends State<PharmacyProfileSetup> {
                         },
                         activeThumbColor: const Color(0xFF00897B),
                       ),
+                      if (_deliveryAvailable) ...[
+                        const SizedBox(height: 12),
+                        _buildTextField(
+                          controller: _deliveryFeeController,
+                          label: 'Delivery Fee (PKR)',
+                          icon: Icons.local_shipping_outlined,
+                          keyboardType: TextInputType.number,
+                        ),
+                      ],
                     ]),
                     const SizedBox(height: 16),
                     _buildSection('Compliance', Icons.verified_user_outlined, [

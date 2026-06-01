@@ -1,13 +1,16 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:icare/providers/auth_provider.dart';
 import 'package:icare/services/order_service.dart';
+import 'package:icare/services/pharmacy_service.dart';
 import 'package:icare/screens/order_tracking.dart';
 import 'package:icare/utils/imagePaths.dart';
 import 'package:icare/utils/theme.dart';
 import 'package:icare/widgets/back_button.dart';
 import 'package:icare/widgets/custom_text.dart';
 import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class MyOrdersScreen extends ConsumerStatefulWidget {
   const MyOrdersScreen({super.key});
@@ -18,8 +21,10 @@ class MyOrdersScreen extends ConsumerStatefulWidget {
 
 class _MyOrdersScreenState extends ConsumerState<MyOrdersScreen> {
   final OrderService _orderService = OrderService();
+  final PharmacyService _pharmacyService = PharmacyService();
   bool _isLoading = true;
   List<Map<String, dynamic>> _orders = [];
+  final Set<String> _ratedOrders = {};
 
   @override
   void initState() {
@@ -74,6 +79,181 @@ class _MyOrdersScreenState extends ConsumerState<MyOrdersScreen> {
         ).showSnackBar(SnackBar(content: Text('Unable to load data. Please try again.'.tr())));
       }
     }
+  }
+
+  Future<void> _showComplaintDialog(Map<String, dynamic> order) async {
+    final subjectCtrl = TextEditingController();
+    final messageCtrl = TextEditingController();
+    String category = 'Late Delivery';
+    bool sending = false;
+
+    await showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSt) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: const Row(children: [
+            Icon(Icons.report_problem_rounded, color: Color(0xFFEF4444), size: 22),
+            SizedBox(width: 10),
+            Text('Register Complaint', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+          ]),
+          content: SingleChildScrollView(
+            child: SizedBox(
+              width: 380,
+              child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text('Order: ${order['id']}', style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                const SizedBox(height: 16),
+                const Text('Category', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                const SizedBox(height: 8),
+                DropdownButtonFormField<String>(
+                  value: category,
+                  decoration: InputDecoration(
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  ),
+                  items: ['Late Delivery', 'Wrong Medicine', 'Damaged Product', 'Poor Service', 'Other']
+                      .map((c) => DropdownMenuItem(value: c, child: Text(c, style: const TextStyle(fontSize: 13))))
+                      .toList(),
+                  onChanged: (v) => setSt(() => category = v ?? category),
+                ),
+                const SizedBox(height: 12),
+                const Text('Subject', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: subjectCtrl,
+                  decoration: InputDecoration(
+                    hintText: 'Brief subject of complaint',
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                const Text('Details', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: messageCtrl,
+                  maxLines: 3,
+                  decoration: InputDecoration(
+                    hintText: 'Describe your complaint in detail...',
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  ),
+                ),
+              ]),
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+            ElevatedButton(
+              onPressed: sending ? null : () async {
+                if (subjectCtrl.text.trim().isEmpty || messageCtrl.text.trim().isEmpty) return;
+                setSt(() => sending = true);
+                final user = ref.read(authProvider).user;
+                final body = '''
+Complaint Category: $category
+Order Number: ${order['id']}
+Pharmacy: ${order['pharmacy'] ?? 'N/A'}
+Order Amount: PKR ${order['amount']}
+Order Date: ${order['date']}
+
+Patient Details:
+Name: ${user?.name ?? 'N/A'}
+Email: ${user?.email ?? 'N/A'}
+Phone: ${user?.phoneNumber ?? 'N/A'}
+User ID: ${user?.id ?? 'N/A'}
+
+Subject: ${subjectCtrl.text.trim()}
+
+Message:
+${messageCtrl.text.trim()}
+''';
+                final mailUri = Uri(
+                  scheme: 'mailto',
+                  path: 'icareofficialapp@gmail.com',
+                  queryParameters: {
+                    'subject': '[Complaint] $category - Order ${order['id']}',
+                    'body': body,
+                  },
+                );
+                if (ctx.mounted) Navigator.pop(ctx);
+                await launchUrl(mailUri, mode: LaunchMode.externalApplication);
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Complaint submitted. Our team will respond within 24 hours.'), backgroundColor: Color(0xFF10B981)),
+                  );
+                }
+              },
+              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFEF4444), foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
+              child: const Text('Submit Complaint'),
+            ),
+          ],
+        ),
+      ),
+    );
+    subjectCtrl.dispose();
+    messageCtrl.dispose();
+  }
+
+  Future<void> _showRatePharmacyDialog(Map<String, dynamic> order) async {
+    double rating = 0;
+    final commentCtrl = TextEditingController();
+    bool submitting = false;
+
+    await showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSt) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: const Row(children: [
+            Icon(Icons.star_rounded, color: Color(0xFFF59E0B), size: 22),
+            SizedBox(width: 10),
+            Text('Rate Pharmacy', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+          ]),
+          content: SizedBox(
+            width: 340,
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              Text('How was your experience with ${order['pharmacy']}?', textAlign: TextAlign.center, style: const TextStyle(fontSize: 13, color: Color(0xFF64748B))),
+              const SizedBox(height: 20),
+              Row(mainAxisAlignment: MainAxisAlignment.center, children: List.generate(5, (i) => GestureDetector(
+                onTap: () => setSt(() => rating = i + 1.0),
+                child: Icon(rating > i ? Icons.star_rounded : Icons.star_border_rounded, color: const Color(0xFFF59E0B), size: 40),
+              ))),
+              const SizedBox(height: 16),
+              TextField(
+                controller: commentCtrl,
+                maxLines: 2,
+                decoration: InputDecoration(
+                  hintText: 'Leave a comment (optional)',
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                ),
+              ),
+            ]),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Skip')),
+            ElevatedButton(
+              onPressed: (submitting || rating == 0) ? null : () async {
+                setSt(() => submitting = true);
+                try {
+                  await _pharmacyService.submitOrderRating(order['_id'] ?? '', rating.toInt(), commentCtrl.text.trim());
+                  setState(() => _ratedOrders.add(order['_id'] ?? ''));
+                } catch (_) {}
+                if (ctx.mounted) Navigator.pop(ctx);
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Thank you for your rating!'), backgroundColor: Color(0xFF10B981)),
+                  );
+                }
+              },
+              style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryColor, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
+              child: const Text('Submit Rating'),
+            ),
+          ],
+        ),
+      ),
+    );
+    commentCtrl.dispose();
   }
 
   String _formatStatus(String status) {
@@ -401,7 +581,7 @@ class _MyOrdersScreenState extends ConsumerState<MyOrdersScreen> {
                   borderRadius: BorderRadius.circular(16),
                 ),
                 child: Image.asset(
-                  order['products'][0]['image'],
+                  (order['products'] as List).isNotEmpty ? order['products'][0]['image'] : ImagePaths.capsule,
                   height: 48,
                   width: 48,
                 ),
@@ -413,7 +593,7 @@ class _MyOrdersScreenState extends ConsumerState<MyOrdersScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     CustomText(
-                      text: order['products'][0]['name'],
+                      text: (order['products'] as List).isNotEmpty ? order['products'][0]['name'] : 'Pharmacy Order',
                       fontSize: 16,
                       fontWeight: FontWeight.w900,
                       color: const Color(0xFF0F172A),
@@ -501,26 +681,42 @@ class _MyOrdersScreenState extends ConsumerState<MyOrdersScreen> {
                   ),
                 )
               else
-                TextButton(
-                  onPressed: () {},
-                  style: TextButton.styleFrom(
-                    backgroundColor: const Color(0xFFF1F5F9),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 8,
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (!_ratedOrders.contains(order['_id']))
+                      GestureDetector(
+                        onTap: () => _showRatePharmacyDialog(order),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFEF3C7),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Row(mainAxisSize: MainAxisSize.min, children: [
+                            Icon(Icons.star_rounded, size: 14, color: Color(0xFFF59E0B)),
+                            SizedBox(width: 4),
+                            Text('Rate', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFFB45309))),
+                          ]),
+                        ),
+                      ),
+                    const SizedBox(width: 8),
+                    GestureDetector(
+                      onTap: () => _showComplaintDialog(order),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFEE2E2),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Row(mainAxisSize: MainAxisSize.min, children: [
+                          Icon(Icons.report_problem_rounded, size: 14, color: Color(0xFFEF4444)),
+                          SizedBox(width: 4),
+                          Text('Complaint', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFFDC2626))),
+                        ]),
+                      ),
                     ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  child: Text(
-                    "Reorder".tr(),
-                    style: const TextStyle(
-                      color: Color(0xFF0F172A),
-                      fontWeight: FontWeight.w700,
-                      fontSize: 13,
-                    ),
-                  ),
+                  ],
                 ),
             ],
           ),

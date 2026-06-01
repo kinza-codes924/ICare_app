@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:icare/providers/auth_provider.dart';
 import 'package:icare/utils/theme.dart';
 import 'package:icare/widgets/back_button.dart';
 import 'package:icare/services/pharmacy_service.dart';
@@ -7,14 +9,14 @@ import 'package:icare/widgets/rating_dialog.dart';
 import 'package:icare/utils/pdf_invoice_generator.dart';
 import 'package:intl/intl.dart';
 
-class PharmacyOrders extends StatefulWidget {
+class PharmacyOrders extends ConsumerStatefulWidget {
   const PharmacyOrders({super.key});
 
   @override
-  State<PharmacyOrders> createState() => _PharmacyOrdersState();
+  ConsumerState<PharmacyOrders> createState() => _PharmacyOrdersState();
 }
 
-class _PharmacyOrdersState extends State<PharmacyOrders>
+class _PharmacyOrdersState extends ConsumerState<PharmacyOrders>
     with SingleTickerProviderStateMixin {
   final PharmacyService _pharmacyService = PharmacyService();
   late TabController _tabController;
@@ -596,125 +598,237 @@ class _PharmacyOrdersState extends State<PharmacyOrders>
     final phoneController = TextEditingController();
     final addressController = TextEditingController();
     final notesController = TextEditingController();
-    final medicinesController = TextEditingController();
     bool isSubmitting = false;
     String deliveryOption = 'pickup';
+    // Selected medicines from inventory
+    final List<Map<String, dynamic>> selectedMedicines = [];
+    List<Map<String, dynamic>> inventoryMeds = [];
+    bool medsLoading = true;
+    final searchCtrl = TextEditingController();
+
+    // Load inventory for this pharmacy
+    _pharmacyService.getMedicines().then((meds) {
+      inventoryMeds = meds.map((m) => {
+        'name': (m['productName'] ?? m['name'] ?? 'Unknown').toString(),
+        'id': m['_id'] ?? '',
+        'price': (m['price'] ?? 0).toDouble(),
+        'stock': (m['quantity'] ?? m['stock'] ?? 0),
+      }).toList();
+      medsLoading = false;
+    }).catchError((_) { medsLoading = false; });
 
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setModalState) => Container(
-          padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-          ),
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
-            child: Form(
-              key: formKey,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Center(
-                    child: Container(
-                      width: 40, height: 4,
-                      margin: const EdgeInsets.only(bottom: 20),
-                      decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2)),
-                    ),
-                  ),
-                  Row(children: [
-                    Container(
-                      width: 40, height: 40,
-                      decoration: BoxDecoration(color: AppColors.primaryColor.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(10)),
-                      child: Icon(Icons.add_circle_rounded, color: AppColors.primaryColor, size: 22),
-                    ),
-                    const SizedBox(width: 12),
-                    const Text('Create Walk-in Order', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: Color(0xFF0F172A))),
-                  ]),
-                  const SizedBox(height: 24),
-                  _buildWalkInField(controller: nameController, label: 'Patient Name', icon: Icons.person_rounded,
-                    validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null),
-                  const SizedBox(height: 12),
-                  _buildWalkInField(controller: phoneController, label: 'Contact Number', icon: Icons.phone_rounded,
-                    keyboardType: TextInputType.phone,
-                    validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null),
-                  const SizedBox(height: 12),
-                  _buildWalkInField(controller: medicinesController, label: 'Medicines Required', icon: Icons.medication_rounded,
-                    maxLines: 3, hint: 'List medicines or paste prescription details',
-                    validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null),
-                  const SizedBox(height: 20),
-                  const Text('Delivery Option', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: Color(0xFF0F172A))),
-                  const SizedBox(height: 10),
-                  Row(children: [
-                    Expanded(child: _buildDeliveryOption(
-                      label: 'Pickup', icon: Icons.store_rounded, value: 'pickup',
-                      selected: deliveryOption, onTap: () => setModalState(() => deliveryOption = 'pickup'),
-                    )),
-                    const SizedBox(width: 12),
-                    Expanded(child: _buildDeliveryOption(
-                      label: 'Delivery', icon: Icons.delivery_dining_rounded, value: 'delivery',
-                      selected: deliveryOption, onTap: () => setModalState(() => deliveryOption = 'delivery'),
-                    )),
-                  ]),
-                  if (deliveryOption == 'delivery') ...[
-                    const SizedBox(height: 12),
-                    _buildWalkInField(controller: addressController, label: 'Delivery Address', icon: Icons.location_on_rounded),
-                  ],
-                  const SizedBox(height: 12),
-                  _buildWalkInField(controller: notesController, label: 'Notes (optional)', icon: Icons.notes_rounded, maxLines: 2),
-                  const SizedBox(height: 24),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: isSubmitting ? null : () async {
-                        if (!formKey.currentState!.validate()) return;
-                        setModalState(() => isSubmitting = true);
-                        try {
-                          await _pharmacyService.createWalkInOrder(
-                            patientName: nameController.text.trim(),
-                            contact: phoneController.text.trim(),
-                            medicines: medicinesController.text.trim(),
-                            deliveryOption: deliveryOption,
-                            address: addressController.text.trim(),
-                            notes: notesController.text.trim(),
-                          );
-                          if (ctx.mounted) {
-                            Navigator.pop(ctx);
-                            ScaffoldMessenger.of(ctx).showSnackBar(
-                              const SnackBar(content: Text('Walk-in order created successfully'), backgroundColor: Colors.green, behavior: SnackBarBehavior.floating),
-                            );
-                          }
-                          _loadOrders();
-                        } catch (e) {
-                          setModalState(() => isSubmitting = false);
-                          if (ctx.mounted) {
-                            ScaffoldMessenger.of(ctx).showSnackBar(
-                              SnackBar(content: Text(e.toString()), backgroundColor: Colors.red),
-                            );
-                          }
-                        }
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primaryColor,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                        elevation: 0,
+        builder: (ctx, setModalState) {
+          final filtered = inventoryMeds.where((m) {
+            final q = searchCtrl.text.toLowerCase();
+            return q.isEmpty || m['name'].toString().toLowerCase().contains(q);
+          }).toList();
+
+          return Container(
+            padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+            ),
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(24),
+              child: Form(
+                key: formKey,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 40, height: 4,
+                        margin: const EdgeInsets.only(bottom: 20),
+                        decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2)),
                       ),
-                      child: isSubmitting
-                          ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                          : const Text('Create Order', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
                     ),
-                  ),
-                  const SizedBox(height: 8),
-                ],
+                    Row(children: [
+                      Container(
+                        width: 40, height: 40,
+                        decoration: BoxDecoration(color: AppColors.primaryColor.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(10)),
+                        child: Icon(Icons.add_circle_rounded, color: AppColors.primaryColor, size: 22),
+                      ),
+                      const SizedBox(width: 12),
+                      const Text('Create Walk-in Order', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: Color(0xFF0F172A))),
+                    ]),
+                    const SizedBox(height: 24),
+                    _buildWalkInField(controller: nameController, label: 'Patient Name', icon: Icons.person_rounded,
+                      validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null),
+                    const SizedBox(height: 12),
+                    _buildWalkInField(controller: phoneController, label: 'Contact Number', icon: Icons.phone_rounded,
+                      keyboardType: TextInputType.phone,
+                      validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null),
+                    const SizedBox(height: 20),
+                    // Medicines from inventory
+                    const Text('Medicines Required', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: Color(0xFF0F172A))),
+                    const SizedBox(height: 6),
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFF7ED),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: const Color(0xFFFED7AA)),
+                      ),
+                      child: const Row(children: [
+                        Icon(Icons.info_outline_rounded, size: 14, color: Color(0xFFEA580C)),
+                        SizedBox(width: 8),
+                        Expanded(child: Text(
+                          'All the medicines available in inventory will be shown here only. Add medicine to inventory first if not visible.',
+                          style: TextStyle(fontSize: 11, color: Color(0xFFEA580C)),
+                        )),
+                      ]),
+                    ),
+                    const SizedBox(height: 10),
+                    // Search field
+                    TextField(
+                      controller: searchCtrl,
+                      onChanged: (_) => setModalState(() {}),
+                      decoration: InputDecoration(
+                        hintText: 'Search inventory medicines...',
+                        prefixIcon: const Icon(Icons.search_rounded, size: 18, color: Color(0xFF94A3B8)),
+                        filled: true, fillColor: const Color(0xFFF8FAFC),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                        contentPadding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+                      ),
+                    ),
+                    if (medsLoading) ...[
+                      const SizedBox(height: 12),
+                      const Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                    ] else if (filtered.isEmpty) ...[
+                      const SizedBox(height: 10),
+                      const Text('No medicines found in inventory', style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8))),
+                    ] else ...[
+                      const SizedBox(height: 8),
+                      SizedBox(
+                        height: 180,
+                        child: ListView.separated(
+                          shrinkWrap: true,
+                          itemCount: filtered.length,
+                          separatorBuilder: (_, __) => const Divider(height: 1),
+                          itemBuilder: (_, i) {
+                            final med = filtered[i];
+                            final isSelected = selectedMedicines.any((s) => s['id'] == med['id']);
+                            return ListTile(
+                              dense: true,
+                              title: Text(med['name'], style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                              subtitle: Text('PKR ${med['price'].toStringAsFixed(0)} • Stock: ${med['stock']}', style: const TextStyle(fontSize: 11)),
+                              trailing: isSelected
+                                  ? Icon(Icons.check_circle_rounded, color: AppColors.primaryColor, size: 20)
+                                  : Icon(Icons.add_circle_outline_rounded, color: Colors.grey.shade400, size: 20),
+                              onTap: () {
+                                setModalState(() {
+                                  if (isSelected) {
+                                    selectedMedicines.removeWhere((s) => s['id'] == med['id']);
+                                  } else {
+                                    selectedMedicines.add(med);
+                                  }
+                                });
+                              },
+                            );
+                          },
+                        ),
+                      ),
+                    ],
+                    if (selectedMedicines.isNotEmpty) ...[
+                      const SizedBox(height: 10),
+                      Wrap(
+                        spacing: 6, runSpacing: 6,
+                        children: selectedMedicines.map((m) => Chip(
+                          label: Text(m['name'], style: const TextStyle(fontSize: 11)),
+                          deleteIcon: const Icon(Icons.close, size: 14),
+                          onDeleted: () => setModalState(() => selectedMedicines.removeWhere((s) => s['id'] == m['id'])),
+                          backgroundColor: AppColors.primaryColor.withValues(alpha: 0.1),
+                        )).toList(),
+                      ),
+                    ],
+                    if (selectedMedicines.isEmpty && !medsLoading)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 6),
+                        child: Text('At least one medicine is required', style: TextStyle(fontSize: 11, color: Colors.red.shade400)),
+                      ),
+                    const SizedBox(height: 20),
+                    const Text('Delivery Option', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: Color(0xFF0F172A))),
+                    const SizedBox(height: 10),
+                    Row(children: [
+                      Expanded(child: _buildDeliveryOption(
+                        label: 'Pickup', icon: Icons.store_rounded, value: 'pickup',
+                        selected: deliveryOption, onTap: () => setModalState(() => deliveryOption = 'pickup'),
+                      )),
+                      const SizedBox(width: 12),
+                      Expanded(child: _buildDeliveryOption(
+                        label: 'Delivery', icon: Icons.delivery_dining_rounded, value: 'delivery',
+                        selected: deliveryOption, onTap: () => setModalState(() => deliveryOption = 'delivery'),
+                      )),
+                    ]),
+                    if (deliveryOption == 'delivery') ...[
+                      const SizedBox(height: 12),
+                      _buildWalkInField(controller: addressController, label: 'Delivery Address', icon: Icons.location_on_rounded),
+                    ],
+                    const SizedBox(height: 12),
+                    _buildWalkInField(controller: notesController, label: 'Notes (optional)', icon: Icons.notes_rounded, maxLines: 2),
+                    const SizedBox(height: 24),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: isSubmitting ? null : () async {
+                          if (!formKey.currentState!.validate()) return;
+                          if (selectedMedicines.isEmpty) {
+                            setModalState(() {}); // trigger rebuild to show error
+                            return;
+                          }
+                          setModalState(() => isSubmitting = true);
+                          final medNames = selectedMedicines.map((m) => m['name']).join(', ');
+                          try {
+                            await _pharmacyService.createWalkInOrder(
+                              patientName: nameController.text.trim(),
+                              contact: phoneController.text.trim(),
+                              medicines: medNames,
+                              deliveryOption: deliveryOption,
+                              address: addressController.text.trim(),
+                              notes: notesController.text.trim(),
+                            );
+                            if (ctx.mounted) {
+                              Navigator.pop(ctx);
+                              ScaffoldMessenger.of(ctx).showSnackBar(
+                                const SnackBar(content: Text('Manual order created successfully'), backgroundColor: Colors.green, behavior: SnackBarBehavior.floating),
+                              );
+                            }
+                            _loadOrders();
+                          } catch (e) {
+                            setModalState(() => isSubmitting = false);
+                            if (ctx.mounted) {
+                              ScaffoldMessenger.of(ctx).showSnackBar(
+                                SnackBar(content: Text(e.toString()), backgroundColor: Colors.red),
+                              );
+                            }
+                          }
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primaryColor,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                          elevation: 0,
+                        ),
+                        child: isSubmitting
+                            ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                            : const Text('Create Order', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                  ],
+                ),
               ),
             ),
-          ),
-        ),
+          );
+        },
       ),
     );
   }
@@ -815,6 +929,7 @@ class _PharmacyOrdersState extends State<PharmacyOrders>
     final date = order['date'] as DateTime;
     final isDoctorReferred = order['medicalRecord'] != null;
     final isPrescriptionOrder = order['orderType'] == 'prescription';
+    final isManualOrder = (order['orderType'] ?? '').toString().contains('walk');
     final hasPrescriptionText =
         order['prescriptionText'] != null &&
         order['prescriptionText'].toString().isNotEmpty;
@@ -853,6 +968,23 @@ class _PharmacyOrdersState extends State<PharmacyOrders>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                if (isManualOrder)
+                  Container(
+                    margin: const EdgeInsets.only(bottom: 12),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF6366F1).withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.edit_note_rounded, size: 14, color: Color(0xFF6366F1)),
+                        SizedBox(width: 6),
+                        Text('Order Created Manually', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF6366F1))),
+                      ],
+                    ),
+                  ),
                 if (isDoctorReferred || isPrescriptionOrder)
                   Container(
                     margin: const EdgeInsets.only(bottom: 12),
@@ -1314,16 +1446,18 @@ class _PharmacyOrdersState extends State<PharmacyOrders>
         orderDate = DateTime.now();
       }
 
+      final pharmacyName = ref.read(authProvider).user?.name ?? 'iCare Pharmacy';
       await PdfInvoiceGenerator.generatePharmacyInvoice(
         orderNumber: (order['id'] ?? order['_id'] ?? 'N/A').toString(),
         patientName: (order['customerName'] ?? order['patientName'] ?? order['patient_name'] ?? 'Patient').toString(),
         patientPhone: (order['customerPhone'] ?? order['phone'] ?? order['patientPhone'] ?? 'N/A').toString(),
         patientAddress: (order['address'] ?? order['deliveryAddress'] ?? 'N/A').toString(),
+        patientEmail: (order['customerEmail'] ?? '').toString(),
         items: items,
         deliveryFee: (order['deliveryFee'] ?? order['delivery_fee'] ?? 0).toDouble(),
         totalAmount: total,
         orderDate: orderDate,
-        pharmacyName: 'iCare Pharmacy',
+        pharmacyName: pharmacyName,
       );
     } catch (e) {
       if (mounted) {

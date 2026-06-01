@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:icare/utils/theme.dart';
 import 'package:icare/widgets/back_button.dart';
 import 'package:icare/services/pharmacy_service.dart';
+import 'package:intl/intl.dart';
 
 class PharmacyAnalytics extends StatefulWidget {
   const PharmacyAnalytics({super.key});
@@ -14,6 +15,7 @@ class PharmacyAnalytics extends StatefulWidget {
 class _PharmacyAnalyticsState extends State<PharmacyAnalytics> {
   final PharmacyService _pharmacyService = PharmacyService();
   String _selectedPeriod = 'This Month';
+  DateTimeRange? _customRange;
   bool _isLoading = true;
 
   Map<String, dynamic> _stats = {
@@ -67,7 +69,7 @@ class _PharmacyAnalyticsState extends State<PharmacyAnalytics> {
         elevation: 0,
         leading: const CustomBackButton(),
         title: const Text(
-          'Revenue & Analytics',
+          'Analytics',
           style: TextStyle(
             fontSize: 18,
             fontFamily: 'Gilroy-Bold',
@@ -75,6 +77,14 @@ class _PharmacyAnalyticsState extends State<PharmacyAnalytics> {
             color: Color(0xFF0F172A),
           ),
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.calendar_month_rounded, color: Color(0xFF64748B)),
+            tooltip: 'Custom Date Range',
+            onPressed: _pickDateRange,
+          ),
+          const SizedBox(width: 8),
+        ],
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -109,55 +119,111 @@ class _PharmacyAnalyticsState extends State<PharmacyAnalytics> {
     );
   }
 
+  Future<void> _pickDateRange() async {
+    final now = DateTime.now();
+    final picked = await showDateRangePicker(
+      context: context,
+      firstDate: DateTime(now.year - 2),
+      lastDate: now,
+      initialDateRange: _customRange ?? DateTimeRange(
+        start: DateTime(now.year, now.month, 1),
+        end: now,
+      ),
+      builder: (ctx, child) => Theme(
+        data: ThemeData.light().copyWith(
+          colorScheme: ColorScheme.light(primary: AppColors.primaryColor),
+        ),
+        child: child!,
+      ),
+    );
+    if (picked != null) {
+      setState(() {
+        _customRange = picked;
+        _selectedPeriod = 'Custom';
+      });
+    }
+  }
+
   Widget _buildPeriodSelector() {
     final periods = ['This Week', 'This Month', 'This Year'];
 
-    return Container(
-      padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(4),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.04),
+                blurRadius: 10,
+                offset: const Offset(0, 2),
+              ),
+            ],
           ),
-        ],
-      ),
-      child: Row(
-        children: periods.map((period) {
-          final isSelected = period == _selectedPeriod;
-          return Expanded(
-            child: InkWell(
-              onTap: () {
-                setState(() {
-                  _selectedPeriod = period;
-                });
-              },
-              borderRadius: BorderRadius.circular(8),
-              child: Container(
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                decoration: BoxDecoration(
-                  color: isSelected
-                      ? AppColors.primaryColor
-                      : Colors.transparent,
+          child: Row(
+            children: periods.map((period) {
+              final isSelected = period == _selectedPeriod;
+              return Expanded(
+                child: InkWell(
+                  onTap: () {
+                    setState(() {
+                      _selectedPeriod = period;
+                      _customRange = null;
+                    });
+                  },
                   borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  period,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                    color: isSelected ? Colors.white : const Color(0xFF64748B),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    decoration: BoxDecoration(
+                      color: isSelected ? AppColors.primaryColor : Colors.transparent,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      period,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: isSelected ? Colors.white : const Color(0xFF64748B),
+                      ),
+                    ),
                   ),
                 ),
-              ),
+              );
+            }).toList(),
+          ),
+        ),
+        if (_customRange != null) ...[
+          const SizedBox(height: 10),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: AppColors.primaryColor.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: AppColors.primaryColor.withValues(alpha: 0.3)),
             ),
-          );
-        }).toList(),
-      ),
+            child: Row(
+              children: [
+                const Icon(Icons.date_range_rounded, size: 16, color: AppColors.primaryColor),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Custom: ${DateFormat('dd MMM yyyy').format(_customRange!.start)} – ${DateFormat('dd MMM yyyy').format(_customRange!.end)}',
+                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.primaryColor),
+                  ),
+                ),
+                GestureDetector(
+                  onTap: () => setState(() { _customRange = null; _selectedPeriod = 'This Month'; }),
+                  child: const Icon(Icons.close_rounded, size: 16, color: AppColors.primaryColor),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ],
     );
   }
 

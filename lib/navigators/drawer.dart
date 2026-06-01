@@ -143,7 +143,7 @@ class _CustomDrawerState extends ConsumerState<CustomDrawer> {
             MaterialPageRoute(builder: (ctx) => const PaymentInvoices()),
           );
         }),
-        _drawerItem('Revenue & Analytics', Icons.analytics_outlined, () {
+        _drawerItem('Analytics', Icons.analytics_outlined, () {
           Navigator.of(context).push(
             MaterialPageRoute(builder: (ctx) => const LabAnalytics()),
           );
@@ -297,7 +297,7 @@ class _CustomDrawerState extends ConsumerState<CustomDrawer> {
             context,
           ).push(MaterialPageRoute(builder: (ctx) => const PaymentInvoices()));
         }),
-        _drawerItem('Revenue & Analytics', Icons.analytics_outlined, () {
+        _drawerItem('Analytics', Icons.analytics_outlined, () {
           Navigator.of(context).push(
             MaterialPageRoute(builder: (ctx) => const PharmacyAnalytics()),
           );
@@ -351,7 +351,7 @@ class _CustomDrawerState extends ConsumerState<CustomDrawer> {
             MaterialPageRoute(builder: (ctx) => const PaymentInvoices()),
           );
         }),
-        _drawerItem('Revenue & Analytics', Icons.analytics_outlined, () {
+        _drawerItem('Analytics', Icons.analytics_outlined, () {
           Navigator.of(context).push(
             MaterialPageRoute(builder: (ctx) => const LabAnalytics()),
           );

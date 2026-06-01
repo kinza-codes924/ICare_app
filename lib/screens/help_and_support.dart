@@ -674,7 +674,7 @@ class _WhatsAppSupportButton extends StatelessWidget {
 // INQUIRY FORM — submits a support message
 // ═══════════════════════════════════════════════════════════════════════════
 
-class _InquiryFormDialog extends StatefulWidget {
+class _InquiryFormDialog extends ConsumerStatefulWidget {
   static Future<void> show(BuildContext context) {
     return showDialog(
       context: context,
@@ -686,10 +686,10 @@ class _InquiryFormDialog extends StatefulWidget {
   const _InquiryFormDialog();
 
   @override
-  State<_InquiryFormDialog> createState() => _InquiryFormDialogState();
+  ConsumerState<_InquiryFormDialog> createState() => _InquiryFormDialogState();
 }
 
-class _InquiryFormDialogState extends State<_InquiryFormDialog> {
+class _InquiryFormDialogState extends ConsumerState<_InquiryFormDialog> {
   final _formKey = GlobalKey<FormState>();
   final _nameCtrl = TextEditingController();
   final _emailCtrl = TextEditingController();
@@ -699,6 +699,17 @@ class _InquiryFormDialogState extends State<_InquiryFormDialog> {
   bool _submitting = false;
 
   static const _categories = ['General', 'Technical Issue', 'Billing', 'Account', 'Feedback'];
+
+  @override
+  void initState() {
+    super.initState();
+    // Pre-fill from logged-in user
+    final user = ref.read(authProvider).user;
+    if (user != null) {
+      _nameCtrl.text = user.name ?? '';
+      _emailCtrl.text = user.email ?? '';
+    }
+  }
 
   @override
   void dispose() {
@@ -712,15 +723,52 @@ class _InquiryFormDialogState extends State<_InquiryFormDialog> {
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _submitting = true);
-    // Simulate a short delay so the spinner is visible
-    await Future.delayed(const Duration(milliseconds: 700));
+
+    final user = ref.read(authProvider).user;
+    final role = ref.read(authProvider).userRole ?? 'User';
+    final userId = user?.id ?? '';
+    final userName = _nameCtrl.text.trim();
+    final userEmail = _emailCtrl.text.trim();
+    final subject = _subjectCtrl.text.trim();
+    final message = _messageCtrl.text.trim();
+    final category = _category;
+
+    final body = '''
+Category: $category
+Subject: $subject
+
+Account Details:
+  Name: $userName
+  Email: $userEmail
+  Account Type: $role
+  User ID: ${userId.isNotEmpty ? userId : 'N/A'}
+
+Message:
+$message
+''';
+
+    final mailUri = Uri(
+      scheme: 'mailto',
+      path: 'icareofficialapp@gmail.com',
+      queryParameters: {
+        'subject': '[$category] $subject',
+        'body': body,
+      },
+    );
+
+    try {
+      if (await canLaunchUrl(mailUri)) {
+        await launchUrl(mailUri, mode: LaunchMode.externalApplication);
+      }
+    } catch (_) {}
+
     if (!mounted) return;
     setState(() => _submitting = false);
     Navigator.pop(context);
     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-      content: Text("Inquiry submitted. Our team will get back to you within 24 hours."),
+      content: Text("Your email client has been opened. Please send the message to complete your inquiry."),
       backgroundColor: Color(0xFF10B981),
-      duration: Duration(seconds: 4),
+      duration: Duration(seconds: 5),
     ));
   }
 
