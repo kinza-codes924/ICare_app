@@ -9,6 +9,9 @@ import 'package:icare/services/pharmacy_service.dart';
 import 'package:icare/widgets/back_button.dart';
 import 'package:icare/screens/labb_details.dart';
 import 'package:icare/screens/pharmacy_prescription_screen.dart';
+import 'package:icare/screens/my_orders.dart';
+import 'package:icare/screens/patient_lab_orders.dart';
+import 'package:icare/services/order_service.dart';
 import 'package:flutter/services.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
@@ -30,11 +33,15 @@ class PatientPrescriptions extends ConsumerStatefulWidget {
 
 class _PatientPrescriptionsState extends ConsumerState<PatientPrescriptions> {
   final MedicalRecordService _medicalRecordService = MedicalRecordService();
+  final LaboratoryService _labService = LaboratoryService();
+  final OrderService _orderService = OrderService();
   List<dynamic> _prescriptions = [];
   List<dynamic> _filtered = [];
   bool _isLoading = true;
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
+  Map<String, List<dynamic>> _labBookingsByPrescription = {};
+  Map<String, List<dynamic>> _ordersByPrescription = {};
 
   @override
   void initState() {
@@ -106,10 +113,14 @@ class _PatientPrescriptionsState extends ConsumerState<PatientPrescriptions> {
         patientId.isNotEmpty
             ? ConsultationService().getPatientPrescriptions(patientId: patientId)
             : Future.value(<dynamic>[]),
+        _labService.getMyBookings().catchError((_) => <dynamic>[]),
+        _orderService.getMyOrders().catchError((_) => <dynamic>[]),
       ]);
 
       final medResult = results[0] as Map<String, dynamic>;
       final rxList = results[1] as List<dynamic>;
+      final labBookings = results[2] as List<dynamic>;
+      final pharmacyOrders = results[3] as List<dynamic>;
       final allPrescriptions = <dynamic>[];
 
       if (medResult['success'] == true) {
@@ -147,10 +158,24 @@ class _PatientPrescriptionsState extends ConsumerState<PatientPrescriptions> {
         return bDate.compareTo(aDate);
       });
 
+      // Build lookup maps: prescriptionId → list of lab bookings / pharmacy orders
+      final labMap = <String, List<dynamic>>{};
+      for (final b in labBookings) {
+        final pid = (b['prescriptionId'] ?? b['medicalRecordId'] ?? b['prescription'])?.toString() ?? '';
+        if (pid.isNotEmpty) labMap.putIfAbsent(pid, () => []).add(b);
+      }
+      final orderMap = <String, List<dynamic>>{};
+      for (final o in pharmacyOrders) {
+        final pid = (o['prescriptionId'] ?? o['prescription'])?.toString() ?? '';
+        if (pid.isNotEmpty) orderMap.putIfAbsent(pid, () => []).add(o);
+      }
+
       if (mounted) {
         setState(() {
           _prescriptions = allPrescriptions;
           _filtered = List.from(allPrescriptions);
+          _labBookingsByPrescription = labMap;
+          _ordersByPrescription = orderMap;
           _isLoading = false;
         });
       }
@@ -316,11 +341,17 @@ class _PatientPrescriptionsState extends ConsumerState<PatientPrescriptions> {
       isWithin30Days = false;
     }
 
+    final recordId = (record['_id'] ?? record['id'] ?? '').toString();
+    final linkedBookings = _labBookingsByPrescription[recordId] ?? [];
+    final linkedOrders = _ordersByPrescription[recordId] ?? [];
+
     return _PrescriptionPage(
       record: record,
       medicines: medicines,
       labTests: labTests,
       isWithin30Days: isWithin30Days,
+      linkedLabBookings: linkedBookings,
+      linkedPharmacyOrders: linkedOrders,
       onFindPharmacies: isWithin30Days ? () => _showFindPharmacies(context, medicines) : null,
       onFindLabs: isWithin30Days ? () => _showFindLabs(context, labTests) : null,
     );
@@ -818,6 +849,8 @@ class _PrescriptionPage extends StatelessWidget {
   final VoidCallback? onFindPharmacies;
   final VoidCallback? onFindLabs;
   final bool isWithin30Days;
+  final List<dynamic> linkedLabBookings;
+  final List<dynamic> linkedPharmacyOrders;
 
   const _PrescriptionPage({
     required this.record,
@@ -826,6 +859,8 @@ class _PrescriptionPage extends StatelessWidget {
     required this.isWithin30Days,
     this.onFindPharmacies,
     this.onFindLabs,
+    this.linkedLabBookings = const [],
+    this.linkedPharmacyOrders = const [],
   });
 
   String get _patientName {
@@ -1028,6 +1063,10 @@ class _PrescriptionPage extends StatelessWidget {
                   ]),
                 ),
               ],
+
+              // Journey Status
+              if (linkedLabBookings.isNotEmpty || linkedPharmacyOrders.isNotEmpty)
+                _buildJourneySection(context),
 
               // Signature
               const SizedBox(height: 18), _div(), const SizedBox(height: 14),
@@ -1317,6 +1356,178 @@ class _PrescriptionPage extends StatelessWidget {
       const SnackBar(content: Text('Prescription copied! Paste in WhatsApp or any app to share.')),
     );
   }
+  Widget _buildJourneySection(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 16),
+        _div(),
+        const SizedBox(height: 14),
+        _sec('TREATMENT STATUS', Icons.timeline_rounded, const Color(0xFF0EA5E9)),
+        const SizedBox(height: 10),
+        ...linkedLabBookings.take(3).map((b) => _bookingStatusTile(context, b)),
+        ...linkedPharmacyOrders.take(3).map((o) => _orderStatusTile(context, o)),
+      ],
+    );
+  }
+
+  Widget _bookingStatusTile(BuildContext context, dynamic booking) {
+    final rawLab = booking['laboratoryId'];
+    final labName = (rawLab is Map
+        ? (rawLab['labName'] ?? rawLab['lab_name'] ?? rawLab['name'] ?? 'Lab')
+        : (booking['labName'] ?? booking['lab_name'] ?? 'Laboratory')).toString();
+    final status = (booking['status'] ?? 'pending').toString().toLowerCase();
+    final statusLabel = _labStatusLabel(status);
+    final statusColor = _labStatusColor(status);
+    final testCount = (booking['tests'] as List?)?.length ?? (booking['testNames'] as List?)?.length ?? 0;
+
+    return InkWell(
+      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PatientLabOrdersScreen())),
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF5F3FF),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: const Color(0xFFDDD6FE)),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.biotech_rounded, color: Color(0xFF8B5CF6), size: 18),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(labName, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF0F172A))),
+                  Text(testCount > 0 ? '$testCount test${testCount == 1 ? "" : "s"} booked' : 'Lab Booking',
+                      style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+                ],
+              ),
+            ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: statusColor.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: statusColor.withValues(alpha: 0.3)),
+                  ),
+                  child: Text(statusLabel, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: statusColor)),
+                ),
+                const SizedBox(height: 2),
+                Text('View →', style: TextStyle(fontSize: 10, color: statusColor, fontWeight: FontWeight.w700)),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _orderStatusTile(BuildContext context, dynamic order) {
+    final rawPharmacy = order['pharmacyId'];
+    final pharmacyName = (rawPharmacy is Map
+        ? (rawPharmacy['pharmacy_name'] ?? rawPharmacy['pharmacyName'] ?? rawPharmacy['name'] ?? 'Pharmacy')
+        : (order['pharmacyName'] ?? 'Pharmacy')).toString();
+    final status = (order['status'] ?? 'pending').toString().toLowerCase();
+    final statusLabel = _orderStatusLabel(status);
+    final statusColor = _orderStatusColor(status);
+    final itemCount = (order['items'] as List?)?.length ?? 0;
+
+    return InkWell(
+      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MyOrdersScreen())),
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: const Color(0xFFEFF6FF),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: const Color(0xFFBFDBFE)),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.local_pharmacy_rounded, color: Color(0xFF3B82F6), size: 18),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(pharmacyName, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF0F172A))),
+                  Text(itemCount > 0 ? '$itemCount item${itemCount == 1 ? "" : "s"} ordered' : 'Pharmacy Order',
+                      style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+                ],
+              ),
+            ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: statusColor.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: statusColor.withValues(alpha: 0.3)),
+                  ),
+                  child: Text(statusLabel, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: statusColor)),
+                ),
+                const SizedBox(height: 2),
+                Text('Track →', style: TextStyle(fontSize: 10, color: statusColor, fontWeight: FontWeight.w700)),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _labStatusLabel(String s) {
+    switch (s) {
+      case 'pending': return 'Pending';
+      case 'confirmed': return 'Confirmed';
+      case 'sample_collected': return 'Sample Collected';
+      case 'processing': return 'Processing';
+      case 'completed': return 'Completed ✓';
+      case 'cancelled': return 'Cancelled';
+      default: return s.isNotEmpty ? '${s[0].toUpperCase()}${s.substring(1)}' : 'Pending';
+    }
+  }
+
+  Color _labStatusColor(String s) {
+    switch (s) {
+      case 'completed': return const Color(0xFF10B981);
+      case 'cancelled': return const Color(0xFFEF4444);
+      case 'confirmed': case 'sample_collected': case 'processing': return const Color(0xFF3B82F6);
+      default: return const Color(0xFFF59E0B);
+    }
+  }
+
+  String _orderStatusLabel(String s) {
+    switch (s) {
+      case 'pending': return 'Pending';
+      case 'confirmed': return 'Confirmed';
+      case 'preparing': return 'Preparing';
+      case 'out-for-delivery': case 'out_for_delivery': return 'Out for Delivery';
+      case 'delivered': case 'completed': return 'Delivered ✓';
+      case 'cancelled': case 'rejected': return 'Cancelled';
+      default: return s.isNotEmpty ? '${s[0].toUpperCase()}${s.substring(1)}' : 'Pending';
+    }
+  }
+
+  Color _orderStatusColor(String s) {
+    switch (s) {
+      case 'delivered': case 'completed': return const Color(0xFF10B981);
+      case 'cancelled': case 'rejected': return const Color(0xFFEF4444);
+      case 'out-for-delivery': case 'out_for_delivery': return const Color(0xFF8B5CF6);
+      case 'confirmed': case 'preparing': return const Color(0xFF3B82F6);
+      default: return const Color(0xFFF59E0B);
+    }
+  }
+
   Widget _hdrInfo(String label, String name, List<String> details) {
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Text(label, style: const TextStyle(color: Colors.white60, fontSize: 9, fontWeight: FontWeight.w800, letterSpacing: 1.4)),
