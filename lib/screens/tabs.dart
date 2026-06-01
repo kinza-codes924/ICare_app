@@ -250,7 +250,9 @@ class _TabsScreenState extends ConsumerState<TabsScreen> {
         body: Stack(
           children: [
             activePage,
-            const WhatsAppFloatingButton(),
+            WhatsAppFloatingButton(
+              bottomOffset: (role == 'Pharmacy' && currentIndex == 1) ? 90 : 20,
+            ),
           ],
         ),
         bottomNavigationBar: BottomTabBar(
@@ -323,7 +325,9 @@ class _TabsScreenState extends ConsumerState<TabsScreen> {
               ),
             ],
           ),
-          const WhatsAppFloatingButton(),
+          WhatsAppFloatingButton(
+            bottomOffset: (role == 'Pharmacy' && currentIndex == 1) ? 90 : 20,
+          ),
         ],
       ),
     );

@@ -7,7 +7,8 @@ class WhatsAppFloatingButton extends StatelessWidget {
   static const String defaultMessage =
       'Hello! I would like to inquire about your services.';
 
-  const WhatsAppFloatingButton({super.key});
+  final double bottomOffset;
+  const WhatsAppFloatingButton({super.key, this.bottomOffset = 20});
 
   Future<void> _openWhatsApp(BuildContext context) async {
     final uri = Uri.parse(
@@ -27,7 +28,7 @@ class WhatsAppFloatingButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Positioned(
-      bottom: 90,
+      bottom: bottomOffset,
       right: 20,
       child: Tooltip(
         message: 'Chat on WhatsApp',
