@@ -72,9 +72,7 @@ class _PatientPrescriptionsState extends ConsumerState<PatientPrescriptions> {
       final diagnosis = (r['diagnosis'] ?? '').toString().toLowerCase();
       final doctorName = (r['doctor']?['name'] ?? '').toString().toLowerCase();
       final date = r['createdAt'] != null
-          ? DateFormat('MMM dd, yyyy')
-              .format(DateTime.parse(r['createdAt'].toString()).toLocal())
-              .toLowerCase()
+          ? (() { try { return DateFormat('MMM dd, yyyy').format(DateTime.parse(r['createdAt'].toString().replaceAll('/', '-')).toLocal()).toLowerCase(); } catch (_) { return ''; } })()
           : '';
       final rawId = (r['_id'] ?? r['id'] ?? '').toString();
       final mrNumber = rawId.length >= 6
@@ -2587,7 +2585,7 @@ class _FindPharmaciesSheetState extends State<_FindPharmaciesSheet> {
         final rx = _advisedPrescriptions[i] as Map<String, dynamic>;
         final doctorName = (rx['doctor']?['name'] ?? rx['doctorName'] ?? 'Doctor').toString();
         final dateStr = rx['createdAt'] != null
-            ? DateFormat('MMM dd, yyyy').format(DateTime.parse(rx['createdAt'].toString()).toLocal())
+            ? (() { try { return DateFormat('MMM dd, yyyy').format(DateTime.parse(rx['createdAt'].toString().replaceAll('/', '-')).toLocal()); } catch (_) { return ''; } })()
             : '';
         final meds = (rx['medicines'] as List?) ??
             (rx['prescription'] is Map ? (rx['prescription']['medicines'] as List?) : null) ?? [];

@@ -50,17 +50,16 @@ class _MyOrdersScreenState extends ConsumerState<MyOrdersScreen> {
                     (o['items'] as List?)
                         ?.map(
                           (item) => {
-                            'name': item['productName'] ?? 'Unknown',
+                            'name': item['productName'] ?? item['name'] ?? item['medicine'] ?? 'Medicine',
                             'image': ImagePaths.capsule,
                           },
                         )
                         .toList() ??
                     [],
-                'pharmacy': 'Pharmacy',
+                'pharmacy': o['pharmacyName'] ?? 'Pharmacy',
                 'date': o['createdAt'] != null
-                    ? DateFormat(
-                        'dd MMM yyyy',
-                      ).format(DateTime.parse(o['createdAt']))
+                    ? DateFormat('dd MMM yyyy').format(
+                        DateTime.parse(o['createdAt'].toString().replaceAll('/', '-')))
                     : 'N/A',
                 'amount': (o['totalAmount'] ?? 0).toString(),
                 'qty': (o['items'] as List?)?.length ?? 0,

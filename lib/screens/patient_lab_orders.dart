@@ -350,12 +350,23 @@ ${messageCtrl.text.trim()}
     final status = order['status'] ?? 'pending';
     final statusColor = _getStatusColor(status);
     final statusIcon = _getStatusIcon(status);
-    final testName = order['testName'] ?? 'Lab Test';
+    final rawTestName = (order['testName'] ?? 'Lab Test').toString();
+    // Truncate very long test names (multiple tests comma-separated)
+    final testParts = rawTestName.split(',');
+    final testName = testParts.length > 2
+        ? '${testParts[0].trim()}, ${testParts[1].trim()} +${testParts.length - 2} more'
+        : rawTestName;
     final bookingNumber = order['bookingNumber'] ?? 'N/A';
     final labName = order['laboratory']?['labName'] ?? 'Laboratory';
     final labCity = order['laboratory']?['city'] ?? '';
-    final date = order['date'] != null
-        ? DateFormat('MMM dd, yyyy').format(DateTime.parse(order['date']))
+    DateTime? parsedDate;
+    try {
+      if (order['date'] != null) {
+        parsedDate = DateTime.parse(order['date'].toString().replaceAll('/', '-'));
+      }
+    } catch (_) {}
+    final date = parsedDate != null
+        ? DateFormat('MMM dd, yyyy').format(parsedDate)
         : 'Not scheduled';
     final hasReport =
         order['reportUrl'] != null && order['reportUrl'].toString().isNotEmpty;
