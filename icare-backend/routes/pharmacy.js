@@ -411,6 +411,17 @@ router.get('/orders', authMiddleware, async (req, res) => {
     if (status && status !== 'all') query.status = status;
 
     const orders = await PharmacyOrder.find(query).sort({ createdAt: -1 }).lean();
+
+    // Fetch pharmacy names for all unique pharmacy IDs
+    const pharmacyIds = [...new Set(orders.map(o => o.pharmacy_id?.toString()).filter(Boolean))];
+    const pharmacyProfiles = await PharmacyProfile.find({ user_id: { $in: pharmacyIds.map(id => toId(id)) } }).lean();
+    const pharmacyUsers = await User.find({ _id: { $in: pharmacyIds.map(id => toId(id)) } }).lean();
+    const pharmNameMap = {};
+    pharmacyUsers.forEach(u => { pharmNameMap[u._id.toString()] = u.username || u.name || 'Pharmacy'; });
+    pharmacyProfiles.forEach(p => {
+      if (p.pharmacy_name) pharmNameMap[p.user_id.toString()] = p.pharmacy_name;
+    });
+
     res.json({
       success: true,
       orders: orders.map(o => ({
@@ -418,11 +429,15 @@ router.get('/orders', authMiddleware, async (req, res) => {
         _id: o._id.toString(),
         prescriptionId: o.prescription_id?.toString() || null,
         pharmacyId: o.pharmacy_id?.toString() || null,
+        pharmacyName: pharmNameMap[o.pharmacy_id?.toString()] || 'Pharmacy',
         patientId: o.patient_id?.toString() || null,
         totalAmount: o.total_amount || 0,
         deliveryFee: o.delivery_fee || 0,
         deliveryAddress: o.delivery_address || '',
-        items: o.items || [],
+        items: (o.items || []).map(item => ({
+          ...item,
+          name: item.productName || item.name || item.medicine || 'Medicine',
+        })),
       })),
     });
   } catch (err) {

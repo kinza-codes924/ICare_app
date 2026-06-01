@@ -1,20 +1,20 @@
 const sendEmail = async ({ to, subject, html }) => {
-  const res = await fetch('https://api.resend.com/emails', {
+  const res = await fetch('https://api.brevo.com/v3/smtp/email', {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${process.env.RESEND_API_KEY}`,
+      'api-key': process.env.BREVO_API_KEY,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      from: 'iCare <onboarding@resend.dev>',
-      to: [to],
+      sender: { name: 'iCare', email: 'icareofficialapp@gmail.com' },
+      to: [{ email: to }],
       subject,
-      html,
+      htmlContent: html,
     }),
   });
   if (!res.ok) {
     const err = await res.text();
-    throw new Error(`Resend error: ${err}`);
+    throw new Error(`Brevo error: ${err}`);
   }
   return res.json();
 };
