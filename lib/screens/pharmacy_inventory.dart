@@ -44,12 +44,12 @@ class _PharmacyInventoryState extends State<PharmacyInventory> {
 
       List<Map<String, dynamic>> products = medicines.map<Map<String, dynamic>>((m) => {
         '_id': m['_id'],
-        'name': m['productName'] ?? 'Unknown',
+        'name': m['productName'] ?? m['name'] ?? m['product_name'] ?? m['medicine_name'] ?? 'Unknown',
         'brand': m['brand'] ?? m['companyName'] ?? '',
         'category': m['category'] ?? 'Other',
         'type': m['medicineType'] ?? 'Tablet',
         'power': m['power'] ?? '',
-        'stock': (m['quantity'] ?? 0) as int,
+        'stock': ((m['quantity'] ?? m['stock_quantity'] ?? m['stock'] ?? 0) as num).toInt(),
         'price': (m['price'] ?? 0).toDouble(),
         'amount': m['amount'] ?? '',
         'details': m['details'] ?? '',
@@ -324,6 +324,7 @@ class _PharmacyInventoryState extends State<PharmacyInventory> {
         if (cols.isEmpty || (cols[0]).isEmpty) continue;
         try {
           await _pharmacyService.createMedicine({
+            'name': cols[0],
             'productName': cols[0],
             'brand': cols.length > 1 ? cols[1] : '',
             'category': cols.length > 2 && cols[2].isNotEmpty ? cols[2] : 'Other',
@@ -763,6 +764,7 @@ class _AddMedicineModalState extends State<_AddMedicineModal> {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _saving = true);
     await widget.onSave({
+      'name': _name.text.trim(),
       'productName': _name.text.trim(),
       'brand': _brand.text.trim(),
       'power': _power.text.trim(),

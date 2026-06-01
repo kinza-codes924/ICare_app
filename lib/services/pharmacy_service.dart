@@ -186,12 +186,13 @@ class PharmacyService {
       url += '&q=${Uri.encodeComponent(search)}';
     }
     final response = await _apiService.get(url);
-    return response.data['medicines'] as List;
+    final data = response.data;
+    return (data['medicines'] ?? data['products'] ?? data['data'] ?? []) as List;
   }
 
   Future<Map<String, dynamic>> createMedicine(Map<String, dynamic> data) async {
     final response = await _apiService.post('/pharmacy/products', data);
-    return response.data['medicine'];
+    return (response.data['medicine'] ?? response.data['product'] ?? response.data['data'] ?? {}) as Map<String, dynamic>;
   }
 
   Future<Map<String, dynamic>> updateMedicine(
@@ -199,7 +200,7 @@ class PharmacyService {
     Map<String, dynamic> data,
   ) async {
     final response = await _apiService.put('/pharmacy/products/$id', data);
-    return response.data['medicine'];
+    return (response.data['medicine'] ?? response.data['product'] ?? response.data['data'] ?? {}) as Map<String, dynamic>;
   }
 
   Future<void> deleteMedicine(String id) async {
