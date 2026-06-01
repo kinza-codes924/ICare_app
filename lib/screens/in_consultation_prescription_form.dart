@@ -217,17 +217,12 @@ class _InConsultationPrescriptionFormState
   }
 
   Future<void> _maybeSendPrescriptionEmail() async {
-    // Check if patient has enabled email prescription toggle
-    final patientEmailPreference = await _notificationService.getNotificationPreferences(
-      widget.appointment.patient?.id ?? '',
-    );
-    
-    final bool shouldSendEmail = patientEmailPreference['emailPrescriptionAuto'] == true;
-    
-    if (shouldSendEmail) {
+    try {
       await _notificationService.sendPrescriptionEmail(
         consultationId: widget.consultationId,
       );
+    } catch (_) {
+      // Email sending failure should not block prescription completion
     }
   }
 

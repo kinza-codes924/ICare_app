@@ -59,6 +59,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
   bool _biometricEnabled = false;
   bool _biometricLoading = false;
 
+  // Social sign-in state
+  bool _googleLoading = false;
+  bool _appleLoading = false;
+
   @override
   void initState() {
     super.initState();
@@ -172,6 +176,61 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
       if (!mounted) return;
       setState(() => _biometricLoading = false);
       _showError('Biometric authentication failed. Please use your password.');
+    }
+  }
+
+  Future<void> _handleGoogleSignIn() async {
+    if (_googleLoading) return;
+    setState(() => _googleLoading = true);
+    try {
+      final result = await _authService.loginWithGoogle();
+      if (!mounted) return;
+      if (result['success'] == true) {
+        await _completeSocialLogin(result);
+      } else {
+        _showError(result['message'] ?? 'Google sign-in failed');
+      }
+    } catch (e) {
+      if (mounted) _showError('Google sign-in error: $e');
+    } finally {
+      if (mounted) setState(() => _googleLoading = false);
+    }
+  }
+
+  Future<void> _handleAppleSignIn() async {
+    if (_appleLoading) return;
+    setState(() => _appleLoading = true);
+    try {
+      final result = await _authService.loginWithApple();
+      if (!mounted) return;
+      if (result['success'] == true) {
+        await _completeSocialLogin(result);
+      } else {
+        _showError(result['message'] ?? 'Apple sign-in failed');
+      }
+    } catch (e) {
+      if (mounted) _showError('Apple sign-in error: $e');
+    } finally {
+      if (mounted) setState(() => _appleLoading = false);
+    }
+  }
+
+  Future<void> _completeSocialLogin(Map<String, dynamic> authResult) async {
+    final data = authResult['data'] as Map<String, dynamic>? ?? {};
+    final token = data['token']?.toString() ?? '';
+    if (token.isEmpty) {
+      _showError('Sign-in failed: no token received');
+      return;
+    }
+    final profileResult = await _userService.getUserProfile(token: token);
+    if (!mounted) return;
+    if (profileResult['success'] == true) {
+      final user = app_user.User.fromJson(profileResult['user'] as Map<String, dynamic>);
+      await ref.read(authProvider.notifier).setUserToken(token);
+      await ref.read(authProvider.notifier).setUser(user);
+      if (mounted) context.go('/dashboard');
+    } else {
+      _showError('Could not load profile: ${profileResult['message']}');
     }
   }
 
@@ -1058,6 +1117,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                                 _webSocialButton(
                                   ImagePaths.google_icon,
                                   "Continue with Google",
+                                  onTap: _handleGoogleSignIn,
+                                  isLoading: _googleLoading,
+                                ),
+                                const SizedBox(height: 10),
+                                _webAppleButton(
+                                  onTap: _handleAppleSignIn,
+                                  isLoading: _appleLoading,
                                 ),
                                 // Biometric / Face Unlock sign-in button — show whenever hardware is available
                                 if (_biometricAvailable) ...[
@@ -1617,7 +1683,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
         const SizedBox(height: 25),
         Text("Or Continue With".tr(), style: const TextStyle(color: Colors.grey)),
         const SizedBox(height: 15),
-        _socialButton(ImagePaths.google_icon, "Google"),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            _socialButton(ImagePaths.google_icon, "Google",
+                onTap: _handleGoogleSignIn, isLoading: _googleLoading),
+            const SizedBox(width: 12),
+            _mobileAppleButton(onTap: _handleAppleSignIn, isLoading: _appleLoading),
+          ],
+        ),
         // Biometric / Face Unlock sign-in button — show whenever hardware is available
         if (_biometricAvailable) ...[
           const SizedBox(height: 12),
@@ -1694,46 +1768,111 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     );
   }
 
-  Widget _webSocialButton(String assetPath, String label) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFE2E8F0), width: 1.5),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Image.asset(assetPath, width: 24, height: 24),
-          const SizedBox(width: 10),
-          Text(
-            label,
-            style: const TextStyle(
-              color: Color(0xFF475569),
-              fontWeight: FontWeight.w600,
-              fontSize: 14,
+  Widget _webSocialButton(String assetPath, String label, {VoidCallback? onTap, bool isLoading = false}) {
+    return GestureDetector(
+      onTap: isLoading ? null : onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: const Color(0xFFE2E8F0), width: 1.5),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            if (isLoading)
+              const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF475569)))
+            else
+              Image.asset(assetPath, width: 24, height: 24),
+            const SizedBox(width: 10),
+            Text(
+              isLoading ? 'Signing in...' : label,
+              style: const TextStyle(
+                color: Color(0xFF475569),
+                fontWeight: FontWeight.w600,
+                fontSize: 14,
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 
-  Widget _socialButton(String assetPath, String label) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 13, horizontal: 20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(30),
-        border: Border.all(color: Colors.grey.shade300),
+  Widget _webAppleButton({VoidCallback? onTap, bool isLoading = false}) {
+    return GestureDetector(
+      onTap: isLoading ? null : onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        decoration: BoxDecoration(
+          color: Colors.black,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: Colors.black, width: 1.5),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            if (isLoading)
+              const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+            else
+              const Icon(Icons.apple, color: Colors.white, size: 24),
+            const SizedBox(width: 10),
+            Text(
+              isLoading ? 'Signing in...' : 'Continue with Apple',
+              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 14),
+            ),
+          ],
+        ),
       ),
-      child: Row(
-        children: [
-          Image.asset(assetPath, width: 24, height: 24),
-          const SizedBox(width: 8),
-          Text(label, style: TextStyle(color: Colors.grey[700], fontSize: 12)),
-        ],
+    );
+  }
+
+  Widget _socialButton(String assetPath, String label, {VoidCallback? onTap, bool isLoading = false}) {
+    return GestureDetector(
+      onTap: isLoading ? null : onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 13, horizontal: 20),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(30),
+          border: Border.all(color: Colors.grey.shade300),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (isLoading)
+              const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2))
+            else
+              Image.asset(assetPath, width: 24, height: 24),
+            const SizedBox(width: 8),
+            Text(isLoading ? 'Signing in...' : label, style: TextStyle(color: Colors.grey[700], fontSize: 12)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _mobileAppleButton({VoidCallback? onTap, bool isLoading = false}) {
+    return GestureDetector(
+      onTap: isLoading ? null : onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 13, horizontal: 20),
+        decoration: BoxDecoration(
+          color: Colors.black,
+          borderRadius: BorderRadius.circular(30),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (isLoading)
+              const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+            else
+              const Icon(Icons.apple, color: Colors.white, size: 22),
+            const SizedBox(width: 8),
+            Text(isLoading ? 'Signing in...' : 'Apple', style: const TextStyle(color: Colors.white, fontSize: 12)),
+          ],
+        ),
       ),
     );
   }

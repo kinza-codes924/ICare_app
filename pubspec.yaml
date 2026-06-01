@@ -78,6 +78,7 @@ dependencies:
   web: ^1.1.0
   local_auth: ^2.3.0
   qr_flutter: ^4.1.0
+  sign_in_with_apple: ^8.1.0
 
 dev_dependencies:
   flutter_test:

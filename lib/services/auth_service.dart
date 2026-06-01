@@ -1,4 +1,6 @@
 import 'package:dio/dio.dart';
+import 'package:google_sign_in/google_sign_in.dart';
+import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import '../utils/shared_pref.dart';
 import 'api_service.dart';
 import 'api_config.dart';
@@ -174,6 +176,80 @@ class AuthService {
       return {'success': false, 'message': _friendlyError(e)};
     } catch (_) {
       return {'success': false, 'message': 'Unexpected error. Please try again.'};
+    }
+  }
+
+  Future<Map<String, dynamic>> loginWithGoogle() async {
+    try {
+      final googleSignIn = GoogleSignIn(
+        clientId: '1076307742101-avj49igc93qipdcnqbqsk3u14gdcb2oh.apps.googleusercontent.com',
+        scopes: ['email', 'profile'],
+      );
+      final account = await googleSignIn.signIn();
+      if (account == null) return {'success': false, 'message': 'Sign-in cancelled'};
+      final auth = await account.authentication;
+      final idToken = auth.idToken;
+      if (idToken == null) return {'success': false, 'message': 'Could not get Google token'};
+      final response = await _apiService.post('/auth/google', {
+        'idToken': idToken,
+        'email': account.email,
+        'name': account.displayName ?? account.email.split('@').first,
+      });
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final data = response.data as Map<String, dynamic>;
+        final inner = data['data'] ?? data;
+        final token = inner['token']?.toString() ?? data['token']?.toString() ?? '';
+        if (token.isNotEmpty) {
+          await _saveToken(token);
+          FcmService().getAndSaveToken();
+        }
+        return {'success': true, 'data': inner is Map ? inner : data};
+      }
+      return {'success': false, 'message': (response.data as Map?)?['message'] ?? 'Google sign-in failed'};
+    } on DioException catch (e) {
+      return {'success': false, 'message': _friendlyError(e)};
+    } catch (e) {
+      return {'success': false, 'message': 'Google sign-in error: ${e.toString()}'};
+    }
+  }
+
+  Future<Map<String, dynamic>> loginWithApple() async {
+    try {
+      final credential = await SignInWithApple.getAppleIDCredential(
+        scopes: [
+          AppleIDAuthorizationScopes.email,
+          AppleIDAuthorizationScopes.fullName,
+        ],
+        webAuthenticationOptions: WebAuthenticationOptions(
+          clientId: 'com.rmhealthsolutions.icare',
+          redirectUri: Uri.parse('https://icare-backend-inky.vercel.app/api/auth/apple/callback'),
+        ),
+      );
+      final identityToken = credential.identityToken;
+      if (identityToken == null) return {'success': false, 'message': 'Could not get Apple token'};
+      final name = [credential.givenName, credential.familyName]
+          .where((s) => s != null && s.isNotEmpty).join(' ');
+      final response = await _apiService.post('/auth/apple', {
+        'identityToken': identityToken,
+        'authorizationCode': credential.authorizationCode,
+        'email': credential.email ?? '',
+        'name': name,
+      });
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final data = response.data as Map<String, dynamic>;
+        final inner = data['data'] ?? data;
+        final token = inner['token']?.toString() ?? data['token']?.toString() ?? '';
+        if (token.isNotEmpty) {
+          await _saveToken(token);
+          FcmService().getAndSaveToken();
+        }
+        return {'success': true, 'data': inner is Map ? inner : data};
+      }
+      return {'success': false, 'message': (response.data as Map?)?['message'] ?? 'Apple sign-in failed'};
+    } on DioException catch (e) {
+      return {'success': false, 'message': _friendlyError(e)};
+    } catch (e) {
+      return {'success': false, 'message': 'Apple sign-in error: ${e.toString()}'};
     }
   }
 
