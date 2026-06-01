@@ -42,6 +42,8 @@ class _PatientPrescriptionsState extends ConsumerState<PatientPrescriptions> {
   String _searchQuery = '';
   Map<String, List<dynamic>> _labBookingsByPrescription = {};
   Map<String, List<dynamic>> _ordersByPrescription = {};
+  List<dynamic> _allLabBookings = [];
+  List<dynamic> _allPharmacyOrders = [];
 
   @override
   void initState() {
@@ -119,8 +121,8 @@ class _PatientPrescriptionsState extends ConsumerState<PatientPrescriptions> {
 
       final medResult = results[0] as Map<String, dynamic>;
       final rxList = results[1] as List<dynamic>;
-      final labBookings = results[2] as List<dynamic>;
-      final pharmacyOrders = results[3] as List<dynamic>;
+      final labBookings = (results[2] as List?) ?? <dynamic>[];
+      final pharmacyOrders = (results[3] as List?) ?? <dynamic>[];
       final allPrescriptions = <dynamic>[];
 
       if (medResult['success'] == true) {
@@ -161,12 +163,12 @@ class _PatientPrescriptionsState extends ConsumerState<PatientPrescriptions> {
       // Build lookup maps: prescriptionId → list of lab bookings / pharmacy orders
       final labMap = <String, List<dynamic>>{};
       for (final b in labBookings) {
-        final pid = (b['prescriptionId'] ?? b['medicalRecordId'] ?? b['prescription'])?.toString() ?? '';
+        final pid = (b['prescriptionId'] ?? b['medicalRecordId'] ?? b['prescription_id'] ?? b['medical_record_id'] ?? b['prescription'])?.toString() ?? '';
         if (pid.isNotEmpty) labMap.putIfAbsent(pid, () => []).add(b);
       }
       final orderMap = <String, List<dynamic>>{};
       for (final o in pharmacyOrders) {
-        final pid = (o['prescriptionId'] ?? o['prescription'])?.toString() ?? '';
+        final pid = (o['prescriptionId'] ?? o['prescription_id'] ?? o['prescription'])?.toString() ?? '';
         if (pid.isNotEmpty) orderMap.putIfAbsent(pid, () => []).add(o);
       }
 
@@ -176,6 +178,8 @@ class _PatientPrescriptionsState extends ConsumerState<PatientPrescriptions> {
           _filtered = List.from(allPrescriptions);
           _labBookingsByPrescription = labMap;
           _ordersByPrescription = orderMap;
+          _allLabBookings = labBookings;
+          _allPharmacyOrders = pharmacyOrders;
           _isLoading = false;
         });
       }
@@ -342,8 +346,33 @@ class _PatientPrescriptionsState extends ConsumerState<PatientPrescriptions> {
     }
 
     final recordId = (record['_id'] ?? record['id'] ?? '').toString();
-    final linkedBookings = _labBookingsByPrescription[recordId] ?? [];
-    final linkedOrders = _ordersByPrescription[recordId] ?? [];
+    List<dynamic> linkedBookings = _labBookingsByPrescription[recordId] ?? [];
+    List<dynamic> linkedOrders = _ordersByPrescription[recordId] ?? [];
+
+    // Date-based fallback: old bookings/orders have no prescriptionId in backend
+    if (linkedBookings.isEmpty && linkedOrders.isEmpty) {
+      final prescriptionDate = _parseDateFromRecord(record);
+      if (prescriptionDate != null) {
+        final idx = _prescriptions.indexWhere((r) =>
+            (r is Map ? (r['_id'] ?? r['id'] ?? '') : '').toString() == recordId);
+        // Prescriptions sorted newest-first: idx-1 is more recent, so its date is the upper cutoff
+        DateTime cutoff;
+        if (idx > 0) {
+          cutoff = _parseDateFromRecord(_prescriptions[idx - 1]) ??
+              DateTime.now().add(const Duration(days: 1));
+        } else {
+          cutoff = DateTime.now().add(const Duration(days: 1));
+        }
+        linkedBookings = _allLabBookings.where((b) {
+          final d = _parseDateFromData(b);
+          return d != null && !d.isBefore(prescriptionDate) && d.isBefore(cutoff);
+        }).toList();
+        linkedOrders = _allPharmacyOrders.where((o) {
+          final d = _parseDateFromData(o);
+          return d != null && !d.isBefore(prescriptionDate) && d.isBefore(cutoff);
+        }).toList();
+      }
+    }
 
     return _PrescriptionPage(
       record: record,
@@ -811,6 +840,36 @@ class _PatientPrescriptionsState extends ConsumerState<PatientPrescriptions> {
                 fontWeight: FontWeight.w600)),
       ],
     );
+  }
+
+  DateTime? _parseDateFromRecord(dynamic record) {
+    final s = (record is Map
+            ? (record['prescribedAt'] ?? record['createdAt'])
+            : null)
+        ?.toString() ??
+        '';
+    if (s.isEmpty) return null;
+    try {
+      return DateTime.parse(s);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  DateTime? _parseDateFromData(dynamic data) {
+    // createdAt first (booking/order creation time), then appointment/scheduled date as fallback
+    final s = (data is Map
+            ? (data['createdAt'] ?? data['bookingDate'] ?? data['orderDate'] ??
+               data['appointmentDate'] ?? data['date'])
+            : null)
+        ?.toString() ??
+        '';
+    if (s.isEmpty) return null;
+    try {
+      return DateTime.parse(s);
+    } catch (_) {
+      return null;
+    }
   }
 
   // â”€â”€ FIND LABS BOTTOM SHEET â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -1372,14 +1431,18 @@ class _PrescriptionPage extends StatelessWidget {
   }
 
   Widget _bookingStatusTile(BuildContext context, dynamic booking) {
-    final rawLab = booking['laboratoryId'];
+    // lab booking uses 'laboratory' field (not 'laboratoryId') from API response
+    final rawLab = booking['laboratory'] ?? booking['laboratoryId'];
     final labName = (rawLab is Map
         ? (rawLab['labName'] ?? rawLab['lab_name'] ?? rawLab['name'] ?? 'Lab')
         : (booking['labName'] ?? booking['lab_name'] ?? 'Laboratory')).toString();
     final status = (booking['status'] ?? 'pending').toString().toLowerCase();
     final statusLabel = _labStatusLabel(status);
     final statusColor = _labStatusColor(status);
+    // lab bookings are one-per-test; testName is a single string
+    final testName = booking['testName']?.toString() ?? '';
     final testCount = (booking['tests'] as List?)?.length ?? (booking['testNames'] as List?)?.length ?? 0;
+    final testSubtitle = testName.isNotEmpty ? testName : (testCount > 0 ? '$testCount test${testCount == 1 ? "" : "s"} booked' : 'Lab Booking');
 
     return InkWell(
       onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PatientLabOrdersScreen())),
@@ -1401,8 +1464,7 @@ class _PrescriptionPage extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(labName, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF0F172A))),
-                  Text(testCount > 0 ? '$testCount test${testCount == 1 ? "" : "s"} booked' : 'Lab Booking',
-                      style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+                  Text(testSubtitle, style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
                 ],
               ),
             ),
@@ -1429,14 +1491,15 @@ class _PrescriptionPage extends StatelessWidget {
   }
 
   Widget _orderStatusTile(BuildContext context, dynamic order) {
-    final rawPharmacy = order['pharmacyId'];
+    // pharmacy orders use 'pharmacyId' (may be populated object) or top-level fields
+    final rawPharmacy = order['pharmacyId'] ?? order['pharmacy'];
     final pharmacyName = (rawPharmacy is Map
         ? (rawPharmacy['pharmacy_name'] ?? rawPharmacy['pharmacyName'] ?? rawPharmacy['name'] ?? 'Pharmacy')
         : (order['pharmacyName'] ?? 'Pharmacy')).toString();
     final status = (order['status'] ?? 'pending').toString().toLowerCase();
     final statusLabel = _orderStatusLabel(status);
     final statusColor = _orderStatusColor(status);
-    final itemCount = (order['items'] as List?)?.length ?? 0;
+    final itemCount = (order['items'] as List?)?.length ?? (order['medicines'] as List?)?.length ?? 0;
 
     return InkWell(
       onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MyOrdersScreen())),

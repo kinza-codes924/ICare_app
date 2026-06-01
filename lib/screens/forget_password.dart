@@ -36,14 +36,47 @@ class _ForgetPasswordState extends State<ForgetPassword> {
 
       if (result['success']) {
         if (mounted) {
-          // Show OTP in console for testing
-          debugPrint('OTP for testing: ${result['otp']}');
-
-          Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (ctx) => VerifyCode(email: emailController.text.trim()),
-            ),
-          );
+          final otp = result['otp']?.toString() ?? '';
+          // Show OTP dialog if email delivery is unavailable
+          if (otp.isNotEmpty) {
+            await showDialog(
+              context: context,
+              builder: (ctx) => AlertDialog(
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                title: const Text('Verification Code', style: TextStyle(fontFamily: 'Gilroy-Bold', fontSize: 18)),
+                content: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text('Your code:', style: TextStyle(fontSize: 14, color: Color(0xFF64748B))),
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF0036BC),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(otp, style: const TextStyle(color: Colors.white, fontSize: 30, fontWeight: FontWeight.bold, letterSpacing: 10)),
+                    ),
+                    const SizedBox(height: 12),
+                    const Text('Check your email or use this code directly.', textAlign: TextAlign.center, style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8))),
+                  ],
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    child: const Text('OK', style: TextStyle(color: Color(0xFF0036BC), fontWeight: FontWeight.bold)),
+                  ),
+                ],
+              ),
+            );
+          }
+          if (mounted) {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (ctx) => VerifyCode(email: emailController.text.trim()),
+              ),
+            );
+          }
         }
       } else {
         _showError(result['message']);
