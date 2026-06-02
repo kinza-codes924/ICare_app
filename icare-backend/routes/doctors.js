@@ -50,11 +50,19 @@ router.get('/stats', authMiddleware, async (req, res) => {
     const consultationFee = profile?.consultation_fee || 0;
     const revenue = completed * consultationFee;
 
-    // Satisfaction = percentage of non-cancelled appointments that completed
-    const attempted = total - cancelled;
-    const satisfaction = attempted > 0 ? Math.round((completed / attempted) * 100) : 0;
+    // Compute avgRating and satisfaction from actual patient reviews
+    const ratedAppts = await Appointment.find({
+      doctor_id: doctorId,
+      rating: { $gte: 1, $lte: 5 },
+    }).select('rating satisfied').lean();
 
-    const avgRating = profile?.rating || 0;
+    const avgRatingVal = ratedAppts.length > 0
+      ? Math.round((ratedAppts.reduce((s, a) => s + (a.rating || 0), 0) / ratedAppts.length) * 10) / 10
+      : 0;
+    const satisfiedCount = ratedAppts.filter(a => a.satisfied !== false).length;
+    const satisfactionPct = ratedAppts.length > 0
+      ? Math.round((satisfiedCount / ratedAppts.length) * 100)
+      : 0;
 
     res.json({
       success: true,
@@ -65,11 +73,11 @@ router.get('/stats', authMiddleware, async (req, res) => {
         completedAppointments: completed,
         cancelledAppointments: cancelled,
         missedAppointments: missed,
-        rating: avgRating,
-        totalReviews: profile?.total_reviews || 0,
+        rating: avgRatingVal,
+        totalReviews: ratedAppts.length,
         revenue,
-        satisfaction,
-        avgRating,
+        satisfaction: `${satisfactionPct}%`,
+        avgRating: avgRatingVal,
         consultationFee,
         avgConsultationMinutes,
       },
@@ -228,6 +236,7 @@ router.get('/me/patient-reviews', authMiddleware, async (req, res) => {
         patientName,
         rating: a.rating,
         comment: a.ratingComment || '',
+        satisfied: a.satisfied !== false,
         ratedAt: a.ratedAt || a.updatedAt || a.createdAt,
       };
     });

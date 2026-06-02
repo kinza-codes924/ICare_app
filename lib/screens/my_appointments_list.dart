@@ -119,7 +119,7 @@ class _MyAppointmentsListScreenState extends State<MyAppointmentsListScreen> {
       context: context,
       title: 'Rate Your Experience',
       subtitle: 'How was your appointment with ${appointment.doctorName}?',
-      onSubmit: (rating, comment) async {
+      onSubmit: (rating, satisfied, comment) async {
         await _appointmentService.rateAppointment(
           appointmentId: appointment.id,
           rating: rating,

@@ -423,7 +423,7 @@ class _VideoCallWebState extends State<VideoCall> {
                   context: context,
                   title: 'Rate Your Doctor',
                   subtitle: 'How was your consultation experience?',
-                  onSubmit: (rating, comment) async {
+                  onSubmit: (rating, satisfied, comment) async {
                     await AppointmentService().rateAppointment(
                       appointmentId: widget.appointmentId!,
                       rating: rating,

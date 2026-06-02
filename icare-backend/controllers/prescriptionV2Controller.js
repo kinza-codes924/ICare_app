@@ -218,6 +218,7 @@ exports.completePrescription = async (req, res) => {
             `<span style="display:inline-block;background:#EFF6FF;color:#1D4ED8;padding:3px 10px;border-radius:20px;font-size:13px;margin:2px;">${d.name || d}</span>`
           ).join('');
 
+          console.log('[Prescription] Sending email to:', patient.email);
           await sendEmail({
             to: patient.email,
             subject: 'iCare — Your Prescription is Ready',
@@ -259,7 +260,8 @@ exports.completePrescription = async (req, res) => {
             `,
           });
         }
-      } catch (emailErr) { console.error('Prescription email error:', emailErr.message); }
+        console.log('[Prescription] Email sent successfully to:', patient.email);
+      } catch (emailErr) { console.error('[Prescription] Email FAILED:', emailErr.message); }
     }
 
     // Award gamification points to patient for completing consultation

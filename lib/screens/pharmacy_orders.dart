@@ -1477,8 +1477,7 @@ class _PharmacyOrdersState extends ConsumerState<PharmacyOrders>
           context: context,
           title: 'How was your experience?',
           subtitle: 'Rate your experience with $customerName\'s order',
-          onSubmit: (rating, comment) async {
-            // Submit rating to backend
+          onSubmit: (rating, satisfied, comment) async {
             try {
               await _pharmacyService.submitOrderRating(orderId, rating, comment);
             } catch (e) {

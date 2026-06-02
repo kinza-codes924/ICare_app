@@ -16,7 +16,9 @@ import 'package:icare/screens/patient_history_view.dart';
 import 'package:icare/screens/prescription_pdf_view_screen.dart';
 import 'package:icare/services/consultation_service.dart';
 import 'package:icare/services/call_service.dart';
+import 'package:icare/services/review_service.dart';
 import 'package:icare/utils/theme.dart';
+import 'package:icare/widgets/rating_dialog.dart';
 import 'package:icare/widgets/back_button.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:intl/intl.dart';
@@ -541,9 +543,28 @@ class _ConsultationChatScreenV2State extends State<ConsultationChatScreenV2> {
           _timer.stop();
           await _clearConsultationState();
           
-          // FIX: Show prescription to patient after consultation ends
+          // Show rating dialog to patient immediately after consultation ends
           if (mounted && !widget.isDoctor) {
-            // Patient side - fetch and show prescription
+            final apptId = widget.appointment?.id ?? '';
+            final doctorId = widget.appointment?.doctor?.id ?? '';
+            if (apptId.isNotEmpty && mounted) {
+              await showRatingDialog(
+                context: context,
+                title: 'Rate Your Doctor',
+                subtitle: 'How was your consultation experience?',
+                onSubmit: (rating, satisfied, comment) async {
+                  await ReviewService().submitReview(
+                    appointmentId: apptId,
+                    doctorId: doctorId,
+                    starRating: rating,
+                    satisfied: satisfied,
+                    reviewText: comment.isNotEmpty ? comment : null,
+                  );
+                },
+              );
+            }
+            if (!mounted) return;
+            // Then show prescription if available
             final prescriptionId = result['prescriptionId']?.toString();
             if (prescriptionId != null && prescriptionId.isNotEmpty) {
               // Navigate to prescription view

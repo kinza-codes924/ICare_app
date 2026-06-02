@@ -117,7 +117,7 @@ class LabBookingDetails extends ConsumerWidget {
             context: context,
             title: 'Rate Your Lab Experience',
             subtitle: 'How was your experience with this test?',
-            onSubmit: (rating, comment) async {
+            onSubmit: (rating, satisfied, comment) async {
               await labService.rateBooking(
                 bookingId: booking['_id'],
                 rating: rating,

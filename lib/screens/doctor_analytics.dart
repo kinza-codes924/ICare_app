@@ -161,8 +161,29 @@ class _DoctorAnalyticsState extends State<DoctorAnalytics> {
   }
   double get _periodRevenue  => _completed * _consultationFee;
   num    get _allTimeRevenue => (_stats['revenue'] is num) ? _stats['revenue'] as num : 0;
-  String get _avgRating => '${_stats['avgRating'] ?? _stats['rating'] ?? '0.0'}';
-  String get _satisfaction => '${_stats['satisfaction'] ?? '0%'}';
+  String get _avgRating {
+    // Prefer computed from actual reviews over stats
+    if (_reviews.isNotEmpty) {
+      final nums = _reviews.map((r) => (r['rating'] as num?)?.toDouble() ?? 0.0).where((v) => v > 0);
+      if (nums.isNotEmpty) {
+        final avg = nums.reduce((a, b) => a + b) / nums.length;
+        return avg.toStringAsFixed(1);
+      }
+    }
+    final v = _stats['avgRating'] ?? _stats['rating'];
+    return v != null ? '$v' : '0.0';
+  }
+
+  String get _satisfaction {
+    // Compute from actual reviews if available
+    if (_reviews.isNotEmpty) {
+      final satisfied = _reviews.where((r) => r['satisfied'] != false).length;
+      final pct = (satisfied / _reviews.length * 100).round();
+      return '$pct%';
+    }
+    final v = _stats['satisfaction'];
+    return v != null ? '$v' : '0%';
+  }
   String get _avgConsultationTime {
     final v = _stats['avgConsultationMinutes'];
     if (v == null) return '—';
@@ -437,21 +458,53 @@ class _DoctorAnalyticsState extends State<DoctorAnalytics> {
         ]),
         const SizedBox(height: 8),
         ...preview.map((r) {
-          final name    = r['patientName']?.toString() ?? 'Patient';
-          final rating  = r['rating'];
-          final comment = r['comment']?.toString() ?? '';
+          final name      = r['patientName']?.toString() ?? 'Patient';
+          final rating    = r['rating'];
+          final comment   = r['comment']?.toString() ?? '';
+          final satisfied = r['satisfied'] != false;
           return Padding(
-            padding: const EdgeInsets.only(bottom: 10),
-            child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(name, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: Color(0xFF0F172A))),
-                if (comment.isNotEmpty)
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+              ),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Row(children: [
+                  Expanded(child: Text(name, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: Color(0xFF0F172A)))),
+                  if (rating != null)
+                    Row(children: List.generate(5, (i) => Icon(
+                      i < (rating as num) ? Icons.star_rounded : Icons.star_border_rounded,
+                      size: 14, color: const Color(0xFFF59E0B),
+                    ))),
+                ]),
+                const SizedBox(height: 6),
+                Row(children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: satisfied ? const Color(0xFFDCFCE7) : const Color(0xFFFEE2E2),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Row(mainAxisSize: MainAxisSize.min, children: [
+                      Icon(satisfied ? Icons.thumb_up_rounded : Icons.thumb_down_rounded,
+                          size: 11, color: satisfied ? const Color(0xFF16A34A) : const Color(0xFFDC2626)),
+                      const SizedBox(width: 4),
+                      Text(satisfied ? 'Satisfied' : 'Not satisfied',
+                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600,
+                              color: satisfied ? const Color(0xFF16A34A) : const Color(0xFFDC2626))),
+                    ]),
+                  ),
+                ]),
+                if (comment.isNotEmpty) ...[
+                  const SizedBox(height: 6),
                   Text(comment, maxLines: 2, overflow: TextOverflow.ellipsis,
                       style: const TextStyle(fontSize: 13, color: Color(0xFF64748B))),
-              ])),
-              const SizedBox(width: 8),
-              if (rating != null) Text('$rating★', style: const TextStyle(fontWeight: FontWeight.w900, color: Color(0xFFF59E0B))),
-            ]),
+                ],
+              ]),
+            ),
           );
         }),
       ]),
