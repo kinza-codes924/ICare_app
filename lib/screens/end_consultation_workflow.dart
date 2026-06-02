@@ -4,6 +4,7 @@ import 'dart:html' as html;
 import 'package:icare/models/appointment_detail.dart';
 import 'package:icare/screens/lab_test_template_screen.dart';
 import 'package:icare/screens/soap_notes_redesign.dart';
+import 'package:icare/services/api_service.dart';
 import 'package:icare/services/appointment_service.dart';
 import 'package:icare/services/clinical_service.dart';
 import 'package:icare/services/medical_record_service.dart';
@@ -219,7 +220,18 @@ class _EndConsultationWorkflowState extends State<EndConsultationWorkflow> {
         }).catchError((_) {});
       }
 
-      // 6. Mark appointment as completed — fire and forget
+      // 6. Complete prescription via backend API — triggers email to patient
+      if (_prescriptionCompleted && medicines.isNotEmpty) {
+        final api = ApiService();
+        api.post('/consultations/$appointmentId/prescription/complete', {
+          'medicines': medicines,
+          'diagnoses': _selectedICDCodes.map((d) => {'code': d['code'], 'name': d['description']}).toList(),
+          'labTests': labTests,
+          'doctorNotes': _diagnosisNotesController.text.trim(),
+        }).catchError((_) {});
+      }
+
+      // 7. Mark appointment as completed — fire and forget
       AppointmentService().updateAppointmentStatus(
         appointmentId: appointmentId,
         status: 'completed',
