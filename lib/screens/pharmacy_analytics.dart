@@ -69,7 +69,7 @@ class _PharmacyAnalyticsState extends State<PharmacyAnalytics> {
         elevation: 0,
         leading: const CustomBackButton(),
         title: const Text(
-          'Analytics',
+          'Revenue & Analytics',
           style: TextStyle(
             fontSize: 18,
             fontFamily: 'Gilroy-Bold',

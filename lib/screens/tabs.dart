@@ -1006,7 +1006,7 @@ class _WebSidebarState extends ConsumerState<_WebSidebar> {
                   _buildExtraNavItem(
                     context,
                     Icons.analytics_outlined,
-                    'Revenue & Analytics',
+                    'Analytics',
                     () {
                       Navigator.of(context).push(
                         MaterialPageRoute(
@@ -1080,7 +1080,7 @@ class _WebSidebarState extends ConsumerState<_WebSidebar> {
                   _buildExtraNavItem(
                     context,
                     Icons.analytics_outlined,
-                    'Revenue & Analytics',
+                    'Analytics',
                     () {
                       Navigator.of(context).push(
                         MaterialPageRoute(
