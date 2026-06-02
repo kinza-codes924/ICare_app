@@ -52,6 +52,22 @@ router.post('/submit', authMiddleware, async (req, res) => {
       if (!fallback) return res.status(404).json({ success: false, message: 'Appointment not found' });
     }
 
+    // Award gamification points for rating a doctor
+    try {
+      const User = require('../models/User');
+      const patient = await User.findById(patientId);
+      if (patient) {
+        if (!patient.gamification) patient.gamification = { points: 0, stats: {}, history: [] };
+        patient.gamification.points = (patient.gamification.points || 0) + 5;
+        patient.gamification.history = patient.gamification.history || [];
+        patient.gamification.history.push({ points: 5, reason: 'rate_doctor', date: new Date().toISOString() });
+        patient.markModified('gamification');
+        await patient.save();
+      }
+    } catch (gamErr) {
+      console.error('Gamification award error on review submit:', gamErr.message);
+    }
+
     res.json({ success: true, message: 'Review submitted successfully' });
   } catch (err) {
     console.error('Review submit error:', err);

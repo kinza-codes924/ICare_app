@@ -223,7 +223,7 @@ router.get('/leaderboard', authMiddleware, async (req, res) => {
     await connectMongoDB();
     const User = require('../models/User');
     const users = await User.find(
-      { role: 'Patient', 'gamification.points': { $gt: 0 } },
+      { role: 'patient', 'gamification.points': { $gt: 0 } },
       { name: 1, 'gamification.points': 1, 'gamification.badges': 1 }
     ).sort({ 'gamification.points': -1 }).limit(20);
 

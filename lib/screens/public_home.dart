@@ -1876,7 +1876,31 @@ class _DoctorsSliderState extends State<_DoctorsSlider> {
       );
     }
 
-    if (_doctors.isEmpty) return const SizedBox.shrink();
+    if (_doctors.isEmpty) {
+      return Container(
+        margin: const EdgeInsets.symmetric(horizontal: 20),
+        padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 24),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF0F9FF),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: const Color(0xFFBAE6FD)),
+        ),
+        child: const Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.watch_later_outlined, color: Color(0xFF0284C7), size: 24),
+            SizedBox(width: 12),
+            Flexible(
+              child: Text(
+                'No doctors are available right now. Please check back soon.',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 14, color: Color(0xFF0369A1), fontWeight: FontWeight.w500),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
 
     if (_isMobile) {
       return Column(

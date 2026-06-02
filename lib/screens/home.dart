@@ -88,7 +88,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           .map((json) => Doctor.fromJson(json))
           .toList();
       setState(() {
-        _topDoctors = doctors.take(3).toList(); // Take first 3 for home page
+        _topDoctors = doctors.where((d) => d.isOnline).take(3).toList();
         _loadingDoctors = false;
       });
     } else {

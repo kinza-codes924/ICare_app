@@ -32,6 +32,7 @@ router.get('/profile', authMiddleware, async (req, res) => {
       profilePicture: user.profilePicture || null,
       gender: user.gender || null,
       age: user.age != null ? user.age.toString() : null,
+      cnic: user.cnic || null,
     });
   } catch (error) {
     console.error('Get user profile error:', error);
@@ -77,6 +78,7 @@ router.put('/profile', authMiddleware, async (req, res) => {
       profilePicture: user.profilePicture || null,
       gender: user.gender || null,
       age: user.age != null ? user.age.toString() : null,
+      cnic: user.cnic || null,
     });
   } catch (error) {
     console.error('Update profile error:', error);
