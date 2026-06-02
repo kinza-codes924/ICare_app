@@ -56,34 +56,43 @@ class _LabDetailsState extends State<LabDetails> {
         ? (labData?['image'] as String)
         : '';
 
-    // Get dynamic tests if available, otherwise use defaults
-    // Backend may return tests as Strings OR as Maps {name, price, ...}
-    final List<String> labTests = (labData?['tests'] is List)
-        ? (labData!['tests'] as List).map((t) {
-            if (t is String) return t;
-            if (t is Map) return (t['name'] ?? t['testName'] ?? t['test_name'] ?? '').toString();
-            return t.toString();
-          }).where((s) => s.isNotEmpty).toList()
-        : [
-            "Complete Blood Count (CBC)",
-            "Blood Sugar (Fasting / Random)",
-            "Liver Function Test (LFT)",
-            "Kidney Profile (KFT)",
-          ];
+    // Rich test catalog from lab's Test Catalog management
+    final List<Map<String, dynamic>> availableTestsRich = (labData?['availableTests'] is List)
+        ? (labData!['availableTests'] as List)
+            .whereType<Map>()
+            .map((t) => Map<String, dynamic>.from(t))
+            .toList()
+        : [];
+
+    // Names list: prefer rich catalog, fall back to string list, then defaults
+    final List<String> labTests = availableTestsRich.isNotEmpty
+        ? availableTestsRich
+            .map((t) => (t['name'] ?? '').toString())
+            .where((s) => s.isNotEmpty)
+            .toList()
+        : (labData?['tests'] is List)
+            ? (labData!['tests'] as List).map((t) {
+                if (t is String) return t;
+                if (t is Map) return (t['name'] ?? t['testName'] ?? t['test_name'] ?? '').toString();
+                return t.toString();
+              }).where((s) => s.isNotEmpty).toList()
+            : [
+                "Complete Blood Count (CBC)",
+                "Blood Sugar (Fasting / Random)",
+                "Liver Function Test (LFT)",
+                "Kidney Profile (KFT)",
+              ];
 
     // Merge prescribed tests with lab's available tests
-    // Prescribed tests always appear first, then lab's other tests
     final List<String> prescribedList = widget.prescribedTests ?? [];
     final Set<String> allTestsSet = <String>{};
-    // Add prescribed tests first (they must appear)
     allTestsSet.addAll(prescribedList);
-    // Then add lab's own tests
     allTestsSet.addAll(labTests);
     final List<String> availableTests = allTestsSet.toList();
 
     return Scaffold(
       appBar: isDesktop
-          ? null // Custom premium header for web
+          ? null
           : AppBar(
               automaticallyImplyLeading: false,
               leading: const CustomBackButton(),
@@ -91,22 +100,12 @@ class _LabDetailsState extends State<LabDetails> {
             ),
       body: isDesktop
           ? _buildWebLayout(
-              context,
-              name,
-              address,
-              open,
-              desc,
-              image,
-              availableTests,
+              context, name, address, open, desc, image,
+              availableTests, availableTestsRich,
             )
           : _buildMobileLayout(
-              context,
-              name,
-              address,
-              open,
-              desc,
-              image,
-              availableTests,
+              context, name, address, open, desc, image,
+              availableTests, availableTestsRich,
             ),
     );
   }
@@ -119,6 +118,7 @@ class _LabDetailsState extends State<LabDetails> {
     String desc,
     String image,
     List<String> availableTests,
+    List<Map<String, dynamic>> availableTestsRich,
   ) {
     return SingleChildScrollView(
       child: Center(
@@ -255,14 +255,21 @@ class _LabDetailsState extends State<LabDetails> {
             ...availableTests.asMap().entries.map((entry) {
               final i = entry.key;
               final testName = entry.value;
+              final rich = availableTestsRich.where((t) => t['name'] == testName).isNotEmpty
+                  ? availableTestsRich.firstWhere((t) => t['name'] == testName)
+                  : null;
+              final price = rich != null ? (rich['price'] as num?)?.toDouble() ?? 0.0 : 0.0;
+              final turnaround = rich?['turnaroundTime']?.toString() ?? '';
+              final isPrescribed = (widget.prescribedTests ?? []).contains(testName);
               return Padding(
-                padding: EdgeInsets.symmetric(vertical: 4),
+                padding: const EdgeInsets.symmetric(vertical: 4),
                 child: Row(
                   children: [
-                    SizedBox(width: Utils.windowWidth(context) * 0.05),
+                    SizedBox(width: Utils.windowWidth(context) * 0.03),
                     Checkbox(
                       value: _selectedTests.contains(testName),
                       onChanged: (val) {
+                        if (isPrescribed && val == false) return;
                         setState(() {
                           if (val == true) {
                             _selectedTests.add(testName);
@@ -274,13 +281,38 @@ class _LabDetailsState extends State<LabDetails> {
                       activeColor: AppColors.primaryColor,
                     ),
                     Expanded(
-                      child: CustomText(
-                        text: "${i + 1}. $testName",
-                        fontSize: 13,
-                        color: AppColors.themeDarkGrey,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Expanded(
+                                child: CustomText(
+                                  text: "${i + 1}. $testName",
+                                  fontSize: 13,
+                                  color: AppColors.themeDarkGrey,
+                                ),
+                              ),
+                              if (price > 0)
+                                Text(
+                                  'PKR ${price.toStringAsFixed(0)}',
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                    color: AppColors.primaryColor,
+                                  ),
+                                ),
+                            ],
+                          ),
+                          if (turnaround.isNotEmpty)
+                            Text(
+                              turnaround,
+                              style: const TextStyle(fontSize: 10, color: Colors.grey),
+                            ),
+                        ],
                       ),
                     ),
-                    SizedBox(width: Utils.windowWidth(context) * 0.05),
+                    SizedBox(width: Utils.windowWidth(context) * 0.03),
                   ],
                 ),
               );
@@ -325,6 +357,7 @@ class _LabDetailsState extends State<LabDetails> {
     String desc,
     String image,
     List<String> availableTests,
+    List<Map<String, dynamic>> availableTestsRich,
   ) {
     return Container(
       color: const Color(0xFFF8FAFC),
@@ -531,6 +564,101 @@ class _LabDetailsState extends State<LabDetails> {
                                 ),
                               ],
                             ),
+                            if (availableTestsRich.isNotEmpty) ...[
+                              const SizedBox(height: 40),
+                              const Text(
+                                'Test Catalog',
+                                style: TextStyle(
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.w900,
+                                  color: Color(0xFF0F172A),
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              const Text(
+                                'All prices in PKR. Turnaround time from sample collection.',
+                                style: TextStyle(fontSize: 13, color: Color(0xFF64748B)),
+                              ),
+                              const SizedBox(height: 16),
+                              Container(
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                                ),
+                                child: Column(
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                                      decoration: const BoxDecoration(
+                                        color: Color(0xFF0B2D6E),
+                                        borderRadius: BorderRadius.only(
+                                          topLeft: Radius.circular(15),
+                                          topRight: Radius.circular(15),
+                                        ),
+                                      ),
+                                      child: const Row(
+                                        children: [
+                                          Expanded(flex: 5, child: Text('TEST NAME', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Colors.white, letterSpacing: 1.0))),
+                                          Expanded(flex: 2, child: Text('PRICE (PKR)', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Colors.white, letterSpacing: 1.0), textAlign: TextAlign.center)),
+                                          Expanded(flex: 2, child: Text('TURNAROUND', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Colors.white, letterSpacing: 1.0), textAlign: TextAlign.center)),
+                                          Expanded(flex: 2, child: Text('SAMPLE TYPE', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Colors.white, letterSpacing: 1.0), textAlign: TextAlign.center)),
+                                        ],
+                                      ),
+                                    ),
+                                    ...availableTestsRich.asMap().entries.map((e) {
+                                      final idx = e.key;
+                                      final t = e.value;
+                                      final price = (t['price'] as num?)?.toDouble() ?? 0.0;
+                                      final turnaround = t['turnaroundTime']?.toString() ?? t['turnaround']?.toString() ?? '—';
+                                      final sampleType = t['sampleType']?.toString() ?? t['collectionType']?.toString() ?? '—';
+                                      return Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                                        decoration: BoxDecoration(
+                                          color: idx.isEven ? Colors.white : const Color(0xFFF8FAFC),
+                                          border: const Border(bottom: BorderSide(color: Color(0xFFE2E8F0))),
+                                        ),
+                                        child: Row(
+                                          children: [
+                                            Expanded(
+                                              flex: 5,
+                                              child: Text(
+                                                t['name']?.toString() ?? '',
+                                                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF0F172A)),
+                                              ),
+                                            ),
+                                            Expanded(
+                                              flex: 2,
+                                              child: Text(
+                                                price > 0 ? 'PKR ${price.toStringAsFixed(0)}' : '—',
+                                                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF0B2D6E)),
+                                                textAlign: TextAlign.center,
+                                              ),
+                                            ),
+                                            Expanded(
+                                              flex: 2,
+                                              child: Text(
+                                                turnaround,
+                                                style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                                                textAlign: TextAlign.center,
+                                              ),
+                                            ),
+                                            Expanded(
+                                              flex: 2,
+                                              child: Text(
+                                                sampleType,
+                                                style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                                                textAlign: TextAlign.center,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      );
+                                    }),
+                                  ],
+                                ),
+                              ),
+                            ],
                           ],
                         ),
                       ),
@@ -569,9 +697,12 @@ class _LabDetailsState extends State<LabDetails> {
                                 color: Colors.grey,
                               ),
                               const SizedBox(height: 24),
-                              ...availableTests
-                                  .map((t) => _buildWebCheckbox(t))
-                                  ,
+                              ...availableTests.map((t) {
+                                final rich = availableTestsRich.where((r) => r['name'] == t).isNotEmpty
+                                    ? availableTestsRich.firstWhere((r) => r['name'] == t)
+                                    : {'name': t};
+                                return _buildWebCheckbox(rich);
+                              }),
                               const SizedBox(height: 32),
 
                               const Divider(
@@ -580,22 +711,31 @@ class _LabDetailsState extends State<LabDetails> {
                               ),
                               const SizedBox(height: 32),
 
-                              Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
-                                children: [
-                                  const CustomText(
-                                    text: "Estimated Total",
-                                    color: Color(0xFF64748B),
-                                  ),
-                                  CustomText(
-                                    text: "PKR ${_selectedTests.length * 3000}",
-                                    fontSize: 24,
-                                    fontWeight: FontWeight.w900,
-                                    color: AppColors.primaryColor,
-                                  ),
-                                ],
-                              ),
+                              Builder(builder: (_) {
+                                double total = 0;
+                                for (final name in _selectedTests) {
+                                  final rich = availableTestsRich.where((r) => r['name'] == name).isNotEmpty
+                                      ? availableTestsRich.firstWhere((r) => r['name'] == name)
+                                      : null;
+                                  final price = rich != null ? (rich['price'] as num?)?.toDouble() ?? 0.0 : 0.0;
+                                  total += price > 0 ? price : 3000;
+                                }
+                                return Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    const CustomText(
+                                      text: "Estimated Total",
+                                      color: Color(0xFF64748B),
+                                    ),
+                                    CustomText(
+                                      text: "PKR ${total.toStringAsFixed(0)}",
+                                      fontSize: 24,
+                                      fontWeight: FontWeight.w900,
+                                      color: AppColors.primaryColor,
+                                    ),
+                                  ],
+                                );
+                              }),
                               const SizedBox(height: 24),
 
                               CustomButton(
@@ -714,14 +854,16 @@ class _LabDetailsState extends State<LabDetails> {
     );
   }
 
-  Widget _buildWebCheckbox(String label) {
+  Widget _buildWebCheckbox(Map<String, dynamic> testData) {
+    final String label = testData['name']?.toString() ?? '';
+    final double price = (testData['price'] as num?)?.toDouble() ?? 0.0;
+    final String turnaround = testData['turnaroundTime']?.toString() ?? '';
     final bool isSelected = _selectedTests.contains(label);
     final bool isPrescribed = (widget.prescribedTests ?? []).contains(label);
     return InkWell(
       onTap: () {
         setState(() {
           if (isSelected) {
-            // Don't allow deselecting prescribed tests
             if (!isPrescribed) _selectedTests.remove(label);
           } else {
             _selectedTests.add(label);
@@ -766,41 +908,57 @@ class _LabDetailsState extends State<LabDetails> {
             ),
             const SizedBox(width: 12),
             Expanded(
-              child: Row(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    label,
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                    ),
-                  ),
-                  if (isPrescribed) ...[
-                    const SizedBox(width: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF8B5CF6).withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(4),
-                        border: Border.all(color: const Color(0xFF8B5CF6).withValues(alpha: 0.3)),
-                      ),
-                      child: const Text(
-                        'Prescribed',
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w700,
-                          color: Color(0xFF8B5CF6),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          label,
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                          ),
                         ),
                       ),
+                      if (isPrescribed) ...[
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF8B5CF6).withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(4),
+                            border: Border.all(color: const Color(0xFF8B5CF6).withValues(alpha: 0.3)),
+                          ),
+                          child: const Text(
+                            'Prescribed',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF8B5CF6),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                  if (turnaround.isNotEmpty)
+                    Text(
+                      turnaround,
+                      style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
                     ),
-                  ],
                 ],
               ),
             ),
-            const CustomText(
-              text: "PKR 3000",
-              fontSize: 13,
-              color: Colors.grey,
+            const SizedBox(width: 8),
+            Text(
+              price > 0 ? 'PKR ${price.toStringAsFixed(0)}' : '—',
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: AppColors.primaryColor,
+              ),
             ),
           ],
         ),

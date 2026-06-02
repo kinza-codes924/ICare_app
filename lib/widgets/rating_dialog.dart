@@ -3,12 +3,14 @@ import 'package:flutter/material.dart';
 class RatingDialog extends StatefulWidget {
   final String title;
   final String subtitle;
+  final String satisfactionQuestion;
   final Function(int rating, bool satisfied, String comment) onSubmit;
 
   const RatingDialog({
     super.key,
     required this.title,
     required this.subtitle,
+    this.satisfactionQuestion = 'Are you satisfied with the service?',
     required this.onSubmit,
   });
 
@@ -115,8 +117,8 @@ class _RatingDialogState extends State<RatingDialog> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Are you satisfied with the doctor?',
-                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF374151))),
+                    Text(widget.satisfactionQuestion,
+                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF374151))),
                     const SizedBox(height: 12),
                     Row(children: [
                       Expanded(
@@ -235,11 +237,17 @@ Future<bool?> showRatingDialog({
   required BuildContext context,
   required String title,
   required String subtitle,
+  String satisfactionQuestion = 'Are you satisfied with the service?',
   required Function(int rating, bool satisfied, String comment) onSubmit,
 }) {
   return showDialog<bool>(
     context: context,
     barrierDismissible: false,
-    builder: (context) => RatingDialog(title: title, subtitle: subtitle, onSubmit: onSubmit),
+    builder: (context) => RatingDialog(
+      title: title,
+      subtitle: subtitle,
+      satisfactionQuestion: satisfactionQuestion,
+      onSubmit: onSubmit,
+    ),
   );
 }

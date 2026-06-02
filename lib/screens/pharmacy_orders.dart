@@ -1551,6 +1551,7 @@ class _PharmacyOrdersState extends ConsumerState<PharmacyOrders>
           context: context,
           title: 'How was your experience?',
           subtitle: 'Rate your experience with $customerName\'s order',
+          satisfactionQuestion: 'Are you satisfied with this order?',
           onSubmit: (rating, satisfied, comment) async {
             try {
               await _pharmacyService.submitOrderRating(orderId, rating, comment);

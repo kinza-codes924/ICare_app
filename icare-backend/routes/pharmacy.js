@@ -387,9 +387,11 @@ router.get('/orders/pharmacy/list', authMiddleware, async (req, res) => {
         rejectionReason: o.rejection_reason || '',
         user: {
           _id: pt?._id?.toString() || '',
-          name: pt?.username || pt?.name || 'Patient',
+          name: o.orderType === 'walk-in'
+            ? (o.patientName || 'Walk-in Patient')
+            : (pt?.username || pt?.name || 'Patient'),
           email: pt?.email || '',
-          phoneNumber: pt?.phone || pt?.phoneNumber || '',
+          phoneNumber: o.orderType === 'walk-in' ? (o.contact || '') : (pt?.phone || pt?.phoneNumber || ''),
         },
         items: o.items || [],
       };

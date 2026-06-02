@@ -25,7 +25,7 @@ class _PharmacyInventoryState extends State<PharmacyInventory> {
   static const _categories = [
     'All', 'Pain Relief', 'Antibiotic', 'Allergy', 'Vitamins',
     'Diabetes', 'Cholesterol', 'Gastric', 'Blood Pressure',
-    'Heart', 'Cough & Cold',
+    'Heart', 'Cough & Cold', 'Vaccine',
   ];
 
   @override
@@ -551,6 +551,7 @@ class _MedicineCard extends StatelessWidget {
       case 'cholesterol': return const Color(0xFFEC4899);
       case 'blood pressure': return const Color(0xFFEF4444);
       case 'heart': return const Color(0xFFDC2626);
+      case 'vaccine': return const Color(0xFF6366F1);
       default: return AppColors.primaryColor;
     }
   }
@@ -736,7 +737,7 @@ class _AddMedicineModalState extends State<_AddMedicineModal> {
   bool _saving = false;
 
   static const _categories = ['Pain Relief', 'Antibiotic', 'Allergy', 'Vitamins',
-    'Diabetes', 'Cholesterol', 'Gastric', 'Blood Pressure', 'Heart', 'Cough & Cold', 'Other'];
+    'Diabetes', 'Cholesterol', 'Gastric', 'Blood Pressure', 'Heart', 'Cough & Cold', 'Vaccine', 'Other'];
   static const _types = ['Tablet', 'Capsule', 'Syrup', 'Gel', 'Injection', 'Drops', 'Cream'];
 
   @override

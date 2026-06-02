@@ -255,13 +255,14 @@ class _LabTestsManagementState extends State<LabTestsManagement>
     }
   }
 
-  Future<void> _addTest(String testName, double price, String turnaroundTime, String collectionType, {bool urgentAvailable = false, String? urgentTurnaround}) async {
+  Future<void> _addTest(String testName, double price, String turnaroundTime, String collectionType, {String sampleType = 'Blood (Serum)', bool urgentAvailable = false, String? urgentTurnaround}) async {
     try {
       final newTest = {
         'name': testName,
         'price': price,
         'turnaroundTime': turnaroundTime,
         'collectionType': collectionType,
+        'sampleType': sampleType,
         'urgentAvailable': urgentAvailable,
         if (urgentTurnaround != null) 'urgentTurnaround': urgentTurnaround,
       };
@@ -318,6 +319,19 @@ class _LabTestsManagementState extends State<LabTestsManagement>
     }
   }
 
+  static const List<String> _sampleTypeOptions = [
+    'Blood (Serum)',
+    'Blood (Whole)',
+    'Blood (Plasma)',
+    'Urine',
+    'Stool',
+    'Saliva / Swab',
+    'Sputum',
+    'Tissue / Biopsy',
+    'Imaging / No Sample',
+    'Other',
+  ];
+
   void _showAddTestDialog() {
     String? selectedTest;
     String testSearchQuery = '';
@@ -325,6 +339,7 @@ class _LabTestsManagementState extends State<LabTestsManagement>
     String normalTurnaround = '1 Day';
     String urgentTurnaround = '4 Hours';
     String collectionType = 'Home and Lab';
+    String sampleType = 'Blood (Serum)';
     bool urgentAvailable = false;
 
     showModalBottomSheet(
@@ -514,6 +529,22 @@ class _LabTestsManagementState extends State<LabTestsManagement>
                     ],
                   ),
                   const SizedBox(height: 24),
+                  const Text('SAMPLE TYPE', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Color(0xFF64748B), letterSpacing: 1.0)),
+                  const SizedBox(height: 8),
+                  DropdownButtonFormField<String>(
+                    value: sampleType,
+                    decoration: InputDecoration(
+                      prefixIcon: const Icon(Icons.biotech_rounded, color: primaryColor),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: primaryColor, width: 2)),
+                      filled: true,
+                      fillColor: const Color(0xFFF8FAFC),
+                    ),
+                    items: _sampleTypeOptions.map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
+                    onChanged: (v) => setModalState(() => sampleType = v!),
+                  ),
+                  const SizedBox(height: 24),
                   const Text('NORMAL TURNAROUND TIME', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Color(0xFF64748B), letterSpacing: 1.0)),
                   const SizedBox(height: 8),
                   DropdownButtonFormField<String>(
@@ -584,6 +615,7 @@ class _LabTestsManagementState extends State<LabTestsManagement>
                                       price,
                                       normalTurnaround,
                                       collectionType,
+                                      sampleType: sampleType,
                                       urgentAvailable: urgentAvailable,
                                       urgentTurnaround: urgentAvailable ? urgentTurnaround : null,
                                     );
