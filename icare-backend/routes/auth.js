@@ -53,6 +53,11 @@ router.post('/2fa/setup', authMiddleware, (req, res, next) => {
   req.url = '/2fa/setup';
   securityRouter.handle(req, res, next);
 });
+// Legacy alias — keeps old cached frontends from 404ing
+router.post('/2fa/send-otp', authMiddleware, (req, res, next) => {
+  req.url = '/2fa/setup';
+  securityRouter.handle(req, res, next);
+});
 router.post('/2fa/enable', authMiddleware, (req, res, next) => {
   req.url = '/2fa/enable';
   securityRouter.handle(req, res, next);
