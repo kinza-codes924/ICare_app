@@ -1953,9 +1953,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
         // 2FA check
         if (result['requiresOtp'] == true) {
           final tempToken = result['tempToken']?.toString() ?? '';
-          final otp = result['otp']?.toString() ?? '';
           final emailSent = result['emailSent'] == true;
-          if (mounted) await _show2FADialog(tempToken: tempToken, fallbackOtp: otp, emailSent: emailSent);
+          if (mounted) await _show2FADialog(tempToken: tempToken, emailSent: emailSent);
           if (mounted) setState(() => isLoading = false);
           return;
         }
@@ -2130,7 +2129,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     Utils.showErrorSnackBar(context, error);
   }
 
-  Future<void> _show2FADialog({required String tempToken, required String fallbackOtp, required bool emailSent}) async {
+  Future<void> _show2FADialog({required String tempToken, required bool emailSent}) async {
     final otpController = TextEditingController();
     bool verifying = false;
 
@@ -2152,17 +2151,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
             child: Row(children: [
               Icon(emailSent ? Icons.email_outlined : Icons.warning_amber_rounded, color: emailSent ? const Color(0xFF3B82F6) : const Color(0xFFF59E0B), size: 20),
               const SizedBox(width: 10),
-              Expanded(child: Text(emailSent ? 'A verification code has been sent to your email.' : 'Email delivery failed. Use this code directly:', style: TextStyle(fontSize: 13, color: emailSent ? const Color(0xFF1E40AF) : const Color(0xFF92400E), height: 1.4))),
+              Expanded(child: Text(emailSent ? 'A verification code has been sent to your email.' : 'Email delivery failed. Please try again or contact support.', style: TextStyle(fontSize: 13, color: emailSent ? const Color(0xFF1E40AF) : const Color(0xFF92400E), height: 1.4))),
             ]),
           ),
-          if (fallbackOtp.isNotEmpty) ...[
-            const SizedBox(height: 10),
-            Center(child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-              decoration: BoxDecoration(color: const Color(0xFF0036BC), borderRadius: BorderRadius.circular(10)),
-              child: Text(fallbackOtp, style: const TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.bold, letterSpacing: 8)),
-            )),
-          ],
           const SizedBox(height: 16),
           const Text('Enter Verification Code', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF374151))),
           const SizedBox(height: 8),

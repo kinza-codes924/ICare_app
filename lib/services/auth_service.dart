@@ -97,7 +97,6 @@ class AuthService {
             'success': false,
             'requiresOtp': true,
             'tempToken': data['tempToken'],
-            'otp': data['otp'],
             'emailSent': data['emailSent'],
             'message': data['message'] ?? 'Verification required',
           };
@@ -175,7 +174,6 @@ class AuthService {
         return {
           'success': true,
           'message': d['message'] ?? 'OTP sent',
-          'otp': d['otp'],
           'emailSent': d['emailSent'] ?? false,
           'emailError': d['emailError'],
         };

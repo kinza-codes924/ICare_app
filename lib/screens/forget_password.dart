@@ -36,56 +36,41 @@ class _ForgetPasswordState extends State<ForgetPassword> {
 
       if (result['success']) {
         if (mounted) {
-          final otp = result['otp']?.toString() ?? '';
           final emailSent = result['emailSent'] == true;
-          // Always show OTP on screen so the user can proceed
-          if (otp.isNotEmpty) {
-            await showDialog(
-              context: context,
-              builder: (ctx) => AlertDialog(
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                title: Row(children: [
-                  Icon(emailSent ? Icons.mark_email_read_rounded : Icons.warning_amber_rounded,
-                    color: emailSent ? const Color(0xFF10B981) : const Color(0xFFF59E0B), size: 22),
-                  const SizedBox(width: 8),
-                  Text(emailSent ? 'Code Sent' : 'Verification Code',
-                    style: const TextStyle(fontFamily: 'Gilroy-Bold', fontSize: 18)),
-                ]),
-                content: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      emailSent
-                          ? 'A verification code has been sent to ${emailController.text.trim()}. Also shown here:'
-                          : 'Email delivery failed. Use this code directly:',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: emailSent ? const Color(0xFF374151) : const Color(0xFFF59E0B),
-                      ),
+          await showDialog(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              title: Row(children: [
+                Icon(Icons.mark_email_read_rounded,
+                  color: const Color(0xFF10B981), size: 22),
+                const SizedBox(width: 8),
+                const Text('Code Sent',
+                  style: TextStyle(fontFamily: 'Gilroy-Bold', fontSize: 18)),
+              ]),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'A verification code has been sent to ${emailController.text.trim()}. Please check your email.',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      color: Color(0xFF374151),
                     ),
-                    const SizedBox(height: 14),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF0036BC),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Text(otp, style: const TextStyle(color: Colors.white, fontSize: 30, fontWeight: FontWeight.bold, letterSpacing: 10)),
-                    ),
-                    const SizedBox(height: 10),
-                    const Text('Valid for 10 minutes.', textAlign: TextAlign.center, style: TextStyle(fontSize: 11, color: Color(0xFF94A3B8))),
-                  ],
-                ),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(ctx),
-                    child: const Text('OK', style: TextStyle(color: Color(0xFF0036BC), fontWeight: FontWeight.bold)),
                   ),
+                  const SizedBox(height: 14),
+                  const Text('The code is valid for 10 minutes.', textAlign: TextAlign.center, style: TextStyle(fontSize: 11, color: Color(0xFF94A3B8))),
                 ],
               ),
-            );
-          }
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('OK', style: TextStyle(color: Color(0xFF0036BC), fontWeight: FontWeight.bold)),
+                ),
+              ],
+            ),
+          );
           if (mounted) {
             Navigator.of(context).push(
               MaterialPageRoute(

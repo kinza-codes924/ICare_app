@@ -217,8 +217,9 @@ const login = async (req, res) => {
         requiresOtp: true,
         tempToken,
         emailSent,
-        otp, // show on screen as fallback
-        message: emailSent ? `Verification code sent to ${user.email}` : 'Verification code generated',
+        message: emailSent
+          ? `Verification code sent to ${user.email}`
+          : 'Email delivery failed. Please contact support.',
       });
     }
 
@@ -324,7 +325,7 @@ const forgotPassword = async (req, res) => {
       console.error('Email send failed:', mailErr.message);
     }
 
-    res.status(200).json({ success: true, message: emailSent ? 'OTP sent to your email' : 'OTP generated (email delivery failed)', otp, emailSent, emailError });
+    res.status(200).json({ success: true, message: emailSent ? 'OTP sent to your email' : 'OTP generation failed. Please try again.', emailSent, emailError });
   } catch (error) {
     console.error('Forgot password error:', error);
     res.status(500).json({ success: false, message: 'Failed to send OTP. Please try again.' });
