@@ -136,7 +136,7 @@ class REceiptScreen extends StatelessWidget {
                           fontSize: 16,
                         ),
                         CustomText(
-                          text: "Rs. $totalPrice",
+                          text: "PKR $totalPrice",
                           fontWeight: FontWeight.bold,
                           fontSize: 18,
                           color: AppColors.primaryColor,

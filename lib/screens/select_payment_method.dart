@@ -323,7 +323,7 @@ class _SelectPaymentMethodState extends State<SelectPaymentMethod> {
                   ),
                   const SizedBox(height: 20),
                   CustomButton(
-                    label: "Confirm & Pay Rs. ${widget.amount ?? 0}",
+                    label: "Confirm & Pay PKR ${widget.amount ?? 0}",
                     borderRadius: 35,
                     onPressed: _processPayment,
                   ),
@@ -470,13 +470,13 @@ class _SelectPaymentMethodState extends State<SelectPaymentMethod> {
                             const SizedBox(height: 24),
                             _buildSummaryItem(
                               "Service Price",
-                              "Rs. ${widget.amount ?? 0}",
+                              "PKR ${widget.amount ?? 0}",
                             ),
-                            _buildSummaryItem("Processing Fee", "Rs. 0.00"),
+                            _buildSummaryItem("Processing Fee", "PKR 0.00"),
                             const Divider(height: 32, color: Color(0xFFF1F5F9)),
                             _buildSummaryItem(
                               "Total",
-                              "Rs. ${widget.amount ?? 0}",
+                              "PKR ${widget.amount ?? 0}",
                               isTotal: true,
                             ),
                             const SizedBox(height: 32),

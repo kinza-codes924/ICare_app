@@ -613,6 +613,8 @@ class _PharmacyOrdersState extends ConsumerState<PharmacyOrders>
         'id': m['_id'] ?? '',
         'price': (m['price'] ?? 0).toDouble(),
         'stock': (m['quantity'] ?? m['stock'] ?? 0),
+        'permission': (m['medicinePermission'] ?? 'OTC').toString(),
+        'category': (m['category'] ?? '').toString(),
       }).toList();
       medsLoading = false;
     }).catchError((_) { medsLoading = false; });
@@ -716,9 +718,19 @@ class _PharmacyOrdersState extends ConsumerState<PharmacyOrders>
                           itemBuilder: (_, i) {
                             final med = filtered[i];
                             final isSelected = selectedMedicines.any((s) => s['id'] == med['id']);
+                            final isControlledMed = med['permission'] == 'Controlled' || med['category'].toString().toLowerCase() == 'controlled';
                             return ListTile(
                               dense: true,
-                              title: Text(med['name'], style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                              title: Row(children: [
+                                Expanded(child: Text(med['name'], style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600))),
+                                if (isControlledMed)
+                                  Container(
+                                    margin: const EdgeInsets.only(left: 4),
+                                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                                    decoration: BoxDecoration(color: const Color(0xFFFEE2E2), borderRadius: BorderRadius.circular(4)),
+                                    child: const Text('Controlled', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w800, color: Color(0xFFDC2626))),
+                                  ),
+                              ]),
                               subtitle: Text('PKR ${med['price'].toStringAsFixed(0)} • Stock: ${med['stock']}', style: const TextStyle(fontSize: 11)),
                               trailing: isSelected
                                   ? Icon(Icons.check_circle_rounded, color: AppColors.primaryColor, size: 20)
@@ -754,6 +766,25 @@ class _PharmacyOrdersState extends ConsumerState<PharmacyOrders>
                         padding: const EdgeInsets.only(top: 6),
                         child: Text('At least one medicine is required', style: TextStyle(fontSize: 11, color: Colors.red.shade400)),
                       ),
+                    if (selectedMedicines.any((m) => m['permission'] == 'Controlled' || m['category'].toString().toLowerCase() == 'controlled')) ...[
+                      const SizedBox(height: 10),
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFEE2E2),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: const Color(0xFFFCA5A5)),
+                        ),
+                        child: const Row(children: [
+                          Icon(Icons.warning_rounded, size: 16, color: Color(0xFFDC2626)),
+                          SizedBox(width: 8),
+                          Expanded(child: Text(
+                            'Controlled drug(s) selected. Ensure valid prescription is verified before dispensing.',
+                            style: TextStyle(fontSize: 11, color: Color(0xFF7F1D1D), fontWeight: FontWeight.w600),
+                          )),
+                        ]),
+                      ),
+                    ],
                     const SizedBox(height: 20),
                     const Text('Delivery Option', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: Color(0xFF0F172A))),
                     const SizedBox(height: 10),

@@ -43,6 +43,7 @@ async function getAllLabs() {
       drap_compliance: p.drap_compliance, createdAt: u.createdAt,
       homeSample: p.home_sample ?? true,
       home_sample: p.home_sample ?? true,
+      rating: p.rating ?? 0, total_reviews: p.total_reviews ?? 0,
     };
   });
 }
@@ -608,6 +609,24 @@ router.post('/bookings/:bookingId/rate', authMiddleware, async (req, res) => {
       { new: true }
     );
     if (!booking) return res.status(404).json({ success: false, message: 'Booking not found' });
+    // Recalculate lab average rating
+    try {
+      const labUserId = booking.labId || booking.lab_id;
+      if (labUserId) {
+        const ratedBookings = await LabTestRequest.find({
+          $or: [{ labId: labUserId }, { lab_id: labUserId }],
+          rating: { $gt: 0 }
+        }).lean();
+        if (ratedBookings.length > 0) {
+          const avg = ratedBookings.reduce((s, b) => s + (b.rating || 0), 0) / ratedBookings.length;
+          await LabProfile.findOneAndUpdate(
+            { user_id: labUserId },
+            { $set: { rating: Math.round(avg * 10) / 10, total_reviews: ratedBookings.length } },
+            { upsert: false }
+          );
+        }
+      }
+    } catch (_) {}
     res.json({ success: true, message: 'Rating submitted', booking: { ...booking.toObject(), _id: booking._id.toString() } });
   } catch (error) {
     console.error(error);

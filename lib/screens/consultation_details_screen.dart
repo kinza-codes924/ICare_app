@@ -146,7 +146,7 @@ class _ConsultationDetailsScreenState
                         color: AppColors.primaryColor.withValues(alpha: 0.08),
                         borderRadius: BorderRadius.circular(20),
                       ),
-                      child: const Text('Rs. 500',
+                      child: const Text('PKR 500',
                           style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.w800,
@@ -286,7 +286,7 @@ class _ConsultationDetailsScreenState
                           borderRadius: BorderRadius.circular(12)),
                       elevation: 0,
                     ),
-                    child: const Text('Pay Rs. 500 & Connect',
+                    child: const Text('Pay PKR 500 & Connect',
                         style: TextStyle(
                             fontSize: 16, fontWeight: FontWeight.w800)),
                   ),

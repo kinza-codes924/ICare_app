@@ -430,7 +430,7 @@ class MyAppointment extends StatelessWidget {
               },
             ),
             SizedBox(height: ScallingConfig.scale(10)),
-            AmountContainer(leadingText: "PKR Rs.", trailingText: "2000"),
+            AmountContainer(leadingText: "PKR", trailingText: "2000"),
             SizedBox(height: ScallingConfig.scale(20)),
             HorizontalText(
               padding: EdgeInsets.symmetric(
@@ -438,7 +438,7 @@ class MyAppointment extends StatelessWidget {
                 vertical: ScallingConfig.scale(10),
               ),
               leadingText: "Service charges",
-              trailingText: "Rs. 2000",
+              trailingText: "PKR 2000",
             ),
             HorizontalText(
               padding: EdgeInsets.symmetric(
@@ -446,7 +446,7 @@ class MyAppointment extends StatelessWidget {
                 vertical: ScallingConfig.scale(10),
               ),
               leadingText: "App Deduction (20%)",
-              trailingText: "-Rs. 200",
+              trailingText: "-PKR 200",
             ),
             HorizontalText(
               padding: EdgeInsets.symmetric(
@@ -454,7 +454,7 @@ class MyAppointment extends StatelessWidget {
                 vertical: ScallingConfig.scale(10),
               ),
               leadingText: "Total Balance",
-              trailingText: "Rs. 1800",
+              trailingText: "PKR 1800",
             ),
             SizedBox(height: ScallingConfig.scale(20)),
           ],

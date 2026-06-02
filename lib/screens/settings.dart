@@ -1287,10 +1287,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       title: const Row(children: [Icon(Icons.attach_money_rounded, color: Color(0xFF10B981), size: 24), SizedBox(width: 10), Text('Consultation Fee', style: TextStyle(fontWeight: FontWeight.w800))]),
       content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-        const Text('Set your consultation fee (Rs.)', style: TextStyle(fontSize: 13, color: Color(0xFF64748B))), const SizedBox(height: 12),
-        TextField(controller: ctrl, keyboardType: TextInputType.number, autofocus: true, decoration: InputDecoration(hintText: 'e.g. 2000', prefixText: 'Rs. ', border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)), filled: true, fillColor: const Color(0xFFF8FAFC))),
+        const Text('Set your consultation fee (PKR)', style: TextStyle(fontSize: 13, color: Color(0xFF64748B))), const SizedBox(height: 12),
+        TextField(controller: ctrl, keyboardType: TextInputType.number, autofocus: true, decoration: InputDecoration(hintText: 'e.g. 2000', prefixText: 'PKR ', border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)), filled: true, fillColor: const Color(0xFFF8FAFC))),
       ]),
-      actions: [TextButton(onPressed: () => Navigator.pop(dc), child: const Text('Cancel')), ElevatedButton(onPressed: saving ? null : () async { final fee = double.tryParse(ctrl.text.trim()); if (fee == null || fee < 0) return; setS(() => saving = true); try { final svc = DoctorService(); await svc.updateConsultationFee(fee); if (dc2.mounted) Navigator.pop(dc2); if (ctx.mounted) ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text('Consultation fee set to Rs. ${fee.toInt()}'), backgroundColor: Colors.green)); } catch (e) { if (ctx.mounted) ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text('Failed: $e'), backgroundColor: Colors.red)); } setS(() => saving = false); }, style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF10B981), foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))), child: saving ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) : const Text('Save'))],
+      actions: [TextButton(onPressed: () => Navigator.pop(dc), child: const Text('Cancel')), ElevatedButton(onPressed: saving ? null : () async { final fee = double.tryParse(ctrl.text.trim()); if (fee == null || fee < 0) return; setS(() => saving = true); try { final svc = DoctorService(); await svc.updateConsultationFee(fee); if (dc2.mounted) Navigator.pop(dc2); if (ctx.mounted) ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text('Consultation fee set to PKR ${fee.toInt()}'), backgroundColor: Colors.green)); } catch (e) { if (ctx.mounted) ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text('Failed: $e'), backgroundColor: Colors.red)); } setS(() => saving = false); }, style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF10B981), foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))), child: saving ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) : const Text('Save'))],
     )));
   }
 
@@ -1484,15 +1484,25 @@ class _WebSettingsLayout extends StatelessWidget {
     return Card(elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Padding(padding: const EdgeInsets.all(20), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         _sectionLabel('Notifications'), const SizedBox(height: 16),
-        _switchTile(icon: Icons.calendar_today_outlined, title: 'Booking Updates', subtitle: 'Appointment confirmations & changes', value: true, onChanged: (_) {}),
-        const Divider(height: 1),
-        _switchTile(icon: Icons.message_outlined, title: 'Doctor Messages', subtitle: 'Messages from providers', value: true, onChanged: (_) {}),
-        const Divider(height: 1),
-        _switchTile(icon: Icons.local_offer_outlined, title: 'Promotions & Offers', subtitle: 'Special deals & health tips', value: false, onChanged: (_) {}),
-        const Divider(height: 1),
-        _switchTile(icon: Icons.volume_up_outlined, title: 'Sound Notifications', subtitle: 'Play sound for notifications', value: true, onChanged: (_) {}),
-        const Divider(height: 1),
-        _switchTile(icon: Icons.email_outlined, title: 'Send Prescription to Email', subtitle: 'Automatically email prescriptions after consultation', value: p.prescriptionEmailEnabled, onChanged: p.onTogglePrescriptionEmail),
+        if (p.isPharmacy || p.isLaboratory) ...[
+          _switchTile(icon: Icons.notifications_active_outlined, title: 'New Order Alerts', subtitle: 'Notify on incoming orders/bookings', value: true, onChanged: (_) {}),
+          const Divider(height: 1),
+          _switchTile(icon: Icons.update_rounded, title: 'Order Status Updates', subtitle: 'Confirmations & changes', value: true, onChanged: (_) {}),
+          const Divider(height: 1),
+          _switchTile(icon: Icons.volume_up_outlined, title: 'Sound Notifications', subtitle: 'Play sound for notifications', value: true, onChanged: (_) {}),
+        ] else ...[
+          _switchTile(icon: Icons.calendar_today_outlined, title: 'Booking Updates', subtitle: 'Appointment confirmations & changes', value: true, onChanged: (_) {}),
+          const Divider(height: 1),
+          _switchTile(icon: Icons.message_outlined, title: 'Doctor Messages', subtitle: 'Messages from providers', value: true, onChanged: (_) {}),
+          const Divider(height: 1),
+          _switchTile(icon: Icons.local_offer_outlined, title: 'Promotions & Offers', subtitle: 'Special deals & health tips', value: false, onChanged: (_) {}),
+          const Divider(height: 1),
+          _switchTile(icon: Icons.volume_up_outlined, title: 'Sound Notifications', subtitle: 'Play sound for notifications', value: true, onChanged: (_) {}),
+          if (p.isPatient) ...[
+            const Divider(height: 1),
+            _switchTile(icon: Icons.email_outlined, title: 'Send Prescription to Email', subtitle: 'Automatically email prescriptions after consultation', value: p.prescriptionEmailEnabled, onChanged: p.onTogglePrescriptionEmail),
+          ],
+        ],
       ])));
   }
 
@@ -1706,7 +1716,7 @@ class _WebSettingsLayout extends StatelessWidget {
             icon: Icons.attach_money_rounded,
             iconColor: const Color(0xFF10B981),
             title: 'Consultation Fee',
-            subtitle: 'Set your consultation fee (Rs.)',
+            subtitle: 'Set your consultation fee (PKR)',
             onTap: () => p.onShowFeeDialog(context),
           ),
           const Divider(height: 1),
@@ -1794,6 +1804,12 @@ class _WebSettingsLayout extends StatelessWidget {
       child: Padding(padding: const EdgeInsets.all(20), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         _sectionLabel('About & Legal'), const SizedBox(height: 16),
         _settingsTile(icon: Icons.info_outline, iconColor: const Color(0xFF64748B), title: 'About Us', subtitle: 'Learn more about iCare', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AboutUs()))),
+        const Divider(height: 1),
+        _settingsTile(icon: Icons.description_outlined, iconColor: const Color(0xFF64748B), title: 'Terms & Conditions', subtitle: 'Review terms of service', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TermsAndConditions()))),
+        const Divider(height: 1),
+        _settingsTile(icon: Icons.privacy_tip_outlined, iconColor: const Color(0xFF64748B), title: 'Privacy Policy', subtitle: 'How we handle your data', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PrivacyPolicy()))),
+        const Divider(height: 1),
+        _settingsTile(icon: Icons.verified_outlined, iconColor: const Color(0xFF10B981), title: 'DRAP Guidelines', subtitle: 'Drug Regulatory Authority of Pakistan', onTap: () async { try { await launchUrl(Uri.parse('https://www.dra.gov.pk'), mode: LaunchMode.externalApplication); } catch (_) {} }),
       ])));
   }
 
@@ -1950,11 +1966,19 @@ class _MobileSettingsLayout extends StatelessWidget {
     return Card(elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Padding(padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         _sectionLabel('Notifications'), const SizedBox(height: 12),
-        _switchTile(icon: Icons.calendar_today_outlined, title: 'Booking Updates', subtitle: 'Appointment confirmations & changes', value: true, onChanged: (_) {}),
-        const Divider(height: 1), _switchTile(icon: Icons.message_outlined, title: 'Doctor Messages', subtitle: 'Messages from providers', value: true, onChanged: (_) {}),
-        const Divider(height: 1), _switchTile(icon: Icons.local_offer_outlined, title: 'Promotions & Offers', subtitle: 'Special deals', value: false, onChanged: (_) {}),
-        const Divider(height: 1), _switchTile(icon: Icons.volume_up_outlined, title: 'Sound Notifications', subtitle: 'Play sound', value: true, onChanged: (_) {}),
-        const Divider(height: 1), _switchTile(icon: Icons.email_outlined, title: 'Send Prescription to Email', subtitle: 'Auto email prescriptions after consultation', value: p.prescriptionEmailEnabled, onChanged: p.onTogglePrescriptionEmail),
+        if (p.isPharmacy || p.isLaboratory) ...[
+          _switchTile(icon: Icons.notifications_active_outlined, title: 'New Order Alerts', subtitle: 'Notify on incoming orders/bookings', value: true, onChanged: (_) {}),
+          const Divider(height: 1), _switchTile(icon: Icons.update_rounded, title: 'Order Status Updates', subtitle: 'Confirmations & changes', value: true, onChanged: (_) {}),
+          const Divider(height: 1), _switchTile(icon: Icons.volume_up_outlined, title: 'Sound Notifications', subtitle: 'Play sound', value: true, onChanged: (_) {}),
+        ] else ...[
+          _switchTile(icon: Icons.calendar_today_outlined, title: 'Booking Updates', subtitle: 'Appointment confirmations & changes', value: true, onChanged: (_) {}),
+          const Divider(height: 1), _switchTile(icon: Icons.message_outlined, title: 'Doctor Messages', subtitle: 'Messages from providers', value: true, onChanged: (_) {}),
+          const Divider(height: 1), _switchTile(icon: Icons.local_offer_outlined, title: 'Promotions & Offers', subtitle: 'Special deals', value: false, onChanged: (_) {}),
+          const Divider(height: 1), _switchTile(icon: Icons.volume_up_outlined, title: 'Sound Notifications', subtitle: 'Play sound', value: true, onChanged: (_) {}),
+          if (p.isPatient) ...[
+            const Divider(height: 1), _switchTile(icon: Icons.email_outlined, title: 'Send Prescription to Email', subtitle: 'Auto email prescriptions after consultation', value: p.prescriptionEmailEnabled, onChanged: p.onTogglePrescriptionEmail),
+          ],
+        ],
       ])));
   }
 
@@ -2068,7 +2092,7 @@ class _MobileSettingsLayout extends StatelessWidget {
             icon: Icons.attach_money_rounded,
             iconColor: const Color(0xFF10B981),
             title: 'Consultation Fee',
-            subtitle: 'Set your consultation fee (Rs.)',
+            subtitle: 'Set your consultation fee (PKR)',
             onTap: () => p.onShowFeeDialog(context),
           ),
           const Divider(height: 1),
@@ -2115,6 +2139,12 @@ class _MobileSettingsLayout extends StatelessWidget {
       child: Padding(padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         _sectionLabel('About & Legal'), const SizedBox(height: 12),
         _settingsTile(icon: Icons.info_outline, iconColor: const Color(0xFF64748B), title: 'About Us', subtitle: 'Learn about iCare', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AboutUs()))),
+        const Divider(height: 1),
+        _settingsTile(icon: Icons.description_outlined, iconColor: const Color(0xFF64748B), title: 'Terms & Conditions', subtitle: 'Review terms', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TermsAndConditions()))),
+        const Divider(height: 1),
+        _settingsTile(icon: Icons.privacy_tip_outlined, iconColor: const Color(0xFF64748B), title: 'Privacy Policy', subtitle: 'Data handling', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PrivacyPolicy()))),
+        const Divider(height: 1),
+        _settingsTile(icon: Icons.verified_outlined, iconColor: const Color(0xFF10B981), title: 'DRAP Guidelines', subtitle: 'Drug Regulatory Authority of Pakistan', onTap: () async { try { await launchUrl(Uri.parse('https://www.dra.gov.pk'), mode: LaunchMode.externalApplication); } catch (_) {} }),
       ])));
   }
 

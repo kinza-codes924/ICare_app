@@ -183,7 +183,7 @@ class _FillLabFormState extends State<FillLabForm> {
                   children: [
                     ScheduledTest(name: test),
                     const CustomText(
-                      text: "Rs. 3000",
+                      text: "PKR 3000",
                       fontSize: 12,
                       fontFamily: "vGilroy-SemiBold",
                       color: AppColors.primary500,
@@ -503,7 +503,7 @@ class _FillLabFormState extends State<FillLabForm> {
                                   Expanded(child: ScheduledTest(name: test)),
                                   const SizedBox(width: 20),
                                   CustomText(
-                                    text: "Rs. 3000",
+                                    text: "PKR 3000",
                                     fontSize: 16,
                                     fontWeight: FontWeight.bold,
                                     color: AppColors.primaryColor,

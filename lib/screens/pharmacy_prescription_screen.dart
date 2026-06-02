@@ -627,7 +627,7 @@ class _PharmacyPrescriptionScreenState
                         ? const Color(0xFF0F172A)
                         : const Color(0xFF475569))),
           ),
-          Text('Rs. $price',
+          Text('PKR $price',
               style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w700,

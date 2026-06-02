@@ -10,7 +10,9 @@ import 'package:icare/widgets/back_button.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class MyCartScreen extends StatefulWidget {
-  const MyCartScreen({super.key});
+  final double? deliveryFee;
+  final String? pharmacyName;
+  const MyCartScreen({super.key, this.deliveryFee, this.pharmacyName});
 
   @override
   State<MyCartScreen> createState() => _MyCartScreenState();
@@ -123,6 +125,7 @@ class _MyCartScreenState extends State<MyCartScreen> {
           subtotal: _subtotal,
           discount: _discount,
           total: _total,
+          deliveryFee: _effectiveDeliveryFee,
           cartService: _cartService,
         ),
       ),
@@ -146,7 +149,8 @@ class _MyCartScreenState extends State<MyCartScreen> {
     return total;
   }
 
-  double get _total => _subtotal - (_subtotal * _discount / 100);
+  double get _effectiveDeliveryFee => widget.deliveryFee ?? 0;
+  double get _total => _subtotal - (_subtotal * _discount / 100) + _effectiveDeliveryFee;
 
   @override
   Widget build(BuildContext context) {
@@ -536,7 +540,7 @@ class _MyCartScreenState extends State<MyCartScreen> {
             if (_discount > 0)
               _summaryRow('${'Discount'.tr()} ($_discount%)', '-PKR ${(_subtotal * _discount / 100).toStringAsFixed(0)}',
                   isNegative: true),
-            _summaryRow('Delivery'.tr(), 'Free'.tr()),
+            _summaryRow('Delivery'.tr(), _effectiveDeliveryFee > 0 ? 'PKR ${_effectiveDeliveryFee.toStringAsFixed(0)}' : 'Free'.tr()),
             const Padding(
               padding: EdgeInsets.symmetric(vertical: 12),
               child: Divider(),
@@ -645,6 +649,7 @@ class _CheckoutScreen extends StatefulWidget {
   final double subtotal;
   final double discount;
   final double total;
+  final double deliveryFee;
   final CartService cartService;
 
   const _CheckoutScreen({
@@ -652,6 +657,7 @@ class _CheckoutScreen extends StatefulWidget {
     required this.subtotal,
     required this.discount,
     required this.total,
+    this.deliveryFee = 0,
     required this.cartService,
   });
 
@@ -1162,7 +1168,7 @@ class _CheckoutScreenState extends State<_CheckoutScreen> {
             _row('${'Discount'.tr()} (${widget.discount.toInt()}%)',
                 '-PKR ${(widget.subtotal * widget.discount / 100).toStringAsFixed(0)}',
                 color: Colors.red),
-          _row('Delivery'.tr(), 'Free'.tr(), color: const Color(0xFF10B981)),
+          _row('Delivery'.tr(), widget.deliveryFee > 0 ? 'PKR ${widget.deliveryFee.toStringAsFixed(0)}' : 'Free'.tr(), color: widget.deliveryFee > 0 ? null : const Color(0xFF10B981)),
           _row('Payment'.tr(), _paymentMethod),
           const Padding(padding: EdgeInsets.symmetric(vertical: 12), child: Divider()),
           Row(

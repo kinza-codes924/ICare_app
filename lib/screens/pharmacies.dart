@@ -817,7 +817,11 @@ class PharmacyWidget extends StatelessWidget {
                                       const Icon(Icons.star_rounded, size: 13, color: Color(0xFFD97706)),
                                       const SizedBox(width: 3),
                                       Text(
-                                        '${pharmacy['rating'] ?? 4.5}',
+                                        () {
+                                          final r = pharmacy['rating'];
+                                          if (r == null || r == 0) return 'New';
+                                          return (r is num) ? r.toStringAsFixed(1) : r.toString();
+                                        }(),
                                         style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF92400E)),
                                       ),
                                     ],

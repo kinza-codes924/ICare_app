@@ -357,7 +357,7 @@ class CancelledOrders extends StatelessWidget {
                     fontWeight: FontWeight.w500,
                   ),
                   CustomText(
-                    text: "Rs. ${order['amount']}",
+                    text: "PKR ${order['amount']}",
                     fontSize: 14,
                     fontWeight: FontWeight.w800,
                     color: const Color(0xFFEF4444),

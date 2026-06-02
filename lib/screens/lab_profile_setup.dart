@@ -26,6 +26,7 @@ class _LabProfileSetupState extends State<LabProfileSetup>
   final _labNameController = TextEditingController();
   final _ownerNameController = TextEditingController();
   final _licenseNumberController = TextEditingController();
+  final _accreditationController = TextEditingController();
   final _labEmailController = TextEditingController();
   final _labPhoneController = TextEditingController();
   final _addressController = TextEditingController();
@@ -77,6 +78,7 @@ class _LabProfileSetupState extends State<LabProfileSetup>
     _labNameController.dispose();
     _ownerNameController.dispose();
     _licenseNumberController.dispose();
+    _accreditationController.dispose();
     _labEmailController.dispose();
     _labPhoneController.dispose();
     _addressController.dispose();
@@ -95,6 +97,7 @@ class _LabProfileSetupState extends State<LabProfileSetup>
         _labNameController.text = profile['labName'] ?? '';
         _ownerNameController.text = profile['ownerName'] ?? '';
         _licenseNumberController.text = profile['licenseNumber'] ?? '';
+        _accreditationController.text = profile['accreditation'] ?? '';
         _labEmailController.text = profile['labEmail'] ?? '';
         _labPhoneController.text = profile['labPhoneNumber'] ?? '';
         _addressController.text = profile['address'] ?? '';
@@ -169,6 +172,7 @@ class _LabProfileSetupState extends State<LabProfileSetup>
         'labName': _labNameController.text,
         'ownerName': _ownerNameController.text,
         'licenseNumber': _licenseNumberController.text,
+        'accreditation': _accreditationController.text,
         'labEmail': _labEmailController.text,
         'labPhoneNumber': _labPhoneController.text,
         'address': _addressController.text,
@@ -288,6 +292,13 @@ class _LabProfileSetupState extends State<LabProfileSetup>
                                 label: 'License Number',
                                 icon: Icons.badge_rounded,
                                 hint: 'e.g., LAB-2024-PKR-12345',
+                              ),
+                              const SizedBox(height: 16),
+                              _buildTextField(
+                                controller: _accreditationController,
+                                label: 'Accreditation',
+                                icon: Icons.verified_rounded,
+                                hint: 'e.g., ISO 15189, DRAP Approved',
                               ),
                             ],
                           ),

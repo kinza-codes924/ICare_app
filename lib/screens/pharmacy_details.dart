@@ -14,6 +14,7 @@ import 'package:icare/utils/utils.dart';
 import 'package:icare/widgets/back_button.dart';
 import 'package:icare/widgets/custom_button.dart';
 import 'package:icare/widgets/custom_text.dart';
+import 'package:icare/screens/consultation_details_screen.dart';
 import 'package:icare/widgets/custom_text_input.dart';
 
 class PharmacyDetailsScreen extends StatefulWidget {
@@ -444,7 +445,10 @@ class _PharmacyDetailsScreenState extends State<PharmacyDetailsScreen> {
                 // View Cart — on top
                 GestureDetector(
                   onTap: () => Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const MyCartScreen()),
+                    MaterialPageRoute(builder: (_) => MyCartScreen(
+                      deliveryFee: (widget.pharmacy['delivery_fee'] as num?)?.toDouble() ?? 0.0,
+                      pharmacyName: (widget.pharmacy['pharmacy_name'] ?? widget.pharmacy['name'] ?? '').toString(),
+                    )),
                   ),
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
@@ -572,7 +576,11 @@ class _PharmacyDetailsScreenState extends State<PharmacyDetailsScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
-          _infoItem(Icons.star_rounded, "4.8", "Rating", Colors.amber),
+          _infoItem(Icons.star_rounded, () {
+            final r = widget.pharmacy['rating'];
+            if (r == null || r == 0) return 'New';
+            return (r is num) ? r.toStringAsFixed(1) : r.toString();
+          }(), "Rating", Colors.amber),
           _divider(),
           _infoItem(
             Icons.access_time_filled_rounded,
@@ -989,6 +997,58 @@ class _PharmacyDetailsScreenState extends State<PharmacyDetailsScreen> {
     );
   }
 
+  void _showVaccineMedicineDialog(dynamic med) {
+    final name = (med['productName'] ?? med['name'] ?? 'This vaccine').toString();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Row(children: [
+          Icon(Icons.vaccines_rounded, color: Color(0xFF7C3AED), size: 22),
+          SizedBox(width: 10),
+          Expanded(child: Text('Vaccine — Consultation Required', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700))),
+        ]),
+        content: Column(mainAxisSize: MainAxisSize.min, children: [
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(color: const Color(0xFFEDE9FE), borderRadius: BorderRadius.circular(12)),
+            child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              const Icon(Icons.info_rounded, color: Color(0xFF7C3AED), size: 20),
+              const SizedBox(width: 12),
+              Expanded(child: Text(
+                '$name is a vaccine.',
+                style: const TextStyle(fontSize: 13, color: Color(0xFF4C1D95), height: 1.5, fontWeight: FontWeight.w600),
+              )),
+            ]),
+          ),
+          const SizedBox(height: 16),
+          const Text(
+            'Vaccines must be administered under medical supervision. A consultation with our doctor is required before ordering a vaccine at your doorstep.',
+            style: TextStyle(fontSize: 13, color: Color(0xFF64748B), height: 1.6),
+            textAlign: TextAlign.center,
+          ),
+        ]),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          ElevatedButton.icon(
+            onPressed: () {
+              Navigator.pop(ctx);
+              Navigator.pop(context);
+              Navigator.push(context, MaterialPageRoute(builder: (_) => const ConsultationDetailsScreen()));
+            },
+            icon: const Icon(Icons.medical_services_rounded, size: 16),
+            label: const Text('Book Consultation'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF7C3AED),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _showControlledMedicineDialog(dynamic med) {
     final name = (med['productName'] ?? med['name'] ?? 'This medicine').toString();
     showDialog(
@@ -1105,6 +1165,9 @@ class _PharmacyDetailsScreenState extends State<PharmacyDetailsScreen> {
     final permission = (med['medicinePermission'] ?? 'OTC').toString();
     final isPrescriptionOnly = permission == 'Prescription Only';
     final isControlled = permission == 'Controlled' || (med['category'] ?? '').toString().toLowerCase() == 'controlled';
+    final isVaccine = (med['category'] ?? '').toString().toLowerCase() == 'vaccine' ||
+        (med['productName'] ?? med['name'] ?? '').toString().toLowerCase().contains('vaccine') ||
+        permission == 'Vaccine';
 
     return GestureDetector(
       // Tap card body → open details dialog
@@ -1155,23 +1218,27 @@ class _PharmacyDetailsScreenState extends State<PharmacyDetailsScreen> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
               decoration: BoxDecoration(
-                color: isControlled
-                    ? const Color(0xFFFEE2E2)
-                    : isPrescriptionOnly
-                        ? const Color(0xFFFEF3C7)
-                        : const Color(0xFFD1FAE5),
+                color: isVaccine
+                    ? const Color(0xFFEDE9FE)
+                    : isControlled
+                        ? const Color(0xFFFEE2E2)
+                        : isPrescriptionOnly
+                            ? const Color(0xFFFEF3C7)
+                            : const Color(0xFFD1FAE5),
                 borderRadius: BorderRadius.circular(4),
               ),
               child: Text(
-                isControlled ? 'Controlled' : isPrescriptionOnly ? 'Rx Only' : 'OTC',
+                isVaccine ? 'Vaccine' : isControlled ? 'Controlled' : isPrescriptionOnly ? 'Rx Only' : 'OTC',
                 style: TextStyle(
                   fontSize: 9,
                   fontWeight: FontWeight.w800,
-                  color: isControlled
-                      ? const Color(0xFFDC2626)
-                      : isPrescriptionOnly
-                          ? const Color(0xFFB45309)
-                          : const Color(0xFF065F46),
+                  color: isVaccine
+                      ? const Color(0xFF6D28D9)
+                      : isControlled
+                          ? const Color(0xFFDC2626)
+                          : isPrescriptionOnly
+                              ? const Color(0xFFB45309)
+                              : const Color(0xFF065F46),
                 ),
               ),
             ),
@@ -1268,6 +1335,10 @@ class _PharmacyDetailsScreenState extends State<PharmacyDetailsScreen> {
               const SizedBox(height: 6),
               GestureDetector(
                 onTap: isAdding ? null : () async {
+                  if (isVaccine) {
+                    _showVaccineMedicineDialog(med);
+                    return;
+                  }
                   if (isControlled) {
                     _showControlledMedicineDialog(med);
                     return;

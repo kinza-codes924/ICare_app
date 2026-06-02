@@ -299,7 +299,7 @@ class _SelectTestState extends State<SelectTest> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      "Rs. ${test.price.toInt()}",
+                      "PKR ${test.price.toInt()}",
                       style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
@@ -352,7 +352,7 @@ class _SelectTestState extends State<SelectTest> {
                     ),
                   ),
                   Text(
-                    "Total: Rs. ${_totalPrice.toInt()}",
+                    "Total: PKR ${_totalPrice.toInt()}",
                     style: const TextStyle(
                       color: Colors.white,
                       fontSize: 20,

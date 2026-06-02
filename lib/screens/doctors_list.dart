@@ -1016,7 +1016,7 @@ class DoctorProfileCard extends StatelessWidget {
                   const Spacer(),
                   if (fee != null && fee > 0)
                     Text(
-                      'Rs. ${fee.toInt()}',
+                      'PKR ${fee.toInt()}',
                       style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
                     ),
                 ],

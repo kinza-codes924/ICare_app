@@ -1300,7 +1300,7 @@ class _DoctorDashboardState extends ConsumerState<DoctorDashboard> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Rs. ${_formatRevenue(revenue)}',
+                  'PKR ${_formatRevenue(revenue)}',
                   style: const TextStyle(
                     fontSize: 28,
                     fontWeight: FontWeight.w900,
@@ -1308,7 +1308,7 @@ class _DoctorDashboardState extends ConsumerState<DoctorDashboard> {
                   ),
                 ),
                 Text(
-                  'Total Revenue${consultationFee > 0 ? '  •  Fee: Rs. $consultationFee' : ''}',
+                  'Total Revenue${consultationFee > 0 ? '  •  Fee: PKR $consultationFee' : ''}',
                   style: TextStyle(
                     fontSize: 13,
                     color: Colors.white.withValues(alpha: 0.85),

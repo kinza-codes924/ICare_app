@@ -344,7 +344,7 @@ class _BookAppointmentScreenState extends ConsumerState<BookAppointmentScreen> {
                       Text(widget.doctor.specialization ?? 'General Practitioner',
                           style: const TextStyle(fontSize: 13, color: Color(0xFF64748B))),
                       if (fee != null && fee > 0)
-                        Text('Fee: Rs. ${fee.toInt()}',
+                        Text('Fee: PKR ${fee.toInt()}',
                             style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF0F172A))),
                     ],
                   ),
@@ -766,7 +766,7 @@ class _BookAppointmentScreenState extends ConsumerState<BookAppointmentScreen> {
             children: [
               Text('Consultation Fee'.tr(), style: const TextStyle(fontSize: 13, color: Color(0xFF64748B))),
               Text(
-                fee > 0 ? 'Rs. ${fee.toInt()}' : 'Free / As per clinic'.tr(),
+                fee > 0 ? 'PKR ${fee.toInt()}' : 'Free / As per clinic'.tr(),
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w800,
@@ -1007,7 +1007,7 @@ class _BookAppointmentScreenState extends ConsumerState<BookAppointmentScreen> {
                     const SizedBox(width: 10),
                     Expanded(child: Text('Online Payment'.tr(), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700))),
                     if (fee > 0)
-                      Text('Rs. ${fee.toInt()}',
+                      Text('PKR ${fee.toInt()}',
                           style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: Color(0xFF0F172A))),
                   ],
                 ),

@@ -523,7 +523,7 @@ class _LaboratoryDashboardState extends State<LaboratoryDashboard>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Rs. $revenue',
+                  'PKR $revenue',
                   style: const TextStyle(
                     fontSize: 28,
                     fontWeight: FontWeight.bold,

@@ -166,11 +166,15 @@ class _LaboratoriesScreenState extends State<LaboratoriesScreen> {
                                 const Color(0xFF6366F1),
                               ),
                               const SizedBox(width: 12),
-                              _buildStatChip(
-                                Icons.star_rounded,
-                                "4.7 Avg Rating",
-                                const Color(0xFFF59E0B),
-                              ),
+                              Builder(builder: (_) {
+                                final ratedLabs = _labs.where((l) => (l['rating'] as num?) != null && (l['rating'] as num) > 0).toList();
+                                final avg = ratedLabs.isEmpty ? null : ratedLabs.map((l) => (l['rating'] as num).toDouble()).reduce((a, b) => a + b) / ratedLabs.length;
+                                return _buildStatChip(
+                                  Icons.star_rounded,
+                                  avg != null ? "${avg.toStringAsFixed(1)} Avg Rating" : "Top Rated",
+                                  const Color(0xFFF59E0B),
+                                );
+                              }),
                               const SizedBox(width: 12),
                               _buildStatChip(
                                 Icons.check_circle_rounded,
@@ -451,7 +455,11 @@ class _LaboratoriesScreenState extends State<LaboratoriesScreen> {
                         ),
                         const SizedBox(width: 4),
                         Text(
-                          "${lab['rating'] ?? 4.5}",
+                          () {
+                            final r = lab['rating'];
+                            if (r == null || r == 0) return 'New';
+                            return (r is num) ? r.toStringAsFixed(1) : r.toString();
+                          }(),
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 12,

@@ -42,6 +42,7 @@ router.get('/', async (req, res) => {
         delivery_fee: p.delivery_fee, address: p.address, city: p.city,
         latitude: p.latitude ?? null, longitude: p.longitude ?? null,
         lat: p.latitude ?? null, lng: p.longitude ?? null,
+        rating: p.rating ?? 0, total_reviews: p.total_reviews ?? 0,
       };
     });
     res.json({ success: true, pharmacies });
@@ -70,6 +71,7 @@ router.get('/get_all_pharmacy', async (req, res) => {
         delivery_fee: p.delivery_fee, address: p.address, city: p.city,
         latitude: p.latitude ?? null, longitude: p.longitude ?? null,
         lat: p.latitude ?? null, lng: p.longitude ?? null,
+        rating: p.rating ?? 0, total_reviews: p.total_reviews ?? 0,
       };
     });
     res.json({ success: true, pharmacies });
@@ -744,6 +746,24 @@ router.post('/orders/:id/rating', authMiddleware, async (req, res) => {
       { new: true }
     );
     if (!order) return res.status(404).json({ success: false, message: 'Order not found' });
+    // Recalculate pharmacy average rating
+    try {
+      const pharmacyUserId = order.pharmacyId || order.pharmacy_id;
+      if (pharmacyUserId) {
+        const ratedOrders = await PharmacyOrder.find({
+          $or: [{ pharmacyId: pharmacyUserId }, { pharmacy_id: pharmacyUserId }],
+          rating: { $gt: 0 }
+        }).lean();
+        if (ratedOrders.length > 0) {
+          const avg = ratedOrders.reduce((s, o) => s + (o.rating || 0), 0) / ratedOrders.length;
+          await PharmacyProfile.findOneAndUpdate(
+            { user_id: pharmacyUserId },
+            { $set: { rating: Math.round(avg * 10) / 10, total_reviews: ratedOrders.length } },
+            { upsert: false }
+          );
+        }
+      }
+    } catch (_) {}
     res.json({ success: true, message: 'Rating submitted', order: { ...order.toObject(), _id: order._id.toString() } });
   } catch (err) {
     console.error(err);

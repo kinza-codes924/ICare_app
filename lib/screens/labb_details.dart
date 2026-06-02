@@ -467,17 +467,20 @@ class _LabDetailsState extends State<LabDetails> {
                                             size: 18,
                                           ),
                                           const SizedBox(width: 4),
-                                          CustomText(
-                                            text:
-                                                "${widget.labData?['rating'] ?? 4.9}",
-                                            fontWeight: FontWeight.bold,
-                                          ),
+                                          Builder(builder: (_) {
+                                            final r = widget.labData?['rating'];
+                                            final rStr = (r == null || r == 0) ? 'New' : (r is num ? r.toStringAsFixed(1) : r.toString());
+                                            return CustomText(text: rStr, fontWeight: FontWeight.bold);
+                                          }),
                                           const SizedBox(width: 4),
-                                          const CustomText(
-                                            text: "(120+ Reviews)",
-                                            color: Colors.grey,
-                                            fontSize: 12,
-                                          ),
+                                          Builder(builder: (_) {
+                                            final count = widget.labData?['total_reviews'] as int? ?? 0;
+                                            return CustomText(
+                                              text: count > 0 ? "($count Reviews)" : "(No Reviews Yet)",
+                                              color: Colors.grey,
+                                              fontSize: 12,
+                                            );
+                                          }),
                                         ],
                                       ),
                                     ),
@@ -586,7 +589,7 @@ class _LabDetailsState extends State<LabDetails> {
                                     color: Color(0xFF64748B),
                                   ),
                                   CustomText(
-                                    text: "Rs. ${_selectedTests.length * 3000}",
+                                    text: "PKR ${_selectedTests.length * 3000}",
                                     fontSize: 24,
                                     fontWeight: FontWeight.w900,
                                     color: AppColors.primaryColor,
@@ -795,7 +798,7 @@ class _LabDetailsState extends State<LabDetails> {
               ),
             ),
             const CustomText(
-              text: "Rs. 3000",
+              text: "PKR 3000",
               fontSize: 13,
               color: Colors.grey,
             ),

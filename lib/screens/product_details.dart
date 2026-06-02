@@ -73,7 +73,7 @@ class ProductDetailsScreen extends StatelessWidget {
                   ),
                   const SizedBox(width: 40),
                   CustomText(
-                    text: "Rs. 2,000",
+                    text: "PKR 2,000",
                     fontSize: 38,
                     fontWeight: FontWeight.w900,
                     fontFamily: "Gilroy-Bold",
