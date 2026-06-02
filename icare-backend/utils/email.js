@@ -1,18 +1,17 @@
 const nodemailer = require('nodemailer');
 
-// Primary: Nodemailer via Gmail SMTP (EMAIL_USER / EMAIL_PASS env vars)
-// Fallback: Brevo HTTP API (BREVO_API_KEY env var)
+// Primary: Gmail SMTP port 465 (SSL — works on Vercel serverless)
+// Fallback: Brevo HTTP API
 
 async function sendViaSmtp({ to, subject, html }) {
   const transporter = nodemailer.createTransport({
     host: 'smtp.gmail.com',
-    port: 587,
-    secure: false,
+    port: 465,
+    secure: true,
     auth: {
       user: process.env.EMAIL_USER,
       pass: process.env.EMAIL_PASS,
     },
-    tls: { rejectUnauthorized: false },
   });
 
   await transporter.sendMail({
@@ -45,7 +44,6 @@ async function sendViaBrevo({ to, subject, html }) {
 }
 
 const sendEmail = async ({ to, subject, html }) => {
-  // Try SMTP first (Gmail), fall back to Brevo
   if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
     try {
       await sendViaSmtp({ to, subject, html });

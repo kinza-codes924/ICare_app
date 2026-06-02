@@ -208,9 +208,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       final userEmail = ref.read(authProvider).user?.email ?? 'your email';
       final result = await _securityService.send2FAOtp();
       if (!mounted) return;
-      final fallbackOtp = result['otp']?.toString();
-      final emailSent = result['emailSent'] == true;
-      _show2FAOtpDialog(userEmail, fallbackOtp: fallbackOtp, emailSent: emailSent);
+      if (result['success'] == true) {
+        _show2FAOtpDialog(userEmail);
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(result['message']?.toString() ?? 'Failed to send OTP. Please try again.'),
+          backgroundColor: Colors.red,
+        ));
+      }
     } else {
       final result = await _securityService.disable2FA();
       if (!mounted) return;
@@ -222,7 +227,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     }
   }
 
-  void _show2FAOtpDialog(String email, {String? fallbackOtp, bool emailSent = true}) {
+  void _show2FAOtpDialog(String email) {
     final otpController = TextEditingController();
     bool verifying = false;
     showDialog(
@@ -243,24 +248,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               const Icon(Icons.email_outlined, color: Color(0xFF3B82F6), size: 20),
               const SizedBox(width: 10),
               Expanded(child: Text(
-                emailSent ? 'A 6-digit verification code has been sent to\n$email' : 'Your verification code (email delivery failed):',
+                'A 6-digit verification code has been sent to\n$email',
                 style: const TextStyle(fontSize: 13, color: Color(0xFF1E40AF), height: 1.4),
               )),
             ]),
           ),
-          if (fallbackOtp != null) ...[
-            const SizedBox(height: 12),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-              decoration: BoxDecoration(color: const Color(0xFFF0FDF4), borderRadius: BorderRadius.circular(10), border: Border.all(color: const Color(0xFF86EFAC))),
-              child: Text(
-                fallbackOtp,
-                textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w900, letterSpacing: 10, color: Color(0xFF16A34A)),
-              ),
-            ),
-          ],
           const SizedBox(height: 16),
           const Text('Enter Verification Code', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF374151))),
           const SizedBox(height: 8),
@@ -283,8 +275,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ),
           ),
           const SizedBox(height: 8),
-          if (emailSent)
-            const Text('Check your spam folder if you don\'t see the email.', style: TextStyle(fontSize: 11, color: Color(0xFF9CA3AF))),
+          const Text('Check your spam folder if you don\'t see the email.', style: TextStyle(fontSize: 11, color: Color(0xFF9CA3AF))),
         ])),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel', style: TextStyle(color: Color(0xFF6B7280)))),

@@ -48,7 +48,7 @@ router.post('/2fa/send-otp', authMiddleware, async (req, res) => {
       console.error('2FA OTP email error:', mailErr.message);
     }
 
-    res.json({ success: true, message: emailSent ? `OTP sent to ${user.email}` : 'OTP generated', otp, emailSent });
+    res.json({ success: true, message: emailSent ? `OTP sent to ${user.email}` : 'Email delivery failed. Please try again or contact support.', emailSent });
   } catch (err) {
     console.error('2FA send OTP error:', err);
     res.status(500).json({ success: false, message: 'Failed to send OTP' });
