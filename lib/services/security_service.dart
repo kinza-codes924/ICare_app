@@ -3,12 +3,12 @@ import 'package:icare/services/api_service.dart';
 class SecurityService {
   final ApiService _apiService = ApiService();
 
-  // ── 2FA via email OTP ────────────────────────────────────────────────────
+  // ── 2FA via Google Authenticator (TOTP) ─────────────────────────────────
 
-  /// Sends OTP to the user's registered email and returns {success, message}
-  Future<Map<String, dynamic>> send2FAOtp() async {
+  /// Generates TOTP secret and returns {success, qrCode, manualKey}
+  Future<Map<String, dynamic>> setup2FA() async {
     try {
-      final response = await _apiService.post('/auth/2fa/send-otp', {});
+      final response = await _apiService.post('/auth/2fa/setup', {});
       final data = response.data;
       if (data is Map) return Map<String, dynamic>.from(data);
       return {'success': response.statusCode == 200};

@@ -189,37 +189,18 @@ const login = async (req, res) => {
       await User.findByIdAndUpdate(user._id, { $set: { loginSessions: sessions } });
     } catch (_) {}
 
-    // 2FA check — if enabled, send OTP and return temp token
+    // 2FA check — if enabled, issue temp token for TOTP verification
     if (user.twoFactorEnabled) {
-      const otp = String(Math.floor(100000 + Math.random() * 900000));
-      const expires = new Date(Date.now() + 10 * 60 * 1000);
-      await User.findByIdAndUpdate(user._id, { $set: { twoFactorOtp: otp, twoFactorOtpExpires: expires } });
-
-      let emailSent = false;
-      try {
-        await sendEmail({
-          to: user.email,
-          subject: 'iCare — Login Verification Code',
-          html: `<div style="font-family:Arial,sans-serif;max-width:500px;margin:0 auto;"><div style="background:#0036BC;padding:24px;border-radius:12px 12px 0 0;"><h2 style="color:#fff;margin:0;">Login Verification</h2></div><div style="background:#fff;padding:24px;border-radius:0 0 12px 12px;border:1px solid #e2e8f0;"><p style="color:#374151;">Your login verification code:</p><div style="text-align:center;margin:20px 0;"><span style="font-size:36px;font-weight:900;letter-spacing:10px;color:#0036BC;">${otp}</span></div><p style="color:#94a3b8;font-size:12px;">Valid for 10 minutes. Do not share this code.</p></div></div>`,
-        });
-        emailSent = true;
-      } catch (_) {}
-
-      // Issue a short-lived temp token for OTP verification
       const tempToken = jwt.sign(
         { id: user._id.toString(), email: user.email, role: user.role, is2FA: true },
         process.env.JWT_SECRET,
         { expiresIn: '15m' }
       );
-
       return res.status(200).json({
         success: true,
         requiresOtp: true,
         tempToken,
-        emailSent,
-        message: emailSent
-          ? `Verification code sent to ${user.email}`
-          : 'Email delivery failed. Please contact support.',
+        message: 'Open Google Authenticator and enter your 6-digit code.',
       });
     }
 

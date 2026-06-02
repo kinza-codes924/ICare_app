@@ -49,8 +49,8 @@ router.put('/update-settings', authMiddleware, async (req, res) => {
 
 // ── 2FA routes — proxy directly to security handlers to avoid router-instance reuse issues ──
 const securityRouter = require('./security');
-router.post('/2fa/send-otp', authMiddleware, (req, res, next) => {
-  req.url = '/2fa/send-otp';
+router.post('/2fa/setup', authMiddleware, (req, res, next) => {
+  req.url = '/2fa/setup';
   securityRouter.handle(req, res, next);
 });
 router.post('/2fa/enable', authMiddleware, (req, res, next) => {

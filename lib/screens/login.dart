@@ -1953,8 +1953,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
         // 2FA check
         if (result['requiresOtp'] == true) {
           final tempToken = result['tempToken']?.toString() ?? '';
-          final emailSent = result['emailSent'] == true;
-          if (mounted) await _show2FADialog(tempToken: tempToken, emailSent: emailSent);
+          if (mounted) await _show2FADialog(tempToken: tempToken);
           if (mounted) setState(() => isLoading = false);
           return;
         }
@@ -2129,7 +2128,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     Utils.showErrorSnackBar(context, error);
   }
 
-  Future<void> _show2FADialog({required String tempToken, required bool emailSent}) async {
+  Future<void> _show2FADialog({required String tempToken}) async {
     final otpController = TextEditingController();
     bool verifying = false;
 
@@ -2140,22 +2139,22 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Row(children: [
           Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: const Color(0xFF0036BC).withValues(alpha: 0.1), borderRadius: BorderRadius.circular(10)),
-            child: const Icon(Icons.verified_user_rounded, color: Color(0xFF0036BC), size: 22)),
+            child: const Icon(Icons.security_rounded, color: Color(0xFF0036BC), size: 22)),
           const SizedBox(width: 10),
           const Text('Two-Factor Auth', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
         ]),
         content: SizedBox(width: 360, child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
           Container(
             padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(color: emailSent ? const Color(0xFFEFF6FF) : const Color(0xFFFEF3C7), borderRadius: BorderRadius.circular(12), border: Border.all(color: emailSent ? const Color(0xFFBFDBFE) : const Color(0xFFFDE68A))),
-            child: Row(children: [
-              Icon(emailSent ? Icons.email_outlined : Icons.warning_amber_rounded, color: emailSent ? const Color(0xFF3B82F6) : const Color(0xFFF59E0B), size: 20),
-              const SizedBox(width: 10),
-              Expanded(child: Text(emailSent ? 'A verification code has been sent to your email.' : 'Email delivery failed. Please try again or contact support.', style: TextStyle(fontSize: 13, color: emailSent ? const Color(0xFF1E40AF) : const Color(0xFF92400E), height: 1.4))),
+            decoration: BoxDecoration(color: const Color(0xFFEFF6FF), borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xFFBFDBFE))),
+            child: const Row(children: [
+              Icon(Icons.phonelink_lock_rounded, color: Color(0xFF3B82F6), size: 20),
+              SizedBox(width: 10),
+              Expanded(child: Text('Open Google Authenticator and enter the 6-digit code for iCare.', style: TextStyle(fontSize: 13, color: Color(0xFF1E40AF), height: 1.4))),
             ]),
           ),
           const SizedBox(height: 16),
-          const Text('Enter Verification Code', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF374151))),
+          const Text('Authenticator Code', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF374151))),
           const SizedBox(height: 8),
           TextField(
             controller: otpController, keyboardType: TextInputType.number, maxLength: 6, autofocus: true, textAlign: TextAlign.center,
@@ -2173,11 +2172,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel', style: TextStyle(color: Color(0xFF6B7280)))),
           ElevatedButton(
             onPressed: verifying ? null : () async {
-              if (otpController.text.length < 4) return;
+              if (otpController.text.length < 6) return;
               setModal(() => verifying = true);
               try {
-                final api = _authService;
-                final result = await api.verify2FA(tempToken: tempToken, otp: otpController.text.trim());
+                final result = await _authService.verify2FA(tempToken: tempToken, otp: otpController.text.trim());
                 if (!ctx.mounted) return;
                 if (result['success'] == true) {
                   final data = result['data'] as Map<String, dynamic>? ?? {};

@@ -203,16 +203,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   Future<void> _toggle2FA(bool value) async {
     if (value) {
-      // Send OTP to user's email first
-      setState(() {}); // show loading
-      final userEmail = ref.read(authProvider).user?.email ?? 'your email';
-      final result = await _securityService.send2FAOtp();
+      setState(() {});
+      final result = await _securityService.setup2FA();
       if (!mounted) return;
       if (result['success'] == true) {
-        _show2FAOtpDialog(userEmail);
+        _show2FASetupDialog(
+          qrCode: result['qrCode']?.toString() ?? '',
+          manualKey: result['manualKey']?.toString() ?? '',
+        );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(result['message']?.toString() ?? 'Failed to send OTP. Please try again.'),
+          content: Text(result['message']?.toString() ?? 'Failed to start 2FA setup. Please try again.'),
           backgroundColor: Colors.red,
         ));
       }
@@ -227,7 +228,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     }
   }
 
-  void _show2FAOtpDialog(String email) {
+  void _show2FASetupDialog({required String qrCode, required String manualKey}) {
     final otpController = TextEditingController();
     bool verifying = false;
     showDialog(
@@ -236,31 +237,78 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       builder: (ctx) => StatefulBuilder(builder: (ctx, setModal) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Row(children: [
-          Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: AppColors.primaryColor.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(10)), child: Icon(Icons.verified_user_rounded, color: AppColors.primaryColor, size: 22)),
+          Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: AppColors.primaryColor.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(10)), child: Icon(Icons.qr_code_2_rounded, color: AppColors.primaryColor, size: 22)),
           const SizedBox(width: 10),
           const Text('Enable 2FA', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
         ]),
-        content: SizedBox(width: 360, child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+        content: SizedBox(width: 360, child: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+          // Step 1
           Container(
-            padding: const EdgeInsets.all(14),
+            padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(color: const Color(0xFFEFF6FF), borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xFFBFDBFE))),
-            child: Row(children: [
-              const Icon(Icons.email_outlined, color: Color(0xFF3B82F6), size: 20),
-              const SizedBox(width: 10),
-              Expanded(child: Text(
-                'A 6-digit verification code has been sent to\n$email',
-                style: const TextStyle(fontSize: 13, color: Color(0xFF1E40AF), height: 1.4),
-              )),
+            child: const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('Step 1', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF3B82F6))),
+              SizedBox(height: 4),
+              Text('Install Google Authenticator or Authy on your phone.', style: TextStyle(fontSize: 13, color: Color(0xFF1E40AF), height: 1.4)),
             ]),
           ),
-          const SizedBox(height: 16),
-          const Text('Enter Verification Code', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF374151))),
-          const SizedBox(height: 8),
+          const SizedBox(height: 12),
+          // Step 2 — QR code
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(color: const Color(0xFFF0FDF4), borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xFFBBF7D0))),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              const Text('Step 2', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF16A34A))),
+              const SizedBox(height: 4),
+              const Text('Scan this QR code with the app:', style: TextStyle(fontSize: 13, color: Color(0xFF166534), height: 1.4)),
+              const SizedBox(height: 12),
+              if (qrCode.isNotEmpty)
+                Center(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: Image.memory(
+                      base64Decode(qrCode.contains(',') ? qrCode.split(',').last : qrCode),
+                      width: 200,
+                      height: 200,
+                    ),
+                  ),
+                ),
+              if (manualKey.isNotEmpty) ...[
+                const SizedBox(height: 10),
+                const Text("Can't scan? Enter this key manually:", style: TextStyle(fontSize: 11, color: Color(0xFF6B7280))),
+                const SizedBox(height: 4),
+                GestureDetector(
+                  onTap: () => Clipboard.setData(ClipboardData(text: manualKey)),
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    decoration: BoxDecoration(color: const Color(0xFFF9FAFB), borderRadius: BorderRadius.circular(8), border: Border.all(color: const Color(0xFFE5E7EB))),
+                    child: Row(children: [
+                      Expanded(child: Text(manualKey, style: const TextStyle(fontSize: 11, fontFamily: 'monospace', color: Color(0xFF374151), letterSpacing: 1))),
+                      const Icon(Icons.copy, size: 14, color: Color(0xFF9CA3AF)),
+                    ]),
+                  ),
+                ),
+              ],
+            ]),
+          ),
+          const SizedBox(height: 12),
+          // Step 3 — enter code
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(color: const Color(0xFFFFFBEB), borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xFFFDE68A))),
+            child: const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('Step 3', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFFD97706))),
+              SizedBox(height: 4),
+              Text('Enter the 6-digit code shown in the app to confirm:', style: TextStyle(fontSize: 13, color: Color(0xFF92400E), height: 1.4)),
+            ]),
+          ),
+          const SizedBox(height: 12),
           TextField(
             controller: otpController,
             keyboardType: TextInputType.number,
             maxLength: 6,
-            autofocus: true,
+            autofocus: false,
             textAlign: TextAlign.center,
             style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900, letterSpacing: 8),
             decoration: InputDecoration(
@@ -274,21 +322,19 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: AppColors.primaryColor, width: 1.5)),
             ),
           ),
-          const SizedBox(height: 8),
-          const Text('Check your spam folder if you don\'t see the email.', style: TextStyle(fontSize: 11, color: Color(0xFF9CA3AF))),
-        ])),
+        ]))),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel', style: TextStyle(color: Color(0xFF6B7280)))),
           ElevatedButton(
             onPressed: verifying ? null : () async {
-              if (otpController.text.length < 4) return;
+              if (otpController.text.length < 6) return;
               setModal(() => verifying = true);
               final result = await _securityService.enable2FAWithOtp(otpController.text.trim());
               if (!ctx.mounted) return;
               if (result['success'] == true) {
                 setState(() => _is2FAEnabled = true);
                 Navigator.pop(ctx);
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Two-Factor Authentication enabled!'), backgroundColor: Colors.green));
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Google Authenticator 2FA enabled!'), backgroundColor: Colors.green));
               } else {
                 setModal(() => verifying = false);
                 ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text(result['message']?.toString() ?? 'Invalid code. Please try again.'), backgroundColor: Colors.red));
