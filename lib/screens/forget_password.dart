@@ -37,18 +37,34 @@ class _ForgetPasswordState extends State<ForgetPassword> {
       if (result['success']) {
         if (mounted) {
           final otp = result['otp']?.toString() ?? '';
-          // Show OTP dialog if email delivery is unavailable
+          final emailSent = result['emailSent'] == true;
+          // Always show OTP on screen so the user can proceed
           if (otp.isNotEmpty) {
             await showDialog(
               context: context,
               builder: (ctx) => AlertDialog(
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                title: const Text('Verification Code', style: TextStyle(fontFamily: 'Gilroy-Bold', fontSize: 18)),
+                title: Row(children: [
+                  Icon(emailSent ? Icons.mark_email_read_rounded : Icons.warning_amber_rounded,
+                    color: emailSent ? const Color(0xFF10B981) : const Color(0xFFF59E0B), size: 22),
+                  const SizedBox(width: 8),
+                  Text(emailSent ? 'Code Sent' : 'Verification Code',
+                    style: const TextStyle(fontFamily: 'Gilroy-Bold', fontSize: 18)),
+                ]),
                 content: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Text('Your code:', style: TextStyle(fontSize: 14, color: Color(0xFF64748B))),
-                    const SizedBox(height: 12),
+                    Text(
+                      emailSent
+                          ? 'A verification code has been sent to ${emailController.text.trim()}. Also shown here:'
+                          : 'Email delivery failed. Use this code directly:',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: emailSent ? const Color(0xFF374151) : const Color(0xFFF59E0B),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
                       decoration: BoxDecoration(
@@ -57,8 +73,8 @@ class _ForgetPasswordState extends State<ForgetPassword> {
                       ),
                       child: Text(otp, style: const TextStyle(color: Colors.white, fontSize: 30, fontWeight: FontWeight.bold, letterSpacing: 10)),
                     ),
-                    const SizedBox(height: 12),
-                    const Text('Check your email or use this code directly.', textAlign: TextAlign.center, style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8))),
+                    const SizedBox(height: 10),
+                    const Text('Valid for 10 minutes.', textAlign: TextAlign.center, style: TextStyle(fontSize: 11, color: Color(0xFF94A3B8))),
                   ],
                 ),
                 actions: [

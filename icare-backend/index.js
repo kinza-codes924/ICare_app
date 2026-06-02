@@ -49,6 +49,7 @@ const lessonNotesRoutes = require('./routes/lesson-notes');
 const certificatesRoutes = require('./routes/certificates');
 const liveSessionPollsRoutes = require('./routes/live-session-polls');
 const securityRoutes = require('./routes/security');
+const gamificationRoutes = require('./routes/gamification');
 
 const app = express();
 
@@ -160,6 +161,7 @@ app.use('/api/lesson-notes', lessonNotesRoutes);
 app.use('/api/certificates', certificatesRoutes);
 app.use('/api/live-session-polls', liveSessionPollsRoutes);
 app.use('/api/security', securityRoutes);
+app.use('/api/gamification', gamificationRoutes);
 
 // Serve uploaded files (only in non-serverless environments)
 if (!process.env.VERCEL) {

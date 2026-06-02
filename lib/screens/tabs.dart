@@ -64,6 +64,7 @@ import 'package:icare/screens/instructor_precautions_management.dart';
 import 'package:icare/screens/instructor_analytics.dart';
 import 'package:icare/screens/instructor_profile_setup.dart';
 import 'package:icare/screens/instructor_lms_dashboard.dart';
+import 'package:icare/screens/my_learning.dart';
 
 class TabsScreen extends ConsumerStatefulWidget {
   final String? initialAdminTab;
@@ -152,12 +153,12 @@ class _TabsScreenState extends ConsumerState<TabsScreen> {
       if (currentIndex == 0) {
         activePage = const HomeScreen();
       } else if (currentIndex == 1) {
-        activePage = const Courses(myPurchased: true);
+        activePage = const MyLearningScreen();
       } else if (currentIndex == 2) {
         // On web show the web profile overview; on mobile show the edit profile form
         activePage = isWeb ? ProfileScreen() : const ProfileEditScreen();
       } else if (currentIndex == 4) {
-        activePage = const Courses(myPurchased: true);
+        activePage = const MyLearningScreen();
       }
     }
 
@@ -709,6 +710,18 @@ class _WebSidebarState extends ConsumerState<_WebSidebar> {
                       Navigator.of(context).push(
                         MaterialPageRoute(
                           builder: (ctx) => const LifestyleTrackerScreen(),
+                        ),
+                      );
+                    },
+                  ),
+                  _buildExtraNavItem(
+                    context,
+                    Icons.school_outlined,
+                    'My Learning',
+                    () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (ctx) => const MyLearningScreen(),
                         ),
                       );
                     },

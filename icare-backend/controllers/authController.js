@@ -175,6 +175,53 @@ const login = async (req, res) => {
       } catch (_) {}
     }
 
+    // Log this login session
+    try {
+      const sessionEntry = {
+        date: new Date().toISOString(),
+        ip: req.headers['x-forwarded-for'] || req.connection?.remoteAddress || 'Unknown',
+        userAgent: req.headers['user-agent'] || 'Unknown',
+        device: (req.headers['user-agent'] || '').includes('Mobile') ? 'Mobile' : 'Web',
+      };
+      const sessions = user.loginSessions || [];
+      sessions.push(sessionEntry);
+      if (sessions.length > 100) sessions.splice(0, sessions.length - 100);
+      await User.findByIdAndUpdate(user._id, { $set: { loginSessions: sessions } });
+    } catch (_) {}
+
+    // 2FA check — if enabled, send OTP and return temp token
+    if (user.twoFactorEnabled) {
+      const otp = String(Math.floor(100000 + Math.random() * 900000));
+      const expires = new Date(Date.now() + 10 * 60 * 1000);
+      await User.findByIdAndUpdate(user._id, { $set: { twoFactorOtp: otp, twoFactorOtpExpires: expires } });
+
+      let emailSent = false;
+      try {
+        await sendEmail({
+          to: user.email,
+          subject: 'iCare — Login Verification Code',
+          html: `<div style="font-family:Arial,sans-serif;max-width:500px;margin:0 auto;"><div style="background:#0036BC;padding:24px;border-radius:12px 12px 0 0;"><h2 style="color:#fff;margin:0;">Login Verification</h2></div><div style="background:#fff;padding:24px;border-radius:0 0 12px 12px;border:1px solid #e2e8f0;"><p style="color:#374151;">Your login verification code:</p><div style="text-align:center;margin:20px 0;"><span style="font-size:36px;font-weight:900;letter-spacing:10px;color:#0036BC;">${otp}</span></div><p style="color:#94a3b8;font-size:12px;">Valid for 10 minutes. Do not share this code.</p></div></div>`,
+        });
+        emailSent = true;
+      } catch (_) {}
+
+      // Issue a short-lived temp token for OTP verification
+      const tempToken = jwt.sign(
+        { id: user._id.toString(), email: user.email, role: user.role, is2FA: true },
+        process.env.JWT_SECRET,
+        { expiresIn: '15m' }
+      );
+
+      return res.status(200).json({
+        success: true,
+        requiresOtp: true,
+        tempToken,
+        emailSent,
+        otp, // show on screen as fallback
+        message: emailSent ? `Verification code sent to ${user.email}` : 'Verification code generated',
+      });
+    }
+
     const token = jwt.sign(
       { id: user._id.toString(), email: user.email, role: user.role },
       process.env.JWT_SECRET,
@@ -253,7 +300,8 @@ const forgotPassword = async (req, res) => {
       resetOtpExpiry: expiry,
     });
 
-    // Send email via Resend
+    let emailSent = false;
+    let emailError = null;
     try {
       await sendEmail({
         to: user.email,
@@ -270,11 +318,13 @@ const forgotPassword = async (req, res) => {
           </div>
         `,
       });
+      emailSent = true;
     } catch (mailErr) {
+      emailError = mailErr.message;
       console.error('Email send failed:', mailErr.message);
     }
 
-    res.status(200).json({ success: true, message: 'OTP sent to your email', otp });
+    res.status(200).json({ success: true, message: emailSent ? 'OTP sent to your email' : 'OTP generated (email delivery failed)', otp, emailSent, emailError });
   } catch (error) {
     console.error('Forgot password error:', error);
     res.status(500).json({ success: false, message: 'Failed to send OTP. Please try again.' });

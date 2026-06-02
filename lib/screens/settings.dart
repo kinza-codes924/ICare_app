@@ -53,6 +53,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   final GamificationService _gamificationService = GamificationService();
   int _totalPoints = 0;
   List<dynamic> _pointsHistory = [];
+  bool _prescriptionEmailEnabled = true;
 
   bool _is2FAEnabled = false;
   bool _isBiometricEnabled = false;
@@ -105,6 +106,21 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         });
       }
     } catch (_) {}
+    // Load prescription email preference
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (mounted) setState(() => _prescriptionEmailEnabled = prefs.getBool('prescription_email_enabled') ?? true);
+    } catch (_) {}
+  }
+
+  Future<void> _togglePrescriptionEmail(bool value) async {
+    setState(() => _prescriptionEmailEnabled = value);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('prescription_email_enabled', value);
+      // Sync to backend user settings
+      await ApiService().post('/auth/update-settings', {'prescriptionEmailEnabled': value});
+    } catch (_) {}
   }
 
   Future<void> _loadBiometricState() async {
@@ -118,8 +134,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     }
   }
 
-  void _loadUserData() {
+  Future<void> _loadUserData() async {
     ref.read(authProvider).user;
+    // Load 2FA status from backend
+    try {
+      final result = await _securityService.getSecuritySettings();
+      if (mounted && result['success'] == true) {
+        setState(() => _is2FAEnabled = result['settings']?['twoFactorEnabled'] == true);
+      }
+    } catch (_) {}
   }
 
   Future<void> _loadHealthSettings() async {
@@ -1237,7 +1260,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       isPatient: isPatient, isPharmacy: isPharmacy, isLaboratory: isLaboratory,
       isDoctor: isDoctor, isStudent: isStudent, isInstructor: isInstructor,
       is2FAEnabled: _is2FAEnabled, isBiometricEnabled: _isBiometricEnabled,
-      biometricAvailable: _biometricAvailable,
+      biometricAvailable: _biometricAvailable, prescriptionEmailEnabled: _prescriptionEmailEnabled,
       trackerToggles: _trackerToggles, healthModeEnabled: _healthModeEnabled,
       selectedConditions: _selectedConditions,
       medicalConditions: _medicalConditions, allergies: _allergies,
@@ -1248,6 +1271,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       savedPaymentMethods: _savedPaymentMethods, billingHistory: _billingHistory,
       totalPoints: _totalPoints, pointsHistory: _pointsHistory,
       onToggle2FA: _toggle2FA, onToggleBiometrics: _toggleBiometrics,
+      onTogglePrescriptionEmail: _togglePrescriptionEmail,
       onTrackerToggle: _updateTrackerToggle, onHealthModeToggle: _toggleHealthMode,
       onLogout: _handleLogout, onComingSoon: _comingSoon,
       onReportIssue: _showReportIssueDialog, onDeleteAccount: _showDeleteAccountDialog,
@@ -1275,6 +1299,7 @@ class _SettingsLayoutParams {
   final app_user.User? user;
   final bool isPatient, isPharmacy, isLaboratory, isDoctor, isStudent, isInstructor;
   final bool is2FAEnabled, isBiometricEnabled, biometricAvailable, healthModeEnabled;
+  final bool prescriptionEmailEnabled;
   final List<String> selectedConditions;
   final String medicalConditions, allergies, currentMedications, healthGoals;
   final int waterReminderMinutes;
@@ -1283,7 +1308,7 @@ class _SettingsLayoutParams {
   final Map<String, bool> trackerToggles;
   final int totalPoints;
   final List<dynamic> pointsHistory;
-  final void Function(bool) onToggle2FA, onToggleBiometrics;
+  final void Function(bool) onToggle2FA, onToggleBiometrics, onTogglePrescriptionEmail;
   final void Function(String, bool) onTrackerToggle, onHealthModeToggle;
   final VoidCallback onLogout;
   final void Function(BuildContext, String) onComingSoon;
@@ -1300,7 +1325,7 @@ class _SettingsLayoutParams {
     required this.isPatient, required this.isPharmacy, required this.isLaboratory,
     required this.isDoctor, required this.isStudent, required this.isInstructor,
     required this.is2FAEnabled, required this.isBiometricEnabled,
-    required this.biometricAvailable,
+    required this.biometricAvailable, required this.prescriptionEmailEnabled,
     required this.healthModeEnabled, required this.selectedConditions,
     required this.medicalConditions, required this.allergies,
     required this.currentMedications, required this.healthGoals,
@@ -1310,6 +1335,7 @@ class _SettingsLayoutParams {
     required this.billingHistory, required this.trackerToggles,
     required this.totalPoints, required this.pointsHistory,
     required this.onToggle2FA, required this.onToggleBiometrics,
+    required this.onTogglePrescriptionEmail,
     required this.onTrackerToggle, required this.onHealthModeToggle,
     required this.onLogout, required this.onComingSoon,
     required this.onReportIssue, required this.onDeleteAccount,
@@ -1415,7 +1441,7 @@ class _WebSettingsLayout extends StatelessWidget {
         const Divider(height: 1),
         _switchTile(icon: Icons.volume_up_outlined, title: 'Sound Notifications', subtitle: 'Play sound for notifications', value: true, onChanged: (_) {}),
         const Divider(height: 1),
-        _switchTile(icon: Icons.email_outlined, title: 'Send Prescription to Email', subtitle: 'Automatically email prescriptions', value: true, onChanged: (_) {}),
+        _switchTile(icon: Icons.email_outlined, title: 'Send Prescription to Email', subtitle: 'Automatically email prescriptions after consultation', value: p.prescriptionEmailEnabled, onChanged: p.onTogglePrescriptionEmail),
       ])));
   }
 
@@ -1877,7 +1903,7 @@ class _MobileSettingsLayout extends StatelessWidget {
         const Divider(height: 1), _switchTile(icon: Icons.message_outlined, title: 'Doctor Messages', subtitle: 'Messages from providers', value: true, onChanged: (_) {}),
         const Divider(height: 1), _switchTile(icon: Icons.local_offer_outlined, title: 'Promotions & Offers', subtitle: 'Special deals', value: false, onChanged: (_) {}),
         const Divider(height: 1), _switchTile(icon: Icons.volume_up_outlined, title: 'Sound Notifications', subtitle: 'Play sound', value: true, onChanged: (_) {}),
-        const Divider(height: 1), _switchTile(icon: Icons.email_outlined, title: 'Send Prescription to Email', subtitle: 'Auto email prescriptions', value: true, onChanged: (_) {}),
+        const Divider(height: 1), _switchTile(icon: Icons.email_outlined, title: 'Send Prescription to Email', subtitle: 'Auto email prescriptions after consultation', value: p.prescriptionEmailEnabled, onChanged: p.onTogglePrescriptionEmail),
       ])));
   }
 

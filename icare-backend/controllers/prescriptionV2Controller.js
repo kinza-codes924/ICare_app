@@ -262,6 +262,23 @@ exports.completePrescription = async (req, res) => {
       } catch (emailErr) { console.error('Prescription email error:', emailErr.message); }
     }
 
+    // Award gamification points to patient for completing consultation
+    if (prescription.patientId) {
+      try {
+        const patientForPoints = await User.findById(prescription.patientId);
+        if (patientForPoints && patientForPoints.role === 'Patient') {
+          if (!patientForPoints.gamification) patientForPoints.gamification = { points: 0, stats: {}, history: [] };
+          patientForPoints.gamification.points = (patientForPoints.gamification.points || 0) + 20;
+          patientForPoints.gamification.stats = patientForPoints.gamification.stats || {};
+          patientForPoints.gamification.stats.completedAppointments = (patientForPoints.gamification.stats.completedAppointments || 0) + 1;
+          patientForPoints.gamification.history = patientForPoints.gamification.history || [];
+          patientForPoints.gamification.history.push({ points: 20, reason: 'complete_appointment', date: new Date().toISOString() });
+          patientForPoints.markModified('gamification');
+          await patientForPoints.save();
+        }
+      } catch (_) {}
+    }
+
     // Update consultation — non-blocking
     Consultation.findByIdAndUpdate(
       consultationId,

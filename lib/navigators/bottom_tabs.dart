@@ -53,8 +53,8 @@ List<Widget> _patientTabs(
         onSelect(1);
       },
       iconColor: currentIndex == 1 ? AppColors.primaryColor : AppColors.grayColor,
-      image: ImagePaths.track,
-      title: 'programs'.tr(),
+      image: ImagePaths.bookings,
+      title: 'my_learning'.tr(),
     ),
     SizedBox(width: 20),
     CustomTabButton(

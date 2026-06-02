@@ -364,6 +364,23 @@ router.put('/bookings/:bookingId', authMiddleware, async (req, res) => {
         });
       } catch (notifyErr) { console.error('⚠️  Lab results notification failed:', notifyErr.message); }
     }
+    // ── Award gamification points to patient on lab test completion ─────────────
+    if ((update.status === 'completed' || update.status === 'reporting_done') && booking.patient_id) {
+      try {
+        const User = require('../models/User');
+        const pat = await User.findById(booking.patient_id);
+        if (pat && pat.role === 'Patient') {
+          if (!pat.gamification) pat.gamification = { points: 0, stats: {}, history: [] };
+          pat.gamification.points = (pat.gamification.points || 0) + 15;
+          pat.gamification.stats = pat.gamification.stats || {};
+          pat.gamification.stats.completedLabTests = (pat.gamification.stats.completedLabTests || 0) + 1;
+          pat.gamification.history = pat.gamification.history || [];
+          pat.gamification.history.push({ points: 15, reason: 'complete_lab_test', date: new Date().toISOString() });
+          pat.markModified('gamification');
+          await pat.save();
+        }
+      } catch (_) {}
+    }
     // ── Notify doctor when results are submitted ─────────────────────────────────
     if (update.status === 'completed' && booking.medical_record_id) {
       try {

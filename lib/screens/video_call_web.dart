@@ -20,6 +20,7 @@ import '../utils/theme.dart';
 import '../screens/patient_history_form_screen.dart';
 import '../services/consultation_service.dart';
 import '../utils/shared_pref.dart';
+import '../widgets/rating_dialog.dart';
 
 // JS interop
 @JS('agoraJoin')
@@ -414,9 +415,23 @@ class _VideoCallWebState extends State<VideoCall> {
         content: const Text('The doctor has ended the consultation.'),
         actions: [
           ElevatedButton(
-            onPressed: () {
+            onPressed: () async {
               Navigator.pop(ctx);
-              // Use browser navigation — guaranteed on Flutter Web
+              // Show rating dialog for patients after consultation
+              if (!_isDoctor && widget.appointmentId != null && widget.appointmentId!.isNotEmpty && mounted) {
+                await showRatingDialog(
+                  context: context,
+                  title: 'Rate Your Doctor',
+                  subtitle: 'How was your consultation experience?',
+                  onSubmit: (rating, comment) async {
+                    await AppointmentService().rateAppointment(
+                      appointmentId: widget.appointmentId!,
+                      rating: rating,
+                      comment: comment,
+                    );
+                  },
+                );
+              }
               html.window.location.href = '/dashboard';
             },
             style: ElevatedButton.styleFrom(

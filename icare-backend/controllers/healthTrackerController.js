@@ -1,5 +1,6 @@
 const HealthTrackerEntry = require('../models/HealthTrackerEntry');
 const UserHealthSettings = require('../models/UserHealthSettings');
+const User = require('../models/User');
 
 // ═══════════════════════════════════════════════════════════════════════════
 // ADD NEW VITAL ENTRY
@@ -31,6 +32,35 @@ exports.addEntry = async (req, res) => {
     entry.status = entry.determineStatus();
 
     await entry.save();
+
+    // Award gamification points for logging a metric
+    try {
+      const user = await User.findById(userId);
+      if (user && user.role === 'Patient') {
+        const today = new Date().toISOString().split('T')[0];
+        if (!user.gamification) user.gamification = { points: 0, streak: 0, stats: {}, history: [], lastLogDate: null };
+        user.gamification.points = (user.gamification.points || 0) + 5;
+        user.gamification.stats = user.gamification.stats || {};
+        user.gamification.stats.metric_logs = (user.gamification.stats.metric_logs || 0) + 1;
+        user.gamification.history = user.gamification.history || [];
+        user.gamification.history.push({ points: 5, reason: 'log_health_metric', date: new Date().toISOString() });
+
+        // Streak tracking
+        const lastLog = user.gamification.lastLogDate;
+        if (lastLog !== today) {
+          const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+          user.gamification.streak = lastLog === yesterday ? (user.gamification.streak || 0) + 1 : 1;
+          user.gamification.lastLogDate = today;
+          if (user.gamification.streak === 7) {
+            user.gamification.points += 25;
+            user.gamification.history.push({ points: 25, reason: 'streak_bonus', date: new Date().toISOString() });
+          }
+        }
+        if (user.gamification.history.length > 200) user.gamification.history = user.gamification.history.slice(-200);
+        user.markModified('gamification');
+        await user.save();
+      }
+    } catch (_) {}
 
     res.status(201).json({
       success: true,

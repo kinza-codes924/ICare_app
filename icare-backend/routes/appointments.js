@@ -26,7 +26,7 @@ async function getAppointments(userId, userRole) {
 
   // Case-insensitive role check — some accounts have 'Doctor', some have 'doctor'
   if (userRole?.toLowerCase() === 'doctor') {
-    appointments = await Appointment.find({ doctor_id: uid }).lean();
+    appointments = await Appointment.find({ doctor_id: uid }).sort({ createdAt: -1 }).lean();
     const patientIds = [...new Set(appointments.map(a => a.patient_id.toString()))];
     const patients = await User.find({ _id: { $in: patientIds.map(id => toId(id)) } }).lean();
     const pMap = {};
@@ -41,11 +41,12 @@ async function getAppointments(userId, userRole) {
         patient_name: p?.username || p?.name,
         patient_age: p?.age?.toString() ?? null,
         patient_gender: p?.gender ?? null,
+        patient_profilePicture: p?.profilePicture || null,
         // contact details intentionally excluded from doctor view
       };
     });
   } else {
-    appointments = await Appointment.find({ patient_id: uid }).lean();
+    appointments = await Appointment.find({ patient_id: uid }).sort({ createdAt: -1 }).lean();
     const doctorIds = [...new Set(appointments.map(a => a.doctor_id.toString()))];
     const doctors = await User.find({ _id: { $in: doctorIds.map(id => toId(id)) } }).lean();
     const profiles = await DoctorProfile.find({ user_id: { $in: doctorIds.map(id => toId(id)) } }).lean();

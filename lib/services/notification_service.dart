@@ -204,22 +204,4 @@ class NotificationService {
     }
   }
 
-  /// Send prescription to patient's email (Feature #68)
-  Future<void> sendPrescriptionEmail({required String consultationId}) async {
-    try {
-      await _apiService.post('/prescriptions/send-email', {
-        'consultationId': consultationId,
-        'from': 'icareofficialapp@gmail.com',
-      });
-      if (kDebugMode) {
-        print('Prescription email sent for consultation: $consultationId');
-      }
-    } catch (e, stackTrace) {
-      ErrorHandler.logError(e, stackTrace, context: 'sendPrescriptionEmail');
-      if (kDebugMode) {
-        print('Error sending prescription email: $e');
-      }
-      // Silent fail — do not block prescription completion
-    }
-  }
 }

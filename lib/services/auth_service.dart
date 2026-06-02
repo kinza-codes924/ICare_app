@@ -90,6 +90,19 @@ class AuthService {
       final res = response!;
       if (res.statusCode == 200) {
         final data = res.data as Map<String, dynamic>;
+
+        // 2FA: backend says OTP required — pass through without saving token
+        if (data['requiresOtp'] == true) {
+          return {
+            'success': false,
+            'requiresOtp': true,
+            'tempToken': data['tempToken'],
+            'otp': data['otp'],
+            'emailSent': data['emailSent'],
+            'message': data['message'] ?? 'Verification required',
+          };
+        }
+
         // Hostinger returns token at top level, Vercel inside data
         final inner = data['data'] ?? data;
         final token = inner['token']?.toString() ?? data['token']?.toString() ?? '';
@@ -113,7 +126,7 @@ class AuthService {
     }
   }
 
-  String _friendlyError(DioException e) {
+  String _friendlyError(DioException e, {bool isSocialAuth = false}) {
     switch (e.type) {
       case DioExceptionType.connectionTimeout:
       case DioExceptionType.sendTimeout:
@@ -123,6 +136,9 @@ class AuthService {
       case DioExceptionType.connectionError:
         return 'Cannot reach server. Please check your internet connection.';
       default:
+        if (isSocialAuth && e.response?.statusCode == 404) {
+          return 'Social sign-in is not yet enabled on this server. Please use email and password.';
+        }
         final msg = (e.response?.data as Map?)?['message']?.toString();
         return msg ?? 'Network error. Please try again.';
     }
@@ -155,7 +171,14 @@ class AuthService {
     try {
       final response = await _apiService.post(ApiConfig.forgetPassword, {'email': email});
       if (response.statusCode == 200) {
-        return {'success': true, 'message': 'OTP sent to your email', 'otp': response.data['otp']};
+        final d = response.data as Map<String, dynamic>? ?? {};
+        return {
+          'success': true,
+          'message': d['message'] ?? 'OTP sent',
+          'otp': d['otp'],
+          'emailSent': d['emailSent'] ?? false,
+          'emailError': d['emailError'],
+        };
       }
       return {'success': false, 'message': 'Failed to send OTP'};
     } on DioException catch (e) {
@@ -189,9 +212,13 @@ class AuthService {
       if (account == null) return {'success': false, 'message': 'Sign-in cancelled'};
       final auth = await account.authentication;
       final idToken = auth.idToken;
-      if (idToken == null) return {'success': false, 'message': 'Could not get Google token'};
+      final accessToken = auth.accessToken;
+      if (idToken == null && accessToken == null) {
+        return {'success': false, 'message': 'Could not get Google token'};
+      }
       final response = await _apiService.post('/auth/google', {
-        'idToken': idToken,
+        if (idToken != null) 'idToken': idToken,
+        if (accessToken != null) 'accessToken': accessToken,
         'email': account.email,
         'name': account.displayName ?? account.email.split('@').first,
       });
@@ -207,7 +234,7 @@ class AuthService {
       }
       return {'success': false, 'message': (response.data as Map?)?['message'] ?? 'Google sign-in failed'};
     } on DioException catch (e) {
-      return {'success': false, 'message': _friendlyError(e)};
+      return {'success': false, 'message': _friendlyError(e, isSocialAuth: true)};
     } catch (e) {
       return {'success': false, 'message': 'Google sign-in error: ${e.toString()}'};
     }
@@ -247,7 +274,7 @@ class AuthService {
       }
       return {'success': false, 'message': (response.data as Map?)?['message'] ?? 'Apple sign-in failed'};
     } on DioException catch (e) {
-      return {'success': false, 'message': _friendlyError(e)};
+      return {'success': false, 'message': _friendlyError(e, isSocialAuth: true)};
     } catch (e) {
       return {'success': false, 'message': 'Apple sign-in error: ${e.toString()}'};
     }
@@ -323,6 +350,29 @@ class AuthService {
         'success': false,
         'message': (response.data as Map?)?['message'] ?? 'Failed to send email',
       };
+    } on DioException catch (e) {
+      return {'success': false, 'message': _friendlyError(e)};
+    } catch (e) {
+      return {'success': false, 'message': 'Error: ${e.toString()}'};
+    }
+  }
+
+  Future<Map<String, dynamic>> verify2FA({required String tempToken, required String otp}) async {
+    try {
+      final response = await _apiService.post('/auth/2fa/verify', {'tempToken': tempToken, 'otp': otp});
+      if (response.statusCode == 200) {
+        final data = response.data as Map<String, dynamic>;
+        if (data['success'] == true) {
+          final inner = data['data'] as Map<String, dynamic>? ?? {};
+          final token = inner['token']?.toString() ?? '';
+          if (token.isNotEmpty) {
+            await _saveToken(token);
+            FcmService().getAndSaveToken();
+          }
+        }
+        return data;
+      }
+      return {'success': false, 'message': (response.data as Map?)?['message'] ?? 'Verification failed'};
     } on DioException catch (e) {
       return {'success': false, 'message': _friendlyError(e)};
     } catch (e) {

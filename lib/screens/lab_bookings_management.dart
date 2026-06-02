@@ -112,12 +112,11 @@ class _LabBookingsManagementState extends State<LabBookingsManagement>
         status: backendStatus,
       );
 
-      // Sort by date — oldest first for pending (priority queue), newest first for completed
-      final isOldestFirst = _selectedFilter == 'pending' || _selectedFilter == 'all';
+      // Sort newest first across all filters
       bookings.sort((a, b) {
-        final dateA = DateTime.tryParse(a['date'] ?? a['createdAt'] ?? '') ?? DateTime.now();
-        final dateB = DateTime.tryParse(b['date'] ?? b['createdAt'] ?? '') ?? DateTime.now();
-        return isOldestFirst ? dateA.compareTo(dateB) : dateB.compareTo(dateA);
+        final dateA = DateTime.tryParse(a['createdAt'] ?? a['date'] ?? '') ?? DateTime(2000);
+        final dateB = DateTime.tryParse(b['createdAt'] ?? b['date'] ?? '') ?? DateTime(2000);
+        return dateB.compareTo(dateA);
       });
       setState(() {
         _bookings = bookings;

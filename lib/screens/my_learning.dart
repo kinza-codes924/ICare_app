@@ -64,7 +64,7 @@ class _MyLearningScreenState extends ConsumerState<MyLearningScreen>
         backgroundColor: Colors.white,
         elevation: 0,
         title: Text(
-          isPatient ? 'My Health Journey'.tr() : 'My Learning'.tr(),
+          'My Learning'.tr(),
           style: TextStyle(
             color: Color(0xFF0F172A),
             fontSize: 20,
@@ -184,23 +184,29 @@ class _MyLearningScreenState extends ConsumerState<MyLearningScreen>
                     topLeft: Radius.circular(16),
                     bottomLeft: Radius.circular(16),
                   ),
-                  child: course['image'] is String
-                      ? Image.asset(
-                          course['image'] as String,
-                          width: 120,
-                          height: 120,
-                          fit: BoxFit.cover,
-                        )
-                      : Container(
+                  child: Builder(builder: (_) {
+                    final img = course['image'] ?? course['thumbnail'] ?? course['coverImage'];
+                    if (img is String && img.startsWith('http')) {
+                      return Image.network(
+                        img,
+                        width: 120,
+                        height: 120,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => Container(
                           width: 120,
                           height: 120,
                           color: Colors.grey[200],
-                          child: const Icon(
-                            Icons.book,
-                            size: 40,
-                            color: Colors.grey,
-                          ),
+                          child: const Icon(Icons.book, size: 40, color: Colors.grey),
                         ),
+                      );
+                    }
+                    return Container(
+                      width: 120,
+                      height: 120,
+                      color: AppColors.primaryColor.withValues(alpha: 0.08),
+                      child: Icon(Icons.health_and_safety_outlined, size: 40, color: AppColors.primaryColor.withValues(alpha: 0.5)),
+                    );
+                  }),
                 ),
                 // Course Info
                 Expanded(
@@ -305,9 +311,143 @@ class _MyLearningScreenState extends ConsumerState<MyLearningScreen>
   }
 
   Widget _buildCertificatesTab() {
-    return const Padding(
-      padding: EdgeInsets.all(16),
-      child: CertificatesList(),
+    final role = ref.read(authProvider).userRole.toLowerCase();
+    final isPatient = role == 'patient';
+
+    if (!isPatient) {
+      return const Padding(
+        padding: EdgeInsets.all(16),
+        child: CertificatesList(),
+      );
+    }
+
+    // Patient: show learning progress summary
+    final total = _enrolledCourses.length;
+    final completed = _enrolledCourses.where((e) => e['status'] == 'completed').length;
+    final inProgress = total - completed;
+
+    int totalProgress = 0;
+    for (final e in _enrolledCourses) {
+      final p = e['progress'];
+      if (p is int) totalProgress += p;
+      else if (p is Map) totalProgress += ((p['percent'] ?? 0) as num).toInt();
+    }
+    final avgProgress = total > 0 ? (totalProgress / total).round() : 0;
+
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        // Summary cards
+        Row(
+          children: [
+            _buildStatCard('Total Programs', '$total', Icons.library_books_outlined, const Color(0xFF0036BC)),
+            const SizedBox(width: 12),
+            _buildStatCard('Completed', '$completed', Icons.check_circle_outline, const Color(0xFF10B981)),
+            const SizedBox(width: 12),
+            _buildStatCard('In Progress', '$inProgress', Icons.timelapse_outlined, const Color(0xFFF59E0B)),
+          ],
+        ),
+        const SizedBox(height: 16),
+        // Overall progress
+        Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 10, offset: const Offset(0, 4))],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Overall Progress', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Color(0xFF0F172A))),
+              const SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text('Average completion', style: TextStyle(fontSize: 13, color: Colors.grey[600])),
+                  Text('$avgProgress%', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Color(0xFF0036BC))),
+                ],
+              ),
+              const SizedBox(height: 8),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(6),
+                child: LinearProgressIndicator(
+                  value: avgProgress / 100,
+                  backgroundColor: const Color(0xFFE2E8F0),
+                  valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF0036BC)),
+                  minHeight: 10,
+                ),
+              ),
+            ],
+          ),
+        ),
+        if (_enrolledCourses.isNotEmpty) ...[
+          const SizedBox(height: 16),
+          const Text('Program Progress', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Color(0xFF0F172A))),
+          const SizedBox(height: 8),
+          ..._enrolledCourses.map((e) {
+            final course = e['course'] ?? {};
+            int prog = 0;
+            final p = e['progress'];
+            if (p is int) prog = p;
+            else if (p is Map) prog = ((p['percent'] ?? 0) as num).toInt();
+            final title = course['title'] ?? course['name'] ?? 'Untitled';
+            final isDone = e['status'] == 'completed';
+            return Container(
+              margin: const EdgeInsets.only(bottom: 10),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFE8ECF5)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(child: Text(title, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF0F172A)), overflow: TextOverflow.ellipsis)),
+                      Text('$prog%', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: isDone ? const Color(0xFF10B981) : const Color(0xFF0036BC))),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: LinearProgressIndicator(
+                      value: prog / 100,
+                      backgroundColor: const Color(0xFFE2E8F0),
+                      valueColor: AlwaysStoppedAnimation<Color>(isDone ? const Color(0xFF10B981) : const Color(0xFF0036BC)),
+                      minHeight: 6,
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildStatCard(String label, String value, IconData icon, Color color) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: color.withValues(alpha: 0.15)),
+        ),
+        child: Column(
+          children: [
+            Icon(icon, color: color, size: 24),
+            const SizedBox(height: 6),
+            Text(value, style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: color)),
+            const SizedBox(height: 2),
+            Text(label, style: TextStyle(fontSize: 10, color: color.withValues(alpha: 0.8), fontWeight: FontWeight.w500), textAlign: TextAlign.center),
+          ],
+        ),
+      ),
     );
   }
 }

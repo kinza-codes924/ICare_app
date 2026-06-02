@@ -52,6 +52,17 @@ class SecurityService {
     }
   }
 
+  Future<Map<String, dynamic>> getSecuritySettings() async {
+    try {
+      final response = await _apiService.get('/security/settings');
+      final data = response.data;
+      if (data is Map) return Map<String, dynamic>.from(data);
+      return {'success': false};
+    } catch (_) {
+      return {'success': false};
+    }
+  }
+
   // ── Login Activity ───────────────────────────────────────────────────────
 
   Future<List<dynamic>> getLoginActivity() async {

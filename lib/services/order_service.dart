@@ -24,7 +24,7 @@ class OrderService {
       url += '?status=$status';
     }
     final response = await _apiService.get(url);
-    return response.data['orders'] as List;
+    return (response.data['orders'] as List?) ?? [];
   }
 
   // Get order by ID

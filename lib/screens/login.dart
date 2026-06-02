@@ -1,6 +1,8 @@
 import 'package:easy_localization/easy_localization.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'dart:io' show Platform;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_size_matters/flutter_size_matters.dart';
 import 'package:go_router/go_router.dart';
@@ -1120,11 +1122,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                                   onTap: _handleGoogleSignIn,
                                   isLoading: _googleLoading,
                                 ),
-                                const SizedBox(height: 10),
-                                _webAppleButton(
-                                  onTap: _handleAppleSignIn,
-                                  isLoading: _appleLoading,
-                                ),
+                                // Apple Sign In: only on iOS native (Services ID not configured for web/Android)
+                                if (!kIsWeb && Platform.isIOS) ...[
+                                  const SizedBox(height: 10),
+                                  _webAppleButton(
+                                    onTap: _handleAppleSignIn,
+                                    isLoading: _appleLoading,
+                                  ),
+                                ],
                                 // Biometric / Face Unlock sign-in button — show whenever hardware is available
                                 if (_biometricAvailable) ...[
                                   const SizedBox(height: 12),
@@ -1688,8 +1693,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
           children: [
             _socialButton(ImagePaths.google_icon, "Google",
                 onTap: _handleGoogleSignIn, isLoading: _googleLoading),
-            const SizedBox(width: 12),
-            _mobileAppleButton(onTap: _handleAppleSignIn, isLoading: _appleLoading),
+            // Apple Sign In: only on iOS native (Services ID not configured for web/Android)
+            if (!kIsWeb && Platform.isIOS) ...[
+              const SizedBox(width: 12),
+              _mobileAppleButton(onTap: _handleAppleSignIn, isLoading: _appleLoading),
+            ],
           ],
         ),
         // Biometric / Face Unlock sign-in button — show whenever hardware is available
@@ -1942,6 +1950,16 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
           email: usernameController.text.trim(),
           password: passwordController.text.trim(),
         );
+        // 2FA check
+        if (result['requiresOtp'] == true) {
+          final tempToken = result['tempToken']?.toString() ?? '';
+          final otp = result['otp']?.toString() ?? '';
+          final emailSent = result['emailSent'] == true;
+          if (mounted) await _show2FADialog(tempToken: tempToken, fallbackOtp: otp, emailSent: emailSent);
+          if (mounted) setState(() => isLoading = false);
+          return;
+        }
+
         if (result['success']) {
           debugPrint("✅ Login successful, token saved");
           debugPrint("🔍 Fetching user profile...");
@@ -2110,5 +2128,92 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
   void _showError(dynamic error) {
     if (!mounted) return;
     Utils.showErrorSnackBar(context, error);
+  }
+
+  Future<void> _show2FADialog({required String tempToken, required String fallbackOtp, required bool emailSent}) async {
+    final otpController = TextEditingController();
+    bool verifying = false;
+
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => StatefulBuilder(builder: (ctx, setModal) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(children: [
+          Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: const Color(0xFF0036BC).withValues(alpha: 0.1), borderRadius: BorderRadius.circular(10)),
+            child: const Icon(Icons.verified_user_rounded, color: Color(0xFF0036BC), size: 22)),
+          const SizedBox(width: 10),
+          const Text('Two-Factor Auth', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
+        ]),
+        content: SizedBox(width: 360, child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(color: emailSent ? const Color(0xFFEFF6FF) : const Color(0xFFFEF3C7), borderRadius: BorderRadius.circular(12), border: Border.all(color: emailSent ? const Color(0xFFBFDBFE) : const Color(0xFFFDE68A))),
+            child: Row(children: [
+              Icon(emailSent ? Icons.email_outlined : Icons.warning_amber_rounded, color: emailSent ? const Color(0xFF3B82F6) : const Color(0xFFF59E0B), size: 20),
+              const SizedBox(width: 10),
+              Expanded(child: Text(emailSent ? 'A verification code has been sent to your email.' : 'Email delivery failed. Use this code directly:', style: TextStyle(fontSize: 13, color: emailSent ? const Color(0xFF1E40AF) : const Color(0xFF92400E), height: 1.4))),
+            ]),
+          ),
+          if (fallbackOtp.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Center(child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+              decoration: BoxDecoration(color: const Color(0xFF0036BC), borderRadius: BorderRadius.circular(10)),
+              child: Text(fallbackOtp, style: const TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.bold, letterSpacing: 8)),
+            )),
+          ],
+          const SizedBox(height: 16),
+          const Text('Enter Verification Code', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF374151))),
+          const SizedBox(height: 8),
+          TextField(
+            controller: otpController, keyboardType: TextInputType.number, maxLength: 6, autofocus: true, textAlign: TextAlign.center,
+            style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900, letterSpacing: 8),
+            decoration: InputDecoration(
+              hintText: '000000', hintStyle: TextStyle(color: Colors.grey.shade300, letterSpacing: 8), counterText: '',
+              filled: true, fillColor: const Color(0xFFF9FAFB),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFE5E7EB))),
+              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFE5E7EB))),
+              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFF0036BC), width: 1.5)),
+            ),
+          ),
+        ])),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel', style: TextStyle(color: Color(0xFF6B7280)))),
+          ElevatedButton(
+            onPressed: verifying ? null : () async {
+              if (otpController.text.length < 4) return;
+              setModal(() => verifying = true);
+              try {
+                final api = _authService;
+                final result = await api.verify2FA(tempToken: tempToken, otp: otpController.text.trim());
+                if (!ctx.mounted) return;
+                if (result['success'] == true) {
+                  final data = result['data'] as Map<String, dynamic>? ?? {};
+                  final token = data['token']?.toString() ?? '';
+                  if (token.isEmpty) { setModal(() => verifying = false); return; }
+                  Navigator.pop(ctx);
+                  final profileResult = await _userService.getUserProfile(token: token);
+                  if (!mounted) return;
+                  if (profileResult['success']) {
+                    final user = app_user.User.fromJson(profileResult['user']);
+                    await ref.read(authProvider.notifier).setUserToken(token);
+                    await ref.read(authProvider.notifier).setUser(user);
+                    if (mounted) context.go('/dashboard');
+                  }
+                } else {
+                  setModal(() => verifying = false);
+                  if (ctx.mounted) ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text(result['message']?.toString() ?? 'Invalid code'), backgroundColor: Colors.red));
+                }
+              } catch (e) {
+                setModal(() => verifying = false);
+              }
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF0036BC), foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
+            child: verifying ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) : const Text('Verify'),
+          ),
+        ],
+      )),
+    );
   }
 }
