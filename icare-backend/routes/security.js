@@ -75,11 +75,11 @@ router.post('/2fa/enable', authMiddleware, async (req, res) => {
       return res.status(400).json({ success: false, message: 'Invalid OTP' });
     }
 
-    user.twoFactorEnabled = true;
-    user.twoFactorOtp = undefined;
-    user.twoFactorOtpExpires = undefined;
-    user.markModified('twoFactorEnabled');
-    await user.save();
+    await User.findByIdAndUpdate(
+      user._id,
+      { $set: { twoFactorEnabled: true }, $unset: { twoFactorOtp: '', twoFactorOtpExpires: '' } },
+      { strict: false }
+    );
 
     res.json({ success: true, message: '2FA enabled successfully' });
   } catch (err) {

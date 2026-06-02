@@ -16,10 +16,6 @@ router.post('/reset_password', resetPassword);
 // Protected routes
 router.get('/profile', authMiddleware, getUserProfile);
 
-// ── 2FA routes (proxied from security router) ────────────────────────────────
-const securityRouter = require('./security');
-router.use('/', securityRouter);
-
 // ── Login sessions ────────────────────────────────────────────────────────────
 router.get('/sessions', authMiddleware, async (req, res) => {
   try {
@@ -44,11 +40,30 @@ router.put('/update-settings', authMiddleware, async (req, res) => {
     const { connectMongoDB } = require('../config/mongodb');
     await connectMongoDB();
     const User = require('../models/User');
-    await User.findByIdAndUpdate(req.user.id, { $set: req.body });
+    await User.findByIdAndUpdate(req.user.id, { $set: req.body }, { strict: false });
     res.json({ success: true });
   } catch (_) {
     res.json({ success: true });
   }
+});
+
+// ── 2FA routes — proxy directly to security handlers to avoid router-instance reuse issues ──
+const securityRouter = require('./security');
+router.post('/2fa/send-otp', authMiddleware, (req, res, next) => {
+  req.url = '/2fa/send-otp';
+  securityRouter.handle(req, res, next);
+});
+router.post('/2fa/enable', authMiddleware, (req, res, next) => {
+  req.url = '/2fa/enable';
+  securityRouter.handle(req, res, next);
+});
+router.post('/2fa/disable', authMiddleware, (req, res, next) => {
+  req.url = '/2fa/disable';
+  securityRouter.handle(req, res, next);
+});
+router.post('/2fa/verify', (req, res, next) => {
+  req.url = '/2fa/verify';
+  securityRouter.handle(req, res, next);
 });
 
 module.exports = router;
