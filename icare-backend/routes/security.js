@@ -18,11 +18,11 @@ router.post('/2fa/send-otp', authMiddleware, async (req, res) => {
 
     const otp = genOtp();
     const expires = new Date(Date.now() + 10 * 60 * 1000); // 10 min
-    user.twoFactorOtp = otp;
-    user.twoFactorOtpExpires = expires;
-    user.markModified('twoFactorOtp');
-    user.markModified('twoFactorOtpExpires');
-    await user.save();
+    await User.findByIdAndUpdate(
+      user._id,
+      { $set: { twoFactorOtp: otp, twoFactorOtpExpires: expires } },
+      { strict: false }
+    );
 
     let emailSent = false;
     try {
