@@ -157,7 +157,7 @@ class DoctorDetailScreen extends ConsumerWidget {
                     icon: Icons.payments_rounded,
                     label: 'Fee',
                     value: (doctor.consultationFee != null && doctor.consultationFee! > 0)
-                        ? 'Rs. ${doctor.consultationFee!.toInt()}'
+                        ? 'PKR ${doctor.consultationFee!.toInt()}'
                         : 'Free',
                     color: const Color(0xFF8B5CF6),
                   ),

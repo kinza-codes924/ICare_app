@@ -989,6 +989,58 @@ class _PharmacyDetailsScreenState extends State<PharmacyDetailsScreen> {
     );
   }
 
+  void _showControlledMedicineDialog(dynamic med) {
+    final name = (med['productName'] ?? med['name'] ?? 'This medicine').toString();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Row(children: [
+          Icon(Icons.warning_rounded, color: Color(0xFFDC2626), size: 22),
+          SizedBox(width: 10),
+          Expanded(child: Text('Controlled Medicine', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700))),
+        ]),
+        content: Column(mainAxisSize: MainAxisSize.min, children: [
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(color: const Color(0xFFFEE2E2), borderRadius: BorderRadius.circular(12)),
+            child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              const Icon(Icons.lock_rounded, color: Color(0xFFDC2626), size: 20),
+              const SizedBox(width: 12),
+              Expanded(child: Text(
+                '$name is a controlled medicine.',
+                style: const TextStyle(fontSize: 13, color: Color(0xFF7F1D1D), height: 1.5, fontWeight: FontWeight.w600),
+              )),
+            ]),
+          ),
+          const SizedBox(height: 16),
+          const Text(
+            'This medicine can only be purchased online after consultation with our doctor. It is mandatory to have a consultation with our doctor.',
+            style: TextStyle(fontSize: 13, color: Color(0xFF64748B), height: 1.6),
+            textAlign: TextAlign.center,
+          ),
+        ]),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          ElevatedButton.icon(
+            onPressed: () {
+              Navigator.pop(ctx);
+              Navigator.pop(context);
+              Navigator.push(context, MaterialPageRoute(builder: (_) => const ConsultationDetailsScreen()));
+            },
+            icon: const Icon(Icons.medical_services_rounded, size: 16),
+            label: const Text('Connect to a Doctor Now'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFDC2626),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _showPrescriptionRequiredDialog(dynamic med) {
     final name = (med['productName'] ?? med['name'] ?? 'This medicine').toString();
     showDialog(
@@ -1052,6 +1104,7 @@ class _PharmacyDetailsScreenState extends State<PharmacyDetailsScreen> {
     final qty = _quantities[id] ?? 0;
     final permission = (med['medicinePermission'] ?? 'OTC').toString();
     final isPrescriptionOnly = permission == 'Prescription Only';
+    final isControlled = permission == 'Controlled' || (med['category'] ?? '').toString().toLowerCase() == 'controlled';
 
     return GestureDetector(
       // Tap card body → open details dialog
@@ -1093,7 +1146,7 @@ class _PharmacyDetailsScreenState extends State<PharmacyDetailsScreen> {
             ),
             const SizedBox(height: 4),
             CustomText(
-              text: "Rs ${med['price'] ?? 0.0}",
+              text: "PKR ${med['price'] ?? 0.0}",
               color: AppColors.primaryColor,
               fontWeight: FontWeight.w900,
               fontSize: 15,
@@ -1102,15 +1155,23 @@ class _PharmacyDetailsScreenState extends State<PharmacyDetailsScreen> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
               decoration: BoxDecoration(
-                color: isPrescriptionOnly ? const Color(0xFFFEF3C7) : const Color(0xFFD1FAE5),
+                color: isControlled
+                    ? const Color(0xFFFEE2E2)
+                    : isPrescriptionOnly
+                        ? const Color(0xFFFEF3C7)
+                        : const Color(0xFFD1FAE5),
                 borderRadius: BorderRadius.circular(4),
               ),
               child: Text(
-                isPrescriptionOnly ? 'Rx Only' : 'OTC',
+                isControlled ? 'Controlled' : isPrescriptionOnly ? 'Rx Only' : 'OTC',
                 style: TextStyle(
                   fontSize: 9,
                   fontWeight: FontWeight.w800,
-                  color: isPrescriptionOnly ? const Color(0xFFB45309) : const Color(0xFF065F46),
+                  color: isControlled
+                      ? const Color(0xFFDC2626)
+                      : isPrescriptionOnly
+                          ? const Color(0xFFB45309)
+                          : const Color(0xFF065F46),
                 ),
               ),
             ),
@@ -1171,6 +1232,17 @@ class _PharmacyDetailsScreenState extends State<PharmacyDetailsScreen> {
                   GestureDetector(
                     onTap: () {
                       final current = _quantities[id] ?? 0;
+                      if (!isPrescriptionOnly && current >= 30) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Maximum 30 units per medicine without a prescription.'),
+                            backgroundColor: Color(0xFFEF4444),
+                            behavior: SnackBarBehavior.floating,
+                            duration: Duration(seconds: 3),
+                          ),
+                        );
+                        return;
+                      }
                       setState(() {
                         _quantities[id] = current + 1;
                         _qtyControllers[id]?.text = (current + 1).toString();
@@ -1196,6 +1268,10 @@ class _PharmacyDetailsScreenState extends State<PharmacyDetailsScreen> {
               const SizedBox(height: 6),
               GestureDetector(
                 onTap: isAdding ? null : () async {
+                  if (isControlled) {
+                    _showControlledMedicineDialog(med);
+                    return;
+                  }
                   if (isPrescriptionOnly) {
                     _showPrescriptionRequiredDialog(med);
                     return;

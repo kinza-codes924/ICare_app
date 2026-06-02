@@ -194,7 +194,11 @@ class _DoctorDashboardState extends ConsumerState<DoctorDashboard> {
                         _buildClinicalFlags(),
                         const SizedBox(height: 24),
 
-                        // 6. Clinical & Professional Features
+                        // 6. Recent Activity
+                        _buildRecentActivity(),
+                        const SizedBox(height: 24),
+
+                        // 7. Clinical & Professional Features
                         _buildFeatureGrid(isDesktop, isTablet),
                         // Quick Actions intentionally removed per meeting notes
                       ],
@@ -1843,6 +1847,76 @@ class _DoctorDashboardState extends ConsumerState<DoctorDashboard> {
       default:
         return const Color(0xFF64748B);
     }
+  }
+
+  Widget _buildRecentActivity() {
+    final recentAppts = _appointments.take(5).toList();
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10, offset: const Offset(0, 4))],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(color: AppColors.primaryColor.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)),
+                child: Icon(Icons.history_rounded, color: AppColors.primaryColor, size: 18),
+              ),
+              const SizedBox(width: 12),
+              const Text('Recent Activity', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Color(0xFF0F172A))),
+            ],
+          ),
+          const SizedBox(height: 16),
+          if (recentAppts.isEmpty)
+            const Center(
+              child: Padding(
+                padding: EdgeInsets.symmetric(vertical: 16),
+                child: Text('No recent activity', style: TextStyle(fontSize: 13, color: Color(0xFF94A3B8))),
+              ),
+            )
+          else
+            ...recentAppts.map((appt) {
+              final status = appt.status.toLowerCase();
+              Color dot;
+              String label;
+              if (status == 'completed') { dot = const Color(0xFF10B981); label = 'Consultation completed'; }
+              else if (status == 'confirmed' || status == 'approved') { dot = const Color(0xFF3B82F6); label = 'Appointment confirmed'; }
+              else if (status == 'cancelled') { dot = const Color(0xFFEF4444); label = 'Appointment cancelled'; }
+              else { dot = const Color(0xFFF59E0B); label = 'Appointment pending'; }
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Row(
+                  children: [
+                    Container(width: 8, height: 8, decoration: BoxDecoration(color: dot, shape: BoxShape.circle)),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF0F172A))),
+                          Text('${appt.patient?.name ?? 'Patient'} • ${appt.date.day}/${appt.date.month}/${appt.date.year}',
+                              style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8))),
+                        ],
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(color: dot.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(6)),
+                      child: Text(appt.status, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: dot)),
+                    ),
+                  ],
+                ),
+              );
+            }),
+        ],
+      ),
+    );
   }
 
   Widget _buildFeatureGrid(bool isDesktop, bool isTablet) {

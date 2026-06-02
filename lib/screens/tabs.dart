@@ -1017,18 +1017,6 @@ class _WebSidebarState extends ConsumerState<_WebSidebar> {
                   ),
                   _buildExtraNavItem(
                     context,
-                    Icons.settings_outlined,
-                    'Settings',
-                    () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (ctx) => const LabSettingsScreen(),
-                        ),
-                      );
-                    },
-                  ),
-                  _buildExtraNavItem(
-                    context,
                     Icons.support_agent_outlined,
                     'iCare Lab Support',
                     () {

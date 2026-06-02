@@ -1102,6 +1102,23 @@ class _PharmacyOrdersState extends ConsumerState<PharmacyOrders>
                               ],
                             ),
                           ],
+                          if ((order['customerEmail'] ?? '').toString().isNotEmpty) ...[
+                            const SizedBox(height: 2),
+                            Row(
+                              children: [
+                                const Icon(Icons.email_rounded, size: 11, color: Color(0xFF94A3B8)),
+                                const SizedBox(width: 4),
+                                Expanded(
+                                  child: Text(
+                                    order['customerEmail'],
+                                    style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
                         ],
                       ),
                     ),
@@ -1171,29 +1188,56 @@ class _PharmacyOrdersState extends ConsumerState<PharmacyOrders>
                   ),
                 ),
                 const SizedBox(height: 8),
-                ...(order['medicines'] as List).map((medicine) {
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 4),
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 6,
-                          height: 6,
-                          decoration: BoxDecoration(
-                            color: statusColor,
-                            shape: BoxShape.circle,
+                Builder(builder: (_) {
+                  final rawItems = order['itemsList'] as List? ?? [];
+                  final medicines = order['medicines'] as List? ?? [];
+                  if (rawItems.isNotEmpty) {
+                    return Column(
+                      children: rawItems.map<Widget>((item) {
+                        final name = (item['product_name'] ?? item['productName'] ?? item['name'] ?? '').toString();
+                        final qty = item['quantity'] ?? item['qty'] ?? 1;
+                        final price = (item['price'] as num?)?.toDouble() ?? 0.0;
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 6),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 6, height: 6,
+                                decoration: BoxDecoration(color: statusColor, shape: BoxShape.circle),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(name, style: const TextStyle(fontSize: 13, color: Color(0xFF0F172A))),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: statusColor.withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text('x$qty', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: statusColor)),
+                              ),
+                              if (price > 0) ...[
+                                const SizedBox(width: 8),
+                                Text('PKR ${price.toStringAsFixed(0)}', style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+                              ],
+                            ],
                           ),
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          medicine,
-                          style: const TextStyle(
-                            fontSize: 13,
-                            color: Color(0xFF0F172A),
-                          ),
-                        ),
-                      ],
-                    ),
+                        );
+                      }).toList(),
+                    );
+                  }
+                  return Column(
+                    children: medicines.map<Widget>((medicine) => Padding(
+                      padding: const EdgeInsets.only(bottom: 4),
+                      child: Row(
+                        children: [
+                          Container(width: 6, height: 6, decoration: BoxDecoration(color: statusColor, shape: BoxShape.circle)),
+                          const SizedBox(width: 8),
+                          Text(medicine.toString(), style: const TextStyle(fontSize: 13, color: Color(0xFF0F172A))),
+                        ],
+                      ),
+                    )).toList(),
                   );
                 }),
                 if (order['prescriptionText'] != null &&
@@ -1251,51 +1295,50 @@ class _PharmacyOrdersState extends ConsumerState<PharmacyOrders>
                   ),
                 ],
                 const SizedBox(height: 16),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Total Amount',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Color(0xFF64748B),
-                          ),
+                Builder(builder: (_) {
+                  final deliveryFee = (order['deliveryFee'] ?? order['delivery_fee'] ?? 0) as num;
+                  return Column(
+                    children: [
+                      if (deliveryFee > 0) ...[
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text('Delivery Fee', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                            Text('PKR ${deliveryFee.toStringAsFixed(0)}', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF64748B))),
+                          ],
                         ),
-                        Text(
-                          'PKR ${order['total']}',
-                          style: const TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.w900,
-                            color: Color(0xFF10B981),
-                          ),
-                        ),
+                        const SizedBox(height: 6),
+                        const Divider(height: 1, color: Color(0xFFE2E8F0)),
+                        const SizedBox(height: 6),
                       ],
-                    ),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        const Text(
-                          'Order Date',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Color(0xFF64748B),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text('Total Amount', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                              Text(
+                                'PKR ${order['total']}',
+                                style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: Color(0xFF10B981)),
+                              ),
+                            ],
                           ),
-                        ),
-                        Text(
-                          DateFormat('MMM dd, HH:mm').format(date),
-                          style: const TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            color: Color(0xFF0F172A),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              const Text('Order Date', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                              Text(
+                                DateFormat('MMM dd, HH:mm').format(date),
+                                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF0F172A)),
+                              ),
+                            ],
                           ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
+                        ],
+                      ),
+                    ],
+                  );
+                }),
                 if (status == 'pending') ...[
                   const SizedBox(height: 16),
                   Row(
