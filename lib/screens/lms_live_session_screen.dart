@@ -171,7 +171,7 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
       );
       if (mounted) setState(() => _isRecording = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Recording stopped — saving to your device...'), backgroundColor: Colors.green, duration: Duration(seconds: 3)),
+        const SnackBar(content: Text('Recording stopped — uploading to LMS...'), backgroundColor: Colors.green, duration: Duration(seconds: 3)),
       );
     }
   }

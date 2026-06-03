@@ -301,11 +301,6 @@
   <script src="flutter_bootstrap.js" async></script>
 
   <!-- LMS Live Session — Agora RTC + MediaRecorder -->
-  <!-- Optional: set these to enable Cloudinary cloud backup of recordings -->
-  <script>
-    window.LMS_CLOUDINARY_CLOUD = '';   // your Cloudinary cloud name (e.g. 'my-cloud')
-    window.LMS_CLOUDINARY_PRESET = 'lms_recordings'; // unsigned upload preset name
-  </script>
   <script>
     window._lmsAgoraClient = null;
     window._lmsLocalAudio = null;
@@ -459,7 +454,7 @@
       }
     };
 
-    // Stop recording → download locally + optionally upload to Cloudinary
+    // Stop recording → upload to Cloudinary via signed backend endpoint → save URL in LMS
     window.lmsStopRecordingAndUpload = function(sessionId, backendUrl, authToken) {
       if (!window._lmsRecorder) return;
 
@@ -474,41 +469,49 @@
         if (blob.size < 5000) { console.log('LMS: recording too short, skipping save'); return; }
 
         var sizeMB = (blob.size / 1048576).toFixed(1);
-        console.log('LMS: session recording size:', sizeMB + ' MB');
+        console.log('LMS: uploading session recording (' + sizeMB + ' MB) to LMS...');
 
-        // Always download to instructor's device
         try {
-          var url = URL.createObjectURL(blob);
-          var a = document.createElement('a');
-          a.href = url;
-          a.download = 'icare-session-' + sessionId.substring(0,8) + '.webm';
-          document.body.appendChild(a);
-          a.click();
-          document.body.removeChild(a);
-          setTimeout(function() { URL.revokeObjectURL(url); }, 10000);
-        } catch(e) { console.warn('LMS: download failed:', e.message); }
+          // Step 1: get a signed upload token from the backend
+          var signResp = await fetch(
+            backendUrl + '/upload/sign?folder=icare%2Flms-recordings&resource_type=video',
+            { headers: { 'Authorization': 'Bearer ' + authToken } }
+          );
+          var sign = await signResp.json();
 
-        // Upload to Cloudinary if configured, then save URL to backend
-        var cloudName = window.LMS_CLOUDINARY_CLOUD;
-        var preset = window.LMS_CLOUDINARY_PRESET;
-        if (cloudName && preset) {
-          try {
-            var fd = new FormData();
-            fd.append('file', blob, 'icare-session-' + sessionId + '.webm');
-            fd.append('upload_preset', preset);
-            var resp = await fetch('https://api.cloudinary.com/v1_1/' + cloudName + '/video/upload', {
-              method: 'POST', body: fd
-            });
-            var data = await resp.json();
-            if (data.secure_url) {
-              await fetch(backendUrl + '/live-sessions/' + sessionId + '/set-recording-url', {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
-                body: JSON.stringify({ recordingUrl: data.secure_url }),
-              });
-              console.log('LMS: recording saved to Cloudinary:', data.secure_url);
-            }
-          } catch(e) { console.warn('LMS: Cloudinary upload failed (file was downloaded locally):', e.message); }
+          if (!sign.success || !sign.cloud_name) {
+            console.warn('LMS: could not get Cloudinary signature:', sign);
+            return;
+          }
+
+          // Step 2: upload blob directly to Cloudinary (signed — bypasses Vercel 4.5 MB limit)
+          var fd = new FormData();
+          fd.append('file', blob, 'icare-session-' + sessionId + '.webm');
+          fd.append('api_key', sign.api_key);
+          fd.append('timestamp', String(sign.timestamp));
+          fd.append('signature', sign.signature);
+          fd.append('folder', sign.folder);
+
+          var uploadResp = await fetch(
+            'https://api.cloudinary.com/v1_1/' + sign.cloud_name + '/video/upload',
+            { method: 'POST', body: fd }
+          );
+          var data = await uploadResp.json();
+
+          if (!data.secure_url) {
+            console.warn('LMS: Cloudinary upload error:', data.error || data);
+            return;
+          }
+
+          // Step 3: save the URL to the live session document in MongoDB
+          await fetch(backendUrl + '/live-sessions/' + sessionId + '/set-recording-url', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
+            body: JSON.stringify({ recordingUrl: data.secure_url }),
+          });
+          console.log('LMS: recording saved to LMS:', data.secure_url);
+        } catch(e) {
+          console.warn('LMS: upload failed:', e.message);
         }
       };
 

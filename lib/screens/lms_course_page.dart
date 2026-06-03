@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:icare/services/lms_service.dart';
 import 'package:icare/utils/shared_pref.dart';
 import 'package:icare/utils/theme.dart';
@@ -6,6 +7,7 @@ import 'package:icare/widgets/back_button.dart';
 import 'package:icare/screens/lesson_detail_page.dart';
 import 'package:icare/screens/certificate_page.dart';
 import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class LmsCoursePage extends StatefulWidget {
   final Map<String, dynamic> course;
@@ -32,7 +34,7 @@ class _LmsCoursePageState extends State<LmsCoursePage> with SingleTickerProvider
   @override
   void initState() {
     super.initState();
-    _tabs = TabController(length: 5, vsync: this);
+    _tabs = TabController(length: 6, vsync: this);
   }
 
   @override
@@ -84,6 +86,7 @@ class _LmsCoursePageState extends State<LmsCoursePage> with SingleTickerProvider
                 Tab(text: 'Grades'),
                 Tab(text: 'People'),
                 Tab(text: 'Attendance'),
+                Tab(text: 'Recordings'),
               ],
             ),
           ),
@@ -96,6 +99,7 @@ class _LmsCoursePageState extends State<LmsCoursePage> with SingleTickerProvider
             _GradesTab(courseId: _courseId, lms: _lms, isInstructor: widget.isInstructor),
             _PeopleTab(courseId: _courseId, lms: _lms, course: widget.course, isInstructor: widget.isInstructor),
             _AttendanceTab(courseId: _courseId, lms: _lms, isInstructor: widget.isInstructor),
+            _RecordingsTab(courseId: _courseId, lms: _lms),
           ],
         ),
       ),
@@ -1410,6 +1414,139 @@ class _AttendanceTabState extends State<_AttendanceTab> {
     } catch (e) {
       return date.toString();
     }
+  }
+}
+
+// ─── RECORDINGS TAB ──────────────────────────────────────────────────────────
+class _RecordingsTab extends StatefulWidget {
+  final String courseId;
+  final LmsService lms;
+  const _RecordingsTab({required this.courseId, required this.lms});
+
+  @override
+  State<_RecordingsTab> createState() => _RecordingsTabState();
+}
+
+class _RecordingsTabState extends State<_RecordingsTab> {
+  List<Map<String, dynamic>> _recordings = [];
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final sessions = await widget.lms.getCourseSessions(widget.courseId);
+      final recs = sessions
+          .where((s) {
+            final url = s['recordingUrl']?.toString() ?? '';
+            return url.isNotEmpty;
+          })
+          .map<Map<String, dynamic>>((s) => Map<String, dynamic>.from(s))
+          .toList();
+      // Most recent first
+      recs.sort((a, b) {
+        final da = DateTime.tryParse(a['scheduledAt']?.toString() ?? '') ?? DateTime(2000);
+        final db = DateTime.tryParse(b['scheduledAt']?.toString() ?? '') ?? DateTime(2000);
+        return db.compareTo(da);
+      });
+      if (mounted) setState(() { _recordings = recs; _loading = false; });
+    } catch (_) {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _openVideo(String url) async {
+    if (kIsWeb) {
+      // Open in new browser tab on web
+      final uri = Uri.tryParse(url);
+      if (uri != null) await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } else {
+      final uri = Uri.tryParse(url);
+      if (uri != null && await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      }
+    }
+  }
+
+  String _formatDuration(dynamic seconds) {
+    if (seconds == null) return '';
+    final s = int.tryParse(seconds.toString()) ?? 0;
+    final m = s ~/ 60;
+    final rem = s % 60;
+    return '${m}m ${rem}s';
+  }
+
+  String _formatDate(dynamic raw) {
+    try {
+      final dt = DateTime.parse(raw?.toString() ?? '').toLocal();
+      return DateFormat('dd MMM yyyy, hh:mm a').format(dt);
+    } catch (_) { return raw?.toString() ?? ''; }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_loading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (_recordings.isEmpty) {
+      return const Center(
+        child: _EmptyState(icon: Icons.videocam_off_outlined, text: 'No recordings yet.\nRecordings appear here after a live session ends.'),
+      );
+    }
+    return RefreshIndicator(
+      onRefresh: _load,
+      child: ListView.separated(
+        padding: const EdgeInsets.all(16),
+        itemCount: _recordings.length,
+        separatorBuilder: (context, index) => const SizedBox(height: 12),
+        itemBuilder: (_, i) {
+          final rec = _recordings[i];
+          final url = rec['recordingUrl']?.toString() ?? '';
+          final title = rec['title']?.toString() ?? 'Live Session';
+          final date = _formatDate(rec['scheduledAt'] ?? rec['recordingEndedAt']);
+          final dur = _formatDuration(rec['recordingDuration']);
+          return Card(
+            elevation: 1,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            child: ListTile(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              leading: Container(
+                width: 48, height: 48,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1E40AF).withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.play_circle_fill_rounded, color: Color(0xFF1E40AF), size: 28),
+              ),
+              title: Text(title, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+              subtitle: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (date.isNotEmpty) ...[
+                    const SizedBox(height: 2),
+                    Text(date, style: TextStyle(fontSize: 12, color: Colors.grey[500])),
+                  ],
+                  if (dur.isNotEmpty) ...[
+                    const SizedBox(height: 2),
+                    Text('Duration: $dur', style: TextStyle(fontSize: 12, color: Colors.grey[500])),
+                  ],
+                ],
+              ),
+              trailing: TextButton.icon(
+                onPressed: () => _openVideo(url),
+                icon: const Icon(Icons.open_in_new, size: 16),
+                label: const Text('Watch'),
+                style: TextButton.styleFrom(foregroundColor: const Color(0xFF1E40AF)),
+              ),
+            ),
+          );
+        },
+      ),
+    );
   }
 }
 
