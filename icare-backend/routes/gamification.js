@@ -67,6 +67,7 @@ router.get('/my-stats', authMiddleware, async (req, res) => {
       badges: earnedBadges,
       availableBadges,
       history: history.slice(-50).reverse(),
+      redemptions: (gam.redemptions || []).slice(-20).reverse(),
     });
   } catch (err) {
     console.error('Gamification stats error:', err);
