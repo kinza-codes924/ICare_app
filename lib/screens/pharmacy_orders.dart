@@ -362,7 +362,7 @@ class _PharmacyOrdersState extends ConsumerState<PharmacyOrders>
             children: [
               Icon(Icons.warning_rounded, color: Color(0xFF8B5CF6), size: 22),
               SizedBox(width: 10),
-              Text('Controlled Medicine Warning', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+              Flexible(child: Text('Controlled Medicine Warning', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700))),
             ],
           ),
           content: Text(
@@ -400,7 +400,7 @@ class _PharmacyOrdersState extends ConsumerState<PharmacyOrders>
             ],
           ),
           content: SizedBox(
-            width: 380,
+            width: double.maxFinite,
             child: Form(
               key: formKey,
               child: Column(
@@ -658,7 +658,7 @@ class _PharmacyOrdersState extends ConsumerState<PharmacyOrders>
                         child: Icon(Icons.add_circle_rounded, color: AppColors.primaryColor, size: 22),
                       ),
                       const SizedBox(width: 12),
-                      const Text('Create Walk-in Order', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: Color(0xFF0F172A))),
+                      const Expanded(child: Text('Create Walk-in Order', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: Color(0xFF0F172A)))),
                     ]),
                     const SizedBox(height: 24),
                     _buildWalkInField(controller: nameController, label: 'Patient Name', icon: Icons.person_rounded,

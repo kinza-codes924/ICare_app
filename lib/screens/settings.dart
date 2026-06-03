@@ -241,7 +241,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           const SizedBox(width: 10),
           const Text('Enable 2FA', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
         ]),
-        content: SizedBox(width: 360, child: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+        content: SizedBox(width: double.maxFinite,child: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
           // Step 1
           Container(
             padding: const EdgeInsets.all(12),
@@ -420,7 +420,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     showDialog(context: ctx, builder: (dc) => AlertDialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       title: const Row(children: [Icon(Icons.bug_report_outlined, color: Color(0xFFEF4444), size: 22), SizedBox(width: 10), Text('Report an Issue', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16))]),
-      content: SizedBox(width: 400, child: Form(key: fk, child: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
+      content: SizedBox(width: double.maxFinite,child: Form(key: fk, child: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
         const Text('Describe the issue you encountered and we\'ll investigate.', style: TextStyle(fontSize: 13, color: Color(0xFF64748B))), const SizedBox(height: 16),
         TextFormField(controller: TextEditingController(text: userRole)..selection = TextSelection.collapsed(offset: userRole.length), enabled: false, decoration: InputDecoration(labelText: 'Account Type', prefixIcon: const Icon(Icons.badge_outlined, size: 18), border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)), contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12))), const SizedBox(height: 12),
         TextFormField(controller: TextEditingController(text: userName)..selection = TextSelection.collapsed(offset: userName.length), enabled: false, decoration: InputDecoration(labelText: 'Name', prefixIcon: const Icon(Icons.person_outline, size: 18), border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)), contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12))), const SizedBox(height: 12),
@@ -487,7 +487,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     showDialog(context: ctx, builder: (dc) => AlertDialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       title: const Row(children: [Icon(Icons.monitor_heart_outlined, color: Color(0xFFEF4444), size: 22), SizedBox(width: 10), Text('Medical Conditions', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16))]),
-      content: SizedBox(width: 400, child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+      content: SizedBox(width: double.maxFinite,child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
         const Text('List your medical conditions', style: TextStyle(fontSize: 13, color: Color(0xFF64748B))), const SizedBox(height: 12),
         TextField(controller: c, maxLines: 3, decoration: InputDecoration(hintText: 'e.g. Diabetes Type 2, Hypertension', border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)), contentPadding: const EdgeInsets.all(12))),
       ])),
@@ -500,7 +500,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     showDialog(context: ctx, builder: (dc) => AlertDialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       title: const Row(children: [Icon(Icons.warning_amber_rounded, color: Color(0xFFF59E0B), size: 22), SizedBox(width: 10), Text('Allergies', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16))]),
-      content: SizedBox(width: 400, child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+      content: SizedBox(width: double.maxFinite,child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
         const Text('List any allergies', style: TextStyle(fontSize: 13, color: Color(0xFF64748B))), const SizedBox(height: 12),
         TextField(controller: c, maxLines: 3, decoration: InputDecoration(hintText: 'e.g. Apple, Peanuts', border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)), contentPadding: const EdgeInsets.all(12))),
       ])),
@@ -519,7 +519,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     showDialog(context: ctx, builder: (dc) => AlertDialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       title: const Row(children: [Icon(Icons.flag_outlined, color: Color(0xFF10B981), size: 22), SizedBox(width: 10), Text('Health Goals', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16))]),
-      content: SizedBox(width: 400, child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+      content: SizedBox(width: double.maxFinite,child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
         const Text('Set your health goals', style: TextStyle(fontSize: 13, color: Color(0xFF64748B))), const SizedBox(height: 12),
         TextField(controller: c, maxLines: 3, decoration: InputDecoration(hintText: 'e.g. Lose 10 kg', border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)), contentPadding: const EdgeInsets.all(12))),
       ])),
@@ -534,7 +534,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     showDialog(context: ctx, builder: (dc) => StatefulBuilder(builder: (ctx2, setS) => AlertDialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       title: const Row(children: [Icon(Icons.water_drop_outlined, color: Color(0xFF3B82F6), size: 22), SizedBox(width: 10), Text('Water Reminder', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16))]),
-      content: SizedBox(width: 300, child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+      content: SizedBox(width: double.maxFinite,child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
         const Text('How often?', style: TextStyle(fontSize: 13, color: Color(0xFF64748B))), const SizedBox(height: 16),
         ...List.generate(intervals.length, (i) {
           final isSel = selected == intervals[i];
@@ -647,7 +647,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     showDialog(context: ctx, builder: (dc) => StatefulBuilder(builder: (_, setS) => AlertDialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       title: const Row(children: [Icon(Icons.translate_rounded, color: Color(0xFF64748B), size: 22), SizedBox(width: 10), Text('Language / زبان', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16))]),
-      content: SizedBox(width: 340, child: Column(mainAxisSize: MainAxisSize.min, children: [
+      content: SizedBox(width: double.maxFinite,child: Column(mainAxisSize: MainAxisSize.min, children: [
         ...langs.map((lang) {
           final isSel = selected == lang['code'];
           return Padding(
@@ -713,7 +713,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     showDialog(context: ctx, builder: (dc) => StatefulBuilder(builder: (ctx2, setS) => AlertDialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       title: const Row(children: [Icon(Icons.public_outlined, color: Color(0xFF64748B), size: 22), SizedBox(width: 10), Text('Country & Region', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16))]),
-      content: SizedBox(width: 300, child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+      content: SizedBox(width: double.maxFinite,child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
         if (isPatient) const Text('Currently available in Pakistan only. More countries coming soon!', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
         if (!isPatient) const Text('Select your country/region', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
         const SizedBox(height: 16),
@@ -771,7 +771,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     showDialog(context: ctx, builder: (dc) => StatefulBuilder(builder: (dc2, setS) => AlertDialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       title: const Row(children: [Icon(Icons.location_on_outlined, color: Color(0xFF10B981), size: 22), SizedBox(width: 10), Expanded(child: Text('Saved Addresses', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16)))]),
-      content: SizedBox(width: 440, height: 340, child: _savedAddresses.isEmpty
+      content: SizedBox(width: double.maxFinite, height: 340,child: _savedAddresses.isEmpty
         ? const Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
             Icon(Icons.location_off_outlined, size: 48, color: Color(0xFFCBD5E1)),
             SizedBox(height: 12),
@@ -811,7 +811,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     showDialog(context: ctx, builder: (dc) => AlertDialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       title: const Row(children: [Icon(Icons.add_location_alt_outlined, color: Color(0xFF10B981), size: 22), SizedBox(width: 10), Text('Add New Address', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16))]),
-      content: SizedBox(width: 420, child: Column(mainAxisSize: MainAxisSize.min, children: [
+      content: SizedBox(width: double.maxFinite,child: Column(mainAxisSize: MainAxisSize.min, children: [
         TextField(controller: labelCtrl, decoration: InputDecoration(labelText: 'Label (e.g. Home, Office)', border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)), contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10))),
         const SizedBox(height: 12),
         TextField(controller: streetCtrl, maxLines: 2, decoration: InputDecoration(labelText: 'Street Address', hintText: 'House #, Street, Area', border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)), contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10))),
@@ -842,7 +842,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     showDialog(context: ctx, builder: (dc) => AlertDialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       title: const Row(children: [Icon(Icons.shopping_bag_outlined, color: Color(0xFF3B82F6), size: 22), SizedBox(width: 10), Text('Order History', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16))]),
-      content: SizedBox(width: 480, height: 400, child: FutureBuilder(
+      content: SizedBox(width: double.maxFinite, height: 400,child: FutureBuilder(
         future: future,
         builder: (_, snap) {
           if (snap.connectionState != ConnectionState.done) return const Center(child: CircularProgressIndicator());
@@ -889,7 +889,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     showDialog(context: ctx, builder: (dc) => AlertDialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       title: const Row(children: [Icon(Icons.local_shipping_outlined, color: Color(0xFF8B5CF6), size: 22), SizedBox(width: 10), Text('Delivery Preferences', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16))]),
-      content: SizedBox(width: 420, child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+      content: SizedBox(width: double.maxFinite,child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
         const Text('Delivery Instructions', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
         const SizedBox(height: 4),
         const Text('e.g. Leave at door, Ring bell twice, Call on arrival', style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8))),
@@ -917,7 +917,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     showDialog(context: ctx, builder: (dc) => AlertDialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       title: const Row(children: [Icon(Icons.download_outlined, color: Color(0xFF8B5CF6), size: 22), SizedBox(width: 10), Text('Download Health Data', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16))]),
-      content: const SizedBox(width: 400, child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+      content: SizedBox(width: double.maxFinite, child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
         Text('A PDF will be generated with all your health records sorted by date.', style: TextStyle(fontSize: 13, color: Color(0xFF64748B))),
         SizedBox(height: 12),
         Text('Includes: Consultations, Prescriptions, Lab Tests, Medicine Orders', style: TextStyle(fontSize: 13, color: Color(0xFF475569))),
@@ -1065,7 +1065,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     showDialog(context: ctx, builder: (dc) => StatefulBuilder(builder: (dc2, setS) => AlertDialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       title: const Row(children: [Icon(Icons.credit_card_outlined, color: Color(0xFF10B981), size: 22), SizedBox(width: 10), Text('Payment Methods', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16))]),
-      content: SizedBox(width: 420, child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+      content: SizedBox(width: double.maxFinite,child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
         const Text('Saved cards', style: TextStyle(fontSize: 13, color: Color(0xFF64748B))), const SizedBox(height: 12),
         if (_savedCards.isEmpty)
           const Padding(padding: EdgeInsets.symmetric(vertical: 12), child: Center(child: Text('No cards saved yet', style: TextStyle(fontSize: 13, color: Color(0xFF94A3B8)))))
@@ -1110,7 +1110,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     showDialog(context: ctx, builder: (dc) => StatefulBuilder(builder: (dc2, setS) => AlertDialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       title: const Row(children: [Icon(Icons.add_card_outlined, color: Color(0xFF10B981), size: 22), SizedBox(width: 10), Text('Add Payment Method', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16))]),
-      content: SizedBox(width: 420, child: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+      content: SizedBox(width: double.maxFinite,child: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
         const Text('Card Type', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF475569))), const SizedBox(height: 8),
         Wrap(spacing: 8, children: cardTypes.map((t) => ChoiceChip(
           label: Text(t, style: TextStyle(fontSize: 12, color: selectedType == t ? Colors.white : const Color(0xFF475569))),
@@ -1160,7 +1160,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         const Expanded(child: Text('Billing History', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16))),
         if (_billingLoading) const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)),
       ]),
-      content: SizedBox(width: 480, height: 400, child: _billingLoading
+      content: SizedBox(width: double.maxFinite, height: 400,child: _billingLoading
         ? const Center(child: CircularProgressIndicator())
         : _billingItems.isEmpty
           ? const Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.receipt_long_outlined, size: 48, color: Color(0xFFCBD5E1)), SizedBox(height: 12), Text('No billing history yet', style: TextStyle(fontSize: 14, color: Color(0xFF94A3B8)))]))
@@ -1554,7 +1554,7 @@ class _WebSettingsLayout extends StatelessWidget {
     showDialog(context: context, builder: (dc) => AlertDialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       title: const Row(children: [Icon(Icons.stars_rounded, color: Color(0xFFF59E0B), size: 24), SizedBox(width: 10), Text('My Points', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18))]),
-      content: SizedBox(width: 360, child: Column(mainAxisSize: MainAxisSize.min, children: [
+      content: SizedBox(width: double.maxFinite,child: Column(mainAxisSize: MainAxisSize.min, children: [
         Container(
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
@@ -1581,7 +1581,7 @@ class _WebSettingsLayout extends StatelessWidget {
     showDialog(context: context, builder: (dc) => AlertDialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       title: const Row(children: [Icon(Icons.history_rounded, color: Color(0xFFF59E0B), size: 22), SizedBox(width: 10), Text('Reward History', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16))]),
-      content: SizedBox(width: 360, height: 300, child: p.pointsHistory.isEmpty
+      content: SizedBox(width: double.maxFinite,height: 300, child: p.pointsHistory.isEmpty
         ? const Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.history_outlined, size: 48, color: Color(0xFFCBD5E1)), SizedBox(height: 12), Text('No reward history yet', style: TextStyle(color: Color(0xFF64748B)))]))
         : ListView.separated(
             itemCount: p.pointsHistory.length,
@@ -2197,7 +2197,7 @@ class _MobileSettingsLayout extends StatelessWidget {
     showDialog(context: context, builder: (dc) => AlertDialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       title: const Row(children: [Icon(Icons.stars_rounded, color: Color(0xFFF59E0B), size: 24), SizedBox(width: 10), Text('My Points', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18))]),
-      content: SizedBox(width: 360, child: Column(mainAxisSize: MainAxisSize.min, children: [
+      content: SizedBox(width: double.maxFinite,child: Column(mainAxisSize: MainAxisSize.min, children: [
         Container(
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(gradient: const LinearGradient(colors: [Color(0xFFF59E0B), Color(0xFFF97316)], begin: Alignment.topLeft, end: Alignment.bottomRight), borderRadius: BorderRadius.circular(14)),
@@ -2221,7 +2221,7 @@ class _MobileSettingsLayout extends StatelessWidget {
     showDialog(context: context, builder: (dc) => AlertDialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       title: const Row(children: [Icon(Icons.history_rounded, color: Color(0xFFF59E0B), size: 22), SizedBox(width: 10), Text('Reward History', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16))]),
-      content: SizedBox(width: 360, height: 300, child: p.pointsHistory.isEmpty
+      content: SizedBox(width: double.maxFinite,height: 300, child: p.pointsHistory.isEmpty
         ? const Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.history_outlined, size: 48, color: Color(0xFFCBD5E1)), SizedBox(height: 12), Text('No reward history yet', style: TextStyle(color: Color(0xFF64748B)))]))
         : ListView.separated(
             itemCount: p.pointsHistory.length,

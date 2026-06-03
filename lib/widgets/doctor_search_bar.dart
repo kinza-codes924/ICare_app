@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:icare/screens/doctors_list.dart';
 import 'package:icare/services/doctor_service.dart';
 
@@ -15,9 +16,11 @@ class _DoctorSearchBarState extends State<DoctorSearchBar> {
   String _mode = 'name';
   final _ctrl = TextEditingController();
   final _focus = FocusNode();
+  final _scrollCtrl = ScrollController();
   bool _showDrop = false;
   List<String> _suggestions = [];
-  List<String> _doctorNames = []; // loaded from API
+  int _highlightIndex = -1;
+  List<String> _doctorNames = [];
   bool _loadingDoctors = false;
   Timer? _debounce;
 
@@ -41,11 +44,43 @@ class _DoctorSearchBarState extends State<DoctorSearchBar> {
     _focus.addListener(() {
       if (!_focus.hasFocus) {
         Future.delayed(const Duration(milliseconds: 200), () {
-          if (mounted) setState(() => _showDrop = false);
+          if (mounted) setState(() { _showDrop = false; _highlightIndex = -1; });
         });
       }
     });
+    _focus.onKeyEvent = (node, event) {
+      if (event is! KeyDownEvent) return KeyEventResult.ignored;
+      if (!_showDrop || _suggestions.isEmpty) return KeyEventResult.ignored;
+      if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
+        setState(() { _highlightIndex = (_highlightIndex + 1) % _suggestions.length; });
+        _scrollToHighlight();
+        return KeyEventResult.handled;
+      }
+      if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
+        setState(() { _highlightIndex = (_highlightIndex - 1 + _suggestions.length) % _suggestions.length; });
+        _scrollToHighlight();
+        return KeyEventResult.handled;
+      }
+      if (event.logicalKey == LogicalKeyboardKey.enter && _highlightIndex >= 0) {
+        final sel = _suggestions[_highlightIndex];
+        _ctrl.text = sel;
+        _navigate(sel);
+        return KeyEventResult.handled;
+      }
+      if (event.logicalKey == LogicalKeyboardKey.escape) {
+        setState(() { _showDrop = false; _highlightIndex = -1; });
+        return KeyEventResult.handled;
+      }
+      return KeyEventResult.ignored;
+    };
     _loadDoctorNames();
+  }
+
+  void _scrollToHighlight() {
+    if (!_scrollCtrl.hasClients || _highlightIndex < 0) return;
+    const itemH = 44.0;
+    final offset = (_highlightIndex * itemH).clamp(0.0, _scrollCtrl.position.maxScrollExtent);
+    _scrollCtrl.animateTo(offset, duration: const Duration(milliseconds: 120), curve: Curves.easeOut);
   }
 
   Future<void> _loadDoctorNames() async {
@@ -69,6 +104,7 @@ class _DoctorSearchBarState extends State<DoctorSearchBar> {
     _debounce?.cancel();
     _ctrl.dispose();
     _focus.dispose();
+    _scrollCtrl.dispose();
     super.dispose();
   }
 
@@ -78,6 +114,7 @@ class _DoctorSearchBarState extends State<DoctorSearchBar> {
       if (!mounted) return;
       if (_mode == 'name') {
         setState(() {
+          _highlightIndex = -1;
           _suggestions = v.isEmpty
               ? []
               : _doctorNames.where((n) => n.toLowerCase().contains(v.toLowerCase())).toList();
@@ -86,6 +123,7 @@ class _DoctorSearchBarState extends State<DoctorSearchBar> {
       } else {
         final list = _mode == 'speciality' ? _specialties : _conditions;
         setState(() {
+          _highlightIndex = -1;
           _suggestions = v.isEmpty
               ? list
               : list.where((s) => s.toLowerCase().contains(v.toLowerCase())).toList();
@@ -97,7 +135,7 @@ class _DoctorSearchBarState extends State<DoctorSearchBar> {
 
   void _navigate(String query) {
     if (query.trim().isEmpty) return;
-    setState(() => _showDrop = false);
+    setState(() { _showDrop = false; _highlightIndex = -1; });
     _focus.unfocus();
     Navigator.of(context).push(MaterialPageRoute(
       builder: (_) => _mode == 'speciality'
@@ -110,6 +148,7 @@ class _DoctorSearchBarState extends State<DoctorSearchBar> {
 
   @override
   Widget build(BuildContext context) {
+    const accentColor = Color(0xFF0036BC);
     return Column(
       children: [
         Container(
@@ -128,14 +167,14 @@ class _DoctorSearchBarState extends State<DoctorSearchBar> {
                   value: _mode,
                   underline: const SizedBox(),
                   icon: const Icon(Icons.arrow_drop_down, size: 20),
-                  style: TextStyle(fontSize: widget.isMobile ? 11 : 12, color: const Color(0xFF0036BC), fontWeight: FontWeight.w600),
+                  style: TextStyle(fontSize: widget.isMobile ? 11 : 12, color: accentColor, fontWeight: FontWeight.w600),
                   items: const [
                     DropdownMenuItem(value: 'name', child: Text('Doctor Name')),
                     DropdownMenuItem(value: 'speciality', child: Text('Speciality')),
                     DropdownMenuItem(value: 'condition', child: Text('Condition')),
                   ],
                   onChanged: (v) {
-                    setState(() { _mode = v!; _ctrl.clear(); _showDrop = false; _suggestions = []; });
+                    setState(() { _mode = v!; _ctrl.clear(); _showDrop = false; _suggestions = []; _highlightIndex = -1; });
                   },
                 ),
               ),
@@ -150,7 +189,7 @@ class _DoctorSearchBarState extends State<DoctorSearchBar> {
                             ? 'Search by speciality...'
                             : 'Search by condition...',
                     hintStyle: TextStyle(fontSize: widget.isMobile ? 12 : 13, color: Colors.grey[400]),
-                    prefixIcon: Icon(Icons.search_rounded, color: const Color(0xFF0036BC), size: widget.isMobile ? 20 : 22),
+                    prefixIcon: Icon(Icons.search_rounded, color: accentColor, size: widget.isMobile ? 20 : 22),
                     border: InputBorder.none,
                     contentPadding: EdgeInsets.symmetric(vertical: widget.isMobile ? 14 : 16),
                   ),
@@ -166,7 +205,7 @@ class _DoctorSearchBarState extends State<DoctorSearchBar> {
                 child: Container(
                   margin: const EdgeInsets.all(6),
                   padding: const EdgeInsets.symmetric(horizontal: 14),
-                  decoration: BoxDecoration(color: const Color(0xFF0036BC), borderRadius: BorderRadius.circular(8)),
+                  decoration: BoxDecoration(color: accentColor, borderRadius: BorderRadius.circular(8)),
                   child: const Center(child: Icon(Icons.search, color: Colors.white, size: 20)),
                 ),
               ),
@@ -179,24 +218,40 @@ class _DoctorSearchBarState extends State<DoctorSearchBar> {
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: const Color(0xFF0036BC).withValues(alpha: 0.2)),
+              border: Border.all(color: accentColor.withValues(alpha: 0.2)),
               boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 12)],
             ),
             constraints: const BoxConstraints(maxHeight: 220),
-            child: ListView(
+            child: ListView.builder(
+              controller: _scrollCtrl,
               padding: EdgeInsets.zero,
               shrinkWrap: true,
-              children: _suggestions.map((s) => ListTile(
-                dense: true,
-                leading: Icon(
-                  _mode == 'name' ? Icons.person_outlined
-                      : _mode == 'speciality' ? Icons.medical_services_outlined
-                      : Icons.healing_outlined,
-                  size: 16, color: const Color(0xFF0036BC),
-                ),
-                title: Text(s, style: const TextStyle(fontSize: 13)),
-                onTap: () { _ctrl.text = s; _navigate(s); },
-              )).toList(),
+              itemCount: _suggestions.length,
+              itemBuilder: (_, i) {
+                final highlighted = i == _highlightIndex;
+                return Container(
+                  color: highlighted ? accentColor.withValues(alpha: 0.08) : null,
+                  child: ListTile(
+                    dense: true,
+                    leading: Icon(
+                      _mode == 'name' ? Icons.person_outlined
+                          : _mode == 'speciality' ? Icons.medical_services_outlined
+                          : Icons.healing_outlined,
+                      size: 16,
+                      color: highlighted ? accentColor : accentColor.withValues(alpha: 0.7),
+                    ),
+                    title: Text(
+                      _suggestions[i],
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: highlighted ? FontWeight.w600 : FontWeight.normal,
+                        color: highlighted ? accentColor : const Color(0xFF0F172A),
+                      ),
+                    ),
+                    onTap: () { _ctrl.text = _suggestions[i]; _navigate(_suggestions[i]); },
+                  ),
+                );
+              },
             ),
           ),
       ],

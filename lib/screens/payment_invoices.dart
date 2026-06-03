@@ -343,8 +343,7 @@ class _PaymentInvoicesState extends State<PaymentInvoices>
                             ),
                           ),
                           const Spacer(),
-                          SizedBox(
-                            width: 400,
+                          Flexible(
                             child: TabBar(
                               controller: _tabController,
                               indicatorColor: AppColors.primaryColor,

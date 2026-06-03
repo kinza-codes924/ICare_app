@@ -450,40 +450,39 @@ class _ConsultationDetailsScreenState
                               )
                             else
                               // Editable chips for Someone Else
-                              Row(
+                              Wrap(
+                                spacing: 8,
+                                runSpacing: 6,
                                 children: ['Male', 'Female', 'Other']
                                     .map((g) {
                                   final isSelected =
                                       _genderController.text == g;
-                                  return Padding(
-                                    padding: const EdgeInsets.only(right: 8),
-                                    child: GestureDetector(
-                                      onTap: () => setState(
-                                          () => _genderController.text = g),
-                                      child: Container(
-                                        padding: const EdgeInsets.symmetric(
-                                            horizontal: 12, vertical: 8),
-                                        decoration: BoxDecoration(
+                                  return GestureDetector(
+                                    onTap: () => setState(
+                                        () => _genderController.text = g),
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 12, vertical: 8),
+                                      decoration: BoxDecoration(
+                                        color: isSelected
+                                            ? AppColors.primaryColor
+                                            : const Color(0xFFF1F5F9),
+                                        borderRadius:
+                                            BorderRadius.circular(8),
+                                        border: Border.all(
                                           color: isSelected
                                               ? AppColors.primaryColor
-                                              : const Color(0xFFF1F5F9),
-                                          borderRadius:
-                                              BorderRadius.circular(8),
-                                          border: Border.all(
-                                            color: isSelected
-                                                ? AppColors.primaryColor
-                                                : const Color(0xFFE2E8F0),
-                                          ),
+                                              : const Color(0xFFE2E8F0),
                                         ),
-                                        child: Text(
-                                          g,
-                                          style: TextStyle(
-                                            fontSize: 12,
-                                            fontWeight: FontWeight.w700,
-                                            color: isSelected
-                                                ? Colors.white
-                                                : const Color(0xFF64748B),
-                                          ),
+                                      ),
+                                      child: Text(
+                                        g,
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w700,
+                                          color: isSelected
+                                              ? Colors.white
+                                              : const Color(0xFF64748B),
                                         ),
                                       ),
                                     ),

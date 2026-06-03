@@ -2143,7 +2143,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
           const SizedBox(width: 10),
           const Text('Two-Factor Auth', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
         ]),
-        content: SizedBox(width: 360, child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+        content: SizedBox(width: double.maxFinite, child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
           Container(
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(color: const Color(0xFFEFF6FF), borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xFFBFDBFE))),

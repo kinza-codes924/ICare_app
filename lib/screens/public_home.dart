@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:icare/screens/consultation_details_screen.dart';
 import 'package:icare/screens/doctors_list.dart';
@@ -404,8 +405,12 @@ class _SpecialtySearchBar extends StatefulWidget {
 class _SpecialtySearchBarState extends State<_SpecialtySearchBar> {
   final _ctrl = TextEditingController();
   final _focus = FocusNode();
+  final _scrollCtrl = ScrollController();
   bool _showDropdown = false;
   List<String> _filtered = [];
+  int _highlightIndex = -1;
+
+  static const _accentColor = Color(0xFF7C3AED);
 
   static const _all = [
     'Cardiologist','Dermatologist','Neurologist','Orthopedic','Gynecologist',
@@ -420,17 +425,49 @@ class _SpecialtySearchBarState extends State<_SpecialtySearchBar> {
     _focus.addListener(() {
       if (!_focus.hasFocus) {
         Future.delayed(const Duration(milliseconds: 200), () {
-          if (mounted) setState(() => _showDropdown = false);
+          if (mounted) setState(() { _showDropdown = false; _highlightIndex = -1; });
         });
       }
     });
+    _focus.onKeyEvent = (node, event) {
+      if (event is! KeyDownEvent) return KeyEventResult.ignored;
+      if (!_showDropdown || _filtered.isEmpty) return KeyEventResult.ignored;
+      if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
+        setState(() { _highlightIndex = (_highlightIndex + 1) % _filtered.length; });
+        _scrollToHighlight();
+        return KeyEventResult.handled;
+      }
+      if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
+        setState(() { _highlightIndex = (_highlightIndex - 1 + _filtered.length) % _filtered.length; });
+        _scrollToHighlight();
+        return KeyEventResult.handled;
+      }
+      if (event.logicalKey == LogicalKeyboardKey.enter && _highlightIndex >= 0) {
+        _ctrl.text = _filtered[_highlightIndex];
+        _select(_filtered[_highlightIndex]);
+        return KeyEventResult.handled;
+      }
+      if (event.logicalKey == LogicalKeyboardKey.escape) {
+        setState(() { _showDropdown = false; _highlightIndex = -1; });
+        return KeyEventResult.handled;
+      }
+      return KeyEventResult.ignored;
+    };
+  }
+
+  void _scrollToHighlight() {
+    if (!_scrollCtrl.hasClients || _highlightIndex < 0) return;
+    const itemH = 44.0;
+    final offset = (_highlightIndex * itemH).clamp(0.0, _scrollCtrl.position.maxScrollExtent);
+    _scrollCtrl.animateTo(offset, duration: const Duration(milliseconds: 120), curve: Curves.easeOut);
   }
 
   @override
-  void dispose() { _ctrl.dispose(); _focus.dispose(); super.dispose(); }
+  void dispose() { _ctrl.dispose(); _focus.dispose(); _scrollCtrl.dispose(); super.dispose(); }
 
   void _onChanged(String v) {
     setState(() {
+      _highlightIndex = -1;
       _filtered = v.isEmpty ? _all : _all.where((s) => s.toLowerCase().contains(v.toLowerCase())).toList();
       _showDropdown = v.isNotEmpty || _focus.hasFocus;
     });
@@ -438,7 +475,7 @@ class _SpecialtySearchBarState extends State<_SpecialtySearchBar> {
 
   void _select(String s) {
     _ctrl.text = s;
-    setState(() => _showDropdown = false);
+    setState(() { _showDropdown = false; _highlightIndex = -1; });
     _focus.unfocus();
     Navigator.of(context).push(MaterialPageRoute(builder: (ctx) => DoctorsList(initialSpecialty: s)));
   }
@@ -454,8 +491,8 @@ class _SpecialtySearchBarState extends State<_SpecialtySearchBar> {
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFF7C3AED).withValues(alpha: 0.3), width: 1.5),
-              boxShadow: [BoxShadow(color: const Color(0xFF7C3AED).withValues(alpha: 0.06), blurRadius: 8, offset: const Offset(0, 2))],
+              border: Border.all(color: _accentColor.withValues(alpha: 0.3), width: 1.5),
+              boxShadow: [BoxShadow(color: _accentColor.withValues(alpha: 0.06), blurRadius: 8, offset: const Offset(0, 2))],
             ),
             child: TextField(
               controller: _ctrl,
@@ -463,10 +500,10 @@ class _SpecialtySearchBarState extends State<_SpecialtySearchBar> {
               decoration: InputDecoration(
                 hintText: 'Search by specialty (e.g. Cardiologist...)',
                 hintStyle: TextStyle(fontSize: 13, color: Colors.grey[400]),
-                prefixIcon: const Icon(Icons.search_rounded, color: Color(0xFF7C3AED), size: 20),
+                prefixIcon: const Icon(Icons.search_rounded, color: _accentColor, size: 20),
                 suffixIcon: _ctrl.text.isNotEmpty
-                    ? IconButton(icon: const Icon(Icons.clear, size: 18, color: Color(0xFF7C3AED)), onPressed: () { _ctrl.clear(); setState(() { _showDropdown = false; }); })
-                    : const Icon(Icons.keyboard_arrow_down_rounded, color: Color(0xFF7C3AED), size: 20),
+                    ? IconButton(icon: const Icon(Icons.clear, size: 18, color: _accentColor), onPressed: () { _ctrl.clear(); setState(() { _showDropdown = false; _highlightIndex = -1; }); })
+                    : const Icon(Icons.keyboard_arrow_down_rounded, color: _accentColor, size: 20),
                 border: InputBorder.none,
                 contentPadding: const EdgeInsets.symmetric(vertical: 15),
               ),
@@ -481,19 +518,27 @@ class _SpecialtySearchBarState extends State<_SpecialtySearchBar> {
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: const Color(0xFF7C3AED).withValues(alpha: 0.2)),
+                border: Border.all(color: _accentColor.withValues(alpha: 0.2)),
                 boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 10)],
               ),
               constraints: const BoxConstraints(maxHeight: 220),
-              child: ListView(
+              child: ListView.builder(
+                controller: _scrollCtrl,
                 padding: EdgeInsets.zero,
                 shrinkWrap: true,
-                children: _filtered.map((s) => ListTile(
-                  dense: true,
-                  leading: const Icon(Icons.medical_services_outlined, size: 16, color: Color(0xFF7C3AED)),
-                  title: Text(s, style: const TextStyle(fontSize: 13)),
-                  onTap: () => _select(s),
-                )).toList(),
+                itemCount: _filtered.length,
+                itemBuilder: (_, i) {
+                  final highlighted = i == _highlightIndex;
+                  return Container(
+                    color: highlighted ? _accentColor.withValues(alpha: 0.08) : null,
+                    child: ListTile(
+                      dense: true,
+                      leading: Icon(Icons.medical_services_outlined, size: 16, color: highlighted ? _accentColor : _accentColor.withValues(alpha: 0.7)),
+                      title: Text(_filtered[i], style: TextStyle(fontSize: 13, fontWeight: highlighted ? FontWeight.w600 : FontWeight.normal, color: highlighted ? _accentColor : const Color(0xFF0F172A))),
+                      onTap: () => _select(_filtered[i]),
+                    ),
+                  );
+                },
               ),
             ),
         ],
@@ -511,8 +556,12 @@ class _ConditionOnlySearchBar extends StatefulWidget {
 class _ConditionOnlySearchBarState extends State<_ConditionOnlySearchBar> {
   final _ctrl = TextEditingController();
   final _focus = FocusNode();
+  final _scrollCtrl = ScrollController();
   bool _showDropdown = false;
   List<String> _filtered = [];
+  int _highlightIndex = -1;
+
+  static const _accentColor = Color(0xFF0891B2);
 
   static const _all = [
     'Diabetes','Hypertension','Fever','Heart Disease','Asthma','Back Pain',
@@ -529,17 +578,49 @@ class _ConditionOnlySearchBarState extends State<_ConditionOnlySearchBar> {
     _focus.addListener(() {
       if (!_focus.hasFocus) {
         Future.delayed(const Duration(milliseconds: 200), () {
-          if (mounted) setState(() => _showDropdown = false);
+          if (mounted) setState(() { _showDropdown = false; _highlightIndex = -1; });
         });
       }
     });
+    _focus.onKeyEvent = (node, event) {
+      if (event is! KeyDownEvent) return KeyEventResult.ignored;
+      if (!_showDropdown || _filtered.isEmpty) return KeyEventResult.ignored;
+      if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
+        setState(() { _highlightIndex = (_highlightIndex + 1) % _filtered.length; });
+        _scrollToHighlight();
+        return KeyEventResult.handled;
+      }
+      if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
+        setState(() { _highlightIndex = (_highlightIndex - 1 + _filtered.length) % _filtered.length; });
+        _scrollToHighlight();
+        return KeyEventResult.handled;
+      }
+      if (event.logicalKey == LogicalKeyboardKey.enter && _highlightIndex >= 0) {
+        _ctrl.text = _filtered[_highlightIndex];
+        _select(_filtered[_highlightIndex]);
+        return KeyEventResult.handled;
+      }
+      if (event.logicalKey == LogicalKeyboardKey.escape) {
+        setState(() { _showDropdown = false; _highlightIndex = -1; });
+        return KeyEventResult.handled;
+      }
+      return KeyEventResult.ignored;
+    };
+  }
+
+  void _scrollToHighlight() {
+    if (!_scrollCtrl.hasClients || _highlightIndex < 0) return;
+    const itemH = 44.0;
+    final offset = (_highlightIndex * itemH).clamp(0.0, _scrollCtrl.position.maxScrollExtent);
+    _scrollCtrl.animateTo(offset, duration: const Duration(milliseconds: 120), curve: Curves.easeOut);
   }
 
   @override
-  void dispose() { _ctrl.dispose(); _focus.dispose(); super.dispose(); }
+  void dispose() { _ctrl.dispose(); _focus.dispose(); _scrollCtrl.dispose(); super.dispose(); }
 
   void _onChanged(String v) {
     setState(() {
+      _highlightIndex = -1;
       _filtered = v.isEmpty ? _all : _all.where((c) => c.toLowerCase().contains(v.toLowerCase())).toList();
       _showDropdown = v.isNotEmpty || _focus.hasFocus;
     });
@@ -547,7 +628,7 @@ class _ConditionOnlySearchBarState extends State<_ConditionOnlySearchBar> {
 
   void _select(String c) {
     _ctrl.text = c;
-    setState(() => _showDropdown = false);
+    setState(() { _showDropdown = false; _highlightIndex = -1; });
     _focus.unfocus();
     Navigator.of(context).push(MaterialPageRoute(builder: (ctx) => DoctorsList(initialCondition: c)));
   }
@@ -563,8 +644,8 @@ class _ConditionOnlySearchBarState extends State<_ConditionOnlySearchBar> {
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFF0891B2).withValues(alpha: 0.3), width: 1.5),
-              boxShadow: [BoxShadow(color: const Color(0xFF0891B2).withValues(alpha: 0.06), blurRadius: 8, offset: const Offset(0, 2))],
+              border: Border.all(color: _accentColor.withValues(alpha: 0.3), width: 1.5),
+              boxShadow: [BoxShadow(color: _accentColor.withValues(alpha: 0.06), blurRadius: 8, offset: const Offset(0, 2))],
             ),
             child: TextField(
               controller: _ctrl,
@@ -572,10 +653,10 @@ class _ConditionOnlySearchBarState extends State<_ConditionOnlySearchBar> {
               decoration: InputDecoration(
                 hintText: 'Search by condition (e.g. Diabetes, Fever...)',
                 hintStyle: TextStyle(fontSize: 13, color: Colors.grey[400]),
-                prefixIcon: const Icon(Icons.search_rounded, color: Color(0xFF0891B2), size: 20),
+                prefixIcon: const Icon(Icons.search_rounded, color: _accentColor, size: 20),
                 suffixIcon: _ctrl.text.isNotEmpty
-                    ? IconButton(icon: const Icon(Icons.clear, size: 18, color: Color(0xFF0891B2)), onPressed: () { _ctrl.clear(); setState(() { _showDropdown = false; }); })
-                    : const Icon(Icons.keyboard_arrow_down_rounded, color: Color(0xFF0891B2), size: 20),
+                    ? IconButton(icon: const Icon(Icons.clear, size: 18, color: _accentColor), onPressed: () { _ctrl.clear(); setState(() { _showDropdown = false; _highlightIndex = -1; }); })
+                    : const Icon(Icons.keyboard_arrow_down_rounded, color: _accentColor, size: 20),
                 border: InputBorder.none,
                 contentPadding: const EdgeInsets.symmetric(vertical: 15),
               ),
@@ -590,19 +671,27 @@ class _ConditionOnlySearchBarState extends State<_ConditionOnlySearchBar> {
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: const Color(0xFF0891B2).withValues(alpha: 0.2)),
+                border: Border.all(color: _accentColor.withValues(alpha: 0.2)),
                 boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 10)],
               ),
               constraints: const BoxConstraints(maxHeight: 220),
-              child: ListView(
+              child: ListView.builder(
+                controller: _scrollCtrl,
                 padding: EdgeInsets.zero,
                 shrinkWrap: true,
-                children: _filtered.map((c) => ListTile(
-                  dense: true,
-                  leading: const Icon(Icons.healing_outlined, size: 16, color: Color(0xFF0891B2)),
-                  title: Text(c, style: const TextStyle(fontSize: 13)),
-                  onTap: () => _select(c),
-                )).toList(),
+                itemCount: _filtered.length,
+                itemBuilder: (_, i) {
+                  final highlighted = i == _highlightIndex;
+                  return Container(
+                    color: highlighted ? _accentColor.withValues(alpha: 0.08) : null,
+                    child: ListTile(
+                      dense: true,
+                      leading: Icon(Icons.healing_outlined, size: 16, color: highlighted ? _accentColor : _accentColor.withValues(alpha: 0.7)),
+                      title: Text(_filtered[i], style: TextStyle(fontSize: 13, fontWeight: highlighted ? FontWeight.w600 : FontWeight.normal, color: highlighted ? _accentColor : const Color(0xFF0F172A))),
+                      onTap: () => _select(_filtered[i]),
+                    ),
+                  );
+                },
               ),
             ),
         ],
@@ -808,9 +897,13 @@ class _MedicineSearchBarState extends State<_MedicineSearchBar> {
   String _filter = 'name';
   final TextEditingController _controller = TextEditingController();
   final FocusNode _focusNode = FocusNode();
+  final ScrollController _scrollCtrl = ScrollController();
   List<Map<String, dynamic>> _suggestions = [];
   bool _showSuggestions = false;
+  int _highlightIndex = -1;
   List<dynamic> _allPharmacies = [];
+
+  static const _accentColor = Color(0xFF95BF47);
 
   @override
   void initState() {
@@ -821,16 +914,59 @@ class _MedicineSearchBarState extends State<_MedicineSearchBar> {
     _focusNode.addListener(() {
       if (!_focusNode.hasFocus) {
         Future.delayed(const Duration(milliseconds: 200), () {
-          if (mounted) setState(() => _showSuggestions = false);
+          if (mounted) setState(() { _showSuggestions = false; _highlightIndex = -1; });
         });
       }
     });
+    _focusNode.onKeyEvent = (node, event) {
+      if (event is! KeyDownEvent) return KeyEventResult.ignored;
+      if (!_showSuggestions || _suggestions.isEmpty) return KeyEventResult.ignored;
+      if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
+        setState(() { _highlightIndex = (_highlightIndex + 1) % _suggestions.length; });
+        _scrollToHighlight();
+        return KeyEventResult.handled;
+      }
+      if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
+        setState(() { _highlightIndex = (_highlightIndex - 1 + _suggestions.length) % _suggestions.length; });
+        _scrollToHighlight();
+        return KeyEventResult.handled;
+      }
+      if (event.logicalKey == LogicalKeyboardKey.enter && _highlightIndex >= 0) {
+        _activateSuggestion(_suggestions[_highlightIndex]);
+        return KeyEventResult.handled;
+      }
+      if (event.logicalKey == LogicalKeyboardKey.escape) {
+        setState(() { _showSuggestions = false; _highlightIndex = -1; });
+        return KeyEventResult.handled;
+      }
+      return KeyEventResult.ignored;
+    };
+  }
+
+  void _scrollToHighlight() {
+    if (!_scrollCtrl.hasClients || _highlightIndex < 0) return;
+    const itemH = 55.0;
+    final offset = (_highlightIndex * itemH).clamp(0.0, _scrollCtrl.position.maxScrollExtent);
+    _scrollCtrl.animateTo(offset, duration: const Duration(milliseconds: 120), curve: Curves.easeOut);
+  }
+
+  void _activateSuggestion(Map<String, dynamic> p) {
+    final isStatic = p.containsKey('_staticType');
+    final name = (p['pharmacyName'] ?? p['pharmacy_name'] ?? p['name'] ?? 'Pharmacy').toString();
+    final label = isStatic ? (p['_label'] as String) : name;
+    setState(() { _controller.text = label; _showSuggestions = false; _highlightIndex = -1; });
+    if (isStatic) {
+      Navigator.of(context).push(MaterialPageRoute(builder: (ctx) => PharmaciesScreen(initialSearch: label)));
+    } else {
+      Navigator.of(context).push(MaterialPageRoute(builder: (ctx) => PharmacyDetailsScreen(pharmacy: p)));
+    }
   }
 
   @override
   void dispose() {
     _controller.dispose();
     _focusNode.dispose();
+    _scrollCtrl.dispose();
     super.dispose();
   }
 
@@ -874,7 +1010,7 @@ class _MedicineSearchBarState extends State<_MedicineSearchBar> {
           .map((c) => {'_staticType': 'condition', '_label': c})
           .toList();
     }
-    setState(() { _suggestions = results; _showSuggestions = results.isNotEmpty; });
+    setState(() { _highlightIndex = -1; _suggestions = results; _showSuggestions = results.isNotEmpty; });
   }
 
   @override
@@ -910,13 +1046,13 @@ class _MedicineSearchBarState extends State<_MedicineSearchBar> {
                     value: _filter,
                     underline: const SizedBox(),
                     icon: const Icon(Icons.arrow_drop_down, size: 20),
-                    style: const TextStyle(fontSize: 12, color: Color(0xFF95BF47), fontWeight: FontWeight.w600),
+                    style: const TextStyle(fontSize: 12, color: _accentColor, fontWeight: FontWeight.w600),
                     items: const [
                       DropdownMenuItem(value: 'name', child: Text('Medicine Name')),
                       DropdownMenuItem(value: 'category', child: Text('Category')),
                       DropdownMenuItem(value: 'condition', child: Text('Condition')),
                     ],
-                    onChanged: (v) => setState(() { _filter = v!; _suggestions = []; _showSuggestions = false; }),
+                    onChanged: (v) => setState(() { _filter = v!; _suggestions = []; _showSuggestions = false; _highlightIndex = -1; }),
                   ),
                 ),
                 Expanded(
@@ -926,13 +1062,13 @@ class _MedicineSearchBarState extends State<_MedicineSearchBar> {
                     decoration: InputDecoration(
                       hintText: hintMap[_filter],
                       hintStyle: TextStyle(fontSize: 13, color: Colors.grey[400]),
-                      prefixIcon: const Icon(Icons.local_pharmacy_rounded, color: Color(0xFF95BF47), size: 20),
+                      prefixIcon: const Icon(Icons.local_pharmacy_rounded, color: _accentColor, size: 20),
                       border: InputBorder.none,
                       contentPadding: const EdgeInsets.symmetric(vertical: 15),
                     ),
                     onChanged: _updateSuggestions,
                     onSubmitted: (value) {
-                      setState(() => _showSuggestions = false);
+                      setState(() { _showSuggestions = false; _highlightIndex = -1; });
                       if (value.trim().isNotEmpty) {
                         Navigator.of(context).push(MaterialPageRoute(
                           builder: (ctx) => PharmaciesScreen(initialSearch: value.trim()),
@@ -947,6 +1083,7 @@ class _MedicineSearchBarState extends State<_MedicineSearchBar> {
           if (_showSuggestions && _suggestions.isNotEmpty)
             Container(
               margin: const EdgeInsets.only(top: 4),
+              constraints: const BoxConstraints(maxHeight: 300),
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(12),
@@ -957,11 +1094,14 @@ class _MedicineSearchBarState extends State<_MedicineSearchBar> {
               ),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(12),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: _suggestions.asMap().entries.map((entry) {
-                    final i = entry.key;
-                    final p = entry.value;
+                child: ListView.builder(
+                  controller: _scrollCtrl,
+                  padding: EdgeInsets.zero,
+                  shrinkWrap: true,
+                  itemCount: _suggestions.length,
+                  itemBuilder: (_, i) {
+                    final p = _suggestions[i];
+                    final highlighted = i == _highlightIndex;
                     final name = (p['pharmacyName'] ?? p['pharmacy_name'] ?? p['name'] ?? 'Pharmacy').toString();
                     final address = (p['address'] ?? p['city'] ?? '').toString();
                     return Column(
@@ -969,35 +1109,23 @@ class _MedicineSearchBarState extends State<_MedicineSearchBar> {
                       children: [
                         if (i > 0) const Divider(height: 1, color: Color(0xFFF1F5F9)),
                         InkWell(
-                          onTap: () {
-                            final isStatic = p.containsKey('_staticType');
-                            final label = isStatic ? (p['_label'] as String) : name;
-                            setState(() { _controller.text = label; _showSuggestions = false; });
-                            if (isStatic) {
-                              Navigator.of(context).push(MaterialPageRoute(
-                                builder: (ctx) => PharmaciesScreen(initialSearch: label),
-                              ));
-                            } else {
-                              Navigator.of(context).push(MaterialPageRoute(
-                                builder: (ctx) => PharmacyDetailsScreen(pharmacy: p),
-                              ));
-                            }
-                          },
-                          child: Padding(
+                          onTap: () => _activateSuggestion(p),
+                          child: Container(
+                            color: highlighted ? _accentColor.withValues(alpha: 0.07) : null,
                             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
                             child: Row(
                               children: [
                                 Container(
                                   padding: const EdgeInsets.all(7),
                                   decoration: BoxDecoration(
-                                    color: const Color(0xFF95BF47).withValues(alpha: 0.1),
+                                    color: _accentColor.withValues(alpha: highlighted ? 0.18 : 0.1),
                                     borderRadius: BorderRadius.circular(8),
                                   ),
                                   child: Icon(
                                     p.containsKey('_staticType')
                                         ? (p['_staticType'] == 'condition' ? Icons.medical_services_outlined : Icons.category_outlined)
                                         : Icons.local_pharmacy_rounded,
-                                    size: 15, color: const Color(0xFF95BF47),
+                                    size: 15, color: _accentColor,
                                   ),
                                 ),
                                 const SizedBox(width: 12),
@@ -1007,7 +1135,7 @@ class _MedicineSearchBarState extends State<_MedicineSearchBar> {
                                     children: [
                                       Text(
                                         p.containsKey('_staticType') ? (p['_label'] as String) : name,
-                                        style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: Color(0xFF0F172A)),
+                                        style: TextStyle(fontWeight: highlighted ? FontWeight.w700 : FontWeight.w600, fontSize: 13, color: highlighted ? _accentColor : const Color(0xFF0F172A)),
                                       ),
                                       if (!p.containsKey('_staticType') && address.isNotEmpty)
                                         Text(address, style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
@@ -1021,7 +1149,7 @@ class _MedicineSearchBarState extends State<_MedicineSearchBar> {
                         ),
                       ],
                     );
-                  }).toList(),
+                  },
                 ),
               ),
             ),
@@ -1040,9 +1168,13 @@ class _LabSearchBarState extends State<_LabSearchBar> {
   String _filter = 'test';
   final TextEditingController _controller = TextEditingController();
   final FocusNode _focusNode = FocusNode();
+  final ScrollController _scrollCtrl = ScrollController();
   List<_HomeSuggestion> _suggestions = [];
   bool _showSuggestions = false;
+  int _highlightIndex = -1;
   List<Map<String, dynamic>> _allLabs = [];
+
+  static const _accentColor = Color(0xFFFF4D00);
 
   @override
   void initState() {
@@ -1053,16 +1185,65 @@ class _LabSearchBarState extends State<_LabSearchBar> {
     _focusNode.addListener(() {
       if (!_focusNode.hasFocus) {
         Future.delayed(const Duration(milliseconds: 200), () {
-          if (mounted) setState(() => _showSuggestions = false);
+          if (mounted) setState(() { _showSuggestions = false; _highlightIndex = -1; });
         });
       }
     });
+    _focusNode.onKeyEvent = (node, event) {
+      if (event is! KeyDownEvent) return KeyEventResult.ignored;
+      if (!_showSuggestions || _suggestions.isEmpty) return KeyEventResult.ignored;
+      if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
+        setState(() { _highlightIndex = (_highlightIndex + 1) % _suggestions.length; });
+        _scrollToHighlight();
+        return KeyEventResult.handled;
+      }
+      if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
+        setState(() { _highlightIndex = (_highlightIndex - 1 + _suggestions.length) % _suggestions.length; });
+        _scrollToHighlight();
+        return KeyEventResult.handled;
+      }
+      if (event.logicalKey == LogicalKeyboardKey.enter && _highlightIndex >= 0) {
+        _activateSuggestion(_suggestions[_highlightIndex]);
+        return KeyEventResult.handled;
+      }
+      if (event.logicalKey == LogicalKeyboardKey.escape) {
+        setState(() { _showSuggestions = false; _highlightIndex = -1; });
+        return KeyEventResult.handled;
+      }
+      return KeyEventResult.ignored;
+    };
+  }
+
+  void _scrollToHighlight() {
+    if (!_scrollCtrl.hasClients || _highlightIndex < 0) return;
+    const itemH = 55.0;
+    final offset = (_highlightIndex * itemH).clamp(0.0, _scrollCtrl.position.maxScrollExtent);
+    _scrollCtrl.animateTo(offset, duration: const Duration(milliseconds: 120), curve: Curves.easeOut);
+  }
+
+  void _activateSuggestion(_HomeSuggestion s) {
+    setState(() { _controller.text = s.label; _showSuggestions = false; _highlightIndex = -1; });
+    final hasId = s.raw.containsKey('_id');
+    if (hasId) {
+      Navigator.of(context).push(MaterialPageRoute(
+        builder: (ctx) => BookLabScreen(
+          labId: s.raw['_id']?.toString() ?? '',
+          labTitle: (s.raw['labName'] ?? s.raw['name'] ?? '').toString(),
+          labProfileId: s.raw['profileId']?.toString(),
+        ),
+      ));
+    } else {
+      Navigator.of(context).push(MaterialPageRoute(
+        builder: (ctx) => LabsListScreen(initialSearch: s.label),
+      ));
+    }
   }
 
   @override
   void dispose() {
     _controller.dispose();
     _focusNode.dispose();
+    _scrollCtrl.dispose();
     super.dispose();
   }
 
@@ -1126,7 +1307,7 @@ class _LabSearchBarState extends State<_LabSearchBar> {
         if (results.length >= 6) break;
       }
     }
-    setState(() { _suggestions = results; _showSuggestions = results.isNotEmpty; });
+    setState(() { _highlightIndex = -1; _suggestions = results; _showSuggestions = results.isNotEmpty; });
   }
 
   @override
@@ -1162,13 +1343,13 @@ class _LabSearchBarState extends State<_LabSearchBar> {
                     value: _filter,
                     underline: const SizedBox(),
                     icon: const Icon(Icons.arrow_drop_down, size: 20),
-                    style: const TextStyle(fontSize: 12, color: Color(0xFFFF4D00), fontWeight: FontWeight.w600),
+                    style: const TextStyle(fontSize: 12, color: _accentColor, fontWeight: FontWeight.w600),
                     items: const [
                       DropdownMenuItem(value: 'test', child: Text('Test Name')),
                       DropdownMenuItem(value: 'category', child: Text('Category')),
                       DropdownMenuItem(value: 'lab', child: Text('Lab Name')),
                     ],
-                    onChanged: (v) => setState(() { _filter = v!; _suggestions = []; _showSuggestions = false; }),
+                    onChanged: (v) => setState(() { _filter = v!; _suggestions = []; _showSuggestions = false; _highlightIndex = -1; }),
                   ),
                 ),
                 Expanded(
@@ -1178,13 +1359,13 @@ class _LabSearchBarState extends State<_LabSearchBar> {
                     decoration: InputDecoration(
                       hintText: hintMap[_filter],
                       hintStyle: TextStyle(fontSize: 13, color: Colors.grey[400]),
-                      prefixIcon: const Icon(Icons.biotech_rounded, color: Color(0xFFFF4D00), size: 20),
+                      prefixIcon: const Icon(Icons.biotech_rounded, color: _accentColor, size: 20),
                       border: InputBorder.none,
                       contentPadding: const EdgeInsets.symmetric(vertical: 15),
                     ),
                     onChanged: _updateSuggestions,
                     onSubmitted: (value) {
-                      setState(() => _showSuggestions = false);
+                      setState(() { _showSuggestions = false; _highlightIndex = -1; });
                       if (value.trim().isNotEmpty) {
                         Navigator.of(context).push(MaterialPageRoute(
                           builder: (ctx) => LabsListScreen(initialSearch: value.trim()),
@@ -1199,6 +1380,7 @@ class _LabSearchBarState extends State<_LabSearchBar> {
           if (_showSuggestions && _suggestions.isNotEmpty)
             Container(
               margin: const EdgeInsets.only(top: 4),
+              constraints: const BoxConstraints(maxHeight: 300),
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(12),
@@ -1209,46 +1391,34 @@ class _LabSearchBarState extends State<_LabSearchBar> {
               ),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(12),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: _suggestions.asMap().entries.map((entry) {
-                    final i = entry.key;
-                    final s = entry.value;
+                child: ListView.builder(
+                  controller: _scrollCtrl,
+                  padding: EdgeInsets.zero,
+                  shrinkWrap: true,
+                  itemCount: _suggestions.length,
+                  itemBuilder: (_, i) {
+                    final s = _suggestions[i];
+                    final highlighted = i == _highlightIndex;
                     return Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         if (i > 0) const Divider(height: 1, color: Color(0xFFF1F5F9)),
                         InkWell(
-                          onTap: () {
-                            setState(() { _controller.text = s.label; _showSuggestions = false; });
-                            final hasId = s.raw.containsKey('_id');
-                            if (hasId) {
-                              Navigator.of(context).push(MaterialPageRoute(
-                                builder: (ctx) => BookLabScreen(
-                                  labId: s.raw['_id']?.toString() ?? '',
-                                  labTitle: (s.raw['labName'] ?? s.raw['name'] ?? '').toString(),
-                                  labProfileId: s.raw['profileId']?.toString(),
-                                ),
-                              ));
-                            } else {
-                              Navigator.of(context).push(MaterialPageRoute(
-                                builder: (ctx) => LabsListScreen(initialSearch: s.label),
-                              ));
-                            }
-                          },
-                          child: Padding(
+                          onTap: () => _activateSuggestion(s),
+                          child: Container(
+                            color: highlighted ? _accentColor.withValues(alpha: 0.07) : null,
                             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
                             child: Row(
                               children: [
                                 Container(
                                   padding: const EdgeInsets.all(7),
                                   decoration: BoxDecoration(
-                                    color: const Color(0xFFFF4D00).withValues(alpha: 0.08),
+                                    color: _accentColor.withValues(alpha: highlighted ? 0.15 : 0.08),
                                     borderRadius: BorderRadius.circular(8),
                                   ),
                                   child: Icon(
                                     s.isTest ? Icons.biotech_outlined : Icons.science_outlined,
-                                    size: 15, color: const Color(0xFFFF4D00),
+                                    size: 15, color: _accentColor,
                                   ),
                                 ),
                                 const SizedBox(width: 12),
@@ -1256,12 +1426,9 @@ class _LabSearchBarState extends State<_LabSearchBar> {
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      Text(s.label, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: Color(0xFF0F172A))),
+                                      Text(s.label, style: TextStyle(fontWeight: highlighted ? FontWeight.w700 : FontWeight.w600, fontSize: 13, color: highlighted ? _accentColor : const Color(0xFF0F172A))),
                                       if (s.sublabel.isNotEmpty)
-                                        Text(
-                                          s.sublabel,
-                                          style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
-                                        ),
+                                        Text(s.sublabel, style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
                                     ],
                                   ),
                                 ),
@@ -1272,7 +1439,7 @@ class _LabSearchBarState extends State<_LabSearchBar> {
                         ),
                       ],
                     );
-                  }).toList(),
+                  },
                 ),
               ),
             ),

@@ -70,7 +70,7 @@ class _PatientLabOrdersScreenState extends ConsumerState<PatientLabOrdersScreen>
           ]),
           content: SingleChildScrollView(
             child: SizedBox(
-              width: 380,
+              width: double.maxFinite,
               child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text('Booking: #$bookingNumber • $testName', style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
                 const SizedBox(height: 16),
