@@ -178,12 +178,21 @@ class _InstructorLmsCoursesScreenState extends State<InstructorLmsCoursesScreen>
                 // Filter chips
                 Row(
                   children: [
-                    _buildFilterChip('All Courses', 'all'),
+                    Flexible(
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          children: [
+                            _buildFilterChip('All Courses', 'all'),
+                            const SizedBox(width: 8),
+                            _buildFilterChip('Published', 'published'),
+                            const SizedBox(width: 8),
+                            _buildFilterChip('Drafts', 'draft'),
+                          ],
+                        ),
+                      ),
+                    ),
                     const SizedBox(width: 8),
-                    _buildFilterChip('Published', 'published'),
-                    const SizedBox(width: 8),
-                    _buildFilterChip('Drafts', 'draft'),
-                    const Spacer(),
                     Text(
                       '${_filteredCourses.length} courses',
                       style: const TextStyle(

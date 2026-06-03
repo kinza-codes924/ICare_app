@@ -399,6 +399,8 @@ class _StudentDashboardState extends ConsumerState<StudentDashboard> {
                       ],
                     ),
                     const SizedBox(height: 20),
+                    // Extra bottom space so content clears the floating WhatsApp button
+                    const SizedBox(height: 80),
                   ],
                 ),
               ),

@@ -24,6 +24,7 @@ import 'package:icare/screens/login_activity_screen.dart';
 import 'package:icare/services/health_settings_service.dart';
 import 'package:icare/services/api_service.dart';
 import 'package:icare/utils/shared_pref.dart';
+import 'package:icare/utils/utils.dart' show buildProfileImageProvider;
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
@@ -34,6 +35,10 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:intl/intl.dart';
 import '../utils/water_notif_stub.dart'
     if (dart.library.html) '../utils/water_notif_web.dart';
+import 'package:icare/services/reminder_service.dart';
+
+// 1 reward point = 0.01 PKR (100 pts = 1 PKR). Configurable from backend.
+const double _kPointToPkr = 0.01;
 
 // ═══════════════════════════════════════════════════════════════════════════
 // SETTINGS SCREEN
@@ -79,6 +84,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   final List<String> _savedPaymentMethods = [];
   final List<String> _billingHistory = [];
 
+  // Reminders
+  TimeOfDay? _medReminderTime;
+  TimeOfDay? _healthCheckReminderTime;
+  bool _appointmentRemindersEnabled = true;
+
+  // Diagnostics
+  bool _preferHomeSample = false;
+  String _reportDelivery = 'In-app';
+
   // Billing & payment
   List<Map<String, dynamic>> _billingItems = [];
   bool _billingLoading = false;
@@ -93,6 +107,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     _loadBillingItems();
     _loadSavedAddresses();
     _loadPointsData();
+    _loadReminderAndDiagnosticsPrefs();
   }
 
   Future<void> _loadPointsData() async {
@@ -110,6 +125,33 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     try {
       final prefs = await SharedPreferences.getInstance();
       if (mounted) setState(() => _prescriptionEmailEnabled = prefs.getBool('prescription_email_enabled') ?? true);
+    } catch (_) {}
+  }
+
+  Future<void> _loadReminderAndDiagnosticsPrefs() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (mounted) {
+        setState(() {
+          final medTime = prefs.getString('med_reminder_time');
+          if (medTime != null) {
+            final parts = medTime.split(':');
+            if (parts.length == 2) {
+              _medReminderTime = TimeOfDay(hour: int.tryParse(parts[0]) ?? 8, minute: int.tryParse(parts[1]) ?? 0);
+            }
+          }
+          final healthTime = prefs.getString('health_check_reminder_time');
+          if (healthTime != null) {
+            final parts = healthTime.split(':');
+            if (parts.length == 2) {
+              _healthCheckReminderTime = TimeOfDay(hour: int.tryParse(parts[0]) ?? 8, minute: int.tryParse(parts[1]) ?? 0);
+            }
+          }
+          _appointmentRemindersEnabled = prefs.getBool('appointment_reminders_enabled') ?? true;
+          _preferHomeSample = prefs.getBool('prefer_home_sample') ?? false;
+          _reportDelivery = prefs.getString('report_delivery_method') ?? 'In-app';
+        });
+      }
     } catch (_) {}
   }
 
@@ -1280,6 +1322,56 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     }
   }
 
+  Future<void> _setMedReminder(TimeOfDay? time) async {
+    setState(() => _medReminderTime = time);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (time != null) {
+        await prefs.setString('med_reminder_time', '${time.hour}:${time.minute}');
+        await ReminderService().createReminder({'title': 'Take your medication', 'type': 'medication', 'time': '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}', 'isRecurring': true});
+      } else {
+        await prefs.remove('med_reminder_time');
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _setHealthCheckReminder(TimeOfDay? time) async {
+    setState(() => _healthCheckReminderTime = time);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (time != null) {
+        await prefs.setString('health_check_reminder_time', '${time.hour}:${time.minute}');
+        await ReminderService().createReminder({'title': 'Log your health metrics', 'type': 'health_check', 'time': '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}', 'isRecurring': true});
+      } else {
+        await prefs.remove('health_check_reminder_time');
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _toggleAppointmentReminders(bool value) async {
+    setState(() => _appointmentRemindersEnabled = value);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('appointment_reminders_enabled', value);
+    } catch (_) {}
+  }
+
+  Future<void> _togglePreferHomeSample(bool value) async {
+    setState(() => _preferHomeSample = value);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('prefer_home_sample', value);
+    } catch (_) {}
+  }
+
+  Future<void> _setReportDelivery(String method) async {
+    setState(() => _reportDelivery = method);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('report_delivery_method', method);
+    } catch (_) {}
+  }
+
   void _showFeeDialog(BuildContext ctx) {
     final ctrl = TextEditingController();
     bool saving = false;
@@ -1296,8 +1388,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final role = ref.read(authProvider).userRole ?? '';
-    final user = ref.read(authProvider).user;
+    final role = ref.watch(authProvider).userRole ?? '';
+    final user = ref.watch(authProvider).user;
     final isPatient = role == 'Patient';
     final isPharmacy = role == 'Pharmacy';
     final isLaboratory = role == 'Laboratory';
@@ -1321,6 +1413,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       savedAddressSubtitle: _savedAddresses.isEmpty ? 'Tap to add' : '${_savedAddresses.length} address${_savedAddresses.length == 1 ? '' : 'es'} saved',
       savedPaymentMethods: _savedPaymentMethods, billingHistory: _billingHistory,
       totalPoints: _totalPoints, pointsHistory: _pointsHistory,
+      medReminderTime: _medReminderTime, healthCheckReminderTime: _healthCheckReminderTime,
+      appointmentRemindersEnabled: _appointmentRemindersEnabled,
+      preferHomeSample: _preferHomeSample, reportDelivery: _reportDelivery,
       onToggle2FA: _toggle2FA, onToggleBiometrics: _toggleBiometrics,
       onTogglePrescriptionEmail: _togglePrescriptionEmail,
       onTrackerToggle: _updateTrackerToggle, onHealthModeToggle: _toggleHealthMode,
@@ -1334,6 +1429,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       onShowDeliveryAddress: _showDeliveryAddressesDialog, onDownloadHealthData: _downloadHealthData,
       onShowPaymentMethods: _showPaymentMethodsDialog, onShowBillingHistory: _showBillingHistoryDialog,
       onShowOrderHistory: _showOrderHistoryDialog, onShowDeliveryPreferences: _showDeliveryPreferencesDialog,
+      onSetMedReminder: _setMedReminder, onSetHealthCheckReminder: _setHealthCheckReminder,
+      onToggleAppointmentReminders: _toggleAppointmentReminders,
+      onTogglePreferHomeSample: _togglePreferHomeSample, onSetReportDelivery: _setReportDelivery,
     );
 
     if (isWide) return _WebSettingsLayout(p: params);
@@ -1359,6 +1457,13 @@ class _SettingsLayoutParams {
   final Map<String, bool> trackerToggles;
   final int totalPoints;
   final List<dynamic> pointsHistory;
+  // Reminders
+  final TimeOfDay? medReminderTime;
+  final TimeOfDay? healthCheckReminderTime;
+  final bool appointmentRemindersEnabled;
+  // Diagnostics
+  final bool preferHomeSample;
+  final String reportDelivery;
   final void Function(bool) onToggle2FA, onToggleBiometrics, onTogglePrescriptionEmail;
   final void Function(String, bool) onTrackerToggle, onHealthModeToggle;
   final VoidCallback onLogout;
@@ -1370,6 +1475,13 @@ class _SettingsLayoutParams {
   final void Function(BuildContext) onShowDeliveryAddress, onDownloadHealthData;
   final void Function(BuildContext) onShowPaymentMethods, onShowBillingHistory;
   final void Function(BuildContext) onShowOrderHistory, onShowDeliveryPreferences;
+  // Reminder setters (callbacks)
+  final void Function(TimeOfDay?) onSetMedReminder;
+  final void Function(TimeOfDay?) onSetHealthCheckReminder;
+  final void Function(bool) onToggleAppointmentReminders;
+  // Diagnostics setters
+  final void Function(bool) onTogglePreferHomeSample;
+  final void Function(String) onSetReportDelivery;
 
   const _SettingsLayoutParams({
     required this.role, required this.user,
@@ -1385,6 +1497,9 @@ class _SettingsLayoutParams {
     required this.savedAddressSubtitle, required this.savedPaymentMethods,
     required this.billingHistory, required this.trackerToggles,
     required this.totalPoints, required this.pointsHistory,
+    required this.medReminderTime, required this.healthCheckReminderTime,
+    required this.appointmentRemindersEnabled,
+    required this.preferHomeSample, required this.reportDelivery,
     required this.onToggle2FA, required this.onToggleBiometrics,
     required this.onTogglePrescriptionEmail,
     required this.onTrackerToggle, required this.onHealthModeToggle,
@@ -1398,6 +1513,9 @@ class _SettingsLayoutParams {
     required this.onDownloadHealthData, required this.onShowPaymentMethods,
     required this.onShowBillingHistory,
     required this.onShowOrderHistory, required this.onShowDeliveryPreferences,
+    required this.onSetMedReminder, required this.onSetHealthCheckReminder,
+    required this.onToggleAppointmentReminders,
+    required this.onTogglePreferHomeSample, required this.onSetReportDelivery,
   });
 }
 
@@ -1419,8 +1537,9 @@ class _WebSettingsLayout extends StatelessWidget {
         if (p.isDoctor) ...[_doctorProfessionalCard(context), const SizedBox(height: 24)],
         if (p.isPatient) ...[_healthProfile(context), const SizedBox(height: 24)],
         _notificationsCard(context), const SizedBox(height: 24),
-        if (p.isPatient) ...[_waterReminderCard(context), const SizedBox(height: 24)],
+        if (p.isPatient) ...[_remindersCard(context), const SizedBox(height: 24)],
         if (p.isPatient) ...[_rewardsCard(context), const SizedBox(height: 24)],
+        if (p.isPatient) ...[_diagnosticsCard(context), const SizedBox(height: 24)],
         if (p.isPatient) ...[_privacyCard(context), const SizedBox(height: 24)],
         if (p.isPatient) ...[_paymentCard(context), const SizedBox(height: 24)],
         _contactCard(context), const SizedBox(height: 24),
@@ -1442,8 +1561,11 @@ class _WebSettingsLayout extends StatelessWidget {
       child: Padding(padding: const EdgeInsets.all(20), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
           CircleAvatar(radius: 32, backgroundColor: AppColors.primaryColor.withValues(alpha: 0.1),
-            backgroundImage: p.user?.profilePicture != null ? NetworkImage(p.user!.profilePicture!) : null,
-            child: p.user?.profilePicture == null ? Text((p.user?.name ?? 'U').substring(0, 1).toUpperCase(), style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: AppColors.primaryColor)) : null),
+            child: ClipOval(child: () {
+              final img = buildProfileImageProvider(p.user?.profilePicture);
+              if (img != null) return Image(image: img, width: 64, height: 64, fit: BoxFit.cover, errorBuilder: (_, __, ___) => Text((p.user?.name ?? 'U').substring(0, 1).toUpperCase(), style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: AppColors.primaryColor)));
+              return Text((p.user?.name ?? 'U').substring(0, 1).toUpperCase(), style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: AppColors.primaryColor));
+            }())),
           const SizedBox(width: 16),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(p.user?.name ?? 'User', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700)),
@@ -1517,6 +1639,53 @@ class _WebSettingsLayout extends StatelessWidget {
       ])));
   }
 
+  // ── REMINDERS & NOTIFICATIONS ──
+  Widget _remindersCard(BuildContext context) {
+    final waterLabels = {'30': '30 min', '60': '1 hr', '120': '2 hrs', '180': '3 hrs'};
+    final waterLabel = waterLabels[p.waterReminderMinutes.toString()] ?? '1 hr';
+    String fmtTime(TimeOfDay? t) => t == null ? 'Not set' : t.format(context);
+    return Card(elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Padding(padding: const EdgeInsets.all(20), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        _sectionLabel('Reminders & Notifications'), const SizedBox(height: 16),
+        _settingsTile(icon: Icons.medication_outlined, iconColor: const Color(0xFF8B5CF6), title: 'Medication Reminder', subtitle: fmtTime(p.medReminderTime), onTap: () async {
+          final picked = await showTimePicker(context: context, initialTime: p.medReminderTime ?? const TimeOfDay(hour: 8, minute: 0));
+          if (picked != null) p.onSetMedReminder(picked);
+        }),
+        const Divider(height: 1),
+        _settingsTile(icon: Icons.water_drop_outlined, iconColor: const Color(0xFF3B82F6), title: 'Water Reminder', subtitle: 'Every $waterLabel', onTap: () => p.onShowWaterReminder(context)),
+        const Divider(height: 1),
+        _settingsTile(icon: Icons.monitor_heart_outlined, iconColor: const Color(0xFFEF4444), title: 'Health Check Reminder', subtitle: fmtTime(p.healthCheckReminderTime), onTap: () async {
+          final picked = await showTimePicker(context: context, initialTime: p.healthCheckReminderTime ?? const TimeOfDay(hour: 8, minute: 0));
+          if (picked != null) p.onSetHealthCheckReminder(picked);
+        }),
+        const Divider(height: 1),
+        _switchTile(icon: Icons.calendar_today_outlined, title: 'Appointment Reminders', subtitle: 'Get reminded before appointments', value: p.appointmentRemindersEnabled, onChanged: p.onToggleAppointmentReminders),
+      ])));
+  }
+
+  // ── DIAGNOSTICS SETTINGS ──
+  Widget _diagnosticsCard(BuildContext context) {
+    return Card(elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Padding(padding: const EdgeInsets.all(20), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        _sectionLabel('Diagnostics Settings'), const SizedBox(height: 16),
+        _settingsTile(icon: Icons.science_outlined, iconColor: const Color(0xFF3B82F6), title: 'Test History', subtitle: 'View past lab bookings', onTap: () => p.onComingSoon(context, 'Test History')),
+        const Divider(height: 1),
+        _switchTile(icon: Icons.home_outlined, title: 'Home Sample Collection', subtitle: 'Prefer home sample collection', value: p.preferHomeSample, onChanged: p.onTogglePreferHomeSample),
+        const Divider(height: 1),
+        _settingsTile(icon: Icons.assignment_outlined, iconColor: const Color(0xFF8B5CF6), title: 'Report Delivery', subtitle: p.reportDelivery, onTap: () => _showReportDeliverySheet(context)),
+      ])));
+  }
+
+  void _showReportDeliverySheet(BuildContext context) {
+    final options = ['In-app', 'Email only', 'Both'];
+    showModalBottomSheet(context: context, shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))), builder: (_) => SafeArea(child: Column(mainAxisSize: MainAxisSize.min, children: [
+      const Padding(padding: EdgeInsets.all(16), child: Text('Report Delivery Method', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16))),
+      const Divider(height: 1),
+      ...options.map((opt) => ListTile(title: Text(opt), trailing: p.reportDelivery == opt ? const Icon(Icons.check_circle_rounded, color: Color(0xFF10B981)) : null, onTap: () { p.onSetReportDelivery(opt); Navigator.pop(context); })),
+      const SizedBox(height: 8),
+    ])));
+  }
+
   // ── REWARDS ──
   Widget _rewardsCard(BuildContext context) {
     return Card(elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -1528,7 +1697,7 @@ class _WebSettingsLayout extends StatelessWidget {
         const Divider(height: 1),
         _settingsTile(icon: Icons.history_outlined, iconColor: const Color(0xFFF59E0B), title: 'Reward History', subtitle: p.pointsHistory.isEmpty ? 'No activity yet' : '${p.pointsHistory.length} activities', onTap: () => _showRewardHistoryDialog(context)),
         const Divider(height: 1),
-        _settingsTile(icon: Icons.swap_horiz_outlined, iconColor: const Color(0xFFF59E0B), title: 'Redemption History', subtitle: 'Coming soon', onTap: () => p.onComingSoon(context, 'Redemption History')),
+        _settingsTile(icon: Icons.swap_horiz_outlined, iconColor: const Color(0xFFF59E0B), title: 'Redemption History', subtitle: 'View redeemed rewards', onTap: () => _showRedemptionHistoryDialog(context)),
       ])));
   }
 
@@ -1545,6 +1714,7 @@ class _WebSettingsLayout extends StatelessWidget {
         Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text('${p.totalPoints}', style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w900, color: Colors.white)),
           const Text('Total Points', style: TextStyle(fontSize: 12, color: Colors.white70, fontWeight: FontWeight.w600)),
+          Text('≈ PKR ${(p.totalPoints * _kPointToPkr).toStringAsFixed(2)}', style: const TextStyle(fontSize: 11, color: Colors.white60)),
         ]),
       ]),
     );
@@ -1554,7 +1724,7 @@ class _WebSettingsLayout extends StatelessWidget {
     showDialog(context: context, builder: (dc) => AlertDialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       title: const Row(children: [Icon(Icons.stars_rounded, color: Color(0xFFF59E0B), size: 24), SizedBox(width: 10), Text('My Points', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18))]),
-      content: SizedBox(width: double.maxFinite,child: Column(mainAxisSize: MainAxisSize.min, children: [
+      content: SizedBox(width: double.maxFinite, child: Column(mainAxisSize: MainAxisSize.min, children: [
         Container(
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
@@ -1567,13 +1737,112 @@ class _WebSettingsLayout extends StatelessWidget {
             Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text('${p.totalPoints}', style: const TextStyle(fontSize: 36, fontWeight: FontWeight.w900, color: Colors.white)),
               const Text('Reward Points', style: TextStyle(fontSize: 13, color: Colors.white70)),
+              Text('≈ PKR ${(p.totalPoints * _kPointToPkr).toStringAsFixed(2)}', style: const TextStyle(fontSize: 12, color: Colors.white60)),
             ]),
           ]),
         ),
         const SizedBox(height: 16),
         const Text('Points are earned by:\n• Logging vitals (+5 pts each)\n• Completing daily goals (+10 pts)\n• Taking all medications (+10 pts)\n• Attending consultations (+15 pts)', style: TextStyle(fontSize: 13, color: Color(0xFF475569), height: 1.6)),
+        const SizedBox(height: 12),
+        SizedBox(width: double.infinity, child: ElevatedButton.icon(onPressed: () { Navigator.pop(dc); _showRedeemRewardsDialog(context); }, icon: const Icon(Icons.redeem_rounded, size: 18), label: const Text('Redeem Points'), style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF10B981), foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))))),
       ])),
       actions: [ElevatedButton(onPressed: () => Navigator.pop(dc), style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFF59E0B), foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))), child: const Text('Close'))],
+    ));
+  }
+
+  void _showRedeemRewardsDialog(BuildContext context) {
+    final rewards = [
+      {'id': 'free_consultation', 'title': 'Free Consultation', 'cost': 1000, 'icon': Icons.video_call_rounded, 'color': const Color(0xFF10B981)},
+      {'id': 'lab_test_discount', 'title': 'Lab Test Discount (20%)', 'cost': 500, 'icon': Icons.science_outlined, 'color': const Color(0xFF3B82F6)},
+    ];
+    final gamSvc = GamificationService();
+    showDialog(context: context, builder: (dc) => StatefulBuilder(builder: (dc2, setS) => AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      title: const Row(children: [Icon(Icons.redeem_rounded, color: Color(0xFF10B981), size: 24), SizedBox(width: 10), Text('Redeem Points', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18))]),
+      content: SizedBox(width: double.maxFinite, child: Column(mainAxisSize: MainAxisSize.min, children: [
+        ...rewards.map((r) {
+          final cost = r['cost'] as int;
+          final hasEnough = p.totalPoints >= cost;
+          final icon = r['icon'] as IconData;
+          final color = r['color'] as Color;
+          return Padding(padding: const EdgeInsets.only(bottom: 12), child: Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(color: color.withValues(alpha: 0.07), borderRadius: BorderRadius.circular(12), border: Border.all(color: color.withValues(alpha: 0.2))),
+            child: Row(children: [
+              Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: color.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(8)), child: Icon(icon, color: color, size: 22)),
+              const SizedBox(width: 12),
+              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(r['title'] as String, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+                Text('$cost pts required', style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+              ])),
+              ElevatedButton(
+                onPressed: hasEnough ? () async {
+                  Navigator.pop(dc2);
+                  try {
+                    final result = await gamSvc.redeemReward(r['id'] as String);
+                    if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(result['message']?.toString() ?? (result['success'] == true ? 'Reward redeemed!' : 'Redemption failed')), backgroundColor: result['success'] == true ? Colors.green : Colors.red));
+                  } catch (e) {
+                    if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to redeem: $e'), backgroundColor: Colors.red));
+                  }
+                } : null,
+                style: ElevatedButton.styleFrom(backgroundColor: hasEnough ? const Color(0xFF10B981) : const Color(0xFFCBD5E1), foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)), padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8)),
+                child: Text(hasEnough ? 'Redeem' : 'Not enough', style: const TextStyle(fontSize: 12)),
+              ),
+            ]),
+          ));
+        }),
+        const Divider(),
+        const Text('1 pt = PKR 0.01 • Rate may change by platform', style: TextStyle(fontSize: 11, color: Color(0xFF94A3B8))),
+      ])),
+      actions: [TextButton(onPressed: () => Navigator.pop(dc2), child: const Text('Close'))],
+    )));
+  }
+
+  void _showRedemptionHistoryDialog(BuildContext context) {
+    final gamSvc = GamificationService();
+    showDialog(context: context, builder: (dc) => FutureBuilder<Map<String, dynamic>>(
+      future: gamSvc.getMyStats(),
+      builder: (_, snap) {
+        List<dynamic> redemptions = [];
+        if (snap.hasData && snap.data!['success'] == true) {
+          final data = snap.data!;
+          redemptions = (data['redemptions'] ?? data['redeemedRewards'] ?? []) as List<dynamic>;
+        }
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: const Row(children: [Icon(Icons.swap_horiz_outlined, color: Color(0xFFF59E0B), size: 22), SizedBox(width: 10), Text('Redemption History', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16))]),
+          content: SizedBox(width: double.maxFinite, height: 280, child: snap.connectionState == ConnectionState.waiting
+            ? const Center(child: CircularProgressIndicator())
+            : redemptions.isEmpty
+              ? Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                  const Icon(Icons.swap_horiz_outlined, size: 48, color: Color(0xFFCBD5E1)),
+                  const SizedBox(height: 12),
+                  const Text('No redemptions yet', style: TextStyle(color: Color(0xFF64748B))),
+                  const SizedBox(height: 16),
+                  ElevatedButton.icon(onPressed: () { Navigator.pop(dc); _showRedeemRewardsDialog(context); }, icon: const Icon(Icons.redeem_rounded, size: 16), label: const Text('Redeem Points'), style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF10B981), foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)))),
+                ]))
+              : ListView.separated(
+                  itemCount: redemptions.length,
+                  separatorBuilder: (_, __) => const Divider(height: 1),
+                  itemBuilder: (_, i) {
+                    final item = redemptions[i];
+                    final title = (item is Map ? item['title'] ?? item['rewardId'] ?? 'Reward' : 'Reward').toString();
+                    final pts = (item is Map ? item['points'] ?? item['cost'] ?? 0 : 0) as num;
+                    final date = (item is Map ? item['createdAt'] ?? item['date'] ?? '' : '').toString();
+                    String dateStr = '';
+                    try { dateStr = date.isNotEmpty ? DateFormat('MMM d, yyyy').format(DateTime.parse(date).toLocal()) : ''; } catch (_) {}
+                    return ListTile(dense: true,
+                      leading: Container(padding: const EdgeInsets.all(6), decoration: BoxDecoration(color: const Color(0xFFF0FDF4), borderRadius: BorderRadius.circular(8)), child: const Icon(Icons.redeem_rounded, color: Color(0xFF10B981), size: 16)),
+                      title: Text(title, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                      subtitle: dateStr.isNotEmpty ? Text(dateStr, style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8))) : null,
+                      trailing: Text('-$pts pts', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: Color(0xFFEF4444))),
+                    );
+                  },
+                ),
+          ),
+          actions: [ElevatedButton(onPressed: () => Navigator.pop(dc), style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFF59E0B), foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))), child: const Text('Close'))],
+        );
+      },
     ));
   }
 
@@ -1622,6 +1891,8 @@ class _WebSettingsLayout extends StatelessWidget {
       child: Padding(padding: const EdgeInsets.all(20), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         _sectionLabel('Payment & Subscription'), const SizedBox(height: 16),
         _settingsTile(icon: Icons.credit_card_outlined, iconColor: const Color(0xFF10B981), title: 'Saved Payment Methods', subtitle: p.savedPaymentMethods.isEmpty ? 'No methods saved' : '${p.savedPaymentMethods.length} method(s)', onTap: () => p.onShowPaymentMethods(context)),
+        const Divider(height: 1),
+        _settingsTile(icon: Icons.card_membership_outlined, iconColor: const Color(0xFF6366F1), title: 'Subscription Plans', subtitle: 'View or upgrade your plan', onTap: () => p.onComingSoon(context, 'Subscription Plans')),
         const Divider(height: 1),
         _settingsTile(icon: Icons.receipt_long_outlined, iconColor: const Color(0xFF10B981), title: 'Billing History', subtitle: p.billingHistory.isEmpty ? 'View transactions' : '${p.billingHistory.length} transaction(s)', onTap: () => p.onShowBillingHistory(context)),
       ])));
@@ -1864,8 +2135,9 @@ class _MobileSettingsLayout extends StatelessWidget {
         if (p.isDoctor) ...[_doctorProfessionalCard(context), const SizedBox(height: 16)],
         if (p.isPatient) ...[_healthProfile(context), const SizedBox(height: 16)],
         _notificationsCard(context), const SizedBox(height: 16),
-        if (p.isPatient) ...[_waterReminderCard(context), const SizedBox(height: 16)],
+        if (p.isPatient) ...[_remindersCard(context), const SizedBox(height: 16)],
         if (p.isPatient) ...[_rewardsCard(context), const SizedBox(height: 16)],
+        if (p.isPatient) ...[_diagnosticsCard(context), const SizedBox(height: 16)],
         if (p.isPatient) ...[_privacyCard(context), const SizedBox(height: 16)],
         if (p.isPatient) ...[_paymentCard(context), const SizedBox(height: 16)],
         _contactCard(context), const SizedBox(height: 16),
@@ -1923,8 +2195,11 @@ class _MobileSettingsLayout extends StatelessWidget {
       child: Padding(padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
           CircleAvatar(radius: 28, backgroundColor: AppColors.primaryColor.withValues(alpha: 0.1),
-            backgroundImage: p.user?.profilePicture != null ? NetworkImage(p.user!.profilePicture!) : null,
-            child: p.user?.profilePicture == null ? Text((p.user?.name ?? 'U').substring(0, 1).toUpperCase(), style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: AppColors.primaryColor)) : null),
+            child: ClipOval(child: () {
+              final img = buildProfileImageProvider(p.user?.profilePicture);
+              if (img != null) return Image(image: img, width: 56, height: 56, fit: BoxFit.cover, errorBuilder: (_, __, ___) => Text((p.user?.name ?? 'U').substring(0, 1).toUpperCase(), style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: AppColors.primaryColor)));
+              return Text((p.user?.name ?? 'U').substring(0, 1).toUpperCase(), style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: AppColors.primaryColor));
+            }())),
           const SizedBox(width: 14),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(p.user?.name ?? 'User', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
@@ -1988,6 +2263,51 @@ class _MobileSettingsLayout extends StatelessWidget {
       ])));
   }
 
+  Widget _remindersCard(BuildContext context) {
+    final waterLabels = {'30': '30 min', '60': '1 hr', '120': '2 hrs', '180': '3 hrs'};
+    final waterLabel = waterLabels[p.waterReminderMinutes.toString()] ?? '1 hr';
+    String formatTime(TimeOfDay? t) => t == null ? 'Not set' : t.format(context);
+    return Card(elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Padding(padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        _sectionLabel('Reminders & Notifications'), const SizedBox(height: 12),
+        _settingsTile(icon: Icons.medication_outlined, iconColor: const Color(0xFF8B5CF6), title: 'Medication Reminder', subtitle: formatTime(p.medReminderTime), onTap: () async {
+          final picked = await showTimePicker(context: context, initialTime: p.medReminderTime ?? const TimeOfDay(hour: 8, minute: 0));
+          if (picked != null) p.onSetMedReminder(picked);
+        }),
+        const Divider(height: 1),
+        _settingsTile(icon: Icons.water_drop_outlined, iconColor: const Color(0xFF3B82F6), title: 'Water Reminder', subtitle: 'Every $waterLabel', onTap: () => p.onShowWaterReminder(context)),
+        const Divider(height: 1),
+        _settingsTile(icon: Icons.monitor_heart_outlined, iconColor: const Color(0xFFEF4444), title: 'Health Check Reminder', subtitle: formatTime(p.healthCheckReminderTime), onTap: () async {
+          final picked = await showTimePicker(context: context, initialTime: p.healthCheckReminderTime ?? const TimeOfDay(hour: 8, minute: 0));
+          if (picked != null) p.onSetHealthCheckReminder(picked);
+        }),
+        const Divider(height: 1),
+        _switchTile(icon: Icons.calendar_today_outlined, title: 'Appointment Reminders', subtitle: 'Get reminded before appointments', value: p.appointmentRemindersEnabled, onChanged: p.onToggleAppointmentReminders),
+      ])));
+  }
+
+  Widget _diagnosticsCard(BuildContext context) {
+    return Card(elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Padding(padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        _sectionLabel('Diagnostics Settings'), const SizedBox(height: 12),
+        _settingsTile(icon: Icons.science_outlined, iconColor: const Color(0xFF3B82F6), title: 'Test History', subtitle: 'View past lab bookings', onTap: () => p.onComingSoon(context, 'Test History')),
+        const Divider(height: 1),
+        _switchTile(icon: Icons.home_outlined, title: 'Home Sample Collection', subtitle: 'Prefer home sample collection', value: p.preferHomeSample, onChanged: p.onTogglePreferHomeSample),
+        const Divider(height: 1),
+        _settingsTile(icon: Icons.assignment_outlined, iconColor: const Color(0xFF8B5CF6), title: 'Report Delivery', subtitle: p.reportDelivery, onTap: () => _showReportDeliverySheet(context)),
+      ])));
+  }
+
+  void _showReportDeliverySheet(BuildContext context) {
+    final options = ['In-app', 'Email only', 'Both'];
+    showModalBottomSheet(context: context, shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))), builder: (_) => SafeArea(child: Column(mainAxisSize: MainAxisSize.min, children: [
+      const Padding(padding: EdgeInsets.all(16), child: Text('Report Delivery Method', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16))),
+      const Divider(height: 1),
+      ...options.map((opt) => ListTile(title: Text(opt), trailing: p.reportDelivery == opt ? const Icon(Icons.check_circle_rounded, color: Color(0xFF10B981)) : null, onTap: () { p.onSetReportDelivery(opt); Navigator.pop(context); })),
+      const SizedBox(height: 8),
+    ])));
+  }
+
   Widget _rewardsCard(BuildContext context) {
     return Card(elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Padding(padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -1996,7 +2316,7 @@ class _MobileSettingsLayout extends StatelessWidget {
         const SizedBox(height: 12),
         _settingsTile(icon: Icons.stars_outlined, iconColor: const Color(0xFFF59E0B), title: 'Reward Points', subtitle: '${p.totalPoints} pts total', onTap: () => _showRewardPointsDialog(context)),
         const Divider(height: 1), _settingsTile(icon: Icons.history_outlined, iconColor: const Color(0xFFF59E0B), title: 'Reward History', subtitle: p.pointsHistory.isEmpty ? 'No activity yet' : '${p.pointsHistory.length} activities', onTap: () => _showRewardHistoryDialog(context)),
-        const Divider(height: 1), _settingsTile(icon: Icons.swap_horiz_outlined, iconColor: const Color(0xFFF59E0B), title: 'Redemption History', subtitle: 'Coming soon', onTap: () => p.onComingSoon(context, 'Redemption History')),
+        const Divider(height: 1), _settingsTile(icon: Icons.swap_horiz_outlined, iconColor: const Color(0xFFF59E0B), title: 'Redemption History', subtitle: 'View redeemed rewards', onTap: () => _showRedemptionHistoryDialog(context)),
       ])));
   }
 
@@ -2013,6 +2333,8 @@ class _MobileSettingsLayout extends StatelessWidget {
       child: Padding(padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         _sectionLabel('Payment & Subscription'), const SizedBox(height: 12),
         _settingsTile(icon: Icons.credit_card_outlined, iconColor: const Color(0xFF10B981), title: 'Saved Payment Methods', subtitle: p.savedPaymentMethods.isEmpty ? 'No methods saved' : '${p.savedPaymentMethods.length} method(s)', onTap: () => p.onShowPaymentMethods(context)),
+        const Divider(height: 1),
+        _settingsTile(icon: Icons.card_membership_outlined, iconColor: const Color(0xFF6366F1), title: 'Subscription Plans', subtitle: 'View or upgrade your plan', onTap: () => p.onComingSoon(context, 'Subscription Plans')),
         const Divider(height: 1), _settingsTile(icon: Icons.receipt_long_outlined, iconColor: const Color(0xFF10B981), title: 'Billing History', subtitle: p.billingHistory.isEmpty ? 'View transactions' : '${p.billingHistory.length} transaction(s)', onTap: () => p.onShowBillingHistory(context)),
       ])));
   }
@@ -2188,6 +2510,7 @@ class _MobileSettingsLayout extends StatelessWidget {
         Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text('${p.totalPoints}', style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w900, color: Colors.white)),
           const Text('Total Points', style: TextStyle(fontSize: 12, color: Colors.white70, fontWeight: FontWeight.w600)),
+          Text('≈ PKR ${(p.totalPoints * _kPointToPkr).toStringAsFixed(2)}', style: const TextStyle(fontSize: 11, color: Colors.white60)),
         ]),
       ]),
     );
@@ -2197,7 +2520,7 @@ class _MobileSettingsLayout extends StatelessWidget {
     showDialog(context: context, builder: (dc) => AlertDialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       title: const Row(children: [Icon(Icons.stars_rounded, color: Color(0xFFF59E0B), size: 24), SizedBox(width: 10), Text('My Points', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18))]),
-      content: SizedBox(width: double.maxFinite,child: Column(mainAxisSize: MainAxisSize.min, children: [
+      content: SizedBox(width: double.maxFinite, child: Column(mainAxisSize: MainAxisSize.min, children: [
         Container(
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(gradient: const LinearGradient(colors: [Color(0xFFF59E0B), Color(0xFFF97316)], begin: Alignment.topLeft, end: Alignment.bottomRight), borderRadius: BorderRadius.circular(14)),
@@ -2207,13 +2530,112 @@ class _MobileSettingsLayout extends StatelessWidget {
             Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text('${p.totalPoints}', style: const TextStyle(fontSize: 36, fontWeight: FontWeight.w900, color: Colors.white)),
               const Text('Reward Points', style: TextStyle(fontSize: 13, color: Colors.white70)),
+              Text('≈ PKR ${(p.totalPoints * _kPointToPkr).toStringAsFixed(2)}', style: const TextStyle(fontSize: 12, color: Colors.white60)),
             ]),
           ]),
         ),
         const SizedBox(height: 16),
         const Text('Points are earned by:\n• Logging vitals (+5 pts each)\n• Completing daily goals (+10 pts)\n• Taking all medications (+10 pts)\n• Attending consultations (+15 pts)', style: TextStyle(fontSize: 13, color: Color(0xFF475569), height: 1.6)),
+        const SizedBox(height: 12),
+        SizedBox(width: double.infinity, child: ElevatedButton.icon(onPressed: () { Navigator.pop(dc); _showRedeemRewardsDialog(context); }, icon: const Icon(Icons.redeem_rounded, size: 18), label: const Text('Redeem Points'), style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF10B981), foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))))),
       ])),
       actions: [ElevatedButton(onPressed: () => Navigator.pop(dc), style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFF59E0B), foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))), child: const Text('Close'))],
+    ));
+  }
+
+  void _showRedeemRewardsDialog(BuildContext context) {
+    final rewards = [
+      {'id': 'free_consultation', 'title': 'Free Consultation', 'cost': 1000, 'icon': Icons.video_call_rounded, 'color': const Color(0xFF10B981)},
+      {'id': 'lab_test_discount', 'title': 'Lab Test Discount (20%)', 'cost': 500, 'icon': Icons.science_outlined, 'color': const Color(0xFF3B82F6)},
+    ];
+    final gamSvc = GamificationService();
+    showDialog(context: context, builder: (dc) => StatefulBuilder(builder: (dc2, setS) => AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      title: const Row(children: [Icon(Icons.redeem_rounded, color: Color(0xFF10B981), size: 24), SizedBox(width: 10), Text('Redeem Points', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18))]),
+      content: SizedBox(width: double.maxFinite, child: Column(mainAxisSize: MainAxisSize.min, children: [
+        ...rewards.map((r) {
+          final cost = r['cost'] as int;
+          final hasEnough = p.totalPoints >= cost;
+          final icon = r['icon'] as IconData;
+          final color = r['color'] as Color;
+          return Padding(padding: const EdgeInsets.only(bottom: 12), child: Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(color: color.withValues(alpha: 0.07), borderRadius: BorderRadius.circular(12), border: Border.all(color: color.withValues(alpha: 0.2))),
+            child: Row(children: [
+              Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: color.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(8)), child: Icon(icon, color: color, size: 22)),
+              const SizedBox(width: 12),
+              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(r['title'] as String, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+                Text('$cost pts required', style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+              ])),
+              ElevatedButton(
+                onPressed: hasEnough ? () async {
+                  Navigator.pop(dc2);
+                  try {
+                    final result = await gamSvc.redeemReward(r['id'] as String);
+                    if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(result['message']?.toString() ?? (result['success'] == true ? 'Reward redeemed!' : 'Redemption failed')), backgroundColor: result['success'] == true ? Colors.green : Colors.red));
+                  } catch (e) {
+                    if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to redeem: $e'), backgroundColor: Colors.red));
+                  }
+                } : null,
+                style: ElevatedButton.styleFrom(backgroundColor: hasEnough ? const Color(0xFF10B981) : const Color(0xFFCBD5E1), foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)), padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8)),
+                child: Text(hasEnough ? 'Redeem' : 'Not enough', style: const TextStyle(fontSize: 12)),
+              ),
+            ]),
+          ));
+        }),
+        const Divider(),
+        const Text('1 pt = PKR 0.01 • Rate may change by platform', style: TextStyle(fontSize: 11, color: Color(0xFF94A3B8))),
+      ])),
+      actions: [TextButton(onPressed: () => Navigator.pop(dc2), child: const Text('Close'))],
+    )));
+  }
+
+  void _showRedemptionHistoryDialog(BuildContext context) {
+    final gamSvc = GamificationService();
+    showDialog(context: context, builder: (dc) => FutureBuilder<Map<String, dynamic>>(
+      future: gamSvc.getMyStats(),
+      builder: (_, snap) {
+        List<dynamic> redemptions = [];
+        if (snap.hasData && snap.data!['success'] == true) {
+          final data = snap.data!;
+          redemptions = (data['redemptions'] ?? data['redeemedRewards'] ?? []) as List<dynamic>;
+        }
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: const Row(children: [Icon(Icons.swap_horiz_outlined, color: Color(0xFFF59E0B), size: 22), SizedBox(width: 10), Text('Redemption History', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16))]),
+          content: SizedBox(width: double.maxFinite, height: 280, child: snap.connectionState == ConnectionState.waiting
+            ? const Center(child: CircularProgressIndicator())
+            : redemptions.isEmpty
+              ? Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                  const Icon(Icons.swap_horiz_outlined, size: 48, color: Color(0xFFCBD5E1)),
+                  const SizedBox(height: 12),
+                  const Text('No redemptions yet', style: TextStyle(color: Color(0xFF64748B))),
+                  const SizedBox(height: 16),
+                  ElevatedButton.icon(onPressed: () { Navigator.pop(dc); _showRedeemRewardsDialog(context); }, icon: const Icon(Icons.redeem_rounded, size: 16), label: const Text('Redeem Points'), style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF10B981), foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)))),
+                ]))
+              : ListView.separated(
+                  itemCount: redemptions.length,
+                  separatorBuilder: (_, __) => const Divider(height: 1),
+                  itemBuilder: (_, i) {
+                    final item = redemptions[i];
+                    final title = (item is Map ? item['title'] ?? item['rewardId'] ?? 'Reward' : 'Reward').toString();
+                    final pts = (item is Map ? item['points'] ?? item['cost'] ?? 0 : 0) as num;
+                    final date = (item is Map ? item['createdAt'] ?? item['date'] ?? '' : '').toString();
+                    String dateStr = '';
+                    try { dateStr = date.isNotEmpty ? DateFormat('MMM d, yyyy').format(DateTime.parse(date).toLocal()) : ''; } catch (_) {}
+                    return ListTile(dense: true,
+                      leading: Container(padding: const EdgeInsets.all(6), decoration: BoxDecoration(color: const Color(0xFFF0FDF4), borderRadius: BorderRadius.circular(8)), child: const Icon(Icons.redeem_rounded, color: Color(0xFF10B981), size: 16)),
+                      title: Text(title, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                      subtitle: dateStr.isNotEmpty ? Text(dateStr, style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8))) : null,
+                      trailing: Text('-$pts pts', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: Color(0xFFEF4444))),
+                    );
+                  },
+                ),
+          ),
+          actions: [ElevatedButton(onPressed: () => Navigator.pop(dc), style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFF59E0B), foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))), child: const Text('Close'))],
+        );
+      },
     ));
   }
 
@@ -2252,14 +2674,14 @@ class _MobileSettingsLayout extends StatelessWidget {
 // PROFILE EDIT CARD — Approach 2: Global Toggle (View ↔ Edit)
 // ═══════════════════════════════════════════════════════════════════════════
 
-class _ProfileEditCard extends StatefulWidget {
+class _ProfileEditCard extends ConsumerStatefulWidget {
   final _SettingsLayoutParams p;
   const _ProfileEditCard({required this.p});
   @override
-  State<_ProfileEditCard> createState() => _ProfileEditCardState();
+  ConsumerState<_ProfileEditCard> createState() => _ProfileEditCardState();
 }
 
-class _ProfileEditCardState extends State<_ProfileEditCard> {
+class _ProfileEditCardState extends ConsumerState<_ProfileEditCard> {
   bool _editMode = false;
   bool _saving = false;
   final _formKey = GlobalKey<FormState>();
@@ -2302,12 +2724,31 @@ class _ProfileEditCardState extends State<_ProfileEditCard> {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _saving = true);
     try {
-      await ApiService().put('/users/profile', {
+      final response = await ApiService().put('/users/profile', {
         'name': _nameCtrl.text.trim(),
         'phoneNumber': _phoneCtrl.text.trim(),
         'age': _ageCtrl.text.trim(),
         if (_gender != null) 'gender': _gender,
       });
+      if (response.statusCode == 200 && response.data != null) {
+        final data = response.data;
+        Map<String, dynamic> userMap;
+        if (data is Map && data['user'] is Map) {
+          userMap = Map<String, dynamic>.from(data['user'] as Map);
+        } else if (data is Map && (data.containsKey('_id') || data.containsKey('id'))) {
+          userMap = Map<String, dynamic>.from(data);
+        } else {
+          userMap = data is Map ? Map<String, dynamic>.from(data) : {};
+        }
+        if (userMap.isNotEmpty) {
+          final existing = ref.read(authProvider).user;
+          if (existing != null && userMap['profilePicture'] == null) {
+            userMap['profilePicture'] = existing.profilePicture;
+          }
+          final updatedUser = app_user.User.fromJson(userMap);
+          ref.read(authProvider.notifier).setUser(updatedUser);
+        }
+      }
       setState(() { _editMode = false; _saving = false; });
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
@@ -2351,11 +2792,11 @@ class _ProfileEditCardState extends State<_ProfileEditCard> {
                   CircleAvatar(
                     radius: 32,
                     backgroundColor: AppColors.primaryColor.withValues(alpha: 0.1),
-                    backgroundImage: u?.profilePicture != null ? NetworkImage(u!.profilePicture!) : null,
-                    child: u?.profilePicture == null
-                        ? Text((u?.name ?? 'U').substring(0, 1).toUpperCase(),
-                            style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: AppColors.primaryColor))
-                        : null,
+                    child: ClipOval(child: () {
+                      final img = buildProfileImageProvider(u?.profilePicture);
+                      if (img != null) return Image(image: img, width: 64, height: 64, fit: BoxFit.cover, errorBuilder: (_, __, ___) => Text((u?.name ?? 'U').substring(0, 1).toUpperCase(), style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: AppColors.primaryColor)));
+                      return Text((u?.name ?? 'U').substring(0, 1).toUpperCase(), style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: AppColors.primaryColor));
+                    }()),
                   ),
                   const SizedBox(width: 16),
                   Expanded(

@@ -364,7 +364,7 @@ class _PharmacistDashboardState extends ConsumerState<PharmacistDashboard> {
           crossAxisCount: isDesktop ? 3 : 2,
           crossAxisSpacing: 12,
           mainAxisSpacing: 12,
-          childAspectRatio: 1.3,
+          childAspectRatio: 1.1,
           children: [
             _buildActionCard(
               'Dispense Queue'.tr(),

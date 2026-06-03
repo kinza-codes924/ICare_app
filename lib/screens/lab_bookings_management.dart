@@ -1262,11 +1262,7 @@ class _LabBookingsManagementState extends State<LabBookingsManagement>
               children: [
                 Row(
                   children: [
-                    const Icon(
-                      Icons.calendar_today_rounded,
-                      size: 14,
-                      color: Colors.grey,
-                    ),
+                    const Icon(Icons.calendar_today_rounded, size: 14, color: Colors.grey),
                     const SizedBox(width: 8),
                     Text(
                       DateFormat('MMM dd, yyyy').format(date),
@@ -1274,6 +1270,16 @@ class _LabBookingsManagementState extends State<LabBookingsManagement>
                     ),
                   ],
                 ),
+                Text(
+                  'PKR ${_calcPrice(booking)}',
+                  style: const TextStyle(fontWeight: FontWeight.bold, color: primaryColor),
+                ),
+              ],
+            ),
+            Wrap(
+              spacing: 4,
+              runSpacing: 4,
+              children: [
                 if (status.toLowerCase() == 'pending')
                   TextButton.icon(
                     onPressed: () => _updateStatus(booking['_id'], 'confirmed'),
@@ -1305,7 +1311,6 @@ class _LabBookingsManagementState extends State<LabBookingsManagement>
                       padding: const EdgeInsets.symmetric(horizontal: 12),
                     ),
                   ),
-                // sample_collected → awaiting_reports
                 if (status.toLowerCase() == 'sample_collected' ||
                     status.toLowerCase() == 'sample-collected')
                   TextButton.icon(
@@ -1317,7 +1322,6 @@ class _LabBookingsManagementState extends State<LabBookingsManagement>
                       padding: const EdgeInsets.symmetric(horizontal: 12),
                     ),
                   ),
-                // awaiting_reports or sample_collected → Enter Results
                 if (status.toLowerCase() == 'sample_collected' ||
                     status.toLowerCase() == 'sample-collected' ||
                     status.toLowerCase() == 'awaiting_reports' ||
@@ -1340,7 +1344,6 @@ class _LabBookingsManagementState extends State<LabBookingsManagement>
                       padding: const EdgeInsets.symmetric(horizontal: 12),
                     ),
                   ),
-                // reporting_done → Mark Completed
                 if (status.toLowerCase() == 'reporting_done' ||
                     status.toLowerCase() == 'reporting-done')
                   TextButton.icon(
@@ -1352,13 +1355,6 @@ class _LabBookingsManagementState extends State<LabBookingsManagement>
                       padding: const EdgeInsets.symmetric(horizontal: 12),
                     ),
                   ),
-                Text(
-                  'PKR ${_calcPrice(booking)}',
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: primaryColor,
-                  ),
-                ),
               ],
             ),
           ],

@@ -573,7 +573,7 @@ class _WebCoursesListState extends State<_WebCoursesList> {
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          course["desc"] ?? course["description"] ?? 'No description',
+                          (course["desc"] ?? course["description"])?.toString() ?? 'No description',
                           style: const TextStyle(
                             fontSize: 14,
                             color: Color(0xFF64748B),

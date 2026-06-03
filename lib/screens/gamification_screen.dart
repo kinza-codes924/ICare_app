@@ -237,6 +237,8 @@ class _GamificationScreenState extends State<GamificationScreen>
                 const Text('Total Points', style: TextStyle(fontSize: 14, color: Colors.white70, fontWeight: FontWeight.w600)),
                 const SizedBox(height: 4),
                 Text('$points', style: const TextStyle(fontSize: 36, fontWeight: FontWeight.w900, color: Colors.white)),
+                const SizedBox(height: 2),
+                Text('≈ PKR ${(points * 0.01).toStringAsFixed(2)}', style: const TextStyle(fontSize: 12, color: Colors.white60)),
                 const SizedBox(height: 4),
                 Row(children: [
                   const Text('🔥', style: TextStyle(fontSize: 14)),
@@ -406,6 +408,9 @@ class _GamificationScreenState extends State<GamificationScreen>
             Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               const Text('Your Balance', style: TextStyle(fontSize: 13, color: Colors.white70)),
               Text('$points points', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: Colors.white)),
+              Text('≈ PKR ${(points * 0.01).toStringAsFixed(2)}', style: const TextStyle(fontSize: 12, color: Colors.white60)),
+              const SizedBox(height: 2),
+              const Text('1 pt = PKR 0.01', style: TextStyle(fontSize: 10, color: Colors.white54)),
             ]),
           ]),
         ),
@@ -433,6 +438,46 @@ class _GamificationScreenState extends State<GamificationScreen>
           color: const Color(0xFF8B5CF6),
           points: points,
         ),
+
+        // Redemption History
+        const SizedBox(height: 28),
+        const Text('Redemption History', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Color(0xFF0F172A))),
+        const SizedBox(height: 12),
+        Builder(builder: (context) {
+          final redemptions = (_stats?['redemptions'] ?? _stats?['redeemedRewards'] ?? []) as List<dynamic>;
+          if (redemptions.isEmpty) {
+            return Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(color: const Color(0xFFF8FAFC), borderRadius: BorderRadius.circular(14), border: Border.all(color: const Color(0xFFE2E8F0))),
+              child: const Row(children: [
+                Text('📜', style: TextStyle(fontSize: 24)),
+                SizedBox(width: 12),
+                Text('No redemptions yet', style: TextStyle(fontSize: 13, color: Color(0xFF64748B))),
+              ]),
+            );
+          }
+          return Column(children: redemptions.take(5).map<Widget>((r) {
+            final title = (r is Map ? r['title'] ?? r['rewardId'] ?? 'Reward' : 'Reward').toString();
+            final pts = (r is Map ? r['points'] ?? r['cost'] ?? 0 : 0) as num;
+            final date = (r is Map ? r['createdAt'] ?? r['date'] ?? '' : '').toString();
+            String dateStr = '';
+            try { dateStr = date.isNotEmpty ? '${DateTime.parse(date).toLocal().day}/${DateTime.parse(date).toLocal().month}/${DateTime.parse(date).toLocal().year}' : ''; } catch (_) {}
+            return Container(
+              margin: const EdgeInsets.only(bottom: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xFFE8ECF5))),
+              child: Row(children: [
+                const Text('🎁', style: TextStyle(fontSize: 20)),
+                const SizedBox(width: 12),
+                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(title, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                  if (dateStr.isNotEmpty) Text(dateStr, style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8))),
+                ])),
+                Text('-${pts.toInt()} pts', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFFEF4444))),
+              ]),
+            );
+          }).toList());
+        }),
 
         const SizedBox(height: 24),
         Container(

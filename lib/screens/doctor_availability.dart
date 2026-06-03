@@ -769,18 +769,20 @@ class _DoctorAvailabilityState extends State<DoctorAvailability> {
                                       color: const Color(0xFFE2E8F0)),
                                 ),
                                 child: Row(
-                                  mainAxisSize: MainAxisSize.min,
                                   children: [
                                     const Icon(Icons.access_time_rounded,
                                         size: 14,
                                         color: Color(0xFF64748B)),
                                     const SizedBox(width: 4),
-                                    Text(
-                                      slot['start'] ?? '09:00',
-                                      style: const TextStyle(
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w600,
-                                        color: Color(0xFF0F172A),
+                                    Flexible(
+                                      child: Text(
+                                        slot['start'] ?? '09:00',
+                                        style: const TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w600,
+                                          color: Color(0xFF0F172A),
+                                        ),
+                                        overflow: TextOverflow.ellipsis,
                                       ),
                                     ),
                                   ],
@@ -809,18 +811,20 @@ class _DoctorAvailabilityState extends State<DoctorAvailability> {
                                       color: const Color(0xFFE2E8F0)),
                                 ),
                                 child: Row(
-                                  mainAxisSize: MainAxisSize.min,
                                   children: [
                                     const Icon(Icons.access_time_rounded,
                                         size: 14,
                                         color: Color(0xFF64748B)),
                                     const SizedBox(width: 4),
-                                    Text(
-                                      slot['end'] ?? '10:00',
-                                      style: const TextStyle(
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w600,
-                                        color: Color(0xFF0F172A),
+                                    Flexible(
+                                      child: Text(
+                                        slot['end'] ?? '10:00',
+                                        style: const TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w600,
+                                          color: Color(0xFF0F172A),
+                                        ),
+                                        overflow: TextOverflow.ellipsis,
                                       ),
                                     ),
                                   ],

@@ -17,6 +17,8 @@ class PatientProfile extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final user = ref.watch(authProvider).user;
+
     return Scaffold(
       appBar: AppBar(
         leading: CustomBackButton(),
@@ -90,17 +92,39 @@ class PatientProfile extends ConsumerWidget {
       body: SingleChildScrollView(
         child: Column(
           children: [
-            Container(
+            // Profile Picture - use dynamic image from user object
+            SizedBox(
               width: Utils.windowWidth(context) * 0.34,
               height: Utils.windowWidth(context) * 0.34,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(18),
+              child: CircleAvatar(
+                radius: Utils.windowWidth(context) * 0.17,
+                backgroundColor: AppColors.primaryColor.withValues(alpha: 0.1),
+                child: ClipOval(
+                  child: () {
+                    final imgProvider = buildProfileImageProvider(user?.profilePicture);
+                    if (imgProvider != null) {
+                      final r = Utils.windowWidth(context) * 0.34;
+                      return Image(
+                        image: imgProvider,
+                        width: r, height: r,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => Text(
+                          (user?.name ?? 'U').substring(0, 1).toUpperCase(),
+                          style: TextStyle(fontSize: Utils.windowWidth(context) * 0.12, fontWeight: FontWeight.w900, color: AppColors.primaryColor),
+                        ),
+                      );
+                    }
+                    return Text(
+                      (user?.name ?? 'U').substring(0, 1).toUpperCase(),
+                      style: TextStyle(fontSize: Utils.windowWidth(context) * 0.12, fontWeight: FontWeight.w900, color: AppColors.primaryColor),
+                    );
+                  }(),
+                ),
               ),
-              child: Image.asset(ImagePaths.user1, fit: BoxFit.cover),
             ),
             SizedBox(height: ScallingConfig.scale(10)),
             CustomText(
-              text: "Emily Jordan",
+              text: user?.name ?? "User",
               fontFamily: "Gilroy-Bold",
               fontSize: 16.79,
             ),
@@ -111,11 +135,11 @@ class PatientProfile extends ConsumerWidget {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  _infoChip(Icons.cake_outlined, "Age", "28 yrs"),
-                  SizedBox(width: ScallingConfig.scale(10)),
-                  _infoChip(Icons.height_rounded, "Height", "165 cm"),
-                  SizedBox(width: ScallingConfig.scale(10)),
-                  _infoChip(Icons.monitor_weight_outlined, "Weight", "58 kg"),
+  _infoChip(Icons.cake_outlined, "Age", user?.age ?? "28 yrs"),
+  SizedBox(width: ScallingConfig.scale(10)),
+  _infoChip(Icons.height_rounded, "Height", "165 cm"),
+  SizedBox(width: ScallingConfig.scale(10)),
+  _infoChip(Icons.monitor_weight_outlined, "Weight", "58 kg"),
                 ],
               ),
             ),
@@ -143,14 +167,13 @@ class PatientProfile extends ConsumerWidget {
                 children: [
                   SvgWrapper(assetPath: ImagePaths.sms),
                   SizedBox(width: ScallingConfig.scale(10)),
-                  CustomText(text: "emily@gmail.com"),
+                  CustomText(text: user?.email ?? "emily@gmail.com"),
                 ],
               ),
             ),
             SizedBox(height: ScallingConfig.scale(10)),
             SizedBox(
               width: Utils.windowWidth(context) * 0.9,
-
               child: Row(
                 children: [
                   SvgWrapper(
@@ -158,7 +181,7 @@ class PatientProfile extends ConsumerWidget {
                     color: AppColors.primaryColor,
                   ),
                   SizedBox(width: ScallingConfig.scale(10)),
-                  CustomText(text: "+1 234 567 8963"),
+                  CustomText(text: user?.phoneNumber ?? "+1 234 567 8963"),
                 ],
               ),
             ),
@@ -169,7 +192,7 @@ class PatientProfile extends ConsumerWidget {
                 children: [
                   Icon(Icons.badge_outlined, color: AppColors.primaryColor, size: 20),
                   SizedBox(width: ScallingConfig.scale(10)),
-                  CustomText(text: "CNIC: 12345-1234567-1"),
+                  CustomText(text: user?.cnic != null && user!.cnic!.isNotEmpty ? "CNIC: ${user.cnic}" : "CNIC: 12345-1234567-1"),
                 ],
               ),
             ),
@@ -301,7 +324,6 @@ class PatientProfile extends ConsumerWidget {
                 horizontal: ScallingConfig.scale(10),
               ),
               child: Row(
-                // mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   SizedBox(
                     width: Utils.windowWidth(context) * 0.3,

@@ -357,12 +357,11 @@ class _DoctorDashboardState extends ConsumerState<DoctorDashboard> {
           CircleAvatar(
             radius: 28,
             backgroundColor: AppColors.primaryColor.withValues(alpha: 0.1),
-            backgroundImage: (profilePic != null && profilePic.isNotEmpty)
-                ? NetworkImage(profilePic) as ImageProvider
-                : null,
-            child: (profilePic == null || profilePic.isEmpty)
-                ? const Icon(Icons.person, color: AppColors.primaryColor, size: 30)
-                : null,
+            child: ClipOval(child: () {
+              final img = buildProfileImageProvider(profilePic);
+              if (img != null) return Image(image: img, width: 56, height: 56, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.person, color: AppColors.primaryColor, size: 30));
+              return const Icon(Icons.person, color: AppColors.primaryColor, size: 30);
+            }()),
           ),
           const SizedBox(width: 16),
           Expanded(
@@ -776,7 +775,7 @@ class _DoctorDashboardState extends ConsumerState<DoctorDashboard> {
                 physics: const NeverScrollableScrollPhysics(),
                 crossAxisSpacing: 8,
                 mainAxisSpacing: 8,
-                childAspectRatio: 1.45,
+                childAspectRatio: 0.95,
                 children: sorted.take(6).map((appointment) {
                   return _buildTodayAppointmentCard(appointment);
                 }).toList(),

@@ -157,16 +157,15 @@ class _DoctorScheduleCalendarState
           _buildCalendarGrid(),
           const SizedBox(height: 16),
           // Legend
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
+          Wrap(
+            alignment: WrapAlignment.center,
+            spacing: 16,
+            runSpacing: 8,
             children: [
               _legendDot(AppColors.primaryColor, 'Selected / Today'),
-              const SizedBox(width: 16),
               _legendDot(const Color(0xFFF59E0B), 'Approved Leave'),
-              if (_appointments.isNotEmpty) ...[
-                const SizedBox(width: 16),
+              if (_appointments.isNotEmpty)
                 _legendDot(AppColors.primaryColor, 'Has Appointments'),
-              ],
             ],
           ),
         ],
@@ -483,11 +482,14 @@ class _DoctorScheduleCalendarState
                       ),
                     ),
                     const SizedBox(width: 12),
-                    Text(
-                      '• ${appointment.reason ?? 'No reason'}',
-                      style: const TextStyle(
-                        fontSize: 13,
-                        color: Color(0xFF64748B),
+                    Flexible(
+                      child: Text(
+                        '• ${appointment.reason ?? 'No reason'}',
+                        style: const TextStyle(
+                          fontSize: 13,
+                          color: Color(0xFF64748B),
+                        ),
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
                   ],

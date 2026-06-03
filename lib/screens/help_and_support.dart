@@ -58,7 +58,7 @@ class HelpAndSupport extends ConsumerWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    "Academic Support".tr(),
+                    isStudent ? "Academic Support".tr() : "Support Center".tr(),
                     style: const TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.w800,
@@ -67,7 +67,13 @@ class HelpAndSupport extends ConsumerWidget {
                   ),
                   const SizedBox(height: 12),
                   Text(
-                    "Welcome to the iCare Student Support Center. Our faculty and technical teams are here to ensure your learning journey is seamless.".tr(),
+                    isStudent
+                        ? "Welcome to the iCare Student Support Center. Our faculty and technical teams are here to ensure your learning journey is seamless.".tr()
+                        : isPharmacy
+                            ? "Welcome to the iCare Pharmacy Support Center. Our team is here to assist with orders, inventory, and platform questions.".tr()
+                            : isLaboratory
+                                ? "Welcome to the iCare Lab Support Center. Our team is available to assist with test requests, result entry, and platform queries.".tr()
+                                : "Welcome to the iCare Support Center. Our team is available 24/7 to help you with any issues or queries.".tr(),
                     style: TextStyle(
                       fontSize: 14,
                       color: Color(0xFF64748B),
@@ -77,8 +83,8 @@ class HelpAndSupport extends ConsumerWidget {
                   const SizedBox(height: 20),
                   _buildContactTile(
                     Icons.email_outlined,
-                    "Academic Support",
-                    "academic@icare.com",
+                    isStudent ? "Academic Support" : "Email Support",
+                    isStudent ? "academic@icare.com" : "support@icare.com",
                   ),
                   const SizedBox(height: 12),
                   _buildContactTile(
@@ -99,26 +105,112 @@ class HelpAndSupport extends ConsumerWidget {
               ),
             ),
             const SizedBox(height: 16),
-            _WebFaqCard(
-              question: "How do I download my certificate?",
-              answer:
-                  "Certificates are automatically generated upon 100% completion of a program. You can find them in the 'Certificates' tab of your My Learning section.",
-            ),
-            _WebFaqCard(
-              question: "Can I access courses offline?",
-              answer:
-                  "Currently, our lessons require an active internet connection to stream video and interactive content reliably.",
-            ),
-            _WebFaqCard(
-              question: "How do I take a module quiz?",
-              answer:
-                  "Once you complete all lessons in a module, the 'Module Quiz' button becomes active at the bottom of the curriculum list.",
-            ),
+            // Role-specific FAQs for mobile
+            if (isStudent) ..._studentFaqs(),
+            if (isPharmacy) ..._pharmacyFaqs(),
+            if (isLaboratory) ..._labFaqs(),
+            if (isDoctor) ..._doctorFaqs(),
+            if (!isStudent && !isPharmacy && !isLaboratory && !isDoctor) ..._defaultFaqs(),
           ],
         ),
       ),
     );
   }
+
+  List<Widget> _studentFaqs() => [
+    _WebFaqCard(
+      question: "How do I download my certificate?",
+      answer: "Certificates are automatically generated upon 100% completion of a program. You can find them in the 'Certificates' tab of your My Learning section.",
+    ),
+    _WebFaqCard(
+      question: "Can I access courses offline?",
+      answer: "Currently, our lessons require an active internet connection to stream video and interactive content reliably.",
+    ),
+    _WebFaqCard(
+      question: "How do I take a module quiz?",
+      answer: "Once you complete all lessons in a module, the 'Module Quiz' button becomes active at the bottom of the curriculum list.",
+    ),
+    _WebFaqCard(
+      question: "How do I track my course progress?",
+      answer: "Your progress is automatically tracked as you complete lessons. Check the 'My Learning' tab or your Student Dashboard to see your progress percentage.",
+    ),
+  ];
+
+  List<Widget> _pharmacyFaqs() => [
+    _WebFaqCard(
+      question: "How do I fulfill an incoming prescription?",
+      answer: "Go to 'Awaiting Fulfillment' in your sidebar. Open the prescription, verify the medicines, and click 'Mark as Fulfilled' once the order is ready for pickup or dispatch.",
+    ),
+    _WebFaqCard(
+      question: "How do I update my medicine inventory?",
+      answer: "Navigate to 'Inventory' in the sidebar. You can add new medicines, update stock quantities, and set minimum stock thresholds to trigger low-stock alerts.",
+    ),
+    _WebFaqCard(
+      question: "Where can I view my revenue and sales data?",
+      answer: "Go to 'Revenue & Analytics' in your sidebar to view total revenue, order trends, top-selling medicines, and order breakdown by status.",
+    ),
+    _WebFaqCard(
+      question: "How do I update my pharmacy profile?",
+      answer: "Go to Settings and select 'Edit Profile'. You can update your pharmacy name, address, Drug Sale License, and contact details from there.",
+    ),
+  ];
+
+  List<Widget> _labFaqs() => [
+    _WebFaqCard(
+      question: "How do I view and accept test requests?",
+      answer: "Open 'Test Requests' from your sidebar. You will see all incoming diagnostic requests. Click on a request to review patient details and accept or reject it.",
+    ),
+    _WebFaqCard(
+      question: "How do I enter test results?",
+      answer: "Navigate to 'Result Entry' in the sidebar. Find the test request, fill in the result values, and click 'Submit Results'. The patient and requesting doctor are notified automatically.",
+    ),
+    _WebFaqCard(
+      question: "How do I manage my test catalog?",
+      answer: "Go to 'Test Catalog' in your sidebar to view, add, or update the diagnostic tests your lab offers, including pricing and turnaround time.",
+    ),
+    _WebFaqCard(
+      question: "Where can I see my lab's revenue and analytics?",
+      answer: "Navigate to 'Revenue & Analytics' in your sidebar to track total revenue, completed tests, pending tests, and revenue by test category.",
+    ),
+  ];
+
+  List<Widget> _doctorFaqs() => [
+    _WebFaqCard(
+      question: "How do I manage my appointment schedule?",
+      answer: "Go to 'My Schedule' in your sidebar to view, accept, or reschedule patient appointments. You can also set your availability and block specific time slots.",
+    ),
+    _WebFaqCard(
+      question: "How do I write and send prescriptions?",
+      answer: "During or after a consultation, click 'Write Prescription' in the appointment details. Add medicines, dosage, and instructions, then send it directly to the patient.",
+    ),
+    _WebFaqCard(
+      question: "How do I update my consultation fees?",
+      answer: "Navigate to Settings > Professional Settings > Consultation Fees. You can set different fees for in-person, video, and follow-up consultations.",
+    ),
+    _WebFaqCard(
+      question: "Where can I view my earnings and patient analytics?",
+      answer: "Go to 'Revenue & Analytics' in your sidebar for consultation revenue summaries, appointment metrics, patient reviews, and activity trends.",
+    ),
+    _WebFaqCard(
+      question: "How do I access patient medical history?",
+      answer: "Click on any appointment to view the patient's profile, which includes past consultations, prescriptions, lab reports, and medical conditions.",
+    ),
+  ];
+
+  List<Widget> _defaultFaqs() => [
+    _WebFaqCard(
+      question: "How do I book a new appointment?",
+      answer: "You can book an appointment by navigating to the 'Appointments' tab and clicking 'New Booking'. Select your preferred doctor and available time slot.",
+    ),
+    _WebFaqCard(
+      question: "How can I access my lab reports?",
+      answer: "All your lab results are synced automatically. Navigate to the 'Lab Results' section under Quick Links in your sidebar to view and download past reports.",
+    ),
+    _WebFaqCard(
+      question: "What should I do if my payment fails?",
+      answer: "If your invoice payment fails, please ensure your card details are correct or try a different payment method. Visit 'Wallet' to manage billing.",
+    ),
+  ];
 
   Widget _buildContactTile(IconData icon, String title, String value) {
     return Row(
@@ -159,7 +251,7 @@ class HelpAndSupport extends ConsumerWidget {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// NEW STUNNING WEB VIEW
+// WEB VIEW
 // ═══════════════════════════════════════════════════════════════════════════
 
 class _WebHelpAndSupport extends StatelessWidget {
@@ -198,7 +290,6 @@ class _WebHelpAndSupport extends StatelessWidget {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // ── Left: Contact Block ──
                 Expanded(
                   flex: 4,
                   child: Container(
@@ -263,7 +354,6 @@ class _WebHelpAndSupport extends StatelessWidget {
                               : "support@icare.com",
                         ),
                         const SizedBox(height: 20),
-                        // WhatsApp Support Button — all roles
                         _WebContactItem(
                           icon: Icons.phone_outlined,
                           title: "Call Us",
@@ -295,10 +385,7 @@ class _WebHelpAndSupport extends StatelessWidget {
                     ),
                   ),
                 ),
-
                 const SizedBox(width: 40),
-
-                // ── Right: FAQ Block ──
                 Expanded(
                   flex: 6,
                   child: Column(
@@ -703,7 +790,6 @@ class _InquiryFormDialogState extends ConsumerState<_InquiryFormDialog> {
   @override
   void initState() {
     super.initState();
-    // Pre-fill from logged-in user
     final user = ref.read(authProvider).user;
     if (user != null) {
       _nameCtrl.text = user.name ?? '';
@@ -807,8 +893,6 @@ $message
                   IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close_rounded)),
                 ]),
                 const SizedBox(height: 18),
-
-                // Name
                 _label('Your Name'),
                 const SizedBox(height: 6),
                 TextFormField(
@@ -817,8 +901,6 @@ $message
                   validator: (v) => v == null || v.trim().isEmpty ? 'Name is required' : null,
                 ),
                 const SizedBox(height: 14),
-
-                // Email
                 _label('Email Address'),
                 const SizedBox(height: 6),
                 TextFormField(
@@ -832,8 +914,6 @@ $message
                   },
                 ),
                 const SizedBox(height: 14),
-
-                // Category
                 _label('Category'),
                 const SizedBox(height: 6),
                 DropdownButtonFormField<String>(
@@ -843,8 +923,6 @@ $message
                   onChanged: (v) => setState(() => _category = v ?? 'General'),
                 ),
                 const SizedBox(height: 14),
-
-                // Subject
                 _label('Subject'),
                 const SizedBox(height: 6),
                 TextFormField(
@@ -853,8 +931,6 @@ $message
                   validator: (v) => v == null || v.trim().isEmpty ? 'Subject is required' : null,
                 ),
                 const SizedBox(height: 14),
-
-                // Message
                 _label('Message'),
                 const SizedBox(height: 6),
                 TextFormField(
@@ -870,7 +946,6 @@ $message
                   },
                 ),
                 const SizedBox(height: 22),
-
                 Row(children: [
                   Expanded(
                     child: OutlinedButton(

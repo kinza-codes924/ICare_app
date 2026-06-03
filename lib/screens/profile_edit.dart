@@ -7,6 +7,7 @@ import 'package:icare/providers/auth_provider.dart';
 import 'package:icare/services/user_service.dart';
 import 'package:icare/services/doctor_service.dart';
 import 'package:icare/utils/theme.dart';
+import 'package:icare/utils/utils.dart' show buildProfileImageProvider;
 import 'package:icare/widgets/custom_text_input.dart';
 import 'package:image_picker/image_picker.dart';
 
@@ -358,9 +359,9 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
                                   width: 120,
                                   height: 120,
                                 )
-                              : user?.profilePicture != null && user!.profilePicture!.isNotEmpty
-                              ? Image.network(
-                                  user.profilePicture!,
+                              : buildProfileImageProvider(user?.profilePicture) != null
+                              ? Image(
+                                  image: buildProfileImageProvider(user!.profilePicture!)!,
                                   fit: BoxFit.cover,
                                   width: 120,
                                   height: 120,

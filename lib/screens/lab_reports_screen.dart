@@ -835,11 +835,13 @@ class _LabReportsScreenState extends State<LabReportsScreen>
                             size: 16,
                           ),
                           SizedBox(width: 8),
-                          Text(
-                            'No written findings — report document may be attached below.',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Color(0xFF92400E),
+                          Expanded(
+                            child: Text(
+                              'No written findings — report document may be attached below.',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Color(0xFF92400E),
+                              ),
                             ),
                           ),
                         ],

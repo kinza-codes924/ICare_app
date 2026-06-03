@@ -16,6 +16,7 @@ import 'package:icare/screens/profile.dart';
 import 'package:icare/screens/profile_edit.dart';
 import 'package:icare/utils/imagePaths.dart';
 import 'package:icare/utils/theme.dart';
+import 'package:icare/utils/utils.dart' show buildProfileImageProvider;
 import 'package:icare/widgets/custom_text.dart';
 import 'package:icare/navigators/drawer.dart';
 import 'package:icare/widgets/svg_wrapper.dart';
@@ -482,22 +483,18 @@ class _WebSidebarState extends ConsumerState<_WebSidebar> {
                     ),
                     child: Consumer(
                       builder: (context, ref, child) {
-                        final profilePic = ref.watch(authProvider).user?.profilePicture;
+                        final user = ref.watch(authProvider).user;
+                        final imgProvider = buildProfileImageProvider(user?.profilePicture);
+                        final initial = (user?.name ?? 'U').isNotEmpty ? (user!.name[0].toUpperCase()) : 'U';
                         return CircleAvatar(
                           radius: 24,
                           backgroundColor: AppColors.primaryColor.withValues(alpha: 0.1),
-                          backgroundImage: (profilePic != null && profilePic.isNotEmpty)
-                              ? NetworkImage(profilePic) as ImageProvider
-                              : null,
-                          child: (profilePic == null || profilePic.isEmpty)
-                              ? Consumer(builder: (ctx, r, _) {
-                                  final name = r.watch(authProvider).user?.name ?? 'U';
-                                  return Text(
-                                    name.isNotEmpty ? name[0].toUpperCase() : 'U',
-                                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.primaryColor),
-                                  );
-                                })
-                              : null,
+                          child: ClipOval(
+                            child: imgProvider != null
+                              ? Image(image: imgProvider, width: 48, height: 48, fit: BoxFit.cover,
+                                  errorBuilder: (_, __, ___) => Text(initial, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.primaryColor)))
+                              : Text(initial, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.primaryColor)),
+                          ),
                         );
                       },
                     ),
@@ -1623,20 +1620,18 @@ class _WebTopBar extends ConsumerWidget {
                   const SizedBox(width: 10),
                   Consumer(
                     builder: (context, ref, child) {
-                      final profilePic = ref.watch(authProvider).user?.profilePicture;
-                      final name = ref.watch(authProvider).user?.name ?? 'U';
+                      final user = ref.watch(authProvider).user;
+                      final imgProvider = buildProfileImageProvider(user?.profilePicture);
+                      final initial = (user?.name ?? 'U').isNotEmpty ? user!.name[0].toUpperCase() : 'U';
                       return CircleAvatar(
                         radius: 20,
                         backgroundColor: AppColors.primaryColor.withValues(alpha: 0.1),
-                        backgroundImage: (profilePic != null && profilePic.isNotEmpty)
-                            ? NetworkImage(profilePic) as ImageProvider
-                            : null,
-                        child: (profilePic == null || profilePic.isEmpty)
-                            ? Text(
-                                name.isNotEmpty ? name[0].toUpperCase() : 'U',
-                                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.primaryColor),
-                              )
-                            : null,
+                        child: ClipOval(
+                          child: imgProvider != null
+                            ? Image(image: imgProvider, width: 40, height: 40, fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) => Text(initial, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.primaryColor)))
+                            : Text(initial, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.primaryColor)),
+                        ),
                       );
                     },
                   ),

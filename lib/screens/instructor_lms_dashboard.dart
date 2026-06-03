@@ -830,14 +830,16 @@ class _CalendarPageState extends State<_CalendarPage> {
           child: Row(
             children: [
               // Course filter
-              DropdownButton<String>(
-                value: _selectedCourse,
-                underline: Container(height: 1, color: const Color(0xFFDADCE0)),
-                style: const TextStyle(fontSize: 14, color: Color(0xFF202124)),
-                items: _courseNames.map((n) => DropdownMenuItem(value: n, child: Text(n))).toList(),
-                onChanged: (v) => setState(() => _selectedCourse = v!),
+              Flexible(
+                child: DropdownButton<String>(
+                  isExpanded: true,
+                  value: _selectedCourse,
+                  underline: Container(height: 1, color: const Color(0xFFDADCE0)),
+                  style: const TextStyle(fontSize: 14, color: Color(0xFF202124)),
+                  items: _courseNames.map((n) => DropdownMenuItem(value: n, child: Text(n, overflow: TextOverflow.ellipsis))).toList(),
+                  onChanged: (v) => setState(() => _selectedCourse = v!),
+                ),
               ),
-              const Spacer(),
               TextButton(
                 onPressed: () => setState(() => _weekStart = _mondayOf(DateTime.now())),
                 child: const Text('Today', style: TextStyle(fontSize: 13, color: Color(0xFF1A73E8))),
