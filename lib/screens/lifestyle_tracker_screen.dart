@@ -209,14 +209,15 @@ class _LifestyleTrackerScreenState extends State<LifestyleTrackerScreen>
   }
 
   Future<void> _saveVital(String vitalType, String value, String unit) async {
-    // Optimistically increment so user sees the change immediately
     setState(() => _pointsToday += 5);
-    await _healthTrackerService.addEntry(
-      vitalType: vitalType,
-      value: value,
-      unit: unit,
-    );
-    // Reload vitals display (does NOT reset points)
+    await _healthTrackerService.addEntry(vitalType: vitalType, value: value, unit: unit);
+    // Persist points to backend
+    _gamificationService.logMetric().then((pts) {
+      if (mounted) {
+        final total = (pts['totalPoints'] as num?)?.toInt();
+        if (total != null) setState(() => _pointsToday = total);
+      }
+    });
     await _loadLatestVitals();
     _loadAllLogs();
   }

@@ -176,8 +176,29 @@ router.put('/update_status', authMiddleware, async (req, res) => {
 
     if (!appt) return res.status(404).json({ success: false, message: 'Appointment not found or access denied' });
 
+    const wasAlreadyCompleted = appt.status === 'completed';
     appt.status = status;
     await appt.save();
+
+    // Award 20 points to patient when appointment is marked completed (once only)
+    if (status === 'completed' && !wasAlreadyCompleted && appt.patient_id) {
+      try {
+        const User = require('../models/User');
+        const patient = await User.findById(appt.patient_id);
+        if (patient) {
+          if (!patient.gamification) patient.gamification = { points: 0, streak: 0, stats: {}, history: [] };
+          patient.gamification.points = (patient.gamification.points || 0) + 20;
+          patient.gamification.stats = patient.gamification.stats || {};
+          patient.gamification.stats.completedAppointments = (patient.gamification.stats.completedAppointments || 0) + 1;
+          patient.gamification.history = patient.gamification.history || [];
+          patient.gamification.history.push({ points: 20, reason: 'complete_appointment', date: new Date().toISOString() });
+          patient.markModified('gamification');
+          await patient.save();
+        }
+      } catch (e) {
+        console.error('Appointment points award error:', e);
+      }
+    }
 
     res.json({ success: true, message: 'Status updated successfully', appointment: { ...appt.toObject(), id: appt._id.toString() } });
   } catch (error) {
@@ -309,6 +330,22 @@ router.post('/:id/rate', authMiddleware, async (req, res) => {
       { user_id: appt.doctor_id },
       { $set: { rating: Math.round(avgR * 10) / 10, total_reviews: totalR } },
     ).catch(() => {});
+
+    // Award 5 points to patient for rating a doctor
+    try {
+      const User = require('../models/User');
+      const patient = await User.findById(appt.patient_id);
+      if (patient) {
+        if (!patient.gamification) patient.gamification = { points: 0, history: [] };
+        patient.gamification.points = (patient.gamification.points || 0) + 5;
+        patient.gamification.history = patient.gamification.history || [];
+        patient.gamification.history.push({ points: 5, reason: 'rate_doctor', date: new Date().toISOString() });
+        patient.markModified('gamification');
+        await patient.save();
+      }
+    } catch (e) {
+      console.error('Rating points award error:', e);
+    }
 
     res.json({ success: true, message: 'Rating submitted successfully' });
   } catch (error) {

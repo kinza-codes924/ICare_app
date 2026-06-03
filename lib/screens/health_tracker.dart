@@ -138,17 +138,16 @@ class _HealthTrackerState extends State<HealthTracker> {
           );
 
           if (res['success']) {
-            // Wait briefly for backend to process points
-            await Future.delayed(const Duration(milliseconds: 500));
             _loadAllData();
-            if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('$type reading added successfully'),
-                  backgroundColor: Colors.green,
-                ),
-              );
-            }
+            _gamificationService.logMetric().then((pts) {
+              if (!mounted) return;
+              final awarded = (pts['pointsAwarded'] as num?)?.toInt() ?? 5;
+              ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                content: Text('$type reading added! +$awarded pts 🏆'),
+                backgroundColor: const Color(0xFF10B981),
+                duration: const Duration(seconds: 3),
+              ));
+            });
           } else {
             if (mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
