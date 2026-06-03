@@ -2,15 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { authMiddleware } = require('../middleware/auth');
 const { connectMongoDB } = require('../config/mongodb');
-const mongoose = require('mongoose');
 
-// Inline schema for gamification data (stored on User document)
-async function getUser(userId) {
-  const User = require('../models/User');
-  return User.findById(userId);
-}
-
-// Points rules
 const POINT_RULES = {
   log_health_metric: 5,
   complete_appointment: 20,
@@ -49,7 +41,8 @@ function computeBadges(stats, points, streak) {
 router.get('/my-stats', authMiddleware, async (req, res) => {
   try {
     await connectMongoDB();
-    const user = await getUser(req.user.id);
+    const User = require('../models/User');
+    const user = await User.findById(req.user.id).lean();
     if (!user) return res.status(404).json({ success: false, message: 'User not found' });
 
     const gam = user.gamification || {};
@@ -85,32 +78,25 @@ router.get('/my-stats', authMiddleware, async (req, res) => {
 router.post('/award-points', authMiddleware, async (req, res) => {
   try {
     await connectMongoDB();
+    const User = require('../models/User');
     const { points, reason } = req.body;
     const awardPts = parseInt(points) || POINT_RULES[reason] || 0;
     if (awardPts === 0) return res.json({ success: true, message: 'No points to award', totalPoints: 0 });
 
-    const User = require('../models/User');
-    const user = await User.findById(req.user.id);
-    if (!user) return res.status(404).json({ success: false });
+    const historyEntry = { points: awardPts, reason: reason || 'manual', date: new Date().toISOString() };
 
-    if (!user.gamification) user.gamification = { points: 0, streak: 0, stats: {}, history: [] };
-    user.gamification.points = (user.gamification.points || 0) + awardPts;
-    user.gamification.history = user.gamification.history || [];
-    user.gamification.history.push({
-      points: awardPts,
-      reason,
-      date: new Date().toISOString(),
-    });
+    const updated = await User.findByIdAndUpdate(
+      req.user.id,
+      {
+        $inc: { 'gamification.points': awardPts },
+        $push: { 'gamification.history': { $each: [historyEntry], $slice: -200 } },
+      },
+      { new: true, strict: false }
+    ).lean();
 
-    // Keep history to last 200 entries
-    if (user.gamification.history.length > 200) {
-      user.gamification.history = user.gamification.history.slice(-200);
-    }
+    if (!updated) return res.status(404).json({ success: false });
 
-    user.markModified('gamification');
-    await user.save();
-
-    res.json({ success: true, totalPoints: user.gamification.points, awardedPoints: awardPts });
+    res.json({ success: true, totalPoints: updated.gamification?.points || 0, awardedPoints: awardPts });
   } catch (err) {
     console.error('Award points error:', err);
     res.status(500).json({ success: false, message: 'Failed to award points' });
@@ -122,48 +108,58 @@ router.post('/log-metric', authMiddleware, async (req, res) => {
   try {
     await connectMongoDB();
     const User = require('../models/User');
-    const user = await User.findById(req.user.id);
-    if (!user) return res.status(404).json({ success: false });
-
-    if (!user.gamification) user.gamification = { points: 0, streak: 0, stats: {}, history: [], lastLogDate: null };
 
     const today = new Date().toISOString().split('T')[0];
-    const lastLog = user.gamification.lastLogDate;
+    const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+
+    // Read current state to compute streak
+    const current = await User.findById(req.user.id).lean();
+    if (!current) return res.status(404).json({ success: false });
+
+    const gam = current.gamification || {};
+    const lastLog = gam.lastLogDate || null;
+
+    let newStreak = gam.streak || 0;
     let streakBonus = 0;
 
-    // Award 5 pts for logging a metric
-    user.gamification.points = (user.gamification.points || 0) + 5;
-    user.gamification.stats = user.gamification.stats || {};
-    user.gamification.stats.metric_logs = (user.gamification.stats.metric_logs || 0) + 1;
-    user.gamification.history = user.gamification.history || [];
-    user.gamification.history.push({ points: 5, reason: 'log_health_metric', date: new Date().toISOString() });
-
-    // Streak logic
     if (lastLog !== today) {
-      const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
-      if (lastLog === yesterday) {
-        user.gamification.streak = (user.gamification.streak || 0) + 1;
-      } else if (lastLog !== today) {
-        user.gamification.streak = 1;
-      }
-      user.gamification.lastLogDate = today;
-
-      // Streak bonuses at 7 days
-      if (user.gamification.streak === 7) {
-        user.gamification.points += 25;
-        streakBonus = 25;
-        user.gamification.history.push({ points: 25, reason: 'streak_bonus', date: new Date().toISOString() });
-      }
+      newStreak = lastLog === yesterday ? (gam.streak || 0) + 1 : 1;
+      if (newStreak === 7) streakBonus = 25;
     }
 
-    user.markModified('gamification');
-    await user.save();
+    const historyEntries = [{ points: 5, reason: 'log_health_metric', date: new Date().toISOString() }];
+    if (streakBonus > 0) {
+      historyEntries.push({ points: 25, reason: 'streak_bonus', date: new Date().toISOString() });
+    }
+
+    const updateOps = {
+      $inc: {
+        'gamification.points': 5 + streakBonus,
+        'gamification.stats.metric_logs': 1,
+      },
+      $push: {
+        'gamification.history': { $each: historyEntries, $slice: -200 },
+      },
+      $set: {
+        'gamification.streak': newStreak,
+      },
+    };
+
+    if (lastLog !== today) {
+      updateOps.$set['gamification.lastLogDate'] = today;
+    }
+
+    const updated = await User.findByIdAndUpdate(
+      req.user.id,
+      updateOps,
+      { new: true, strict: false }
+    ).lean();
 
     res.json({
       success: true,
       pointsAwarded: 5 + streakBonus,
-      totalPoints: user.gamification.points,
-      streak: user.gamification.streak,
+      totalPoints: updated?.gamification?.points || 0,
+      streak: updated?.gamification?.streak || newStreak,
       streakBonus,
     });
   } catch (err) {
@@ -176,39 +172,40 @@ router.post('/log-metric', authMiddleware, async (req, res) => {
 router.post('/redeem', authMiddleware, async (req, res) => {
   try {
     await connectMongoDB();
+    const User = require('../models/User');
     const { rewardId } = req.body;
     const costs = { free_consultation: 100, lab_discount: 150 };
     const cost = costs[rewardId];
     if (!cost) return res.status(400).json({ success: false, message: 'Invalid reward' });
 
-    const User = require('../models/User');
-    const user = await User.findById(req.user.id);
-    if (!user) return res.status(404).json({ success: false });
+    const current = await User.findById(req.user.id).lean();
+    if (!current) return res.status(404).json({ success: false });
 
-    const currentPoints = user.gamification?.points || 0;
+    const currentPoints = current.gamification?.points || 0;
     if (currentPoints < cost) {
       return res.status(400).json({ success: false, message: `Not enough points. Need ${cost}, have ${currentPoints}.` });
     }
 
-    if (!user.gamification) user.gamification = { points: 0, history: [] };
-    user.gamification.points = currentPoints - cost;
-    user.gamification.history = user.gamification.history || [];
-    user.gamification.history.push({
-      points: -cost,
-      reason: `redeem_${rewardId}`,
-      date: new Date().toISOString(),
-    });
-    user.gamification.redemptions = user.gamification.redemptions || [];
-    user.gamification.redemptions.push({ rewardId, redeemedAt: new Date().toISOString(), cost });
+    const historyEntry = { points: -cost, reason: `redeem_${rewardId}`, date: new Date().toISOString() };
+    const redemptionEntry = { rewardId, redeemedAt: new Date().toISOString(), cost };
 
-    user.markModified('gamification');
-    await user.save();
+    const updated = await User.findByIdAndUpdate(
+      req.user.id,
+      {
+        $inc: { 'gamification.points': -cost },
+        $push: {
+          'gamification.history': { $each: [historyEntry], $slice: -200 },
+          'gamification.redemptions': redemptionEntry,
+        },
+      },
+      { new: true, strict: false }
+    ).lean();
 
     const codes = { free_consultation: 'ICARE-FREE-CONSULT', lab_discount: 'ICARE-LAB-15OFF' };
     res.json({
       success: true,
       message: 'Reward redeemed!',
-      remainingPoints: user.gamification.points,
+      remainingPoints: updated?.gamification?.points || 0,
       code: codes[rewardId],
     });
   } catch (err) {
@@ -225,7 +222,7 @@ router.get('/leaderboard', authMiddleware, async (req, res) => {
     const users = await User.find(
       { role: 'patient', 'gamification.points': { $gt: 0 } },
       { name: 1, 'gamification.points': 1, 'gamification.badges': 1 }
-    ).sort({ 'gamification.points': -1 }).limit(20);
+    ).sort({ 'gamification.points': -1 }).limit(20).lean();
 
     const leaderboard = users.map((u, i) => ({
       rank: i + 1,
