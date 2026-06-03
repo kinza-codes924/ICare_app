@@ -284,10 +284,16 @@
         var ms = intervalMinutes * 60 * 1000;
         _waterReminderTimer = setInterval(function() {
           try {
-            new Notification('Drink Water', {
-              body: 'Time to drink a glass of water! Stay hydrated.',
-              icon: '/icons/Icon-192.png',
-            });
+            if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+              new Notification('Drink Water 💧', {
+                body: 'Time to drink a glass of water! Stay hydrated.',
+                icon: '/icons/Icon-192.png',
+              });
+            }
+            // In-app banner event
+            window.dispatchEvent(new CustomEvent('icare-reminder', {
+              detail: JSON.stringify({ type: 'water', title: 'Drink Water 💧', body: 'Time to drink a glass of water! Stay hydrated.' })
+            }));
           } catch(e) { console.warn('Water notification error:', e); }
         }, ms);
         console.log('Water reminder scheduled every', intervalMinutes, 'minutes');
@@ -296,6 +302,52 @@
 
     window.cancelWaterReminder = function() {
       if (_waterReminderTimer) { clearInterval(_waterReminderTimer); _waterReminderTimer = null; }
+    };
+
+    // ── Generic Daily Reminder Notifications (medication, health check, etc.) ──
+    var _dailyReminderTimers = {};
+
+    // Schedule a reminder to fire daily at hour:minute.
+    // Also dispatches icare-reminder CustomEvent for in-app banner.
+    window.scheduleDailyReminder = function(type, title, body, hour, minute) {
+      try {
+        // Cancel any previous timers for this type
+        if (_dailyReminderTimers[type + '_t']) clearTimeout(_dailyReminderTimers[type + '_t']);
+        if (_dailyReminderTimers[type + '_i']) clearInterval(_dailyReminderTimers[type + '_i']);
+
+        function fire() {
+          try {
+            if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+              new Notification(title, { body: body, icon: '/icons/Icon-192.png' });
+            }
+            window.dispatchEvent(new CustomEvent('icare-reminder', {
+              detail: JSON.stringify({ type: type, title: title, body: body })
+            }));
+          } catch(e) { console.warn('Daily reminder fire error:', e); }
+        }
+
+        var now  = new Date();
+        var next = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hour, minute, 0, 0);
+        if (next <= now) next.setDate(next.getDate() + 1);
+        var delay = next - now;
+
+        _dailyReminderTimers[type + '_t'] = setTimeout(function() {
+          fire();
+          _dailyReminderTimers[type + '_i'] = setInterval(fire, 24 * 60 * 60 * 1000);
+        }, delay);
+
+        console.log('Daily reminder scheduled:', type, 'at',
+          (hour < 10 ? '0' : '') + hour + ':' + (minute < 10 ? '0' : '') + minute,
+          '— fires in', Math.round(delay / 60000), 'min');
+      } catch(e) { console.warn('scheduleDailyReminder error:', e); }
+    };
+
+    window.cancelDailyReminder = function(type) {
+      try {
+        if (_dailyReminderTimers[type + '_t']) { clearTimeout(_dailyReminderTimers[type + '_t']); delete _dailyReminderTimers[type + '_t']; }
+        if (_dailyReminderTimers[type + '_i']) { clearInterval(_dailyReminderTimers[type + '_i']); delete _dailyReminderTimers[type + '_i']; }
+        console.log('Daily reminder cancelled:', type);
+      } catch(e) {}
     };
   </script>
   <script src="flutter_bootstrap.js" async></script>

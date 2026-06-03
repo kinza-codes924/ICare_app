@@ -35,6 +35,8 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:intl/intl.dart';
 import '../utils/water_notif_stub.dart'
     if (dart.library.html) '../utils/water_notif_web.dart';
+import '../utils/daily_reminder_stub.dart'
+    if (dart.library.html) '../utils/daily_reminder_web.dart';
 import 'package:icare/services/reminder_service.dart';
 
 // 1 reward point = 0.01 PKR (100 pts = 1 PKR). Configurable from backend.
@@ -151,6 +153,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           _preferHomeSample = prefs.getBool('prefer_home_sample') ?? false;
           _reportDelivery = prefs.getString('report_delivery_method') ?? 'In-app';
         });
+        // Re-schedule JS daily reminders so they survive page refresh
+        if (_medReminderTime != null) {
+          scheduleDailyReminder('medication', 'Medication Reminder 💊', 'Time to take your medication. Stay on track!', _medReminderTime!.hour, _medReminderTime!.minute);
+        }
+        if (_healthCheckReminderTime != null) {
+          scheduleDailyReminder('health_check', 'Health Check Reminder ❤️', 'Time to log your health metrics (BP, weight, etc.).', _healthCheckReminderTime!.hour, _healthCheckReminderTime!.minute);
+        }
       }
     } catch (_) {}
   }
@@ -1329,8 +1338,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       if (time != null) {
         await prefs.setString('med_reminder_time', '${time.hour}:${time.minute}');
         await ReminderService().createReminder({'title': 'Take your medication', 'type': 'medication', 'time': '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}', 'isRecurring': true});
+        scheduleDailyReminder('medication', 'Medication Reminder 💊', 'Time to take your medication. Stay on track!', time.hour, time.minute);
       } else {
         await prefs.remove('med_reminder_time');
+        cancelDailyReminder('medication');
       }
     } catch (_) {}
   }
@@ -1342,8 +1353,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       if (time != null) {
         await prefs.setString('health_check_reminder_time', '${time.hour}:${time.minute}');
         await ReminderService().createReminder({'title': 'Log your health metrics', 'type': 'health_check', 'time': '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}', 'isRecurring': true});
+        scheduleDailyReminder('health_check', 'Health Check Reminder ❤️', 'Time to log your health metrics (BP, weight, etc.).', time.hour, time.minute);
       } else {
         await prefs.remove('health_check_reminder_time');
+        cancelDailyReminder('health_check');
       }
     } catch (_) {}
   }
