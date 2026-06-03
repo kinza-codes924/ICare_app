@@ -11,6 +11,36 @@ const PharmacyProfile = require('../models/PharmacyProfile');
 const GOOGLE_CLIENT_ID = '1076307742101-avj49igc93qipdcnqbqsk3u14gdcb2oh.apps.googleusercontent.com';
 const googleClient = new OAuth2Client(GOOGLE_CLIENT_ID);
 
+function detectDevice(req) {
+  const platform = (req.headers['x-platform'] || '').toLowerCase();
+  if (platform === 'android') return 'Android';
+  if (platform === 'ios') return 'iOS';
+  if (platform === 'web') return 'Web';
+  const ua = (req.headers['user-agent'] || '').toLowerCase();
+  if (ua.includes('android')) return 'Android';
+  if (ua.includes('iphone') || ua.includes('ipad')) return 'iOS';
+  if (ua.includes('mobile')) return 'Mobile';
+  if (ua.includes('dart')) return 'Mobile'; // Flutter mobile fallback
+  return 'Web';
+}
+
+async function logLoginSession(req, userId) {
+  try {
+    const entry = {
+      date: new Date().toISOString(),
+      ip: (req.headers['x-forwarded-for'] || req.connection?.remoteAddress || 'Unknown').split(',')[0].trim(),
+      userAgent: req.headers['user-agent'] || 'Unknown',
+      device: detectDevice(req),
+      platform: req.headers['x-platform'] || 'unknown',
+    };
+    await User.findByIdAndUpdate(
+      userId,
+      { $push: { loginSessions: { $each: [entry], $slice: -100 } } },
+      { strict: false }
+    );
+  } catch (_) {}
+}
+
 const { sendEmail } = require('../utils/email');
 
 // ─── MR NUMBER GENERATOR ──────────────────────────────────────────────────────
@@ -176,18 +206,7 @@ const login = async (req, res) => {
     }
 
     // Log this login session
-    try {
-      const sessionEntry = {
-        date: new Date().toISOString(),
-        ip: req.headers['x-forwarded-for'] || req.connection?.remoteAddress || 'Unknown',
-        userAgent: req.headers['user-agent'] || 'Unknown',
-        device: (req.headers['user-agent'] || '').includes('Mobile') ? 'Mobile' : 'Web',
-      };
-      const sessions = user.loginSessions || [];
-      sessions.push(sessionEntry);
-      if (sessions.length > 100) sessions.splice(0, sessions.length - 100);
-      await User.findByIdAndUpdate(user._id, { $set: { loginSessions: sessions } });
-    } catch (_) {}
+    await logLoginSession(req, user._id);
 
     // 2FA check — if enabled, issue temp token for TOTP verification
     if (user.twoFactorEnabled) {
@@ -426,6 +445,8 @@ const googleLogin = async (req, res) => {
       { expiresIn: '30d' }
     );
 
+    await logLoginSession(req, user._id);
+
     res.status(200).json({
       success: true,
       message: 'Google sign-in successful',
@@ -506,6 +527,8 @@ const appleLogin = async (req, res) => {
       process.env.JWT_SECRET,
       { expiresIn: '30d' }
     );
+
+    await logLoginSession(req, user._id);
 
     res.status(200).json({
       success: true,
