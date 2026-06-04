@@ -780,7 +780,10 @@ class _PharmacyOrdersState extends ConsumerState<PharmacyOrders>
                         padding: const EdgeInsets.only(top: 6),
                         child: Text('At least one medicine is required', style: TextStyle(fontSize: 11, color: Colors.red.shade400)),
                       ),
-                    if (selectedMedicines.any((m) => m['permission'] == 'Controlled' || m['category'].toString().toLowerCase() == 'controlled')) ...[
+                    if (selectedMedicines.any((m) =>
+                        m['permission'] == 'Controlled' ||
+                        m['category'].toString().toLowerCase() == 'controlled' ||
+                        (m['medicine_category'] ?? '').toString().toLowerCase() == 'controlled')) ...[
                       const SizedBox(height: 10),
                       Container(
                         padding: const EdgeInsets.all(10),
@@ -813,7 +816,10 @@ class _PharmacyOrdersState extends ConsumerState<PharmacyOrders>
                           contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                         ),
                         validator: (_) {
-                          final hasControlled = selectedMedicines.any((m) => m['permission'] == 'Controlled' || m['category'].toString().toLowerCase() == 'controlled');
+                          final hasControlled = selectedMedicines.any((m) =>
+                              m['permission'] == 'Controlled' ||
+                              m['category'].toString().toLowerCase() == 'controlled' ||
+                              (m['medicine_category'] ?? '').toString().toLowerCase() == 'controlled');
                           if (hasControlled && prescriptionCtrl.text.trim().isEmpty) {
                             return 'Prescription ID is required for controlled medicines';
                           }
