@@ -480,12 +480,37 @@ router.post('/seed-controlled-medicines', async (req, res) => {
     const results = [];
     for (const med of medicines) {
       const existing = await Product.findOne({ name: med.name, pharmacy_id: pharmacy._id });
-      if (existing) { results.push({ name: med.name, status: 'already exists' }); continue; }
+      if (existing) {
+        // Update medicine_category in case it was OTC before
+        await Product.findByIdAndUpdate(existing._id, { $set: { medicine_category: 'Controlled', requires_prescription: true } });
+        results.push({ name: med.name, status: 'updated to Controlled' });
+        continue;
+      }
       await Product.create(med);
       results.push({ name: med.name, status: 'added' });
     }
 
-    res.json({ success: true, pharmacy: pharmacy.username || pharmacy.email, results });
+    // Also seed the admin ControlledDrug list with generic names
+    const ControlledDrug = require('../models/ControlledDrug');
+    const drugList = [
+      { genericName: 'Alprazolam', innName: 'Alprazolam', schedule: 'Schedule IV', notes: 'Benzodiazepine — anxiety' },
+      { genericName: 'Tramadol Hydrochloride', innName: 'Tramadol', schedule: 'Schedule IV', notes: 'Opioid analgesic' },
+      { genericName: 'Codeine', innName: 'Codeine Phosphate', schedule: 'Schedule II', notes: 'Opioid — pain & cough' },
+      { genericName: 'Diazepam', innName: 'Diazepam', schedule: 'Schedule IV', notes: 'Benzodiazepine' },
+      { genericName: 'Morphine', innName: 'Morphine Sulfate', schedule: 'Schedule II', notes: 'Opioid analgesic' },
+      { genericName: 'Methylphenidate', innName: 'Methylphenidate HCl', schedule: 'Schedule II', notes: 'ADHD stimulant' },
+    ];
+    const drugResults = [];
+    for (const d of drugList) {
+      await ControlledDrug.findOneAndUpdate(
+        { genericName: { $regex: `^${d.genericName}$`, $options: 'i' } },
+        { $set: d },
+        { upsert: true }
+      );
+      drugResults.push(d.genericName);
+    }
+
+    res.json({ success: true, pharmacy: pharmacy.username || pharmacy.email, results, controlledDrugListSeeded: drugResults });
   } catch (err) {
     console.error(err);
     res.status(500).json({ success: false, message: err.message });
