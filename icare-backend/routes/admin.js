@@ -517,6 +517,19 @@ router.post('/seed-controlled-medicines', async (req, res) => {
   }
 });
 
+// ─── TEST: get a sample prescription ID for dev/testing (no auth) ────────────
+router.get('/test-prescription-id', async (req, res) => {
+  try {
+    await connectMongoDB();
+    const EnhancedPrescription = require('../models/EnhancedPrescription');
+    const rx = await EnhancedPrescription.findOne({}).lean();
+    if (!rx) return res.json({ success: false, message: 'No prescriptions found in DB. Ask a doctor to create one first.' });
+    res.json({ success: true, prescriptionId: rx._id.toString(), patientId: rx.patient_id?.toString(), doctorId: rx.doctor_id?.toString() });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
 router.all('/{*path}', (req, res) => {
   res.json({ success: true, users: [], data: [], count: 0 });
 });
