@@ -7,6 +7,21 @@ const PharmacyProfile = require('../models/PharmacyProfile');
 const Product = require('../models/Product');
 const PharmacyOrder = require('../models/PharmacyOrder');
 const { authMiddleware } = require('../middleware/auth');
+const { sendToUser } = require('../services/notificationService');
+
+// Notification messages per status
+function _statusNotifPayload(status, orderNumber) {
+  const map = {
+    confirmed:         { title: '✅ Order Confirmed', body: `Your order ${orderNumber} has been confirmed by the pharmacy.`, type: 'delivery_update' },
+    preparing:         { title: '⚗️ Order Being Prepared', body: `Your order ${orderNumber} is now being prepared.`, type: 'delivery_update' },
+    'out-for-delivery':{ title: '🚚 Order Dispatched', body: `Your order ${orderNumber} is on its way!`, type: 'order_dispatched' },
+    delivered:         { title: '📦 Order Delivered', body: `Your order ${orderNumber} has been delivered. Enjoy!`, type: 'delivery_update' },
+    completed:         { title: '✅ Order Completed', body: `Your order ${orderNumber} is marked complete.`, type: 'delivery_update' },
+    rejected:          { title: '❌ Order Rejected', body: `Your order ${orderNumber} was rejected. Please contact the pharmacy.`, type: 'delivery_update' },
+    cancelled:         { title: '🚫 Order Cancelled', body: `Your order ${orderNumber} has been cancelled.`, type: 'delivery_update' },
+  };
+  return map[status] || null;
+}
 
 function toId(id) {
   try { return new mongoose.Types.ObjectId(id); } catch { return null; }
@@ -558,6 +573,13 @@ router.put('/update_order_status/:id', authMiddleware, async (req, res) => {
     );
 
     if (!order) return res.status(404).json({ success: false, message: 'Order not found or access denied' });
+
+    // Notify patient about status change
+    const notifPayload = _statusNotifPayload(status, order.order_number || order._id.toString().slice(-6));
+    if (notifPayload && order.patient_id && String(order.patient_id) !== String(userId)) {
+      sendToUser(order.patient_id, { ...notifPayload, data: { orderId: String(order._id), type: notifPayload.type } }).catch(() => {});
+    }
+
     res.json({ success: true, message: 'Order updated successfully', order: { ...order.toObject(), _id: order._id.toString() } });
   } catch (err) {
     console.error(err);
@@ -596,6 +618,13 @@ router.put('/orders/:id', authMiddleware, async (req, res) => {
     );
 
     if (!order) return res.status(404).json({ success: false, message: 'Order not found' });
+
+    // Notify patient about status change
+    const notifPayload2 = _statusNotifPayload(status, order.order_number || order._id.toString().slice(-6));
+    if (notifPayload2 && order.patient_id && String(order.patient_id) !== String(userId)) {
+      sendToUser(order.patient_id, { ...notifPayload2, data: { orderId: String(order._id), type: notifPayload2.type } }).catch(() => {});
+    }
+
     res.json({ success: true, message: 'Order updated', order: { ...order.toObject(), _id: order._id.toString() } });
   } catch (err) {
     console.error(err);

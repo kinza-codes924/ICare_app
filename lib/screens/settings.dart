@@ -100,6 +100,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   // Learning
   bool _courseNotificationsEnabled = false;
 
+  // Notification preferences (loaded from API + cached in SharedPreferences)
+  Map<String, bool> _notifPrefs = {
+    'new_orders': true, 'order_dispatched': true, 'delivery_updates': true,
+    'system_alerts': true, 'booking_updates': true, 'doctor_messages': true,
+    'promotions': false, 'sound_notifications': true,
+  };
+
   // Billing & payment
   List<Map<String, dynamic>> _billingItems = [];
   bool _billingLoading = false;
@@ -115,6 +122,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     _loadSavedAddresses();
     _loadPointsData();
     _loadReminderAndDiagnosticsPrefs();
+    _loadNotifPrefs();
   }
 
   Future<void> _loadPointsData() async {
@@ -167,6 +175,43 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           scheduleDailyReminder('health_check', 'Health Check Reminder ❤️', 'Time to log your health metrics (BP, weight, etc.).', _healthCheckReminderTime!.hour, _healthCheckReminderTime!.minute);
         }
       }
+    } catch (_) {}
+  }
+
+  Future<void> _loadNotifPrefs() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      // Load from SharedPreferences first (fast)
+      final cached = <String, bool>{};
+      for (final key in _notifPrefs.keys) {
+        final v = prefs.getBool('notif_$key');
+        if (v != null) cached[key] = v;
+      }
+      if (cached.isNotEmpty && mounted) setState(() => _notifPrefs = {..._notifPrefs, ...cached});
+      // Then sync from API
+      final res = await ApiService().get('/notifications/preferences');
+      final data = res.data as Map<String, dynamic>?;
+      if (data?['success'] == true && data?['preferences'] is Map) {
+        final remote = Map<String, dynamic>.from(data!['preferences'] as Map);
+        final updated = <String, bool>{};
+        for (final key in _notifPrefs.keys) {
+          if (remote[key] is bool) updated[key] = remote[key] as bool;
+        }
+        if (updated.isNotEmpty && mounted) setState(() => _notifPrefs = {..._notifPrefs, ...updated});
+        // Cache locally
+        for (final e in updated.entries) {
+          await prefs.setBool('notif_${e.key}', e.value);
+        }
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _saveNotifPref(String key, bool value) async {
+    setState(() => _notifPrefs = {..._notifPrefs, key: value});
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('notif_$key', value);
+      await ApiService().put('/notifications/preferences', {key: value});
     } catch (_) {}
   }
 
@@ -1489,6 +1534,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       onTogglePreferHomeSample: _togglePreferHomeSample, onSetReportDelivery: _setReportDelivery,
       courseNotificationsEnabled: _courseNotificationsEnabled,
       onToggleCourseNotifications: _toggleCourseNotifications,
+      notifPrefs: _notifPrefs,
+      onSaveNotifPref: _saveNotifPref,
     );
 
     if (isWide) return _WebSettingsLayout(p: params);
@@ -1524,6 +1571,9 @@ class _SettingsLayoutParams {
   // Learning
   final bool courseNotificationsEnabled;
   final void Function(bool) onToggleCourseNotifications;
+  // Notification preferences
+  final Map<String, bool> notifPrefs;
+  final void Function(String, bool) onSaveNotifPref;
   final void Function(bool) onToggle2FA, onToggleBiometrics, onTogglePrescriptionEmail;
   final void Function(String, bool) onTrackerToggle, onHealthModeToggle;
   final VoidCallback onLogout;
@@ -1577,6 +1627,7 @@ class _SettingsLayoutParams {
     required this.onToggleAppointmentReminders,
     required this.onTogglePreferHomeSample, required this.onSetReportDelivery,
     required this.courseNotificationsEnabled, required this.onToggleCourseNotifications,
+    required this.notifPrefs, required this.onSaveNotifPref,
   });
 }
 
@@ -1672,21 +1723,21 @@ class _WebSettingsLayout extends StatelessWidget {
         if (p.isPharmacy || p.isLaboratory) ...[
           _switchTile(icon: Icons.notifications_active_outlined, title: 'New Orders', subtitle: 'Required • Cannot be turned off', value: true, onChanged: (_) {}),
           const Divider(height: 1),
-          _switchTile(icon: Icons.local_shipping_outlined, title: 'Order Dispatched', subtitle: 'Notify when order is out for delivery', value: true, onChanged: (_) {}),
+          _switchTile(icon: Icons.local_shipping_outlined, title: 'Order Dispatched', subtitle: 'Notify when order is out for delivery', value: p.notifPrefs['order_dispatched'] ?? true, onChanged: (v) => p.onSaveNotifPref('order_dispatched', v)),
           const Divider(height: 1),
-          _switchTile(icon: Icons.update_rounded, title: 'Delivery Status Updates', subtitle: 'Real-time delivery tracking notifications', value: true, onChanged: (_) {}),
+          _switchTile(icon: Icons.update_rounded, title: 'Delivery Status Updates', subtitle: 'Real-time delivery tracking notifications', value: p.notifPrefs['delivery_updates'] ?? true, onChanged: (v) => p.onSaveNotifPref('delivery_updates', v)),
           const Divider(height: 1),
-          _switchTile(icon: Icons.warning_amber_outlined, title: 'System Alerts', subtitle: 'Platform & maintenance notifications', value: true, onChanged: (_) {}),
+          _switchTile(icon: Icons.warning_amber_outlined, title: 'System Alerts', subtitle: 'Platform & maintenance notifications', value: p.notifPrefs['system_alerts'] ?? true, onChanged: (v) => p.onSaveNotifPref('system_alerts', v)),
           const Divider(height: 1),
-          _switchTile(icon: Icons.volume_up_outlined, title: 'Sound Notifications', subtitle: 'Play sound for notifications', value: true, onChanged: (_) {}),
+          _switchTile(icon: Icons.volume_up_outlined, title: 'Sound Notifications', subtitle: 'Play sound for notifications', value: p.notifPrefs['sound_notifications'] ?? true, onChanged: (v) => p.onSaveNotifPref('sound_notifications', v)),
         ] else ...[
-          _switchTile(icon: Icons.calendar_today_outlined, title: 'Booking Updates', subtitle: 'Appointment confirmations & changes', value: true, onChanged: (_) {}),
+          _switchTile(icon: Icons.calendar_today_outlined, title: 'Booking Updates', subtitle: 'Appointment confirmations & changes', value: p.notifPrefs['booking_updates'] ?? true, onChanged: (v) => p.onSaveNotifPref('booking_updates', v)),
           const Divider(height: 1),
-          _switchTile(icon: Icons.message_outlined, title: 'Doctor Messages', subtitle: 'Messages from providers', value: true, onChanged: (_) {}),
+          _switchTile(icon: Icons.message_outlined, title: 'Doctor Messages', subtitle: 'Messages from providers', value: p.notifPrefs['doctor_messages'] ?? true, onChanged: (v) => p.onSaveNotifPref('doctor_messages', v)),
           const Divider(height: 1),
-          _switchTile(icon: Icons.local_offer_outlined, title: 'Promotions & Offers', subtitle: 'Special deals & health tips', value: false, onChanged: (_) {}),
+          _switchTile(icon: Icons.local_offer_outlined, title: 'Promotions & Offers', subtitle: 'Special deals & health tips', value: p.notifPrefs['promotions'] ?? false, onChanged: (v) => p.onSaveNotifPref('promotions', v)),
           const Divider(height: 1),
-          _switchTile(icon: Icons.volume_up_outlined, title: 'Sound Notifications', subtitle: 'Play sound for notifications', value: true, onChanged: (_) {}),
+          _switchTile(icon: Icons.volume_up_outlined, title: 'Sound Notifications', subtitle: 'Play sound for notifications', value: p.notifPrefs['sound_notifications'] ?? true, onChanged: (v) => p.onSaveNotifPref('sound_notifications', v)),
           if (p.isPatient) ...[
             const Divider(height: 1),
             _switchTile(icon: Icons.email_outlined, title: 'Send Prescription to Email', subtitle: 'Automatically email prescriptions after consultation', value: p.prescriptionEmailEnabled, onChanged: p.onTogglePrescriptionEmail),
@@ -2306,15 +2357,15 @@ class _MobileSettingsLayout extends StatelessWidget {
         _sectionLabel('Notifications'), const SizedBox(height: 12),
         if (p.isPharmacy || p.isLaboratory) ...[
           _switchTile(icon: Icons.notifications_active_outlined, title: 'New Orders', subtitle: 'Required • Cannot be turned off', value: true, onChanged: (_) {}),
-          const Divider(height: 1), _switchTile(icon: Icons.local_shipping_outlined, title: 'Order Dispatched', subtitle: 'Notify when order is out for delivery', value: true, onChanged: (_) {}),
-          const Divider(height: 1), _switchTile(icon: Icons.update_rounded, title: 'Delivery Status Updates', subtitle: 'Real-time delivery tracking notifications', value: true, onChanged: (_) {}),
-          const Divider(height: 1), _switchTile(icon: Icons.warning_amber_outlined, title: 'System Alerts', subtitle: 'Platform & maintenance notifications', value: true, onChanged: (_) {}),
-          const Divider(height: 1), _switchTile(icon: Icons.volume_up_outlined, title: 'Sound Notifications', subtitle: 'Play sound', value: true, onChanged: (_) {}),
+          const Divider(height: 1), _switchTile(icon: Icons.local_shipping_outlined, title: 'Order Dispatched', subtitle: 'Notify when order is out for delivery', value: p.notifPrefs['order_dispatched'] ?? true, onChanged: (v) => p.onSaveNotifPref('order_dispatched', v)),
+          const Divider(height: 1), _switchTile(icon: Icons.update_rounded, title: 'Delivery Status Updates', subtitle: 'Real-time delivery tracking notifications', value: p.notifPrefs['delivery_updates'] ?? true, onChanged: (v) => p.onSaveNotifPref('delivery_updates', v)),
+          const Divider(height: 1), _switchTile(icon: Icons.warning_amber_outlined, title: 'System Alerts', subtitle: 'Platform & maintenance notifications', value: p.notifPrefs['system_alerts'] ?? true, onChanged: (v) => p.onSaveNotifPref('system_alerts', v)),
+          const Divider(height: 1), _switchTile(icon: Icons.volume_up_outlined, title: 'Sound Notifications', subtitle: 'Play sound', value: p.notifPrefs['sound_notifications'] ?? true, onChanged: (v) => p.onSaveNotifPref('sound_notifications', v)),
         ] else ...[
-          _switchTile(icon: Icons.calendar_today_outlined, title: 'Booking Updates', subtitle: 'Appointment confirmations & changes', value: true, onChanged: (_) {}),
-          const Divider(height: 1), _switchTile(icon: Icons.message_outlined, title: 'Doctor Messages', subtitle: 'Messages from providers', value: true, onChanged: (_) {}),
-          const Divider(height: 1), _switchTile(icon: Icons.local_offer_outlined, title: 'Promotions & Offers', subtitle: 'Special deals', value: false, onChanged: (_) {}),
-          const Divider(height: 1), _switchTile(icon: Icons.volume_up_outlined, title: 'Sound Notifications', subtitle: 'Play sound', value: true, onChanged: (_) {}),
+          _switchTile(icon: Icons.calendar_today_outlined, title: 'Booking Updates', subtitle: 'Appointment confirmations & changes', value: p.notifPrefs['booking_updates'] ?? true, onChanged: (v) => p.onSaveNotifPref('booking_updates', v)),
+          const Divider(height: 1), _switchTile(icon: Icons.message_outlined, title: 'Doctor Messages', subtitle: 'Messages from providers', value: p.notifPrefs['doctor_messages'] ?? true, onChanged: (v) => p.onSaveNotifPref('doctor_messages', v)),
+          const Divider(height: 1), _switchTile(icon: Icons.local_offer_outlined, title: 'Promotions & Offers', subtitle: 'Special deals', value: p.notifPrefs['promotions'] ?? false, onChanged: (v) => p.onSaveNotifPref('promotions', v)),
+          const Divider(height: 1), _switchTile(icon: Icons.volume_up_outlined, title: 'Sound Notifications', subtitle: 'Play sound', value: p.notifPrefs['sound_notifications'] ?? true, onChanged: (v) => p.onSaveNotifPref('sound_notifications', v)),
           if (p.isPatient) ...[
             const Divider(height: 1), _switchTile(icon: Icons.email_outlined, title: 'Send Prescription to Email', subtitle: 'Auto email prescriptions after consultation', value: p.prescriptionEmailEnabled, onChanged: p.onTogglePrescriptionEmail),
           ],

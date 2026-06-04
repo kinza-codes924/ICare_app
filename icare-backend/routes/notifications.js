@@ -2,63 +2,66 @@ const express = require('express');
 const router = express.Router();
 const { connectMongoDB } = require('../config/mongodb');
 const { authMiddleware } = require('../middleware/auth');
+const User = require('../models/User');
 
-// GET /api/notifications — get notifications for current user
-router.get('/', authMiddleware, async (req, res) => {
+// POST /api/notifications/token  — save FCM token after login
+router.post('/token', authMiddleware, async (req, res) => {
   try {
     await connectMongoDB();
-    const Notification = require('../models/Notification');
-    const notifications = await Notification.find({ userId: req.user.id })
-      .sort({ createdAt: -1 })
-      .limit(100)
-      .lean();
-    res.json({ success: true, notifications });
-  } catch (err) {
-    console.error('GET /notifications error:', err);
-    res.json({ success: true, notifications: [] });
-  }
-});
-
-// PUT /api/notifications/:id/read — mark one as read
-router.put('/:id/read', authMiddleware, async (req, res) => {
-  try {
-    await connectMongoDB();
-    const Notification = require('../models/Notification');
-    await Notification.findByIdAndUpdate(req.params.id, { read: true });
+    const { fcmToken } = req.body;
+    if (!fcmToken) return res.status(400).json({ success: false, message: 'fcmToken required' });
+    await User.findByIdAndUpdate(req.user.id, { $addToSet: { fcm_tokens: fcmToken } });
     res.json({ success: true });
   } catch (err) {
-    res.status(500).json({ success: false, message: 'Failed to mark as read' });
+    res.status(500).json({ success: false, message: err.message });
   }
 });
 
-// PUT /api/notifications/read-all — mark all as read
-router.put('/read-all', authMiddleware, async (req, res) => {
+// DELETE /api/notifications/token  — remove FCM token on logout
+router.delete('/token', authMiddleware, async (req, res) => {
   try {
     await connectMongoDB();
-    const Notification = require('../models/Notification');
-    await Notification.updateMany({ userId: req.user.id, read: false }, { read: true });
+    const { fcmToken } = req.body;
+    if (fcmToken) {
+      await User.findByIdAndUpdate(req.user.id, { $pull: { fcm_tokens: fcmToken } });
+    }
     res.json({ success: true });
   } catch (err) {
-    res.status(500).json({ success: false, message: 'Failed to mark all as read' });
+    res.status(500).json({ success: false, message: err.message });
   }
 });
 
-// POST /api/notifications — create a notification (internal use)
-router.post('/', authMiddleware, async (req, res) => {
+// GET /api/notifications/preferences
+router.get('/preferences', authMiddleware, async (req, res) => {
   try {
     await connectMongoDB();
-    const Notification = require('../models/Notification');
-    const { userId, type, title, message } = req.body;
-    const notif = await Notification.create({
-      userId: userId || req.user.id,
-      type: type || 'general',
-      title: title || 'Notification',
-      message: message || '',
-      read: false,
-    });
-    res.status(201).json({ success: true, notification: notif });
+    const user = await User.findById(req.user.id).select('notification_preferences').lean();
+    const defaults = {
+      new_orders: true, order_dispatched: true, delivery_updates: true,
+      system_alerts: true, booking_updates: true, doctor_messages: true,
+      promotions: false, sound_notifications: true,
+    };
+    res.json({ success: true, preferences: { ...defaults, ...(user?.notification_preferences || {}) } });
   } catch (err) {
-    res.status(500).json({ success: false, message: 'Failed to create notification' });
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// PUT /api/notifications/preferences
+router.put('/preferences', authMiddleware, async (req, res) => {
+  try {
+    await connectMongoDB();
+    const allowed = ['new_orders','order_dispatched','delivery_updates','system_alerts','booking_updates','doctor_messages','promotions','sound_notifications'];
+    const update = {};
+    for (const key of allowed) {
+      if (req.body[key] !== undefined) {
+        update[`notification_preferences.${key}`] = Boolean(req.body[key]);
+      }
+    }
+    await User.findByIdAndUpdate(req.user.id, { $set: update });
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
   }
 });
 

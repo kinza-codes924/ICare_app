@@ -8,6 +8,7 @@ const CartItem = require('../models/CartItem');
 const PharmacyOrder = require('../models/PharmacyOrder');
 const PharmacyProfile = require('../models/PharmacyProfile');
 const { authMiddleware } = require('../middleware/auth');
+const { sendToUser } = require('../services/notificationService');
 
 function toId(id) {
   try { return new mongoose.Types.ObjectId(id); } catch { return null; }
@@ -311,6 +312,16 @@ router.post('/checkout', authMiddleware, async (req, res) => {
 
     // 6. Clear cart
     await CartItem.deleteMany({ user_id: userId });
+
+    // 7. Notify pharmacy about new order (best-effort)
+    if (resolvedPharmacyId) {
+      sendToUser(resolvedPharmacyId, {
+        title: '🛒 New Order Received',
+        body: `Order ${order.order_number} has been placed. Tap to review.`,
+        data: { orderId: String(order._id), type: 'new_order' },
+        type: 'new_order',
+      }).catch(() => {});
+    }
 
     return res.status(201).json({
       success: true,

@@ -17,6 +17,18 @@ const userSchema = new mongoose.Schema({
   // Virtual hospital compat fields
   isApproved: { type: Boolean, default: true },
   isActive: { type: Boolean, default: true },
+  // Push notifications
+  fcm_tokens: [{ type: String }],
+  notification_preferences: {
+    new_orders:       { type: Boolean, default: true },
+    order_dispatched: { type: Boolean, default: true },
+    delivery_updates: { type: Boolean, default: true },
+    system_alerts:    { type: Boolean, default: true },
+    booking_updates:  { type: Boolean, default: true },
+    doctor_messages:  { type: Boolean, default: true },
+    promotions:       { type: Boolean, default: false },
+    sound_notifications: { type: Boolean, default: true },
+  },
 }, {
   timestamps: true,
   strict: false, // Accept any extra fields from virtual hospital accounts

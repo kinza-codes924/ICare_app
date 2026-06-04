@@ -92,7 +92,7 @@ router.post('/fcm-token', authMiddleware, async (req, res) => {
     await connectMongoDB();
     const { fcmToken } = req.body;
     if (fcmToken) {
-      await User.findByIdAndUpdate(toId(req.user.id), { $set: { fcmToken } });
+      await User.findByIdAndUpdate(toId(req.user.id), { $addToSet: { fcm_tokens: fcmToken } });
     }
     res.json({ success: true, message: 'FCM token saved' });
   } catch (error) {
