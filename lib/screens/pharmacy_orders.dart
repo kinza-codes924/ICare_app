@@ -613,25 +613,30 @@ class _PharmacyOrdersState extends ConsumerState<PharmacyOrders>
     final searchCtrl = TextEditingController();
     final prescriptionCtrl = TextEditingController();
 
-    // Load inventory for this pharmacy
-    _pharmacyService.getMedicines().then((meds) {
-      inventoryMeds = meds.map((m) => {
-        'name': (m['productName'] ?? m['name'] ?? 'Unknown').toString(),
-        'id': m['_id'] ?? '',
-        'price': (m['price'] ?? 0).toDouble(),
-        'stock': (m['quantity'] ?? m['stock'] ?? 0),
-        'permission': (m['medicinePermission'] ?? 'OTC').toString(),
-        'category': (m['category'] ?? '').toString(),
-      }).toList();
-      medsLoading = false;
-    }).catchError((_) { medsLoading = false; });
-
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setModalState) {
+          // Load inventory on first build — setModalState is in scope here
+          if (medsLoading && inventoryMeds.isEmpty) {
+            _pharmacyService.getMedicines().then((meds) {
+              setModalState(() {
+                inventoryMeds = meds.map((m) => {
+                  'name': (m['productName'] ?? m['name'] ?? 'Unknown').toString(),
+                  'id': m['_id'] ?? '',
+                  'price': (m['price'] ?? 0).toDouble(),
+                  'stock': (m['stock_quantity'] ?? m['quantity'] ?? m['stock'] ?? 0),
+                  'permission': (m['medicinePermission'] ?? 'OTC').toString(),
+                  'category': (m['category'] ?? '').toString(),
+                  'medicine_category': (m['medicine_category'] ?? m['medicineCategory'] ?? 'OTC').toString(),
+                }).toList();
+                medsLoading = false;
+              });
+            }).catchError((_) { setModalState(() { medsLoading = false; }); });
+          }
+
           final filtered = inventoryMeds.where((m) {
             final q = searchCtrl.text.toLowerCase();
             return q.isEmpty || m['name'].toString().toLowerCase().contains(q);
@@ -725,7 +730,9 @@ class _PharmacyOrdersState extends ConsumerState<PharmacyOrders>
                           itemBuilder: (_, i) {
                             final med = filtered[i];
                             final isSelected = selectedMedicines.any((s) => s['id'] == med['id']);
-                            final isControlledMed = med['permission'] == 'Controlled' || med['category'].toString().toLowerCase() == 'controlled';
+                            final isControlledMed = med['permission'] == 'Controlled' ||
+                                med['category'].toString().toLowerCase() == 'controlled' ||
+                                (med['medicine_category'] ?? '').toString().toLowerCase() == 'controlled';
                             return ListTile(
                               dense: true,
                               title: Row(children: [

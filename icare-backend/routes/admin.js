@@ -396,6 +396,57 @@ router.put('/credentials/:doctorId/:credId', authMiddleware, adminOnly, async (r
   }
 });
 
+// ─── CONTROLLED DRUG LIST (admin-managed by INN/generic name) ────────────────
+const ControlledDrug = require('../models/ControlledDrug');
+
+// GET all controlled drugs
+router.get('/controlled-drugs', authMiddleware, async (req, res) => {
+  try {
+    await connectMongoDB();
+    const drugs = await ControlledDrug.find().sort({ genericName: 1 }).lean();
+    res.json({ success: true, drugs });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+// POST add a generic/INN name to controlled list
+router.post('/controlled-drugs', authMiddleware, async (req, res) => {
+  try {
+    await connectMongoDB();
+    const { genericName, innName, schedule, notes } = req.body;
+    if (!genericName?.trim()) return res.status(400).json({ success: false, message: 'genericName is required' });
+
+    const drug = await ControlledDrug.findOneAndUpdate(
+      { genericName: { $regex: `^${genericName.trim()}$`, $options: 'i' } },
+      { $set: { genericName: genericName.trim(), innName: innName || '', schedule: schedule || '', notes: notes || '', addedBy: toId(req.user.id) } },
+      { upsert: true, new: true }
+    );
+
+    // Retroactively update all products whose generic_name matches
+    const Product = require('../models/Product');
+    const updated = await Product.updateMany(
+      { generic_name: { $regex: `^${genericName.trim()}$`, $options: 'i' } },
+      { $set: { medicine_category: 'Controlled', requires_prescription: true } }
+    );
+
+    res.json({ success: true, drug, productsUpdated: updated.modifiedCount });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+// DELETE remove from controlled list
+router.delete('/controlled-drugs/:id', authMiddleware, async (req, res) => {
+  try {
+    await connectMongoDB();
+    await ControlledDrug.findByIdAndDelete(req.params.id);
+    res.json({ success: true, message: 'Removed from controlled drug list' });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
 // ─── SEED CONTROLLED MEDICINES (one-time, no auth needed for convenience) ─────
 router.post('/seed-controlled-medicines', async (req, res) => {
   try {

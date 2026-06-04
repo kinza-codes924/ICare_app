@@ -644,16 +644,34 @@ router.get('/products', async (req, res) => {
   }
 });
 
+// Helper: check if generic name is on the admin-controlled list
+async function resolveControlledCategory(genericName) {
+  if (!genericName) return null;
+  try {
+    const ControlledDrug = require('../models/ControlledDrug');
+    const match = await ControlledDrug.findOne({
+      genericName: { $regex: `^${genericName.trim()}$`, $options: 'i' },
+    }).lean();
+    return match ? 'Controlled' : null;
+  } catch (_) { return null; }
+}
+
 router.post('/products', authMiddleware, async (req, res) => {
   try {
     await connectMongoDB();
     const userId = toId(req.user.id);
-    const { name, description, category, price, stockQuantity, manufacturer, requiresPrescription, genericName } = req.body;
+    const { name, description, category, price, stockQuantity, manufacturer, requiresPrescription, genericName, medicineCategory } = req.body;
+
+    // Admin-controlled drug list takes precedence — pharmacist cannot override classification
+    const adminCategory = await resolveControlledCategory(genericName);
+    const finalCategory = adminCategory || medicineCategory || 'OTC';
+    const finalRequiresPrescription = adminCategory === 'Controlled' ? true : (requiresPrescription ?? false);
 
     const product = await Product.create({
       pharmacy_id: userId, name, description, category: category || 'OTC',
+      medicine_category: finalCategory,
       price: price || 0, stock_quantity: stockQuantity || 0,
-      manufacturer, requires_prescription: requiresPrescription ?? false, generic_name: genericName,
+      manufacturer, requires_prescription: finalRequiresPrescription, generic_name: genericName,
     });
 
     res.status(201).json({ success: true, medicine: { ...product.toObject(), _id: product._id.toString() } });
@@ -666,13 +684,23 @@ router.post('/products', authMiddleware, async (req, res) => {
 router.put('/products/:id', authMiddleware, async (req, res) => {
   try {
     await connectMongoDB();
-    const { name, price, stockQuantity, category, description } = req.body;
+    const { name, price, stockQuantity, category, description, genericName, medicineCategory } = req.body;
     const update = {};
     if (name) update.name = name;
     if (price !== undefined) update.price = price;
     if (stockQuantity !== undefined) update.stock_quantity = stockQuantity;
     if (category) update.category = category;
     if (description) update.description = description;
+    if (genericName !== undefined) update.generic_name = genericName;
+
+    // Admin classification always wins — pharmacist cannot reclassify
+    const adminCategory = await resolveControlledCategory(genericName || (await Product.findById(req.params.id).lean())?.generic_name);
+    if (adminCategory) {
+      update.medicine_category = adminCategory;
+      update.requires_prescription = true;
+    } else if (medicineCategory) {
+      update.medicine_category = medicineCategory;
+    }
 
     if (Object.keys(update).length === 0) {
       return res.status(400).json({ success: false, message: 'Nothing to update' });
