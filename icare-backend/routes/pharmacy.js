@@ -713,6 +713,49 @@ router.post('/orders/walk-in', authMiddleware, async (req, res) => {
       return res.status(400).json({ success: false, message: 'patientName and medicines are required' });
     }
 
+    // If any controlled medicine is in the order, validate prescriptionId against iCare prescriptions
+    const Product = require('../models/Product');
+    const EnhancedPrescription = require('../models/EnhancedPrescription');
+
+    // Parse item names and check if any are controlled
+    const itemNames = Array.isArray(items)
+      ? items.map(i => (i.name || '').toLowerCase())
+      : medicines.split(',').map(m => m.trim().toLowerCase());
+
+    // Find any matching product with medicine_category = Controlled
+    const controlledCheck = await Product.findOne({
+      pharmacy_id: pharmacyUserId,
+      is_active: true,
+      medicine_category: 'Controlled',
+      $or: itemNames.map(n => ({ name: { $regex: n.split(' ')[0], $options: 'i' } })),
+    }).lean().catch(() => null);
+
+    if (controlledCheck) {
+      if (!prescriptionId || !prescriptionId.toString().trim()) {
+        return res.status(400).json({
+          success: false,
+          requiresPrescription: true,
+          message: 'A valid iCare prescription ID is required for controlled medicines.',
+        });
+      }
+      // Verify the prescriptionId exists in iCare prescriptions
+      const mongoose = require('mongoose');
+      let rxValid = false;
+      try {
+        const rxId = new mongoose.Types.ObjectId(prescriptionId.trim());
+        const rx = await EnhancedPrescription.findById(rxId).lean();
+        rxValid = !!rx;
+      } catch (_) { rxValid = false; }
+
+      if (!rxValid) {
+        return res.status(400).json({
+          success: false,
+          requiresPrescription: true,
+          message: 'The provided iCare Prescription ID was not found. Please enter a valid prescription ID issued by an iCare doctor.',
+        });
+      }
+    }
+
     // Normalize items from Flutter (may have name/price/qty fields)
     const normalizedItems = Array.isArray(items) ? items.map(i => ({
       product_name: i.product_name || i.name || '',

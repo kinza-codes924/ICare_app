@@ -1224,6 +1224,57 @@ class _PharmacyDetailsScreenState extends State<PharmacyDetailsScreen> {
     );
   }
 
+  void _showOverLimitDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Row(children: [
+          Icon(Icons.block_rounded, color: Color(0xFFEF4444), size: 22),
+          SizedBox(width: 10),
+          Expanded(child: Text('Quantity Limit Reached', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700))),
+        ]),
+        content: Column(mainAxisSize: MainAxisSize.min, children: [
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(color: const Color(0xFFFEE2E2), borderRadius: BorderRadius.circular(12)),
+            child: const Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Icon(Icons.info_rounded, color: Color(0xFFDC2626), size: 18),
+              SizedBox(width: 10),
+              Expanded(child: Text(
+                'Without a prescription, a maximum of 30 units per medicine is allowed per order (3 doses/day × 10 days).',
+                style: TextStyle(fontSize: 13, color: Color(0xFF7F1D1D), height: 1.5, fontWeight: FontWeight.w600),
+              )),
+            ]),
+          ),
+          const SizedBox(height: 14),
+          const Text(
+            'To order more than 30 units, you need a valid prescription from an iCare doctor.',
+            style: TextStyle(fontSize: 13, color: Color(0xFF64748B), height: 1.5),
+            textAlign: TextAlign.center,
+          ),
+        ]),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('OK, Got It')),
+          ElevatedButton.icon(
+            onPressed: () {
+              Navigator.pop(ctx);
+              Navigator.pop(context);
+              Navigator.push(context, MaterialPageRoute(builder: (_) => const ConsultationDetailsScreen()));
+            },
+            icon: const Icon(Icons.medical_services_rounded, size: 16),
+            label: const Text('Get a Prescription'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primaryColor,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildMedicineCard(dynamic med) {
     final id = med['_id']?.toString() ?? '';
     final isAdding = _addingToCart.contains(id);
@@ -1232,8 +1283,12 @@ class _PharmacyDetailsScreenState extends State<PharmacyDetailsScreen> {
     final qty = _quantities[id] ?? 0;
     final permission = (med['medicinePermission'] ?? 'OTC').toString();
     final isPrescriptionOnly = permission == 'Prescription Only';
-    final isControlled = permission == 'Controlled' || (med['category'] ?? '').toString().toLowerCase() == 'controlled';
-    final isVaccine = (med['category'] ?? '').toString().toLowerCase() == 'vaccine' ||
+    final medCat = (med['medicine_category'] ?? med['medicineCategory'] ?? '').toString().toLowerCase();
+    final isControlled = permission == 'Controlled' ||
+        (med['category'] ?? '').toString().toLowerCase() == 'controlled' ||
+        medCat == 'controlled';
+    final isVaccine = medCat == 'vaccine' ||
+        (med['category'] ?? '').toString().toLowerCase() == 'vaccine' ||
         (med['productName'] ?? med['name'] ?? '').toString().toLowerCase().contains('vaccine') ||
         permission == 'Vaccine';
 
@@ -1356,6 +1411,15 @@ class _PharmacyDetailsScreenState extends State<PharmacyDetailsScreen> {
                           onChanged: (v) {
                             final parsed = int.tryParse(v);
                             if (parsed != null && parsed >= 0) {
+                              // Cap at 30 for non-prescription medicines
+                              if (!isPrescriptionOnly && parsed > 30) {
+                                _qtyControllers[id]?.text = '30';
+                                _qtyControllers[id]?.selection = TextSelection.fromPosition(
+                                  TextPosition(offset: '30'.length));
+                                setState(() => _quantities[id] = 30);
+                                _showOverLimitDialog();
+                                return;
+                              }
                               setState(() => _quantities[id] = parsed);
                             }
                           },
@@ -1368,14 +1432,7 @@ class _PharmacyDetailsScreenState extends State<PharmacyDetailsScreen> {
                     onTap: () {
                       final current = _quantities[id] ?? 0;
                       if (!isPrescriptionOnly && current >= 30) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Maximum 30 units per medicine without a prescription.'),
-                            backgroundColor: Color(0xFFEF4444),
-                            behavior: SnackBarBehavior.floating,
-                            duration: Duration(seconds: 3),
-                          ),
-                        );
+                        _showOverLimitDialog();
                         return;
                       }
                       setState(() {
@@ -1413,6 +1470,11 @@ class _PharmacyDetailsScreenState extends State<PharmacyDetailsScreen> {
                   }
                   if (isPrescriptionOnly) {
                     _showPrescriptionRequiredDialog(med);
+                    return;
+                  }
+                  // Block order if qty > 30 without prescription
+                  if (!isPrescriptionOnly && qty > 30) {
+                    _showOverLimitDialog();
                     return;
                   }
                   setState(() => _addingToCart.add(id));

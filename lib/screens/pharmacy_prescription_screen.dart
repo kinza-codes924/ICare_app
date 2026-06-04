@@ -58,7 +58,7 @@ class _PharmacyPrescriptionScreenState
 
       // For liquid, qty defaults to 1 bottle; for tablets/capsules, calculate from schedule
       final isLiquid = formType.toLowerCase() == 'liquid' || formType.toLowerCase() == 'syrup';
-      final calculatedQty = isLiquid ? 1 : _calcQty(day, noon, night, duration);
+      final calculatedQty = isLiquid ? 1 : _calcQty(day, noon, night, duration, frequency: frequency);
 
       return {
         'name': name,
@@ -76,12 +76,32 @@ class _PharmacyPrescriptionScreenState
     }).where((m) => (m['name'] as String).isNotEmpty).toList();
   }
 
-  int _calcQty(String day, String noon, String night, String duration) {
+  /// Maps frequency codes used by doctors to times-per-day
+  int _freqToPerDay(String freq) {
+    switch (freq.toLowerCase().trim()) {
+      case 'od': case 'qd': case 'once daily': case 'once a day': case 'nocte': case 'hs': case 'at night': return 1;
+      case 'bd': case 'bid': case 'twice daily': case 'twice a day': return 2;
+      case 'tds': case 'tid': case 'thrice daily': case 'three times daily': case 'three times a day': return 3;
+      case 'qds': case 'qid': case 'four times daily': case 'four times a day': return 4;
+      case 'q6h': return 4;
+      case 'q8h': return 3;
+      case 'q12h': return 2;
+      default: return int.tryParse(freq) ?? 1;
+    }
+  }
+
+  int _calcQty(String day, String noon, String night, String duration, {String frequency = ''}) {
     try {
       final d = int.tryParse(day) ?? 0;
       final n = int.tryParse(noon) ?? 0;
       final ni = int.tryParse(night) ?? 0;
-      final perDay = d + n + ni;
+      int perDay = d + n + ni;
+
+      // If no day/noon/night schedule, fall back to frequency code (bd=2, tds=3, etc.)
+      if (perDay == 0 && frequency.isNotEmpty) {
+        perDay = _freqToPerDay(frequency);
+      }
+
       final durationMatch = RegExp(r'\d+').firstMatch(duration);
       final days = durationMatch != null
           ? int.tryParse(durationMatch.group(0)!) ?? 0
