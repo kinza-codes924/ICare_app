@@ -706,7 +706,7 @@ router.post('/orders/walk-in', authMiddleware, async (req, res) => {
     const pharmacyProfile = await PharmacyProfile.findOne({ user_id: pharmacyUserId }).lean();
     const pharmacyId = pharmacyProfile ? pharmacyProfile._id : pharmacyUserId;
 
-    const { patientName, contact, medicines, deliveryOption, deliveryAddress, notes } = req.body;
+    const { patientName, contact, medicines, deliveryOption, deliveryAddress, notes, prescriptionId } = req.body;
     if (!patientName || !medicines) {
       return res.status(400).json({ success: false, message: 'patientName and medicines are required' });
     }
@@ -728,6 +728,7 @@ router.post('/orders/walk-in', authMiddleware, async (req, res) => {
       orderNumber,
       total_amount: 0,
       items: [],
+      ...(prescriptionId ? { prescription_id: prescriptionId } : {}),
     });
 
     res.status(201).json({ success: true, message: 'Walk-in order created', order: { ...order.toObject(), _id: order._id.toString() } });

@@ -253,8 +253,64 @@ class _PharmacyHomeState extends State<PharmacyHome> {
           ],
         ),
         SizedBox(height: ScallingConfig.scale(20)),
+        _buildVaccineBanner(context),
+        SizedBox(height: ScallingConfig.scale(20)),
         SellerProducts(),
       ],
+    );
+  }
+
+  Widget _buildVaccineBanner(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [Color(0xFF0036BC), Color(0xFF0EA5E9)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Get Vaccines at Your Doorstep',
+                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: Colors.white),
+                  ),
+                  const SizedBox(height: 4),
+                  const Text(
+                    'Consult our doctor first, then get your vaccine safely delivered home.',
+                    style: TextStyle(fontSize: 11, color: Colors.white70, height: 1.4),
+                  ),
+                  const SizedBox(height: 12),
+                  ElevatedButton(
+                    onPressed: () {},
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.white,
+                      foregroundColor: const Color(0xFF0036BC),
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                      elevation: 0,
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    child: const Text('Book Now', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 12),
+            const Icon(Icons.vaccines_rounded, size: 52, color: Colors.white54),
+          ],
+        ),
+      ),
     );
   }
 

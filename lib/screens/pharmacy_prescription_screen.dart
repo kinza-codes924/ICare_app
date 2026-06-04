@@ -63,6 +63,7 @@ class _PharmacyPrescriptionScreenState
       return {
         'name': name,
         'qty': calculatedQty > 0 ? calculatedQty : 1,
+        'prescribedQty': calculatedQty > 0 ? calculatedQty : 1,
         'day': day,
         'noon': noon,
         'night': night,
@@ -558,19 +559,22 @@ class _PharmacyPrescriptionScreenState
                 child: Text('$qty',
                     style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: _primary)),
               ),
-              GestureDetector(
-                onTap: () {
-                  setState(() => m['qty'] = qty + 1);
-                },
-                child: Container(
-                  width: 32, height: 32,
-                  decoration: BoxDecoration(
-                    color: _primary,
-                    borderRadius: BorderRadius.circular(8),
+              Builder(builder: (_) {
+                final maxQty = (m['prescribedQty'] as int?) ?? qty;
+                final atMax = qty >= maxQty;
+                return GestureDetector(
+                  onTap: atMax ? null : () => setState(() => m['qty'] = qty + 1),
+                  child: Container(
+                    width: 32, height: 32,
+                    decoration: BoxDecoration(
+                      color: atMax ? const Color(0xFFCBD5E1) : _primary,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(Icons.add_rounded, size: 18,
+                        color: atMax ? const Color(0xFF94A3B8) : Colors.white),
                   ),
-                  child: const Icon(Icons.add_rounded, size: 18, color: Colors.white),
-                ),
-              ),
+                );
+              }),
             ],
           ),
         ],

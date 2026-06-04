@@ -391,6 +391,7 @@ class PharmacyService {
     required String deliveryOption,
     String? address,
     String? notes,
+    String? prescriptionId,
   }) async {
     try {
       final response = await _apiService.post('/pharmacy/orders/walk-in', {
@@ -400,6 +401,7 @@ class PharmacyService {
         'deliveryOption': deliveryOption,
         if (address != null && address.isNotEmpty) 'deliveryAddress': address,
         if (notes != null && notes.isNotEmpty) 'notes': notes,
+        if (prescriptionId != null && prescriptionId.isNotEmpty) 'prescriptionId': prescriptionId,
         'orderType': 'walk-in',
         'status': 'pending',
       });

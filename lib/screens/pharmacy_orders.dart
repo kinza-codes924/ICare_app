@@ -605,6 +605,7 @@ class _PharmacyOrdersState extends ConsumerState<PharmacyOrders>
     List<Map<String, dynamic>> inventoryMeds = [];
     bool medsLoading = true;
     final searchCtrl = TextEditingController();
+    final prescriptionCtrl = TextEditingController();
 
     // Load inventory for this pharmacy
     _pharmacyService.getMedicines().then((meds) {
@@ -779,10 +780,32 @@ class _PharmacyOrdersState extends ConsumerState<PharmacyOrders>
                           Icon(Icons.warning_rounded, size: 16, color: Color(0xFFDC2626)),
                           SizedBox(width: 8),
                           Expanded(child: Text(
-                            'Controlled drug(s) selected. Ensure valid prescription is verified before dispensing.',
+                            'Controlled drug(s) selected. A valid iCare prescription ID is required to proceed.',
                             style: TextStyle(fontSize: 11, color: Color(0xFF7F1D1D), fontWeight: FontWeight.w600),
                           )),
                         ]),
+                      ),
+                      const SizedBox(height: 10),
+                      TextFormField(
+                        controller: prescriptionCtrl,
+                        decoration: InputDecoration(
+                          labelText: 'iCare Prescription ID *',
+                          hintText: 'Enter prescription reference ID',
+                          prefixIcon: const Icon(Icons.receipt_long_rounded, color: Color(0xFFDC2626), size: 18),
+                          filled: true,
+                          fillColor: const Color(0xFFFEF2F2),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFFCA5A5))),
+                          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFFCA5A5))),
+                          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFDC2626), width: 2)),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                        ),
+                        validator: (_) {
+                          final hasControlled = selectedMedicines.any((m) => m['permission'] == 'Controlled' || m['category'].toString().toLowerCase() == 'controlled');
+                          if (hasControlled && prescriptionCtrl.text.trim().isEmpty) {
+                            return 'Prescription ID is required for controlled medicines';
+                          }
+                          return null;
+                        },
                       ),
                     ],
                     const SizedBox(height: 20),
@@ -825,6 +848,7 @@ class _PharmacyOrdersState extends ConsumerState<PharmacyOrders>
                               deliveryOption: deliveryOption,
                               address: addressController.text.trim(),
                               notes: notesController.text.trim(),
+                              prescriptionId: prescriptionCtrl.text.trim().isNotEmpty ? prescriptionCtrl.text.trim() : null,
                             );
                             if (ctx.mounted) {
                               Navigator.pop(ctx);
@@ -1323,6 +1347,30 @@ class _PharmacyOrdersState extends ConsumerState<PharmacyOrders>
                         ],
                       ],
                     ),
+                  ),
+                ],
+                if ((order['prescriptionId'] ?? '').toString().isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF0F9FF),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: const Color(0xFFBAE6FD)),
+                    ),
+                    child: Row(children: [
+                      const Icon(Icons.receipt_long_rounded, size: 14, color: Color(0xFF0369A1)),
+                      const SizedBox(width: 8),
+                      const Text('Prescription Ref: ', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF0369A1))),
+                      Expanded(
+                        child: Text(
+                          order['prescriptionId'].toString(),
+                          style: const TextStyle(fontSize: 11, color: Color(0xFF0C4A6E)),
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
+                        ),
+                      ),
+                    ]),
                   ),
                 ],
                 const SizedBox(height: 16),

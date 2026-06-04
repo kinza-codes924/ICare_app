@@ -91,6 +91,14 @@ class _PharmacyDetailsScreenState extends State<PharmacyDetailsScreen> {
       return;
     }
 
+    // Pre-check: controlled medicines and vaccines require consultation before purchase
+    final medCategory = (med['medicine_category'] ?? med['medicineCategory'] ?? '').toString();
+    if (medCategory == 'Controlled' || medCategory == 'Vaccine') {
+      if (mounted) _showConsultationRequiredDialog(medCategory);
+      setState(() => _addingToCart.remove(id));
+      return;
+    }
+
     setState(() => _addingToCart.add(id));
     try {
       await _cartService.addItem(id, quantity);
@@ -104,23 +112,83 @@ class _PharmacyDetailsScreenState extends State<PharmacyDetailsScreen> {
       }
     } catch (e) {
       if (mounted) {
-        String errMsg = 'Failed to add to cart';
         if (e is DioException) {
           final data = e.response?.data;
-          if (data is Map && data['message'] != null) {
-            errMsg = data['message'].toString();
+          if (data is Map && data['requiresConsultation'] == true) {
+            _showConsultationRequiredDialog((data['medicineCategory'] ?? 'Controlled').toString());
+            return;
           }
+          final errMsg = data is Map ? (data['message']?.toString() ?? 'Failed to add to cart') : 'Failed to add to cart';
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(errMsg),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 4),
+          ));
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(e.toString()),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 4),
+          ));
         }
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(errMsg),
-          backgroundColor: Colors.red,
-          behavior: SnackBarBehavior.floating,
-          duration: const Duration(seconds: 4),
-        ));
       }
     } finally {
       if (mounted) setState(() => _addingToCart.remove(id));
     }
+  }
+
+  void _showConsultationRequiredDialog(String category) {
+    final isVaccine = category.toLowerCase() == 'vaccine';
+    if (!mounted) return;
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(color: const Color(0xFFFEF3C7), borderRadius: BorderRadius.circular(10)),
+            child: Icon(
+              isVaccine ? Icons.vaccines_rounded : Icons.medication_rounded,
+              color: const Color(0xFFF59E0B), size: 22,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              isVaccine ? 'Consultation Required' : 'Controlled Medicine',
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+            ),
+          ),
+        ]),
+        content: Text(
+          isVaccine
+              ? 'This vaccine can only be ordered after consultation with our doctor. Please book a consultation first.'
+              : 'This medicine can only be purchased online after consultation with our doctor. It is mandatory to have a consultation with our doctor.',
+          style: const TextStyle(fontSize: 14, color: Color(0xFF374151), height: 1.5),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel', style: TextStyle(color: Color(0xFF64748B))),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primaryColor,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            child: Text(
+              isVaccine ? 'Book Consultation' : 'Connect to a Doctor Now',
+              style: const TextStyle(fontSize: 13),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _fetchMedicines() async {
