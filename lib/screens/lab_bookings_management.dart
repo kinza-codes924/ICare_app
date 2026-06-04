@@ -313,13 +313,13 @@ class _LabBookingsManagementState extends State<LabBookingsManagement>
             label: const Text('Import / Export'),
             onPressed: () => showDialog(
               context: context,
-              builder: (_) => AlertDialog(
+              builder: (ctx) => AlertDialog(
                 title: const Text('API Integration'),
                 content: const Text(
                   'Connect your lab\'s existing software to iCare for automatic order sync and result import.\n\nTo enable API integration, please provide your lab system\'s API documentation and credentials to the iCare team.',
                 ),
                 actions: [
-                  TextButton(onPressed: () => Navigator.pop(_), child: const Text('Close')),
+                  TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Close')),
                 ],
               ),
             ),
