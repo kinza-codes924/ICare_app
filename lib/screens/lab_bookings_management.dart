@@ -307,6 +307,24 @@ class _LabBookingsManagementState extends State<LabBookingsManagement>
             color: Color(0xFF0F172A),
           ),
         ),
+        actions: [
+          TextButton.icon(
+            icon: const Icon(Icons.sync_alt_rounded, size: 18),
+            label: const Text('Import / Export'),
+            onPressed: () => showDialog(
+              context: context,
+              builder: (_) => AlertDialog(
+                title: const Text('API Integration'),
+                content: const Text(
+                  'Connect your lab\'s existing software to iCare for automatic order sync and result import.\n\nTo enable API integration, please provide your lab system\'s API documentation and credentials to the iCare team.',
+                ),
+                actions: [
+                  TextButton(onPressed: () => Navigator.pop(_), child: const Text('Close')),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _showCreateOrderDialog(context),

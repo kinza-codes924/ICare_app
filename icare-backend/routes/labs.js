@@ -6,6 +6,7 @@ const User = require('../models/User');
 const LabProfile = require('../models/LabProfile');
 const LabTestRequest = require('../models/LabTestRequest');
 const { authMiddleware } = require('../middleware/auth');
+const { sendToUser } = require('../services/notificationService');
 
 function toId(id) {
   try { return new mongoose.Types.ObjectId(id); } catch { return null; }
@@ -352,18 +353,13 @@ router.put('/bookings/:bookingId', authMiddleware, async (req, res) => {
 
     // ── Notify patient when results are ready ─────────────────────────────────────
     if ((update.status === 'reporting_done' || update.status === 'completed') && booking.patient_id) {
-      try {
-        const Notification = require('../models/Notification');
-        const testName = booking.testType || booking.test_type || 'Lab Test';
-        await Notification.create({
-          userId: booking.patient_id,
-          type: 'lab',
-          title: 'Lab Results Ready',
-          message: `Your ${testName} results are now available. Please check your lab reports.`,
-          data: { bookingId: booking._id.toString() },
-          read: false,
-        });
-      } catch (notifyErr) { console.error('⚠️  Lab results notification failed:', notifyErr.message); }
+      const testName = booking.test_type || 'Lab Test';
+      sendToUser(booking.patient_id, {
+        title: '🔬 Lab Results Ready',
+        body: `Your ${testName} results are now available. Tap to view your report.`,
+        data: { bookingId: booking._id.toString(), type: 'lab_result' },
+        type: 'system_alert',
+      }).catch(() => {});
     }
     // ── Award gamification points to patient on lab test completion ─────────────
     if ((update.status === 'completed' || update.status === 'reporting_done') && booking.patient_id) {
@@ -382,17 +378,15 @@ router.put('/bookings/:bookingId', authMiddleware, async (req, res) => {
         }
       } catch (_) {}
     }
-    // ── Notify doctor when results are submitted ─────────────────────────────────
-    if (update.status === 'completed' && booking.medical_record_id) {
-      try {
-        const MedicalRecord = require('../models/MedicalRecord');
-        const record = await MedicalRecord.findById(booking.medical_record_id).lean();
-        if (record) {
-          console.log(`🔔 Lab results ready → Doctor ${record.doctor} notified for test: ${booking.test_type}`);
-        }
-      } catch (notifyErr) {
-        console.error('⚠️  Doctor notification failed:', notifyErr.message);
-      }
+    // ── Notify referring doctor when results are submitted ────────────────────────
+    if ((update.status === 'reporting_done' || update.status === 'completed') && booking.doctor_id) {
+      const testName = booking.test_type || 'Lab Test';
+      sendToUser(booking.doctor_id, {
+        title: '📋 Lab Results Available',
+        body: `${testName} results for your patient are ready. Tap to review.`,
+        data: { bookingId: booking._id.toString(), type: 'lab_result' },
+        type: 'doctor_message',
+      }).catch(() => {});
     }
 
     res.json({ 
@@ -645,6 +639,27 @@ router.post('/bookings/:bookingId/upload-report', authMiddleware, async (req, re
       { new: true }
     );
     if (!booking) return res.status(404).json({ success: false, message: 'Booking not found' });
+
+    // Notify patient of uploaded report
+    if (booking.patient_id) {
+      const testName = booking.test_type || 'Lab Test';
+      sendToUser(booking.patient_id, {
+        title: '🔬 Lab Report Ready',
+        body: `Your ${testName} report has been uploaded. Tap to view.`,
+        data: { bookingId: booking._id.toString(), type: 'lab_result' },
+        type: 'system_alert',
+      }).catch(() => {});
+    }
+    if (booking.doctor_id) {
+      const testName = booking.test_type || 'Lab Test';
+      sendToUser(booking.doctor_id, {
+        title: '📋 Lab Report Uploaded',
+        body: `${testName} report for your patient is now available.`,
+        data: { bookingId: booking._id.toString(), type: 'lab_result' },
+        type: 'doctor_message',
+      }).catch(() => {});
+    }
+
     res.json({ success: true, message: 'Report uploaded', reportUrl, booking: { ...booking.toObject(), _id: booking._id.toString() } });
   } catch (error) {
     console.error(error);

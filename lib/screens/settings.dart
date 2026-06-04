@@ -1720,7 +1720,17 @@ class _WebSettingsLayout extends StatelessWidget {
     return Card(elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Padding(padding: const EdgeInsets.all(20), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         _sectionLabel('Notifications'), const SizedBox(height: 16),
-        if (p.isPharmacy || p.isLaboratory) ...[
+        if (p.isLaboratory) ...[
+          _switchTile(icon: Icons.notifications_active_outlined, title: 'New Test Requests', subtitle: 'Required • Cannot be turned off', value: true, onChanged: (_) {}),
+          const Divider(height: 1),
+          _switchTile(icon: Icons.biotech_outlined, title: 'Sample Collection Status', subtitle: 'Updates on sample pickup & processing', value: p.notifPrefs['delivery_updates'] ?? true, onChanged: (v) => p.onSaveNotifPref('delivery_updates', v)),
+          const Divider(height: 1),
+          _switchTile(icon: Icons.upload_file_outlined, title: 'Result Upload Reminders', subtitle: 'Reminders to upload pending test results', value: p.notifPrefs['booking_updates'] ?? true, onChanged: (v) => p.onSaveNotifPref('booking_updates', v)),
+          const Divider(height: 1),
+          _switchTile(icon: Icons.warning_amber_outlined, title: 'System Alerts', subtitle: 'Platform & maintenance notifications', value: p.notifPrefs['system_alerts'] ?? true, onChanged: (v) => p.onSaveNotifPref('system_alerts', v)),
+          const Divider(height: 1),
+          _switchTile(icon: Icons.volume_up_outlined, title: 'Sound Notifications', subtitle: 'Play sound for notifications', value: p.notifPrefs['sound_notifications'] ?? true, onChanged: (v) => p.onSaveNotifPref('sound_notifications', v)),
+        ] else if (p.isPharmacy) ...[
           _switchTile(icon: Icons.notifications_active_outlined, title: 'New Orders', subtitle: 'Required • Cannot be turned off', value: true, onChanged: (_) {}),
           const Divider(height: 1),
           _switchTile(icon: Icons.local_shipping_outlined, title: 'Order Dispatched', subtitle: 'Notify when order is out for delivery', value: p.notifPrefs['order_dispatched'] ?? true, onChanged: (v) => p.onSaveNotifPref('order_dispatched', v)),
@@ -2357,7 +2367,13 @@ class _MobileSettingsLayout extends StatelessWidget {
     return Card(elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Padding(padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         _sectionLabel('Notifications'), const SizedBox(height: 12),
-        if (p.isPharmacy || p.isLaboratory) ...[
+        if (p.isLaboratory) ...[
+          _switchTile(icon: Icons.notifications_active_outlined, title: 'New Test Requests', subtitle: 'Required • Cannot be turned off', value: true, onChanged: (_) {}),
+          const Divider(height: 1), _switchTile(icon: Icons.biotech_outlined, title: 'Sample Collection Status', subtitle: 'Updates on sample pickup & processing', value: p.notifPrefs['delivery_updates'] ?? true, onChanged: (v) => p.onSaveNotifPref('delivery_updates', v)),
+          const Divider(height: 1), _switchTile(icon: Icons.upload_file_outlined, title: 'Result Upload Reminders', subtitle: 'Reminders to upload pending results', value: p.notifPrefs['booking_updates'] ?? true, onChanged: (v) => p.onSaveNotifPref('booking_updates', v)),
+          const Divider(height: 1), _switchTile(icon: Icons.warning_amber_outlined, title: 'System Alerts', subtitle: 'Platform & maintenance notifications', value: p.notifPrefs['system_alerts'] ?? true, onChanged: (v) => p.onSaveNotifPref('system_alerts', v)),
+          const Divider(height: 1), _switchTile(icon: Icons.volume_up_outlined, title: 'Sound Notifications', subtitle: 'Play sound', value: p.notifPrefs['sound_notifications'] ?? true, onChanged: (v) => p.onSaveNotifPref('sound_notifications', v)),
+        ] else if (p.isPharmacy) ...[
           _switchTile(icon: Icons.notifications_active_outlined, title: 'New Orders', subtitle: 'Required • Cannot be turned off', value: true, onChanged: (_) {}),
           const Divider(height: 1), _switchTile(icon: Icons.local_shipping_outlined, title: 'Order Dispatched', subtitle: 'Notify when order is out for delivery', value: p.notifPrefs['order_dispatched'] ?? true, onChanged: (v) => p.onSaveNotifPref('order_dispatched', v)),
           const Divider(height: 1), _switchTile(icon: Icons.update_rounded, title: 'Delivery Status Updates', subtitle: 'Real-time delivery tracking notifications', value: p.notifPrefs['delivery_updates'] ?? true, onChanged: (v) => p.onSaveNotifPref('delivery_updates', v)),
