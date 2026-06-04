@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:file_picker/file_picker.dart';
 // ignore: avoid_web_libraries_in_flutter
 import '../utils/html_stub.dart' as html
     if (dart.library.html) 'dart:html';
@@ -50,6 +51,8 @@ class _LabProfileSetupState extends State<LabProfileSetup>
   final List<Map<String, TextEditingController>> _doctors = [];
   // Sample Collectors Panel
   final List<Map<String, TextEditingController>> _collectors = [];
+  // Compliance Documents
+  final List<Map<String, String>> _documents = []; // [{type, name}]
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
 
@@ -93,10 +96,23 @@ class _LabProfileSetupState extends State<LabProfileSetup>
   Future<void> _loadProfile() async {
     try {
       final profile = await _labService.getProfile();
+      // Load doctors
+      final doctorsList = (profile['doctors'] as List<dynamic>? ?? []);
+      final loadedDoctors = doctorsList.map((d) => {
+        'name': TextEditingController(text: d['name']?.toString() ?? ''),
+        'education': TextEditingController(text: d['education']?.toString() ?? ''),
+        'designation': TextEditingController(text: d['designation']?.toString() ?? ''),
+      }).toList();
+      // Load collectors
+      final collectorsList = (profile['collectors'] as List<dynamic>? ?? []);
+      final loadedCollectors = collectorsList.map((c) => {
+        'name': TextEditingController(text: c['name']?.toString() ?? ''),
+        'designation': TextEditingController(text: c['designation']?.toString() ?? ''),
+      }).toList();
       setState(() {
-        _labNameController.text = profile['labName'] ?? '';
+        _labNameController.text = profile['labName'] ?? profile['lab_name'] ?? '';
         _ownerNameController.text = profile['ownerName'] ?? '';
-        _licenseNumberController.text = profile['licenseNumber'] ?? '';
+        _licenseNumberController.text = profile['licenseNumber'] ?? profile['license_number'] ?? '';
         _accreditationController.text = profile['accreditation'] ?? '';
         _labEmailController.text = profile['labEmail'] ?? '';
         _labPhoneController.text = profile['labPhoneNumber'] ?? '';
@@ -110,6 +126,16 @@ class _LabProfileSetupState extends State<LabProfileSetup>
         _homeSampleAvailable = profile['homeSampleAvailable'] ?? false;
         _latitude = (profile['latitude'] as num?)?.toDouble();
         _longitude = (profile['longitude'] as num?)?.toDouble();
+        _doctors.clear();
+        _doctors.addAll(loadedDoctors);
+        _collectors.clear();
+        _collectors.addAll(loadedCollectors);
+        _documents.clear();
+        final docsList = (profile['documents'] as List<dynamic>? ?? []);
+        _documents.addAll(docsList.map((d) => {
+          'type': d['type']?.toString() ?? '',
+          'name': d['name']?.toString() ?? '',
+        }));
         _isLoading = false;
       });
       _animationController.forward();
@@ -186,6 +212,16 @@ class _LabProfileSetupState extends State<LabProfileSetup>
         'homeSampleAvailable': _homeSampleAvailable,
         if (_latitude != null) 'latitude': _latitude,
         if (_longitude != null) 'longitude': _longitude,
+        'doctors': _doctors.map((d) => {
+          'name': d['name']!.text.trim(),
+          'education': d['education']!.text.trim(),
+          'designation': d['designation']!.text.trim(),
+        }).toList(),
+        'collectors': _collectors.map((c) => {
+          'name': c['name']!.text.trim(),
+          'designation': c['designation']!.text.trim(),
+        }).toList(),
+        'documents': _documents,
       });
 
       if (mounted) {
@@ -215,7 +251,6 @@ class _LabProfileSetupState extends State<LabProfileSetup>
     }
   }
 
-  @override
   Future<void> _pickProfileImage() async {
     final picked = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 80, maxWidth: 600);
     if (picked != null) {
@@ -403,6 +438,8 @@ class _LabProfileSetupState extends State<LabProfileSetup>
                           _buildDoctorsPanel(),
                           const SizedBox(height: 20),
                           _buildCollectorsPanel(),
+                          const SizedBox(height: 20),
+                          _buildDocumentsPanel(),
                           const SizedBox(height: 20),
                           _buildSection(
                             'Working Hours',
@@ -964,6 +1001,111 @@ class _LabProfileSetupState extends State<LabProfileSetup>
                     TextField(controller: _collectors[i]['name'], decoration: _inputDec('Full Name', Icons.person_rounded)),
                     const SizedBox(height: 8),
                     TextField(controller: _collectors[i]['designation'], decoration: _inputDec('Designation (e.g. Lab Technician)', Icons.work_rounded)),
+                  ],
+                ),
+              ),
+            )),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDocumentsPanel() {
+    const docTypes = ['Registration Certificate', 'License Document', 'Compliance Certificate', 'DRAP Certificate', 'Other'];
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(color: const Color(0xFFF59E0B).withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)),
+                child: const Icon(Icons.folder_special_rounded, color: Color(0xFFF59E0B), size: 20),
+              ),
+              const SizedBox(width: 12),
+              const Text('Compliance Documents', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: Color(0xFF0F172A))),
+              const Spacer(),
+              TextButton.icon(
+                onPressed: () async {
+                  final result = await FilePicker.platform.pickFiles(
+                    type: FileType.custom,
+                    allowedExtensions: ['pdf', 'jpg', 'jpeg', 'png'],
+                    allowMultiple: true,
+                  );
+                  if (result != null) {
+                    setState(() {
+                      for (final f in result.files) {
+                        _documents.add({'type': 'Other', 'name': f.name});
+                      }
+                    });
+                  }
+                },
+                icon: const Icon(Icons.upload_file_rounded, size: 18),
+                label: const Text('Upload'),
+                style: TextButton.styleFrom(foregroundColor: const Color(0xFFF59E0B)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          const Text('Upload Registration Certificate, License, and Compliance Documents.', style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8))),
+          const SizedBox(height: 16),
+          if (_documents.isEmpty)
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(color: const Color(0xFFF8FAFC), borderRadius: BorderRadius.circular(10)),
+              child: const Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.upload_file_rounded, color: Color(0xFFCBD5E1), size: 24),
+                  SizedBox(width: 8),
+                  Text('No documents uploaded yet.', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 13)),
+                ],
+              ),
+            )
+          else
+            ...List.generate(_documents.length, (i) => Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFFBEB),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: const Color(0xFFFDE68A)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.description_rounded, color: Color(0xFFF59E0B), size: 18),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          DropdownButtonHideUnderline(
+                            child: DropdownButton<String>(
+                              value: docTypes.contains(_documents[i]['type']) ? _documents[i]['type'] : 'Other',
+                              isDense: true,
+                              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFFB45309)),
+                              items: docTypes.map((t) => DropdownMenuItem(value: t, child: Text(t))).toList(),
+                              onChanged: (v) => setState(() => _documents[i] = {..._documents[i], 'type': v!}),
+                            ),
+                          ),
+                          Text(_documents[i]['name'] ?? '', style: const TextStyle(fontSize: 12, color: Color(0xFF92400E)), overflow: TextOverflow.ellipsis),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.remove_circle_outline, color: Colors.red, size: 18),
+                      onPressed: () => setState(() => _documents.removeAt(i)),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                    ),
                   ],
                 ),
               ),

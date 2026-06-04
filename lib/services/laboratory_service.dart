@@ -262,6 +262,13 @@ class LaboratoryService {
     required String collectionType,
     bool isUrgent = false,
     String? turnaroundTime,
+    String? age,
+    String? gender,
+    String? mrNumber,
+    String? referredBy,
+    String? prescriptionDate,
+    List<String>? specimenIds,
+    String? sampleCollectedBy,
   }) async {
     try {
       final profile = await getProfile();
@@ -270,6 +277,7 @@ class LaboratoryService {
         '/laboratories/$labId/bookings',
         {
           'patientName': patientName,
+          'patient_name': patientName,
           'contact': contact,
           'address': address,
           'testName': tests,
@@ -281,6 +289,13 @@ class LaboratoryService {
           'urgency': isUrgent ? 'Urgent' : 'Normal',
           'is_urgent': isUrgent,
           if (turnaroundTime != null) 'turnaroundTime': turnaroundTime,
+          if (age != null && age.isNotEmpty) 'patientAge': age,
+          if (gender != null) 'patientGender': gender,
+          if (mrNumber != null && mrNumber.isNotEmpty) 'mrNumber': mrNumber,
+          if (referredBy != null && referredBy.isNotEmpty) 'referredBy': referredBy,
+          if (prescriptionDate != null && prescriptionDate.isNotEmpty) 'prescriptionDate': prescriptionDate,
+          if (specimenIds != null && specimenIds.isNotEmpty) 'specimenIds': specimenIds,
+          if (sampleCollectedBy != null && sampleCollectedBy.isNotEmpty) 'sampleCollectedBy': sampleCollectedBy,
         },
       );
       return response.data['booking'] ?? {};

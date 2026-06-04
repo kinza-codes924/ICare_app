@@ -1,3 +1,4 @@
+import 'package:flutter/services.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
@@ -16,6 +17,8 @@ class PdfInvoiceGenerator {
     required String pharmacyName,
     String patientEmail = '',
   }) async {
+    final logoBytes = (await rootBundle.load('assets/images/logo.png')).buffer.asUint8List();
+    final logoImage = pw.MemoryImage(logoBytes);
     final pdf = pw.Document();
 
     pdf.addPage(
@@ -26,35 +29,36 @@ class PdfInvoiceGenerator {
             crossAxisAlignment: pw.CrossAxisAlignment.start,
             children: [
               // iCare Header
-              pw.Container(
-                padding: const pw.EdgeInsets.all(20),
-                decoration: pw.BoxDecoration(
-                  color: PdfColor.fromHex('#0036BC'),
-                  borderRadius: pw.BorderRadius.circular(12),
-                ),
-                child: pw.Column(
-                  crossAxisAlignment: pw.CrossAxisAlignment.start,
-                  children: [
-                    pw.Text(
-                      'iCare',
-                      style: pw.TextStyle(
-                        fontSize: 32,
-                        fontWeight: pw.FontWeight.bold,
-                        color: PdfColors.white,
+              pw.Row(
+                crossAxisAlignment: pw.CrossAxisAlignment.center,
+                children: [
+                  pw.Image(logoImage, height: 64, width: 64),
+                  pw.SizedBox(width: 16),
+                  pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.start,
+                    children: [
+                      pw.Text(
+                        'iCare',
+                        style: pw.TextStyle(
+                          fontSize: 28,
+                          fontWeight: pw.FontWeight.bold,
+                          color: PdfColor.fromHex('#0036BC'),
+                        ),
                       ),
-                    ),
-                    pw.SizedBox(height: 4),
-                    pw.Text(
-                      'Your Trusted Healthcare Platform',
-                      style: pw.TextStyle(
-                        fontSize: 12,
-                        color: PdfColors.white,
+                      pw.Text(
+                        'Your Trusted Healthcare Platform',
+                        style: const pw.TextStyle(
+                          fontSize: 11,
+                          color: PdfColors.grey700,
+                        ),
                       ),
-                    ),
-                  ],
-                ),
+                    ],
+                  ),
+                ],
               ),
-              pw.SizedBox(height: 24),
+              pw.SizedBox(height: 8),
+              pw.Divider(color: PdfColor.fromHex('#0036BC'), thickness: 2),
+              pw.SizedBox(height: 16),
 
               // Invoice Title
               pw.Row(
@@ -267,7 +271,11 @@ class PdfInvoiceGenerator {
     required String labName,
     String? sampleType,
     String? turnaroundTime,
+    String? sampleCollectedBy,
+    List<Map<String, dynamic>>? doctors,
   }) async {
+    final logoBytes = (await rootBundle.load('assets/images/logo.png')).buffer.asUint8List();
+    final logoImage = pw.MemoryImage(logoBytes);
     final pdf = pw.Document();
 
     pdf.addPage(
@@ -278,35 +286,36 @@ class PdfInvoiceGenerator {
             crossAxisAlignment: pw.CrossAxisAlignment.start,
             children: [
               // iCare Header
-              pw.Container(
-                padding: const pw.EdgeInsets.all(20),
-                decoration: pw.BoxDecoration(
-                  color: PdfColor.fromHex('#0B2D6E'),
-                  borderRadius: pw.BorderRadius.circular(12),
-                ),
-                child: pw.Column(
-                  crossAxisAlignment: pw.CrossAxisAlignment.start,
-                  children: [
-                    pw.Text(
-                      'iCare',
-                      style: pw.TextStyle(
-                        fontSize: 32,
-                        fontWeight: pw.FontWeight.bold,
-                        color: PdfColors.white,
+              pw.Row(
+                crossAxisAlignment: pw.CrossAxisAlignment.center,
+                children: [
+                  pw.Image(logoImage, height: 64, width: 64),
+                  pw.SizedBox(width: 16),
+                  pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.start,
+                    children: [
+                      pw.Text(
+                        'iCare',
+                        style: pw.TextStyle(
+                          fontSize: 28,
+                          fontWeight: pw.FontWeight.bold,
+                          color: PdfColor.fromHex('#0B2D6E'),
+                        ),
                       ),
-                    ),
-                    pw.SizedBox(height: 4),
-                    pw.Text(
-                      'Your Trusted Healthcare Platform',
-                      style: pw.TextStyle(
-                        fontSize: 12,
-                        color: PdfColors.white,
+                      pw.Text(
+                        'Your Trusted Healthcare Platform',
+                        style: const pw.TextStyle(
+                          fontSize: 11,
+                          color: PdfColors.grey700,
+                        ),
                       ),
-                    ),
-                  ],
-                ),
+                    ],
+                  ),
+                ],
               ),
-              pw.SizedBox(height: 24),
+              pw.SizedBox(height: 8),
+              pw.Divider(color: PdfColor.fromHex('#0B2D6E'), thickness: 2),
+              pw.SizedBox(height: 16),
 
               // Invoice Title
               pw.Row(
@@ -477,21 +486,39 @@ class PdfInvoiceGenerator {
 
               // Footer
               pw.Divider(color: PdfColor.fromHex('#E2E8F0')),
-              pw.SizedBox(height: 12),
+              pw.SizedBox(height: 8),
+              if (sampleCollectedBy != null && sampleCollectedBy.isNotEmpty)
+                pw.Text(
+                  'Sample Collected By: $sampleCollectedBy',
+                  style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey700),
+                ),
+              if (doctors != null && doctors.isNotEmpty) ...[
+                pw.SizedBox(height: 6),
+                pw.Text(
+                  'This is an electronically generated report verified by:',
+                  style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey700),
+                ),
+                pw.SizedBox(height: 4),
+                ...doctors.map((d) {
+                  final name = d['name']?.toString() ?? '';
+                  final edu = d['education']?.toString() ?? '';
+                  final desig = d['designation']?.toString() ?? '';
+                  final parts = [name, edu, desig].where((s) => s.isNotEmpty).join(', ');
+                  return pw.Text(parts, style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey700));
+                }),
+                pw.SizedBox(height: 6),
+              ],
               pw.Row(
                 mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                 children: [
                   pw.Text(
                     'Processed by: $labName',
-                    style: const pw.TextStyle(
-                      fontSize: 10,
-                      color: PdfColors.grey600,
-                    ),
+                    style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey600),
                   ),
                   pw.Text(
                     'Powered by iCare',
                     style: pw.TextStyle(
-                      fontSize: 10,
+                      fontSize: 9,
                       fontWeight: pw.FontWeight.bold,
                       color: PdfColor.fromHex('#0B2D6E'),
                     ),

@@ -144,6 +144,8 @@ router.post('/add_laboratory_details', authMiddleware, async (req, res) => {
       accreditation, services, operatingHours, operating_hours,
       address, city, drapCompliance, drap_compliance,
       latitude, longitude,
+      ownerName, labEmail, labPhoneNumber, description, title,
+      homeSampleAvailable, workingHours, doctors, collectors,
     } = req.body;
 
     const update = {};
@@ -156,9 +158,22 @@ router.post('/add_laboratory_details', authMiddleware, async (req, res) => {
     if (hours) update.operating_hours = hours;
     if (address !== undefined) update.address = address;
     if (city !== undefined) update.city = city;
-    update.drap_compliance = drapCompliance ?? drap_compliance ?? false;
+    const drapVal = drapCompliance ?? drap_compliance;
+    if (drapVal !== undefined) update.drap_compliance = drapVal;
     if (latitude != null) update.latitude = parseFloat(latitude);
     if (longitude != null) update.longitude = parseFloat(longitude);
+    if (ownerName !== undefined) update.ownerName = ownerName;
+    if (labEmail !== undefined) update.labEmail = labEmail;
+    if (labPhoneNumber !== undefined) update.labPhoneNumber = labPhoneNumber;
+    if (description !== undefined) update.description = description;
+    if (title !== undefined) update.title = title;
+    if (homeSampleAvailable !== undefined) update.homeSampleAvailable = homeSampleAvailable;
+    if (workingHours !== undefined) update.workingHours = workingHours;
+    if (doctors !== undefined) update.doctors = doctors;
+    if (collectors !== undefined) update.collectors = collectors;
+    const { documents, availableTests } = req.body;
+    if (documents !== undefined) update.documents = documents;
+    if (availableTests !== undefined) update.availableTests = availableTests;
 
     const profile = await LabProfile.findOneAndUpdate(
       { user_id: userId },
@@ -482,7 +497,8 @@ router.post('/:labId/bookings', authMiddleware, async (req, res) => {
     const price = testCount * 3000;
 
     const { urgency, is_urgent, collectionType, collection_type, turnaroundTime, source, patientName, patient_name, contact, address,
-      patientAge, patient_age, patientGender, patient_gender, patientPhone, patient_phone, patientAddress, patient_address } = req.body;
+      patientAge, patient_age, patientGender, patient_gender, patientPhone, patient_phone, patientAddress, patient_address,
+      mrNumber, referredBy, prescriptionDate, specimenIds, sampleCollectedBy } = req.body;
 
     const booking = await LabTestRequest.create({
       patient_id: patientId,
@@ -501,6 +517,11 @@ router.post('/:labId/bookings', authMiddleware, async (req, res) => {
       patient_gender: patientGender || patient_gender || null,
       patient_phone: patientPhone || patient_phone || contact || null,
       patient_address: patientAddress || patient_address || address || null,
+      ...(mrNumber ? { mrNumber } : {}),
+      ...(referredBy ? { referredBy } : {}),
+      ...(prescriptionDate ? { prescriptionDate } : {}),
+      ...(specimenIds ? { specimenIds } : {}),
+      ...(sampleCollectedBy ? { sampleCollectedBy } : {}),
     });
 
     console.log('✅ LAB BOOKING - Created booking:', booking._id.toString());

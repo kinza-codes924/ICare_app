@@ -307,24 +307,6 @@ class _LabBookingsManagementState extends State<LabBookingsManagement>
             color: Color(0xFF0F172A),
           ),
         ),
-        actions: [
-          TextButton.icon(
-            icon: const Icon(Icons.sync_alt_rounded, size: 18),
-            label: const Text('Import / Export'),
-            onPressed: () => showDialog(
-              context: context,
-              builder: (ctx) => AlertDialog(
-                title: const Text('API Integration'),
-                content: const Text(
-                  'Connect your lab\'s existing software to iCare for automatic order sync and result import.\n\nTo enable API integration, please provide your lab system\'s API documentation and credentials to the iCare team.',
-                ),
-                actions: [
-                  TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Close')),
-                ],
-              ),
-            ),
-          ),
-        ],
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _showCreateOrderDialog(context),
@@ -353,7 +335,17 @@ class _LabBookingsManagementState extends State<LabBookingsManagement>
     );
   }
 
-  void _showCreateOrderDialog(BuildContext context) {
+  Future<void> _showCreateOrderDialog(BuildContext context) async {
+    // Pre-load available tests and collectors from profile
+    List<Map<String, dynamic>> availableTests = [];
+    List<Map<String, dynamic>> availableCollectors = [];
+    try {
+      final profile = await _labService.getProfile();
+      availableTests = List<Map<String, dynamic>>.from(profile['availableTests'] ?? []);
+      availableCollectors = List<Map<String, dynamic>>.from(profile['collectors'] ?? []);
+    } catch (_) {}
+    if (!mounted) return;
+
     final formKey = GlobalKey<FormState>();
     final nameController = TextEditingController();
     final ageController = TextEditingController();
@@ -362,7 +354,6 @@ class _LabBookingsManagementState extends State<LabBookingsManagement>
     final mrNumberController = TextEditingController();
     final prescriptionDateController = TextEditingController();
     final referredByController = TextEditingController();
-    final testController = TextEditingController();
     final specimenControllers = <TextEditingController>[TextEditingController()];
     String collectionType = 'in-lab';
     String gender = 'Male';
@@ -370,6 +361,9 @@ class _LabBookingsManagementState extends State<LabBookingsManagement>
     String normalTurnaround = '1 Day';
     String urgentTurnaround = '4 Hours';
     bool isSubmitting = false;
+    String? selectedTest; // For registered tests dropdown
+    String? selectedCollector; // For sample collector dropdown
+    final testController = TextEditingController(); // fallback if no tests registered
 
     showModalBottomSheet(
       context: context,
@@ -515,13 +509,51 @@ class _LabBookingsManagementState extends State<LabBookingsManagement>
                   // Tests Required
                   _buildSectionLabel('Test(s) Required'),
                   const SizedBox(height: 12),
-                  _buildFormField(
-                    controller: testController,
-                    label: 'Test Name(s)',
-                    icon: Icons.science_rounded,
-                    hint: 'e.g. CBC, Blood Sugar, Lipid Profile',
-                    validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
-                  ),
+                  if (availableTests.isNotEmpty) ...[
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Select Test', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF475569))),
+                        const SizedBox(height: 6),
+                        DropdownButtonFormField<String>(
+                          value: selectedTest,
+                          hint: const Text('Choose from registered tests'),
+                          decoration: InputDecoration(
+                            prefixIcon: const Icon(Icons.science_rounded, size: 18, color: primaryColor),
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.grey.shade200)),
+                            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.grey.shade200)),
+                            filled: true,
+                            fillColor: const Color(0xFFF8FAFC),
+                          ),
+                          validator: (v) => v == null ? 'Required' : null,
+                          items: availableTests.map((t) => DropdownMenuItem<String>(
+                            value: t['name']?.toString() ?? '',
+                            child: Text(t['name']?.toString() ?? '', overflow: TextOverflow.ellipsis),
+                          )).toList(),
+                          onChanged: (v) => setModalState(() => selectedTest = v),
+                        ),
+                      ],
+                    ),
+                  ] else ...[
+                    _buildFormField(
+                      controller: testController,
+                      label: 'Test Name(s)',
+                      icon: Icons.science_rounded,
+                      hint: 'e.g. CBC, Blood Sugar, Lipid Profile',
+                      validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
+                    ),
+                    const SizedBox(height: 6),
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(color: const Color(0xFFFFF7ED), borderRadius: BorderRadius.circular(8), border: Border.all(color: const Color(0xFFFED7AA))),
+                      child: const Row(children: [
+                        Icon(Icons.info_outline_rounded, size: 14, color: Color(0xFFEA580C)),
+                        SizedBox(width: 6),
+                        Expanded(child: Text('Add tests in Test Management to enable dropdown selection', style: TextStyle(fontSize: 11, color: Color(0xFFEA580C)))),
+                      ]),
+                    ),
+                  ],
                   const SizedBox(height: 20),
                   // Specimen Information
                   _buildSectionLabel('Specimen Information'),
@@ -558,6 +590,35 @@ class _LabBookingsManagementState extends State<LabBookingsManagement>
                     label: const Text('Add Another Specimen'),
                     style: TextButton.styleFrom(foregroundColor: primaryColor),
                   ),
+                  if (availableCollectors.isNotEmpty) ...[
+                    const SizedBox(height: 20),
+                    _buildSectionLabel('Sample Collector'),
+                    const SizedBox(height: 12),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Assigned Collector', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF475569))),
+                        const SizedBox(height: 6),
+                        DropdownButtonFormField<String>(
+                          value: selectedCollector,
+                          hint: const Text('Select sample collector'),
+                          decoration: InputDecoration(
+                            prefixIcon: const Icon(Icons.person_pin_rounded, size: 18, color: primaryColor),
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.grey.shade200)),
+                            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.grey.shade200)),
+                            filled: true,
+                            fillColor: const Color(0xFFF8FAFC),
+                          ),
+                          items: availableCollectors.map((c) => DropdownMenuItem<String>(
+                            value: c['name']?.toString() ?? '',
+                            child: Text('${c['name'] ?? ''} — ${c['designation'] ?? ''}', overflow: TextOverflow.ellipsis),
+                          )).toList(),
+                          onChanged: (v) => setModalState(() => selectedCollector = v),
+                        ),
+                      ],
+                    ),
+                  ],
                   const SizedBox(height: 20),
                   // Collection Type
                   _buildSectionLabel('Collection Type'),
@@ -666,10 +727,17 @@ class _LabBookingsManagementState extends State<LabBookingsManagement>
                                   patientName: nameController.text.trim(),
                                   contact: contactController.text.trim(),
                                   address: locationController.text.trim(),
-                                  tests: testController.text.trim(),
+                                  tests: selectedTest ?? testController.text.trim(),
                                   collectionType: collectionType,
                                   isUrgent: isUrgent,
                                   turnaroundTime: isUrgent ? urgentTurnaround : normalTurnaround,
+                                  age: ageController.text.trim(),
+                                  gender: gender,
+                                  mrNumber: mrNumberController.text.trim(),
+                                  referredBy: referredByController.text.trim(),
+                                  prescriptionDate: prescriptionDateController.text.trim(),
+                                  specimenIds: specimenControllers.map((c) => c.text.trim()).where((s) => s.isNotEmpty).toList(),
+                                  sampleCollectedBy: selectedCollector,
                                 );
                                 if (ctx.mounted) Navigator.pop(ctx);
                                 _loadBookings();
@@ -1062,7 +1130,7 @@ class _LabBookingsManagementState extends State<LabBookingsManagement>
                         const Icon(Icons.medical_services_rounded, size: 14, color: Color(0xFF8B5CF6)),
                         const SizedBox(width: 6),
                         Text(
-                          'Ordered by${doctorName != null ? ' Dr. $doctorName' : ' Doctor'}',
+                          'Ordered by${doctorName != null ? ' Dr. $doctorName' : ''}',
                           style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF8B5CF6)),
                         ),
                       ],
@@ -1294,6 +1362,29 @@ class _LabBookingsManagementState extends State<LabBookingsManagement>
                 ),
               ],
             ),
+            if (['pending', 'confirmed', 'accepted'].contains(status.toLowerCase())) ...[
+              const SizedBox(height: 10),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFF7ED),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: const Color(0xFFFED7AA)),
+                ),
+                child: const Row(
+                  children: [
+                    Icon(Icons.payments_outlined, size: 15, color: Color(0xFFEA580C)),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Payment must be received before sample collection',
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFFEA580C)),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
             Wrap(
               spacing: 4,
               runSpacing: 4,

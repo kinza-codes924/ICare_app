@@ -26,6 +26,8 @@ class _PaymentInvoicesState extends State<PaymentInvoices>
   String _selectedFilter = "All";
   bool _isLoading = true;
   List<Map<String, dynamic>> _invoices = [];
+  List<Map<String, dynamic>> _labDoctors = [];
+  String _labName = 'iCare Laboratory';
 
   @override
   void initState() {
@@ -82,6 +84,17 @@ class _PaymentInvoicesState extends State<PaymentInvoices>
       } else {
         final profile = await _labService.getProfile();
         final labId = profile['_id'] ?? profile['id'] ?? '';
+        // Store lab doctors and name for PDF footer
+        final doctorsList = (profile['doctors'] as List<dynamic>? ?? []);
+        _labDoctors = doctorsList
+            .map((d) => {
+                  'name': d['name']?.toString() ?? '',
+                  'education': d['education']?.toString() ?? '',
+                  'designation': d['designation']?.toString() ?? '',
+                })
+            .where((d) => (d['name'] as String).isNotEmpty)
+            .toList();
+        _labName = profile['labName'] ?? profile['lab_name'] ?? profile['name'] ?? 'iCare Laboratory';
         final bookings = await _labService.getBookings(labId);
         setState(() {
           _invoices = bookings.map((b) {
@@ -195,7 +208,8 @@ class _PaymentInvoicesState extends State<PaymentInvoices>
           testName: test,
           testPrice: amount,
           bookingDate: invoiceDate,
-          labName: 'iCare Laboratory',
+          labName: _labName,
+          doctors: _labDoctors.isNotEmpty ? _labDoctors : null,
         );
       }
     } catch (e) {

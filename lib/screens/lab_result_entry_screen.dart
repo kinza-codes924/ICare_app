@@ -32,11 +32,7 @@ class _LabResultEntryScreenState extends State<LabResultEntryScreen>
 
   // Doctor approval
   String? _selectedDoctor;
-  final List<Map<String, String>> _doctors = [
-    {'name': 'Dr. Ahmed Khan', 'qualification': 'MBBS, FCPS', 'designation': 'Pathologist'},
-    {'name': 'Dr. Sarah Ali', 'qualification': 'MBBS, MPhil', 'designation': 'Clinical Pathologist'},
-    {'name': 'Dr. Usman Malik', 'qualification': 'MBBS, FCPS', 'designation': 'Consultant Pathologist'},
-  ];
+  List<Map<String, String>> _doctors = [];
 
   static const Color primaryColor = Color(0xFF0B2D6E);
   static const Color backgroundColor = Color(0xFFF8FAFC);
@@ -46,6 +42,26 @@ class _LabResultEntryScreenState extends State<LabResultEntryScreen>
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
     _addParameter(); // Start with one row
+    _loadDoctors();
+  }
+
+  Future<void> _loadDoctors() async {
+    try {
+      final profile = await _labService.getProfile();
+      final list = (profile['doctors'] as List<dynamic>? ?? []);
+      if (mounted) {
+        setState(() {
+          _doctors = list
+              .map((d) => {
+                    'name': d['name']?.toString() ?? '',
+                    'qualification': d['education']?.toString() ?? '',
+                    'designation': d['designation']?.toString() ?? '',
+                  })
+              .where((d) => d['name']!.isNotEmpty)
+              .toList();
+        });
+      }
+    } catch (_) {}
   }
 
   @override
