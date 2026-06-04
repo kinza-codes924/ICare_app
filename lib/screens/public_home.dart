@@ -15,6 +15,7 @@ import 'package:icare/services/pharmacy_service.dart';
 import 'package:icare/services/laboratory_service.dart';
 import 'package:icare/screens/pharmacy_details.dart';
 import 'package:icare/screens/book_lab.dart';
+import 'package:icare/screens/gamification_screen.dart';
 
 // ── Auth guard — show sign-in/sign-up dialog if not logged in ─────────────────
 Future<bool> _requireAuth(BuildContext context) async {
@@ -3750,6 +3751,77 @@ class _FooterColumn extends StatelessWidget {
   }
 }
 
+// ── Achievements & Rewards Banner ────────────────────────────────────────────
+class _AchievementsBanner extends StatelessWidget {
+  const _AchievementsBanner();
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: GestureDetector(
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const GamificationScreen()),
+        ),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [Color(0xFF0036BC), Color(0xFF7C3AED)],
+              begin: Alignment.centerLeft,
+              end: Alignment.centerRight,
+            ),
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF0036BC).withValues(alpha: 0.25),
+                blurRadius: 16,
+                offset: const Offset(0, 6),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(Icons.emoji_events_rounded, color: Colors.white, size: 28),
+              ),
+              const SizedBox(width: 14),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Achievements & Rewards',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                        fontFamily: 'Gilroy-Bold',
+                      ),
+                    ),
+                    SizedBox(height: 2),
+                    Text(
+                      'Earn points, unlock badges, redeem rewards',
+                      style: TextStyle(color: Colors.white70, fontSize: 12),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white70, size: 16),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 /// The scrollable body content of the public home page, without the top navbar.
 /// Used on the logged-in patient home page so the layout matches the public home.
 class PublicHomeBody extends StatelessWidget {
@@ -3779,6 +3851,9 @@ class PublicHomeBody extends StatelessWidget {
             ),
           ),
         ),
+        const SizedBox(height: 32),
+        // Achievements & Rewards Banner
+        _AchievementsBanner(),
         const SizedBox(height: 60),
         // 2. Browse by Specialty (before pharmacy/labs)
         _CenteredSection(

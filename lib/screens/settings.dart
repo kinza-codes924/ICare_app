@@ -21,6 +21,8 @@ import 'package:icare/services/security_service.dart';
 import 'package:icare/services/biometric_service.dart';
 import 'package:icare/services/gamification_service.dart';
 import 'package:icare/screens/login_activity_screen.dart';
+import 'package:icare/screens/patient_lab_orders.dart';
+import 'package:icare/screens/prescriptions.dart' show PrescriptionsScreen;
 import 'package:icare/services/health_settings_service.dart';
 import 'package:icare/services/api_service.dart';
 import 'package:icare/utils/shared_pref.dart';
@@ -95,6 +97,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   bool _preferHomeSample = false;
   String _reportDelivery = 'In-app';
 
+  // Learning
+  bool _courseNotificationsEnabled = false;
+
   // Billing & payment
   List<Map<String, dynamic>> _billingItems = [];
   bool _billingLoading = false;
@@ -152,6 +157,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           _appointmentRemindersEnabled = prefs.getBool('appointment_reminders_enabled') ?? true;
           _preferHomeSample = prefs.getBool('prefer_home_sample') ?? false;
           _reportDelivery = prefs.getString('report_delivery_method') ?? 'In-app';
+          _courseNotificationsEnabled = prefs.getBool('course_notifications_enabled') ?? false;
         });
         // Re-schedule JS daily reminders so they survive page refresh
         if (_medReminderTime != null) {
@@ -170,7 +176,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool('prescription_email_enabled', value);
       // Sync to backend user settings
-      await ApiService().post('/auth/update-settings', {'prescriptionEmailEnabled': value});
+      await ApiService().put('/auth/update-settings', {'prescriptionEmailEnabled': value});
     } catch (_) {}
   }
 
@@ -194,6 +200,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         setState(() => _is2FAEnabled = result['settings']?['twoFactorEnabled'] == true);
       }
     } catch (_) {}
+    // Load prescription email preference from backend (source of truth)
+    try {
+      final resp = await ApiService().get('/auth/profile');
+      if (mounted && resp.data['success'] == true) {
+        final emailEnabled = resp.data['user']?['prescriptionEmailEnabled'] as bool? ?? true;
+        setState(() => _prescriptionEmailEnabled = emailEnabled);
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setBool('prescription_email_enabled', emailEnabled);
+      }
+    } catch (_) {}
   }
 
   Future<void> _loadHealthSettings() async {
@@ -210,6 +226,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           trackedVitals.forEach((key, value) {
             if (_trackerToggles.containsKey(key)) _trackerToggles[key] = value;
           });
+          final labPrefs = settings['labPreferences'] as Map<String, dynamic>?;
+          if (labPrefs != null) {
+            final method = labPrefs['reportDeliveryMethod'] as String?;
+            if (method != null && method.isNotEmpty) _reportDelivery = method;
+            _preferHomeSample = labPrefs['homeSampleCollection'] as bool? ?? _preferHomeSample;
+          }
         });
       }
     } catch (_) {}
@@ -1375,6 +1397,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool('prefer_home_sample', value);
     } catch (_) {}
+    try {
+      await _healthSettingsService.updateLabPreferences({
+        'homeSampleCollection': value,
+        'reportDeliveryMethod': _reportDelivery,
+      });
+    } catch (_) {}
   }
 
   Future<void> _setReportDelivery(String method) async {
@@ -1382,6 +1410,20 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('report_delivery_method', method);
+    } catch (_) {}
+    try {
+      await _healthSettingsService.updateLabPreferences({
+        'reportDeliveryMethod': method,
+        'homeSampleCollection': _preferHomeSample,
+      });
+    } catch (_) {}
+  }
+
+  Future<void> _toggleCourseNotifications(bool value) async {
+    setState(() => _courseNotificationsEnabled = value);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('course_notifications_enabled', value);
     } catch (_) {}
   }
 
@@ -1445,6 +1487,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       onSetMedReminder: _setMedReminder, onSetHealthCheckReminder: _setHealthCheckReminder,
       onToggleAppointmentReminders: _toggleAppointmentReminders,
       onTogglePreferHomeSample: _togglePreferHomeSample, onSetReportDelivery: _setReportDelivery,
+      courseNotificationsEnabled: _courseNotificationsEnabled,
+      onToggleCourseNotifications: _toggleCourseNotifications,
     );
 
     if (isWide) return _WebSettingsLayout(p: params);
@@ -1477,6 +1521,9 @@ class _SettingsLayoutParams {
   // Diagnostics
   final bool preferHomeSample;
   final String reportDelivery;
+  // Learning
+  final bool courseNotificationsEnabled;
+  final void Function(bool) onToggleCourseNotifications;
   final void Function(bool) onToggle2FA, onToggleBiometrics, onTogglePrescriptionEmail;
   final void Function(String, bool) onTrackerToggle, onHealthModeToggle;
   final VoidCallback onLogout;
@@ -1529,6 +1576,7 @@ class _SettingsLayoutParams {
     required this.onSetMedReminder, required this.onSetHealthCheckReminder,
     required this.onToggleAppointmentReminders,
     required this.onTogglePreferHomeSample, required this.onSetReportDelivery,
+    required this.courseNotificationsEnabled, required this.onToggleCourseNotifications,
   });
 }
 
@@ -1557,7 +1605,7 @@ class _WebSettingsLayout extends StatelessWidget {
         if (p.isPatient) ...[_paymentCard(context), const SizedBox(height: 24)],
         _contactCard(context), const SizedBox(height: 24),
         if (p.isPatient) ...[_pharmacyCard(context), const SizedBox(height: 24)],
-        if (p.isStudent || p.isInstructor) ...[_learningCard(context), const SizedBox(height: 24)],
+        if (p.isPatient || p.isStudent || p.isInstructor) ...[_learningCard(context), const SizedBox(height: 24)],
         _securityCard(context), const SizedBox(height: 24),
         if (p.isDoctor) ...[_notificationSettingsCard(context), const SizedBox(height: 24)],
         _languageCard(context), const SizedBox(height: 24),
@@ -1609,6 +1657,8 @@ class _WebSettingsLayout extends StatelessWidget {
         _settingsTile(icon: Icons.warning_amber_rounded, iconColor: const Color(0xFFF59E0B), title: 'Allergies', subtitle: p.allergies.isEmpty ? 'Tap to add' : p.allergies, onTap: () => p.onShowAllergies(context)),
         const Divider(height: 1),
         _settingsTile(icon: Icons.medication_outlined, iconColor: const Color(0xFF8B5CF6), title: 'Current Medications', subtitle: p.currentMedications.isEmpty ? 'Tap to add' : p.currentMedications, onTap: () => p.onShowCurrentMedications(context)),
+        const Divider(height: 1),
+        _settingsTile(icon: Icons.receipt_long_outlined, iconColor: const Color(0xFF0036BC), title: 'My Prescriptions', subtitle: 'View prescriptions from your doctors', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PrescriptionsScreen()))),
         const Divider(height: 1),
         _settingsTile(icon: Icons.flag_outlined, iconColor: const Color(0xFF10B981), title: 'Health Goals', subtitle: p.healthGoals.isEmpty ? 'Tap to set goals' : p.healthGoals, onTap: () => p.onShowHealthGoals(context)),
       ])));
@@ -1681,7 +1731,7 @@ class _WebSettingsLayout extends StatelessWidget {
     return Card(elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Padding(padding: const EdgeInsets.all(20), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         _sectionLabel('Diagnostics Settings'), const SizedBox(height: 16),
-        _settingsTile(icon: Icons.science_outlined, iconColor: const Color(0xFF3B82F6), title: 'Test History', subtitle: 'View past lab bookings', onTap: () => p.onComingSoon(context, 'Test History')),
+        _settingsTile(icon: Icons.science_outlined, iconColor: const Color(0xFF3B82F6), title: 'Test History', subtitle: 'View past lab bookings', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PatientLabOrdersScreen()))),
         const Divider(height: 1),
         _switchTile(icon: Icons.home_outlined, title: 'Home Sample Collection', subtitle: 'Prefer home sample collection', value: p.preferHomeSample, onChanged: p.onTogglePreferHomeSample),
         const Divider(height: 1),
@@ -1905,8 +1955,6 @@ class _WebSettingsLayout extends StatelessWidget {
         _sectionLabel('Payment & Subscription'), const SizedBox(height: 16),
         _settingsTile(icon: Icons.credit_card_outlined, iconColor: const Color(0xFF10B981), title: 'Saved Payment Methods', subtitle: p.savedPaymentMethods.isEmpty ? 'No methods saved' : '${p.savedPaymentMethods.length} method(s)', onTap: () => p.onShowPaymentMethods(context)),
         const Divider(height: 1),
-        _settingsTile(icon: Icons.card_membership_outlined, iconColor: const Color(0xFF6366F1), title: 'Subscription Plans', subtitle: 'View or upgrade your plan', onTap: () => p.onComingSoon(context, 'Subscription Plans')),
-        const Divider(height: 1),
         _settingsTile(icon: Icons.receipt_long_outlined, iconColor: const Color(0xFF10B981), title: 'Billing History', subtitle: p.billingHistory.isEmpty ? 'View transactions' : '${p.billingHistory.length} transaction(s)', onTap: () => p.onShowBillingHistory(context)),
       ])));
   }
@@ -1950,9 +1998,9 @@ class _WebSettingsLayout extends StatelessWidget {
         const Divider(height: 1),
         _settingsTile(icon: Icons.verified_outlined, iconColor: const Color(0xFF10B981), title: 'Certificates', subtitle: 'View your earned certificates', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CertificatesScreen()))),
         const Divider(height: 1),
-        _settingsTile(icon: Icons.trending_up_outlined, iconColor: const Color(0xFF8B5CF6), title: 'Progress Tracking', subtitle: 'Track course progress', onTap: () => p.onComingSoon(context, 'Progress Tracking')),
+        _settingsTile(icon: Icons.trending_up_outlined, iconColor: const Color(0xFF8B5CF6), title: 'Progress Tracking', subtitle: 'View your course completion', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const Courses()))),
         const Divider(height: 1),
-        _switchTile(icon: Icons.notifications_active_outlined, title: 'Notifications for New Courses', subtitle: 'Get notified about new offerings', value: false, onChanged: (_) {}),
+        _switchTile(icon: Icons.notifications_active_outlined, title: 'Notifications for New Courses', subtitle: 'Get notified about new offerings', value: p.courseNotificationsEnabled, onChanged: p.onToggleCourseNotifications),
       ])));
   }
 
@@ -2155,7 +2203,7 @@ class _MobileSettingsLayout extends StatelessWidget {
         if (p.isPatient) ...[_paymentCard(context), const SizedBox(height: 16)],
         _contactCard(context), const SizedBox(height: 16),
         if (p.isPatient) ...[_pharmacyCard(context), const SizedBox(height: 16)],
-        if (p.isStudent || p.isInstructor) ...[_learningCard(context), const SizedBox(height: 16)],
+        if (p.isPatient || p.isStudent || p.isInstructor) ...[_learningCard(context), const SizedBox(height: 16)],
         _securityCard(context), const SizedBox(height: 16),
         if (p.isDoctor) ...[_notificationSettingsCard(context), const SizedBox(height: 16)],
         _languageCard(context), const SizedBox(height: 16),
@@ -2242,6 +2290,8 @@ class _MobileSettingsLayout extends StatelessWidget {
         const Divider(height: 1),
         _settingsTile(icon: Icons.medication_outlined, iconColor: const Color(0xFF8B5CF6), title: 'Current Medications', subtitle: p.currentMedications.isEmpty ? 'Tap to add' : p.currentMedications, onTap: () => p.onShowCurrentMedications(context)),
         const Divider(height: 1),
+        _settingsTile(icon: Icons.receipt_long_outlined, iconColor: const Color(0xFF0036BC), title: 'My Prescriptions', subtitle: 'View prescriptions from your doctors', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PrescriptionsScreen()))),
+        const Divider(height: 1),
         _settingsTile(icon: Icons.flag_outlined, iconColor: const Color(0xFF10B981), title: 'Health Goals', subtitle: p.healthGoals.isEmpty ? 'Tap to set goals' : p.healthGoals, onTap: () => p.onShowHealthGoals(context)),
       ])));
   }
@@ -2303,7 +2353,7 @@ class _MobileSettingsLayout extends StatelessWidget {
     return Card(elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Padding(padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         _sectionLabel('Diagnostics Settings'), const SizedBox(height: 12),
-        _settingsTile(icon: Icons.science_outlined, iconColor: const Color(0xFF3B82F6), title: 'Test History', subtitle: 'View past lab bookings', onTap: () => p.onComingSoon(context, 'Test History')),
+        _settingsTile(icon: Icons.science_outlined, iconColor: const Color(0xFF3B82F6), title: 'Test History', subtitle: 'View past lab bookings', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PatientLabOrdersScreen()))),
         const Divider(height: 1),
         _switchTile(icon: Icons.home_outlined, title: 'Home Sample Collection', subtitle: 'Prefer home sample collection', value: p.preferHomeSample, onChanged: p.onTogglePreferHomeSample),
         const Divider(height: 1),
@@ -2346,8 +2396,6 @@ class _MobileSettingsLayout extends StatelessWidget {
       child: Padding(padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         _sectionLabel('Payment & Subscription'), const SizedBox(height: 12),
         _settingsTile(icon: Icons.credit_card_outlined, iconColor: const Color(0xFF10B981), title: 'Saved Payment Methods', subtitle: p.savedPaymentMethods.isEmpty ? 'No methods saved' : '${p.savedPaymentMethods.length} method(s)', onTap: () => p.onShowPaymentMethods(context)),
-        const Divider(height: 1),
-        _settingsTile(icon: Icons.card_membership_outlined, iconColor: const Color(0xFF6366F1), title: 'Subscription Plans', subtitle: 'View or upgrade your plan', onTap: () => p.onComingSoon(context, 'Subscription Plans')),
         const Divider(height: 1), _settingsTile(icon: Icons.receipt_long_outlined, iconColor: const Color(0xFF10B981), title: 'Billing History', subtitle: p.billingHistory.isEmpty ? 'View transactions' : '${p.billingHistory.length} transaction(s)', onTap: () => p.onShowBillingHistory(context)),
       ])));
   }
@@ -2380,8 +2428,8 @@ class _MobileSettingsLayout extends StatelessWidget {
         _sectionLabel('Learning'), const SizedBox(height: 12),
         _settingsTile(icon: Icons.book_outlined, iconColor: const Color(0xFF6366F1), title: 'Enrolled Courses', subtitle: 'View courses', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const Courses()))),
         const Divider(height: 1), _settingsTile(icon: Icons.verified_outlined, iconColor: const Color(0xFF10B981), title: 'Certificates', subtitle: 'Earned certificates', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CertificatesScreen()))),
-        const Divider(height: 1), _settingsTile(icon: Icons.trending_up_outlined, iconColor: const Color(0xFF8B5CF6), title: 'Progress Tracking', subtitle: 'Track progress', onTap: () => p.onComingSoon(context, 'Progress Tracking')),
-        const Divider(height: 1), _switchTile(icon: Icons.notifications_active_outlined, title: 'Notifications for New Courses', subtitle: 'Get notified', value: false, onChanged: (_) {}),
+        const Divider(height: 1), _settingsTile(icon: Icons.trending_up_outlined, iconColor: const Color(0xFF8B5CF6), title: 'Progress Tracking', subtitle: 'View course completion', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const Courses()))),
+        const Divider(height: 1), _switchTile(icon: Icons.notifications_active_outlined, title: 'Notifications for New Courses', subtitle: 'Get notified', value: p.courseNotificationsEnabled, onChanged: p.onToggleCourseNotifications),
       ])));
   }
 

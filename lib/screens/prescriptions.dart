@@ -10,14 +10,16 @@ class PrescriptionsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bool isWeb = MediaQuery.of(context).size.width > 900;
+    return const PatientPrescriptions();
+  }
+}
 
-    // ── MOBILE: redirect to PatientPrescriptions (digital prescriptions) ────
-    if (!isWeb) {
-      return const PatientPrescriptions();
-    }
+// ignore: unused_element
+class _PrescriptionsScreenLegacyWeb extends StatelessWidget {
+  const _PrescriptionsScreenLegacyWeb();
 
-    // ── WEB: redesigned layout ──────────────────────────────────────────────
+  @override
+  Widget build(BuildContext context) {
     final List<Map<String, dynamic>> prescriptions = [
       {
         "id": "PR-8802",

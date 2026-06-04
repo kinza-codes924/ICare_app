@@ -1,9 +1,14 @@
+const fs = require('fs');
+const path = require('path');
 const EnhancedPrescription = require('../models/EnhancedPrescription');
 const { connectMongoDB } = require('../config/mongodb');
 const LifestyleAdvice = require('../models/LifestyleAdvice');
 const Consultation = require('../models/Consultation');
 const User = require('../models/User');
 const { sendEmail } = require('../utils/email');
+
+let _logoB64 = '';
+try { _logoB64 = fs.readFileSync(path.join(__dirname, '..', 'logo_b64.txt'), 'utf8').trim(); } catch (_) {}
 
 // Save prescription draft
 exports.savePrescriptionDraft = async (req, res) => {
@@ -202,20 +207,20 @@ exports.completePrescription = async (req, res) => {
       // Send prescription email to patient
       try {
         const patient = await User.findById(prescription.patientId).lean();
-        if (patient?.email) {
+        if (patient?.email && patient?.prescriptionEmailEnabled !== false) {
           const medsHtml = (prescription.medicines || []).map((m, i) =>
             `<tr>
-              <td style="padding:8px 12px;border-bottom:1px solid #f1f5f9;">${i + 1}. ${m.name || 'Medicine'}</td>
+              <td style="padding:8px 12px;border-bottom:1px solid #f1f5f9;">${i + 1}. ${m.medicineName || m.name || 'Medicine'}</td>
               <td style="padding:8px 12px;border-bottom:1px solid #f1f5f9;color:#64748b;">${m.dosage || m.dose || ''}</td>
               <td style="padding:8px 12px;border-bottom:1px solid #f1f5f9;color:#64748b;">${m.frequency || ''}</td>
               <td style="padding:8px 12px;border-bottom:1px solid #f1f5f9;color:#64748b;">${m.duration || ''}</td>
             </tr>`
           ).join('');
           const labsHtml = (prescription.labTests || []).map(t =>
-            `<li style="margin-bottom:4px;color:#374151;">${t.name || t.testName || t}</li>`
+            `<li style="margin-bottom:4px;color:#374151;">${t.testName || t.name || t}</li>`
           ).join('');
           const diagnosesHtml = (prescription.diagnoses || []).map(d =>
-            `<span style="display:inline-block;background:#EFF6FF;color:#1D4ED8;padding:3px 10px;border-radius:20px;font-size:13px;margin:2px;">${d.name || d}</span>`
+            `<span style="display:inline-block;background:#EFF6FF;color:#1D4ED8;padding:3px 10px;border-radius:20px;font-size:13px;margin:2px;">${d.diagnosis || d.name || d}</span>`
           ).join('');
 
           console.log('[Prescription] Sending email to:', patient.email);
@@ -224,7 +229,8 @@ exports.completePrescription = async (req, res) => {
             subject: 'iCare — Your Prescription is Ready',
             html: `
               <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;background:#f8fafc;">
-                <div style="background:#0036BC;padding:28px 32px;border-radius:12px 12px 0 0;">
+                <div style="background:#0036BC;padding:28px 32px;border-radius:12px 12px 0 0;text-align:center;">
+                  ${_logoB64 ? `<img src="data:image/png;base64,${_logoB64}" alt="iCare" style="height:52px;margin-bottom:12px;display:block;margin-left:auto;margin-right:auto;"/>` : ''}
                   <h2 style="color:#fff;margin:0;font-size:22px;">iCare Prescription</h2>
                   <p style="color:rgba(255,255,255,0.8);margin:4px 0 0;font-size:14px;">Your doctor has completed your prescription</p>
                 </div>

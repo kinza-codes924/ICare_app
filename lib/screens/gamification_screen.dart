@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:fl_chart/fl_chart.dart';
+import 'package:intl/intl.dart';
 import 'package:icare/services/gamification_service.dart';
 import 'package:icare/widgets/back_button.dart';
 
@@ -274,6 +276,11 @@ class _GamificationScreenState extends State<GamificationScreen>
             ]),
           ),
 
+          if (history.isNotEmpty) ...[
+            const SizedBox(height: 20),
+            _buildPointsPieChart(history),
+          ],
+
           const SizedBox(height: 24),
 
           // Stats Grid
@@ -392,6 +399,7 @@ class _GamificationScreenState extends State<GamificationScreen>
 
   Widget _buildRedeemTab() {
     final points = (_stats?['points'] ?? 0) as int;
+    final history = _stats?['history'] as List? ?? [];
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -439,6 +447,12 @@ class _GamificationScreenState extends State<GamificationScreen>
           points: points,
         ),
 
+        // Monthly points chart
+        if (history.isNotEmpty) ...[
+          const SizedBox(height: 28),
+          _buildMonthlyBarChart(history),
+        ],
+
         // Redemption History
         const SizedBox(height: 28),
         const Text('Redemption History', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Color(0xFF0F172A))),
@@ -456,9 +470,14 @@ class _GamificationScreenState extends State<GamificationScreen>
               ]),
             );
           }
+          const rewardLabels = {
+            'free_consultation': 'Free Consultation',
+            'lab_discount': 'Lab Test Discount (15% off)',
+          };
           return Column(children: redemptions.take(5).map<Widget>((r) {
-            final title = (r is Map ? r['title'] ?? r['rewardId'] ?? 'Reward' : 'Reward').toString();
-            final pts = (r is Map ? r['points'] ?? r['cost'] ?? 0 : 0) as num;
+            final rawId = (r is Map ? r['rewardId'] ?? '' : '').toString();
+            final title = rewardLabels[rawId] ?? (r is Map ? r['title'] ?? rawId.replaceAll('_', ' ') : 'Reward').toString();
+            final pts = (r is Map ? r['cost'] ?? r['points'] ?? 0 : 0) as num;
             final date = (r is Map ? r['createdAt'] ?? r['date'] ?? '' : '').toString();
             String dateStr = '';
             try { dateStr = date.isNotEmpty ? '${DateTime.parse(date).toLocal().day}/${DateTime.parse(date).toLocal().month}/${DateTime.parse(date).toLocal().year}' : ''; } catch (_) {}
@@ -609,6 +628,190 @@ class _GamificationScreenState extends State<GamificationScreen>
       ]),
     );
   }
+
+  // ── Charts ──────────────────────────────────────────────────────────────
+
+  Widget _buildPointsPieChart(List<dynamic> history) {
+    const reasonLabels = {
+      'log_health_metric': 'Health Logs',
+      'complete_appointment': 'Appointments',
+      'complete_lab_test': 'Lab Tests',
+      'complete_program': 'Programs',
+      'daily_goal': 'Daily Goal',
+      'streak_bonus': 'Streak Bonus',
+      'rate_doctor': 'Doctor Rating',
+    };
+    const sliceColors = [
+      Color(0xFF6366F1), Color(0xFF10B981), Color(0xFF8B5CF6),
+      Color(0xFF3B82F6), Color(0xFFF59E0B), Color(0xFFEF4444), Color(0xFF06B6D4),
+    ];
+
+    final Map<String, int> byReason = {};
+    for (final e in history) {
+      final pts = (e['points'] as num? ?? 0).toInt();
+      final reason = (e['reason'] ?? 'other') as String;
+      if (pts > 0) byReason[reason] = (byReason[reason] ?? 0) + pts;
+    }
+    if (byReason.isEmpty) return const SizedBox.shrink();
+
+    final entries = byReason.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
+    final total = byReason.values.fold(0, (a, b) => a + b);
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFE8ECF5)),
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 10, offset: const Offset(0, 4))],
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: const Color(0xFF6366F1).withValues(alpha: 0.1), borderRadius: BorderRadius.circular(10)),
+            child: const Icon(Icons.pie_chart_rounded, color: Color(0xFF6366F1), size: 18)),
+          const SizedBox(width: 10),
+          const Text('Points by Activity', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Color(0xFF0F172A))),
+          const Spacer(),
+          Text('$total pts total', style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+        ]),
+        const SizedBox(height: 20),
+        Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
+          SizedBox(
+            width: 140,
+            height: 140,
+            child: PieChart(PieChartData(
+              sections: entries.asMap().entries.map((e) {
+                final pct = e.value.value / total * 100;
+                return PieChartSectionData(
+                  value: e.value.value.toDouble(),
+                  title: '${pct.toStringAsFixed(0)}%',
+                  color: sliceColors[e.key % sliceColors.length],
+                  radius: 55,
+                  titleStyle: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Colors.white),
+                );
+              }).toList(),
+              centerSpaceRadius: 30,
+              sectionsSpace: 2,
+            )),
+          ),
+          const SizedBox(width: 16),
+          Expanded(child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: entries.asMap().entries.map((e) {
+              final label = reasonLabels[e.value.key] ?? e.value.key;
+              final color = sliceColors[e.key % sliceColors.length];
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Row(children: [
+                  Container(width: 8, height: 8, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+                  const SizedBox(width: 6),
+                  Expanded(child: Text(label, style: const TextStyle(fontSize: 11, color: Color(0xFF374151)), overflow: TextOverflow.ellipsis)),
+                  Text('${e.value.value}', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: color)),
+                ]),
+              );
+            }).toList(),
+          )),
+        ]),
+      ]),
+    );
+  }
+
+  Widget _buildMonthlyBarChart(List<dynamic> history) {
+    final now = DateTime.now();
+    final months = List.generate(6, (i) => DateTime(now.year, now.month - (5 - i)));
+    final monthKeys = months.map((m) => DateFormat('MMM yy').format(m)).toList();
+
+    final earned = {for (final k in monthKeys) k: 0};
+    final spent = {for (final k in monthKeys) k: 0};
+
+    for (final e in history) {
+      final pts = (e['points'] as num? ?? 0).toInt();
+      final dateStr = (e['date'] ?? '') as String;
+      if (dateStr.isEmpty) continue;
+      try {
+        final key = DateFormat('MMM yy').format(DateTime.parse(dateStr).toLocal());
+        if (pts > 0) earned[key] = (earned[key] ?? 0) + pts;
+        else spent[key] = (spent[key] ?? 0) + pts.abs();
+      } catch (_) {}
+    }
+
+    final maxY = [...earned.values, ...spent.values].fold(0, (a, b) => a > b ? a : b).toDouble();
+    if (maxY == 0) return const SizedBox.shrink();
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFE8ECF5)),
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 10, offset: const Offset(0, 4))],
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: const Color(0xFF10B981).withValues(alpha: 0.1), borderRadius: BorderRadius.circular(10)),
+            child: const Icon(Icons.bar_chart_rounded, color: Color(0xFF10B981), size: 18)),
+          const SizedBox(width: 10),
+          const Text('Monthly Points', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Color(0xFF0F172A))),
+        ]),
+        const SizedBox(height: 8),
+        Row(children: [
+          _legendDot(const Color(0xFF10B981), 'Earned'),
+          const SizedBox(width: 16),
+          _legendDot(const Color(0xFFEF4444), 'Redeemed'),
+        ]),
+        const SizedBox(height: 20),
+        SizedBox(
+          height: 180,
+          child: BarChart(BarChartData(
+            alignment: BarChartAlignment.spaceAround,
+            maxY: maxY * 1.35,
+            barTouchData: BarTouchData(
+              touchTooltipData: BarTouchTooltipData(
+                getTooltipColor: (_) => const Color(0xFF1E293B),
+                getTooltipItem: (group, _, rod, rodIndex) {
+                  final key = monthKeys[group.x];
+                  final label = rodIndex == 0 ? 'Earned' : 'Redeemed';
+                  return BarTooltipItem('$key\n$label: ${rod.toY.toInt()} pts',
+                      const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600));
+                },
+              ),
+            ),
+            titlesData: FlTitlesData(
+              bottomTitles: AxisTitles(sideTitles: SideTitles(
+                showTitles: true, reservedSize: 28,
+                getTitlesWidget: (v, _) {
+                  final i = v.toInt();
+                  if (i < 0 || i >= monthKeys.length) return const SizedBox.shrink();
+                  return Padding(padding: const EdgeInsets.only(top: 6),
+                    child: Text(monthKeys[i].split(' ')[0], style: const TextStyle(fontSize: 10, color: Color(0xFF64748B))));
+                },
+              )),
+              leftTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+              topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+              rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+            ),
+            gridData: FlGridData(show: true, drawVerticalLine: false,
+              getDrawingHorizontalLine: (_) => const FlLine(color: Color(0xFFE8ECF5), strokeWidth: 1)),
+            borderData: FlBorderData(show: false),
+            barGroups: monthKeys.asMap().entries.map((e) => BarChartGroupData(
+              x: e.key,
+              barsSpace: 4,
+              barRods: [
+                BarChartRodData(toY: (earned[e.value] ?? 0).toDouble(), color: const Color(0xFF10B981), width: 12, borderRadius: BorderRadius.circular(4)),
+                BarChartRodData(toY: (spent[e.value] ?? 0).toDouble(), color: const Color(0xFFEF4444), width: 12, borderRadius: BorderRadius.circular(4)),
+              ],
+            )).toList(),
+          )),
+        ),
+      ]),
+    );
+  }
+
+  Widget _legendDot(Color color, String label) => Row(mainAxisSize: MainAxisSize.min, children: [
+    Container(width: 10, height: 10, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+    const SizedBox(width: 6),
+    Text(label, style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+  ]);
 
   Widget _buildLeaderboardCard(Map<String, dynamic> entry, int index) {
     final rank = entry['rank'] ?? index + 1;

@@ -440,7 +440,7 @@ router.get('/orders', authMiddleware, async (req, res) => {
         deliveryAddress: o.delivery_address || '',
         items: (o.items || []).map(item => ({
           ...item,
-          name: item.productName || item.name || item.medicine || 'Medicine',
+          name: item.productName || item.product_name || item.name || item.medicine_name || item.medicine || item.title || 'Unknown Item',
         })),
       })),
     });

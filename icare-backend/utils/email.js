@@ -28,8 +28,9 @@ async function sendViaResend({ to, subject, html }) {
 async function sendViaSmtp({ to, subject, html }) {
   const transporter = nodemailer.createTransport({
     host: 'smtp.gmail.com',
-    port: 465,
-    secure: true,
+    port: 587,
+    secure: false,
+    requireTLS: true,
     auth: {
       user: process.env.EMAIL_USER,
       pass: process.env.EMAIL_PASS,
@@ -51,7 +52,7 @@ async function sendViaBrevo({ to, subject, html }) {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      sender: { name: 'iCare', email: process.env.EMAIL_USER || 'icareofficialapp@gmail.com' },
+      sender: { name: 'iCare', email: 'icareofficialapp@gmail.com' },
       to: [{ email: Array.isArray(to) ? to[0] : to }],
       subject,
       htmlContent: html,

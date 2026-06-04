@@ -3,6 +3,15 @@ import 'package:dio/dio.dart';
 import '../utils/shared_pref.dart';
 import 'api_config.dart';
 
+String _detectPlatform() {
+  if (kIsWeb) return 'web';
+  switch (defaultTargetPlatform) {
+    case TargetPlatform.android: return 'android';
+    case TargetPlatform.iOS: return 'ios';
+    default: return 'unknown';
+  }
+}
+
 class ApiService {
   static final ApiService _instance = ApiService._internal();
   factory ApiService() => _instance;
@@ -13,7 +22,11 @@ class ApiService {
       baseUrl: ApiConfig.baseUrl,
       connectTimeout: const Duration(seconds: 60),
       receiveTimeout: const Duration(seconds: 60),
-      headers: {'Content-Type': 'application/json'},
+      headers: {
+        'Content-Type': 'application/json',
+        // Only send x-platform on native mobile — web doesn't need it and it triggers CORS preflight
+        if (!kIsWeb) 'x-platform': _detectPlatform(),
+      },
     ),
   );
   final SharedPref _sharedPref = SharedPref();

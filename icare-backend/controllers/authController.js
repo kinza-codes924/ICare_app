@@ -270,6 +270,7 @@ const getUserProfile = async (req, res) => {
         role: user.role,
         isApproved: user.is_approved !== false,
         mrNumber: user.mrNumber || null,
+        prescriptionEmailEnabled: user.prescriptionEmailEnabled !== false,
       },
     });
   } catch (error) {
