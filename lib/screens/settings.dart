@@ -1670,9 +1670,13 @@ class _WebSettingsLayout extends StatelessWidget {
       child: Padding(padding: const EdgeInsets.all(20), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         _sectionLabel('Notifications'), const SizedBox(height: 16),
         if (p.isPharmacy || p.isLaboratory) ...[
-          _switchTile(icon: Icons.notifications_active_outlined, title: 'New Order Alerts', subtitle: 'Notify on incoming orders/bookings', value: true, onChanged: (_) {}),
+          _switchTile(icon: Icons.notifications_active_outlined, title: 'New Orders', subtitle: 'Required • Cannot be turned off', value: true, onChanged: (_) {}),
           const Divider(height: 1),
-          _switchTile(icon: Icons.update_rounded, title: 'Order Status Updates', subtitle: 'Confirmations & changes', value: true, onChanged: (_) {}),
+          _switchTile(icon: Icons.local_shipping_outlined, title: 'Order Dispatched', subtitle: 'Notify when order is out for delivery', value: true, onChanged: (_) {}),
+          const Divider(height: 1),
+          _switchTile(icon: Icons.update_rounded, title: 'Delivery Status Updates', subtitle: 'Real-time delivery tracking notifications', value: true, onChanged: (_) {}),
+          const Divider(height: 1),
+          _switchTile(icon: Icons.warning_amber_outlined, title: 'System Alerts', subtitle: 'Platform & maintenance notifications', value: true, onChanged: (_) {}),
           const Divider(height: 1),
           _switchTile(icon: Icons.volume_up_outlined, title: 'Sound Notifications', subtitle: 'Play sound for notifications', value: true, onChanged: (_) {}),
         ] else ...[
@@ -2301,8 +2305,10 @@ class _MobileSettingsLayout extends StatelessWidget {
       child: Padding(padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         _sectionLabel('Notifications'), const SizedBox(height: 12),
         if (p.isPharmacy || p.isLaboratory) ...[
-          _switchTile(icon: Icons.notifications_active_outlined, title: 'New Order Alerts', subtitle: 'Notify on incoming orders/bookings', value: true, onChanged: (_) {}),
-          const Divider(height: 1), _switchTile(icon: Icons.update_rounded, title: 'Order Status Updates', subtitle: 'Confirmations & changes', value: true, onChanged: (_) {}),
+          _switchTile(icon: Icons.notifications_active_outlined, title: 'New Orders', subtitle: 'Required • Cannot be turned off', value: true, onChanged: (_) {}),
+          const Divider(height: 1), _switchTile(icon: Icons.local_shipping_outlined, title: 'Order Dispatched', subtitle: 'Notify when order is out for delivery', value: true, onChanged: (_) {}),
+          const Divider(height: 1), _switchTile(icon: Icons.update_rounded, title: 'Delivery Status Updates', subtitle: 'Real-time delivery tracking notifications', value: true, onChanged: (_) {}),
+          const Divider(height: 1), _switchTile(icon: Icons.warning_amber_outlined, title: 'System Alerts', subtitle: 'Platform & maintenance notifications', value: true, onChanged: (_) {}),
           const Divider(height: 1), _switchTile(icon: Icons.volume_up_outlined, title: 'Sound Notifications', subtitle: 'Play sound', value: true, onChanged: (_) {}),
         ] else ...[
           _switchTile(icon: Icons.calendar_today_outlined, title: 'Booking Updates', subtitle: 'Appointment confirmations & changes', value: true, onChanged: (_) {}),
