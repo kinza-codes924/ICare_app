@@ -385,6 +385,8 @@ router.get('/orders/pharmacy/list', authMiddleware, async (req, res) => {
         createdAt: o.createdAt,
         prescriptionId: o.prescription_id || null,
         rejectionReason: o.rejection_reason || '',
+        walkInMedicines: o.orderType === 'walk-in' ? (o.medicines || '') : '',
+        orderType: o.orderType || 'cart',
         user: {
           _id: pt?._id?.toString() || '',
           name: o.orderType === 'walk-in'

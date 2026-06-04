@@ -100,6 +100,12 @@ class _PharmacyOrdersState extends ConsumerState<PharmacyOrders>
                     'Medicine').toString();
                 return _sanitizeText(name) ?? name;
               }),
+              // Walk-in orders: parse medicines text string
+              ...(() {
+                final walkInText = (o['walkInMedicines'] ?? '').toString().trim();
+                if (walkInText.isEmpty) return <String>[];
+                return walkInText.split(',').map((m) => m.trim()).where((m) => m.isNotEmpty).toList();
+              })(),
             ],
             'prescriptionText': _sanitizeText(o['prescriptionText']?.toString()),
             'medicalRecord': o['medicalRecord'],
