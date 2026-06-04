@@ -392,6 +392,8 @@ class PharmacyService {
     String? address,
     String? notes,
     String? prescriptionId,
+    double totalAmount = 0,
+    List<Map<String, dynamic>>? items,
   }) async {
     try {
       final response = await _apiService.post('/pharmacy/orders/walk-in', {
@@ -402,6 +404,8 @@ class PharmacyService {
         if (address != null && address.isNotEmpty) 'deliveryAddress': address,
         if (notes != null && notes.isNotEmpty) 'notes': notes,
         if (prescriptionId != null && prescriptionId.isNotEmpty) 'prescriptionId': prescriptionId,
+        'totalAmount': totalAmount,
+        if (items != null && items.isNotEmpty) 'items': items,
         'orderType': 'walk-in',
         'status': 'pending',
       });

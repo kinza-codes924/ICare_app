@@ -396,6 +396,51 @@ router.put('/credentials/:doctorId/:credId', authMiddleware, adminOnly, async (r
   }
 });
 
+// ─── SEED CONTROLLED MEDICINES (one-time, no auth needed for convenience) ─────
+router.post('/seed-controlled-medicines', async (req, res) => {
+  try {
+    await connectMongoDB();
+    const Product = require('../models/Product');
+
+    const pharmacy = await User.findOne({ role: { $in: ['pharmacy', 'Pharmacy'] } }).lean();
+    if (!pharmacy) return res.status(404).json({ success: false, message: 'No pharmacy found' });
+
+    const medicines = [
+      {
+        pharmacy_id: pharmacy._id, name: 'Xanax (Alprazolam) 0.5mg', generic_name: 'Alprazolam',
+        description: 'Controlled benzodiazepine for anxiety disorders.', category: 'psychiatric',
+        medicine_category: 'Controlled', price: 450, stock_quantity: 50,
+        manufacturer: 'Pfizer', requires_prescription: true, is_active: true,
+      },
+      {
+        pharmacy_id: pharmacy._id, name: 'Tramadol HCl 50mg', generic_name: 'Tramadol Hydrochloride',
+        description: 'Controlled opioid analgesic for moderate to severe pain.', category: 'analgesics',
+        medicine_category: 'Controlled', price: 320, stock_quantity: 30,
+        manufacturer: 'Searle Pakistan', requires_prescription: true, is_active: true,
+      },
+      {
+        pharmacy_id: pharmacy._id, name: 'Codeine Phosphate 30mg', generic_name: 'Codeine',
+        description: 'Controlled opioid for pain and cough suppression.', category: 'analgesics',
+        medicine_category: 'Controlled', price: 280, stock_quantity: 20,
+        manufacturer: 'Martin Dow', requires_prescription: true, is_active: true,
+      },
+    ];
+
+    const results = [];
+    for (const med of medicines) {
+      const existing = await Product.findOne({ name: med.name, pharmacy_id: pharmacy._id });
+      if (existing) { results.push({ name: med.name, status: 'already exists' }); continue; }
+      await Product.create(med);
+      results.push({ name: med.name, status: 'added' });
+    }
+
+    res.json({ success: true, pharmacy: pharmacy.username || pharmacy.email, results });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 router.all('/{*path}', (req, res) => {
   res.json({ success: true, users: [], data: [], count: 0 });
 });

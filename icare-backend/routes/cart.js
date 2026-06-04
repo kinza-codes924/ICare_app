@@ -6,6 +6,7 @@ const User = require('../models/User');
 const Product = require('../models/Product');
 const CartItem = require('../models/CartItem');
 const PharmacyOrder = require('../models/PharmacyOrder');
+const PharmacyProfile = require('../models/PharmacyProfile');
 const { authMiddleware } = require('../middleware/auth');
 
 function toId(id) {
@@ -280,11 +281,19 @@ router.post('/checkout', authMiddleware, async (req, res) => {
     // Pick up prescription_id from any cart item that has one
     const prescriptionId = cartItems.find(c => c.prescription_id)?.prescription_id || undefined;
 
+    // Fetch pharmacy delivery fee
+    let deliveryFee = 0;
+    if (resolvedPharmacyId) {
+      const pharmProfile = await PharmacyProfile.findOne({ user_id: resolvedPharmacyId }).lean().catch(() => null);
+      deliveryFee = Number(pharmProfile?.delivery_fee) || 0;
+    }
+
     // 5. Create order
     const orderPayload = {
       patient_id:       userId,
-      pharmacy_id:      resolvedPharmacyId || null,   // null = unassigned, pharmacy list shows these too
-      total_amount:     totalAmount,
+      pharmacy_id:      resolvedPharmacyId || null,
+      total_amount:     totalAmount + deliveryFee,
+      delivery_fee:     deliveryFee,
       delivery_address: String(deliveryAddress).trim(),
       status:           'pending',
       order_number:     `ORD-${Date.now()}-${Math.random().toString(36).substr(2,5).toUpperCase()}`,

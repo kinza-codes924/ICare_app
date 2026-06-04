@@ -846,6 +846,12 @@ class _PharmacyOrdersState extends ConsumerState<PharmacyOrders>
                           }
                           setModalState(() => isSubmitting = true);
                           final medNames = selectedMedicines.map((m) => m['name']).join(', ');
+                          final walkInItems = selectedMedicines.map((m) => {
+                            'name': m['name'].toString(),
+                            'price': (m['price'] as num?)?.toDouble() ?? 0.0,
+                            'quantity': 1,
+                          }).toList();
+                          final walkInTotal = walkInItems.fold<double>(0, (sum, i) => sum + ((i['price'] as num) * (i['quantity'] as num)));
                           try {
                             await _pharmacyService.createWalkInOrder(
                               patientName: nameController.text.trim(),
@@ -855,6 +861,8 @@ class _PharmacyOrdersState extends ConsumerState<PharmacyOrders>
                               address: addressController.text.trim(),
                               notes: notesController.text.trim(),
                               prescriptionId: prescriptionCtrl.text.trim().isNotEmpty ? prescriptionCtrl.text.trim() : null,
+                              totalAmount: walkInTotal,
+                              items: walkInItems,
                             );
                             if (ctx.mounted) {
                               Navigator.pop(ctx);

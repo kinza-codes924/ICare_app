@@ -708,10 +708,22 @@ router.post('/orders/walk-in', authMiddleware, async (req, res) => {
     const pharmacyProfile = await PharmacyProfile.findOne({ user_id: pharmacyUserId }).lean();
     const pharmacyId = pharmacyProfile ? pharmacyProfile._id : pharmacyUserId;
 
-    const { patientName, contact, medicines, deliveryOption, deliveryAddress, notes, prescriptionId } = req.body;
+    const { patientName, contact, medicines, deliveryOption, deliveryAddress, notes, prescriptionId, totalAmount, items } = req.body;
     if (!patientName || !medicines) {
       return res.status(400).json({ success: false, message: 'patientName and medicines are required' });
     }
+
+    // Normalize items from Flutter (may have name/price/qty fields)
+    const normalizedItems = Array.isArray(items) ? items.map(i => ({
+      product_name: i.product_name || i.name || '',
+      generic_name: i.generic_name || '',
+      quantity: Number(i.quantity) || 1,
+      price: Number(i.price) || 0,
+    })) : [];
+
+    // Compute total from items if not provided
+    const computedTotal = normalizedItems.reduce((sum, i) => sum + i.price * i.quantity, 0);
+    const finalTotal = Number(totalAmount) > 0 ? Number(totalAmount) : computedTotal;
 
     const orderNumber = `WO-${Date.now().toString().slice(-8)}-${Math.random().toString(36).slice(-4).toUpperCase()}`;
 
@@ -728,8 +740,8 @@ router.post('/orders/walk-in', authMiddleware, async (req, res) => {
       status: 'pending',
       order_number: orderNumber,
       orderNumber,
-      total_amount: 0,
-      items: [],
+      total_amount: finalTotal,
+      items: normalizedItems,
       ...(prescriptionId ? { prescription_id: prescriptionId } : {}),
     });
 
