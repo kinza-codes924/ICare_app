@@ -502,7 +502,10 @@ class _LabTestsManagementState extends State<LabTestsManagement>
                     keyboardType: TextInputType.number,
                     decoration: InputDecoration(
                       hintText: 'e.g., 1500',
-                      prefixIcon: const Icon(Icons.currency_rupee_rounded, color: primaryColor),
+                      prefixIcon: Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: Image.asset('assets/money.png', width: 22, height: 22),
+                      ),
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
                       enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
                       focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: primaryColor, width: 2)),
@@ -959,7 +962,8 @@ class _LabTestsManagementState extends State<LabTestsManagement>
                     spacing: 6,
                     runSpacing: 4,
                     children: [
-                      _buildChip('PKR $price', Icons.currency_rupee_rounded, const Color(0xFF10B981)),
+                      _buildChip('PKR $price', Icons.currency_rupee_rounded, const Color(0xFF10B981),
+                          iconWidget: Image.asset('assets/money.png', width: 13, height: 13)),
                       if (turnaround.isNotEmpty)
                         _buildChip(turnaround, Icons.schedule_rounded, const Color(0xFFF59E0B)),
                       if (sampleType.isNotEmpty)
@@ -984,7 +988,7 @@ class _LabTestsManagementState extends State<LabTestsManagement>
     );
   }
 
-  Widget _buildChip(String label, IconData icon, Color color) {
+  Widget _buildChip(String label, IconData icon, Color color, {Widget? iconWidget}) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
@@ -994,7 +998,7 @@ class _LabTestsManagementState extends State<LabTestsManagement>
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 12, color: color),
+          iconWidget ?? Icon(icon, size: 12, color: color),
           const SizedBox(width: 4),
           Text(label, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: color)),
         ],
