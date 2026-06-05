@@ -230,7 +230,7 @@ exports.completePrescription = async (req, res) => {
             html: `
               <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;background:#f8fafc;">
                 <div style="background:#0036BC;padding:28px 32px;border-radius:12px 12px 0 0;text-align:center;">
-                  ${_logoB64 ? `<div style="background:#fff;display:inline-block;border-radius:12px;padding:8px 16px;margin-bottom:14px;"><img src="data:image/png;base64,${_logoB64}" alt="iCare" style="height:48px;display:block;"/></div>` : ''}
+                  <div style="background:#fff;display:inline-block;border-radius:12px;padding:8px 16px;margin-bottom:14px;"><img src="https://www.icare.com.co/assets/assets/images/logo.png" alt="iCare" style="height:48px;display:block;"/></div>
                   <h2 style="color:#fff;margin:0;font-size:22px;">iCare Prescription</h2>
                   <p style="color:rgba(255,255,255,0.8);margin:4px 0 0;font-size:14px;">Your doctor has completed your prescription</p>
                 </div>
