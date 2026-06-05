@@ -448,28 +448,42 @@ router.get('/:labId/bookings', authMiddleware, async (req, res) => {
     const bookings = await LabTestRequest.find(query).sort({ createdAt: -1 }).lean();
     console.log('✅ LAB BOOKINGS FETCH - Found', bookings.length, 'bookings');
 
-    const patientIds = [...new Set(bookings.map(b => b.patient_id.toString()))];
+    const patientIds = [...new Set(bookings.map(b => b.patient_id?.toString()).filter(Boolean))];
     const patients = await User.find({ _id: { $in: patientIds.map(id => toId(id)) } }).lean();
     const pMap = {};
     patients.forEach(p => { pMap[p._id.toString()] = p; });
 
-    const result = bookings.map(b => ({
+    const result = bookings.map(b => {
+      const pid = b.patient_id?.toString();
+      const pUser = pid ? pMap[pid] : null;
+      // Walk-in override takes priority so the actual patient name is always correct
+      const resolvedName = b.patient_name_override || pUser?.username || pUser?.name || 'Unknown';
+      return {
       ...b,
       _id: b._id.toString(),
       // Normalize status to underscore for Flutter consistency
-      status: b.status?.replace(/-/g, '_') ?? b.status,
-      patient_name: pMap[b.patient_id.toString()]?.username || pMap[b.patient_id.toString()]?.name || b.patient_name_override,
-      patient_email: pMap[b.patient_id.toString()]?.email,
-      patient_phone: b.patient_phone || pMap[b.patient_id.toString()]?.phone,
+      status: b.status?.replace(/-/g, '_')?.toLowerCase() ?? b.status,
+      patient_name: resolvedName,
+      patientName: resolvedName,
+      patient_email: pUser?.email,
+      patient_phone: b.patient_phone || b.contact || pUser?.phone,
       patient_age: b.patient_age || null,
       patient_gender: b.patient_gender || null,
       patient_address: b.patient_address || null,
+      // camelCase aliases for Flutter
+      testName: b.test_type,
+      testType: b.test_type,
+      date: b.test_date,
+      reportNotes: b.report_notes,
+      reportUrl: b.report_url,
+      bookingNumber: b._id.toString().slice(-6).toUpperCase(),
+      isAbnormal: b.is_abnormal || false,
       // Include urgency fields
       urgency: b.urgency || 'Normal',
       is_urgent: b.is_urgent || b.urgency === 'Urgent' || false,
       collectionType: b.collection_type || 'in-lab',
       collection_type: b.collection_type || 'in-lab',
-    }));
+    };});
     res.json({ success: true, bookings: result });
   } catch (error) {
     console.error('❌ LAB BOOKINGS FETCH - Error:', error);
