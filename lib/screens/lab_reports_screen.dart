@@ -96,16 +96,16 @@ class _LabReportsScreenState extends State<LabReportsScreen>
       final query = _searchQuery.toLowerCase();
       switch (_searchFilter) {
         case 'patient':
-          final patientName = (booking['patient']?['name'] ?? booking['patientName'] ?? '').toString().toLowerCase();
-          return patientName.contains(query);
+          final name = (booking['patientName'] ?? booking['patient_name'] ?? booking['patient']?['name'] ?? booking['contactName'] ?? '').toString().toLowerCase();
+          return name.contains(query);
         case 'mr_number':
-          final mrNumber = (booking['patient']?['mrNumber'] ?? booking['mrNumber'] ?? '').toString().toLowerCase();
-          return mrNumber.contains(query);
+          final mr = (booking['mrNumber'] ?? booking['mr_number'] ?? booking['patient']?['mrNumber'] ?? '').toString().toLowerCase();
+          return mr.contains(query);
         case 'doctor':
-          final doctorName = (booking['referredBy'] ?? booking['referred_by'] ?? '').toString().toLowerCase();
-          return doctorName.contains(query);
+          final doc = (booking['referredBy'] ?? booking['referred_by'] ?? booking['doctor']?['name'] ?? '').toString().toLowerCase();
+          return doc.contains(query);
         case 'contact':
-          final contact = (booking['patient']?['contact'] ?? booking['contact'] ?? '').toString().toLowerCase();
+          final contact = (booking['contact'] ?? booking['patient_phone'] ?? booking['patient']?['contact'] ?? '').toString().toLowerCase();
           return contact.contains(query);
         default:
           return true;
@@ -116,11 +116,14 @@ class _LabReportsScreenState extends State<LabReportsScreen>
   @override
   Widget build(BuildContext context) {
     final isDesktop = MediaQuery.of(context).size.width > 700;
-    final completed = _filterBookings(_completedBookings
-        .where((b) => b['status'] == 'completed')
-        .toList());
+    bool isDone(dynamic b) {
+      final s = (b['status'] ?? '').toString();
+      return s == 'completed' || s == 'reporting_done' || s == 'reporting-done';
+    }
+
+    final completed = _filterBookings(_completedBookings.where(isDone).toList());
     final pending = _filterBookings(_completedBookings
-        .where((b) => b['status'] != 'completed' && b['status'] != 'cancelled')
+        .where((b) => !isDone(b) && b['status'] != 'cancelled')
         .toList());
 
     return Scaffold(
@@ -406,6 +409,20 @@ class _LabReportsScreenState extends State<LabReportsScreen>
     );
   }
 
+  Widget _tableCell(String text, {bool isHeader = false, bool bold = false, bool small = false, Color? color}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      child: Text(
+        text,
+        style: TextStyle(
+          fontSize: isHeader ? 11 : (small ? 11 : 13),
+          fontWeight: (isHeader || bold) ? FontWeight.w700 : FontWeight.w400,
+          color: color ?? (isHeader ? const Color(0xFF64748B) : const Color(0xFF0F172A)),
+        ),
+      ),
+    );
+  }
+
   void _showAdvisedTestsDialog(BuildContext context, String doctorName, String date,
       List labTests, String diagnosis) {
     showDialog(
@@ -544,18 +561,23 @@ class _LabReportsScreenState extends State<LabReportsScreen>
   }
 
   Widget _buildReportCard(dynamic booking, {required bool showResults}) {
-    final testName = booking['testName'] ?? 'Lab Test';
-    final patientName = booking['contactName'] ?? 'Patient';
-    final dateStr = booking['date'] ?? '';
+    final testName = (booking['testName'] ?? booking['test_type'] ?? booking['testType'] ?? 'Lab Test').toString();
+    final patientName = (booking['patientName'] ?? booking['patient_name'] ?? booking['contactName'] ?? '').toString();
+    final mrNumber = (booking['mrNumber'] ?? booking['mr_number'] ?? '').toString();
+    final referredBy = (booking['referredBy'] ?? booking['referred_by'] ?? '').toString();
+    final contact = (booking['contact'] ?? booking['patient_phone'] ?? '').toString();
+    final dateStr = (booking['date'] ?? booking['test_date'] ?? booking['createdAt'] ?? '').toString();
     DateTime? dateObj = DateTime.tryParse(dateStr);
     final formattedDate = dateObj != null
         ? DateFormat('dd MMM yyyy').format(dateObj)
         : '—';
-    final status = booking['status'] ?? 'pending';
-    final resultNotes = booking['resultNotes'] ?? '';
-    final reportUrl = booking['reportUrl'] ?? '';
-    final bookingNumber = booking['bookingNumber'] ?? '#—';
-    final bool isAbnormal = booking['isAbnormal'] ?? false;
+    final status = (booking['status'] ?? 'pending').toString();
+    final resultNotes = (booking['reportNotes'] ?? booking['report_notes'] ?? booking['resultNotes'] ?? '').toString();
+    final reportUrl = (booking['reportUrl'] ?? booking['report_url'] ?? '').toString();
+    final bookingNumber = (booking['bookingNumber'] ?? '#—').toString();
+    final bool isAbnormal = booking['isAbnormal'] ?? booking['is_abnormal'] ?? false;
+    final List<dynamic> results = (booking['results'] as List<dynamic>?) ?? [];
+    final bool isDone = status == 'completed' || status == 'reporting_done' || status == 'reporting-done';
 
     Color statusColor;
     Color statusBg;
@@ -676,37 +698,39 @@ class _LabReportsScreenState extends State<LabReportsScreen>
                         ],
                       ),
                       const SizedBox(height: 4),
-                      Row(
+                      Wrap(
+                        spacing: 10,
+                        runSpacing: 2,
                         children: [
-                          const Icon(
-                            Icons.person_rounded,
-                            size: 13,
-                            color: Color(0xFF94A3B8),
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            patientName,
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: Color(0xFF64748B),
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          const Icon(
-                            Icons.calendar_today_rounded,
-                            size: 12,
-                            color: Color(0xFF94A3B8),
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            formattedDate,
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: Color(0xFF64748B),
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
+                          if (patientName.isNotEmpty)
+                            Row(mainAxisSize: MainAxisSize.min, children: [
+                              const Icon(Icons.person_rounded, size: 13, color: Color(0xFF94A3B8)),
+                              const SizedBox(width: 4),
+                              Text(patientName, style: const TextStyle(fontSize: 12, color: Color(0xFF64748B), fontWeight: FontWeight.w600)),
+                            ]),
+                          if (mrNumber.isNotEmpty)
+                            Row(mainAxisSize: MainAxisSize.min, children: [
+                              const Icon(Icons.badge_outlined, size: 13, color: Color(0xFF94A3B8)),
+                              const SizedBox(width: 4),
+                              Text('MR# $mrNumber', style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                            ]),
+                          Row(mainAxisSize: MainAxisSize.min, children: [
+                            const Icon(Icons.calendar_today_rounded, size: 12, color: Color(0xFF94A3B8)),
+                            const SizedBox(width: 4),
+                            Text(formattedDate, style: const TextStyle(fontSize: 12, color: Color(0xFF64748B), fontWeight: FontWeight.w500)),
+                          ]),
+                          if (referredBy.isNotEmpty)
+                            Row(mainAxisSize: MainAxisSize.min, children: [
+                              const Icon(Icons.medical_services_outlined, size: 13, color: Color(0xFF94A3B8)),
+                              const SizedBox(width: 4),
+                              Text('Dr. $referredBy', style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                            ]),
+                          if (contact.isNotEmpty)
+                            Row(mainAxisSize: MainAxisSize.min, children: [
+                              const Icon(Icons.phone_rounded, size: 12, color: Color(0xFF94A3B8)),
+                              const SizedBox(width: 4),
+                              Text(contact, style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                            ]),
                         ],
                       ),
                     ],
@@ -742,64 +766,96 @@ class _LabReportsScreenState extends State<LabReportsScreen>
           ),
 
           // ── Results Body ───────────────────────────────────────
-          if (showResults && status == 'completed') ...[
+          if (showResults && isDone) ...[
             Padding(
               padding: const EdgeInsets.all(20),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Booking ID
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF1F5F9),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          bookingNumber,
-                          style: const TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w700,
-                            color: Color(0xFF475569),
-                            fontFamily: 'monospace',
-                          ),
-                        ),
-                      ),
-                    ],
+                  // Booking ID chip
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF1F5F9),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      bookingNumber,
+                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF475569), fontFamily: 'monospace'),
+                    ),
                   ),
 
+                  // Structured results table
+                  if (results.isNotEmpty) ...[
+                    const SizedBox(height: 16),
+                    Row(children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(color: primaryColor.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(10)),
+                        child: const Icon(Icons.table_chart_rounded, color: primaryColor, size: 16),
+                      ),
+                      const SizedBox(width: 10),
+                      const Text('Test Findings', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: Color(0xFF0F172A))),
+                    ]),
+                    const SizedBox(height: 10),
+                    Container(
+                      decoration: BoxDecoration(
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: Table(
+                          columnWidths: const {
+                            0: FlexColumnWidth(2.5),
+                            1: FlexColumnWidth(1.5),
+                            2: FlexColumnWidth(1.2),
+                            3: FlexColumnWidth(2),
+                          },
+                          children: [
+                            TableRow(
+                              decoration: const BoxDecoration(color: Color(0xFFF1F5F9)),
+                              children: [
+                                _tableCell('Parameter', isHeader: true),
+                                _tableCell('Value', isHeader: true),
+                                _tableCell('Unit', isHeader: true),
+                                _tableCell('Ref. Range', isHeader: true),
+                              ],
+                            ),
+                            ...results.map((r) {
+                              final row = r as Map<String, dynamic>;
+                              final severity = (row['severity'] ?? 'normal').toString();
+                              final isAbn = severity == 'abnormal' || severity == 'critical';
+                              return TableRow(
+                                decoration: BoxDecoration(
+                                  color: isAbn ? const Color(0xFFFFF1F2) : Colors.white,
+                                ),
+                                children: [
+                                  _tableCell(row['testParameter']?.toString() ?? '', bold: true),
+                                  _tableCell(row['value']?.toString() ?? '', color: isAbn ? const Color(0xFFDC2626) : null, bold: isAbn),
+                                  _tableCell(row['unit']?.toString() ?? ''),
+                                  _tableCell(row['referenceRange']?.toString() ?? '', small: true),
+                                ],
+                              );
+                            }),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+
+                  // Notes / text findings
                   if (resultNotes.isNotEmpty) ...[
                     const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: primaryColor.withValues(alpha: 0.08),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: const Icon(
-                            Icons.notes_rounded,
-                            color: primaryColor,
-                            size: 16,
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        const Text(
-                          'Result Findings',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w800,
-                            color: Color(0xFF0F172A),
-                          ),
-                        ),
-                      ],
-                    ),
+                    Row(children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(color: primaryColor.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(10)),
+                        child: const Icon(Icons.notes_rounded, color: primaryColor, size: 16),
+                      ),
+                      const SizedBox(width: 10),
+                      const Text('Remarks / Notes', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: Color(0xFF0F172A))),
+                    ]),
                     const SizedBox(height: 10),
                     Container(
                       width: double.infinity,
@@ -809,16 +865,12 @@ class _LabReportsScreenState extends State<LabReportsScreen>
                         borderRadius: BorderRadius.circular(14),
                         border: Border.all(color: const Color(0xFFE2E8F0)),
                       ),
-                      child: Text(
-                        resultNotes,
-                        style: const TextStyle(
-                          fontSize: 13,
-                          color: Color(0xFF334155),
-                          height: 1.6,
-                        ),
-                      ),
+                      child: Text(resultNotes, style: const TextStyle(fontSize: 13, color: Color(0xFF334155), height: 1.6)),
                     ),
-                  ] else ...[
+                  ],
+
+                  // No findings warning — only if BOTH are empty and no report URL
+                  if (results.isEmpty && resultNotes.isEmpty && reportUrl.isEmpty) ...[
                     const SizedBox(height: 12),
                     Container(
                       padding: const EdgeInsets.all(14),
@@ -827,25 +879,11 @@ class _LabReportsScreenState extends State<LabReportsScreen>
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(color: const Color(0xFFFDE68A)),
                       ),
-                      child: const Row(
-                        children: [
-                          Icon(
-                            Icons.info_outline_rounded,
-                            color: Color(0xFFD97706),
-                            size: 16,
-                          ),
-                          SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              'No written findings — report document may be attached below.',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Color(0xFF92400E),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
+                      child: const Row(children: [
+                        Icon(Icons.info_outline_rounded, color: Color(0xFFD97706), size: 16),
+                        SizedBox(width: 8),
+                        Expanded(child: Text('No findings entered — report document may be uploaded separately.', style: TextStyle(fontSize: 12, color: Color(0xFF92400E)))),
+                      ]),
                     ),
                   ],
 
@@ -857,28 +895,16 @@ class _LabReportsScreenState extends State<LabReportsScreen>
                         onPressed: () {
                           Clipboard.setData(ClipboardData(text: reportUrl));
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Report link copied to clipboard!'),
-                              backgroundColor: Color(0xFF10B981),
-                              behavior: SnackBarBehavior.floating,
-                            ),
+                            const SnackBar(content: Text('Report link copied to clipboard!'), backgroundColor: Color(0xFF10B981), behavior: SnackBarBehavior.floating),
                           );
                         },
                         icon: const Icon(Icons.copy_rounded, size: 16),
-                        label: const Text(
-                          'Copy Report Link',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w700,
-                            fontSize: 14,
-                          ),
-                        ),
+                        label: const Text('Copy Report Link', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: primaryColor,
                           foregroundColor: Colors.white,
                           padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
-                          ),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                           elevation: 0,
                         ),
                       ),
