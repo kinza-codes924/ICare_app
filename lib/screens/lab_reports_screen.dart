@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:icare/services/laboratory_service.dart';
 import 'package:icare/services/medical_record_service.dart';
 import 'package:icare/utils/shared_pref.dart';
@@ -424,20 +425,6 @@ class _LabReportsScreenState extends State<LabReportsScreen>
     );
   }
 
-  Widget _tableCell(String text, {bool isHeader = false, bool bold = false, bool small = false, Color? color}) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-      child: Text(
-        text,
-        style: TextStyle(
-          fontSize: isHeader ? 11 : (small ? 11 : 13),
-          fontWeight: (isHeader || bold) ? FontWeight.w700 : FontWeight.w400,
-          color: color ?? (isHeader ? const Color(0xFF64748B) : const Color(0xFF0F172A)),
-        ),
-      ),
-    );
-  }
-
   void _showAdvisedTestsDialog(BuildContext context, String doctorName, String date,
       List labTests, String diagnosis) {
     showDialog(
@@ -571,35 +558,120 @@ class _LabReportsScreenState extends State<LabReportsScreen>
       padding: EdgeInsets.all(isDesktop ? 28 : 16),
       itemCount: bookings.length,
       itemBuilder: (ctx, i) =>
-          _buildReportCard(bookings[i], showResults: showResults),
+          _RecordCard(booking: bookings[i], showResults: showResults),
     );
   }
 
-  Widget _buildReportCard(dynamic booking, {required bool showResults}) {
-    final testName = (booking['testName'] ?? booking['test_type'] ?? booking['testType'] ?? 'Lab Test').toString();
-    final patientName = (booking['patientName'] ?? booking['patient_name'] ?? booking['contactName'] ?? '').toString();
-    final mrNumber = (booking['mrNumber'] ?? booking['mr_number'] ?? '').toString();
-    final referredBy = (booking['referredBy'] ?? booking['referred_by'] ?? '').toString();
-    final contact = (booking['contact'] ?? booking['patient_phone'] ?? '').toString();
-    final dateStr = (booking['date'] ?? booking['test_date'] ?? booking['createdAt'] ?? '').toString();
-    DateTime? dateObj = DateTime.tryParse(dateStr);
-    final formattedDate = dateObj != null
-        ? DateFormat('dd MMM yyyy').format(dateObj)
-        : '—';
-    final status = (booking['status'] ?? 'pending').toString();
-    final resultNotes = (booking['reportNotes'] ?? booking['report_notes'] ?? booking['resultNotes'] ?? '').toString();
-    final reportUrl = (booking['reportUrl'] ?? booking['report_url'] ?? '').toString();
-    final bookingNumber = (booking['bookingNumber'] ?? '#—').toString();
-    final bool isAbnormal = booking['isAbnormal'] ?? booking['is_abnormal'] ?? false;
-    final List<dynamic> results = (booking['results'] as List<dynamic>?) ?? [];
-    final bool isDone = status == 'completed' || status == 'reporting_done' || status == 'reporting-done';
+}
+
+// ── Accordion record card ──────────────────────────────────────────────────
+
+class _RecordCard extends StatefulWidget {
+  final dynamic booking;
+  final bool showResults;
+  const _RecordCard({required this.booking, required this.showResults});
+  @override
+  State<_RecordCard> createState() => _RecordCardState();
+}
+
+class _RecordCardState extends State<_RecordCard>
+    with SingleTickerProviderStateMixin {
+  bool _expanded = false;
+  late final AnimationController _ctrl;
+  late final Animation<double> _chevron;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 250));
+    _chevron = Tween<double>(begin: 0, end: 0.5)
+        .animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut));
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  void _toggle() {
+    setState(() => _expanded = !_expanded);
+    _expanded ? _ctrl.forward() : _ctrl.reverse();
+  }
+
+  static Widget _tc(String text,
+      {bool isHeader = false,
+      bool bold = false,
+      bool small = false,
+      Color? color}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      child: Text(
+        text,
+        style: TextStyle(
+          fontSize: isHeader ? 11 : (small ? 11 : 13),
+          fontWeight:
+              (isHeader || bold) ? FontWeight.w700 : FontWeight.w400,
+          color: color ??
+              (isHeader
+                  ? const Color(0xFF64748B)
+                  : const Color(0xFF0F172A)),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openUrl(BuildContext context, String url) async {
+    final uri = Uri.tryParse(url);
+    if (uri == null) return;
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } catch (_) {
+      await Clipboard.setData(ClipboardData(text: url));
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text('Report link copied to clipboard!'),
+          backgroundColor: Color(0xFF10B981),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final b = widget.booking;
+    final showResults = widget.showResults;
+
+    final testName = (b['testName'] ?? b['test_type'] ?? b['testType'] ?? 'Lab Test').toString();
+    final patientName = (b['patientName'] ?? b['patient_name'] ?? b['contactName'] ?? '').toString();
+    final mrNumber = (b['mrNumber'] ?? b['mr_number'] ?? '').toString();
+    final referredBy = (b['referredBy'] ?? b['referred_by'] ?? '').toString();
+    final contact = (b['contact'] ?? b['patient_phone'] ?? '').toString();
+    final dateStr = (b['date'] ?? b['test_date'] ?? b['createdAt'] ?? '').toString();
+    final dateObj = DateTime.tryParse(dateStr);
+    final formattedDate = dateObj != null ? DateFormat('dd MMM yyyy').format(dateObj) : '—';
+    final status = (b['status'] ?? 'pending').toString();
+    final resultNotes = (b['reportNotes'] ?? b['report_notes'] ?? b['resultNotes'] ?? '').toString();
+    final reportUrl = (b['reportUrl'] ?? b['report_url'] ?? '').toString();
+    final bookingNumber = (b['bookingNumber'] ?? '#—').toString();
+    final bool isAbnormal = b['isAbnormal'] ?? b['is_abnormal'] ?? false;
+    final List<dynamic> results = (b['results'] as List<dynamic>?) ?? [];
+    final bool isDone = status == 'completed' ||
+        status == 'reporting_done' ||
+        status == 'done' ||
+        status == 'result_ready';
 
     Color statusColor;
     Color statusBg;
     IconData statusIcon;
-
     switch (status) {
       case 'completed':
+      case 'reporting_done':
+      case 'done':
+      case 'result_ready':
         statusColor = const Color(0xFF10B981);
         statusBg = const Color(0xFFD1FAE5);
         statusIcon = Icons.check_circle_rounded;
@@ -620,6 +692,23 @@ class _LabReportsScreenState extends State<LabReportsScreen>
         statusIcon = Icons.pending_actions_rounded;
     }
 
+    String statusLabel;
+    switch (status) {
+      case 'reporting_done':
+        statusLabel = 'Done';
+        break;
+      case 'result_ready':
+        statusLabel = 'Ready';
+        break;
+      default:
+        statusLabel = status.isEmpty
+            ? '—'
+            : status[0].toUpperCase() +
+                status.substring(1).replaceAll('_', ' ');
+    }
+
+    final bool isExpandable = showResults && isDone;
+
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
@@ -628,326 +717,434 @@ class _LabReportsScreenState extends State<LabReportsScreen>
         border: Border.all(color: const Color(0xFFF1F5F9), width: 1.5),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
+              color: Colors.black.withValues(alpha: 0.04),
+              blurRadius: 12,
+              offset: const Offset(0, 4)),
         ],
       ),
       child: Column(
         children: [
-          // ── Header ────────────────────────────────────────────
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  primaryColor.withValues(alpha: 0.04),
-                  secondaryColor.withValues(alpha: 0.02),
-                ],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: const BorderRadius.vertical(
-                top: Radius.circular(20),
-              ),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(14),
-                    boxShadow: [
-                      BoxShadow(
-                        color: primaryColor.withValues(alpha: 0.1),
-                        blurRadius: 8,
-                        offset: const Offset(0, 3),
-                      ),
-                    ],
-                  ),
-                  child: const Icon(
-                    Icons.biotech_rounded,
-                    color: primaryColor,
-                    size: 24,
-                  ),
+          // ── Header ──────────────────────────────────────────────
+          GestureDetector(
+            onTap: isExpandable ? _toggle : null,
+            behavior: HitTestBehavior.opaque,
+            child: Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    primaryColor.withValues(alpha: 0.04),
+                    secondaryColor.withValues(alpha: 0.02),
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
                 ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Text(
-                            testName,
-                            style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w900,
-                              color: Color(0xFF0F172A),
-                              letterSpacing: -0.2,
-                            ),
-                          ),
-                          if (isAbnormal) ...[
-                            const SizedBox(width: 8),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 6,
-                                vertical: 2,
-                              ),
-                              decoration: BoxDecoration(
-                                color: Colors.red,
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              child: const Text(
-                                'ABNORMAL',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 9,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Icon box
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(14),
+                      boxShadow: [
+                        BoxShadow(
+                            color: primaryColor.withValues(alpha: 0.1),
+                            blurRadius: 8,
+                            offset: const Offset(0, 3)),
+                      ],
+                    ),
+                    child: const Icon(Icons.biotech_rounded,
+                        color: primaryColor, size: 24),
+                  ),
+                  const SizedBox(width: 16),
+
+                  // Test name + metadata — takes all remaining space
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // OVERFLOW FIX: Flexible lets the text wrap instead of
+                        // pushing the abnormal badge off screen.
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Flexible(
+                              child: Text(
+                                testName,
+                                softWrap: true,
+                                style: const TextStyle(
+                                  fontSize: 16,
                                   fontWeight: FontWeight.w900,
+                                  color: Color(0xFF0F172A),
+                                  letterSpacing: -0.2,
                                 ),
                               ),
                             ),
+                            if (isAbnormal) ...[
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                    color: Colors.red,
+                                    borderRadius: BorderRadius.circular(4)),
+                                child: const Text('ABNORMAL',
+                                    style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 9,
+                                        fontWeight: FontWeight.w900)),
+                              ),
+                            ],
                           ],
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      Wrap(
-                        spacing: 10,
-                        runSpacing: 2,
-                        children: [
-                          if (patientName.isNotEmpty)
+                        ),
+                        const SizedBox(height: 6),
+                        Wrap(
+                          spacing: 10,
+                          runSpacing: 4,
+                          children: [
+                            // Date is shown first and bolder as the prominent stamp
                             Row(mainAxisSize: MainAxisSize.min, children: [
-                              const Icon(Icons.person_rounded, size: 13, color: Color(0xFF94A3B8)),
+                              const Icon(Icons.calendar_today_rounded,
+                                  size: 12, color: Color(0xFF64748B)),
                               const SizedBox(width: 4),
-                              Text(patientName, style: const TextStyle(fontSize: 12, color: Color(0xFF64748B), fontWeight: FontWeight.w600)),
+                              Text(formattedDate,
+                                  style: const TextStyle(
+                                      fontSize: 12,
+                                      color: Color(0xFF334155),
+                                      fontWeight: FontWeight.w700)),
                             ]),
-                          if (mrNumber.isNotEmpty)
-                            Row(mainAxisSize: MainAxisSize.min, children: [
-                              const Icon(Icons.badge_outlined, size: 13, color: Color(0xFF94A3B8)),
-                              const SizedBox(width: 4),
-                              Text('MR# $mrNumber', style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
-                            ]),
-                          Row(mainAxisSize: MainAxisSize.min, children: [
-                            const Icon(Icons.calendar_today_rounded, size: 12, color: Color(0xFF94A3B8)),
-                            const SizedBox(width: 4),
-                            Text(formattedDate, style: const TextStyle(fontSize: 12, color: Color(0xFF64748B), fontWeight: FontWeight.w500)),
-                          ]),
-                          if (referredBy.isNotEmpty)
-                            Row(mainAxisSize: MainAxisSize.min, children: [
-                              const Icon(Icons.medical_services_outlined, size: 13, color: Color(0xFF94A3B8)),
-                              const SizedBox(width: 4),
-                              Text('Dr. $referredBy', style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
-                            ]),
-                          if (contact.isNotEmpty)
-                            Row(mainAxisSize: MainAxisSize.min, children: [
-                              const Icon(Icons.phone_rounded, size: 12, color: Color(0xFF94A3B8)),
-                              const SizedBox(width: 4),
-                              Text(contact, style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
-                            ]),
-                        ],
-                      ),
-                    ],
+                            if (patientName.isNotEmpty)
+                              Row(mainAxisSize: MainAxisSize.min, children: [
+                                const Icon(Icons.person_rounded,
+                                    size: 13, color: Color(0xFF94A3B8)),
+                                const SizedBox(width: 4),
+                                Text(patientName,
+                                    style: const TextStyle(
+                                        fontSize: 12,
+                                        color: Color(0xFF64748B),
+                                        fontWeight: FontWeight.w600)),
+                              ]),
+                            if (mrNumber.isNotEmpty)
+                              Row(mainAxisSize: MainAxisSize.min, children: [
+                                const Icon(Icons.badge_outlined,
+                                    size: 13, color: Color(0xFF94A3B8)),
+                                const SizedBox(width: 4),
+                                Text('MR# $mrNumber',
+                                    style: const TextStyle(
+                                        fontSize: 12, color: Color(0xFF64748B))),
+                              ]),
+                            if (referredBy.isNotEmpty)
+                              Row(mainAxisSize: MainAxisSize.min, children: [
+                                const Icon(Icons.medical_services_outlined,
+                                    size: 13, color: Color(0xFF94A3B8)),
+                                const SizedBox(width: 4),
+                                Text('Dr. $referredBy',
+                                    style: const TextStyle(
+                                        fontSize: 12, color: Color(0xFF64748B))),
+                              ]),
+                            if (contact.isNotEmpty)
+                              Row(mainAxisSize: MainAxisSize.min, children: [
+                                const Icon(Icons.phone_rounded,
+                                    size: 12, color: Color(0xFF94A3B8)),
+                                const SizedBox(width: 4),
+                                Text(contact,
+                                    style: const TextStyle(
+                                        fontSize: 12, color: Color(0xFF64748B))),
+                              ]),
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 6,
-                  ),
-                  decoration: BoxDecoration(
-                    color: statusBg,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Row(
+                  const SizedBox(width: 12),
+
+                  // Right column — fixed width, never shrinks into text
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(statusIcon, size: 13, color: statusColor),
-                      const SizedBox(width: 5),
-                      Text(
-                        status[0].toUpperCase() + status.substring(1),
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w800,
-                          color: statusColor,
+                      // Status badge
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(
+                            color: statusBg,
+                            borderRadius: BorderRadius.circular(20)),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(statusIcon, size: 13, color: statusColor),
+                            const SizedBox(width: 5),
+                            Text(statusLabel,
+                                style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w800,
+                                    color: statusColor)),
+                          ],
                         ),
                       ),
+                      const SizedBox(height: 6),
+
+                      // Booking number chip
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF1F5F9),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(bookingNumber,
+                            style: const TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFF475569),
+                                fontFamily: 'monospace')),
+                      ),
+
+                      // Open Report button — visible when report URL is set
+                      if (isDone && reportUrl.isNotEmpty) ...[
+                        const SizedBox(height: 6),
+                        GestureDetector(
+                          onTap: () => _openUrl(context, reportUrl),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 5),
+                            decoration: BoxDecoration(
+                                color: primaryColor,
+                                borderRadius: BorderRadius.circular(8)),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.open_in_new_rounded,
+                                    size: 12, color: Colors.white),
+                                SizedBox(width: 4),
+                                Text('Open',
+                                    style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w700,
+                                        color: Colors.white)),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+
+                      // Chevron — only for expandable cards
+                      if (isExpandable) ...[
+                        const SizedBox(height: 6),
+                        RotationTransition(
+                          turns: _chevron,
+                          child: Icon(Icons.expand_more_rounded,
+                              size: 20,
+                              color: primaryColor.withValues(alpha: 0.6)),
+                        ),
+                      ],
                     ],
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
 
-          // ── Results Body ───────────────────────────────────────
-          if (showResults && isDone) ...[
+          // ── Accordion body (collapsed by default) ───────────────
+          AnimatedSize(
+            duration: const Duration(milliseconds: 250),
+            curve: Curves.easeInOut,
+            child: _expanded
+                ? _buildBody(context, results, resultNotes, reportUrl)
+                : const SizedBox.shrink(),
+          ),
+
+          // ── Pending footer — shown directly (no accordion) ───────
+          if (!showResults)
             Padding(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Booking ID chip
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF1F5F9),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      bookingNumber,
-                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF475569), fontFamily: 'monospace'),
-                    ),
-                  ),
-
-                  // Structured results table
-                  if (results.isNotEmpty) ...[
-                    const SizedBox(height: 16),
-                    Row(children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(color: primaryColor.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(10)),
-                        child: const Icon(Icons.table_chart_rounded, color: primaryColor, size: 16),
-                      ),
-                      const SizedBox(width: 10),
-                      const Text('Test Findings', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: Color(0xFF0F172A))),
-                    ]),
-                    const SizedBox(height: 10),
-                    Container(
-                      decoration: BoxDecoration(
-                        border: Border.all(color: const Color(0xFFE2E8F0)),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(12),
-                        child: Table(
-                          columnWidths: const {
-                            0: FlexColumnWidth(2.5),
-                            1: FlexColumnWidth(1.5),
-                            2: FlexColumnWidth(1.2),
-                            3: FlexColumnWidth(2),
-                          },
-                          children: [
-                            TableRow(
-                              decoration: const BoxDecoration(color: Color(0xFFF1F5F9)),
-                              children: [
-                                _tableCell('Parameter', isHeader: true),
-                                _tableCell('Value', isHeader: true),
-                                _tableCell('Unit', isHeader: true),
-                                _tableCell('Ref. Range', isHeader: true),
-                              ],
-                            ),
-                            ...results.map((r) {
-                              final row = r as Map<String, dynamic>;
-                              final severity = (row['severity'] ?? 'normal').toString();
-                              final isAbn = severity == 'abnormal' || severity == 'critical';
-                              return TableRow(
-                                decoration: BoxDecoration(
-                                  color: isAbn ? const Color(0xFFFFF1F2) : Colors.white,
-                                ),
-                                children: [
-                                  _tableCell(row['testParameter']?.toString() ?? '', bold: true),
-                                  _tableCell(row['value']?.toString() ?? '', color: isAbn ? const Color(0xFFDC2626) : null, bold: isAbn),
-                                  _tableCell(row['unit']?.toString() ?? ''),
-                                  _tableCell(row['referenceRange']?.toString() ?? '', small: true),
-                                ],
-                              );
-                            }),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
-
-                  // Notes / text findings
-                  if (resultNotes.isNotEmpty) ...[
-                    const SizedBox(height: 16),
-                    Row(children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(color: primaryColor.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(10)),
-                        child: const Icon(Icons.notes_rounded, color: primaryColor, size: 16),
-                      ),
-                      const SizedBox(width: 10),
-                      const Text('Remarks / Notes', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: Color(0xFF0F172A))),
-                    ]),
-                    const SizedBox(height: 10),
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF8FAFC),
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: const Color(0xFFE2E8F0)),
-                      ),
-                      child: Text(resultNotes, style: const TextStyle(fontSize: 13, color: Color(0xFF334155), height: 1.6)),
-                    ),
-                  ],
-
-                  // No findings warning — only if BOTH are empty and no report URL
-                  if (results.isEmpty && resultNotes.isEmpty && reportUrl.isEmpty) ...[
-                    const SizedBox(height: 12),
-                    Container(
-                      padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFFFFBEB),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: const Color(0xFFFDE68A)),
-                      ),
-                      child: const Row(children: [
-                        Icon(Icons.info_outline_rounded, color: Color(0xFFD97706), size: 16),
-                        SizedBox(width: 8),
-                        Expanded(child: Text('No findings entered — report document may be uploaded separately.', style: TextStyle(fontSize: 12, color: Color(0xFF92400E)))),
-                      ]),
-                    ),
-                  ],
-
-                  if (reportUrl.isNotEmpty) ...[
-                    const SizedBox(height: 16),
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton.icon(
-                        onPressed: () {
-                          Clipboard.setData(ClipboardData(text: reportUrl));
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Report link copied to clipboard!'), backgroundColor: Color(0xFF10B981), behavior: SnackBarBehavior.floating),
-                          );
-                        },
-                        icon: const Icon(Icons.copy_rounded, size: 16),
-                        label: const Text('Copy Report Link', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: primaryColor,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                          elevation: 0,
-                        ),
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-          ] else if (!showResults) ...[
-            Padding(
-              padding: const EdgeInsets.all(20),
-              child: Row(
-                children: [
-                  const Icon(
-                    Icons.hourglass_bottom_rounded,
-                    color: Color(0xFFF59E0B),
-                    size: 16,
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
+              padding: const EdgeInsets.fromLTRB(20, 4, 20, 16),
+              child: Row(children: [
+                const Icon(Icons.hourglass_bottom_rounded,
+                    color: Color(0xFFF59E0B), size: 16),
+                const SizedBox(width: 8),
+                Flexible(
+                  child: Text(
                     'Awaiting lab results — booked for $formattedDate',
                     style: const TextStyle(
-                      fontSize: 13,
-                      color: Color(0xFF64748B),
-                      fontWeight: FontWeight.w500,
-                    ),
+                        fontSize: 13,
+                        color: Color(0xFF64748B),
+                        fontWeight: FontWeight.w500),
                   ),
-                ],
+                ),
+              ]),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBody(BuildContext context, List<dynamic> results,
+      String resultNotes, String reportUrl) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Divider(height: 24),
+
+          // Structured results table
+          if (results.isNotEmpty) ...[
+            Row(children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                    color: primaryColor.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(10)),
+                child: const Icon(Icons.table_chart_rounded,
+                    color: primaryColor, size: 16),
+              ),
+              const SizedBox(width: 10),
+              const Text('Test Findings',
+                  style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF0F172A))),
+            ]),
+            const SizedBox(height: 10),
+            Container(
+              decoration: BoxDecoration(
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: Table(
+                  columnWidths: const {
+                    0: FlexColumnWidth(2.5),
+                    1: FlexColumnWidth(1.5),
+                    2: FlexColumnWidth(1.2),
+                    3: FlexColumnWidth(2),
+                  },
+                  children: [
+                    TableRow(
+                      decoration:
+                          const BoxDecoration(color: Color(0xFFF1F5F9)),
+                      children: [
+                        _tc('Parameter', isHeader: true),
+                        _tc('Value', isHeader: true),
+                        _tc('Unit', isHeader: true),
+                        _tc('Ref. Range', isHeader: true),
+                      ],
+                    ),
+                    ...results.map((r) {
+                      final row = r as Map<String, dynamic>;
+                      final severity =
+                          (row['severity'] ?? 'normal').toString();
+                      final isAbn =
+                          severity == 'abnormal' || severity == 'critical';
+                      return TableRow(
+                        decoration: BoxDecoration(
+                            color: isAbn
+                                ? const Color(0xFFFFF1F2)
+                                : Colors.white),
+                        children: [
+                          _tc(row['testParameter']?.toString() ?? '',
+                              bold: true),
+                          _tc(row['value']?.toString() ?? '',
+                              color: isAbn
+                                  ? const Color(0xFFDC2626)
+                                  : null,
+                              bold: isAbn),
+                          _tc(row['unit']?.toString() ?? ''),
+                          _tc(row['referenceRange']?.toString() ?? '',
+                              small: true),
+                        ],
+                      );
+                    }),
+                  ],
+                ),
+              ),
+            ),
+          ],
+
+          // Notes
+          if (resultNotes.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            Row(children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                    color: primaryColor.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(10)),
+                child: const Icon(Icons.notes_rounded,
+                    color: primaryColor, size: 16),
+              ),
+              const SizedBox(width: 10),
+              const Text('Remarks / Notes',
+                  style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF0F172A))),
+            ]),
+            const SizedBox(height: 10),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+              ),
+              child: Text(resultNotes,
+                  style: const TextStyle(
+                      fontSize: 13, color: Color(0xFF334155), height: 1.6)),
+            ),
+          ],
+
+          // No findings at all
+          if (results.isEmpty && resultNotes.isEmpty && reportUrl.isEmpty) ...[
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFFBEB),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFFDE68A)),
+              ),
+              child: const Row(children: [
+                Icon(Icons.info_outline_rounded,
+                    color: Color(0xFFD97706), size: 16),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'No findings entered — report document may be uploaded separately.',
+                    style:
+                        TextStyle(fontSize: 12, color: Color(0xFF92400E)),
+                  ),
+                ),
+              ]),
+            ),
+          ],
+
+          // Full-width Open Report button inside body
+          if (reportUrl.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () => _openUrl(context, reportUrl),
+                icon: const Icon(Icons.open_in_new_rounded, size: 16),
+                label: const Text('Open Report',
+                    style: TextStyle(
+                        fontWeight: FontWeight.w700, fontSize: 14)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: primaryColor,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14)),
+                  elevation: 0,
+                ),
               ),
             ),
           ],
