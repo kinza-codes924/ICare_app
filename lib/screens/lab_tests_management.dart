@@ -502,7 +502,7 @@ class _LabTestsManagementState extends State<LabTestsManagement>
                     keyboardType: TextInputType.number,
                     decoration: InputDecoration(
                       hintText: 'e.g., 1500',
-                      prefixIcon: const Icon(Icons.attach_money_rounded, color: primaryColor),
+                      prefixIcon: const Icon(Icons.currency_rupee_rounded, color: primaryColor),
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
                       enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
                       focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: primaryColor, width: 2)),
@@ -959,7 +959,7 @@ class _LabTestsManagementState extends State<LabTestsManagement>
                     spacing: 6,
                     runSpacing: 4,
                     children: [
-                      _buildChip('PKR $price', Icons.attach_money_rounded, const Color(0xFF10B981)),
+                      _buildChip('PKR $price', Icons.currency_rupee_rounded, const Color(0xFF10B981)),
                       if (turnaround.isNotEmpty)
                         _buildChip(turnaround, Icons.schedule_rounded, const Color(0xFFF59E0B)),
                       if (sampleType.isNotEmpty)
