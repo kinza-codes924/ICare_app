@@ -78,6 +78,14 @@ class _LabReportsScreenState extends State<LabReportsScreen>
         } catch (_) {}
       }
 
+      // For lab: advised = bookings referred by a doctor
+      if (role == 'laboratory' || role == 'lab_technician') {
+        advised = bookings.where((b) {
+          final ref = (b['referredBy'] ?? b['referred_by'] ?? '').toString().trim();
+          return ref.isNotEmpty;
+        }).toList();
+      }
+
       setState(() {
         _completedBookings = List<dynamic>.from(bookings);
         _advisedPrescriptions = advised;
@@ -117,8 +125,8 @@ class _LabReportsScreenState extends State<LabReportsScreen>
   Widget build(BuildContext context) {
     final isDesktop = MediaQuery.of(context).size.width > 700;
     bool isDone(dynamic b) {
-      final s = (b['status'] ?? '').toString();
-      return s == 'completed' || s == 'reporting_done' || s == 'reporting-done';
+      final s = (b['status'] ?? '').toString().toLowerCase().replaceAll('-', '_');
+      return s == 'completed' || s == 'reporting_done' || s == 'done' || s == 'result_ready';
     }
 
     final completed = _filterBookings(_completedBookings.where(isDone).toList());
@@ -306,16 +314,23 @@ class _LabReportsScreenState extends State<LabReportsScreen>
             children: [
               Icon(Icons.biotech_outlined, size: 56, color: Color(0xFF94A3B8)),
               SizedBox(height: 16),
-              Text('No advised lab tests',
+              Text('No doctor-referred tests',
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: Color(0xFF0F172A))),
               SizedBox(height: 8),
-              Text('Tests your doctor has advised will appear here',
+              Text('Bookings referred by a doctor will appear here',
                   textAlign: TextAlign.center,
                   style: TextStyle(fontSize: 14, color: Color(0xFF64748B))),
             ],
           ),
         ),
       );
+    }
+
+    // Lab role: items are booking maps — render as booking cards
+    final isLabBookings = _advisedPrescriptions.isNotEmpty &&
+        (_advisedPrescriptions[0]['test_type'] != null || _advisedPrescriptions[0]['testName'] != null);
+    if (isLabBookings) {
+      return _buildReportList(_filterBookings(_advisedPrescriptions), showResults: false, isDesktop: isDesktop);
     }
 
     return ListView.separated(
