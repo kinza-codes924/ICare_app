@@ -377,6 +377,7 @@ class _LabTestsManagementState extends State<LabTestsManagement>
                   ),
                   const SizedBox(height: 24),
                   Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
                       Container(
                         padding: const EdgeInsets.all(16),
@@ -412,6 +413,17 @@ class _LabTestsManagementState extends State<LabTestsManagement>
                               ),
                             ),
                           ],
+                        ),
+                      ),
+                      GestureDetector(
+                        onTap: () => Navigator.pop(ctx),
+                        child: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF1F5F9),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: const Icon(Icons.close_rounded, size: 22, color: Color(0xFF64748B)),
                         ),
                       ),
                     ],
