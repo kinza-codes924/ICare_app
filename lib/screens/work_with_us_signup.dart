@@ -198,15 +198,15 @@ class _WorkWithUsSignupState extends State<WorkWithUsSignup> {
     setState(() => _submitting = true);
 
     try {
-      // Backend expects capitalized roles matching the normal signup flow
+      // Map display roles to backend enum values in User model
       final roleMap = {
-        'Doctor': 'Doctor',
-        'Pharmacy': 'Pharmacy',
-        'Laboratory': 'Laboratory',
-        'Student': 'Student',
-        'Instructor': 'Instructor',
+        'Doctor': 'doctor',
+        'Pharmacy': 'pharmacy',
+        'Laboratory': 'lab',       // enum is 'lab' not 'laboratory'
+        'Student': 'student',
+        'Instructor': 'instructor',
       };
-      final backendRole = roleMap[_selectedRole] ?? _selectedRole!;
+      final backendRole = roleMap[_selectedRole] ?? _selectedRole!.toLowerCase();
       final capturedName = _nameCtrl.text.trim();
 
       final api = ApiService();
