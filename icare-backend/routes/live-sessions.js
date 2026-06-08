@@ -450,6 +450,12 @@ router.post('/course/:courseId/set-live', authMiddleware, async (req, res) => {
     await connectMongoDB();
     const { sessionId, isLive } = req.body;
     if (sessionId) {
+      // End any OTHER live sessions for this course so only one is ever live at a time.
+      // This prevents stale sessions from confusing student channel matching.
+      await LiveSession.updateMany(
+        { courseId: toId(req.params.courseId), status: 'live', _id: { $ne: toId(sessionId) } },
+        { status: 'ended' }
+      );
       await LiveSession.findByIdAndUpdate(toId(sessionId), { status: isLive ? 'live' : 'ended' });
     } else {
       // Create a quick live marker if no scheduled session
