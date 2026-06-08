@@ -438,6 +438,16 @@ router.get('/course/:courseId/active', authMiddleware, async (req, res) => {
       courseId: toId(req.params.courseId),
       status: 'live',
     }).lean();
+
+    // Auto-expire sessions that have been "live" for more than 3 hours — these are stale
+    if (session) {
+      const threeHoursAgo = new Date(Date.now() - 3 * 60 * 60 * 1000);
+      if (new Date(session.createdAt) < threeHoursAgo) {
+        await LiveSession.findByIdAndUpdate(session._id, { status: 'ended' });
+        return res.json({ success: true, isLive: false, session: null });
+      }
+    }
+
     res.json({ success: true, isLive: !!session, session: session || null });
   } catch (e) {
     res.status(500).json({ success: false, isLive: false });
@@ -448,34 +458,44 @@ router.get('/course/:courseId/active', authMiddleware, async (req, res) => {
 router.post('/course/:courseId/set-live', authMiddleware, async (req, res) => {
   try {
     await connectMongoDB();
-    const { sessionId, isLive } = req.body;
-    if (sessionId) {
-      // End any OTHER live sessions for this course so only one is ever live at a time.
-      // This prevents stale sessions from confusing student channel matching.
-      await LiveSession.updateMany(
-        { courseId: toId(req.params.courseId), status: 'live', _id: { $ne: toId(sessionId) } },
-        { status: 'ended' }
-      );
-      await LiveSession.findByIdAndUpdate(toId(sessionId), { status: isLive ? 'live' : 'ended' });
-    } else {
-      // Create a quick live marker if no scheduled session
-      if (isLive) {
-        await LiveSession.findOneAndUpdate(
-          { courseId: toId(req.params.courseId), status: 'live' },
-          {
-            courseId: toId(req.params.courseId),
-            instructorId: toId(req.user.id),
-            status: 'live',
-            title: req.body.title || 'Live Session',
-            scheduledAt: new Date(),   // ← required field fix
-          },
-          { upsert: true, new: true, setDefaultsOnInsert: true }
-        );
-      } else {
-        await LiveSession.updateMany({ courseId: toId(req.params.courseId), status: 'live' }, { status: 'ended' });
-      }
+    const { sessionId, isLive, title } = req.body;
+
+    if (!isLive) {
+      // Ending: mark all live sessions for this course as ended
+      await LiveSession.updateMany({ courseId: toId(req.params.courseId), status: 'live' }, { status: 'ended' });
+      return res.json({ success: true });
     }
-    res.json({ success: true });
+
+    // Going live: always end ALL existing live sessions for this course first
+    await LiveSession.updateMany(
+      { courseId: toId(req.params.courseId), status: 'live' },
+      { status: 'ended' }
+    );
+
+    let resultSession = null;
+
+    // Try to mark a pre-scheduled session live (only if sessionId is a valid session, not courseId)
+    if (sessionId && sessionId !== req.params.courseId) {
+      resultSession = await LiveSession.findByIdAndUpdate(
+        toId(sessionId),
+        { status: 'live' },
+        { new: true }
+      );
+    }
+
+    // If no valid session found/provided, create a fresh one (always gets a new _id)
+    if (!resultSession) {
+      resultSession = await LiveSession.create({
+        courseId: toId(req.params.courseId),
+        instructorId: toId(req.user.id),
+        status: 'live',
+        title: title || 'Live Session',
+        scheduledAt: new Date(),
+      });
+    }
+
+    console.log(`set-live: course=${req.params.courseId} session=${resultSession._id}`);
+    res.json({ success: true, sessionId: resultSession._id.toString() });
   } catch (e) {
     res.status(500).json({ success: false, message: e.message });
   }
