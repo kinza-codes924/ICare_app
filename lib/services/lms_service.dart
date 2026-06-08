@@ -565,9 +565,13 @@ class LmsService {
     } catch (_) {}
   }
 
-  Future<void> setSessionLive({required String courseId, required bool isLive, String? title}) async {
+  Future<void> setSessionLive({required String courseId, required bool isLive, String? title, String? sessionId}) async {
     try {
-      await _api.post('/live-sessions/course/$courseId/set-live', {'isLive': isLive, if (title != null) 'title': title});
+      await _api.post('/live-sessions/course/$courseId/set-live', {
+        'isLive': isLive,
+        if (title != null) 'title': title,
+        if (sessionId != null && sessionId.isNotEmpty) 'sessionId': sessionId,
+      });
     } catch (_) {}
   }
 

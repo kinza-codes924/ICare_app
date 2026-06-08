@@ -65,6 +65,10 @@ import 'package:icare/screens/instructor_precautions_management.dart';
 import 'package:icare/screens/instructor_analytics.dart';
 import 'package:icare/screens/instructor_profile_setup.dart';
 import 'package:icare/screens/instructor_lms_dashboard.dart';
+import 'dart:async';
+import 'package:icare/screens/lms_live_session_screen.dart';
+import 'package:icare/services/lms_service.dart';
+import 'package:icare/services/course_service.dart';
 import 'package:icare/screens/my_learning.dart';
 
 class TabsScreen extends ConsumerStatefulWidget {
@@ -76,10 +80,109 @@ class TabsScreen extends ConsumerStatefulWidget {
 
 class _TabsScreenState extends ConsumerState<TabsScreen> {
   var currentIndex = 0;
+  Timer? _livePoller;
+  final Set<String> _shownLiveSessions = {};
+  final LmsService _lms = LmsService();
+  final CourseService _courseService = CourseService();
+
   void _selectPage(int index) {
     setState(() {
       currentIndex = index;
     });
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final role = ref.read(authProvider).userRole;
+      if (role == 'Student') _startGlobalLivePoller();
+    });
+  }
+
+  @override
+  void dispose() {
+    _livePoller?.cancel();
+    super.dispose();
+  }
+
+  void _startGlobalLivePoller() {
+    _checkForLiveSessions();
+    _livePoller = Timer.periodic(const Duration(seconds: 20), (_) => _checkForLiveSessions());
+  }
+
+  Future<void> _checkForLiveSessions() async {
+    if (!mounted || LmsLiveSessionScreen.activeCourseId != null) return;
+    try {
+      final enrollments = await _courseService.myPurchases();
+      for (final enrollment in enrollments) {
+        final course = enrollment['course'] as Map? ?? enrollment['courseId'] as Map? ?? {};
+        final courseId = course['_id']?.toString() ?? '';
+        final courseTitle = course['title']?.toString() ?? 'Your Course';
+        if (courseId.isEmpty) continue;
+        try {
+          final result = await _lms.checkActiveLiveSession(courseId);
+          if (result['isLive'] == true && mounted) {
+            final sessionData = result['session'] as Map? ?? {};
+            final sessionId = sessionData['_id']?.toString() ?? courseId;
+            if (_shownLiveSessions.contains(sessionId)) continue;
+            _shownLiveSessions.add(sessionId);
+            _showLiveAlert(sessionId, courseId, courseTitle);
+            return;
+          }
+        } catch (_) {}
+      }
+    } catch (_) {}
+  }
+
+  void _showLiveAlert(String sessionId, String courseId, String courseTitle) {
+    if (!mounted) return;
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        backgroundColor: const Color(0xFF1C2333),
+        content: Column(mainAxisSize: MainAxisSize.min, children: [
+          const Icon(Icons.live_tv_rounded, color: Colors.red, size: 56),
+          const SizedBox(height: 12),
+          const Text('🔴 LIVE SESSION STARTED!',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900)),
+          const SizedBox(height: 8),
+          Text('$courseTitle\nis now live. Join now!',
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: Colors.white70, fontSize: 14)),
+        ]),
+        actionsAlignment: MainAxisAlignment.center,
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Later', style: TextStyle(color: Colors.white54)),
+          ),
+          ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+            ),
+            onPressed: () {
+              Navigator.pop(ctx);
+              Navigator.push(context, MaterialPageRoute(
+                builder: (_) => LmsLiveSessionScreen(
+                  sessionId: sessionId,
+                  courseId: courseId,
+                  sessionTitle: courseTitle,
+                  isInstructor: false,
+                ),
+              ));
+            },
+            icon: const Icon(Icons.play_arrow_rounded),
+            label: const Text('JOIN NOW', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
+          ),
+        ],
+      ),
+    );
   }
 
   @override

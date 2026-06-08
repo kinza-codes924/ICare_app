@@ -101,32 +101,37 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
       _currentUserName = user?.name ?? (widget.isInstructor ? 'Instructor' : 'Student');
       _currentUserId = user?.id ?? '';
 
-      // Step 1: Get the actual MongoDB _id of the live session
-      final sessionData = await _lms.checkActiveLiveSession(widget.courseId);
-      if (sessionData['session'] != null) {
-        _sessionDocId = sessionData['session']['_id']?.toString() ?? '';
-      }
+      // Step 1: Use widget.sessionId directly if it's a real session ID (not courseId).
+      // This avoids a race condition where checkActiveLiveSession runs before the
+      // instructor marks the session as live.
+      if (widget.sessionId.isNotEmpty && widget.sessionId != widget.courseId) {
+        _sessionDocId = widget.sessionId;
+      } else {
+        // Fall back to polling the active session
+        final sessionData = await _lms.checkActiveLiveSession(widget.courseId);
+        if (sessionData['session'] != null) {
+          _sessionDocId = sessionData['session']['_id']?.toString() ?? '';
+        }
 
-      // Fallback: scan course sessions list for an active/live one
-      if (_sessionDocId.isEmpty || _sessionDocId == widget.courseId) {
-        try {
-          final sessions = await _lms.getCourseSessions(widget.courseId);
-          if (sessions.isNotEmpty) {
-            final live = sessions.where((s) =>
-                s['isLive'] == true || s['status'] == 'live' || s['status'] == 'active').toList();
-            if (live.isNotEmpty) {
-              _sessionDocId = live.first['_id']?.toString() ?? '';
-            } else {
-              // Use most recent session as last resort
-              _sessionDocId = sessions.last['_id']?.toString() ?? '';
+        // Fallback: scan course sessions list for a live/active one
+        if (_sessionDocId.isEmpty || _sessionDocId == widget.courseId) {
+          try {
+            final sessions = await _lms.getCourseSessions(widget.courseId);
+            if (sessions.isNotEmpty) {
+              final live = sessions.where((s) =>
+                  s['isLive'] == true || s['status'] == 'live' || s['status'] == 'active').toList();
+              if (live.isNotEmpty) {
+                _sessionDocId = live.first['_id']?.toString() ?? '';
+              } else {
+                _sessionDocId = sessions.last['_id']?.toString() ?? '';
+              }
             }
-          }
-        } catch (_) {}
-      }
+          } catch (_) {}
+        }
 
-      // Final fallback: use widget.sessionId if it looks like a real ID (not equal to courseId)
-      if (_sessionDocId.isEmpty) {
-        _sessionDocId = widget.sessionId.isNotEmpty ? widget.sessionId : widget.courseId;
+        if (_sessionDocId.isEmpty) {
+          _sessionDocId = widget.sessionId.isNotEmpty ? widget.sessionId : widget.courseId;
+        }
       }
 
       // Step 2: Join the session (registers attendance)
@@ -242,6 +247,9 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
       } catch (_) {}
 
       if (mounted) {
+        // Capture previous count BEFORE setState so comparison below is correct
+        final prevWaitingCount = _waitingStudents.length;
+
         setState(() {
           _participants.clear();
           // Add self first
@@ -254,7 +262,6 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
           _chatMessages.addAll(newMessages);
           _polls.clear();
           _polls.addAll(newPolls);
-          // Show waiting room badge for instructor
           if (widget.isInstructor && waitingNames.isNotEmpty) {
             _waitingStudents = waitingNames.cast<String>();
           } else {
@@ -262,24 +269,32 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
           }
         });
 
-        // Notify instructor of new join request
-        if (widget.isInstructor && waitingNames.length > (_waitingStudents.length)) {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Text('✋ ${waitingNames.last} wants to join'),
-            backgroundColor: Colors.blue,
-            action: SnackBarAction(
-              label: 'Admit',
-              textColor: Colors.white,
-              onPressed: () => _admitStudent(waiting.last['_id']?.toString() ?? ''),
-            ),
-            duration: const Duration(seconds: 8),
-          ));
+        // Notify instructor of new join request — compare against PRE-setState count
+        if (mounted && widget.isInstructor && waitingNames.length > prevWaitingCount) {
+          try {
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+              content: Text('✋ ${waitingNames.last} wants to join'),
+              backgroundColor: Colors.blue,
+              action: SnackBarAction(
+                label: 'Admit',
+                textColor: Colors.white,
+                onPressed: () => _admitStudent(waiting.last['_id']?.toString() ?? ''),
+              ),
+              duration: const Duration(seconds: 8),
+            ));
+          } catch (_) {}
         }
 
-        // Scroll chat to bottom
-        if (_chatMessages.isNotEmpty && _chatScroll.hasClients) {
-          _chatScroll.animateTo(_chatScroll.position.maxScrollExtent,
-              duration: const Duration(milliseconds: 200), curve: Curves.easeOut);
+        // Scroll chat to bottom — must be in its own try-catch because animateTo
+        // returns an unawaited Future; its rejection bypasses the outer try-catch
+        if (mounted && _chatMessages.isNotEmpty && _chatScroll.hasClients) {
+          try {
+            _chatScroll.animateTo(
+              _chatScroll.position.maxScrollExtent,
+              duration: const Duration(milliseconds: 200),
+              curve: Curves.easeOut,
+            );
+          } catch (_) {}
         }
       }
     } catch (_) {}
@@ -310,13 +325,21 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
 
       // Join after the platform view is in the DOM
       WidgetsBinding.instance.addPostFrameCallback((_) async {
-        final tokenData = await AgoraService().getToken(channelName: roomName, uid: 0);
-        final agoraToken = tokenData['data']?['token'] as String? ?? '';
-        final agoraAppId = tokenData['data']?['appId'] as String? ?? '';
-        Future.delayed(const Duration(milliseconds: 400), () {
-          lmsJoinChannel(roomName, agoraAppId, agoraToken, widget.isInstructor);
-          debugPrint('LMS Agora join: room=$roomName');
-        });
+        try {
+          final tokenData = await AgoraService().getToken(channelName: roomName, uid: 0);
+          final agoraToken = tokenData['data']?['token'] as String? ?? '';
+          final agoraAppId = tokenData['data']?['appId'] as String? ?? '';
+          Future.delayed(const Duration(milliseconds: 400), () {
+            try {
+              lmsJoinChannel(roomName, agoraAppId, agoraToken, widget.isInstructor);
+              debugPrint('LMS Agora join: room=$roomName');
+            } catch (e) {
+              debugPrint('LMS Agora join error: $e');
+            }
+          });
+        } catch (e) {
+          debugPrint('LMS token fetch error: $e');
+        }
       });
 
       // Auto-show recording indicator for instructor (recording starts in JS after 3s)
@@ -339,6 +362,7 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
         courseId: widget.courseId,
         isLive: true,
         title: widget.sessionTitle,
+        sessionId: widget.sessionId,
       );
       // Also send push notifications
       await _lms.startLiveSessionNotify(

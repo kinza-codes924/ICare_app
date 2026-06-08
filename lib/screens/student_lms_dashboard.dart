@@ -79,22 +79,23 @@ class _StudentLmsDashboardState extends State<StudentLmsDashboard>
         final result = await _lmsService.checkActiveLiveSession(courseId);
         if (result['isLive'] == true && mounted) {
           final courseTitle = course['title']?.toString() ?? 'Your Course';
-          if (LmsLiveSessionScreen.activeCourseId == courseId) return;
-          if (_shownSessions.contains(courseId)) return; // already shown
-          setState(() => _activeLiveSession = {'courseId': courseId, 'courseTitle': courseTitle});
-          _shownSessions.add(courseId);
-          _showLiveAlert(courseId, courseTitle, course);
+          final sessionData = result['session'] as Map? ?? {};
+          final sessionId = sessionData['_id']?.toString() ?? courseId;
+          // Only update the banner state — dialog is handled by tabs.dart global poller
+          // to avoid duplicate popups when both pollers run simultaneously.
+          if (mounted) {
+            setState(() => _activeLiveSession = {'courseId': courseId, 'courseTitle': courseTitle, 'sessionId': sessionId});
+          }
           return;
         }
       } catch (_) {}
     }
     if (mounted) {
       setState(() => _activeLiveSession = null);
-      _shownSessions.clear(); // Reset so next new session can show popup
     }
   }
 
-  void _showLiveAlert(String courseId, String courseTitle, Map course) {
+  void _showLiveAlert(String sessionId, String courseId, String courseTitle, Map course) {
     if (!mounted) return;
     showDialog(
       context: context,
@@ -129,7 +130,7 @@ class _StudentLmsDashboardState extends State<StudentLmsDashboard>
               Navigator.pop(ctx);
               Navigator.push(context, MaterialPageRoute(
                 builder: (_) => LmsLiveSessionScreen(
-                  sessionId: courseId,
+                  sessionId: sessionId,
                   courseId: courseId,
                   sessionTitle: courseTitle,
                   isInstructor: false,
@@ -419,6 +420,7 @@ class _StudentLmsDashboardState extends State<StudentLmsDashboard>
     final enrollmentId = enrollment['_id']?.toString();
     final courseId = course['_id']?.toString() ?? '';
     final isLive = _activeLiveSession?['courseId'] == courseId;
+    final liveSessionId = _activeLiveSession?['sessionId']?.toString() ?? courseId;
 
     return GestureDetector(
       onTap: () {
@@ -426,7 +428,7 @@ class _StudentLmsDashboardState extends State<StudentLmsDashboard>
           // Go directly to live session if this course is live
           Navigator.push(context, MaterialPageRoute(
             builder: (_) => LmsLiveSessionScreen(
-              sessionId: courseId,
+              sessionId: liveSessionId,
               courseId: courseId,
               sessionTitle: title,
               isInstructor: false,

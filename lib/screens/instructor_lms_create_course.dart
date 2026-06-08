@@ -13,25 +13,49 @@ Future<String?> _signedCloudinaryUpload({
   required String folder,
   String resourceType = 'auto',
 }) async {
-  final signRes = await ApiService().get('/upload/sign?folder=$folder&resource_type=$resourceType');
-  if (signRes.data['success'] != true) throw Exception('Could not get upload signature');
+  // Step 1: get signature from backend
+  final signRes = await ApiService().get(
+    '/upload/sign?folder=${Uri.encodeQueryComponent(folder)}&resource_type=$resourceType',
+  );
+  if (signRes.data['success'] != true) {
+    throw Exception('Backend sign error: ${signRes.data['message'] ?? signRes.data}');
+  }
+
   final cloudName = signRes.data['cloud_name']?.toString() ?? 'dzlcnyxgb';
+  final signature = signRes.data['signature']?.toString() ?? '';
+  final timestamp = signRes.data['timestamp']?.toString() ?? '';
+  final apiKey = signRes.data['api_key']?.toString() ?? '';
+  // Use the folder value that the backend actually signed (may differ from requested)
+  final signedFolder = signRes.data['folder']?.toString() ?? folder;
+
+  if (signature.isEmpty || apiKey.isEmpty) {
+    throw Exception('Backend returned empty signature or api_key');
+  }
+
+  // Step 2: upload directly to Cloudinary — no extra fields beyond what was signed
   final formData = FormData.fromMap({
     'file': MultipartFile.fromBytes(bytes, filename: filename),
-    'signature': signRes.data['signature'],
-    'timestamp': signRes.data['timestamp'].toString(),
-    'api_key': signRes.data['api_key'],
-    'folder': folder,
+    'api_key': apiKey,
+    'timestamp': timestamp,
+    'signature': signature,
+    'folder': signedFolder,
   });
+
   final res = await Dio().post(
     'https://api.cloudinary.com/v1_1/$cloudName/$resourceType/upload',
     data: formData,
     options: Options(validateStatus: (s) => s != null && s < 600),
   );
+
   if (res.statusCode == 200 && res.data['secure_url'] != null) {
     return res.data['secure_url'] as String;
   }
-  throw Exception('Upload failed: ${res.data}');
+
+  // Extract Cloudinary error message for clear diagnostics
+  final cloudinaryError = res.data is Map
+      ? (res.data['error']?['message'] ?? res.data.toString())
+      : res.data.toString();
+  throw Exception('Cloudinary ${res.statusCode}: $cloudinaryError');
 }
 
 /// Course Creation Wizard - Google Classroom/Moodle style

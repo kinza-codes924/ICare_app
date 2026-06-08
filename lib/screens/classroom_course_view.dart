@@ -364,12 +364,21 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
 
   Future<void> _joinLiveClass() async {
     if (!mounted) return;
+    final courseId = widget.course['_id']?.toString() ?? '';
+    // Resolve the real live session ID before navigating
+    String sessionId = courseId;
+    try {
+      final result = await _lms.checkActiveLiveSession(courseId);
+      final sid = result['session']?['_id']?.toString() ?? '';
+      if (sid.isNotEmpty) sessionId = sid;
+    } catch (_) {}
+    if (!mounted) return;
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => LmsLiveSessionScreen(
-          sessionId: widget.course['_id']?.toString() ?? '',
-          courseId: widget.course['_id']?.toString() ?? '',
+          sessionId: sessionId,
+          courseId: courseId,
           sessionTitle: widget.course['title']?.toString() ?? 'Live Session',
           isInstructor: false,
         ),
