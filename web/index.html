@@ -433,6 +433,20 @@
           if (ru.hasAudio) { try { await window._lmsAgoraClient.subscribe(ru,'audio'); ru.audioTrack.play(); } catch(_){} }
         }
 
+        // Explicitly request browser permission first — avoids silent denial when Agora requests it
+        try {
+          var permStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
+          permStream.getTracks().forEach(function(t) { t.stop(); }); // release immediately; Agora will re-acquire
+        } catch(permErr) {
+          // If video is blocked, try audio only
+          try {
+            var audioOnly = await navigator.mediaDevices.getUserMedia({ audio: true });
+            audioOnly.getTracks().forEach(function(t) { t.stop(); });
+          } catch(audioErr) {
+            console.warn('LMS: microphone permission denied — audio will be unavailable:', audioErr.message);
+          }
+        }
+
         // Create local tracks
         try { window._lmsLocalAudio = await AgoraRTC.createMicrophoneAudioTrack(); } catch(e) { console.warn('LMS mic error:', e.message); }
         try { window._lmsLocalVideo = await AgoraRTC.createCameraVideoTrack(); } catch(e) { console.warn('LMS cam error:', e.message); }
@@ -461,6 +475,45 @@
       }
     };
 
+    // ── LMS Microphone Permission Request (called from Dart via JS interop) ──
+    // Uses getUserMedia with retry loop to explicitly request browser mic permission
+    // before Agora tries to access it. This prevents silent denial in Flutter Web.
+    window.lmsRequestMicPermission = async function(maxRetries, retryDelayMs) {
+      maxRetries = maxRetries || 3;
+      retryDelayMs = retryDelayMs || 500;
+      for (var attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+          // Try audio + video first
+          var stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
+          stream.getTracks().forEach(function(t) { t.stop(); });
+          console.log('LMS: Mic+cam permission granted (attempt ' + attempt + ')');
+          return true;
+        } catch(e) {
+          var errStr = (e.message || String(e)).toLowerCase();
+          // If both failed, try audio only
+          if (errStr.indexOf('notfound') >= 0 || errStr.indexOf('notallowed') >= 0 ||
+              errStr.indexOf('permission') >= 0 || errStr.indexOf('denied') >= 0 ||
+              errStr.indexOf('aborterror') >= 0) {
+            try {
+              var audioOnly = await navigator.mediaDevices.getUserMedia({ audio: true });
+              audioOnly.getTracks().forEach(function(t) { t.stop(); });
+              console.log('LMS: Mic permission granted (audio-only, attempt ' + attempt + ')');
+              return true;
+            } catch(audioErr) {
+              console.warn('LMS: Audio attempt ' + attempt + ' failed: ' + audioErr.message);
+            }
+          } else {
+            console.warn('LMS: getUserMedia attempt ' + attempt + ' failed: ' + e.message);
+          }
+          if (attempt < maxRetries) {
+            await new Promise(function(r) { setTimeout(r, retryDelayMs); });
+          }
+        }
+      }
+      console.error('LMS: Microphone permission denied after ' + maxRetries + ' attempts');
+      return false;
+    };
+
     window.lmsAgoraLeave = async function() {
       try {
         if (window._lmsLocalAudio) { window._lmsLocalAudio.stop(); window._lmsLocalAudio.close(); window._lmsLocalAudio = null; }
@@ -481,17 +534,27 @@
 
     window.lmsSetPanelWidth = function(panelOpen) {};
 
-    // Start recording the instructor's camera + mic
+    // Start recording using the Agora tracks already captured (no second getUserMedia needed)
     window.lmsStartRecording = async function() {
       try {
         if (window._lmsRecorder && window._lmsRecorder.state === 'recording') return;
-        var stream = await navigator.mediaDevices.getUserMedia({
-          audio: true,
-          video: { width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 15 } },
-        });
-        window._lmsStream = stream;
-        window._lmsChunks = [];
 
+        // Build a MediaStream from the Agora local tracks (already acquired by the browser)
+        var stream = new MediaStream();
+        if (window._lmsLocalAudio) {
+          try { stream.addTrack(window._lmsLocalAudio.getMediaStreamTrack()); } catch(_) {}
+        }
+        if (window._lmsLocalVideo) {
+          try { stream.addTrack(window._lmsLocalVideo.getMediaStreamTrack()); } catch(_) {}
+        }
+
+        // Fallback: request a fresh stream only if Agora tracks are unavailable
+        if (stream.getTracks().length === 0) {
+          stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
+          window._lmsStream = stream;
+        }
+
+        window._lmsChunks = [];
         var mimeType = ['video/webm;codecs=vp9','video/webm;codecs=vp8','video/webm']
           .find(function(t) { return MediaRecorder.isTypeSupported(t); }) || 'video/webm';
 
@@ -499,8 +562,8 @@
         window._lmsRecorder.ondataavailable = function(e) {
           if (e.data && e.data.size > 0) window._lmsChunks.push(e.data);
         };
-        window._lmsRecorder.start(5000); // collect every 5 seconds
-        console.log('LMS: auto-recording started');
+        window._lmsRecorder.start(5000); // collect a chunk every 5 seconds
+        console.log('LMS: recording started (' + stream.getTracks().length + ' track(s))');
       } catch(e) {
         console.warn('LMS: recording unavailable:', e.message);
       }
@@ -556,12 +619,17 @@
           }
 
           // Step 3: save the URL to the live session document in MongoDB
-          await fetch(backendUrl + '/live-sessions/' + sessionId + '/set-recording-url', {
+          var patchResp = await fetch(backendUrl + '/live-sessions/' + sessionId + '/set-recording-url', {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
             body: JSON.stringify({ recordingUrl: data.secure_url }),
           });
+          var patchData = await patchResp.json();
           console.log('LMS: recording saved to LMS:', data.secure_url);
+          // Notify Flutter so the session list can refresh and show the ▶ REC badge
+          if (window._lmsRecordingSavedCallback) {
+            try { window._lmsRecordingSavedCallback(data.secure_url); } catch(_) {}
+          }
         } catch(e) {
           console.warn('LMS: upload failed:', e.message);
         }
