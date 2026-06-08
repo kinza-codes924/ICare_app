@@ -98,22 +98,35 @@ router.post('/product', protect, upload.single('file'), async (req, res) => {
 // Query params: folder (optional), resource_type (optional: image|video|raw|auto)
 router.get('/sign', protect, async (req, res) => {
   try {
+    const apiSecret = process.env.CLOUDINARY_API_SECRET || cloudinary.config().api_secret;
+    const apiKey = process.env.CLOUDINARY_API_KEY || cloudinary.config().api_key;
+    const cloudName = cloudinary.config().cloud_name;
+
+    // Fail fast if credentials are missing — prevents Cloudinary 401
+    if (!apiSecret) {
+      console.error('CLOUDINARY_API_SECRET is not set in environment variables');
+      return res.status(500).json({ success: false, message: 'Server Cloudinary configuration is incomplete (missing API secret)' });
+    }
+    if (!apiKey || !cloudName) {
+      console.error('Cloudinary api_key or cloud_name missing');
+      return res.status(500).json({ success: false, message: 'Server Cloudinary configuration is incomplete' });
+    }
+
     const folder = req.query.folder || 'icare/media';
     const resourceType = req.query.resource_type || 'auto';
     const timestamp = Math.round(Date.now() / 1000);
-    const paramsToSign = { timestamp, folder };
+    const paramsToSign = { folder, timestamp };
 
-    const signature = cloudinary.utils.api_sign_request(
-      paramsToSign,
-      process.env.CLOUDINARY_API_SECRET || cloudinary.config().api_secret
-    );
+    const signature = cloudinary.utils.api_sign_request(paramsToSign, apiSecret);
+
+    console.log(`Cloudinary sign: cloud=${cloudName} folder=${folder} resource_type=${resourceType}`);
 
     res.json({
       success: true,
       signature,
       timestamp,
-      api_key: process.env.CLOUDINARY_API_KEY || cloudinary.config().api_key,
-      cloud_name: cloudinary.config().cloud_name,
+      api_key: apiKey,
+      cloud_name: cloudName,
       folder,
       resource_type: resourceType,
     });
