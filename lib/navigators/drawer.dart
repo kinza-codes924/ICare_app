@@ -37,6 +37,9 @@ import 'package:icare/screens/prescriptions.dart';
 import 'package:icare/screens/reminder_list.dart';
 import 'package:icare/screens/emergency_contacts_screen.dart';
 import 'package:icare/screens/my_learning.dart';
+import 'package:icare/screens/student_lms_dashboard.dart';
+import 'package:icare/screens/instructor_lms_dashboard.dart';
+import 'package:icare/screens/lms_public_catalog.dart';
 import 'package:icare/screens/settings.dart';
 import 'package:icare/screens/tabs.dart';
 import 'package:icare/screens/tasks.dart';
@@ -374,6 +377,13 @@ class _CustomDrawerState extends ConsumerState<CustomDrawer> {
             MaterialPageRoute(builder: (ctx) => InstructorDashboardScreen()),
           );
         }),
+        _drawerItem('iCare Classroom', Icons.class_rounded, () {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (ctx) => const InstructorLmsDashboard(),
+            ),
+          );
+        }),
         _drawerItem('Manage Courses', Icons.library_books_outlined, () {
           Navigator.of(context).push(
             MaterialPageRoute(
@@ -421,17 +431,17 @@ class _CustomDrawerState extends ConsumerState<CustomDrawer> {
             context,
           ).push(MaterialPageRoute(builder: (ctx) => const StudentDashboard()));
         }),
-        _drawerItem('My Professional Courses', Icons.school_outlined, () {
+        _drawerItem('iCare Academy', Icons.school_rounded, () {
           Navigator.of(context).push(
             MaterialPageRoute(
-              builder: (ctx) => const Courses(myPurchased: true),
+              builder: (ctx) => const StudentLmsDashboard(),
             ),
           );
         }),
         _drawerItem('Course Catalog', Icons.explore_outlined, () {
           Navigator.of(
             context,
-          ).push(MaterialPageRoute(builder: (ctx) => const Courses()));
+          ).push(MaterialPageRoute(builder: (ctx) => const LmsPublicCatalog()));
         }),
         _drawerItem('My Certificates', Icons.workspace_premium_outlined, () {
           Navigator.of(context).push(

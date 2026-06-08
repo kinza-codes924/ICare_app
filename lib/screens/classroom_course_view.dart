@@ -53,6 +53,12 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
   List<dynamic> _students = [];
   bool _loadingPeople = true;
 
+  // Student grades & attendance
+  List<dynamic> _myGrades = [];
+  List<dynamic> _myQuizAttempts = [];
+  Map<String, dynamic>? _myAttendance;
+  bool _loadingGrades = true;
+
   // Live session detection
   bool _isSessionLive = false;
   Timer? _livePoller;
@@ -85,16 +91,19 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
   void initState() {
     super.initState();
     _tabs = TabController(
-      length: widget.isInstructor ? 4 : 3,
+      length: 4,
       vsync: this,
-      initialIndex: widget.initialTab.clamp(0, widget.isInstructor ? 3 : 2),
+      initialIndex: widget.initialTab.clamp(0, 3),
     );
     _tabs.addListener(() => setState(() {}));
     _loadStream();
     _loadClasswork();
     _loadPeople();
     // Poll for live session every 10s (students only)
-    if (!widget.isInstructor) _startLivePolling();
+    if (!widget.isInstructor) {
+      _startLivePolling();
+      _loadStudentGrades();
+    }
   }
 
   void _startLivePolling() {
@@ -177,6 +186,39 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
     }
   }
 
+  Future<void> _loadStudentGrades() async {
+    if (_courseId.isEmpty) { setState(() => _loadingGrades = false); return; }
+    setState(() => _loadingGrades = true);
+    try {
+      final grades = await _lms.getMyGrades(_courseId);
+      final attendance = await _lms.getMyAttendance(_courseId);
+      // Fetch the latest attempt for each quiz in this course
+      final quizList = await _lms.getCourseQuizzes(_courseId);
+      final attempts = <dynamic>[];
+      for (final q in quizList) {
+        final qId = q['_id']?.toString() ?? '';
+        if (qId.isEmpty) continue;
+        final qAttempts = await _lms.getMyQuizAttempts(qId);
+        if (qAttempts.isNotEmpty) {
+          // Add the most recent attempt, tagged with quiz title
+          final latest = Map<String, dynamic>.from(qAttempts.first is Map ? qAttempts.first : {});
+          latest['quizTitle'] = q['title']?.toString() ?? 'Quiz';
+          attempts.add(latest);
+        }
+      }
+      if (mounted) {
+        setState(() {
+          _myGrades = grades;
+          _myQuizAttempts = attempts;
+          _myAttendance = attendance.isNotEmpty ? attendance : null;
+          _loadingGrades = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _loadingGrades = false);
+    }
+  }
+
   Future<void> _postAnnouncement() async {
     final text = _postCtrl.text.trim();
     if (text.isEmpty || _courseId.isEmpty) return;
@@ -228,8 +270,8 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
         children: [
           _buildStreamTab(isWide),
           _buildClassworkTab(isWide),
-          _buildPeopleTab(isWide),
-          if (widget.isInstructor) _buildGradesTab(),
+          widget.isInstructor ? _buildPeopleTab(isWide) : _buildStudentGradesTab(),
+          widget.isInstructor ? _buildGradesTab() : _buildPeopleTab(isWide),
         ],
       ),
     );
@@ -309,8 +351,8 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
         tabs: [
           const Tab(text: 'Announcement'),
           const Tab(text: 'Classwork'),
-          const Tab(text: 'People'),
-          if (widget.isInstructor) const Tab(text: 'Grades'),
+          Tab(text: widget.isInstructor ? 'People' : 'Grades'),
+          Tab(text: widget.isInstructor ? 'Grades' : 'People'),
         ],
       ),
     );
@@ -1900,6 +1942,256 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
             ),
         ],
       ),
+    );
+  }
+
+  // ════════════════════════════════════════════════
+  // GRADES TAB (student)
+  // ════════════════════════════════════════════════
+
+  Widget _buildStudentGradesTab() {
+    if (_loadingGrades) {
+      return const Center(child: CircularProgressIndicator(strokeWidth: 2));
+    }
+
+    final totalAssignments = _assignments.length;
+    final gradedCount = _myGrades.length;
+    final attendedSessions = (_myAttendance?['present'] ?? 0) as num;
+    final totalSessions = (_myAttendance?['total'] ?? 0) as num;
+    final attendancePct = totalSessions > 0
+        ? ((attendedSessions / totalSessions) * 100).round()
+        : 0;
+
+    return RefreshIndicator(
+      onRefresh: () async {
+        await _loadClasswork();
+        await _loadStudentGrades();
+      },
+      child: ListView(
+        padding: const EdgeInsets.fromLTRB(24, 16, 24, 40),
+        children: [
+          // ── Summary cards row ──────────────────────────────
+          Row(children: [
+            Expanded(child: _gradeSummaryCard(
+              'Assignments',
+              '$gradedCount / $totalAssignments graded',
+              Icons.assignment_turned_in_outlined,
+              const Color(0xFF1A73E8),
+            )),
+            const SizedBox(width: 12),
+            Expanded(child: _gradeSummaryCard(
+              'Attendance',
+              '$attendancePct%',
+              Icons.how_to_reg_outlined,
+              attendancePct >= 75 ? const Color(0xFF188038) : const Color(0xFFE37400),
+            )),
+            const SizedBox(width: 12),
+            Expanded(child: _gradeSummaryCard(
+              'Quizzes',
+              '${_myQuizAttempts.length} taken',
+              Icons.quiz_outlined,
+              const Color(0xFF9334E6),
+            )),
+          ]),
+
+          const SizedBox(height: 24),
+
+          // ── Assignments grades ─────────────────────────────
+          if (_assignments.isNotEmpty) ...[
+            const Text('Assignments', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Color(0xFF202124))),
+            const SizedBox(height: 8),
+            ..._assignments.map((a) {
+              final assignId = a['_id']?.toString() ?? '';
+              final grade = _myGrades.firstWhere(
+                (g) => g['assignmentId']?.toString() == assignId || g['assignment']?['_id']?.toString() == assignId,
+                orElse: () => null,
+              );
+              final title = a['title']?.toString() ?? 'Assignment';
+              final totalMarks = a['totalMarks']?.toString() ?? '--';
+              final obtained = grade?['obtainedMarks']?.toString() ?? grade?['marks']?.toString();
+              final status = grade != null
+                  ? (obtained != null ? 'Graded' : 'Submitted')
+                  : 'Pending';
+              final feedback = grade?['feedback']?.toString() ?? '';
+
+              return Container(
+                margin: const EdgeInsets.only(bottom: 8),
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: const Color(0xFFDADCE0)),
+                ),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Row(children: [
+                    const Icon(Icons.assignment_outlined, size: 18, color: Color(0xFF1A73E8)),
+                    const SizedBox(width: 8),
+                    Expanded(child: Text(title, style: const TextStyle(fontSize: 14, color: Color(0xFF202124), fontWeight: FontWeight.w500))),
+                    _gradeChip(status, obtained, totalMarks),
+                  ]),
+                  if (feedback.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(color: const Color(0xFFF8FAFC), borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: const Color(0xFFE2E8F0))),
+                      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        const Icon(Icons.comment_outlined, size: 14, color: Color(0xFF70757A)),
+                        const SizedBox(width: 6),
+                        Expanded(child: Text('Feedback: $feedback',
+                            style: const TextStyle(fontSize: 12, color: Color(0xFF5F6368)))),
+                      ]),
+                    ),
+                  ],
+                ]),
+              );
+            }),
+            const SizedBox(height: 16),
+          ],
+
+          // ── Quiz scores ────────────────────────────────────
+          if (_myQuizAttempts.isNotEmpty) ...[
+            const Text('Quizzes', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Color(0xFF202124))),
+            const SizedBox(height: 8),
+            ..._myQuizAttempts.map((attempt) {
+              final quizTitle = attempt['quizTitle']?.toString()
+                  ?? attempt['quiz']?['title']?.toString()
+                  ?? 'Quiz';
+              final score = attempt['score']?.toString() ?? attempt['obtainedMarks']?.toString() ?? '--';
+              final total = attempt['totalMarks']?.toString() ?? attempt['quiz']?['totalMarks']?.toString() ?? '--';
+              final passed = attempt['passed'] == true;
+              return Container(
+                margin: const EdgeInsets.only(bottom: 8),
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: const Color(0xFFDADCE0)),
+                ),
+                child: Row(children: [
+                  const Icon(Icons.quiz_outlined, size: 18, color: Color(0xFF9334E6)),
+                  const SizedBox(width: 8),
+                  Expanded(child: Text(quizTitle, style: const TextStyle(fontSize: 14, color: Color(0xFF202124)))),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: passed ? const Color(0xFFE6F4EA) : const Color(0xFFFCE8E6),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      '$score / $total',
+                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700,
+                          color: passed ? const Color(0xFF188038) : const Color(0xFFD93025)),
+                    ),
+                  ),
+                ]),
+              );
+            }),
+            const SizedBox(height: 16),
+          ],
+
+          // ── Attendance detail ──────────────────────────────
+          if (_myAttendance != null) ...[
+            const Text('Attendance', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Color(0xFF202124))),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xFFDADCE0)),
+              ),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Row(children: [
+                  const Icon(Icons.how_to_reg_outlined, size: 20, color: Color(0xFF188038)),
+                  const SizedBox(width: 8),
+                  Text('${attendedSessions.toInt()} of ${totalSessions.toInt()} sessions attended',
+                      style: const TextStyle(fontSize: 14, color: Color(0xFF202124))),
+                  const Spacer(),
+                  Text('$attendancePct%', style: TextStyle(
+                      fontSize: 16, fontWeight: FontWeight.w800,
+                      color: attendancePct >= 75 ? const Color(0xFF188038) : const Color(0xFFE37400))),
+                ]),
+                const SizedBox(height: 10),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(4),
+                  child: LinearProgressIndicator(
+                    value: totalSessions > 0 ? attendedSessions / totalSessions : 0,
+                    backgroundColor: const Color(0xFFE8F0FE),
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                        attendancePct >= 75 ? const Color(0xFF188038) : const Color(0xFFE37400)),
+                    minHeight: 8,
+                  ),
+                ),
+                if (attendancePct < 75) ...[
+                  const SizedBox(height: 8),
+                  const Text('⚠️ Attendance below 75% may affect course completion.',
+                      style: TextStyle(fontSize: 12, color: Color(0xFFD93025))),
+                ],
+              ]),
+            ),
+          ],
+
+          // Empty state
+          if (_assignments.isEmpty && _myQuizAttempts.isEmpty && _myAttendance == null)
+            Center(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 60),
+                child: Column(mainAxisSize: MainAxisSize.min, children: [
+                  Icon(Icons.grade_outlined, size: 56, color: Colors.grey.shade300),
+                  const SizedBox(height: 12),
+                  const Text('No grades yet', style: TextStyle(fontSize: 15, color: Color(0xFF5F6368))),
+                  const SizedBox(height: 4),
+                  const Text('Complete assignments and quizzes to see your grades here.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 12, color: Color(0xFF70757A))),
+                ]),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _gradeSummaryCard(String label, String value, IconData icon, Color color) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withValues(alpha: 0.2)),
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Icon(icon, size: 20, color: color),
+        const SizedBox(height: 8),
+        Text(value, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: color)),
+        const SizedBox(height: 2),
+        Text(label, style: const TextStyle(fontSize: 11, color: Color(0xFF70757A))),
+      ]),
+    );
+  }
+
+  Widget _gradeChip(String status, String? obtained, String total) {
+    Color bg;
+    Color fg;
+    String text;
+    if (obtained != null) {
+      bg = const Color(0xFFE6F4EA);
+      fg = const Color(0xFF188038);
+      text = '$obtained / $total';
+    } else if (status == 'Submitted') {
+      bg = const Color(0xFFFFF8E1);
+      fg = const Color(0xFFE37400);
+      text = 'Submitted';
+    } else {
+      bg = const Color(0xFFF1F3F4);
+      fg = const Color(0xFF70757A);
+      text = 'Pending';
+    }
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(12)),
+      child: Text(text, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: fg)),
     );
   }
 

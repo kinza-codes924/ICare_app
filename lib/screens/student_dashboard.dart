@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:icare/screens/courses.dart';
 import 'package:icare/screens/resource_library_screen.dart';
-import 'package:icare/screens/view_profile.dart';
+import 'package:icare/screens/student_lms_dashboard.dart';
+import 'package:icare/screens/lms_public_catalog.dart';
+import 'package:icare/screens/tabs.dart';
 import 'package:icare/screens/view_course.dart';
 import 'package:icare/services/course_service.dart';
 import 'package:icare/services/analytics_service.dart';
@@ -139,7 +140,7 @@ class _StudentDashboardState extends ConsumerState<StudentDashboard> {
                                 GestureDetector(
                                   onTap: () => Navigator.of(context).push(
                                     MaterialPageRoute(
-                                      builder: (ctx) => const Courses(),
+                                      builder: (ctx) => const StudentLmsDashboard(),
                                     ),
                                   ),
                                   child: Container(
@@ -158,13 +159,13 @@ class _StudentDashboardState extends ConsumerState<StudentDashboard> {
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
                                         Icon(
-                                          Icons.play_circle_outline_rounded,
+                                          Icons.class_rounded,
                                           color: Colors.white,
                                           size: 18,
                                         ),
                                         SizedBox(width: 8),
                                         Text(
-                                          'Browse Programs',
+                                          'Open Classroom',
                                           style: TextStyle(
                                             color: Colors.white,
                                             fontSize: 13,
@@ -298,8 +299,7 @@ class _StudentDashboardState extends ConsumerState<StudentDashboard> {
                           GestureDetector(
                             onTap: () => Navigator.of(context).push(
                               MaterialPageRoute(
-                                builder: (ctx) =>
-                                    const Courses(myPurchased: true),
+                                builder: (ctx) => const StudentLmsDashboard(),
                               ),
                             ),
                             child: const Text(
@@ -353,13 +353,13 @@ class _StudentDashboardState extends ConsumerState<StudentDashboard> {
                       children: [
                         Expanded(
                           child: _buildActionCard(
-                            'Browse Courses',
-                            Icons.explore_outlined,
+                            'iCare Academy',
+                            Icons.school_rounded,
                             AppColors.primaryColor,
                             () {
                               Navigator.of(context).push(
                                 MaterialPageRoute(
-                                  builder: (ctx) => const Courses(),
+                                  builder: (ctx) => const StudentLmsDashboard(),
                                 ),
                               );
                             },
@@ -368,14 +368,13 @@ class _StudentDashboardState extends ConsumerState<StudentDashboard> {
                         const SizedBox(width: 12),
                         Expanded(
                           child: _buildActionCard(
-                            'My Learning',
-                            Icons.play_lesson_outlined,
-                            const Color(0xFF6366F1),
+                            'Telehealth',
+                            Icons.video_call_rounded,
+                            const Color(0xFF0EA5E9),
                             () {
-                              Navigator.of(context).push(
+                              Navigator.of(context).pushReplacement(
                                 MaterialPageRoute(
-                                  builder: (ctx) =>
-                                      const Courses(myPurchased: true),
+                                  builder: (ctx) => const TabsScreen(),
                                 ),
                               );
                             },
@@ -384,13 +383,13 @@ class _StudentDashboardState extends ConsumerState<StudentDashboard> {
                         const SizedBox(width: 12),
                         Expanded(
                           child: _buildActionCard(
-                            'My Profile',
-                            Icons.person_outline_rounded,
+                            'Browse Courses',
+                            Icons.explore_outlined,
                             const Color(0xFF10B981),
                             () {
                               Navigator.of(context).push(
                                 MaterialPageRoute(
-                                  builder: (ctx) => const ViewProfile(),
+                                  builder: (ctx) => const LmsPublicCatalog(),
                                 ),
                               );
                             },
