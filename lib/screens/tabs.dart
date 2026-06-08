@@ -123,9 +123,18 @@ class _TabsScreenState extends ConsumerState<TabsScreen> {
 
   Future<void> _checkForLiveSessions() async {
     // Skip if not mounted, student is already in a session, or dialog is already up
-    if (!mounted || LmsLiveSessionScreen.activeCourseId != null || _dialogActive) return;
+    if (!mounted) return;
+    if (LmsLiveSessionScreen.activeCourseId != null) {
+      debugPrint('🟡 LIVE POLLER: skipping — already in session ${LmsLiveSessionScreen.activeCourseId}');
+      return;
+    }
+    if (_dialogActive) {
+      debugPrint('🟡 LIVE POLLER: skipping — dialog already active');
+      return;
+    }
     try {
       final enrollments = await _courseService.myPurchases();
+      debugPrint('🔵 LIVE POLLER: checking ${enrollments.length} enrollments');
       for (final enrollment in enrollments) {
         final course = enrollment['course'] as Map? ?? enrollment['courseId'] as Map? ?? {};
         final courseId = course['_id']?.toString() ?? '';
@@ -135,7 +144,6 @@ class _TabsScreenState extends ConsumerState<TabsScreen> {
           final result = await _lms.checkActiveLiveSession(courseId);
 
           if (result['isLive'] != true) {
-            // Session ended — remove tracking so next live session shows fresh dialog
             _shownSessionPerCourse.remove(courseId);
             continue;
           }
@@ -145,22 +153,29 @@ class _TabsScreenState extends ConsumerState<TabsScreen> {
           final sessionData = result['session'] as Map? ?? {};
           final sessionId = sessionData['_id']?.toString() ?? '';
 
-          // Only skip if this exact sessionId was already shown for this course
-          // A new sessionId means instructor started a fresh session — show it
-          if (sessionId.isNotEmpty && _shownSessionPerCourse[courseId] == sessionId) continue;
+          debugPrint('🔴 LIVE POLLER: $courseTitle LIVE! sessionId=$sessionId shownBefore=${_shownSessionPerCourse[courseId]}');
 
-          // Mark this session as shown for this course
+          if (sessionId.isNotEmpty && _shownSessionPerCourse[courseId] == sessionId) {
+            debugPrint('⏭️ LIVE POLLER: already shown sessionId=$sessionId for $courseTitle, skipping');
+            continue;
+          }
+
           _shownSessionPerCourse[courseId] = sessionId.isNotEmpty ? sessionId : courseId;
+          debugPrint('🔔 LIVE POLLER: showing JOIN dialog for $courseTitle sessionId=$sessionId');
 
           _showLiveAlert(
             sessionId.isNotEmpty ? sessionId : courseId,
             courseId,
             courseTitle,
           );
-          return; // Show one dialog at a time
-        } catch (_) {}
+          return;
+        } catch (e) {
+          debugPrint('❌ LIVE POLLER: error checking $courseTitle: $e');
+        }
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('❌ LIVE POLLER: enrollment fetch error: $e');
+    }
   }
 
   void _showLiveAlert(String sessionId, String courseId, String courseTitle) {

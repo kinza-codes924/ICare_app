@@ -1,5 +1,5 @@
-# Flutter build output — built on Vercel servers, don't upload locally built artifacts
-build/
+# Flutter build output — pre-built locally, build/web is uploaded to Vercel
+# build/web is the outputDirectory in vercel.json — do NOT exclude it
 .dart_tool/
 
 # Android/iOS/desktop platform builds — web only on Vercel
