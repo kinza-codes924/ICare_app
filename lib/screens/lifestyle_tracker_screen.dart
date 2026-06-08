@@ -8,6 +8,7 @@ import 'package:icare/services/health_tracker_service.dart';
 import 'package:icare/services/gamification_service.dart';
 import 'package:icare/services/consultation_service.dart';
 import 'package:intl/intl.dart';
+import 'package:fl_chart/fl_chart.dart';
 
 class LifestyleTrackerScreen extends StatefulWidget {
   const LifestyleTrackerScreen({super.key});
@@ -75,6 +76,7 @@ class _LifestyleTrackerScreenState extends State<LifestyleTrackerScreen>
   String _logFilter = 'all';
   String _dateRangeFilter = 'all';
   DateTime? _customDate;
+  String _historyViewMode = 'cards'; // 'cards' | 'table' | 'graph'
 
   // Weekly / monthly goal progress (derived from _allLogs)
   double get _weeklyGoalProgress {
@@ -613,6 +615,22 @@ class _LifestyleTrackerScreenState extends State<LifestyleTrackerScreen>
                   ]),
                 ),
               ),
+              // ── View mode segmented control ──────────────────────────
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+                child: Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF1F5F9),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Row(children: [
+                    _historySegment(Icons.grid_view_rounded,   'Cards', 'cards', setModal),
+                    _historySegment(Icons.table_rows_rounded,  'Table', 'table', setModal),
+                    _historySegment(Icons.show_chart_rounded,  'Graph', 'graph', setModal),
+                  ]),
+                ),
+              ),
               const Divider(height: 1, color: Color(0xFFE2E8F0)),
               Expanded(
                 child: _logsLoading
@@ -625,6 +643,10 @@ class _LifestyleTrackerScreenState extends State<LifestyleTrackerScreen>
                         const SizedBox(height: 4),
                         const Text('Tap "Log More" to record your first entry.', style: TextStyle(fontSize: 13, color: Color(0xFF94A3B8))),
                       ]))
+                    : _historyViewMode == 'table'
+                    ? _buildHistoryTableView(filtered, scroll)
+                    : _historyViewMode == 'graph'
+                    ? _buildHistoryGraphView(filtered)
                     : ListView.builder(
                         controller: scroll,
                         padding: const EdgeInsets.fromLTRB(16, 8, 16, 40),
@@ -633,7 +655,6 @@ class _LifestyleTrackerScreenState extends State<LifestyleTrackerScreen>
                           final key     = dateKeys[gi];
                           final entries = grouped[key]!;
                           return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                            // Date header
                             Padding(
                               padding: const EdgeInsets.symmetric(vertical: 12),
                               child: Row(children: [
@@ -647,7 +668,6 @@ class _LifestyleTrackerScreenState extends State<LifestyleTrackerScreen>
                                   style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8), fontWeight: FontWeight.w600)),
                               ]),
                             ),
-                            // Card grid
                             GridView.builder(
                               shrinkWrap: true,
                               physics: const NeverScrollableScrollPhysics(),
@@ -678,6 +698,433 @@ class _LifestyleTrackerScreenState extends State<LifestyleTrackerScreen>
         );
       }),
     );
+  }
+
+  // ── Animated segmented control pill ─────────────────────────────────────
+  Widget _historySegment(IconData icon, String label, String mode, StateSetter setModal) {
+    final sel = _historyViewMode == mode;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () { setState(() => _historyViewMode = mode); setModal(() {}); },
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeInOut,
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          decoration: BoxDecoration(
+            color: sel ? Colors.white : Colors.transparent,
+            borderRadius: BorderRadius.circular(11),
+            boxShadow: sel
+                ? [BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 10, offset: const Offset(0, 2))]
+                : [],
+          ),
+          child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+            Icon(icon, size: 15,
+                color: sel ? AppColors.primaryColor : const Color(0xFF94A3B8)),
+            const SizedBox(width: 6),
+            Text(label,
+                style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: sel ? FontWeight.w800 : FontWeight.w500,
+                    color: sel ? AppColors.primaryColor : const Color(0xFF94A3B8))),
+          ]),
+        ),
+      ),
+    );
+  }
+
+  // ── History: Table view — 4 column layout ────────────────────────────────
+  Widget _buildHistoryTableView(List<Map<String, dynamic>> entries, ScrollController scroll) {
+    const vColors = <String, Color>{
+      'Blood Pressure': Color(0xFFEF4444), 'Blood Glucose': Color(0xFFF59E0B),
+      'Weight': Color(0xFF8B5CF6), 'Heart Rate': Color(0xFFEC4899),
+      'Oxygen Level': Color(0xFF3B82F6), 'Steps': Color(0xFF10B981),
+      'Water Intake': Color(0xFF38BDF8), 'Sleep': Color(0xFF6366F1),
+      'Temperature': Color(0xFFFF6B35), 'Medication Adherence': Color(0xFF10B981),
+    };
+    const vIcons = <String, IconData>{
+      'Blood Pressure': Icons.favorite_rounded,   'Blood Glucose': Icons.bloodtype_rounded,
+      'Weight': Icons.monitor_weight_rounded,     'Heart Rate': Icons.show_chart_rounded,
+      'Oxygen Level': Icons.air_rounded,          'Steps': Icons.directions_walk_rounded,
+      'Water Intake': Icons.water_drop_rounded,   'Sleep': Icons.nights_stay_rounded,
+      'Temperature': Icons.thermostat_rounded,    'Medication Adherence': Icons.medication_rounded,
+    };
+
+    Color statusFg(String s) {
+      if (s == 'Normal' || s == 'Healthy' || s == 'Taken') return const Color(0xFF059669);
+      if (s == 'Elevated' || s == 'Low')                   return const Color(0xFFD97706);
+      if (s == 'High' || s == 'Missed')                    return const Color(0xFFDC2626);
+      return const Color(0xFF64748B);
+    }
+    Color statusBg(String s) {
+      if (s == 'Normal' || s == 'Healthy' || s == 'Taken') return const Color(0xFFD1FAE5);
+      if (s == 'Elevated' || s == 'Low')                   return const Color(0xFFFEF3C7);
+      if (s == 'High' || s == 'Missed')                    return const Color(0xFFFEE2E2);
+      return const Color(0xFFF1F5F9);
+    }
+
+    const headerStyle = TextStyle(fontSize: 9, fontWeight: FontWeight.w800,
+        color: Color(0xFF94A3B8), letterSpacing: 0.9);
+
+    return Column(children: [
+      // ── Sticky column header ─────────────────────────────────────────
+      Container(
+        color: const Color(0xFFF8FAFC),
+        padding: const EdgeInsets.fromLTRB(16, 10, 16, 8),
+        child: Row(children: [
+          const Expanded(flex: 3, child: Text('VITAL', style: headerStyle)),
+          const Expanded(flex: 4, child: Text('DATE & TIME', style: headerStyle)),
+          const Expanded(flex: 3,
+              child: Align(alignment: Alignment.centerRight, child: Text('VALUE', style: headerStyle))),
+          const SizedBox(width: 8),
+          const SizedBox(width: 64,
+              child: Center(child: Text('STATUS', style: headerStyle))),
+        ]),
+      ),
+      const Divider(height: 1, color: Color(0xFFE2E8F0)),
+
+      // ── Data rows ───────────────────────────────────────────────────
+      Expanded(
+        child: ListView.separated(
+          controller: scroll,
+          padding: const EdgeInsets.only(bottom: 40),
+          itemCount: entries.length,
+          separatorBuilder: (context, index) =>
+              const Divider(height: 1, color: Color(0xFFF1F5F9), indent: 16, endIndent: 16),
+          itemBuilder: (_, i) {
+            final log    = entries[i];
+            final ts     = DateTime.tryParse(log['timestamp'] as String? ?? '');
+            final type   = log['vitalType'] as String? ?? '';
+            final val    = log['value']    as String? ?? '';
+            final unit   = log['unit']     as String? ?? '';
+            final status = log['status']   as String? ?? '';
+            final color  = vColors[type]  ?? const Color(0xFF6366F1);
+            final icon   = vIcons[type]   ?? Icons.monitor_heart_outlined;
+            final fg     = statusFg(status);
+            final bg     = statusBg(status);
+
+            return Container(
+              color: i.isEven ? Colors.white : const Color(0xFFFAFAFC),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
+              child: Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
+
+                // Col 1 — Vital Name
+                Expanded(flex: 3, child: Row(children: [
+                  Container(
+                    width: 30, height: 30,
+                    decoration: BoxDecoration(
+                        color: color.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(8)),
+                    child: Icon(icon, color: color, size: 15),
+                  ),
+                  const SizedBox(width: 7),
+                  Expanded(
+                    child: Text(type,
+                        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700,
+                            color: Color(0xFF0F172A)),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis),
+                  ),
+                ])),
+
+                // Col 2 — Date & Time
+                Expanded(flex: 4, child: ts != null
+                    ? Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        Text(DateFormat('EEE • MMM d, yyyy').format(ts),
+                            style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600,
+                                color: Color(0xFF475569))),
+                        Text(DateFormat('hh:mm a').format(ts),
+                            style: const TextStyle(fontSize: 10, color: Color(0xFF94A3B8))),
+                      ])
+                    : const Text('—', style: TextStyle(fontSize: 10, color: Color(0xFF94A3B8)))),
+
+                // Col 3 — Value
+                Expanded(flex: 3,
+                    child: Align(
+                      alignment: Alignment.centerRight,
+                      child: RichText(
+                        textAlign: TextAlign.right,
+                        text: TextSpan(children: [
+                          TextSpan(text: val,
+                              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w900,
+                                  color: color)),
+                          if (unit.isNotEmpty)
+                            TextSpan(text: '\n$unit',
+                                style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w500,
+                                    color: Color(0xFF94A3B8))),
+                        ]),
+                      ),
+                    )),
+
+                const SizedBox(width: 8),
+
+                // Col 4 — Status Badge
+                SizedBox(
+                  width: 64,
+                  child: status.isNotEmpty
+                      ? Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 5),
+                          decoration: BoxDecoration(
+                              color: bg, borderRadius: BorderRadius.circular(8)),
+                          child: Text(status,
+                              textAlign: TextAlign.center,
+                              style: TextStyle(fontSize: 9, fontWeight: FontWeight.w800, color: fg)),
+                        )
+                      : const SizedBox(),
+                ),
+              ]),
+            );
+          },
+        ),
+      ),
+    ]);
+  }
+
+  // ── History: Graph view ──────────────────────────────────────────────────
+  Widget _buildHistoryGraphView(List<Map<String, dynamic>> entries) {
+    // Placeholder when no specific vital is selected
+    if (_logFilter == 'all') {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 32),
+          child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+            Container(
+              padding: const EdgeInsets.all(22),
+              decoration: BoxDecoration(
+                  color: const Color(0xFFEEF2FF),
+                  shape: BoxShape.circle,
+                  boxShadow: [BoxShadow(color: const Color(0xFF6366F1).withValues(alpha: 0.15),
+                      blurRadius: 20, offset: const Offset(0, 8))]),
+              child: const Icon(Icons.bar_chart_rounded, size: 44, color: Color(0xFF6366F1)),
+            ),
+            const SizedBox(height: 22),
+            const Text('No Vital Selected',
+                style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900, color: Color(0xFF0F172A))),
+            const SizedBox(height: 10),
+            const Text(
+              'Please select a specific vital from the filter dropdown above to view progress analytics.',
+              style: TextStyle(fontSize: 13, color: Color(0xFF64748B), height: 1.6),
+              textAlign: TextAlign.center,
+            ),
+          ]),
+        ),
+      );
+    }
+
+    // Sort chronologically
+    final sorted = List<Map<String, dynamic>>.from(entries)
+      ..sort((a, b) {
+        final ta = DateTime.tryParse(a['timestamp'] as String? ?? '')?.millisecondsSinceEpoch ?? 0;
+        final tb = DateTime.tryParse(b['timestamp'] as String? ?? '')?.millisecondsSinceEpoch ?? 0;
+        return ta.compareTo(tb);
+      });
+
+    // Build FlSpots
+    final spots = <FlSpot>[];
+    final dateLabels = <int, String>{};
+    for (int i = 0; i < sorted.length; i++) {
+      final raw = (sorted[i]['value'] as String? ?? '').split('/')[0];
+      final v = double.tryParse(raw);
+      if (v != null) {
+        spots.add(FlSpot(i.toDouble(), v));
+        final ts = DateTime.tryParse(sorted[i]['timestamp'] as String? ?? '');
+        if (ts != null) dateLabels[i] = DateFormat('MMM d').format(ts);
+      }
+    }
+
+    if (spots.isEmpty) {
+      return const Center(
+          child: Text('No numeric data to chart.',
+              style: TextStyle(color: Color(0xFF94A3B8), fontSize: 14)));
+    }
+
+    const vColors = <String, Color>{
+      'Blood Pressure': Color(0xFFEF4444), 'Blood Glucose': Color(0xFFF59E0B),
+      'Weight': Color(0xFF8B5CF6), 'Heart Rate': Color(0xFFEC4899),
+      'Oxygen Level': Color(0xFF3B82F6), 'Steps': Color(0xFF10B981),
+      'Water Intake': Color(0xFF38BDF8), 'Sleep': Color(0xFF6366F1),
+      'Temperature': Color(0xFFFF6B35), 'Medication Adherence': Color(0xFF10B981),
+    };
+    final lineColor = vColors[_logFilter] ?? AppColors.primaryColor;
+
+    final minY  = spots.map((s) => s.y).reduce((a, b) => a < b ? a : b);
+    final maxY  = spots.map((s) => s.y).reduce((a, b) => a > b ? a : b);
+    final avg   = spots.map((s) => s.y).reduce((a, b) => a + b) / spots.length;
+    final yPad  = ((maxY - minY) * 0.2).clamp(1.0, double.infinity);
+    final yInt  = ((maxY - minY) / 4).clamp(0.5, double.infinity);
+    final xInt  = spots.length <= 7 ? 1.0 : (spots.length / 5).roundToDouble();
+
+    // Trend: compare last 3 vs first 3
+    String trendLabel = 'Stable'; IconData trendIcon = Icons.remove_rounded; Color trendColor = const Color(0xFF64748B);
+    if (spots.length >= 4) {
+      final first = spots.take(3).map((s) => s.y).reduce((a, b) => a + b) / 3;
+      final last  = spots.reversed.take(3).map((s) => s.y).reduce((a, b) => a + b) / 3;
+      final diff  = ((last - first) / first) * 100;
+      if (diff > 3)  { trendLabel = 'Increasing'; trendIcon = Icons.trending_up_rounded;   trendColor = const Color(0xFFEF4444); }
+      if (diff < -3) { trendLabel = 'Decreasing'; trendIcon = Icons.trending_down_rounded; trendColor = const Color(0xFF10B981); }
+    }
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 40),
+      child: Column(children: [
+
+        // ── Stats cards row ───────────────────────────────────────────
+        Row(children: [
+          _graphStatCard('MIN',  minY.toStringAsFixed(1),  lineColor),
+          const SizedBox(width: 8),
+          _graphStatCard('AVG',  avg.toStringAsFixed(1),   lineColor),
+          const SizedBox(width: 8),
+          _graphStatCard('MAX',  maxY.toStringAsFixed(1),  lineColor),
+          const SizedBox(width: 8),
+          // Trend card
+          Expanded(child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 14),
+            decoration: BoxDecoration(
+              color: trendColor.withValues(alpha: 0.06),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: trendColor.withValues(alpha: 0.18)),
+            ),
+            child: Column(children: [
+              Icon(trendIcon, color: trendColor, size: 20),
+              const SizedBox(height: 4),
+              Text(trendLabel,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: trendColor)),
+              const SizedBox(height: 1),
+              const Text('Trend', style: TextStyle(fontSize: 9, color: Color(0xFF94A3B8), fontWeight: FontWeight.w600)),
+            ]),
+          )),
+        ]),
+
+        const SizedBox(height: 20),
+
+        // ── Line chart ───────────────────────────────────────────────
+        Container(
+          padding: const EdgeInsets.fromLTRB(8, 16, 16, 12),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: const Color(0xFFE2E8F0)),
+            boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04),
+                blurRadius: 12, offset: const Offset(0, 4))],
+          ),
+          child: SizedBox(
+            height: 210,
+            child: LineChart(LineChartData(
+              gridData: FlGridData(
+                show: true,
+                drawVerticalLine: false,
+                horizontalInterval: yInt,
+                getDrawingHorizontalLine: (_) =>
+                    const FlLine(color: Color(0xFFF1F5F9), strokeWidth: 1),
+              ),
+              titlesData: FlTitlesData(
+                leftTitles: AxisTitles(sideTitles: SideTitles(
+                  showTitles: true,
+                  reservedSize: 42,
+                  interval: yInt,
+                  getTitlesWidget: (v, meta) => Padding(
+                    padding: const EdgeInsets.only(right: 6),
+                    child: Text(v.toStringAsFixed(0),
+                        style: const TextStyle(fontSize: 10, color: Color(0xFF94A3B8))),
+                  ),
+                )),
+                bottomTitles: AxisTitles(sideTitles: SideTitles(
+                  showTitles: true,
+                  reservedSize: 30,
+                  interval: xInt,
+                  getTitlesWidget: (v, meta) {
+                    final label = dateLabels[v.toInt()];
+                    return label != null
+                        ? Padding(
+                            padding: const EdgeInsets.only(top: 6),
+                            child: Text(label,
+                                style: const TextStyle(fontSize: 9, color: Color(0xFF94A3B8))))
+                        : const SizedBox();
+                  },
+                )),
+                rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                topTitles:   const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+              ),
+              borderData: FlBorderData(show: false),
+              minX: 0,
+              maxX: (spots.length - 1).toDouble(),
+              minY: (minY - yPad).clamp(0, double.infinity),
+              maxY: maxY + yPad,
+              lineBarsData: [
+                LineChartBarData(
+                  spots: spots,
+                  isCurved: true,
+                  curveSmoothness: 0.35,
+                  color: lineColor,
+                  barWidth: 2.5,
+                  isStrokeCapRound: true,
+                  dotData: FlDotData(
+                    show: spots.length <= 30,
+                    getDotPainter: (spot, xPct, bar, index) => FlDotCirclePainter(
+                        radius: 3.5,
+                        color: lineColor,
+                        strokeWidth: 2,
+                        strokeColor: Colors.white),
+                  ),
+                  belowBarData: BarAreaData(
+                    show: true,
+                    gradient: LinearGradient(
+                      colors: [lineColor.withValues(alpha: 0.18), lineColor.withValues(alpha: 0.0)],
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                    ),
+                  ),
+                ),
+              ],
+              lineTouchData: LineTouchData(
+                touchTooltipData: LineTouchTooltipData(
+                  tooltipRoundedRadius: 10,
+                  tooltipPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  getTooltipItems: (touchedSpots) => touchedSpots.map((s) {
+                    final date = dateLabels[s.spotIndex] ?? '';
+                    return LineTooltipItem(
+                      '${s.y.toStringAsFixed(1)}\n',
+                      TextStyle(color: lineColor, fontWeight: FontWeight.w900, fontSize: 14),
+                      children: [TextSpan(text: date,
+                          style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 10,
+                              fontWeight: FontWeight.w500))],
+                    );
+                  }).toList(),
+                ),
+                handleBuiltInTouches: true,
+              ),
+            )),
+          ),
+        ),
+
+        const SizedBox(height: 16),
+
+        // ── Entry count footer ────────────────────────────────────────
+        Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+          Container(width: 8, height: 8, decoration: BoxDecoration(color: lineColor, shape: BoxShape.circle)),
+          const SizedBox(width: 6),
+          Text('${spots.length} data point${spots.length == 1 ? '' : 's'} plotted',
+              style: const TextStyle(fontSize: 12, color: Color(0xFF64748B), fontWeight: FontWeight.w600)),
+        ]),
+      ]),
+    );
+  }
+
+  Widget _graphStatCard(String label, String value, Color color) {
+    return Expanded(child: Container(
+      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: color.withValues(alpha: 0.18)),
+      ),
+      child: Column(children: [
+        Text(value, style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900, color: color)),
+        const SizedBox(height: 3),
+        Text(label, style: const TextStyle(fontSize: 9, color: Color(0xFF94A3B8),
+            fontWeight: FontWeight.w800, letterSpacing: 0.6)),
+      ]),
+    ));
   }
 
   // ── BP dialog (two fields) ──────────────────────────────────────────────
