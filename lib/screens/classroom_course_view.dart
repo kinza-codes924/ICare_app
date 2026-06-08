@@ -1381,15 +1381,29 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
                           fontSize: 12, color: Color(0xFF70757A)),
                     ),
                   if (type == 'session' && sessionStatus.isNotEmpty && sessionStatus != 'live')
-                    Text(
-                      sessionStatus == 'scheduled' ? 'Scheduled${dueLabel.isNotEmpty ? ' · $dueLabel' : ''}' :
-                      sessionStatus == 'ended' ? 'Session ended' :
-                      sessionStatus == 'completed' ? 'Completed' : sessionStatus,
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: sessionStatus == 'scheduled' ? const Color(0xFF1A73E8) : const Color(0xFF70757A),
+                    Row(children: [
+                      Text(
+                        sessionStatus == 'scheduled' ? 'Scheduled${dueLabel.isNotEmpty ? ' · $dueLabel' : ''}' :
+                        sessionStatus == 'ended' ? 'Session ended' :
+                        sessionStatus == 'completed' ? 'Completed' : sessionStatus,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: sessionStatus == 'scheduled' ? const Color(0xFF1A73E8) : const Color(0xFF70757A),
+                        ),
                       ),
-                    ),
+                      if ((data['recordingUrl']?.toString() ?? '').isNotEmpty) ...[
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF1A73E8),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: const Text('▶ REC',
+                              style: TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w900)),
+                        ),
+                      ],
+                    ]),
                 ],
               ),
             ),
@@ -1436,10 +1450,11 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
       final sessionId = data['_id']?.toString() ?? widget.course['_id']?.toString() ?? '';
       final sessionTitle = data['title']?.toString() ?? 'Live Session';
       final status = data['status']?.toString() ?? '';
+      final recordingUrl = data['recordingUrl']?.toString() ?? '';
 
-      // Completed sessions → show transcript instead of re-joining
+      // Completed sessions → show recording + transcript options
       if (!widget.isInstructor && (status == 'completed' || status == 'ended')) {
-        _viewSessionTranscript(sessionId, sessionTitle);
+        _showCompletedSessionOptions(sessionId, sessionTitle, recordingUrl);
         return;
       }
 
@@ -1455,6 +1470,81 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
         ),
       );
     }
+  }
+
+  void _showCompletedSessionOptions(String sessionId, String title, String recordingUrl) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (_) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 8),
+            Container(width: 40, height: 4,
+                decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2))),
+            const SizedBox(height: 12),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Text(title,
+                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Color(0xFF202124)),
+                  maxLines: 2, overflow: TextOverflow.ellipsis),
+            ),
+            const SizedBox(height: 4),
+            const Divider(),
+            if (recordingUrl.isNotEmpty)
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(color: const Color(0xFFE8F0FE), shape: BoxShape.circle),
+                  child: const Icon(Icons.play_circle_filled_rounded, color: Color(0xFF1A73E8), size: 22),
+                ),
+                title: const Text('Watch Recording', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+                subtitle: const Text('Full session video recording', style: TextStyle(fontSize: 12)),
+                onTap: () async {
+                  Navigator.pop(context);
+                  final uri = Uri.parse(recordingUrl);
+                  if (await canLaunchUrl(uri)) {
+                    await launchUrl(uri, mode: LaunchMode.externalApplication);
+                  } else if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Cannot open: $recordingUrl'), backgroundColor: Colors.red),
+                    );
+                  }
+                },
+              )
+            else
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(color: Colors.grey.shade100, shape: BoxShape.circle),
+                  child: Icon(Icons.videocam_off_outlined, color: Colors.grey.shade400, size: 22),
+                ),
+                title: Text('No Recording Available',
+                    style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: Colors.grey.shade500)),
+                subtitle: const Text('Recording was not saved for this session', style: TextStyle(fontSize: 12)),
+                enabled: false,
+              ),
+            ListTile(
+              leading: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(color: const Color(0xFFE6F4EA), shape: BoxShape.circle),
+                child: const Icon(Icons.chat_bubble_outline_rounded, color: Color(0xFF188038), size: 22),
+              ),
+              title: const Text('View Chat Transcript', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+              subtitle: const Text('All messages from this session', style: TextStyle(fontSize: 12)),
+              onTap: () {
+                Navigator.pop(context);
+                _viewSessionTranscript(sessionId, title);
+              },
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
   }
 
   Future<void> _viewSessionTranscript(String sessionId, String title) async {
@@ -1615,6 +1705,23 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
                       lessonId: data['_id']?.toString(),
                     ),
                   ));
+                },
+              ),
+            // Session — Watch Recording (completed sessions with recording)
+            if (type == 'session' &&
+                (data['status'] == 'completed' || data['status'] == 'ended') &&
+                (data['recordingUrl']?.toString() ?? '').isNotEmpty)
+              ListTile(
+                leading: const Icon(Icons.play_circle_filled_rounded, color: Color(0xFF1A73E8)),
+                title: const Text('Watch Recording', style: TextStyle(fontWeight: FontWeight.w700)),
+                subtitle: const Text('Full session video recording'),
+                onTap: () async {
+                  Navigator.pop(context);
+                  final url = data['recordingUrl']?.toString() ?? '';
+                  final uri = Uri.parse(url);
+                  if (await canLaunchUrl(uri)) {
+                    await launchUrl(uri, mode: LaunchMode.externalApplication);
+                  }
                 },
               ),
             // Session — View Transcript (completed sessions)

@@ -36,6 +36,7 @@ import 'package:icare/screens/lab_analytics.dart';
 import 'package:icare/screens/prescriptions.dart';
 import 'package:icare/screens/reminder_list.dart';
 import 'package:icare/screens/emergency_contacts_screen.dart';
+import 'package:icare/screens/admin_lms_payments_screen.dart';
 import 'package:icare/screens/my_learning.dart';
 import 'package:icare/screens/student_lms_dashboard.dart';
 import 'package:icare/screens/instructor_lms_dashboard.dart';
@@ -697,6 +698,20 @@ class _CustomDrawerState extends ConsumerState<CustomDrawer> {
                               builder: (ctx) => const TabsScreen(
                                 initialAdminTab: 'Instructor',
                               ),
+                            ),
+                          );
+                        },
+                      ),
+
+                      _drawerActionItem(
+                        context,
+                        'LMS Payments',
+                        const Color(0xFF10B981),
+                        Icons.receipt_long_outlined,
+                        () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (ctx) => const AdminLmsPaymentsScreen(),
                             ),
                           );
                         },

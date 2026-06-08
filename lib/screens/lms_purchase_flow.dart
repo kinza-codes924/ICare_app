@@ -117,11 +117,13 @@ class _LmsPurchaseFlowState extends State<LmsPurchaseFlow> {
   }
 
   void _proceedToPayment() {
+    final price = (widget.course['discountedPrice'] ?? widget.course['price'] ?? widget.course['cost'] ?? 0);
+    final amount = (price is num) ? price.toDouble() : double.tryParse(price.toString()) ?? 0.0;
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(
         builder: (_) => SelectPaymentMethod(
-          amount: 0, // TODO: Add course price
+          amount: amount,
           onPaymentSuccess: _handlePaymentSuccess,
           courseId: widget.course['_id'],
         ),

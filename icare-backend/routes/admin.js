@@ -530,6 +530,45 @@ router.get('/test-prescription-id', async (req, res) => {
   }
 });
 
+// ─── LMS: all enrollments (admin payment management) ──────────────────────────
+router.get('/lms/enrollments', authMiddleware, adminOnly, async (req, res) => {
+  try {
+    await connectMongoDB();
+    const Enrollment = require('../models/Enrollment');
+    const Course = require('../models/Course');
+
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 50;
+    const skip = (page - 1) * limit;
+
+    const total = await Enrollment.countDocuments();
+    const enrollments = await Enrollment.find()
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .populate('userId', 'name email username phone')
+      .lean();
+
+    const courseIds = [...new Set(enrollments.map(e => e.courseId?.toString()).filter(Boolean))];
+    const courses = await Course.find({ _id: { $in: courseIds } }, 'title price discountedPrice instructor_id').lean();
+    const courseMap = {};
+    courses.forEach(c => { courseMap[c._id.toString()] = c; });
+
+    const result = enrollments.map(e => ({
+      _id: e._id,
+      enrolledAt: e.createdAt,
+      student: e.userId,
+      course: courseMap[e.courseId?.toString()] || { title: 'Unknown Course' },
+      progress: e.progress,
+      completed: e.progress?.completed || false,
+    }));
+
+    res.json({ success: true, enrollments: result, total, page, pages: Math.ceil(total / limit) });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 router.all('/{*path}', (req, res) => {
   res.json({ success: true, users: [], data: [], count: 0 });
 });
