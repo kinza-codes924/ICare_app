@@ -134,16 +134,17 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
         }
       }
 
-      // Step 2: Join the session (registers attendance)
+      // Step 2: If instructor, notify students first so we get the real sessionId
+      // BEFORE initialising the Agora room (room name is derived from _sessionDocId).
+      if (widget.isInstructor) await _notifyStudents();
+
+      // Step 3: Join the session (registers attendance)
       if (_sessionDocId.isNotEmpty && _sessionDocId != widget.courseId) {
         await _lms.joinLiveSession(_sessionDocId);
       }
 
-      // Step 3: Start web camera
+      // Step 4: Start web camera (uses _sessionDocId for Agora room name)
       if (kIsWeb) await _initWebCamera();
-
-      // Step 4: Notify students if instructor
-      if (widget.isInstructor) await _notifyStudents();
 
       // Step 5: Start polling for real-time sync
       _startSyncPolling();
@@ -357,17 +358,21 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
 
   Future<void> _notifyStudents() async {
     try {
-      // Mark session as LIVE in backend — students polling will pick this up
-      await _lms.setSessionLive(
+      // Mark session as LIVE — backend returns the fresh session ID (may differ from widget.sessionId
+      // if widget.sessionId was a courseId placeholder or a stale session).
+      final freshSessionId = await _lms.setSessionLive(
         courseId: widget.courseId,
         isLive: true,
         title: widget.sessionTitle,
-        sessionId: widget.sessionId,
+        sessionId: _sessionDocId.isNotEmpty && _sessionDocId != widget.courseId ? _sessionDocId : null,
       );
-      // Also send push notifications
+      // Update _sessionDocId so Agora room name and join/sync use the real session
+      if (freshSessionId != null && freshSessionId.isNotEmpty) {
+        _sessionDocId = freshSessionId;
+      }
       await _lms.startLiveSessionNotify(
         courseId: widget.courseId,
-        sessionId: widget.sessionId,
+        sessionId: _sessionDocId,
         instructorName: _currentUserName,
         sessionTitle: widget.sessionTitle,
       );

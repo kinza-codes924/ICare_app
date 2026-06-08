@@ -66,7 +66,7 @@ class _InstructorCourseContentScreenState extends State<InstructorCourseContentS
       context,
       MaterialPageRoute(
         builder: (_) => LmsLiveSessionScreen(
-          sessionId: widget.courseId,
+          sessionId: '',  // empty — backend will create a fresh session with a real _id
           courseId: widget.courseId,
           sessionTitle: courseTitle,
           isInstructor: true,

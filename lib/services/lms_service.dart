@@ -565,14 +565,18 @@ class LmsService {
     } catch (_) {}
   }
 
-  Future<void> setSessionLive({required String courseId, required bool isLive, String? title, String? sessionId}) async {
+  Future<String?> setSessionLive({required String courseId, required bool isLive, String? title, String? sessionId}) async {
     try {
-      await _api.post('/live-sessions/course/$courseId/set-live', {
+      final res = await _api.post('/live-sessions/course/$courseId/set-live', {
         'isLive': isLive,
         if (title != null) 'title': title,
-        if (sessionId != null && sessionId.isNotEmpty) 'sessionId': sessionId,
+        // Never pass courseId as sessionId — backend will create fresh session if omitted
+        if (sessionId != null && sessionId.isNotEmpty && sessionId != courseId) 'sessionId': sessionId,
       });
-    } catch (_) {}
+      return res.data?['sessionId']?.toString();
+    } catch (_) {
+      return null;
+    }
   }
 
   Future<Map<String, dynamic>> startRecording(String sessionId) async {
