@@ -28,6 +28,7 @@ router.post('/', authMiddleware, async (req, res) => {
 router.get('/course/:courseId', authMiddleware, async (req, res) => {
   try {
     await connectMongoDB();
+
     const sessions = await LiveSession.find({ 
       courseId: toId(req.params.courseId) 
     })
@@ -58,6 +59,81 @@ router.get('/upcoming', authMiddleware, async (req, res) => {
     .lean();
 
     res.json({ success: true, sessions });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+// ── STUDENT: Join session ───────────────────────────────────────────────────
+// ── IMPORTANT: /course/:courseId/active and /course/:courseId/set-live must be
+// ── defined BEFORE /:id to prevent Express treating 'course' as an :id param.
+
+// GET /live-sessions/course/:courseId/active — check if any session is currently live
+router.get('/course/:courseId/active', authMiddleware, async (req, res) => {
+  try {
+    await connectMongoDB();
+    const session = await LiveSession.findOne({
+      courseId: toId(req.params.courseId),
+      status: 'live',
+    }).lean();
+
+    // Auto-expire sessions that have been "live" for more than 3 hours — these are stale
+    if (session) {
+      const threeHoursAgo = new Date(Date.now() - 3 * 60 * 60 * 1000);
+      if (new Date(session.createdAt) < threeHoursAgo) {
+        await LiveSession.findByIdAndUpdate(session._id, { status: 'ended' });
+        return res.json({ success: true, isLive: false, session: null });
+      }
+    }
+
+    res.json({ success: true, isLive: !!session, session: session || null });
+  } catch (e) {
+    res.status(500).json({ success: false, isLive: false });
+  }
+});
+
+// POST /live-sessions/course/:courseId/set-live — instructor marks session live
+router.post('/course/:courseId/set-live', authMiddleware, async (req, res) => {
+  try {
+    await connectMongoDB();
+    const { sessionId, isLive, title } = req.body;
+
+    if (!isLive) {
+      // Ending: mark all live sessions for this course as ended
+      await LiveSession.updateMany({ courseId: toId(req.params.courseId), status: 'live' }, { status: 'ended' });
+      return res.json({ success: true });
+    }
+
+    // Going live: always end ALL existing live sessions for this course first
+    await LiveSession.updateMany(
+      { courseId: toId(req.params.courseId), status: 'live' },
+      { status: 'ended' }
+    );
+
+    let resultSession = null;
+
+    // Try to mark a pre-scheduled session live (only if sessionId is a valid session, not courseId)
+    if (sessionId && sessionId !== req.params.courseId) {
+      resultSession = await LiveSession.findByIdAndUpdate(
+        toId(sessionId),
+        { status: 'live' },
+        { new: true }
+      );
+    }
+
+    // If no valid session found/provided, create a fresh one (always gets a new _id)
+    if (!resultSession) {
+      resultSession = await LiveSession.create({
+        courseId: toId(req.params.courseId),
+        instructorId: toId(req.user.id),
+        status: 'live',
+        title: title || 'Live Session',
+        scheduledAt: new Date(),
+      });
+    }
+
+    console.log(`set-live: course=${req.params.courseId} session=${resultSession._id}`);
+    res.json({ success: true, sessionId: resultSession._id.toString() });
   } catch (e) {
     res.status(500).json({ success: false, message: e.message });
   }
@@ -430,76 +506,7 @@ router.delete('/:id', authMiddleware, async (req, res) => {
   }
 });
 
-// GET /live-sessions/course/:courseId/active — check if any session is currently live
-router.get('/course/:courseId/active', authMiddleware, async (req, res) => {
-  try {
-    await connectMongoDB();
-    const session = await LiveSession.findOne({
-      courseId: toId(req.params.courseId),
-      status: 'live',
-    }).lean();
-
-    // Auto-expire sessions that have been "live" for more than 3 hours — these are stale
-    if (session) {
-      const threeHoursAgo = new Date(Date.now() - 3 * 60 * 60 * 1000);
-      if (new Date(session.createdAt) < threeHoursAgo) {
-        await LiveSession.findByIdAndUpdate(session._id, { status: 'ended' });
-        return res.json({ success: true, isLive: false, session: null });
-      }
-    }
-
-    res.json({ success: true, isLive: !!session, session: session || null });
-  } catch (e) {
-    res.status(500).json({ success: false, isLive: false });
-  }
-});
-
-// POST /live-sessions/course/:courseId/set-live — instructor marks session live
-router.post('/course/:courseId/set-live', authMiddleware, async (req, res) => {
-  try {
-    await connectMongoDB();
-    const { sessionId, isLive, title } = req.body;
-
-    if (!isLive) {
-      // Ending: mark all live sessions for this course as ended
-      await LiveSession.updateMany({ courseId: toId(req.params.courseId), status: 'live' }, { status: 'ended' });
-      return res.json({ success: true });
-    }
-
-    // Going live: always end ALL existing live sessions for this course first
-    await LiveSession.updateMany(
-      { courseId: toId(req.params.courseId), status: 'live' },
-      { status: 'ended' }
-    );
-
-    let resultSession = null;
-
-    // Try to mark a pre-scheduled session live (only if sessionId is a valid session, not courseId)
-    if (sessionId && sessionId !== req.params.courseId) {
-      resultSession = await LiveSession.findByIdAndUpdate(
-        toId(sessionId),
-        { status: 'live' },
-        { new: true }
-      );
-    }
-
-    // If no valid session found/provided, create a fresh one (always gets a new _id)
-    if (!resultSession) {
-      resultSession = await LiveSession.create({
-        courseId: toId(req.params.courseId),
-        instructorId: toId(req.user.id),
-        status: 'live',
-        title: title || 'Live Session',
-        scheduledAt: new Date(),
-      });
-    }
-
-    console.log(`set-live: course=${req.params.courseId} session=${resultSession._id}`);
-    res.json({ success: true, sessionId: resultSession._id.toString() });
-  } catch (e) {
-    res.status(500).json({ success: false, message: e.message });
-  }
-});
+// (routes moved above /:id — see near top of file)
 
 // POST /live-sessions/notify-start — notify enrolled students when instructor goes live
 router.post('/notify-start', authMiddleware, async (req, res) => {

@@ -81,7 +81,16 @@ class TabsScreen extends ConsumerStatefulWidget {
 class _TabsScreenState extends ConsumerState<TabsScreen> {
   var currentIndex = 0;
   Timer? _livePoller;
-  final Set<String> _shownLiveSessions = {};
+
+  // Track per-course: which sessionId we already showed dialog for.
+  // Key = courseId, Value = sessionId we showed last.
+  // This way if a NEW session starts (different _id), we show it again.
+  // But if the same session is still live, we don't repeat the dialog.
+  final Map<String, String> _shownSessionPerCourse = {};
+
+  // Guard against multiple dialogs showing at once
+  bool _dialogActive = false;
+
   final LmsService _lms = LmsService();
   final CourseService _courseService = CourseService();
 
@@ -107,12 +116,14 @@ class _TabsScreenState extends ConsumerState<TabsScreen> {
   }
 
   void _startGlobalLivePoller() {
+    // Poll immediately on start, then every 10 seconds
     _checkForLiveSessions();
-    _livePoller = Timer.periodic(const Duration(seconds: 20), (_) => _checkForLiveSessions());
+    _livePoller = Timer.periodic(const Duration(seconds: 10), (_) => _checkForLiveSessions());
   }
 
   Future<void> _checkForLiveSessions() async {
-    if (!mounted || LmsLiveSessionScreen.activeCourseId != null) return;
+    // Skip if not mounted, student is already in a session, or dialog is already up
+    if (!mounted || LmsLiveSessionScreen.activeCourseId != null || _dialogActive) return;
     try {
       final enrollments = await _courseService.myPurchases();
       for (final enrollment in enrollments) {
@@ -122,21 +133,39 @@ class _TabsScreenState extends ConsumerState<TabsScreen> {
         if (courseId.isEmpty) continue;
         try {
           final result = await _lms.checkActiveLiveSession(courseId);
-          if (result['isLive'] == true && mounted) {
-            final sessionData = result['session'] as Map? ?? {};
-            final sessionId = sessionData['_id']?.toString() ?? courseId;
-            if (_shownLiveSessions.contains(sessionId)) continue;
-            _shownLiveSessions.add(sessionId);
-            _showLiveAlert(sessionId, courseId, courseTitle);
-            return;
+
+          if (result['isLive'] != true) {
+            // Session ended — remove tracking so next live session shows fresh dialog
+            _shownSessionPerCourse.remove(courseId);
+            continue;
           }
+
+          if (!mounted) return;
+
+          final sessionData = result['session'] as Map? ?? {};
+          final sessionId = sessionData['_id']?.toString() ?? '';
+
+          // Only skip if this exact sessionId was already shown for this course
+          // A new sessionId means instructor started a fresh session — show it
+          if (sessionId.isNotEmpty && _shownSessionPerCourse[courseId] == sessionId) continue;
+
+          // Mark this session as shown for this course
+          _shownSessionPerCourse[courseId] = sessionId.isNotEmpty ? sessionId : courseId;
+
+          _showLiveAlert(
+            sessionId.isNotEmpty ? sessionId : courseId,
+            courseId,
+            courseTitle,
+          );
+          return; // Show one dialog at a time
         } catch (_) {}
       }
     } catch (_) {}
   }
 
   void _showLiveAlert(String sessionId, String courseId, String courseTitle) {
-    if (!mounted) return;
+    if (!mounted || _dialogActive) return;
+    _dialogActive = true;
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -157,7 +186,10 @@ class _TabsScreenState extends ConsumerState<TabsScreen> {
         actionsAlignment: MainAxisAlignment.center,
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(ctx),
+            onPressed: () {
+              Navigator.pop(ctx);
+              _dialogActive = false;
+            },
             child: const Text('Later', style: TextStyle(color: Colors.white54)),
           ),
           ElevatedButton.icon(
@@ -168,6 +200,7 @@ class _TabsScreenState extends ConsumerState<TabsScreen> {
             ),
             onPressed: () {
               Navigator.pop(ctx);
+              _dialogActive = false;
               Navigator.push(context, MaterialPageRoute(
                 builder: (_) => LmsLiveSessionScreen(
                   sessionId: sessionId,
@@ -182,7 +215,10 @@ class _TabsScreenState extends ConsumerState<TabsScreen> {
           ),
         ],
       ),
-    );
+    ).then((_) {
+      // Safety net: reset guard if dialog was dismissed by back button
+      _dialogActive = false;
+    });
   }
 
   @override
