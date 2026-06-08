@@ -1,0 +1,648 @@
+<!doctype html>
+<html>
+<head>
+  <base href="/">
+  <meta charset="UTF-8">
+  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
+  <meta name="description" content="iCare - Your Virtual Healthcare Platform">
+  <meta name="google-signin-client_id" content="1076307742101-avj49igc93qipdcnqbqsk3u14gdcb2oh.apps.googleusercontent.com">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-title" content="iCare">
+  <meta http-equiv="Content-Security-Policy" content="img-src 'self' data: https: http: blob:;">
+  <link rel="apple-touch-icon" href="icons/Icon-192.png">
+  <link rel="icon" type="image/png" href="favicon.png"/>
+  <title>iCare</title>
+  <link rel="manifest" href="manifest.json">
+  <style>
+    body { margin: 0; background: #ffffff; }
+    #loading {
+      position: fixed; inset: 0;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      background: #ffffff; z-index: 9999;
+    }
+    #loading img { width: 160px; height: 160px; object-fit: contain; }
+    #loading .spinner {
+      margin-top: 24px; width: 36px; height: 36px;
+      border: 3px solid #e2e8f0;
+      border-top-color: #0036BC;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <div id="loading">
+    <img src="icare_logo.png" alt="iCare" style="width:160px;height:160px;object-fit:contain;">
+    <div class="spinner"></div>
+  </div>
+  <!-- Agora Web SDK -->
+  <script src="https://download.agora.io/sdk/release/AgoraRTC_N-4.22.0.js"></script>
+  <script>
+    window.addEventListener('flutter-first-frame', function() {
+      var loading = document.getElementById('loading');
+      if (loading) loading.style.display = 'none';
+    });
+
+    // ── Agora Web helpers called from Flutter via JS interop ──────────────
+    var _agoraClient = null;
+    var _localAudioTrack = null;
+    var _localVideoTrack = null;
+
+    window.agoraJoin = async function(appId, channel, token, uid, audioOnly) {
+      try {
+        // Suppress Agora telemetry CORS errors
+        AgoraRTC.setLogLevel(4);
+        try { AgoraRTC.disableLogUpload(); } catch(_) {}
+        // Clean up any stale previous session so mic/cam aren't "in use"
+        if (_localAudioTrack) { try { _localAudioTrack.stop(); _localAudioTrack.close(); } catch(_){} _localAudioTrack = null; }
+        if (_localVideoTrack) { try { _localVideoTrack.stop(); _localVideoTrack.close(); } catch(_){} _localVideoTrack = null; }
+        if (_agoraClient) { try { await _agoraClient.leave(); } catch(_){} _agoraClient = null; }
+
+        _agoraClient = AgoraRTC.createClient({ mode: 'rtc', codec: 'vp8' });
+        window._agoraRemoteJoined = false; // reset on each new call
+        window._agoraRemoteLeft = false;
+
+        // ── Helper: play remote video with retry until div is in DOM ──────
+        async function playRemoteVideo(videoTrack, retries) {
+          retries = retries || 0;
+          var remoteDiv = document.getElementById('agora-remote');
+          if (remoteDiv) {
+            try {
+              // Clear any previous video before playing new one
+              videoTrack.play('agora-remote');
+              console.log('✅ Remote video playing (attempt ' + retries + ')');
+            } catch(e) {
+              console.warn('Remote video play error:', e.message);
+              if (retries < 5) {
+                setTimeout(function() { playRemoteVideo(videoTrack, retries + 1); }, 300);
+              }
+            }
+          } else {
+            // Div not ready yet — retry up to 20 times (6 seconds total)
+            if (retries < 20) {
+              console.warn('agora-remote div not found, retry ' + retries);
+              setTimeout(function() { playRemoteVideo(videoTrack, retries + 1); }, 300);
+            } else {
+              console.error('agora-remote div never appeared after retries');
+            }
+          }
+        }
+
+        _agoraClient.on('user-left', (user) => {
+          window._agoraRemoteLeft = true;
+          console.log('📞 Remote user left the call');
+        });
+
+        _agoraClient.on('user-published', async (user, mediaType) => {
+          window._agoraRemoteJoined = true;
+          await _agoraClient.subscribe(user, mediaType);
+          if (mediaType === 'video') {
+            playRemoteVideo(user.videoTrack, 0);
+          }
+          if (mediaType === 'audio') {
+            try { user.audioTrack.play(); } catch(e) { console.warn('Audio play error:', e); }
+          }
+        });
+
+        _agoraClient.on('user-unpublished', (user, mediaType) => {
+          if (mediaType === 'video') {
+            var remoteDiv = document.getElementById('agora-remote');
+            if (remoteDiv) remoteDiv.innerHTML = '';
+          }
+        });
+
+        // ── Handle users who joined BEFORE us ─────────────────────────────
+        _agoraClient.on('user-joined', async (user) => {
+          window._agoraRemoteJoined = true;
+          // If remote user is already publishing, subscribe immediately
+          if (user.hasVideo) {
+            try {
+              await _agoraClient.subscribe(user, 'video');
+              playRemoteVideo(user.videoTrack, 0);
+            } catch(e) { console.warn('user-joined video subscribe error:', e); }
+          }
+          if (user.hasAudio) {
+            try {
+              await _agoraClient.subscribe(user, 'audio');
+              user.audioTrack.play();
+            } catch(e) { console.warn('user-joined audio subscribe error:', e); }
+          }
+        });
+
+        await _agoraClient.join(appId, channel, token, uid || null);
+
+        // ── Subscribe to any users already in channel ──────────────────────
+        var remoteUsers = _agoraClient.remoteUsers;
+        for (var i = 0; i < remoteUsers.length; i++) {
+          var remoteUser = remoteUsers[i];
+          if (remoteUser.hasVideo) {
+            try {
+              await _agoraClient.subscribe(remoteUser, 'video');
+              playRemoteVideo(remoteUser.videoTrack, 0);
+            } catch(e) { console.warn('Pre-existing user video error:', e); }
+          }
+          if (remoteUser.hasAudio) {
+            try {
+              await _agoraClient.subscribe(remoteUser, 'audio');
+              remoteUser.audioTrack.play();
+            } catch(e) { console.warn('Pre-existing user audio error:', e); }
+          }
+        }
+
+        // Always try mic
+        try {
+          _localAudioTrack = await AgoraRTC.createMicrophoneAudioTrack();
+        } catch(micErr) {
+          console.warn('Mic not available:', micErr.message, '— joining without mic');
+          _localAudioTrack = null;
+        }
+
+        // Only create camera track when NOT audio-only
+        if (!audioOnly) {
+          try {
+            _localVideoTrack = await AgoraRTC.createCameraVideoTrack();
+          } catch(camErr) {
+            console.warn('Camera not available:', camErr.message, '— joining without camera');
+            _localVideoTrack = null;
+          }
+        } else {
+          console.log('📞 Audio-only call — camera disabled');
+          _localVideoTrack = null;
+        }
+
+        var tracks = [];
+        if (_localAudioTrack) tracks.push(_localAudioTrack);
+        if (_localVideoTrack) tracks.push(_localVideoTrack);
+        if (tracks.length > 0) await _agoraClient.publish(tracks);
+        if (_localVideoTrack) _localVideoTrack.play('agora-local');
+
+        return 'ok';
+      } catch(e) {
+        console.warn('agoraJoin non-fatal error:', e.message || String(e));
+        // Never block the user — return ok so Flutter shows the call screen
+        return 'ok';
+      }
+    };
+
+    window.agoraLeave = async function() {
+      try {
+        if (_localAudioTrack) { _localAudioTrack.stop(); _localAudioTrack.close(); }
+        if (_localVideoTrack) { _localVideoTrack.stop(); _localVideoTrack.close(); }
+        if (_agoraClient) await _agoraClient.leave();
+        _agoraClient = null; _localAudioTrack = null; _localVideoTrack = null;
+      } catch(e) { console.error('agoraLeave error:', e); }
+    };
+
+    // Returns number of remote users currently in the Agora channel
+    window.agoraGetRemoteUserCount = function() {
+      try { return _agoraClient ? _agoraClient.remoteUsers.length : 0; } catch(e) { return 0; }
+    };
+
+    // Returns true if a remote user has joined this call session
+    window.agoraIsRemoteJoined = function() {
+      return window._agoraRemoteJoined === true || (window.agoraGetRemoteUserCount() > 0);
+    };
+
+    // Returns true if the remote user LEFT mid-call (e.g. doctor converted to video)
+    window.agoraIsRemoteLeft = function() {
+      return window._agoraRemoteLeft === true && window.agoraGetRemoteUserCount() === 0;
+    };
+
+    window.agoraMuteMic = function(mute) {
+      if (_localAudioTrack) {
+        try {
+          // setMuted keeps track published — no republication, no video freeze
+          _localAudioTrack.setMuted(mute);
+        } catch(e) {
+          try { _localAudioTrack.setEnabled(!mute); } catch(_) {}
+        }
+      }
+    };
+
+    window.agoraMuteCam = function(mute) {
+      if (_localVideoTrack) {
+        try {
+          _localVideoTrack.setMuted(mute);
+        } catch(e) {
+          try { _localVideoTrack.setEnabled(!mute); } catch(_) {}
+        }
+      }
+    };
+
+    // ── Ringtone (Web Audio API — no external file needed) ────────────────
+    var _ringtoneInterval = null;
+    var _ringtoneCtx = null;
+
+    window.playRingtone = function() {
+      try {
+        if (_ringtoneInterval) return;
+        _ringtoneCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+        function ringOnce() {
+          if (!_ringtoneCtx) return;
+          // Two-tone phone ring: 480 Hz + 440 Hz
+          [480, 440].forEach(function(freq, i) {
+            var osc = _ringtoneCtx.createOscillator();
+            var gain = _ringtoneCtx.createGain();
+            osc.connect(gain);
+            gain.connect(_ringtoneCtx.destination);
+            osc.frequency.value = freq;
+            osc.type = 'sine';
+            gain.gain.setValueAtTime(0, _ringtoneCtx.currentTime);
+            gain.gain.linearRampToValueAtTime(0.25, _ringtoneCtx.currentTime + 0.05);
+            gain.gain.setValueAtTime(0.25, _ringtoneCtx.currentTime + 0.35);
+            gain.gain.linearRampToValueAtTime(0, _ringtoneCtx.currentTime + 0.5);
+            osc.start(_ringtoneCtx.currentTime);
+            osc.stop(_ringtoneCtx.currentTime + 0.5);
+          });
+        }
+
+        ringOnce();
+        _ringtoneInterval = setInterval(ringOnce, 2000);
+      } catch(e) {
+        console.warn('Ringtone error:', e);
+      }
+    };
+
+    window.stopRingtone = function() {
+      try {
+        if (_ringtoneInterval) { clearInterval(_ringtoneInterval); _ringtoneInterval = null; }
+        if (_ringtoneCtx) { _ringtoneCtx.close(); _ringtoneCtx = null; }
+      } catch(_) {}
+    };
+
+    // ── Water Reminder Notifications ─────────────────────────────────────────
+    var _waterReminderTimer = null;
+
+    // Called from Dart after permission is already granted
+    window.scheduleWaterReminderInterval = function(intervalMinutes) {
+      try {
+        if (_waterReminderTimer) { clearInterval(_waterReminderTimer); _waterReminderTimer = null; }
+        var ms = intervalMinutes * 60 * 1000;
+        _waterReminderTimer = setInterval(function() {
+          try {
+            if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+              new Notification('Drink Water 💧', {
+                body: 'Time to drink a glass of water! Stay hydrated.',
+                icon: '/icons/Icon-192.png',
+              });
+            }
+            // In-app banner event
+            window.dispatchEvent(new CustomEvent('icare-reminder', {
+              detail: JSON.stringify({ type: 'water', title: 'Drink Water 💧', body: 'Time to drink a glass of water! Stay hydrated.' })
+            }));
+          } catch(e) { console.warn('Water notification error:', e); }
+        }, ms);
+        console.log('Water reminder scheduled every', intervalMinutes, 'minutes');
+      } catch(e) { console.warn('scheduleWaterReminderInterval error:', e); }
+    };
+
+    window.cancelWaterReminder = function() {
+      if (_waterReminderTimer) { clearInterval(_waterReminderTimer); _waterReminderTimer = null; }
+    };
+
+    // ── Generic Daily Reminder Notifications (medication, health check, etc.) ──
+    var _dailyReminderTimers = {};
+
+    // Schedule a reminder to fire daily at hour:minute.
+    // Also dispatches icare-reminder CustomEvent for in-app banner.
+    window.scheduleDailyReminder = function(type, title, body, hour, minute) {
+      try {
+        // Cancel any previous timers for this type
+        if (_dailyReminderTimers[type + '_t']) clearTimeout(_dailyReminderTimers[type + '_t']);
+        if (_dailyReminderTimers[type + '_i']) clearInterval(_dailyReminderTimers[type + '_i']);
+
+        function fire() {
+          try {
+            if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+              new Notification(title, { body: body, icon: '/icons/Icon-192.png' });
+            }
+            window.dispatchEvent(new CustomEvent('icare-reminder', {
+              detail: JSON.stringify({ type: type, title: title, body: body })
+            }));
+          } catch(e) { console.warn('Daily reminder fire error:', e); }
+        }
+
+        var now  = new Date();
+        var next = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hour, minute, 0, 0);
+        if (next <= now) next.setDate(next.getDate() + 1);
+        var delay = next - now;
+
+        _dailyReminderTimers[type + '_t'] = setTimeout(function() {
+          fire();
+          _dailyReminderTimers[type + '_i'] = setInterval(fire, 24 * 60 * 60 * 1000);
+        }, delay);
+
+        console.log('Daily reminder scheduled:', type, 'at',
+          (hour < 10 ? '0' : '') + hour + ':' + (minute < 10 ? '0' : '') + minute,
+          '— fires in', Math.round(delay / 60000), 'min');
+      } catch(e) { console.warn('scheduleDailyReminder error:', e); }
+    };
+
+    window.cancelDailyReminder = function(type) {
+      try {
+        if (_dailyReminderTimers[type + '_t']) { clearTimeout(_dailyReminderTimers[type + '_t']); delete _dailyReminderTimers[type + '_t']; }
+        if (_dailyReminderTimers[type + '_i']) { clearInterval(_dailyReminderTimers[type + '_i']); delete _dailyReminderTimers[type + '_i']; }
+        console.log('Daily reminder cancelled:', type);
+      } catch(e) {}
+    };
+  </script>
+  <script src="flutter_bootstrap.js" async></script>
+
+  <!-- LMS Live Session — Agora RTC + MediaRecorder -->
+  <script>
+    window._lmsAgoraClient = null;
+    window._lmsLocalAudio = null;
+    window._lmsLocalVideo = null;
+    window._lmsRecorder = null;
+    window._lmsChunks = [];
+    window._lmsStream = null;
+
+    // Raise Flutter glass pane above video so Flutter buttons work
+    window.lmsRaiseFlutterLayer = function() {
+      document.querySelectorAll('flt-glass-pane,flt-text-editing-host').forEach(function(el) {
+        el.style.zIndex = '99999';
+      });
+    };
+
+    // ── LMS Agora Video (no login, no branding) ───────────────────────────────
+
+    window.lmsAgoraJoin = async function(appId, channel, token, uid, isInstructor) {
+      try {
+        // Clean up previous session
+        if (window._lmsLocalAudio) { try { window._lmsLocalAudio.stop(); window._lmsLocalAudio.close(); } catch(_){} window._lmsLocalAudio = null; }
+        if (window._lmsLocalVideo) { try { window._lmsLocalVideo.stop(); window._lmsLocalVideo.close(); } catch(_){} window._lmsLocalVideo = null; }
+        if (window._lmsAgoraClient) { try { await window._lmsAgoraClient.leave(); } catch(_){} window._lmsAgoraClient = null; }
+
+        AgoraRTC.setLogLevel(4);
+        try { AgoraRTC.disableLogUpload(); } catch(_) {}
+
+        window._lmsAgoraClient = AgoraRTC.createClient({ mode: 'rtc', codec: 'vp8' });
+
+        // ── Helper: play remote video with retry until div is in DOM ──────
+        async function lmsPlayRemoteVideo(videoTrack, retries) {
+          retries = retries || 0;
+          var remoteDiv = document.getElementById('lms-agora-remote');
+          if (remoteDiv) {
+            try {
+              remoteDiv.innerHTML = '';
+              videoTrack.play('lms-agora-remote');
+              console.log('LMS: remote video playing (attempt ' + retries + ')');
+            } catch(e) {
+              console.warn('LMS remote video play error:', e.message);
+              if (retries < 5) setTimeout(function() { lmsPlayRemoteVideo(videoTrack, retries + 1); }, 500);
+            }
+          } else {
+            if (retries < 20) {
+              console.warn('lms-agora-remote div not found, retry ' + retries);
+              setTimeout(function() { lmsPlayRemoteVideo(videoTrack, retries + 1); }, 300);
+            } else {
+              console.error('lms-agora-remote div never appeared');
+            }
+          }
+        }
+
+        // Subscribe to remote users
+        // (lms-agora-remote and lms-agora-local divs are created by Dart registerViewFactory)
+        window._lmsAgoraClient.on('user-published', async function(user, mediaType) {
+          await window._lmsAgoraClient.subscribe(user, mediaType);
+          if (mediaType === 'video') {
+            lmsPlayRemoteVideo(user.videoTrack, 0);
+          }
+          if (mediaType === 'audio') {
+            try { user.audioTrack.play(); } catch(_) {}
+          }
+        });
+
+        window._lmsAgoraClient.on('user-unpublished', function(user, mediaType) {
+          if (mediaType === 'video') {
+            var remoteDiv = document.getElementById('lms-agora-remote');
+            if (remoteDiv) remoteDiv.innerHTML = '';
+          }
+        });
+
+        await window._lmsAgoraClient.join(appId, channel, token || null, uid || null);
+
+        // Subscribe to anyone already in channel when joining late
+        for (var j = 0; j < window._lmsAgoraClient.remoteUsers.length; j++) {
+          var ru = window._lmsAgoraClient.remoteUsers[j];
+          if (ru.hasVideo) { try { await window._lmsAgoraClient.subscribe(ru,'video'); lmsPlayRemoteVideo(ru.videoTrack, 0); } catch(_){} }
+          if (ru.hasAudio) { try { await window._lmsAgoraClient.subscribe(ru,'audio'); ru.audioTrack.play(); } catch(_){} }
+        }
+
+        // Explicitly request browser permission first — avoids silent denial when Agora requests it
+        try {
+          var permStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
+          permStream.getTracks().forEach(function(t) { t.stop(); }); // release immediately; Agora will re-acquire
+        } catch(permErr) {
+          // If video is blocked, try audio only
+          try {
+            var audioOnly = await navigator.mediaDevices.getUserMedia({ audio: true });
+            audioOnly.getTracks().forEach(function(t) { t.stop(); });
+          } catch(audioErr) {
+            console.warn('LMS: microphone permission denied — audio will be unavailable:', audioErr.message);
+          }
+        }
+
+        // Create local tracks
+        try { window._lmsLocalAudio = await AgoraRTC.createMicrophoneAudioTrack(); } catch(e) { console.warn('LMS mic error:', e.message); }
+        try { window._lmsLocalVideo = await AgoraRTC.createCameraVideoTrack(); } catch(e) { console.warn('LMS cam error:', e.message); }
+
+        var tracks = [];
+        if (window._lmsLocalAudio) tracks.push(window._lmsLocalAudio);
+        if (window._lmsLocalVideo) tracks.push(window._lmsLocalVideo);
+        if (tracks.length > 0) await window._lmsAgoraClient.publish(tracks);
+        if (window._lmsLocalVideo) {
+          var localDiv = document.getElementById('lms-agora-local');
+          if (localDiv) window._lmsLocalVideo.play('lms-agora-local');
+        }
+
+        setTimeout(window.lmsRaiseFlutterLayer, 800);
+
+        // Auto-start recording for instructor after 3s (MediaRecorder — unchanged)
+        if (isInstructor) {
+          setTimeout(function() { window.lmsStartRecording(); }, 3000);
+        }
+
+        console.log('LMS: Agora joined channel', channel);
+        return 'ok';
+      } catch(e) {
+        console.warn('lmsAgoraJoin error:', e.message || String(e));
+        return 'error:' + (e.message || String(e));
+      }
+    };
+
+    // ── LMS Microphone Permission Request (called from Dart via JS interop) ──
+    // Uses getUserMedia with retry loop to explicitly request browser mic permission
+    // before Agora tries to access it. This prevents silent denial in Flutter Web.
+    window.lmsRequestMicPermission = async function(maxRetries, retryDelayMs) {
+      maxRetries = maxRetries || 3;
+      retryDelayMs = retryDelayMs || 500;
+      for (var attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+          // Try audio + video first
+          var stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
+          stream.getTracks().forEach(function(t) { t.stop(); });
+          console.log('LMS: Mic+cam permission granted (attempt ' + attempt + ')');
+          return true;
+        } catch(e) {
+          var errStr = (e.message || String(e)).toLowerCase();
+          // If both failed, try audio only
+          if (errStr.indexOf('notfound') >= 0 || errStr.indexOf('notallowed') >= 0 ||
+              errStr.indexOf('permission') >= 0 || errStr.indexOf('denied') >= 0 ||
+              errStr.indexOf('aborterror') >= 0) {
+            try {
+              var audioOnly = await navigator.mediaDevices.getUserMedia({ audio: true });
+              audioOnly.getTracks().forEach(function(t) { t.stop(); });
+              console.log('LMS: Mic permission granted (audio-only, attempt ' + attempt + ')');
+              return true;
+            } catch(audioErr) {
+              console.warn('LMS: Audio attempt ' + attempt + ' failed: ' + audioErr.message);
+            }
+          } else {
+            console.warn('LMS: getUserMedia attempt ' + attempt + ' failed: ' + e.message);
+          }
+          if (attempt < maxRetries) {
+            await new Promise(function(r) { setTimeout(r, retryDelayMs); });
+          }
+        }
+      }
+      console.error('LMS: Microphone permission denied after ' + maxRetries + ' attempts');
+      return false;
+    };
+
+    window.lmsAgoraLeave = async function() {
+      try {
+        if (window._lmsLocalAudio) { window._lmsLocalAudio.stop(); window._lmsLocalAudio.close(); window._lmsLocalAudio = null; }
+        if (window._lmsLocalVideo) { window._lmsLocalVideo.stop(); window._lmsLocalVideo.close(); window._lmsLocalVideo = null; }
+        if (window._lmsAgoraClient) { await window._lmsAgoraClient.leave(); window._lmsAgoraClient = null; }
+        var h = document.getElementById('lms-jitsi-host');
+        if (h && h.parentNode === document.body) h.remove();
+      } catch(_) {}
+    };
+
+    window.lmsAgoraMuteMic = function(mute) {
+      if (window._lmsLocalAudio) { try { window._lmsLocalAudio.setMuted(mute); } catch(_) {} }
+    };
+
+    window.lmsAgoraMuteCamera = function(mute) {
+      if (window._lmsLocalVideo) { try { window._lmsLocalVideo.setMuted(mute); } catch(_) {} }
+    };
+
+    window.lmsSetPanelWidth = function(panelOpen) {};
+
+    // Start recording using the Agora tracks already captured (no second getUserMedia needed)
+    window.lmsStartRecording = async function() {
+      try {
+        if (window._lmsRecorder && window._lmsRecorder.state === 'recording') return;
+
+        // Build a MediaStream from the Agora local tracks (already acquired by the browser)
+        var stream = new MediaStream();
+        if (window._lmsLocalAudio) {
+          try { stream.addTrack(window._lmsLocalAudio.getMediaStreamTrack()); } catch(_) {}
+        }
+        if (window._lmsLocalVideo) {
+          try { stream.addTrack(window._lmsLocalVideo.getMediaStreamTrack()); } catch(_) {}
+        }
+
+        // Fallback: request a fresh stream only if Agora tracks are unavailable
+        if (stream.getTracks().length === 0) {
+          stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
+          window._lmsStream = stream;
+        }
+
+        window._lmsChunks = [];
+        var mimeType = ['video/webm;codecs=vp9','video/webm;codecs=vp8','video/webm']
+          .find(function(t) { return MediaRecorder.isTypeSupported(t); }) || 'video/webm';
+
+        window._lmsRecorder = new MediaRecorder(stream, { mimeType: mimeType, videoBitsPerSecond: 500000 });
+        window._lmsRecorder.ondataavailable = function(e) {
+          if (e.data && e.data.size > 0) window._lmsChunks.push(e.data);
+        };
+        window._lmsRecorder.start(5000); // collect a chunk every 5 seconds
+        console.log('LMS: recording started (' + stream.getTracks().length + ' track(s))');
+      } catch(e) {
+        console.warn('LMS: recording unavailable:', e.message);
+      }
+    };
+
+    // Stop recording → upload to Cloudinary via signed backend endpoint → save URL in LMS
+    window.lmsStopRecordingAndUpload = function(sessionId, backendUrl, authToken) {
+      if (!window._lmsRecorder) return;
+
+      var doSave = async function() {
+        if (window._lmsStream) {
+          window._lmsStream.getTracks().forEach(function(t) { t.stop(); });
+          window._lmsStream = null;
+        }
+        var blob = new Blob(window._lmsChunks, { type: 'video/webm' });
+        window._lmsChunks = [];
+
+        if (blob.size < 5000) { console.log('LMS: recording too short, skipping save'); return; }
+
+        var sizeMB = (blob.size / 1048576).toFixed(1);
+        console.log('LMS: uploading session recording (' + sizeMB + ' MB) to LMS...');
+
+        try {
+          // Step 1: get a signed upload token from the backend
+          var signResp = await fetch(
+            backendUrl + '/upload/sign?folder=icare%2Flms-recordings&resource_type=video',
+            { headers: { 'Authorization': 'Bearer ' + authToken } }
+          );
+          var sign = await signResp.json();
+
+          if (!sign.success || !sign.cloud_name) {
+            console.warn('LMS: could not get Cloudinary signature:', sign);
+            return;
+          }
+
+          // Step 2: upload blob directly to Cloudinary (signed — bypasses Vercel 4.5 MB limit)
+          var fd = new FormData();
+          fd.append('file', blob, 'icare-session-' + sessionId + '.webm');
+          fd.append('api_key', sign.api_key);
+          fd.append('timestamp', String(sign.timestamp));
+          fd.append('signature', sign.signature);
+          fd.append('folder', sign.folder);
+
+          var uploadResp = await fetch(
+            'https://api.cloudinary.com/v1_1/' + sign.cloud_name + '/video/upload',
+            { method: 'POST', body: fd }
+          );
+          var data = await uploadResp.json();
+
+          if (!data.secure_url) {
+            console.warn('LMS: Cloudinary upload error:', data.error || data);
+            return;
+          }
+
+          // Step 3: save the URL to the live session document in MongoDB
+          var patchResp = await fetch(backendUrl + '/live-sessions/' + sessionId + '/set-recording-url', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
+            body: JSON.stringify({ recordingUrl: data.secure_url }),
+          });
+          var patchData = await patchResp.json();
+          console.log('LMS: recording saved to LMS:', data.secure_url);
+          // Notify Flutter so the session list can refresh and show the ▶ REC badge
+          if (window._lmsRecordingSavedCallback) {
+            try { window._lmsRecordingSavedCallback(data.secure_url); } catch(_) {}
+          }
+        } catch(e) {
+          console.warn('LMS: upload failed:', e.message);
+        }
+      };
+
+      if (window._lmsRecorder.state === 'recording') {
+        window._lmsRecorder.onstop = doSave;
+        window._lmsRecorder.stop();
+      } else {
+        doSave();
+      }
+    };
+  </script>
+
+</body>
+</html>

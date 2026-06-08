@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "buildCommand": "bash build.sh",
+  "buildCommand": "",
   "outputDirectory": "build/web",
-  "installCommand": "echo 'Dependencies handled in build script'",
+  "installCommand": "",
   "headers": [
     {
       "source": "/manifest.json",
