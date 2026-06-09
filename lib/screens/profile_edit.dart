@@ -159,6 +159,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
   void initState() {
     super.initState();
     final user = ref.read(authProvider).user;
+    debugPrint('🟦 [EditProfile] initState: user=${user?.name}, specialization=${user?.specialization}, role=${ref.read(authProvider).userRole}');
     if (user != null) {
       nameController.text = user.name;
       phoneController.text = user.phoneNumber;
@@ -184,15 +185,18 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
           _selectedDoctorConditions.addAll(user.conditionsTreated!);
         }
       }
+      debugPrint('🟦 [EditProfile] calling _loadDoctorProfile...');
       _loadDoctorProfile();
     }
   }
 
   Future<void> _loadDoctorProfile() async {
     final result = await _doctorService.getMyDoctorProfile();
+    debugPrint('🟦 [EditProfile] _loadDoctorProfile result: $result');
     if (!mounted) return;
     if (result['success'] == true && result['doctor'] != null) {
       final doc = result['doctor'] as Map<String, dynamic>;
+      debugPrint('🟦 [EditProfile] doctor doc: name=${doc['name']}, phone=${doc['phoneNumber']}, spec=${doc['specialization']}, conds=${doc['conditionsTreated']}');
       setState(() {
         final spec = doc['specialization']?.toString();
         if (spec != null && spec.isNotEmpty) _selectedSpecialization = spec;
@@ -212,6 +216,8 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
           phoneController.text = backendPhone;
         }
       });
+    } else {
+      debugPrint('🔴 [EditProfile] _loadDoctorProfile FAILED: ${result['message']}');
     }
   }
 
@@ -239,13 +245,15 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
     try {
       final role = ref.read(authProvider).userRole ?? '';
       final isPatient = role == 'Patient';
+      debugPrint('🟩 [EditProfile] _handleUpdate: role=$role, isPatient=$isPatient, spec=$_selectedSpecialization, name=${nameController.text}');
 
       // For non-patients: save specialization + conditions to doctor profile
       if (!isPatient && _selectedSpecialization != null && _selectedSpecialization!.isNotEmpty) {
-        await _doctorService.updateDoctorSpecialization(
+        final specResult = await _doctorService.updateDoctorSpecialization(
           specialization: _selectedSpecialization!,
           conditionsTreated: _selectedDoctorConditions.toList(),
         );
+        debugPrint('🟩 [EditProfile] updateDoctorSpecialization result: $specResult');
       }
 
       // Build height string
@@ -290,6 +298,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
         emergencyContacts: isPatient ? (ecList.isEmpty ? null : ecList) : null,
       );
 
+      debugPrint('🟩 [EditProfile] updateProfile result: success=${result['success']}, msg=${result['message']}');
       if (result['success']) {
         final userData = result['user'] as Map<String, dynamic>? ?? {};
         final existingUser = ref.read(authProvider).user!;
@@ -315,7 +324,9 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
               ? _selectedDoctorConditions.toList()
               : existingUser.conditionsTreated,
         );
+        debugPrint('🟩 [EditProfile] updatedUser: name=${updatedUser.name}, spec=${updatedUser.specialization}, conds=${updatedUser.conditionsTreated}');
         await ref.read(authProvider.notifier).setUser(updatedUser);
+        debugPrint('🟩 [EditProfile] setUser done. State user spec=${ref.read(authProvider).user?.specialization}');
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(

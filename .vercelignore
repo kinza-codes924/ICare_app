@@ -1,5 +1,6 @@
-# Flutter build output — pre-built locally, build/web is uploaded to Vercel
-# build/web is the outputDirectory in vercel.json — do NOT exclude it
+# Flutter build output served via .vercel/output/static/ (pre-built output API)
+# build/web must NOT be uploaded — it exceeds 100MB Vercel limit
+build/
 .dart_tool/
 
 # Android/iOS/desktop platform builds — web only on Vercel
