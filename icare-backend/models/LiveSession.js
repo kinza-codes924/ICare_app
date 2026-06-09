@@ -43,6 +43,9 @@ const liveSessionSchema = new mongoose.Schema({
   // Linked lesson (for auto-saving recording)
   linkedLessonId: String,
   linkedModuleId: String,
+  // Instructor heartbeat — updated every 30s while instructor is in session.
+  // If older than 90s, session is treated as stale (instructor left without ending).
+  instructorHeartbeat: { type: Date, default: null },
 }, { timestamps: true });
 
 module.exports = mongoose.models.LiveSession || mongoose.model('LiveSession', liveSessionSchema);

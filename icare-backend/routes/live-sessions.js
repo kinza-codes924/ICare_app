@@ -77,8 +77,20 @@ router.get('/course/:courseId/active', authMiddleware, async (req, res) => {
       status: 'live',
     }).lean();
 
-    // Auto-expire sessions that have been "live" for more than 3 hours — these are stale
     if (session) {
+      // Auto-expire: no instructor heartbeat for 90s means instructor left without ending
+      const ninetySecsAgo = new Date(Date.now() - 90 * 1000);
+      const heartbeat = session.instructorHeartbeat;
+      const sessionAge = Date.now() - new Date(session.createdAt).getTime();
+      // Grace period: first 60s after creation, heartbeat may not have arrived yet
+      const pastGracePeriod = sessionAge > 60 * 1000;
+      if (pastGracePeriod && heartbeat && new Date(heartbeat) < ninetySecsAgo) {
+        await LiveSession.findByIdAndUpdate(session._id, { status: 'ended' });
+        console.log(`Auto-expired stale session ${session._id} (last heartbeat: ${heartbeat})`);
+        return res.json({ success: true, isLive: false, session: null });
+      }
+
+      // Hard cap: 3 hours without any heartbeat at all
       const threeHoursAgo = new Date(Date.now() - 3 * 60 * 60 * 1000);
       if (new Date(session.createdAt) < threeHoursAgo) {
         await LiveSession.findByIdAndUpdate(session._id, { status: 'ended' });
@@ -89,6 +101,19 @@ router.get('/course/:courseId/active', authMiddleware, async (req, res) => {
     res.json({ success: true, isLive: !!session, session: session || null });
   } catch (e) {
     res.status(500).json({ success: false, isLive: false });
+  }
+});
+
+// POST /live-sessions/:id/heartbeat — instructor pings every 30s while in session
+router.post('/:id/heartbeat', authMiddleware, async (req, res) => {
+  try {
+    await connectMongoDB();
+    await LiveSession.findByIdAndUpdate(toId(req.params.id), {
+      instructorHeartbeat: new Date(),
+    });
+    res.json({ success: true });
+  } catch (e) {
+    res.status(500).json({ success: false });
   }
 });
 
