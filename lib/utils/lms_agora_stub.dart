@@ -18,6 +18,7 @@ void lmsMuteCamera(bool mute) {}
 void lmsSetPanelWidth(bool open) {}
 void lmsStartRecording() {}
 void lmsStopRecordingAndUpload(String sessionId, String backendUrl, String authToken) {}
+Future<void> lmsEnableMediaAndPublish() async {}
 
 String registerLmsVideoView() => '';
 Widget lmsGetLocalVideoWidget(String? viewName) => const SizedBox.shrink();

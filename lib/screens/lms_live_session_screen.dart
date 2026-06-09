@@ -45,6 +45,10 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
   String? _error;
   final List<int> _remoteUids = [];
 
+  // Show "Enable Camera & Mic" button until user explicitly grants permission via a tap.
+  // This ensures getUserMedia is called from a real user gesture (Chrome requirement).
+  bool _permissionsEnabled = false;
+
   // UI State
   bool _chatOpen = false;
   bool _participantsOpen = false;
@@ -71,6 +75,7 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
   String _sessionDocId = ''; // actual MongoDB _id of the LiveSession document
   Timer? _sessionTimer;
   Timer? _syncTimer; // polls backend for chat/participants/raised hands
+  Timer? _heartbeatTimer; // instructor-only: keeps session alive on backend
   int _sessionSeconds = 0;
 
   final LmsService _lms = LmsService();
@@ -87,6 +92,7 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
   void dispose() {
     _sessionTimer?.cancel();
     _syncTimer?.cancel();
+    _heartbeatTimer?.cancel();
     _chatCtrl.dispose();
     _chatScroll.dispose();
     _panelTab.dispose();
@@ -418,6 +424,13 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
     _sessionTimer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (mounted) setState(() => _sessionSeconds++);
     });
+    // Instructor heartbeat — tells backend the session is still active
+    if (widget.isInstructor && _sessionDocId.isNotEmpty) {
+      _lms.sendHeartbeat(_sessionDocId); // send immediately
+      _heartbeatTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+        if (mounted && _sessionDocId.isNotEmpty) _lms.sendHeartbeat(_sessionDocId);
+      });
+    }
   }
 
   String get _timerText {
@@ -511,6 +524,11 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
     );
     if (confirm == true && mounted) {
       lmsLeaveChannel();
+
+      // Remove self from session attendees on backend so participant count stays accurate
+      if (_sessionDocId.isNotEmpty && _sessionDocId != widget.courseId) {
+        await _lms.leaveLiveSession(_sessionDocId);
+      }
 
       if (widget.isInstructor) {
         // Stop recording + save to device (auto-download) + upload if Cloudinary configured
@@ -732,6 +750,52 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
         children: [
           // Video platform view — contains lms-local-video + lms-remote-main
           SizedBox.expand(child: HtmlElementView(viewType: _cameraViewName!)),
+
+          // "Enable Camera & Mic" overlay — must be tapped to satisfy Chrome's
+          // getUserMedia user-gesture requirement. Disappears after first tap.
+          if (!_permissionsEnabled)
+            Positioned.fill(
+              child: Container(
+                color: Colors.black.withValues(alpha: 0.75),
+                child: Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.mic_rounded, color: Colors.white, size: 56),
+                      const SizedBox(height: 16),
+                      const Text(
+                        'Tap to enable your\nCamera & Microphone',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w700),
+                      ),
+                      const SizedBox(height: 8),
+                      const Text(
+                        'Chrome requires a tap before\nmicrophone access is allowed.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: Colors.white60, fontSize: 13),
+                      ),
+                      const SizedBox(height: 24),
+                      ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.green,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        onPressed: () async {
+                          if (kIsWeb) await lmsEnableMediaAndPublish();
+                          if (mounted) setState(() => _permissionsEnabled = true);
+                        },
+                        icon: const Icon(Icons.videocam_rounded, size: 24),
+                        label: const Text('Enable Camera & Mic',
+                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+
           // Raised hand banner
           if (_raisedHands.isNotEmpty)
             Positioned(

@@ -529,6 +529,18 @@ class LmsService {
     }
   }
 
+  Future<void> leaveLiveSession(String sessionId) async {
+    try {
+      await _api.post('/live-sessions/$sessionId/leave', {});
+    } catch (_) {}
+  }
+
+  Future<void> sendHeartbeat(String sessionId) async {
+    try {
+      await _api.post('/live-sessions/$sessionId/heartbeat', {});
+    } catch (_) {}
+  }
+
   Future<Map<String, dynamic>> getSessionState(String sessionId) async {
     try {
       final response = await _api.get('/live-sessions/$sessionId');

@@ -82,11 +82,12 @@ class _TabsScreenState extends ConsumerState<TabsScreen> {
   var currentIndex = 0;
   Timer? _livePoller;
 
-  // Track per-course: which sessionId we already showed dialog for.
-  // Key = courseId, Value = sessionId we showed last.
-  // This way if a NEW session starts (different _id), we show it again.
-  // But if the same session is still live, we don't repeat the dialog.
-  final Map<String, String> _shownSessionPerCourse = {};
+  // Per-course snooze state:
+  // Key = courseId
+  // Value = {sessionId, snoozedAt (DateTime if Later was clicked), joined (bool)}
+  // Dialog re-shows after 3 min snooze if session still live.
+  // If student clicked JOIN, dialog never shows again for that sessionId.
+  final Map<String, Map<String, dynamic>> _sessionSnooze = {};
 
   // Guard against multiple dialogs showing at once
   bool _dialogActive = false;
@@ -103,9 +104,9 @@ class _TabsScreenState extends ConsumerState<TabsScreen> {
   @override
   void initState() {
     super.initState();
+    // Try starting poller after first frame (handles case where role is already set)
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final role = ref.read(authProvider).userRole;
-      if (role == 'Student') _startGlobalLivePoller();
+      if (ref.read(authProvider).userRole == 'Student') _ensurePollerRunning();
     });
   }
 
@@ -115,11 +116,14 @@ class _TabsScreenState extends ConsumerState<TabsScreen> {
     super.dispose();
   }
 
-  void _startGlobalLivePoller() {
-    // Poll immediately on start, then every 10 seconds
+  void _ensurePollerRunning() {
+    if (_livePoller != null) return; // already running
+    debugPrint('🟢 LIVE POLLER: starting');
     _checkForLiveSessions();
     _livePoller = Timer.periodic(const Duration(seconds: 10), (_) => _checkForLiveSessions());
   }
+
+  void _startGlobalLivePoller() => _ensurePollerRunning();
 
   Future<void> _checkForLiveSessions() async {
     // Skip if not mounted, student is already in a session, or dialog is already up
@@ -144,7 +148,8 @@ class _TabsScreenState extends ConsumerState<TabsScreen> {
           final result = await _lms.checkActiveLiveSession(courseId);
 
           if (result['isLive'] != true) {
-            _shownSessionPerCourse.remove(courseId);
+            // Session ended — clear snooze so next session shows fresh
+            _sessionSnooze.remove(courseId);
             continue;
           }
 
@@ -152,22 +157,34 @@ class _TabsScreenState extends ConsumerState<TabsScreen> {
 
           final sessionData = result['session'] as Map? ?? {};
           final sessionId = sessionData['_id']?.toString() ?? '';
+          final effectiveId = sessionId.isNotEmpty ? sessionId : courseId;
 
-          debugPrint('🔴 LIVE POLLER: $courseTitle LIVE! sessionId=$sessionId shownBefore=${_shownSessionPerCourse[courseId]}');
+          debugPrint('🔴 LIVE POLLER: $courseTitle LIVE! sessionId=$sessionId');
 
-          if (sessionId.isNotEmpty && _shownSessionPerCourse[courseId] == sessionId) {
-            debugPrint('⏭️ LIVE POLLER: already shown sessionId=$sessionId for $courseTitle, skipping');
-            continue;
+          final snooze = _sessionSnooze[courseId];
+          if (snooze != null && snooze['sessionId'] == effectiveId) {
+            // Student already joined this session — never re-show
+            if (snooze['joined'] == true) {
+              debugPrint('⏭️ LIVE POLLER: student already joined $courseTitle, skipping');
+              continue;
+            }
+            // Student clicked Later — snooze for 3 minutes, then re-show
+            final snoozedAt = snooze['snoozedAt'] as DateTime?;
+            if (snoozedAt != null &&
+                DateTime.now().difference(snoozedAt) < const Duration(minutes: 3)) {
+              debugPrint('⏭️ LIVE POLLER: snoozed for $courseTitle, ${3 - DateTime.now().difference(snoozedAt).inMinutes}min left');
+              continue;
+            }
           }
 
-          _shownSessionPerCourse[courseId] = sessionId.isNotEmpty ? sessionId : courseId;
-          debugPrint('🔔 LIVE POLLER: showing JOIN dialog for $courseTitle sessionId=$sessionId');
+          debugPrint('🔔 LIVE POLLER: showing JOIN dialog for $courseTitle sessionId=$effectiveId');
+          _sessionSnooze[courseId] = {
+            'sessionId': effectiveId,
+            'snoozedAt': DateTime.now(),
+            'joined': false,
+          };
 
-          _showLiveAlert(
-            sessionId.isNotEmpty ? sessionId : courseId,
-            courseId,
-            courseTitle,
-          );
+          _showLiveAlert(effectiveId, courseId, courseTitle);
           return;
         } catch (e) {
           debugPrint('❌ LIVE POLLER: error checking $courseTitle: $e');
@@ -204,8 +221,15 @@ class _TabsScreenState extends ConsumerState<TabsScreen> {
             onPressed: () {
               Navigator.pop(ctx);
               _dialogActive = false;
+              // Snooze: update snoozedAt so timer restarts from now
+              _sessionSnooze[courseId] = {
+                'sessionId': sessionId,
+                'snoozedAt': DateTime.now(),
+                'joined': false,
+              };
+              debugPrint('😴 LIVE POLLER: snoozed $courseTitle for 3 min');
             },
-            child: const Text('Later', style: TextStyle(color: Colors.white54)),
+            child: const Text('Later (3 min)', style: TextStyle(color: Colors.white54)),
           ),
           ElevatedButton.icon(
             style: ElevatedButton.styleFrom(
@@ -216,6 +240,12 @@ class _TabsScreenState extends ConsumerState<TabsScreen> {
             onPressed: () {
               Navigator.pop(ctx);
               _dialogActive = false;
+              // Mark as joined — never re-show this session's dialog
+              _sessionSnooze[courseId] = {
+                'sessionId': sessionId,
+                'snoozedAt': DateTime.now(),
+                'joined': true,
+              };
               Navigator.push(context, MaterialPageRoute(
                 builder: (_) => LmsLiveSessionScreen(
                   sessionId: sessionId,
@@ -223,7 +253,13 @@ class _TabsScreenState extends ConsumerState<TabsScreen> {
                   sessionTitle: courseTitle,
                   isInstructor: false,
                 ),
-              ));
+              )).then((_) {
+                // After leaving session, clear joined flag so
+                // if instructor starts a NEW session later, dialog shows again
+                if (_sessionSnooze[courseId]?['sessionId'] == sessionId) {
+                  _sessionSnooze.remove(courseId);
+                }
+              });
             },
             icon: const Icon(Icons.play_arrow_rounded),
             label: const Text('JOIN NOW', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
@@ -231,7 +267,7 @@ class _TabsScreenState extends ConsumerState<TabsScreen> {
         ],
       ),
     ).then((_) {
-      // Safety net: reset guard if dialog was dismissed by back button
+      // Safety net: reset guard if dialog dismissed by back button / barrier tap
       _dialogActive = false;
     });
   }
@@ -239,6 +275,12 @@ class _TabsScreenState extends ConsumerState<TabsScreen> {
   @override
   Widget build(BuildContext context) {
     final role = ref.watch(authProvider).userRole;
+
+    // Start live poller as soon as we know user is a Student (handles post-login case
+    // where initState ran before auth was set).
+    if (role == 'Student') {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _ensurePollerRunning());
+    }
 
     // Instructor gets the full Google Classroom LMS as their main interface
     if (role == 'Instructor') {

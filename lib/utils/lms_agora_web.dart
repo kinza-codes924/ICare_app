@@ -23,6 +23,9 @@ external void _lmsStartRecordingJS();
 @JS('lmsStopRecordingAndUpload')
 external void _lmsStopRecordingAndUploadJS(JSString sessionId, JSString backendUrl, JSString authToken);
 
+@JS('lmsEnableMediaAndPublish')
+external JSPromise<JSAny?> _lmsEnableMediaAndPublishJS();
+
 // appId and token fetched by caller from AgoraService
 Future<void> lmsJoinChannel(String roomName, String appId, String token, bool isInstructor) async {
   await _lmsAgoraJoinJS(appId.toJS, roomName.toJS, token.toJS, 0.toJS, isInstructor.toJS).toDart;
@@ -35,6 +38,9 @@ void lmsSetPanelWidth(bool panelOpen) {}
 void lmsStartRecording() => _lmsStartRecordingJS();
 void lmsStopRecordingAndUpload(String sessionId, String backendUrl, String authToken) =>
     _lmsStopRecordingAndUploadJS(sessionId.toJS, backendUrl.toJS, authToken.toJS);
+Future<void> lmsEnableMediaAndPublish() async {
+  await _lmsEnableMediaAndPublishJS().toDart;
+}
 
 void lmsSetCallbacks({void Function(int, bool)? onRemote, void Function()? onJoined}) {}
 Widget lmsGetLocalVideoWidget(String? viewName) => const SizedBox.shrink();
