@@ -116,7 +116,8 @@ router.post('/course/:courseId/set-live', authMiddleware, async (req, res) => {
     if (sessionId && sessionId !== req.params.courseId) {
       resultSession = await LiveSession.findByIdAndUpdate(
         toId(sessionId),
-        { status: 'live' },
+        // Clear stale attendees/waiting/hands/chat from any previous run of this session
+        { status: 'live', attendees: [], waitingStudents: [], raisedHands: [], chatMessages: [] },
         { new: true }
       );
     }
@@ -129,6 +130,10 @@ router.post('/course/:courseId/set-live', authMiddleware, async (req, res) => {
         status: 'live',
         title: title || 'Live Session',
         scheduledAt: new Date(),
+        attendees: [],
+        waitingStudents: [],
+        raisedHands: [],
+        chatMessages: [],
       });
     }
 
@@ -211,6 +216,20 @@ router.post('/:id/join', authMiddleware, async (req, res) => {
         meetingPassword: session.meetingPassword
       }
     });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+// ── STUDENT/INSTRUCTOR: Leave session (removes from attendees + waiting) ────
+router.post('/:id/leave', authMiddleware, async (req, res) => {
+  try {
+    await connectMongoDB();
+    const userId = toId(req.user.id);
+    await LiveSession.findByIdAndUpdate(toId(req.params.id), {
+      $pull: { attendees: userId, waitingStudents: userId },
+    });
+    res.json({ success: true });
   } catch (e) {
     res.status(500).json({ success: false, message: e.message });
   }
