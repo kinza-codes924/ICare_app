@@ -10,6 +10,8 @@ class User {
   final String? age;
   final String? mrNumber; // Auto-generated Medical Record Number (patients only)
   final String? cnic;
+  final String? specialization;
+  final List<String>? conditionsTreated;
 
   User({
     required this.id,
@@ -23,6 +25,8 @@ class User {
     this.age,
     this.mrNumber,
     this.cnic,
+    this.specialization,
+    this.conditionsTreated,
   });
 
   factory User.fromJson(Map<String, dynamic> json) {
@@ -40,6 +44,10 @@ class User {
       age: json['age']?.toString(),
       mrNumber: json['mrNumber']?.toString(),
       cnic: (json['cnic'] ?? json['idCard'] ?? json['id_card'])?.toString(),
+      specialization: json['specialization']?.toString(),
+      conditionsTreated: (json['conditionsTreated'] as List?)
+          ?.map((e) => e.toString())
+          .toList(),
     );
   }
 
@@ -56,6 +64,8 @@ class User {
       if (age != null) 'age': age,
       if (mrNumber != null) 'mrNumber': mrNumber,
       if (cnic != null) 'cnic': cnic,
+      if (specialization != null) 'specialization': specialization,
+      if (conditionsTreated != null) 'conditionsTreated': conditionsTreated,
     };
   }
 
@@ -71,6 +81,8 @@ class User {
     String? age,
     String? mrNumber,
     String? cnic,
+    String? specialization,
+    List<String>? conditionsTreated,
   }) {
     return User(
       id: id ?? this.id,
@@ -84,6 +96,8 @@ class User {
       age: age ?? this.age,
       mrNumber: mrNumber ?? this.mrNumber,
       cnic: cnic ?? this.cnic,
+      specialization: specialization ?? this.specialization,
+      conditionsTreated: conditionsTreated ?? this.conditionsTreated,
     );
   }
 }

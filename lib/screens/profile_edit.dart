@@ -174,7 +174,18 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
       }
     }
     final role = ref.read(authProvider).userRole ?? '';
-    if (role != 'Patient') _loadDoctorProfile();
+    if (role != 'Patient') {
+      // Pre-populate from cache immediately (API call updates on top)
+      if (user != null) {
+        if (user.specialization != null && user.specialization!.isNotEmpty) {
+          _selectedSpecialization = user.specialization;
+        }
+        if (user.conditionsTreated != null && user.conditionsTreated!.isNotEmpty) {
+          _selectedDoctorConditions.addAll(user.conditionsTreated!);
+        }
+      }
+      _loadDoctorProfile();
+    }
   }
 
   Future<void> _loadDoctorProfile() async {
@@ -216,10 +227,10 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
 
     try {
       final role = ref.read(authProvider).userRole ?? '';
-      final isDoctor = role != 'Patient';
+      final isPatient = role == 'Patient';
 
-      // For doctors: save specialization + conditions to doctor profile
-      if (isDoctor && _selectedSpecialization != null && _selectedSpecialization!.isNotEmpty) {
+      // For non-patients: save specialization + conditions to doctor profile
+      if (!isPatient && _selectedSpecialization != null && _selectedSpecialization!.isNotEmpty) {
         await _doctorService.updateDoctorSpecialization(
           specialization: _selectedSpecialization!,
           conditionsTreated: _selectedDoctorConditions.toList(),
@@ -256,22 +267,44 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
       final result = await _userService.updateProfile(
         name: nameController.text.trim(),
         phoneNumber: phoneController.text.trim(),
-        cnic: cnicController.text.trim().isEmpty ? null : cnicController.text.trim(),
-        age: ageController.text.trim().isEmpty ? null : ageController.text.trim(),
-        gender: _selectedGender,
-        height: heightStr,
-        weight: weightStr,
-        address: addressController.text.trim().isEmpty ? null : addressController.text.trim(),
         profileImage: _imageBytes,
-        existingConditions: _selectedConditions.isEmpty ? null : _selectedConditions.join(', '),
-        healthGoals: _selectedGoals.isEmpty ? null : _selectedGoals.join(', '),
-        emergencyContacts: ecList.isEmpty ? null : ecList,
+        cnic: isPatient ? (cnicController.text.trim().isEmpty ? null : cnicController.text.trim()) : null,
+        age: isPatient ? (ageController.text.trim().isEmpty ? null : ageController.text.trim()) : null,
+        gender: isPatient ? _selectedGender : null,
+        height: isPatient ? heightStr : null,
+        weight: isPatient ? weightStr : null,
+        address: isPatient ? (addressController.text.trim().isEmpty ? null : addressController.text.trim()) : null,
+        existingConditions: isPatient ? (_selectedConditions.isEmpty ? null : _selectedConditions.join(', ')) : null,
+        healthGoals: isPatient ? (_selectedGoals.isEmpty ? null : _selectedGoals.join(', ')) : null,
+        emergencyContacts: isPatient ? (ecList.isEmpty ? null : ecList) : null,
       );
 
       if (result['success']) {
-        final userData = result['user'];
-        final user = app_user.User.fromJson(userData);
-        ref.read(authProvider.notifier).setUser(user);
+        final userData = result['user'] as Map<String, dynamic>? ?? {};
+        final existingUser = ref.read(authProvider).user!;
+        final newPic = (userData['profilePicture'] ?? userData['profile_picture'])?.toString();
+        final updatedUser = app_user.User(
+          id: existingUser.id,
+          name: nameController.text.trim(),
+          email: existingUser.email,
+          phoneNumber: phoneController.text.trim(),
+          role: existingUser.role,
+          profilePicture: newPic ?? existingUser.profilePicture,
+          createdAt: existingUser.createdAt,
+          gender: isPatient ? (_selectedGender ?? existingUser.gender) : existingUser.gender,
+          age: isPatient
+              ? (ageController.text.trim().isNotEmpty ? ageController.text.trim() : existingUser.age)
+              : existingUser.age,
+          mrNumber: existingUser.mrNumber,
+          cnic: isPatient
+              ? (cnicController.text.trim().isNotEmpty ? cnicController.text.trim() : existingUser.cnic)
+              : existingUser.cnic,
+          specialization: !isPatient ? _selectedSpecialization : existingUser.specialization,
+          conditionsTreated: !isPatient
+              ? _selectedDoctorConditions.toList()
+              : existingUser.conditionsTreated,
+        );
+        ref.read(authProvider.notifier).setUser(updatedUser);
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
