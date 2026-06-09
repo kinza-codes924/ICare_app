@@ -111,6 +111,49 @@ router.post('/online-status', authMiddleware, async (req, res) => {
   }
 });
 
+// ─── GET MY DOCTOR PROFILE ────────────────────────────────────────────────────
+router.get('/my-profile', authMiddleware, async (req, res) => {
+  try {
+    await connectMongoDB();
+    const userId = toId(req.user.id);
+    const [user, profile] = await Promise.all([
+      User.findById(userId).lean(),
+      DoctorProfile.findOne({ user_id: userId }).lean(),
+    ]);
+    if (!user) return res.status(404).json({ success: false, message: 'Doctor not found' });
+    const p = profile || {};
+    res.json({
+      success: true,
+      doctor: {
+        id: user._id.toString(),
+        _id: user._id.toString(),
+        name: user.username || user.name,
+        email: user.email,
+        phoneNumber: user.phone,
+        role: user.role,
+        profilePicture: user.profilePicture || null,
+        specialization: p.specialization || null,
+        conditionsTreated: p.conditions_treated || [],
+        experience: p.experience_years || null,
+        licenseNumber: p.license_number || null,
+        consultationFee: p.consultation_fee || null,
+        availableDays: p.available_days || [],
+        availableTime: p.available_hours || null,
+        degrees: p.degrees || [],
+        clinicName: p.clinic_name || null,
+        clinicAddress: p.clinic_address || null,
+        consultationType: p.consultation_type || [],
+        languages: p.languages || [],
+        rating: p.rating || 0,
+        totalReviews: p.total_reviews || 0,
+      },
+    });
+  } catch (e) {
+    console.error('Get my doctor profile error:', e);
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
 // ─── GET ALL DOCTORS ──────────────────────────────────────────────────────────
 router.get('/get_all_doctors', async (req, res) => {
   try {
