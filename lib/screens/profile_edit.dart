@@ -198,7 +198,18 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
         if (spec != null && spec.isNotEmpty) _selectedSpecialization = spec;
         final conds = doc['conditionsTreated'];
         if (conds is List) {
-          _selectedDoctorConditions.addAll(conds.map((c) => c.toString()));
+          _selectedDoctorConditions
+            ..clear()
+            ..addAll(conds.map((c) => c.toString()));
+        }
+        // Refresh name/phone from backend so stale cache never shows wrong data
+        final backendName = doc['name']?.toString();
+        if (backendName != null && backendName.isNotEmpty) {
+          nameController.text = backendName;
+        }
+        final backendPhone = doc['phoneNumber']?.toString();
+        if (backendPhone != null && backendPhone.isNotEmpty) {
+          phoneController.text = backendPhone;
         }
       });
     }
@@ -304,7 +315,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
               ? _selectedDoctorConditions.toList()
               : existingUser.conditionsTreated,
         );
-        ref.read(authProvider.notifier).setUser(updatedUser);
+        await ref.read(authProvider.notifier).setUser(updatedUser);
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
