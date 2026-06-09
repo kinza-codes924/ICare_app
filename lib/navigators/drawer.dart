@@ -320,57 +320,6 @@ class _CustomDrawerState extends ConsumerState<CustomDrawer> {
           );
         }),
       ];
-    } else if (selectedRole == "Laboratory") {
-      drawerItems = [
-        _drawerItem('Dashboard', Icons.dashboard_outlined, () {
-          Navigator.of(context).push(
-            MaterialPageRoute(builder: (ctx) => const LaboratoryDashboard()),
-          );
-        }),
-        _drawerItem('New Requests', Icons.pending_actions_outlined, () {
-          Navigator.of(context).push(MaterialPageRoute(
-            builder: (ctx) => const LabBookingsManagement(
-              title: 'New Requests',
-              initialFilter: 'pending',
-            ),
-          ));
-        }),
-        _drawerItem('Records', Icons.folder_copy_outlined, () {
-          Navigator.of(context).push(
-            MaterialPageRoute(builder: (ctx) => const LabReportsScreen()),
-          );
-        }),
-        _drawerItem('Orders', Icons.list_alt_outlined, () {
-          Navigator.of(context).push(MaterialPageRoute(
-            builder: (ctx) => const LabBookingsManagement(),
-          ));
-        }),
-        _drawerItem('Test Catalog', Icons.science_outlined, () {
-          Navigator.of(context).push(
-            MaterialPageRoute(builder: (ctx) => const LabTestsManagement()),
-          );
-        }),
-        _drawerItem('Invoices', Icons.receipt_long_outlined, () {
-          Navigator.of(context).push(
-            MaterialPageRoute(builder: (ctx) => const PaymentInvoices()),
-          );
-        }),
-        _drawerItem('Analytics', Icons.analytics_outlined, () {
-          Navigator.of(context).push(
-            MaterialPageRoute(builder: (ctx) => const LabAnalytics()),
-          );
-        }),
-        _drawerItem('Settings', Icons.settings_outlined, () {
-          Navigator.of(context).push(
-            MaterialPageRoute(builder: (ctx) => const SettingsScreen()),
-          );
-        }),
-        _drawerItem('iCare Lab Support', Icons.headset_mic_rounded, () {
-          Navigator.of(context).push(
-            MaterialPageRoute(builder: (ctx) => const HelpAndSupport()),
-          );
-        }),
-      ];
     } else if (selectedRole == "Instructor") {
       drawerItems = [
         _drawerItem('Dashboard', Icons.dashboard_outlined, () {

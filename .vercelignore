@@ -1,6 +1,4 @@
-# Flutter build output served via .vercel/output/static/ (pre-built output API)
-# build/web must NOT be uploaded — it exceeds 100MB Vercel limit
-build/
+# Flutter build output — build/web uploaded as outputDirectory
 .dart_tool/
 
 # Android/iOS/desktop platform builds — web only on Vercel
@@ -22,3 +20,17 @@ linux/
 
 # Stray zero-byte file that confuses Vercel Go framework detection
 cmd
+
+# CanvasKit loads from gstatic CDN at runtime — no need to upload ~37MB locally
+build/web/canvaskit/
+
+# Flutter source files — not needed, site is pre-built
+lib/
+test/
+assets/
+pubspec.yaml
+pubspec.lock
+analysis_options.yaml
+linux/
+windows/
+macos/

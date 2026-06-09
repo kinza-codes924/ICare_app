@@ -175,7 +175,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
       }
     }
     final role = ref.read(authProvider).userRole ?? '';
-    if (role != 'Patient') {
+    if (role == 'Doctor') {
       // Pre-populate from cache immediately (API call updates on top)
       if (user != null) {
         if (user.specialization != null && user.specialization!.isNotEmpty) {
@@ -245,10 +245,11 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
     try {
       final role = ref.read(authProvider).userRole ?? '';
       final isPatient = role == 'Patient';
+      final isDoctor = role == 'Doctor';
       debugPrint('🟩 [EditProfile] _handleUpdate: role=$role, isPatient=$isPatient, spec=$_selectedSpecialization, name=${nameController.text}');
 
-      // For non-patients: save specialization + conditions to doctor profile
-      if (!isPatient && _selectedSpecialization != null && _selectedSpecialization!.isNotEmpty) {
+      // Only for Doctor: save specialization + conditions to doctor profile
+      if (isDoctor && _selectedSpecialization != null && _selectedSpecialization!.isNotEmpty) {
         final specResult = await _doctorService.updateDoctorSpecialization(
           specialization: _selectedSpecialization!,
           conditionsTreated: _selectedDoctorConditions.toList(),
@@ -319,8 +320,8 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
           cnic: isPatient
               ? (cnicController.text.trim().isNotEmpty ? cnicController.text.trim() : existingUser.cnic)
               : existingUser.cnic,
-          specialization: !isPatient ? _selectedSpecialization : existingUser.specialization,
-          conditionsTreated: !isPatient
+          specialization: isDoctor ? _selectedSpecialization : existingUser.specialization,
+          conditionsTreated: isDoctor
               ? _selectedDoctorConditions.toList()
               : existingUser.conditionsTreated,
         );
@@ -364,6 +365,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
     final user = ref.watch(authProvider).user;
     final role = ref.read(authProvider).userRole ?? '';
     final isPatient = role == 'Patient';
+    final isDoctor = role == 'Doctor';
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFD),
@@ -561,7 +563,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
                           'Email cannot be changed',
                           style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
                         ),
-                        if (!isPatient) ...[
+                        if (isDoctor) ...[
                           const SizedBox(height: 24),
                           const Text(
                             'Doctor Profile',
