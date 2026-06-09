@@ -144,6 +144,9 @@ router.get('/my-profile', authMiddleware, async (req, res) => {
         clinicAddress: p.clinic_address || null,
         consultationType: p.consultation_type || [],
         languages: p.languages || [],
+        specialties: p.specialties || [],
+        spokenLanguages: p.spoken_languages || [],
+        licenseValidTill: p.license_valid_till || null,
         rating: p.rating || 0,
         totalReviews: p.total_reviews || 0,
       },
@@ -213,7 +216,8 @@ router.post('/add_doctor_details', authMiddleware, async (req, res) => {
       specialization, experience, licenseNumber,
       consultationFee, availableDays, availableTime,
       degrees, clinicName, clinicAddress, consultationType, languages,
-      profilePicture, conditionsTreated,
+      profilePicture, conditionsTreated, specialties, spokenLanguages,
+      licenseValidTill,
     } = req.body;
 
     const update = {};
@@ -233,6 +237,9 @@ router.post('/add_doctor_details', authMiddleware, async (req, res) => {
     if (consultationType !== undefined) update.consultation_type = consultationType;
     if (languages !== undefined) update.languages = languages;
     if (conditionsTreated !== undefined) update.conditions_treated = conditionsTreated;
+    if (specialties !== undefined) update.specialties = specialties;
+    if (spokenLanguages !== undefined) update.spoken_languages = spokenLanguages;
+    if (licenseValidTill !== undefined) update.license_valid_till = licenseValidTill;
 
     const profile = await DoctorProfile.findOneAndUpdate(
       { user_id: userId },

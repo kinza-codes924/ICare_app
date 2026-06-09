@@ -19,6 +19,7 @@ class DoctorProfileSetup extends ConsumerStatefulWidget {
 class _DoctorProfileSetupState extends ConsumerState<DoctorProfileSetup> {
   final _formKey = GlobalKey<FormState>();
   bool _isLoading = false;
+  bool _isLoadingProfile = true; // Loading saved data on init
 
   // Controllers
   final TextEditingController specializationController =
@@ -35,6 +36,7 @@ class _DoctorProfileSetupState extends ConsumerState<DoctorProfileSetup> {
   DateTime? _licenseValidTill;
 
   Uint8List? _imageBytes;
+  String? _existingProfilePictureUrl;
   final ImagePicker _picker = ImagePicker();
 
   // Specialties — doctor selects which specialties they practice
@@ -75,6 +77,103 @@ class _DoctorProfileSetupState extends ConsumerState<DoctorProfileSetup> {
     'Skin Conditions', 'Eye Problems', 'Dental Issues', 'Pregnancy Care',
     'Child Health', 'Bone & Joint Pain',
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadProfile();
+  }
+
+  Future<void> _loadProfile() async {
+    setState(() => _isLoadingProfile = true);
+    try {
+      final result = await DoctorService().getMyDoctorProfile();
+      if (!mounted) return;
+      if (result['success'] == true && result['doctor'] != null) {
+        final doc = result['doctor'] as Map<String, dynamic>;
+        setState(() {
+          // Basic info
+          specializationController.text = doc['specialization']?.toString() ?? '';
+          experienceController.text = doc['experience']?.toString() ?? '';
+          licenseController.text = doc['licenseNumber']?.toString() ?? '';
+          clinicNameController.text = doc['clinicName']?.toString() ?? '';
+          clinicAddressController.text = doc['clinicAddress']?.toString() ?? '';
+
+          // Degrees (comma-separated list)
+          final degrees = doc['degrees'];
+          if (degrees is List) {
+            degreesController.text = degrees.join(', ');
+          }
+
+          // Specialties
+          final specialties = doc['specialties'];
+          if (specialties is List) {
+            _selectedSpecialties.clear();
+            _selectedSpecialties.addAll(specialties.map((s) => s.toString()));
+          }
+
+          // Conditions treated
+          final conditions = doc['conditionsTreated'];
+          if (conditions is List) {
+            _conditionsTreated.clear();
+            _conditionsTreated.addAll(conditions.map((c) => c.toString()));
+          }
+
+          // Languages
+          final languages = doc['languages'];
+          if (languages is List) {
+            _selectedLanguages.clear();
+            _selectedLanguages.addAll(languages.map((l) => l.toString()));
+          }
+
+          // Availability days
+          final availableDays = doc['availableDays'];
+          if (availableDays is List) {
+            for (final day in availableDays) {
+              final dayStr = day.toString();
+              if (selectedDays.containsKey(dayStr)) {
+                selectedDays[dayStr] = true;
+              }
+            }
+          }
+
+          // Availability time
+          final availableTime = doc['availableTime'];
+          if (availableTime is Map<String, dynamic>) {
+            startTimeController.text = availableTime['start']?.toString() ?? '';
+            endTimeController.text = availableTime['end']?.toString() ?? '';
+          } else if (availableTime is String && availableTime.contains('-')) {
+            final parts = availableTime.split('-');
+            if (parts.length == 2) {
+              startTimeController.text = parts[0].trim();
+              endTimeController.text = parts[1].trim();
+            }
+          }
+
+          // License valid till
+          if (doc['licenseValidTill'] != null) {
+            final expiry = DateTime.tryParse(doc['licenseValidTill'].toString());
+            if (expiry != null) {
+              _licenseValidTill = expiry;
+            }
+          }
+
+          // Profile picture URL (for display)
+          _existingProfilePictureUrl = doc['profilePicture']?.toString();
+
+          _isLoadingProfile = false;
+        });
+      } else {
+        // No existing profile - just show empty form
+        setState(() => _isLoadingProfile = false);
+      }
+    } catch (e) {
+      debugPrint('⚠️ Error loading doctor profile: $e');
+      if (mounted) {
+        setState(() => _isLoadingProfile = false);
+      }
+    }
+  }
 
   Future<void> _pickProfileImage() async {
     final picked = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 80, maxWidth: 600);
@@ -323,6 +422,27 @@ class _DoctorProfileSetupState extends ConsumerState<DoctorProfileSetup> {
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoadingProfile) {
+      return Scaffold(
+        appBar: AppBar(
+          backgroundColor: AppColors.bgColor,
+          leading: const CustomBackButton(color: AppColors.primaryColor),
+          automaticallyImplyLeading: false,
+          title: const Text(
+            "Professional Profile",
+            style: TextStyle(
+              fontSize: 16.78,
+              fontFamily: "Gilroy-Bold",
+              fontWeight: FontWeight.w400,
+              color: AppColors.primary500,
+            ),
+          ),
+        ),
+        body: const Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
     if (MediaQuery.of(context).size.width > 900) {
       return _buildWebView();
     }
@@ -370,6 +490,8 @@ class _DoctorProfileSetupState extends ConsumerState<DoctorProfileSetup> {
                           child: ClipOval(
                             child: _imageBytes != null
                                 ? Image.memory(_imageBytes!, fit: BoxFit.cover)
+                                : _existingProfilePictureUrl != null && _existingProfilePictureUrl!.isNotEmpty
+                                ? Image.network(_existingProfilePictureUrl!, fit: BoxFit.cover, errorBuilder: (_, __, ___) => Icon(Icons.person_rounded, size: 44, color: AppColors.primaryColor))
                                 : Icon(Icons.person_rounded, size: 44, color: AppColors.primaryColor),
                           ),
                         ),
@@ -614,6 +736,8 @@ class _DoctorProfileSetupState extends ConsumerState<DoctorProfileSetup> {
                                   child: ClipOval(
                                     child: _imageBytes != null
                                         ? Image.memory(_imageBytes!, fit: BoxFit.cover)
+                                        : _existingProfilePictureUrl != null && _existingProfilePictureUrl!.isNotEmpty
+                                        ? Image.network(_existingProfilePictureUrl!, fit: BoxFit.cover, errorBuilder: (_, __, ___) => Icon(Icons.person_rounded, size: 50, color: AppColors.primaryColor))
                                         : Icon(Icons.person_rounded, size: 50, color: AppColors.primaryColor),
                                   ),
                                 ),
