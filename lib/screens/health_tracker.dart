@@ -26,6 +26,8 @@ class _HealthTrackerState extends State<HealthTracker> {
   // Login streak data
   int _loginStreak = 0;
   List<Map<String, dynamic>> _weekActivity = [];
+  bool _loggedInToday = false;
+  bool _checkingIn = false;
 
   @override
   void initState() {
@@ -59,9 +61,11 @@ class _HealthTrackerState extends State<HealthTracker> {
         }
         if (loginResult['success'] == true) {
           _loginStreak = (loginResult['loginStreak'] as num?)?.toInt() ?? 0;
+          final today = DateTime.now().toIso8601String().split('T')[0];
           final raw = loginResult['weekActivity'];
           if (raw is List) {
             _weekActivity = raw.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+            _loggedInToday = _weekActivity.any((d) => d['date'] == today && d['logged'] == true);
           }
         }
         _isLoading = false;
@@ -132,6 +136,35 @@ class _HealthTrackerState extends State<HealthTracker> {
       'color': const Color(0xFFF43F5E),
     },
   ];
+
+  Future<void> _doCheckIn() async {
+    if (_loggedInToday || _checkingIn) return;
+    setState(() => _checkingIn = true);
+    final result = await _gamificationService.recordDailyLogin();
+    if (!mounted) return;
+    if (result['success'] == true) {
+      final streak = (result['loginStreak'] as num?)?.toInt() ?? _loginStreak;
+      final raw = result['weekActivity'];
+      setState(() {
+        _loginStreak = streak;
+        _loggedInToday = true;
+        _checkingIn = false;
+        if (raw is List) {
+          _weekActivity = raw.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+        }
+        _points += result['alreadyLoggedToday'] == true ? 0 : 5;
+      });
+      if (result['alreadyLoggedToday'] != true) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Day logged! +5 pts 🔥 Keep your streak alive!'),
+          backgroundColor: Color(0xFF10B981),
+          duration: Duration(seconds: 3),
+        ));
+      }
+    } else {
+      setState(() => _checkingIn = false);
+    }
+  }
 
   void _addVitalReading(String type, String unit) {
     showDialog(
@@ -556,17 +589,48 @@ class _HealthTrackerState extends State<HealthTracker> {
           Row(
             children: [
               Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => StarClickGame())),
-                  icon: const Icon(Icons.videogame_asset_rounded, size: 14),
-                  label: const Text('Earn Bonus Points', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: streakColor,
-                    side: BorderSide(color: streakColor.withValues(alpha: 0.4)),
-                    padding: const EdgeInsets.symmetric(vertical: 8),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  ),
+                child: _loggedInToday
+                    ? Container(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF10B981).withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.3)),
+                        ),
+                        child: const Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.check_circle_rounded, color: Color(0xFF10B981), size: 18),
+                            SizedBox(width: 8),
+                            Text('Logged in today ✓', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF10B981))),
+                          ],
+                        ),
+                      )
+                    : ElevatedButton.icon(
+                        onPressed: _checkingIn ? null : _doCheckIn,
+                        icon: _checkingIn
+                            ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                            : const Icon(Icons.login_rounded, size: 16),
+                        label: const Text('Log In Today', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: streakColor,
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                      ),
+              ),
+              const SizedBox(width: 10),
+              OutlinedButton(
+                onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => StarClickGame())),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: streakColor,
+                  side: BorderSide(color: streakColor.withValues(alpha: 0.4)),
+                  padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 ),
+                child: const Icon(Icons.videogame_asset_rounded, size: 18),
               ),
             ],
           ),
