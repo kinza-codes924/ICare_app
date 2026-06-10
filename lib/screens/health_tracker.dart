@@ -26,7 +26,6 @@ class _HealthTrackerState extends State<HealthTracker> {
   // Login streak data
   int _loginStreak = 0;
   List<Map<String, dynamic>> _weekActivity = [];
-  bool _awardedLoginToday = false;
 
   @override
   void initState() {
@@ -40,7 +39,7 @@ class _HealthTrackerState extends State<HealthTracker> {
     final results = await Future.wait([
       _gamificationService.getMyStats(),
       _healthTrackerService.getLatestEntries(),
-      _gamificationService.recordDailyLogin(),
+      _gamificationService.getLoginStreak(),
     ]);
 
     final gamificationResult = results[0];
@@ -60,14 +59,9 @@ class _HealthTrackerState extends State<HealthTracker> {
         }
         if (loginResult['success'] == true) {
           _loginStreak = (loginResult['loginStreak'] as num?)?.toInt() ?? 0;
-          _awardedLoginToday = loginResult['alreadyLoggedToday'] != true;
           final raw = loginResult['weekActivity'];
           if (raw is List) {
             _weekActivity = raw.map((e) => Map<String, dynamic>.from(e as Map)).toList();
-          }
-          // Update total points from login result if we just got points
-          if (_awardedLoginToday && loginResult['totalPoints'] != null) {
-            _points = (loginResult['totalPoints'] as num).toInt();
           }
         }
         _isLoading = false;
@@ -506,12 +500,11 @@ class _HealthTrackerState extends State<HealthTracker> {
                   ],
                 ),
               ),
-              if (_awardedLoginToday)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(color: const Color(0xFF10B981).withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)),
-                  child: const Text('+5 pts', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF10B981))),
-                ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(color: const Color(0xFF10B981).withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)),
+                child: const Text('+5/day', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF10B981))),
+              ),
             ],
           ),
           const SizedBox(height: 18),

@@ -215,6 +215,36 @@ router.post('/redeem', authMiddleware, async (req, res) => {
   }
 });
 
+// GET /api/gamification/login-streak — read-only: returns current streak + week chart
+router.get('/login-streak', authMiddleware, async (req, res) => {
+  try {
+    await connectMongoDB();
+    const User = require('../models/User');
+    const user = await User.findById(req.user.id).lean();
+    if (!user) return res.status(404).json({ success: false });
+
+    const gam = user.gamification || {};
+    const loginStreak = gam.loginStreak || 0;
+    const loginDates = gam.loginDates || [];
+
+    const now = new Date();
+    const dayOfWeek = now.getDay();
+    const monday = new Date(now);
+    monday.setDate(now.getDate() - ((dayOfWeek + 6) % 7));
+    const weekActivity = Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(monday);
+      d.setDate(monday.getDate() + i);
+      const dateStr = d.toISOString().split('T')[0];
+      const dayLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+      return { day: dayLabels[i], date: dateStr, logged: loginDates.includes(dateStr) };
+    });
+
+    res.json({ success: true, loginStreak, weekActivity, totalPoints: gam.points || 0 });
+  } catch (err) {
+    res.status(500).json({ success: false });
+  }
+});
+
 // POST /api/gamification/daily-login — call on app open; awards 5 pts once per day, tracks weekly streak
 router.post('/daily-login', authMiddleware, async (req, res) => {
   try {

@@ -14,6 +14,7 @@ import 'package:icare/screens/pharmacy_profile_setup.dart';
 import 'package:icare/screens/student_profile_setup.dart';
 import 'package:icare/services/auth_service.dart';
 import 'package:icare/services/biometric_service.dart';
+import 'package:icare/services/gamification_service.dart';
 import 'package:icare/services/user_service.dart';
 import 'package:icare/utils/shared_pref.dart';
 import 'package:icare/models/user.dart' as app_user;
@@ -49,6 +50,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
   final AuthService _authService = AuthService();
   final UserService _userService = UserService();
   final BiometricService _biometricService = BiometricService();
+  final GamificationService _gamificationService = GamificationService();
 
   bool rememberMe = false;
   bool isLogin = true;
@@ -154,6 +156,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
             if (user != null && mounted) {
               await ref.read(authProvider.notifier).setUserToken(token);
               await ref.read(authProvider.notifier).setUser(user);
+              _recordLoginStreak();
               if (mounted) context.go('/dashboard');
             } else {
               _showError('Session expired. Please sign in with your password.');
@@ -230,10 +233,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
       final user = app_user.User.fromJson(profileResult['user'] as Map<String, dynamic>);
       await ref.read(authProvider.notifier).setUserToken(token);
       await ref.read(authProvider.notifier).setUser(user);
+      _recordLoginStreak();
       if (mounted) context.go('/dashboard');
     } else {
       _showError('Could not load profile: ${profileResult['message']}');
     }
+  }
+
+  void _recordLoginStreak() {
+    _gamificationService.recordDailyLogin();
   }
 
   /// After a successful password login, offer to enable biometrics.
@@ -2003,7 +2011,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
 
             // Offer biometric setup after first successful password login
             await _offerBiometricSetup(usernameController.text.trim());
-
+            _recordLoginStreak();
             context.go('/dashboard');
           } else {
             debugPrint("❌ Failed to fetch profile: ${profileResult['message']}");
