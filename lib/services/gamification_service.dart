@@ -50,6 +50,16 @@ class GamificationService {
     }
   }
 
+  Future<Map<String, dynamic>> recordDailyLogin() async {
+    try {
+      final response = await _apiService.post('/gamification/daily-login', {});
+      return response.data is Map ? Map<String, dynamic>.from(response.data) : {'success': false};
+    } catch (e) {
+      debugPrint('Error recording daily login: $e');
+      return {'success': false};
+    }
+  }
+
   Future<List<dynamic>> getLeaderboard() async {
     try {
       final response = await _apiService.get('/gamification/leaderboard');

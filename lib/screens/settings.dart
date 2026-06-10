@@ -1801,10 +1801,11 @@ class _WebSettingsLayout extends StatelessWidget {
         _switchTile(icon: Icons.home_outlined, title: 'Home Sample Collection', subtitle: 'Prefer home sample collection', value: p.preferHomeSample, onChanged: p.onTogglePreferHomeSample),
         const Divider(height: 1),
         ListTile(
-          leading: Container(width: 40, height: 40, decoration: BoxDecoration(color: const Color(0xFF8B5CF6).withValues(alpha: 0.1), borderRadius: BorderRadius.circular(10)), child: const Icon(Icons.assignment_outlined, color: Color(0xFF8B5CF6), size: 20)),
+          contentPadding: EdgeInsets.zero,
+          leading: Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: const Color(0xFF8B5CF6).withValues(alpha: 0.1), borderRadius: BorderRadius.circular(10)), child: const Icon(Icons.assignment_outlined, color: Color(0xFF8B5CF6), size: 20)),
           title: const Text('Report Delivery', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF0F172A))),
-          subtitle: const Text('In-app / Email', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
-          trailing: const Icon(Icons.check_circle_rounded, color: Color(0xFF10B981), size: 22),
+          subtitle: const Text('In-app / Email', style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8))),
+          trailing: const Icon(Icons.check_circle_rounded, color: Color(0xFF10B981), size: 20),
         ),
       ])));
   }
@@ -2428,10 +2429,11 @@ class _MobileSettingsLayout extends StatelessWidget {
         _switchTile(icon: Icons.home_outlined, title: 'Home Sample Collection', subtitle: 'Prefer home sample collection', value: p.preferHomeSample, onChanged: p.onTogglePreferHomeSample),
         const Divider(height: 1),
         ListTile(
-          leading: Container(width: 40, height: 40, decoration: BoxDecoration(color: const Color(0xFF8B5CF6).withValues(alpha: 0.1), borderRadius: BorderRadius.circular(10)), child: const Icon(Icons.assignment_outlined, color: Color(0xFF8B5CF6), size: 20)),
+          contentPadding: EdgeInsets.zero,
+          leading: Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: const Color(0xFF8B5CF6).withValues(alpha: 0.1), borderRadius: BorderRadius.circular(10)), child: const Icon(Icons.assignment_outlined, color: Color(0xFF8B5CF6), size: 20)),
           title: const Text('Report Delivery', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF0F172A))),
-          subtitle: const Text('In-app / Email', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
-          trailing: const Icon(Icons.check_circle_rounded, color: Color(0xFF10B981), size: 22),
+          subtitle: const Text('In-app / Email', style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8))),
+          trailing: const Icon(Icons.check_circle_rounded, color: Color(0xFF10B981), size: 20),
         ),
       ])));
   }

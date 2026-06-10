@@ -23,6 +23,11 @@ class _HealthTrackerState extends State<HealthTracker> {
   List<HealthTrackerEntry> _latestEntries = [];
   bool _isLoading = true;
 
+  // Login streak data
+  int _loginStreak = 0;
+  List<Map<String, dynamic>> _weekActivity = [];
+  bool _awardedLoginToday = false;
+
   @override
   void initState() {
     super.initState();
@@ -32,14 +37,15 @@ class _HealthTrackerState extends State<HealthTracker> {
   Future<void> _loadAllData() async {
     setState(() => _isLoading = true);
 
-    // Concurrent data loading
     final results = await Future.wait([
       _gamificationService.getMyStats(),
       _healthTrackerService.getLatestEntries(),
+      _gamificationService.recordDailyLogin(),
     ]);
 
     final gamificationResult = results[0];
     final entriesResult = results[1];
+    final loginResult = results[2] as Map<String, dynamic>;
 
     if (mounted) {
       setState(() {
@@ -47,11 +53,22 @@ class _HealthTrackerState extends State<HealthTracker> {
           _points = gamificationResult['points'] ?? 0;
           _badges = gamificationResult['badges'] ?? [];
         }
-
         if (entriesResult['success'] == true) {
           _latestEntries = (entriesResult['entries'] as List)
               .map((e) => HealthTrackerEntry.fromJson(e))
               .toList();
+        }
+        if (loginResult['success'] == true) {
+          _loginStreak = (loginResult['loginStreak'] as num?)?.toInt() ?? 0;
+          _awardedLoginToday = loginResult['alreadyLoggedToday'] != true;
+          final raw = loginResult['weekActivity'];
+          if (raw is List) {
+            _weekActivity = raw.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+          }
+          // Update total points from login result if we just got points
+          if (_awardedLoginToday && loginResult['totalPoints'] != null) {
+            _points = (loginResult['totalPoints'] as num).toInt();
+          }
         }
         _isLoading = false;
       });
@@ -445,78 +462,120 @@ class _HealthTrackerState extends State<HealthTracker> {
   }
 
   Widget _buildStreakCard() {
+    final bool hasStreak = _loginStreak > 0;
+    final Color streakColor = _loginStreak >= 7
+        ? const Color(0xFFEF4444)
+        : _loginStreak >= 3
+            ? const Color(0xFFD97706)
+            : const Color(0xFF3B82F6);
+
     return Container(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: const Color(0xFFE2E8F0)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10, offset: const Offset(0, 4))],
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: const Color(0xFFFDE68A),
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(
-              Icons.flash_on_rounded,
-              color: Color(0xFFD97706),
-              size: 32,
-            ),
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(color: streakColor.withValues(alpha: 0.12), shape: BoxShape.circle),
+                child: Icon(Icons.local_fire_department_rounded, color: streakColor, size: 28),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      hasStreak ? '$_loginStreak Day${_loginStreak == 1 ? '' : 's'} Streak! 🔥' : 'Start Your Streak!',
+                      style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w900, color: Color(0xFF0F172A)),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      hasStreak
+                          ? 'Login daily to keep your streak alive. +5 pts/day'
+                          : 'Login every day to earn 5 pts and build your streak.',
+                      style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                    ),
+                  ],
+                ),
+              ),
+              if (_awardedLoginToday)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(color: const Color(0xFF10B981).withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)),
+                  child: const Text('+5 pts', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF10B981))),
+                ),
+            ],
           ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  '7 Day Streak!',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w900,
-                    color: Color(0xFF0F172A),
+          const SizedBox(height: 18),
+          // Weekly Mon-Sun chart
+          if (_weekActivity.isNotEmpty) ...[
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: _weekActivity.map((day) {
+                final logged = day['logged'] == true;
+                final label = day['day'] as String;
+                final isToday = day['date'] == DateTime.now().toIso8601String().split('T')[0];
+                return Expanded(
+                  child: Column(
+                    children: [
+                      Text(
+                        label,
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: isToday ? FontWeight.w800 : FontWeight.w500,
+                          color: isToday ? streakColor : const Color(0xFF94A3B8),
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Container(
+                        width: 32,
+                        height: 32,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: logged ? streakColor : const Color(0xFFF1F5F9),
+                          border: isToday && !logged
+                              ? Border.all(color: streakColor, width: 2)
+                              : null,
+                        ),
+                        child: Center(
+                          child: logged
+                              ? const Icon(Icons.check_rounded, color: Colors.white, size: 16)
+                              : isToday
+                                  ? Icon(Icons.circle, color: streakColor, size: 8)
+                                  : const Icon(Icons.circle_outlined, color: Color(0xFFCBD5E1), size: 12),
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-                const Text(
-                  'You updated your vitals 7 days in a row. Keep it up!',
-                  style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
-                ),
-                const SizedBox(height: 12),
-                ElevatedButton.icon(
-                  onPressed: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(builder: (ctx) => StarClickGame()),
-                    );
-                  },
-                  icon: const Icon(Icons.videogame_asset_rounded, size: 16),
-                  label: const Text(
-                    'Earn Daily Points',
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFD97706),
-                    foregroundColor: Colors.white,
-                    elevation: 0,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 8,
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                ),
-              ],
+                );
+              }).toList(),
             ),
+            const SizedBox(height: 14),
+          ],
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => StarClickGame())),
+                  icon: const Icon(Icons.videogame_asset_rounded, size: 14),
+                  label: const Text('Earn Bonus Points', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: streakColor,
+                    side: BorderSide(color: streakColor.withValues(alpha: 0.4)),
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),

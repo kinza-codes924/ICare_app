@@ -55,7 +55,7 @@ class _LoginActivityScreenState extends ConsumerState<LoginActivityScreen> {
   Map<String, List<dynamic>> _groupByDate() {
     final Map<String, List<dynamic>> grouped = {};
     for (final s in _sessions) {
-      final dateStr = (s['createdAt'] ?? s['loginAt'] ?? s['timestamp'] ?? '').toString();
+      final dateStr = (s['date'] ?? s['createdAt'] ?? s['loginAt'] ?? s['timestamp'] ?? '').toString();
       final label = dateStr.isNotEmpty ? _dateLabel(dateStr) : 'Unknown Date';
       grouped.putIfAbsent(label, () => []).add(s);
     }
@@ -143,7 +143,7 @@ class _LoginActivityScreenState extends ConsumerState<LoginActivityScreen> {
   Widget _buildRow(dynamic session, String userName, String? profilePic) {
     final device = (session['device'] ?? session['userAgent'] ?? session['browser'] ?? 'Unknown Device').toString();
     final ip = (session['ipAddress'] ?? session['ip'] ?? '').toString();
-    final dateStr = (session['createdAt'] ?? session['loginAt'] ?? session['timestamp'] ?? '').toString();
+    final dateStr = (session['date'] ?? session['createdAt'] ?? session['loginAt'] ?? session['timestamp'] ?? '').toString();
     final timeStr = dateStr.isNotEmpty ? _timeLabel(dateStr) : '';
     final logout = _isLogout(session);
     final deviceIcon = _deviceIcon(device);

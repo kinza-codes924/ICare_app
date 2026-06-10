@@ -215,6 +215,72 @@ router.post('/redeem', authMiddleware, async (req, res) => {
   }
 });
 
+// POST /api/gamification/daily-login — call on app open; awards 5 pts once per day, tracks weekly streak
+router.post('/daily-login', authMiddleware, async (req, res) => {
+  try {
+    await connectMongoDB();
+    const User = require('../models/User');
+
+    const now = new Date();
+    const today = now.toISOString().split('T')[0]; // e.g. "2026-06-10"
+    const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+
+    const user = await User.findById(req.user.id).lean();
+    if (!user) return res.status(404).json({ success: false });
+
+    const gam = user.gamification || {};
+    const lastLoginDate = gam.lastLoginDate || null;
+    const alreadyLoggedToday = lastLoginDate === today;
+
+    let loginStreak = gam.loginStreak || 0;
+    let loginDates = gam.loginDates || [];
+
+    if (!alreadyLoggedToday) {
+      loginStreak = lastLoginDate === yesterday ? loginStreak + 1 : 1;
+      loginDates = [...loginDates.filter(d => d !== today), today].slice(-30); // keep last 30 days
+
+      const historyEntry = { points: 5, reason: 'daily_login', date: now.toISOString() };
+      await User.findByIdAndUpdate(
+        req.user.id,
+        {
+          $inc: { 'gamification.points': 5 },
+          $push: { 'gamification.history': { $each: [historyEntry], $slice: -200 } },
+          $set: {
+            'gamification.loginStreak': loginStreak,
+            'gamification.lastLoginDate': today,
+            'gamification.loginDates': loginDates,
+          },
+        },
+        { strict: false }
+      );
+    }
+
+    // Build Mon-Sun chart for current week
+    const dayOfWeek = now.getDay(); // 0=Sun,1=Mon,...
+    const monday = new Date(now);
+    monday.setDate(now.getDate() - ((dayOfWeek + 6) % 7)); // go back to Monday
+    const weekActivity = Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(monday);
+      d.setDate(monday.getDate() + i);
+      const dateStr = d.toISOString().split('T')[0];
+      const dayLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+      return { day: dayLabels[i], date: dateStr, logged: loginDates.includes(dateStr) };
+    });
+
+    res.json({
+      success: true,
+      alreadyLoggedToday,
+      pointsAwarded: alreadyLoggedToday ? 0 : 5,
+      loginStreak,
+      weekActivity,
+      totalPoints: (gam.points || 0) + (alreadyLoggedToday ? 0 : 5),
+    });
+  } catch (err) {
+    console.error('Daily login error:', err);
+    res.status(500).json({ success: false });
+  }
+});
+
 // GET /api/gamification/leaderboard
 router.get('/leaderboard', authMiddleware, async (req, res) => {
   try {
