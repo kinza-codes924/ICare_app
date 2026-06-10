@@ -1800,18 +1800,13 @@ class _WebSettingsLayout extends StatelessWidget {
         const Divider(height: 1),
         _switchTile(icon: Icons.home_outlined, title: 'Home Sample Collection', subtitle: 'Prefer home sample collection', value: p.preferHomeSample, onChanged: p.onTogglePreferHomeSample),
         const Divider(height: 1),
-        _settingsTile(icon: Icons.assignment_outlined, iconColor: const Color(0xFF8B5CF6), title: 'Report Delivery', subtitle: p.reportDelivery, onTap: () => _showReportDeliverySheet(context)),
+        ListTile(
+          leading: Container(width: 40, height: 40, decoration: BoxDecoration(color: const Color(0xFF8B5CF6).withValues(alpha: 0.1), borderRadius: BorderRadius.circular(10)), child: const Icon(Icons.assignment_outlined, color: Color(0xFF8B5CF6), size: 20)),
+          title: const Text('Report Delivery', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF0F172A))),
+          subtitle: const Text('In-app / Email', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+          trailing: const Icon(Icons.check_circle_rounded, color: Color(0xFF10B981), size: 22),
+        ),
       ])));
-  }
-
-  void _showReportDeliverySheet(BuildContext context) {
-    final options = ['In-app', 'Email only', 'Both'];
-    showModalBottomSheet(context: context, shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))), builder: (_) => SafeArea(child: Column(mainAxisSize: MainAxisSize.min, children: [
-      const Padding(padding: EdgeInsets.all(16), child: Text('Report Delivery Method', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16))),
-      const Divider(height: 1),
-      ...options.map((opt) => ListTile(title: Text(opt), trailing: p.reportDelivery == opt ? const Icon(Icons.check_circle_rounded, color: Color(0xFF10B981)) : null, onTap: () { p.onSetReportDelivery(opt); Navigator.pop(context); })),
-      const SizedBox(height: 8),
-    ])));
   }
 
   // ── REWARDS ──
@@ -2432,18 +2427,13 @@ class _MobileSettingsLayout extends StatelessWidget {
         const Divider(height: 1),
         _switchTile(icon: Icons.home_outlined, title: 'Home Sample Collection', subtitle: 'Prefer home sample collection', value: p.preferHomeSample, onChanged: p.onTogglePreferHomeSample),
         const Divider(height: 1),
-        _settingsTile(icon: Icons.assignment_outlined, iconColor: const Color(0xFF8B5CF6), title: 'Report Delivery', subtitle: p.reportDelivery, onTap: () => _showReportDeliverySheet(context)),
+        ListTile(
+          leading: Container(width: 40, height: 40, decoration: BoxDecoration(color: const Color(0xFF8B5CF6).withValues(alpha: 0.1), borderRadius: BorderRadius.circular(10)), child: const Icon(Icons.assignment_outlined, color: Color(0xFF8B5CF6), size: 20)),
+          title: const Text('Report Delivery', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF0F172A))),
+          subtitle: const Text('In-app / Email', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+          trailing: const Icon(Icons.check_circle_rounded, color: Color(0xFF10B981), size: 22),
+        ),
       ])));
-  }
-
-  void _showReportDeliverySheet(BuildContext context) {
-    final options = ['In-app', 'Email only', 'Both'];
-    showModalBottomSheet(context: context, shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))), builder: (_) => SafeArea(child: Column(mainAxisSize: MainAxisSize.min, children: [
-      const Padding(padding: EdgeInsets.all(16), child: Text('Report Delivery Method', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16))),
-      const Divider(height: 1),
-      ...options.map((opt) => ListTile(title: Text(opt), trailing: p.reportDelivery == opt ? const Icon(Icons.check_circle_rounded, color: Color(0xFF10B981)) : null, onTap: () { p.onSetReportDelivery(opt); Navigator.pop(context); })),
-      const SizedBox(height: 8),
-    ])));
   }
 
   Widget _rewardsCard(BuildContext context) {
