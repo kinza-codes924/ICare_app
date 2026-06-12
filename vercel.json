@@ -20,50 +20,58 @@
       ]
     }
   ],
-  "rewrites": [
+  "routes": [
     {
-      "source": "/manifest.json",
-      "destination": "/manifest.json"
+      "src": "/flutter_bootstrap\\.js",
+      "dest": "/flutter_bootstrap.js"
     },
     {
-      "source": "/flutter.js",
-      "destination": "/flutter.js"
+      "src": "/flutter\\.js",
+      "dest": "/flutter.js"
     },
     {
-      "source": "/flutter_service_worker.js",
-      "destination": "/flutter_service_worker.js"
+      "src": "/flutter_service_worker\\.js",
+      "dest": "/flutter_service_worker.js"
     },
     {
-      "source": "/main.dart.js",
-      "destination": "/main.dart.js"
+      "src": "/main\\.dart\\.js",
+      "dest": "/main.dart.js"
     },
     {
-      "source": "/icons/(.*)",
-      "destination": "/icons/$1"
+      "src": "/manifest\\.json",
+      "dest": "/manifest.json"
     },
     {
-      "source": "/assets/(.*)",
-      "destination": "/assets/$1"
+      "src": "/version\\.json",
+      "dest": "/version.json"
     },
     {
-      "source": "/(.*\\.js)",
-      "destination": "/$1"
+      "src": "/share-modal\\.js",
+      "dest": "/share-modal.js"
     },
     {
-      "source": "/(.*\\.json)",
-      "destination": "/$1"
+      "src": "/favicon\\.png",
+      "dest": "/favicon.png"
     },
     {
-      "source": "/(.*\\.png)",
-      "destination": "/$1"
+      "src": "/icare_logo\\.png",
+      "dest": "/icare_logo.png"
     },
     {
-      "source": "/(.*\\.wasm)",
-      "destination": "/$1"
+      "src": "/icons/(.*)",
+      "dest": "/icons/$1"
     },
     {
-      "source": "/(.*)",
-      "destination": "/index.html"
+      "src": "/canvaskit/(.*)",
+      "dest": "/canvaskit/$1"
+    },
+    {
+      "src": "/assets/(.*)",
+      "dest": "/assets/$1"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/index.html"
     }
   ]
 }
