@@ -31,6 +31,13 @@
       animation: spin 0.8s linear infinite;
     }
     @keyframes spin { to { transform: rotate(360deg); } }
+    /* Agora video elements must fill their containers */
+    #lms-agora-remote > div, #lms-agora-remote video,
+    #lms-agora-local  > div, #lms-agora-local  video,
+    #agora-remote     > div, #agora-remote     video {
+      width: 100% !important; height: 100% !important;
+      object-fit: cover; display: block;
+    }
   </style>
 </head>
 <body>
@@ -420,11 +427,17 @@
             }
           }
 
-          // 4. Resume/play all remote audio tracks (unblocks autoplay)
+        // 4. Resume/play all remote audio + video tracks (unblocks autoplay)
           window._lmsAgoraClient.remoteUsers.forEach(function(u) {
             if (u.audioTrack) {
               try { u.audioTrack.play(); console.log('LMS enable: remote audio resumed for uid', u.uid); }
               catch(e) { console.warn('LMS enable: remote audio play error:', e.message); }
+            }
+            if (u.videoTrack) {
+              try {
+                var rd = document.getElementById('lms-agora-remote');
+                if (rd) { rd.innerHTML = ''; u.videoTrack.play('lms-agora-remote'); console.log('LMS enable: remote video resumed for uid', u.uid); }
+              } catch(_) {}
             }
           });
         }
@@ -454,8 +467,12 @@
 
         // Chrome autoplay fix — must be set before any audio track is played
         AgoraRTC.onAudioAutoplayFailed = function() {
-          console.warn('LMS: audio autoplay blocked by browser — showing click-to-enable button');
-          lmsShowAudioBtn();
+          console.warn('LMS: audio autoplay blocked — dispatching lms-audio-blocked event');
+          window.dispatchEvent(new CustomEvent('lms-audio-blocked', {}));
+        };
+        // Define lmsShowAudioBtn so legacy calls don't crash
+        window.lmsShowAudioBtn = function() {
+          window.dispatchEvent(new CustomEvent('lms-audio-blocked', {}));
         };
 
         window._lmsAgoraClient = AgoraRTC.createClient({ mode: 'rtc', codec: 'vp8' });
@@ -577,6 +594,95 @@
       }
       console.error('LMS: Microphone permission denied after ' + maxRetries + ' attempts');
       return false;
+    };
+
+    // Student: create mic track, publish it, AND resume remote audio/video.
+    // Called from Flutter button tap (real user gesture) so getUserMedia is allowed.
+    window.lmsStudentEnableAudio = async function() {
+      try {
+        if (!window._lmsAgoraClient) {
+          console.warn('LMS student: no Agora client yet');
+          return 'no_client';
+        }
+
+        // 1. Request mic permission (user gesture is active — Flutter button tap)
+        try {
+          var permStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          permStream.getTracks().forEach(function(t) { t.stop(); });
+          console.log('LMS student: mic permission granted');
+        } catch(permErr) {
+          console.error('LMS student: mic permission denied:', permErr.message);
+          // Still try to play remote audio even if mic is denied
+        }
+
+        // 2. Create mic track if not already created
+        if (!window._lmsLocalAudio) {
+          try {
+            window._lmsLocalAudio = await AgoraRTC.createMicrophoneAudioTrack();
+            console.log('LMS student: mic track created');
+          } catch(micErr) {
+            console.warn('LMS student: mic track creation failed:', micErr.message);
+          }
+        }
+
+        // 3. Optionally create camera track
+        if (!window._lmsLocalVideo) {
+          try {
+            window._lmsLocalVideo = await AgoraRTC.createCameraVideoTrack();
+            console.log('LMS student: camera track created');
+          } catch(camErr) {
+            console.warn('LMS student: camera track creation failed (ok if no cam):', camErr.message);
+          }
+        }
+
+        // 4. Publish mic (and camera if available)
+        var toPublish = [];
+        if (window._lmsLocalAudio) toPublish.push(window._lmsLocalAudio);
+        if (window._lmsLocalVideo) toPublish.push(window._lmsLocalVideo);
+        if (toPublish.length > 0) {
+          try {
+            await window._lmsAgoraClient.publish(toPublish);
+            console.log('LMS student: published', toPublish.length, 'track(s)');
+          } catch(pubErr) {
+            console.warn('LMS student: publish failed (may already be published):', pubErr.message);
+          }
+        }
+
+        // 5. Show local video preview
+        if (window._lmsLocalVideo) {
+          var localDiv = document.getElementById('lms-agora-local');
+          if (localDiv) {
+            try { window._lmsLocalVideo.play('lms-agora-local'); } catch(_) {}
+          }
+        }
+
+        // 6. Resume all remote users' audio and video (unblocks Chrome autoplay)
+        var count = 0;
+        window._lmsAgoraClient.remoteUsers.forEach(function(u) {
+          if (u.audioTrack) {
+            try {
+              u.audioTrack.play();
+              count++;
+              console.log('LMS student: remote audio resumed uid', u.uid);
+            } catch(e) {
+              console.warn('LMS student: remote audio play error:', e.message);
+            }
+          }
+          if (u.videoTrack) {
+            try {
+              var rd = document.getElementById('lms-agora-remote');
+              if (rd) { rd.innerHTML = ''; u.videoTrack.play('lms-agora-remote'); }
+              console.log('LMS student: remote video resumed uid', u.uid);
+            } catch(_) {}
+          }
+        });
+
+        console.log('LMS student: joined with mic, remote users resumed:', count);
+        return 'ok:' + count;
+      } catch(e) {
+        console.error('lmsStudentEnableAudio error:', e.message);
+        return 'error:' + e.message;
+      }
     };
 
     window.lmsAgoraLeave = async function() {

@@ -45,7 +45,7 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
   String? _error;
   final List<int> _remoteUids = [];
 
-  bool _permissionsEnabled = true;
+  bool _permissionsEnabled = false; // shows "tap to enable" overlay for BOTH roles
 
   // UI State
   bool _chatOpen = false;
@@ -83,6 +83,8 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
     super.initState();
     _panelTab = TabController(length: 3, vsync: this);
     LmsLiveSessionScreen.activeCourseId = widget.courseId; // stop popup
+    // Both instructor and student must tap to unblock Chrome getUserMedia/autoplay
+    _permissionsEnabled = false;
     _initSession();
   }
 
@@ -338,15 +340,8 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
           try {
             await lmsJoinChannel(roomName, agoraAppId, agoraToken, widget.isInstructor);
             debugPrint('LMS Agora join: room=$roomName isInstructor=${widget.isInstructor}');
-            // Only instructor publishes mic+cam. Students are audience — they receive only.
-            if (widget.isInstructor) {
-              try {
-                await lmsEnableMediaAndPublish();
-                debugPrint('LMS: instructor mic+cam published');
-              } catch (e) {
-                debugPrint('LMS: instructor media publish error: $e');
-              }
-            }
+            // mic/cam activation is done via the overlay tap button (user gesture)
+            // so Chrome allows getUserMedia. Do NOT call lmsEnableMediaAndPublish here.
           } catch (e) {
             debugPrint('LMS Agora join error: $e');
           }
@@ -372,24 +367,28 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
     try {
       // Mark session as LIVE — backend returns the fresh session ID (may differ from widget.sessionId
       // if widget.sessionId was a courseId placeholder or a stale session).
+      debugPrint('✅ _notifyStudents: calling setSessionLive(courseId=${widget.courseId}, _sessionDocId=$_sessionDocId)');
       final freshSessionId = await _lms.setSessionLive(
         courseId: widget.courseId,
         isLive: true,
         title: widget.sessionTitle,
         sessionId: _sessionDocId.isNotEmpty && _sessionDocId != widget.courseId ? _sessionDocId : null,
       );
+      debugPrint('✅ Session marked LIVE: freshSessionId=$freshSessionId, _sessionDocId=$_sessionDocId');
       // Update _sessionDocId so Agora room name and join/sync use the real session
       if (freshSessionId != null && freshSessionId.isNotEmpty) {
         _sessionDocId = freshSessionId;
       }
+      debugPrint('✅ _notifyStudents: calling startLiveSessionNotify(sessionId=$_sessionDocId)');
       await _lms.startLiveSessionNotify(
         courseId: widget.courseId,
         sessionId: _sessionDocId,
         instructorName: _currentUserName,
         sessionTitle: widget.sessionTitle,
       );
+      debugPrint('✅ _notifyStudents: notifications sent successfully');
     } catch (e) {
-      debugPrint('Notify students error: $e');
+      debugPrint('❌ _notifyStudents FAILED: $e');
     }
   }
 
@@ -432,10 +431,15 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
     });
     // Instructor heartbeat — tells backend the session is still active
     if (widget.isInstructor && _sessionDocId.isNotEmpty) {
+      debugPrint('💓 Sending initial heartbeat for session $_sessionDocId');
       _lms.sendHeartbeat(_sessionDocId); // send immediately
       _heartbeatTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+        debugPrint('💓 Sending heartbeat for session $_sessionDocId');
         if (mounted && _sessionDocId.isNotEmpty) _lms.sendHeartbeat(_sessionDocId);
       });
+      debugPrint('💓 Heartbeat timer started (every 30s) for session $_sessionDocId');
+    } else {
+      debugPrint('💓 No heartbeat started: isInstructor=${widget.isInstructor}, _sessionDocId=$_sessionDocId');
     }
   }
 
@@ -762,23 +766,30 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
           if (!_permissionsEnabled)
             Positioned.fill(
               child: Container(
-                color: Colors.black.withValues(alpha: 0.75),
+                color: Colors.black.withValues(alpha: 0.80),
                 child: Center(
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(Icons.mic_rounded, color: Colors.white, size: 56),
+                      Icon(
+                        widget.isInstructor ? Icons.videocam_rounded : Icons.volume_up_rounded,
+                        color: Colors.white, size: 56,
+                      ),
                       const SizedBox(height: 16),
-                      const Text(
-                        'Tap to enable your\nCamera & Microphone',
+                      Text(
+                        widget.isInstructor
+                            ? 'Tap to enable your\nCamera & Microphone'
+                            : 'Tap to join the live session',
                         textAlign: TextAlign.center,
-                        style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w700),
+                        style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w700),
                       ),
                       const SizedBox(height: 8),
-                      const Text(
-                        'Chrome requires a tap before\nmicrophone access is allowed.',
+                      Text(
+                        widget.isInstructor
+                            ? 'Chrome requires a tap before\nmicrophone access is allowed.'
+                            : 'Click below to enable your mic & camera\nso instructor can hear you too.',
                         textAlign: TextAlign.center,
-                        style: TextStyle(color: Colors.white60, fontSize: 13),
+                        style: const TextStyle(color: Colors.white60, fontSize: 13),
                       ),
                       const SizedBox(height: 24),
                       ElevatedButton.icon(
@@ -789,12 +800,25 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                         ),
                         onPressed: () async {
-                          if (kIsWeb) await lmsEnableMediaAndPublish();
+                          if (kIsWeb) {
+                            if (widget.isInstructor) {
+                              // Instructor: create mic+cam, publish, and hear students
+                              await lmsEnableMediaAndPublish();
+                            } else {
+                              // Student: create mic, publish, AND hear instructor
+                              await lmsStudentEnableAudio();
+                            }
+                          }
                           if (mounted) setState(() => _permissionsEnabled = true);
                         },
-                        icon: const Icon(Icons.videocam_rounded, size: 24),
-                        label: const Text('Enable Camera & Mic',
-                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+                        icon: Icon(
+                          widget.isInstructor ? Icons.videocam_rounded : Icons.mic_rounded,
+                          size: 24,
+                        ),
+                        label: Text(
+                          widget.isInstructor ? 'Enable Camera & Mic' : 'Join Live Session',
+                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                        ),
                       ),
                     ],
                   ),
