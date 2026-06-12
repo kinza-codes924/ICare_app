@@ -7,32 +7,15 @@
     {
       "source": "/manifest.json",
       "headers": [
-        { "key": "Content-Type", "value": "application/manifest+json" },
-        { "key": "Cache-Control", "value": "public, max-age=3600" }
+        { "key": "Content-Type", "value": "application/manifest+json" }
       ]
     },
     {
       "source": "/(.*)",
       "headers": [
-        { "key": "Cache-Control", "value": "public, max-age=3600" },
         { "key": "Cross-Origin-Opener-Policy", "value": "unsafe-none" },
         { "key": "Cross-Origin-Embedder-Policy", "value": "unsafe-none" }
       ]
     }
-  ],
-  "rewrites": [
-    { "source": "/assets/:path*",               "destination": "/assets/:path*" },
-    { "source": "/canvaskit/:path*",             "destination": "/canvaskit/:path*" },
-    { "source": "/icons/:path*",                 "destination": "/icons/:path*" },
-    { "source": "/flutter.js",                   "destination": "/flutter.js" },
-    { "source": "/flutter_bootstrap.js",         "destination": "/flutter_bootstrap.js" },
-    { "source": "/flutter_service_worker.js",    "destination": "/flutter_service_worker.js" },
-    { "source": "/main.dart.js",                 "destination": "/main.dart.js" },
-    { "source": "/manifest.json",                "destination": "/manifest.json" },
-    { "source": "/version.json",                 "destination": "/version.json" },
-    { "source": "/share-modal.js",               "destination": "/share-modal.js" },
-    { "source": "/favicon.png",                  "destination": "/favicon.png" },
-    { "source": "/icare_logo.png",               "destination": "/icare_logo.png" },
-    { "source": "/(.*)",                         "destination": "/index.html" }
   ]
 }
