@@ -45,9 +45,7 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
   String? _error;
   final List<int> _remoteUids = [];
 
-  // Show "Enable Camera & Mic" button until user explicitly grants permission via a tap.
-  // This ensures getUserMedia is called from a real user gesture (Chrome requirement).
-  bool _permissionsEnabled = false;
+  bool _permissionsEnabled = true;
 
   // UI State
   bool _chatOpen = false;
@@ -336,14 +334,22 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
           final tokenData = await AgoraService().getToken(channelName: roomName, uid: 0);
           final agoraToken = tokenData['data']?['token'] as String? ?? '';
           final agoraAppId = tokenData['data']?['appId'] as String? ?? '';
-          Future.delayed(const Duration(milliseconds: 400), () {
-            try {
-              lmsJoinChannel(roomName, agoraAppId, agoraToken, widget.isInstructor);
-              debugPrint('LMS Agora join: room=$roomName');
-            } catch (e) {
-              debugPrint('LMS Agora join error: $e');
+          await Future.delayed(const Duration(milliseconds: 400));
+          try {
+            await lmsJoinChannel(roomName, agoraAppId, agoraToken, widget.isInstructor);
+            debugPrint('LMS Agora join: room=$roomName isInstructor=${widget.isInstructor}');
+            // Only instructor publishes mic+cam. Students are audience — they receive only.
+            if (widget.isInstructor) {
+              try {
+                await lmsEnableMediaAndPublish();
+                debugPrint('LMS: instructor mic+cam published');
+              } catch (e) {
+                debugPrint('LMS: instructor media publish error: $e');
+              }
             }
-          });
+          } catch (e) {
+            debugPrint('LMS Agora join error: $e');
+          }
         } catch (e) {
           debugPrint('LMS token fetch error: $e');
         }

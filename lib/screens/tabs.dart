@@ -140,8 +140,16 @@ class _TabsScreenState extends ConsumerState<TabsScreen> {
       final enrollments = await _courseService.myPurchases();
       debugPrint('🔵 LIVE POLLER: checking ${enrollments.length} enrollments');
       for (final enrollment in enrollments) {
-        final course = enrollment['course'] as Map? ?? enrollment['courseId'] as Map? ?? {};
-        final courseId = course['_id']?.toString() ?? '';
+        final rawCourse = enrollment['course'];
+        final rawCourseId = enrollment['courseId'];
+        final Map course = (rawCourse is Map)
+            ? rawCourse
+            : (rawCourseId is Map)
+                ? rawCourseId
+                : <String, dynamic>{};
+        final courseId = course['_id']?.toString() ??
+            (rawCourseId is String ? rawCourseId : null) ??
+            '';
         final courseTitle = course['title']?.toString() ?? 'Your Course';
         if (courseId.isEmpty) continue;
         try {
@@ -1204,6 +1212,18 @@ class _WebSidebarState extends ConsumerState<_WebSidebar> {
                       Navigator.of(context).push(
                         MaterialPageRoute(
                           builder: (ctx) => const LabAnalytics(),
+                        ),
+                      );
+                    },
+                  ),
+                  _buildExtraNavItem(
+                    context,
+                    Icons.settings_outlined,
+                    'Settings',
+                    () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (ctx) => const SettingsScreen(),
                         ),
                       );
                     },

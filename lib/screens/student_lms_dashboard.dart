@@ -65,15 +65,26 @@ class _StudentLmsDashboardState extends State<StudentLmsDashboard>
   }
 
   void _startGlobalLivePolling() {
-    _checkAllCoursesForLive();
-    _globalLivePoller = Timer.periodic(const Duration(seconds: 15), (_) => _checkAllCoursesForLive());
+    // Don't check immediately — enrollments won't be loaded yet.
+    // The check will be triggered inside _loadEnrollments() once data arrives,
+    // and then polled every 5 seconds.
+    _globalLivePoller = Timer.periodic(const Duration(seconds: 5), (_) => _checkAllCoursesForLive());
   }
 
   Future<void> _checkAllCoursesForLive() async {
     if (!mounted || _enrollments.isEmpty) return;
     for (final enrollment in _enrollments) {
-      final course = enrollment['courseId'] as Map? ?? enrollment['course'] as Map? ?? {};
-      final courseId = course['_id']?.toString() ?? enrollment['courseId']?.toString() ?? '';
+      // Safe cast: courseId may be a populated Map or a raw String ID
+      final rawCourseId = enrollment['courseId'];
+      final rawCourse = enrollment['course'];
+      final Map course = (rawCourseId is Map)
+          ? rawCourseId
+          : (rawCourse is Map)
+              ? rawCourse
+              : <String, dynamic>{};
+      final courseId = course['_id']?.toString() ??
+          (rawCourseId is String ? rawCourseId : null) ??
+          '';
       if (courseId.isEmpty) continue;
       try {
         final result = await _lmsService.checkActiveLiveSession(courseId);
@@ -167,6 +178,8 @@ class _StudentLmsDashboardState extends State<StudentLmsDashboard>
           _loadingCourses = false;
         });
         await _loadTodoItems(enrollments);
+        // Enrollments are now loaded — kick off first live check immediately
+        _checkAllCoursesForLive();
       }
     } catch (e) {
       if (mounted) {
@@ -388,16 +401,95 @@ class _StudentLmsDashboardState extends State<StudentLmsDashboard>
 
     return RefreshIndicator(
       onRefresh: _refresh,
-      child: GridView.builder(
-        padding: EdgeInsets.all(isWide ? 24 : 16),
-        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: isWide ? 3 : (MediaQuery.of(context).size.width > 600 ? 2 : 1),
-          crossAxisSpacing: 16,
-          mainAxisSpacing: 16,
-          childAspectRatio: isWide ? 1.1 : 1.0,
+      child: CustomScrollView(
+        slivers: [
+          // ── LIVE NOW banner — shows when any enrolled course is live ──
+          if (_activeLiveSession != null)
+            SliverToBoxAdapter(child: _buildLiveNowBanner()),
+          // ── Course cards grid ──
+          SliverPadding(
+            padding: EdgeInsets.fromLTRB(
+              isWide ? 24 : 16,
+              _activeLiveSession != null ? 12 : (isWide ? 24 : 16),
+              isWide ? 24 : 16,
+              isWide ? 24 : 16,
+            ),
+            sliver: SliverGrid(
+              delegate: SliverChildBuilderDelegate(
+                (ctx, i) => _buildClassCard(_enrollments[i], i),
+                childCount: _enrollments.length,
+              ),
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: isWide ? 3 : (MediaQuery.of(context).size.width > 600 ? 2 : 1),
+                crossAxisSpacing: 16,
+                mainAxisSpacing: 16,
+                childAspectRatio: isWide ? 1.1 : 1.0,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLiveNowBanner() {
+    final session = _activeLiveSession!;
+    final courseId = session['courseId']?.toString() ?? '';
+    final courseTitle = session['courseTitle']?.toString() ?? 'Your Course';
+    final sessionId = session['sessionId']?.toString() ?? '';
+    final validSessionId = sessionId.isNotEmpty && sessionId != courseId ? sessionId : courseId;
+
+    return GestureDetector(
+      onTap: () {
+        if (validSessionId.isEmpty) return;
+        Navigator.push(context, MaterialPageRoute(
+          builder: (_) => LmsLiveSessionScreen(
+            sessionId: validSessionId,
+            courseId: courseId,
+            sessionTitle: courseTitle,
+            isInstructor: false,
+          ),
+        ));
+      },
+      child: Container(
+        margin: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [Color(0xFFB91C1C), Color(0xFFDC2626)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [BoxShadow(color: Colors.red.withValues(alpha: 0.35), blurRadius: 16, offset: const Offset(0, 6))],
         ),
-        itemCount: _enrollments.length,
-        itemBuilder: (ctx, i) => _buildClassCard(_enrollments[i], i),
+        child: Row(children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(4)),
+            child: const Row(mainAxisSize: MainAxisSize.min, children: [
+              Icon(Icons.circle, color: Colors.red, size: 8),
+              SizedBox(width: 4),
+              Text('LIVE', style: TextStyle(color: Colors.red, fontSize: 11, fontWeight: FontWeight.w900)),
+            ]),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+              const Text('Instructor is LIVE now!',
+                  style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w800)),
+              Text(courseTitle, style: const TextStyle(color: Colors.white70, fontSize: 12),
+                  overflow: TextOverflow.ellipsis),
+            ]),
+          ),
+          const SizedBox(width: 12),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
+            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20)),
+            child: const Text('JOIN NOW',
+                style: TextStyle(color: Color(0xFFB91C1C), fontSize: 13, fontWeight: FontWeight.w900)),
+          ),
+        ]),
       ),
     );
   }

@@ -108,7 +108,7 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
 
   void _startLivePolling() {
     _checkLiveSession();
-    _livePoller = Timer.periodic(const Duration(seconds: 10), (_) => _checkLiveSession());
+    _livePoller = Timer.periodic(const Duration(seconds: 5), (_) => _checkLiveSession());
   }
 
   Future<void> _checkLiveSession() async {
@@ -255,16 +255,26 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: _buildAppBar(),
-      floatingActionButton: widget.isInstructor && _tabs.index == 1
+      floatingActionButton: !widget.isInstructor && _isSessionLive
           ? FloatingActionButton.extended(
-              onPressed: _showCreateMenu,
-              backgroundColor: const Color(0xFF1A73E8),
-              icon: const Icon(Icons.add_rounded, color: Colors.white),
-              label: const Text('Create',
-                  style: TextStyle(
-                      color: Colors.white, fontWeight: FontWeight.w500)),
+              onPressed: _joinLiveClass,
+              backgroundColor: Colors.red,
+              icon: const Icon(Icons.live_tv_rounded, color: Colors.white),
+              label: const Text(
+                'Join Live Session',
+                style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800),
+              ),
             )
-          : null,
+          : widget.isInstructor && _tabs.index == 1
+              ? FloatingActionButton.extended(
+                  onPressed: _showCreateMenu,
+                  backgroundColor: const Color(0xFF1A73E8),
+                  icon: const Icon(Icons.add_rounded, color: Colors.white),
+                  label: const Text('Create',
+                      style: TextStyle(
+                          color: Colors.white, fontWeight: FontWeight.w500)),
+                )
+              : null,
       body: TabBarView(
         controller: _tabs,
         children: [
@@ -365,13 +375,58 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
   Future<void> _joinLiveClass() async {
     if (!mounted) return;
     final courseId = widget.course['_id']?.toString() ?? '';
-    // Resolve the real live session ID before navigating
-    String sessionId = courseId;
+    if (courseId.isEmpty) return;
+
+    String sessionId = '';
+    bool isLive = false;
+
+    // First check: get live session from backend
     try {
       final result = await _lms.checkActiveLiveSession(courseId);
+      isLive = result['isLive'] == true;
       final sid = result['session']?['_id']?.toString() ?? '';
-      if (sid.isNotEmpty) sessionId = sid;
+      if (sid.isNotEmpty && sid != courseId) sessionId = sid;
     } catch (_) {}
+
+    if (!mounted) return;
+    if (!isLive) {
+      // Update local state so FAB hides immediately
+      if (_isSessionLive) setState(() => _isSessionLive = false);
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('No live session right now. Check back when your instructor goes live.'),
+        backgroundColor: Color(0xFF64748B),
+        duration: Duration(seconds: 3),
+      ));
+      return;
+    }
+
+    // If session ID is still missing, retry once after a short delay (instructor may be mid-setup)
+    if (sessionId.isEmpty) {
+      await Future.delayed(const Duration(seconds: 1));
+      if (!mounted) return;
+      try {
+        final retry = await _lms.checkActiveLiveSession(courseId);
+        final sid = retry['session']?['_id']?.toString() ?? '';
+        if (sid.isNotEmpty && sid != courseId) sessionId = sid;
+        // If still no real session doc, abort with a message
+        if (sessionId.isEmpty) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('Session is starting — please try again in a moment.'),
+            backgroundColor: Color(0xFF64748B),
+            duration: Duration(seconds: 3),
+          ));
+          return;
+        }
+      } catch (_) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Could not connect. Please try again.'),
+          backgroundColor: Colors.red,
+          duration: Duration(seconds: 3),
+        ));
+        return;
+      }
+    }
+
     if (!mounted) return;
     Navigator.push(
       context,
@@ -426,25 +481,6 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
                     ),
                   ]),
                 ),
-              ),
-            ),
-          // Show subtle join option even when not live (student can still join if they know)
-          if (!widget.isInstructor && !_isSessionLive)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade50,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.grey.shade200),
-                ),
-                child: Row(children: [
-                  const Icon(Icons.videocam_outlined, color: Colors.grey, size: 18),
-                  const SizedBox(width: 8),
-                  const Expanded(child: Text('No live session right now. Check back when your instructor goes live.',
-                      style: TextStyle(fontSize: 12, color: Color(0xFF64748B)))),
-                ]),
               ),
             ),
 
