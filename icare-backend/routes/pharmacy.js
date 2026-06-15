@@ -6,8 +6,80 @@ const User = require('../models/User');
 const PharmacyProfile = require('../models/PharmacyProfile');
 const Product = require('../models/Product');
 const PharmacyOrder = require('../models/PharmacyOrder');
+const EnhancedPrescription = require('../models/EnhancedPrescription');
+const MedicalRecord = require('../models/MedicalRecord');
 const { authMiddleware } = require('../middleware/auth');
 const { sendToUser } = require('../services/notificationService');
+const { sendEmail } = require('../utils/email');
+
+async function _sendDeliveredEmail(order) {
+  try {
+    const patient = await User.findById(order.patient_id).select('email name username').lean();
+    if (!patient?.email) return;
+    const orderNum = order.order_number || `#${order._id.toString().slice(-6).toUpperCase()}`;
+    const dateStr = new Date().toLocaleDateString('en-PK', { day: 'numeric', month: 'long', year: 'numeric' });
+    const receiptUrl = `https://icare-backend-inky.vercel.app/api/pharmacy/receipt/${order._id}`;
+    const itemsHtml = (order.items || []).map(i => {
+      const unitPrice = i.price || 0;
+      const qty = i.quantity || 1;
+      return `<tr>
+        <td style="padding:10px 14px;border-bottom:1px solid #f1f5f9;color:#1f2937;font-size:14px;">${i.product_name || i.name || 'Item'}${i.generic_name ? `<br/><span style="color:#94a3b8;font-size:12px;">${i.generic_name}</span>` : ''}</td>
+        <td style="padding:10px 14px;border-bottom:1px solid #f1f5f9;color:#64748b;text-align:center;font-size:14px;">×${qty}</td>
+        <td style="padding:10px 14px;border-bottom:1px solid #f1f5f9;color:#374151;text-align:right;font-size:14px;">Rs ${unitPrice.toFixed(0)}</td>
+        <td style="padding:10px 14px;border-bottom:1px solid #f1f5f9;color:#1f2937;text-align:right;font-weight:600;font-size:14px;">Rs ${(unitPrice * qty).toFixed(0)}</td>
+      </tr>`;
+    }).join('');
+    await sendEmail({
+      to: patient.email,
+      subject: `iCare — Your Medicine Order ${orderNum} has been Delivered ✅`,
+      html: `
+<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;background:#f8fafc;">
+  <div style="background:#0036BC;padding:28px 32px;border-radius:12px 12px 0 0;text-align:center;">
+    <h2 style="color:#fff;margin:0;font-size:22px;">📦 Order Delivered!</h2>
+    <p style="color:rgba(255,255,255,0.8);margin:6px 0 0;font-size:14px;">Your medicines have arrived safely</p>
+  </div>
+  <div style="background:#fff;padding:32px;border-radius:0 0 12px 12px;box-shadow:0 4px 20px rgba(0,0,0,0.06);">
+    <p style="color:#374151;font-size:15px;">Dear <strong>${patient.name || patient.username || 'Patient'}</strong>,</p>
+    <p style="color:#374151;font-size:14px;line-height:1.6;">Great news! Your pharmacy order <strong>${orderNum}</strong> has been delivered successfully. Please find your receipt below.</p>
+
+    <div style="background:#ECFDF5;border-left:4px solid #10B981;border-radius:8px;padding:14px 18px;margin:20px 0;">
+      <p style="margin:0;color:#065F46;font-weight:700;font-size:14px;">✅ Delivery Confirmed</p>
+      <p style="margin:6px 0 0;color:#374151;font-size:13px;"><strong>Order No:</strong> ${orderNum}</p>
+      <p style="margin:4px 0 0;color:#374151;font-size:13px;"><strong>Date:</strong> ${dateStr}</p>
+      ${order.delivery_address ? `<p style="margin:4px 0 0;color:#374151;font-size:13px;"><strong>Delivered to:</strong> ${order.delivery_address}</p>` : ''}
+    </div>
+
+    ${itemsHtml ? `
+    <p style="color:#0f172a;font-weight:700;font-size:14px;margin:24px 0 10px;">🧾 Order Summary</p>
+    <table style="width:100%;border-collapse:collapse;border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;">
+      <thead><tr style="background:#f8fafc;">
+        <th style="padding:10px 14px;text-align:left;color:#64748b;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;">Medicine</th>
+        <th style="padding:10px 14px;text-align:center;color:#64748b;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;">Qty</th>
+        <th style="padding:10px 14px;text-align:right;color:#64748b;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;">Unit Price</th>
+        <th style="padding:10px 14px;text-align:right;color:#64748b;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;">Total</th>
+      </tr></thead>
+      <tbody>${itemsHtml}</tbody>
+    </table>
+    <table width="100%" cellpadding="0" cellspacing="0" style="margin-top:12px;border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;">
+      <tr style="background:#f8fafc;">
+        <td style="padding:14px 18px;color:#64748b;font-size:13px;font-weight:600;">Grand Total</td>
+        <td style="padding:14px 18px;text-align:right;color:#0036BC;font-weight:800;font-size:18px;">Rs ${(order.total_amount || 0).toFixed(0)}</td>
+      </tr>
+    </table>` : ''}
+
+    <div style="text-align:center;margin:28px 0 16px;">
+      <a href="${receiptUrl}" style="background:#0036BC;color:#fff;padding:13px 32px;border-radius:8px;text-decoration:none;font-weight:700;font-size:15px;display:inline-block;">🧾 Download Receipt</a>
+    </div>
+    <p style="color:#64748b;font-size:12px;text-align:center;margin:0 0 20px;">Click above to open your receipt — you can save it as PDF from your browser.</p>
+
+    <hr style="border:none;border-top:1px solid #e2e8f0;margin:20px 0;">
+    <p style="color:#64748b;font-size:13px;margin:0 0 4px;">Any concerns? Contact your pharmacy through the <strong>iCare app</strong>.</p>
+    <p style="color:#94a3b8;font-size:12px;text-align:center;margin:20px 0 0;">iCare Healthcare Platform &nbsp;|&nbsp; <a href="https://www.icare.com.co" style="color:#0036BC;text-decoration:none;">www.icare.com.co</a></p>
+  </div>
+</div>`,
+    });
+  } catch (e) { console.error('[Pharmacy] Delivered email error:', e.message); }
+}
 
 // Notification messages per status
 function _statusNotifPayload(status, orderNumber) {
@@ -386,9 +458,36 @@ router.get('/orders/pharmacy/list', authMiddleware, async (req, res) => {
     const pMap = {};
     patients.forEach(p => { pMap[p._id.toString()] = p; });
 
+    // Look up doctor names for prescription orders
+    const prescriptionIds = rawOrders
+      .map(o => o.prescription_id?.toString())
+      .filter(id => id && id.length === 24);
+    const prescriptionDoctorMap = {};
+    if (prescriptionIds.length > 0) {
+      try {
+        const objIds = prescriptionIds.map(id => toId(id)).filter(Boolean);
+        const [enhancedRx, medRecords] = await Promise.all([
+          EnhancedPrescription.find({ _id: { $in: objIds } })
+            .populate('doctorId', 'name username').lean(),
+          MedicalRecord.find({ _id: { $in: objIds } })
+            .populate('doctor', 'name username').lean(),
+        ]);
+        enhancedRx.forEach(rx => {
+          const name = rx.doctorId?.name || rx.doctorId?.username;
+          if (name) prescriptionDoctorMap[rx._id.toString()] = name;
+        });
+        medRecords.forEach(mr => {
+          const name = mr.doctor?.name || mr.doctor?.username;
+          if (name) prescriptionDoctorMap[mr._id.toString()] = name;
+        });
+      } catch (_) {}
+    }
+
     const orders = rawOrders.map(o => {
       const pid = o.patient_id?.toString() || '';
       const pt = pMap[pid];
+      const rxId = o.prescription_id?.toString() || '';
+      const doctorName = prescriptionDoctorMap[rxId] || null;
       return {
         _id: o._id.toString(),
         orderNumber: o.order_number || `#${o._id.toString().slice(-6).toUpperCase()}`,
@@ -402,6 +501,7 @@ router.get('/orders/pharmacy/list', authMiddleware, async (req, res) => {
         rejectionReason: o.rejection_reason || '',
         walkInMedicines: o.orderType === 'walk-in' ? (o.medicines || '') : '',
         orderType: o.orderType || 'cart',
+        doctorName,
         user: {
           _id: pt?._id?.toString() || '',
           name: o.orderType === 'walk-in'
@@ -409,6 +509,7 @@ router.get('/orders/pharmacy/list', authMiddleware, async (req, res) => {
             : (pt?.username || pt?.name || 'Patient'),
           email: pt?.email || '',
           phoneNumber: o.orderType === 'walk-in' ? (o.contact || '') : (pt?.phone || pt?.phoneNumber || ''),
+          address: pt?.address || '',
         },
         items: o.items || [],
       };
@@ -579,6 +680,7 @@ router.put('/update_order_status/:id', authMiddleware, async (req, res) => {
     if (notifPayload && order.patient_id && String(order.patient_id) !== String(userId)) {
       sendToUser(order.patient_id, { ...notifPayload, data: { orderId: String(order._id), type: notifPayload.type } }).catch(() => {});
     }
+    if (status === 'delivered' || status === 'completed') _sendDeliveredEmail(order);
 
     res.json({ success: true, message: 'Order updated successfully', order: { ...order.toObject(), _id: order._id.toString() } });
   } catch (err) {
@@ -624,6 +726,7 @@ router.put('/orders/:id', authMiddleware, async (req, res) => {
     if (notifPayload2 && order.patient_id && String(order.patient_id) !== String(userId)) {
       sendToUser(order.patient_id, { ...notifPayload2, data: { orderId: String(order._id), type: notifPayload2.type } }).catch(() => {});
     }
+    if (status === 'delivered' || status === 'completed') _sendDeliveredEmail(order);
 
     res.json({ success: true, message: 'Order updated', order: { ...order.toObject(), _id: order._id.toString() } });
   } catch (err) {
@@ -885,6 +988,107 @@ router.post('/orders/:id/rating', authMiddleware, async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ success: false, message: 'Failed to submit rating' });
+  }
+});
+
+// ─── PRINTABLE RECEIPT PAGE (public, no auth) ─────────────────────────────────
+router.get('/receipt/:orderId', async (req, res) => {
+  try {
+    await connectMongoDB();
+    const order = await PharmacyOrder.findById(toId(req.params.orderId)).lean();
+    if (!order) return res.status(404).send('<h2>Receipt not found</h2>');
+
+    const patient = await User.findById(order.patient_id).select('name username email').lean().catch(() => null);
+    const pharmProfile = await PharmacyProfile.findOne({ user_id: order.pharmacy_id }).lean().catch(() => null);
+    const pharmUser = await User.findById(order.pharmacy_id).select('username name').lean().catch(() => null);
+    const pharmName = pharmProfile?.pharmacy_name || pharmUser?.username || pharmUser?.name || 'iCare Pharmacy';
+    const patientName = patient?.name || patient?.username || 'Patient';
+    const orderNum = order.order_number || `#${order._id.toString().slice(-6).toUpperCase()}`;
+    const dateStr = new Date(order.createdAt || Date.now()).toLocaleDateString('en-PK', { day: 'numeric', month: 'long', year: 'numeric' });
+    const itemsHtml = (order.items || []).map((i, idx) => {
+      const unitPrice = i.price || 0;
+      const qty = i.quantity || 1;
+      return `<tr>
+        <td style="padding:11px 14px;border-bottom:1px solid #f1f5f9;">${idx + 1}</td>
+        <td style="padding:11px 14px;border-bottom:1px solid #f1f5f9;">
+          <strong>${i.product_name || i.name || 'Item'}</strong>
+          ${i.generic_name ? `<br/><span style="color:#94a3b8;font-size:12px;">${i.generic_name}</span>` : ''}
+        </td>
+        <td style="padding:11px 14px;border-bottom:1px solid #f1f5f9;text-align:center;">${qty}</td>
+        <td style="padding:11px 14px;border-bottom:1px solid #f1f5f9;text-align:right;">Rs ${unitPrice.toFixed(0)}</td>
+        <td style="padding:11px 14px;border-bottom:1px solid #f1f5f9;text-align:right;font-weight:600;">Rs ${(unitPrice * qty).toFixed(0)}</td>
+      </tr>`;
+    }).join('');
+
+    const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>iCare — Receipt ${orderNum}</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:Arial,sans-serif;background:#f8fafc;padding:24px;color:#1f2937}
+    .wrap{max-width:720px;margin:0 auto;background:#fff;border-radius:12px;box-shadow:0 4px 24px rgba(0,0,0,0.08);overflow:hidden}
+    .hdr{background:#0036BC;padding:28px 32px;text-align:center;color:#fff}
+    .hdr h1{font-size:22px;margin-bottom:4px}
+    .hdr p{opacity:.8;font-size:13px}
+    .body{padding:32px}
+    .meta{display:flex;justify-content:space-between;flex-wrap:wrap;gap:16px;margin-bottom:28px;padding-bottom:24px;border-bottom:1px solid #f1f5f9}
+    .meta-block h4{color:#94a3b8;font-size:10px;text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px}
+    .meta-block p{font-size:14px;font-weight:600;color:#1f2937}
+    .badge{display:inline-block;background:#DCFCE7;color:#166534;padding:3px 12px;border-radius:20px;font-size:13px;font-weight:600}
+    table{width:100%;border-collapse:collapse;font-size:14px}
+    thead tr{background:#f8fafc}
+    th{padding:10px 14px;text-align:left;color:#64748b;font-size:11px;text-transform:uppercase;letter-spacing:.5px;font-weight:700}
+    .total-row{background:#f8fafc}
+    .total-row td{padding:14px;font-weight:700;font-size:16px;color:#0036BC;border-top:2px solid #e2e8f0}
+    .print-btn{display:block;margin:28px auto 0;padding:12px 36px;background:#0036BC;color:#fff;border:none;border-radius:8px;font-size:15px;font-weight:700;cursor:pointer}
+    .ftr{text-align:center;padding:20px;color:#94a3b8;font-size:12px;border-top:1px solid #f1f5f9}
+    @media print{.print-btn{display:none}body{background:#fff;padding:0}.wrap{box-shadow:none;border-radius:0}}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="hdr">
+      <h1>🧾 Order Receipt</h1>
+      <p>iCare Healthcare Platform</p>
+    </div>
+    <div class="body">
+      <div class="meta">
+        <div class="meta-block"><h4>Order Number</h4><p>${orderNum}</p></div>
+        <div class="meta-block"><h4>Date</h4><p>${dateStr}</p></div>
+        <div class="meta-block"><h4>Patient</h4><p>${patientName}</p></div>
+        <div class="meta-block"><h4>Pharmacy</h4><p>${pharmName}</p></div>
+        <div class="meta-block"><h4>Status</h4><span class="badge">✅ Delivered</span></div>
+        ${order.delivery_address ? `<div class="meta-block" style="flex:1 1 100%"><h4>Delivery Address</h4><p>${order.delivery_address}</p></div>` : ''}
+      </div>
+
+      <table>
+        <thead><tr>
+          <th>#</th><th>Medicine</th><th style="text-align:center">Qty</th>
+          <th style="text-align:right">Unit Price</th><th style="text-align:right">Total</th>
+        </tr></thead>
+        <tbody>${itemsHtml}</tbody>
+        <tfoot>
+          <tr class="total-row">
+            <td colspan="4" style="text-align:right;padding:14px">Grand Total</td>
+            <td style="text-align:right;padding:14px">Rs ${(order.total_amount || 0).toFixed(0)}</td>
+          </tr>
+        </tfoot>
+      </table>
+
+      <button class="print-btn" onclick="window.print()">🖨️ Print / Save as PDF</button>
+    </div>
+    <div class="ftr">iCare Healthcare Platform &nbsp;|&nbsp; www.icare.com.co &nbsp;|&nbsp; This is an official delivery receipt.</div>
+  </div>
+</body>
+</html>`;
+    res.setHeader('Content-Type', 'text/html');
+    res.send(html);
+  } catch (e) {
+    console.error('[Pharmacy] Receipt page error:', e.message);
+    res.status(500).send('<h2>Error loading receipt</h2>');
   }
 });
 

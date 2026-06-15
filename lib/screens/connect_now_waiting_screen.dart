@@ -114,7 +114,7 @@ class _ConnectNowWaitingScreenState extends State<ConnectNowWaitingScreen>
     
     final sharedPref = SharedPref();
     final userData = await sharedPref.getUserData();
-    final patientName = userData?.name ?? 'Patient';
+    final patientName = (userData?.name?.trim().isNotEmpty == true) ? userData!.name.trim() : 'Patient';
     final patientId = userData?.id ?? '';
 
     if (!mounted) return;

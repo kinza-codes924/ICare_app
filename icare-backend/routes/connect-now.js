@@ -2,12 +2,16 @@ const express = require('express');
 const router = express.Router();
 const { connectMongoDB } = require('../config/mongodb');
 const ConnectNow = require('../models/ConnectNow');
+const User = require('../models/User');
 const { authMiddleware } = require('../middleware/auth');
+const { sendToUser } = require('../services/notificationService');
 
 // POST /api/connect-now/initiate — patient initiates instant consultation
 router.post('/initiate', authMiddleware, async (req, res) => {
   try {
     await connectMongoDB();
+
+    const patientName = req.body.patientName || 'Patient';
 
     // Generate unique channel name
     const channelName = `connect_now_${Date.now()}_${req.user.id}`;
@@ -15,12 +19,36 @@ router.post('/initiate', authMiddleware, async (req, res) => {
     // Create request
     const request = await ConnectNow.create({
       patientId: req.user.id,
-      patientName: req.body.patientName || 'Patient',
+      patientName,
       channelName,
     });
 
-    // Count available doctors (in real app, check who's online)
-    const notifiedDoctors = 1; // Placeholder
+    // Push notification to ALL available doctors immediately — no waiting for polling
+    let notifiedDoctors = 0;
+    try {
+      const doctors = await User.find({
+        role: { $in: ['Doctor', 'doctor'] },
+        is_active: { $ne: false },
+      }).select('_id').lean();
+
+      notifiedDoctors = doctors.length;
+
+      await Promise.all(doctors.map(d =>
+        sendToUser(d._id, {
+          title: '🚨 Instant Consultation Request',
+          body: `${patientName} needs a doctor right now! Tap to accept.`,
+          data: {
+            type: 'connect_now_request',
+            requestId: request._id.toString(),
+            patientName,
+            channelName,
+          },
+          type: 'connect_now_request',
+        }).catch(() => {})
+      ));
+    } catch (notifErr) {
+      console.warn('[ConnectNow] Push notification failed (non-blocking):', notifErr.message);
+    }
 
     res.json({
       success: true,

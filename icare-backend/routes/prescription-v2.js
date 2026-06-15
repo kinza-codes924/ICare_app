@@ -1,5 +1,7 @@
 const express = require('express');
 const router = express.Router();
+const mongoose = require('mongoose');
+const { connectMongoDB } = require('../config/mongodb');
 const prescriptionV2Controller = require('../controllers/prescriptionV2Controller');
 
 // Save prescription draft
@@ -25,5 +27,158 @@ router.get('/doctors/:doctorId/prescriptions', prescriptionV2Controller.getDocto
 
 // Update prescription status
 router.patch('/prescriptions/:prescriptionId/status', prescriptionV2Controller.updatePrescriptionStatus);
+
+// ─── PRINTABLE PRESCRIPTION PAGE — matches Flutter PDF template (public, no auth)
+router.get('/prescriptions/:prescriptionId/receipt', async (req, res) => {
+  try {
+    await connectMongoDB();
+    const EnhancedPrescription = require('../models/EnhancedPrescription');
+    const User = require('../models/User');
+
+    const rx = await EnhancedPrescription.findById(new mongoose.Types.ObjectId(req.params.prescriptionId)).lean();
+    if (!rx) return res.status(404).send('<h2>Prescription not found</h2>');
+
+    const [patient, doctor] = await Promise.all([
+      User.findById(rx.patientId).select('name username').lean().catch(() => null),
+      User.findById(rx.doctorId).select('name username').lean().catch(() => null),
+    ]);
+
+    const patientName = patient?.name || patient?.username || 'Patient';
+    const doctorName = doctor?.name || doctor?.username || 'Doctor';
+    const dateObj = new Date(rx.createdAt || Date.now());
+    const dateStr = dateObj.toLocaleDateString('en-PK', { day: 'numeric', month: 'long', year: 'numeric' });
+    const timeStr = dateObj.toLocaleTimeString('en-PK', { hour: '2-digit', minute: '2-digit' });
+    const rxId = rx._id.toString().slice(-8).toUpperCase();
+
+    const diagHtml = (rx.diagnoses || []).map(d => {
+      const text = d.description || d.desc || d.diagnosis || d.name || (typeof d === 'string' ? d : '');
+      return `<span style="display:inline-block;background:#FEF2F2;border:1px solid #FECACA;color:#991B1B;padding:4px 12px;border-radius:4px;font-size:12px;margin:2px 3px;">${text}</span>`;
+    }).join('');
+
+    const medsHtml = (rx.medicines || []).map((m, i) => {
+      const name = m.medicineName || m.name || m.medicine || 'Medicine';
+      const dose = m.dosage || m.dose || '';
+      const freq = m.frequency || '';
+      const dur = m.duration || '';
+      const details = [dose ? `Dose: ${dose}` : '', freq ? `Frequency: ${freq}` : '', dur ? `Duration: ${dur}` : ''].filter(Boolean).join('  ');
+      return `<div style="margin-bottom:8px;padding:10px 14px;background:#EFF6FF;border:1px solid #BFDBFE;border-radius:4px;">
+        <p style="margin:0;font-size:13px;font-weight:700;color:#0f172a;">${i + 1}. ${name}</p>
+        ${details ? `<p style="margin:4px 0 0;font-size:11px;color:#4B5563;">${details}</p>` : ''}
+      </div>`;
+    }).join('');
+
+    const labsHtml = (rx.labTests || []).map(t => {
+      const name = (typeof t === 'string') ? t : (t.testName || t.name || 'Lab Test');
+      return `<li style="margin-bottom:6px;font-size:13px;color:#374151;">${name}</li>`;
+    }).join('');
+
+    const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>iCare Prescription — ${rxId}</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:Arial,sans-serif;background:#f1f5f9;padding:24px;color:#1f2937;font-size:13px}
+    .wrap{max-width:740px;margin:0 auto;background:#fff;border-radius:8px;box-shadow:0 2px 16px rgba(0,0,0,0.08);overflow:hidden}
+    .hdr{padding:24px 32px 20px}
+    .hdr-row{display:table;width:100%}
+    .hdr-left{display:table-cell;vertical-align:top}
+    .hdr-right{display:table-cell;vertical-align:top;text-align:right}
+    .brand{font-size:26px;font-weight:900;color:#1D4ED8;line-height:1}
+    .brand-sub{font-size:10px;color:#6B7280;margin-top:3px}
+    .date-text{font-size:13px;font-weight:700;color:#1f2937}
+    .time-text{font-size:11px;color:#6B7280;margin-top:2px}
+    .divider{height:3px;background:#1D4ED8;margin:0}
+    .body{padding:24px 32px}
+    .pt-dr-row{display:table;width:100%;margin-bottom:20px}
+    .pt-col,.dr-col{display:table-cell;width:50%;vertical-align:top;padding:12px}
+    .col-label{font-size:8px;font-weight:700;color:#9CA3AF;text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px}
+    .col-name{font-size:15px;font-weight:800;color:#0f172a;margin-bottom:2px}
+    .col-sub{font-size:11px;color:#6B7280}
+    .sec-title{font-size:9px;font-weight:800;color:#1D4ED8;text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px}
+    .sec{margin-bottom:20px}
+    .validity-box{background:#FFFBEB;border:1px solid #FDE68A;border-radius:6px;padding:10px 14px;margin-bottom:20px;font-size:12px;color:#92400E}
+    .sig-row{display:table;width:100%;border-top:2px solid #e2e8f0;padding-top:16px;margin-top:8px}
+    .sig-right{display:table-cell;text-align:right;vertical-align:bottom}
+    .sig-line-elem{width:180px;border-top:1.5px solid #000;display:inline-block;margin-bottom:4px}
+    .sig-name{font-size:13px;font-weight:700;color:#0f172a}
+    .sig-sub{font-size:10px;color:#6B7280}
+    .footer-box{background:#F3F4F6;border-radius:4px;padding:10px 14px;margin-top:16px;font-size:9px;color:#6B7280;text-align:center;line-height:1.5}
+    .print-btn{display:block;margin:20px auto 0;padding:11px 36px;background:#1D4ED8;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer}
+    @media print{.print-btn{display:none}body{background:#fff;padding:0}.wrap{box-shadow:none;border-radius:0}}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="hdr">
+      <div class="hdr-row">
+        <div class="hdr-left">
+          <div class="brand">iCare</div>
+          <div class="brand-sub">RM Health Solutions (Private) Limited<br/>iCare Telemedicine Platform</div>
+        </div>
+        <div class="hdr-right">
+          <div class="date-text">${dateStr}</div>
+          <div class="time-text">${timeStr}</div>
+        </div>
+      </div>
+    </div>
+    <div class="divider"></div>
+
+    <div class="body">
+      <div class="pt-dr-row">
+        <div class="pt-col">
+          <div class="col-label">Patient</div>
+          <div class="col-name">${patientName}</div>
+          ${rx.patientAge ? `<div class="col-sub">Age: ${rx.patientAge}${rx.patientGender ? '  |  Gender: ' + rx.patientGender : ''}</div>` : ''}
+          ${rx.mrNumber || rx.patientMrNumber ? `<div class="col-sub" style="font-weight:700;">MR#: ${rx.mrNumber || rx.patientMrNumber}</div>` : ''}
+        </div>
+        <div class="dr-col">
+          <div class="col-label">Doctor</div>
+          <div class="col-name">Dr. ${doctorName}</div>
+          ${rx.doctorPmdc ? `<div class="col-sub">PMDC: ${rx.doctorPmdc}</div>` : ''}
+          ${rx.doctorPhone ? `<div class="col-sub">Phone: ${rx.doctorPhone}</div>` : ''}
+        </div>
+      </div>
+
+      ${diagHtml ? `<div class="sec"><div class="sec-title">Diagnosis</div><div>${diagHtml}</div></div>` : ''}
+
+      ${medsHtml ? `<div class="sec"><div class="sec-title">Rx&nbsp;&nbsp;Medications</div>${medsHtml}</div>` : ''}
+
+      ${labsHtml ? `<div class="sec"><div class="sec-title">Lab Tests</div><ul style="padding-left:20px;margin:0;">${labsHtml}</ul></div>` : ''}
+
+      ${rx.doctorNotes ? `<div class="sec"><div class="sec-title">Doctor Notes</div><p style="font-size:12px;color:#374151;line-height:1.6;margin:0;">${rx.doctorNotes}</p></div>` : ''}
+
+      ${rx.followUpDate ? `<div class="sec"><div class="sec-title">Follow-Up</div><p style="font-size:13px;color:#374151;margin:0;">Next visit: ${rx.followUpDate}</p></div>` : ''}
+
+      <div class="validity-box">⚠️ This prescription is valid for <strong>30 days</strong> from the date of issue.</div>
+
+      <div class="sig-row">
+        <div class="sig-right">
+          <div><span class="sig-line-elem"></span></div>
+          <div class="sig-name">Dr. ${doctorName}</div>
+          ${rx.doctorPmdc ? `<div class="sig-sub">PMDC Reg. No. ${rx.doctorPmdc}</div>` : ''}
+          <div class="sig-sub">Authorized Signature</div>
+        </div>
+      </div>
+
+      <div class="footer-box">
+        This prescription has been electronically generated and authenticated via iCare — RM Health Solutions (Private) Limited.<br/>
+        Valid only for the stated patient and date. &nbsp;|&nbsp; <strong>www.icare.com.co</strong> &nbsp;|&nbsp; Prescription Ref: ${rxId}
+      </div>
+
+      <button class="print-btn" onclick="window.print()">🖨️ Print / Save as PDF</button>
+    </div>
+  </div>
+</body>
+</html>`;
+    res.setHeader('Content-Type', 'text/html');
+    res.send(html);
+  } catch (e) {
+    console.error('[Prescription] Receipt error:', e.message);
+    res.status(500).send('<h2>Error loading prescription</h2>');
+  }
+});
 
 module.exports = router;

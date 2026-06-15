@@ -10,8 +10,9 @@ class ConnectNowService {
   Future<Map<String, dynamic>> initiateConnect() async {
     try {
       final userData = await _sharedPref.getUserData();
+      final patientName = (userData?.name?.trim().isNotEmpty == true) ? userData!.name.trim() : 'Patient';
       final response = await _apiService.post('/connect-now/initiate', {
-        'patientName': userData?.name ?? 'Patient',
+        'patientName': patientName,
       });
       return response.data;
     } catch (e) {

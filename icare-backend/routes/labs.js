@@ -7,9 +7,70 @@ const LabProfile = require('../models/LabProfile');
 const LabTestRequest = require('../models/LabTestRequest');
 const { authMiddleware } = require('../middleware/auth');
 const { sendToUser } = require('../services/notificationService');
+const { sendEmail } = require('../utils/email');
 
 function toId(id) {
   try { return new mongoose.Types.ObjectId(id); } catch { return null; }
+}
+
+function _labReportEmailHtml({ patientName, testName, dateStr, reportUrl, reportPageUrl, reportNotes }) {
+  return `
+<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;background:#f8fafc;">
+  <div style="background:#0B2D6E;padding:28px 32px;border-radius:12px 12px 0 0;text-align:center;">
+    <h2 style="color:#fff;margin:0;font-size:22px;">🔬 Lab Report Ready</h2>
+    <p style="color:rgba(255,255,255,0.75);margin:6px 0 0;font-size:14px;">Your test results are now available</p>
+  </div>
+  <div style="background:#fff;padding:32px;border-radius:0 0 12px 12px;box-shadow:0 4px 20px rgba(0,0,0,0.06);">
+    <p style="color:#374151;font-size:15px;margin:0 0 6px;">Dear <strong>${patientName}</strong>,</p>
+    <p style="color:#374151;font-size:14px;line-height:1.6;margin:0 0 20px;">Your <strong>${testName}</strong> results are ready. Please find the details below.</p>
+
+    <table width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 20px;">
+      <tr>
+        <td width="50%" style="padding:12px;background:#EFF6FF;border:1px solid #DBEAFE;border-radius:6px;vertical-align:top;">
+          <p style="margin:0 0 4px;color:#1e40af;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;">Patient</p>
+          <p style="margin:0;color:#0f172a;font-size:14px;font-weight:600;">${patientName}</p>
+        </td>
+        <td width="4%" style="padding:0;"> </td>
+        <td width="46%" style="padding:12px;background:#EFF6FF;border:1px solid #DBEAFE;border-radius:6px;vertical-align:top;">
+          <p style="margin:0 0 4px;color:#1e40af;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;">Date</p>
+          <p style="margin:0;color:#0f172a;font-size:14px;font-weight:600;">${dateStr}</p>
+        </td>
+      </tr>
+    </table>
+
+    <table width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 20px;border:1px solid #DBEAFE;border-radius:8px;overflow:hidden;">
+      <tr style="background:#EFF6FF;">
+        <td style="padding:12px 16px;color:#1e40af;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;" colspan="2">Test Details</td>
+      </tr>
+      <tr style="background:#fff;">
+        <td style="padding:10px 16px;color:#64748b;font-size:13px;width:35%;">Test Name</td>
+        <td style="padding:10px 16px;color:#0f172a;font-size:13px;font-weight:600;">${testName}</td>
+      </tr>
+      <tr style="background:#f8fafc;">
+        <td style="padding:10px 16px;color:#64748b;font-size:13px;">Report Date</td>
+        <td style="padding:10px 16px;color:#0f172a;font-size:13px;font-weight:600;">${dateStr}</td>
+      </tr>
+      <tr style="background:#fff;">
+        <td style="padding:10px 16px;color:#64748b;font-size:13px;">Status</td>
+        <td style="padding:10px 16px;"><span style="background:#DCFCE7;color:#166534;padding:3px 10px;border-radius:20px;font-size:12px;font-weight:700;">Results Ready ✅</span></td>
+      </tr>
+    </table>
+
+    ${reportNotes ? `<table width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 20px;border-left:4px solid #0B2D6E;border-radius:4px;background:#f8fafc;"><tr><td style="padding:14px 18px;"><p style="margin:0 0 4px;color:#64748b;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;">Lab Notes</p><p style="margin:0;color:#374151;font-size:14px;">${reportNotes}</p></td></tr></table>` : ''}
+
+    <table width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 8px;">
+      <tr>
+        ${reportUrl ? `<td style="padding:0 6px 0 0;"><a href="${reportUrl}" style="display:block;background:#0B2D6E;color:#fff;padding:13px 0;border-radius:8px;text-decoration:none;font-weight:700;font-size:14px;text-align:center;">📄 Download PDF Report</a></td>` : ''}
+        <td style="padding:0 0 0 ${reportUrl ? '6px' : '0'};"><a href="${reportPageUrl}" style="display:block;background:#fff;color:#0B2D6E;padding:12px 0;border-radius:8px;text-decoration:none;font-weight:700;font-size:14px;text-align:center;border:2px solid #0B2D6E;">🔬 View Full Report</a></td>
+      </tr>
+    </table>
+    <p style="color:#94a3b8;font-size:12px;text-align:center;margin:8px 0 20px;">Click "View Full Report" to open a printable lab report — save it as PDF from your browser.</p>
+
+    <p style="color:#64748b;font-size:13px;margin:0 0 4px;">You can also view your report anytime in the <strong>iCare app</strong> under Lab Reports.</p>
+    <hr style="border:none;border-top:1px solid #e2e8f0;margin:20px 0;">
+    <p style="color:#94a3b8;font-size:12px;text-align:center;margin:0;">iCare Healthcare Platform &nbsp;|&nbsp; <a href="https://www.icare.com.co" style="color:#0B2D6E;text-decoration:none;">www.icare.com.co</a></p>
+  </div>
+</div>`;
 }
 
 // ─── HAVERSINE DISTANCE (km) ──────────────────────────────────────────────────
@@ -260,35 +321,45 @@ router.get('/bookings/my', authMiddleware, async (req, res) => {
   try {
     await connectMongoDB();
     const userId = toId(req.user.id);
-    const bookings = await LabTestRequest.find({ patient_id: userId }).sort({ createdAt: -1 }).lean();
-    const labIds = [...new Set(bookings.map(b => b.lab_id.toString()))];
-    const labs = await User.find({ _id: { $in: labIds.map(id => toId(id)) } }).lean();
-    const labProfiles = await LabProfile.find({ user_id: { $in: labIds.map(id => toId(id)) } }).lean();
+    const [bookings, authUser] = await Promise.all([
+      LabTestRequest.find({ patient_id: userId }).sort({ createdAt: -1 }).lean(),
+      User.findById(userId).lean(),
+    ]);
+    const authPatientName = authUser?.name || authUser?.username || '';
+
+    const labIds = [...new Set(bookings.map(b => b.lab_id?.toString()).filter(Boolean))];
+    const labs = labIds.length > 0 ? await User.find({ _id: { $in: labIds.map(id => toId(id)) } }).lean() : [];
+    const labProfiles = labIds.length > 0 ? await LabProfile.find({ user_id: { $in: labIds.map(id => toId(id)) } }).lean() : [];
     const lMap = {};
     labs.forEach(l => { lMap[l._id.toString()] = l; });
     const lpMap = {};
     labProfiles.forEach(p => { lpMap[p.user_id.toString()] = p; });
 
-    const result = bookings.map(b => ({
-      ...b,
-      _id: b._id.toString(),
-      // camelCase aliases for Flutter
-      prescriptionId: b.prescription_id?.toString() || b.medical_record_id?.toString() || null,
-      medicalRecordId: b.prescription_id?.toString() || b.medical_record_id?.toString() || null,
-      testName: b.test_type,
-      testType: b.test_type,
-      date: b.test_date,
-      reportUrl: b.report_url,
-      reportNotes: b.report_notes,
-      bookingNumber: b._id.toString().slice(-6).toUpperCase(),
-      isAbnormal: b.is_abnormal || false,
-      criticalAlert: b.critical_alert || false,
-      laboratory: {
-        _id: lMap[b.lab_id.toString()]?._id?.toString(),
-        labName: lpMap[b.lab_id.toString()]?.lab_name || lMap[b.lab_id.toString()]?.username || lMap[b.lab_id.toString()]?.name || 'Laboratory',
-        city: lpMap[b.lab_id.toString()]?.city || '',
-      },
-    }));
+    const result = bookings.map(b => {
+      const resolvedName = b.patient_name_override || authPatientName || 'Patient';
+      return {
+        ...b,
+        _id: b._id.toString(),
+        patientName: resolvedName,
+        patient_name: resolvedName,
+        // camelCase aliases for Flutter
+        prescriptionId: b.prescription_id?.toString() || b.medical_record_id?.toString() || null,
+        medicalRecordId: b.prescription_id?.toString() || b.medical_record_id?.toString() || null,
+        testName: b.test_type,
+        testType: b.test_type,
+        date: b.test_date,
+        reportUrl: b.report_url,
+        reportNotes: b.report_notes,
+        bookingNumber: b._id.toString().slice(-6).toUpperCase(),
+        isAbnormal: b.is_abnormal || false,
+        criticalAlert: b.critical_alert || false,
+        laboratory: {
+          _id: lMap[b.lab_id?.toString()]?._id?.toString(),
+          labName: lpMap[b.lab_id?.toString()]?.lab_name || lMap[b.lab_id?.toString()]?.username || lMap[b.lab_id?.toString()]?.name || 'Laboratory',
+          city: lpMap[b.lab_id?.toString()]?.city || '',
+        },
+      };
+    });
     res.json({ success: true, bookings: result });
   } catch (error) {
     console.error(error);
@@ -334,20 +405,22 @@ router.put('/bookings/:bookingId', authMiddleware, async (req, res) => {
   try {
     await connectMongoDB();
     const userId = toId(req.user.id);
-    let { status, results, testDate, date, reportNotes, reportUrl } = req.body;
-    
+    let { status, results, testDate, date, reportNotes, reportUrl, approvedByDoctor, sampleCollectedBy } = req.body;
+
     // Normalize status: accept both underscore and hyphen variants
     // Store with underscore for consistency
     if (status) {
       status = status.replace(/-/g, '_');
     }
-    
+
     const update = {};
     if (status) update.status = status;
     if (results) update.results = results;
     if (testDate || date) update.test_date = testDate || date;
-    if (reportNotes) update.report_notes = reportNotes;
+    if (reportNotes !== undefined) update.report_notes = reportNotes;
     if (reportUrl) update.report_url = reportUrl;
+    if (approvedByDoctor !== undefined) update.approvedByDoctor = approvedByDoctor;
+    if (sampleCollectedBy !== undefined) update.sampleCollectedBy = sampleCollectedBy;
 
     // Auto-set status to reporting_done when results are submitted without explicit status
     if (results && !status) {
@@ -375,6 +448,24 @@ router.put('/bookings/:bookingId', authMiddleware, async (req, res) => {
         data: { bookingId: booking._id.toString(), type: 'lab_result' },
         type: 'system_alert',
       }).catch(() => {});
+
+      // ── Email patient with lab report ────────────────────────────────────────
+      try {
+        const patientUser = await User.findById(booking.patient_id).select('email name username').lean();
+        const patientEmail = booking.patient_email || patientUser?.email;
+        if (patientEmail) {
+          const rUrl = booking.report_url || update.report_url;
+          const rNotes = booking.report_notes || update.report_notes || '';
+          const patientName = patientUser?.name || patientUser?.username || 'Patient';
+          const dateStr = new Date().toLocaleDateString('en-PK', { day: 'numeric', month: 'long', year: 'numeric' });
+          const reportPageUrl = `https://icare-backend-inky.vercel.app/api/labs/report/${booking._id}`;
+          await sendEmail({
+            to: patientEmail,
+            subject: `iCare — Your ${testName} Report is Ready`,
+            html: _labReportEmailHtml({ patientName, testName, dateStr, reportUrl: rUrl, reportPageUrl, reportNotes: rNotes }),
+          });
+        }
+      } catch (emailErr) { console.error('[Lab] Email error:', emailErr.message); }
     }
     // ── Award gamification points to patient on lab test completion ─────────────
     if ((update.status === 'completed' || update.status === 'reporting_done') && booking.patient_id) {
@@ -457,7 +548,10 @@ router.get('/:labId/bookings', authMiddleware, async (req, res) => {
       const pid = b.patient_id?.toString();
       const pUser = pid ? pMap[pid] : null;
       // Walk-in override takes priority so the actual patient name is always correct
-      const resolvedName = b.patient_name_override || pUser?.username || pUser?.name || 'Unknown';
+      const resolvedName = b.patient_name_override ||
+        (pUser?.name && pUser.name.trim() ? pUser.name.trim() : null) ||
+        (pUser?.username && pUser.username.trim() ? pUser.username.trim() : null) ||
+        b.contact || '';
       return {
       ...b,
       _id: b._id.toString(),
@@ -684,6 +778,23 @@ router.post('/bookings/:bookingId/upload-report', authMiddleware, async (req, re
         data: { bookingId: booking._id.toString(), type: 'lab_result' },
         type: 'system_alert',
       }).catch(() => {});
+
+      // Email patient with report download link
+      try {
+        const patientUser = await User.findById(booking.patient_id).select('email name username').lean();
+        const patientEmail = booking.patient_email || patientUser?.email;
+        if (patientEmail) {
+          const testName = booking.test_type || 'Lab Test';
+          const patientName = patientUser?.name || patientUser?.username || 'Patient';
+          const dateStr = new Date().toLocaleDateString('en-PK', { day: 'numeric', month: 'long', year: 'numeric' });
+          const reportPageUrl = `https://icare-backend-inky.vercel.app/api/labs/report/${booking._id}`;
+          await sendEmail({
+            to: patientEmail,
+            subject: `iCare — Your ${testName} Report is Ready`,
+            html: _labReportEmailHtml({ patientName, testName, dateStr, reportUrl, reportPageUrl, reportNotes: booking.report_notes || '' }),
+          });
+        }
+      } catch (emailErr) { console.error('[Lab] Upload-report email error:', emailErr.message); }
     }
     if (booking.doctor_id) {
       const testName = booking.test_type || 'Lab Test';
@@ -699,6 +810,185 @@ router.post('/bookings/:bookingId/upload-report', authMiddleware, async (req, re
   } catch (error) {
     console.error(error);
     res.status(500).json({ success: false, message: 'Failed to upload report' });
+  }
+});
+
+// ─── PRINTABLE LAB REPORT PAGE (public, no auth) ─────────────────────────────
+router.get('/report/:bookingId', async (req, res) => {
+  try {
+    await connectMongoDB();
+    const booking = await LabTestRequest.findById(toId(req.params.bookingId)).lean();
+    if (!booking) return res.status(404).send('<h2>Report not found</h2>');
+
+    const [patientUser, labUser, labProfile] = await Promise.all([
+      User.findById(booking.patient_id).select('name username phone email').lean().catch(() => null),
+      User.findById(booking.lab_id).select('name username').lean().catch(() => null),
+      LabProfile.findOne({ user_id: booking.lab_id }).lean().catch(() => null),
+    ]);
+
+    const patientName = booking.patient_name_override || patientUser?.name || patientUser?.username || 'Patient';
+    const patientPhone = booking.patient_phone || patientUser?.phone || '—';
+    const labName = labProfile?.lab_name || labUser?.username || labUser?.name || 'iCare Laboratory';
+    const bookingNum = booking._id.toString().slice(-6).toUpperCase();
+    const dateObj = booking.test_date ? new Date(booking.test_date) : new Date(booking.createdAt);
+    const dateStr = dateObj.toLocaleDateString('en-PK', { day: 'numeric', month: 'long', year: 'numeric' });
+    const testName = booking.test_type || 'Lab Test';
+    const testList = testName.split(',').map(t => t.trim()).filter(Boolean);
+    const results = Array.isArray(booking.results) ? booking.results : [];
+    const notes = booking.report_notes || '';
+    const doctors = Array.isArray(labProfile?.doctors) ? labProfile.doctors.filter(d => d.name) : [];
+    const sampleCollectedBy = booking.sampleCollectedBy || '';
+
+    const testsHtml = testList.map((t, i) => `
+      <tr>
+        <td style="padding:10px 14px;border-bottom:1px solid #f1f5f9;width:36px;">
+          <span style="display:inline-block;background:#0B2D6E;color:#fff;width:22px;height:22px;border-radius:3px;text-align:center;line-height:22px;font-size:11px;font-weight:700;">${i + 1}</span>
+        </td>
+        <td style="padding:10px 14px;border-bottom:1px solid #f1f5f9;font-size:14px;font-weight:600;color:#0f172a;">${t}</td>
+      </tr>`).join('');
+
+    const resultsHtml = results.length > 0 ? `
+      <div class="section">
+        <h3>TEST RESULTS</h3>
+        <table>
+          <thead><tr>
+            <th>TEST PARAMETER</th>
+            <th>RESULT</th>
+            <th>UNIT</th>
+            <th>REFERENCE RANGE</th>
+          </tr></thead>
+          <tbody>
+            ${results.map((r, i) => {
+              const isAbn = r.isAbnormal || r.is_abnormal || r.abnormal;
+              return `<tr style="background:${i % 2 === 0 ? '#fafafa' : '#fff'}">
+                <td style="padding:9px 12px;border-bottom:1px solid #f1f5f9;">${r.testParameter || r.parameter || '—'}</td>
+                <td style="padding:9px 12px;border-bottom:1px solid #f1f5f9;font-weight:700;color:${isAbn ? '#DC2626' : '#0f172a'};">${r.value || '—'}</td>
+                <td style="padding:9px 12px;border-bottom:1px solid #f1f5f9;color:#64748b;">${r.unit || '—'}</td>
+                <td style="padding:9px 12px;border-bottom:1px solid #f1f5f9;color:#64748b;font-size:12px;">${r.referenceRange || r.reference_range || '—'}</td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+        <p style="color:#64748b;font-size:12px;margin:8px 0 0;"><span style="color:#DC2626;font-weight:700;">■</span> Values outside reference range are flagged in red</p>
+      </div>` : `
+      <div style="background:#FFFBEB;border:1px solid #FDE68A;border-radius:8px;padding:14px 18px;margin:0 0 24px;font-size:13px;color:#92400E;">
+        ⚠️ Detailed test results will be updated by the laboratory. Please contact the laboratory for individual parameter values.
+      </div>`;
+
+    const doctorsHtml = doctors.length > 0 ? `
+      <div class="section">
+        <h3>VERIFIED BY</h3>
+        <table width="100%" cellpadding="0" cellspacing="0">
+          <tr>${doctors.map(d => `
+            <td style="padding:0 8px 0 0;vertical-align:top;">
+              <div style="border:1px solid #e2e8f0;border-radius:8px;padding:12px;">
+                <p style="margin:0;font-weight:700;font-size:14px;color:#0f172a;">${d.name || ''}</p>
+                ${d.designation ? `<p style="margin:3px 0 0;font-size:12px;color:#64748b;">${d.designation}</p>` : ''}
+                ${d.education ? `<p style="margin:2px 0 0;font-size:12px;color:#64748b;">${d.education}</p>` : ''}
+              </div>
+            </td>`).join('')}
+          </tr>
+        </table>
+      </div>` : '';
+
+    const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>iCare — Lab Report ${bookingNum}</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:Arial,sans-serif;background:#f8fafc;padding:24px;color:#1f2937}
+    .wrap{max-width:760px;margin:0 auto;background:#fff;border-radius:12px;box-shadow:0 4px 24px rgba(0,0,0,0.08);overflow:hidden}
+    .hdr{padding:24px 32px;border-bottom:3px solid #0B2D6E;}
+    .hdr-inner{display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:16px}
+    .brand-name{font-size:26px;font-weight:900;color:#0B2D6E;letter-spacing:-0.5px}
+    .brand-sub{font-size:11px;color:#64748b;margin-top:2px}
+    .badge{background:#0B2D6E;color:#fff;padding:5px 14px;border-radius:4px;font-size:11px;font-weight:700;letter-spacing:.5px;display:inline-block;margin-bottom:6px}
+    .report-meta p{font-size:11px;color:#64748b;margin:2px 0}
+    .body{padding:28px 32px}
+    .info-grid{display:table;width:100%;margin-bottom:24px}
+    .info-col{display:table-cell;width:50%;vertical-align:top;padding:14px;background:#EFF6FF;border:1px solid #DBEAFE;border-radius:8px}
+    .info-col:first-child{margin-right:12px}
+    .info-label{font-size:9px;font-weight:700;color:#1e40af;text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px}
+    .info-row{display:flex;margin-bottom:5px}
+    .info-key{width:100px;flex-shrink:0;font-size:11px;color:#64748b;font-weight:600}
+    .info-val{font-size:11px;color:#0f172a}
+    .section{margin-bottom:24px}
+    .section h3{font-size:9px;font-weight:800;color:#0B2D6E;text-transform:uppercase;letter-spacing:.8px;margin-bottom:12px;padding-bottom:6px;border-bottom:2px solid #EFF6FF}
+    table{width:100%;border-collapse:collapse;font-size:13px}
+    thead tr{background:#0B2D6E}
+    th{padding:9px 12px;text-align:left;color:#fff;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px}
+    .ftr{border-top:1px solid #e2e8f0;padding:16px 32px;background:#f8fafc}
+    .ftr p{font-size:11px;color:#64748b;margin:3px 0}
+    .print-btn{display:block;margin:24px auto;padding:12px 40px;background:#0B2D6E;color:#fff;border:none;border-radius:8px;font-size:15px;font-weight:700;cursor:pointer}
+    @media print{.print-btn{display:none}body{background:#fff;padding:0}.wrap{box-shadow:none;border-radius:0}}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="hdr">
+      <div class="hdr-inner">
+        <div>
+          <div class="brand-name">iCare</div>
+          <div class="brand-sub">Your Trusted Healthcare Platform</div>
+        </div>
+        <div class="report-meta" style="text-align:right">
+          <span class="badge">LABORATORY REPORT</span>
+          <p>Report No: <strong>${bookingNum}</strong></p>
+          <p>Date: ${dateStr}</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="body">
+      <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;">
+        <tr>
+          <td style="vertical-align:top;padding:14px;background:#EFF6FF;border:1px solid #DBEAFE;border-radius:8px;width:48%;">
+            <p style="font-size:9px;font-weight:700;color:#1e40af;text-transform:uppercase;letter-spacing:.8px;margin:0 0 8px;">Patient Information</p>
+            <p style="font-size:11px;margin:3px 0;color:#0f172a;"><strong>Name:</strong> ${patientName}</p>
+            <p style="font-size:11px;margin:3px 0;color:#0f172a;"><strong>Phone:</strong> ${patientPhone}</p>
+            ${sampleCollectedBy ? `<p style="font-size:11px;margin:3px 0;color:#0f172a;"><strong>Collected By:</strong> ${sampleCollectedBy}</p>` : ''}
+          </td>
+          <td style="width:4%;"></td>
+          <td style="vertical-align:top;padding:14px;background:#EFF6FF;border:1px solid #DBEAFE;border-radius:8px;width:48%;">
+            <p style="font-size:9px;font-weight:700;color:#1e40af;text-transform:uppercase;letter-spacing:.8px;margin:0 0 8px;">Laboratory Information</p>
+            <p style="font-size:11px;margin:3px 0;color:#0f172a;"><strong>Lab:</strong> ${labName}</p>
+            <p style="font-size:11px;margin:3px 0;color:#0f172a;"><strong>Report Date:</strong> ${dateStr}</p>
+          </td>
+        </tr>
+      </table>
+
+      <div class="section">
+        <h3>Tests Ordered</h3>
+        <table><tbody>${testsHtml}</tbody></table>
+      </div>
+
+      ${resultsHtml}
+
+      ${notes ? `<div class="section"><h3>Remarks / Notes</h3><div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:14px 18px;font-size:13px;line-height:1.6;color:#374151;">${notes}</div></div>` : ''}
+
+      ${doctorsHtml}
+
+      ${booking.report_url ? `<div style="text-align:center;margin:0 0 24px;"><a href="${booking.report_url}" style="display:inline-block;background:#0B2D6E;color:#fff;padding:12px 32px;border-radius:8px;text-decoration:none;font-weight:700;font-size:14px;">📄 Download Uploaded PDF Report</a></div>` : ''}
+
+      <button class="print-btn" onclick="window.print()">🖨️ Print / Save as PDF</button>
+    </div>
+
+    <div class="ftr">
+      ${sampleCollectedBy ? `<p>Sample Collected By: ${sampleCollectedBy}</p>` : ''}
+      <p>This is an electronically generated report. | Processed by: ${labName}</p>
+      <p style="font-weight:700;color:#0B2D6E;">Powered by iCare &nbsp;|&nbsp; www.icare.com.co</p>
+    </div>
+  </div>
+</body>
+</html>`;
+    res.setHeader('Content-Type', 'text/html');
+    res.send(html);
+  } catch (e) {
+    console.error('[Lab] Report page error:', e.message);
+    res.status(500).send('<h2>Error loading report</h2>');
   }
 });
 

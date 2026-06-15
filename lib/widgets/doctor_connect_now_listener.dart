@@ -34,7 +34,14 @@ class _DoctorConnectNowListenerState extends State<DoctorConnectNowListener> {
   @override
   void initState() {
     super.initState();
-    _loadHandledIds().then((_) => _startPolling());
+    _loadHandledIds().then((_) {
+      // Clear stuck in-consultation flag on fresh app start to prevent
+      // doctors from missing requests after a crash or forced kill
+      SharedPreferences.getInstance().then((prefs) {
+        prefs.setBool('doctor_in_consultation', false);
+      }).catchError((_) {});
+      _startPolling();
+    });
   }
 
   /// Load previously handled request IDs from persistent storage
