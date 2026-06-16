@@ -367,7 +367,7 @@ class _ClassworkTabState extends State<_ClassworkTab> {
             // Course modules/lessons section
             _SectionHeader(title: 'Course Content', icon: Icons.menu_book_rounded),
             const SizedBox(height: 8),
-            _CourseLessons(course: widget.course, enrollmentId: widget.enrollmentId, lms: widget.lms),
+            _CourseLessons(course: widget.course, enrollmentId: widget.enrollmentId, lms: widget.lms, isInstructor: widget.isInstructor),
             const SizedBox(height: 24),
             _SectionHeader(title: 'Assignments', icon: Icons.assignment_rounded),
             const SizedBox(height: 8),
@@ -406,7 +406,8 @@ class _CourseLessons extends StatelessWidget {
   final Map<String, dynamic> course;
   final String? enrollmentId;
   final LmsService lms;
-  const _CourseLessons({required this.course, this.enrollmentId, required this.lms});
+  final bool isInstructor;
+  const _CourseLessons({required this.course, this.enrollmentId, required this.lms, this.isInstructor = false});
 
   @override
   Widget build(BuildContext context) {
@@ -418,59 +419,113 @@ class _CourseLessons extends StatelessWidget {
         child: const Text('No lessons added yet', style: TextStyle(color: Color(0xFF94A3B8))),
       );
     }
+
+    final isPragmatic = course['courseType']?.toString().toLowerCase() == 'pragmatic';
+    final isSelfPaced = !isPragmatic;
+    final isInstructor = this.isInstructor;
+    final courseStart = course['startDate'] != null
+        ? DateTime.tryParse(course['startDate'].toString())
+        : null;
+    final completedModuleIds = <String>{};
+    final rawCompleted = course['_completedModules'];
+    if (rawCompleted is List) {
+      for (final id in rawCompleted) { completedModuleIds.add(id.toString()); }
+    }
+
+    DateTime? pragmaticUnlockDate(int index) {
+      if (!isPragmatic || courseStart == null) return null;
+      int days = 0;
+      for (int i = 0; i < index; i++) {
+        days += ((modules[i] as Map)['durationDays'] as num? ?? 7).toInt();
+      }
+      return courseStart.add(Duration(days: days));
+    }
+
+    bool isModuleLocked(int index) {
+      if (index == 0) return false;
+      if (isInstructor) return false;
+      if (isPragmatic) {
+        final unlock = pragmaticUnlockDate(index);
+        return unlock != null && DateTime.now().isBefore(unlock);
+      }
+      if (isSelfPaced) {
+        final prevId = (modules[index - 1] as Map)['_id']?.toString() ?? '';
+        if (prevId.isNotEmpty && !completedModuleIds.contains(prevId)) return true;
+      }
+      return false;
+    }
+
     return Column(children: modules.asMap().entries.map((me) {
-      final m = me.value;
+      final m = me.value as Map;
       final moduleId = m['_id']?.toString() ?? '';
       final lessons = (m['lessons'] as List?) ?? [];
       final quizzes = (m['quizzes'] as List?) ?? [];
+      final locked = isModuleLocked(me.key);
+      final unlockDate = isPragmatic ? pragmaticUnlockDate(me.key) : null;
+
       return Container(
         margin: const EdgeInsets.only(bottom: 8),
-        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12),
-          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 6)]),
-        child: ExpansionTile(
-          leading: CircleAvatar(radius: 16, backgroundColor: AppColors.primaryColor.withValues(alpha: 0.1),
-            child: Text('${me.key + 1}', style: TextStyle(color: AppColors.primaryColor, fontWeight: FontWeight.w700, fontSize: 12))),
-          title: Text(m['title'] ?? 'Module ${me.key + 1}', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
-          subtitle: Text('${lessons.length} lessons · ${quizzes.length} quizzes', style: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8))),
-          children: [
-            ...lessons.map((l) => ListTile(
-              leading: const Icon(Icons.play_circle_outline_rounded, color: AppColors.primaryColor, size: 20),
-              title: Text(l['title'] ?? 'Lesson', style: const TextStyle(fontSize: 13)),
-              dense: true,
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => LessonDetailPage(
-                    lesson: l,
-                    courseId: course['_id']?.toString() ?? '',
-                    moduleId: moduleId,
-                  ),
-                ),
-              ),
-            )),
-            ...quizzes.map((q) => ListTile(
-              leading: const Icon(Icons.quiz_outlined, color: Colors.orange, size: 20),
-              title: Text(q['title'] ?? 'Quiz', style: const TextStyle(fontSize: 13)),
-              dense: true,
-            )),
-            // Mark as Complete button
-            if (moduleId.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.all(12),
-                child: ElevatedButton.icon(
-                  onPressed: () => _markModuleComplete(context, moduleId),
-                  icon: const Icon(Icons.check_circle_outline, size: 18),
-                  label: const Text('Mark Module as Complete'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.green,
-                    foregroundColor: Colors.white,
-                    minimumSize: const Size(double.infinity, 40),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                  ),
-                ),
-              ),
-          ],
+        decoration: BoxDecoration(
+          color: locked ? const Color(0xFFF8FAFC) : Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 6)],
         ),
+        child: locked
+            ? ListTile(
+                leading: CircleAvatar(radius: 16, backgroundColor: Colors.grey.shade200,
+                  child: Text('${me.key + 1}', style: const TextStyle(color: Colors.grey, fontWeight: FontWeight.w700, fontSize: 12))),
+                title: Text(m['title'] ?? 'Module ${me.key + 1}',
+                  style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: Color(0xFF94A3B8))),
+                subtitle: Text(
+                  isPragmatic && unlockDate != null
+                      ? 'Unlocks ${DateFormat('MMM d, yyyy').format(unlockDate)}'
+                      : 'Complete the previous module to unlock',
+                  style: const TextStyle(fontSize: 11, color: Color(0xFFCBD5E1))),
+                trailing: const Icon(Icons.lock_outline_rounded, color: Color(0xFFCBD5E1), size: 20),
+              )
+            : ExpansionTile(
+                leading: CircleAvatar(radius: 16, backgroundColor: AppColors.primaryColor.withValues(alpha: 0.1),
+                  child: Text('${me.key + 1}', style: TextStyle(color: AppColors.primaryColor, fontWeight: FontWeight.w700, fontSize: 12))),
+                title: Text(m['title'] ?? 'Module ${me.key + 1}', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+                subtitle: Text('${lessons.length} lessons · ${quizzes.length} quizzes', style: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8))),
+                children: [
+                  ...lessons.map((l) => ListTile(
+                    leading: const Icon(Icons.play_circle_outline_rounded, color: AppColors.primaryColor, size: 20),
+                    title: Text(l['title'] ?? 'Lesson', style: const TextStyle(fontSize: 13)),
+                    dense: true,
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => LessonDetailPage(
+                          lesson: l,
+                          courseId: course['_id']?.toString() ?? '',
+                          moduleId: moduleId,
+                        ),
+                      ),
+                    ),
+                  )),
+                  ...quizzes.map((q) => ListTile(
+                    leading: const Icon(Icons.quiz_outlined, color: Colors.orange, size: 20),
+                    title: Text(q['title'] ?? 'Quiz', style: const TextStyle(fontSize: 13)),
+                    dense: true,
+                  )),
+                  if (!isInstructor && moduleId.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: ElevatedButton.icon(
+                        onPressed: () => _markModuleComplete(context, moduleId),
+                        icon: const Icon(Icons.check_circle_outline, size: 18),
+                        label: const Text('Mark Module as Complete'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.green,
+                          foregroundColor: Colors.white,
+                          minimumSize: const Size(double.infinity, 40),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
       );
     }).toList());
   }
@@ -861,14 +916,54 @@ class _GradesTab extends StatefulWidget {
 
 class _GradesTabState extends State<_GradesTab> {
   List<dynamic> _grades = [];
+  List<dynamic> _pendingCerts = [];
   bool _loading = true;
 
   @override
   void initState() { super.initState(); _load(); }
 
   Future<void> _load() async {
-    final g = await widget.lms.getCourseGrades(widget.courseId);
-    if (mounted) setState(() { _grades = g; _loading = false; });
+    final futures = <Future>[
+      widget.lms.getCourseGrades(widget.courseId).then((g) => _grades = g),
+      if (widget.isInstructor) widget.lms.getPendingCertificates(widget.courseId).then((c) => _pendingCerts = c),
+    ];
+    await Future.wait(futures);
+    if (mounted) setState(() => _loading = false);
+  }
+
+  Future<void> _approveCert(String certId, String studentName, String action) async {
+    final noteCtrl = TextEditingController();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(action == 'approve' ? 'Approve Certificate' : 'Reject Certificate'),
+        content: Column(mainAxisSize: MainAxisSize.min, children: [
+          Text('${action == 'approve' ? 'Approve' : 'Reject'} certificate for $studentName?'),
+          const SizedBox(height: 12),
+          TextField(controller: noteCtrl, decoration: const InputDecoration(labelText: 'Note (optional)', border: OutlineInputBorder()), maxLines: 2),
+        ]),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: action == 'approve' ? Colors.green : Colors.red,
+              foregroundColor: Colors.white,
+            ),
+            child: Text(action == 'approve' ? 'Approve' : 'Reject'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    final result = await widget.lms.approveCertificate(certId, action: action, note: noteCtrl.text.trim().isNotEmpty ? noteCtrl.text.trim() : null);
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(result['success'] == true ? 'Done!' : result['message'] ?? 'Failed'),
+        backgroundColor: result['success'] == true ? Colors.green : Colors.red,
+      ));
+      if (result['success'] == true) _load();
+    }
   }
 
   double get _average {
@@ -920,6 +1015,53 @@ class _GradesTabState extends State<_GradesTab> {
           ),
           const SizedBox(height: 20),
 
+          // Instructor: pending certificate approvals
+          if (widget.isInstructor && _pendingCerts.isNotEmpty) ...[
+            Container(
+              margin: const EdgeInsets.only(bottom: 16),
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: Colors.amber.shade50,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.amber.shade300),
+              ),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Row(children: [
+                  const Icon(Icons.workspace_premium_rounded, color: Colors.amber, size: 18),
+                  const SizedBox(width: 8),
+                  Text('Pending Certificate Approvals (${_pendingCerts.length})',
+                    style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13)),
+                ]),
+                const SizedBox(height: 10),
+                ..._pendingCerts.map((c) => Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Row(children: [
+                    CircleAvatar(radius: 16, backgroundColor: AppColors.primaryColor.withValues(alpha: 0.1),
+                      child: Text((c['studentName'] ?? 'S')[0].toUpperCase(),
+                        style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12, color: AppColors.primaryColor))),
+                    const SizedBox(width: 10),
+                    Expanded(child: Text(c['studentName'] ?? 'Student',
+                      style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13))),
+                    TextButton(
+                      onPressed: () => _approveCert(c['_id'].toString(), c['studentName'] ?? 'Student', 'reject'),
+                      style: TextButton.styleFrom(foregroundColor: Colors.red, minimumSize: Size.zero, padding: const EdgeInsets.symmetric(horizontal: 8)),
+                      child: const Text('Reject', style: TextStyle(fontSize: 12)),
+                    ),
+                    ElevatedButton(
+                      onPressed: () => _approveCert(c['_id'].toString(), c['studentName'] ?? 'Student', 'approve'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.green, foregroundColor: Colors.white,
+                        minimumSize: Size.zero, padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        textStyle: const TextStyle(fontSize: 12),
+                      ),
+                      child: const Text('Approve'),
+                    ),
+                  ]),
+                )),
+              ]),
+            ),
+          ],
+
           // Certificate Button (show if average >= 70%)
           if (!widget.isInstructor && _average >= 70)
             Container(
@@ -935,7 +1077,7 @@ class _GradesTabState extends State<_GradesTab> {
                         builder: (_) => CertificatePage(
                           courseId: widget.courseId,
                           studentId: userId,
-                          courseName: 'Course Name', // TODO: Pass actual course name
+                          courseName: '',
                         ),
                       ),
                     );
@@ -967,11 +1109,25 @@ class _GradesTabState extends State<_GradesTab> {
                 Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Text(a['title'] ?? 'Assignment', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
                   const SizedBox(height: 4),
-                  Text('Total: ${a['totalMarks']} marks', style: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8))),
+                  Row(children: [
+                    Text('Max: ${a['totalMarks']} marks', style: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8))),
+                    if (a['passingMarks'] != null) ...[
+                      const Text(' · ', style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8))),
+                      Text('Pass: ${a['passingMarks']}', style: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8))),
+                    ],
+                  ]),
                   if (s == null) const Text('Not submitted', style: TextStyle(fontSize: 12, color: Colors.red)),
                   if (s != null && !graded) const Text('Submitted — Awaiting grade', style: TextStyle(fontSize: 12, color: Colors.orange)),
+                  if (graded && (s['stars'] ?? 0) > 0)
+                    Row(children: List.generate(5, (i) => Icon(
+                      i < (s['stars'] as num) ? Icons.star_rounded : Icons.star_outline_rounded,
+                      color: Colors.amber, size: 16,
+                    ))),
                   if (graded && s['feedback'] != null && s['feedback'].toString().isNotEmpty)
-                    Text('Feedback: ${s['feedback']}', style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: Text('Feedback: ${s['feedback']}', style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                    ),
                 ])),
                 if (graded)
                   Column(children: [
@@ -1010,18 +1166,90 @@ class _PeopleTab extends StatefulWidget {
 
 class _PeopleTabState extends State<_PeopleTab> {
   List<dynamic> _students = [];
+  List<dynamic> _coInstructors = [];
   bool _loading = true;
 
   @override
   void initState() { super.initState(); _load(); }
 
   Future<void> _load() async {
+    final futures = <Future>[];
     if (widget.isInstructor) {
-      final s = await widget.lms.getEnrolledStudents(widget.courseId);
-      if (mounted) setState(() { _students = s; _loading = false; });
-    } else {
-      if (mounted) setState(() => _loading = false);
+      futures.add(widget.lms.getEnrolledStudents(widget.courseId).then((s) => _students = s));
+      futures.add(widget.lms.getCourseInstructors(widget.courseId).then((i) => _coInstructors = i));
     }
+    await Future.wait(futures);
+    if (mounted) setState(() => _loading = false);
+  }
+
+  Future<void> _showInviteTeacherDialog() async {
+    final emailCtrl = TextEditingController();
+    String selectedRole = 'normal';
+    await showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(builder: (ctx, setDlg) => AlertDialog(
+        title: const Text('Invite Teacher', style: TextStyle(fontWeight: FontWeight.w800)),
+        content: Column(mainAxisSize: MainAxisSize.min, children: [
+          TextField(
+            controller: emailCtrl,
+            keyboardType: TextInputType.emailAddress,
+            decoration: const InputDecoration(labelText: 'Teacher Email *', border: OutlineInputBorder()),
+          ),
+          const SizedBox(height: 14),
+          const Align(alignment: Alignment.centerLeft, child: Text('Role', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13))),
+          const SizedBox(height: 8),
+          Row(children: [
+            Expanded(child: _roleChip('Lead Instructor', 'lead', selectedRole, (v) => setDlg(() => selectedRole = v))),
+            const SizedBox(width: 8),
+            Expanded(child: _roleChip('Normal Instructor', 'normal', selectedRole, (v) => setDlg(() => selectedRole = v))),
+          ]),
+          const SizedBox(height: 8),
+          Text(
+            selectedRole == 'lead'
+                ? 'Full permissions including certificate approval.'
+                : 'Limited: cannot approve certificates.',
+            style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
+          ),
+        ]),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () async {
+              final email = emailCtrl.text.trim();
+              if (email.isEmpty) return;
+              Navigator.pop(ctx);
+              final result = await widget.lms.inviteTeacher(courseId: widget.courseId, email: email, role: selectedRole);
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                  content: Text(result['message'] ?? (result['success'] == true ? 'Invitation sent!' : 'Failed to send invite')),
+                  backgroundColor: result['success'] == true ? Colors.green : Colors.red,
+                ));
+                if (result['success'] == true) _load();
+              }
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryColor, foregroundColor: Colors.white),
+            child: const Text('Send Invite'),
+          ),
+        ],
+      )),
+    );
+  }
+
+  Widget _roleChip(String label, String value, String selected, void Function(String) onTap) {
+    final isSelected = selected == value;
+    return GestureDetector(
+      onTap: () => onTap(value),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        decoration: BoxDecoration(
+          color: isSelected ? AppColors.primaryColor.withValues(alpha: 0.1) : const Color(0xFFF8FAFC),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: isSelected ? AppColors.primaryColor : const Color(0xFFE2E8F0)),
+        ),
+        child: Center(child: Text(label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600,
+          color: isSelected ? AppColors.primaryColor : const Color(0xFF64748B)))),
+      ),
+    );
   }
 
   @override
@@ -1030,10 +1258,27 @@ class _PeopleTabState extends State<_PeopleTab> {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        _SectionHeader(title: 'Instructor', icon: Icons.school_rounded),
+        // ── Instructors section
+        Row(children: [
+          Expanded(child: _SectionHeader(title: 'Instructors', icon: Icons.school_rounded)),
+          if (widget.isInstructor)
+            TextButton.icon(
+              onPressed: _showInviteTeacherDialog,
+              icon: const Icon(Icons.person_add_alt_1_rounded, size: 16),
+              label: const Text('Invite Teacher'),
+              style: TextButton.styleFrom(foregroundColor: AppColors.primaryColor),
+            ),
+        ]),
         const SizedBox(height: 8),
-        _PersonTile(name: widget.course['instructorName'] ?? 'Instructor', role: 'Course Instructor', isInstructor: true),
+        _PersonTile(name: widget.course['instructorName'] ?? 'Instructor', role: 'Lead Instructor', isInstructor: true, badge: 'Lead'),
+        ..._coInstructors.map((t) => _PersonTile(
+          name: t['name'] ?? 'Instructor',
+          role: t['email'] ?? '',
+          isInstructor: true,
+          badge: t['role'] == 'lead' ? 'Lead' : 'Normal',
+        )),
         const SizedBox(height: 20),
+        // ── Students section
         _SectionHeader(title: 'Students (${_students.length})', icon: Icons.group_rounded),
         const SizedBox(height: 8),
         if (!widget.isInstructor)
@@ -1056,7 +1301,8 @@ class _PersonTile extends StatelessWidget {
   final String role;
   final bool isInstructor;
   final dynamic progress;
-  const _PersonTile({required this.name, required this.role, required this.isInstructor, this.progress});
+  final String? badge;
+  const _PersonTile({required this.name, required this.role, required this.isInstructor, this.progress, this.badge});
 
   @override
   Widget build(BuildContext context) {
@@ -1068,7 +1314,7 @@ class _PersonTile extends StatelessWidget {
       child: Row(children: [
         CircleAvatar(
           backgroundColor: isInstructor ? AppColors.primaryColor : const Color(0xFFE2E8F0),
-          child: Text(name[0].toUpperCase(),
+          child: Text(name.isNotEmpty ? name[0].toUpperCase() : '?',
             style: TextStyle(color: isInstructor ? Colors.white : const Color(0xFF64748B), fontWeight: FontWeight.w700)),
         ),
         const SizedBox(width: 12),
@@ -1076,7 +1322,17 @@ class _PersonTile extends StatelessWidget {
           Text(name, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
           Text(role, style: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8))),
         ])),
-        if (progress != null && progress['completed'] == true)
+        if (badge != null)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            decoration: BoxDecoration(
+              color: badge == 'Lead' ? AppColors.primaryColor.withValues(alpha: 0.1) : const Color(0xFFE2E8F0),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Text(badge!, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700,
+              color: badge == 'Lead' ? AppColors.primaryColor : const Color(0xFF64748B))),
+          ),
+        if (badge == null && progress != null && progress['completed'] == true)
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             decoration: BoxDecoration(color: Colors.green.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)),

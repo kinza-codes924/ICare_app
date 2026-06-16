@@ -12,6 +12,56 @@ function toId(id) {
   try { return new mongoose.Types.ObjectId(id); } catch { return null; }
 }
 
+// GET /api/certificates/pending/:courseId — instructor sees pending approvals
+router.get('/pending/:courseId', authMiddleware, async (req, res) => {
+  try {
+    await connectMongoDB();
+    const certs = await Certificate.find({ courseId: toId(req.params.courseId), approvalStatus: 'pending' })
+      .sort({ createdAt: -1 }).lean();
+    res.json({ success: true, certificates: certs });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+// PUT /api/certificates/:id/approve — Lead Instructor approves/rejects a certificate
+router.put('/:id/approve', authMiddleware, async (req, res) => {
+  try {
+    await connectMongoDB();
+    const { action, note } = req.body; // action: 'approve' | 'reject'
+    if (!['approve', 'reject'].includes(action)) return res.status(400).json({ success: false, message: 'action must be approve or reject' });
+
+    const cert = await Certificate.findByIdAndUpdate(
+      toId(req.params.id),
+      {
+        approvalStatus: action === 'approve' ? 'approved' : 'rejected',
+        approvedBy: req.user.id,
+        approvedAt: new Date(),
+        approvalNote: note || '',
+      },
+      { new: true }
+    ).lean();
+
+    if (!cert) return res.status(404).json({ success: false, message: 'Not found' });
+
+    // Notify student
+    if (action === 'approve') {
+      const Notification = require('../models/Notification');
+      await Notification.create({
+        userId: cert.studentId,
+        type: 'general',
+        title: 'Certificate Approved!',
+        message: `Your certificate for "${cert.courseName}" has been approved.`,
+        data: { courseId: cert.courseId, certificateId: cert._id },
+      }).catch(() => {});
+    }
+
+    res.json({ success: true, certificate: cert });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
 // POST /api/certificates — Issue certificate when student completes course
 router.post('/', authMiddleware, async (req, res) => {
   try {
@@ -68,6 +118,9 @@ router.post('/', authMiddleware, async (req, res) => {
     const verificationCode = Math.random().toString(36).substring(2, 15).toUpperCase();
     const qrCodeData = `https://icare-app-ten.vercel.app/verify?code=${verificationCode}`;
 
+    // Courses that require manual approval start in 'pending' status
+    const requiresApproval = course.requiresCertificateApproval === true;
+
     const certificate = await Certificate.create({
       enrollmentId: enrollment._id,
       studentId: student._id,
@@ -80,6 +133,7 @@ router.post('/', authMiddleware, async (req, res) => {
       completionDate: enrollment.progress?.completedAt || new Date(),
       template: template || 'classic',
       qrCodeData,
+      approvalStatus: requiresApproval ? 'pending' : 'approved',
     });
 
     res.json({ success: true, certificate });

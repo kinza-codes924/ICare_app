@@ -10,6 +10,36 @@ function toId(id) {
   try { return new mongoose.Types.ObjectId(id); } catch { return null; }
 }
 
+// Mark a student PRESENT for today's run of a live session.
+// One Attendance doc per live-session per day; enrolled students with no record count as absent.
+async function markLivePresent(session, studentId) {
+  try {
+    const Attendance = require('../models/Attendance');
+    const dayStart = new Date(); dayStart.setHours(0, 0, 0, 0);
+    const dayEnd = new Date(); dayEnd.setHours(23, 59, 59, 999);
+    let att = await Attendance.findOne({
+      liveSessionId: session._id.toString(),
+      sessionDate: { $gte: dayStart, $lte: dayEnd },
+    });
+    if (!att) {
+      att = await Attendance.create({
+        courseId: session.courseId,
+        instructorId: session.instructorId,
+        sessionTitle: session.title || 'Live Session',
+        sessionDate: new Date(),
+        liveSessionId: session._id.toString(),
+        records: [],
+      });
+    }
+    if (!att.records.some(r => r.studentId?.toString() === studentId.toString())) {
+      att.records.push({ studentId, status: 'present' });
+      await att.save();
+    }
+  } catch (e) {
+    console.warn('auto-attendance error:', e.message);
+  }
+}
+
 // ── INSTRUCTOR: Create live session ─────────────────────────────────────────
 router.post('/', authMiddleware, async (req, res) => {
   try {
@@ -69,13 +99,23 @@ router.get('/upcoming', authMiddleware, async (req, res) => {
 // ── defined BEFORE /:id to prevent Express treating 'course' as an :id param.
 
 // GET /live-sessions/course/:courseId/active — check if any session is currently live
+// CRITICAL: no-cache headers prevent Vercel CDN from returning stale 304 responses
 router.get('/course/:courseId/active', authMiddleware, async (req, res) => {
   try {
+    // Prevent Vercel CDN caching — always hit the actual backend
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+    res.setHeader('Surrogate-Control', 'no-store');
+
     await connectMongoDB();
+    console.log(`[LIVE-SESSIONS] Checking active for courseId: ${req.params.courseId}`);
     const session = await LiveSession.findOne({
       courseId: toId(req.params.courseId),
       status: 'live',
     }).lean();
+
+    console.log(`[LIVE-SESSIONS] Found session: ${session ? session._id : 'none'}`);
 
     if (session) {
       // Auto-expire: no instructor heartbeat for 90s means instructor left without ending
@@ -86,20 +126,26 @@ router.get('/course/:courseId/active', authMiddleware, async (req, res) => {
       const pastGracePeriod = sessionAge > 60 * 1000;
       if (pastGracePeriod && heartbeat && new Date(heartbeat) < ninetySecsAgo) {
         await LiveSession.findByIdAndUpdate(session._id, { status: 'ended' });
-        console.log(`Auto-expired stale session ${session._id} (last heartbeat: ${heartbeat})`);
+        console.log(`[LIVE-SESSIONS] Auto-expired stale session ${session._id} (last heartbeat: ${heartbeat})`);
+        console.log(`[LIVE-SESSIONS] Returning: isLive=false (auto-expired)`);
         return res.json({ success: true, isLive: false, session: null });
       }
 
-      // Hard cap: 3 hours without any heartbeat at all
+      // Hard cap: use heartbeat if available, else createdAt — prevents old reactivated sessions from expiring
       const threeHoursAgo = new Date(Date.now() - 3 * 60 * 60 * 1000);
-      if (new Date(session.createdAt) < threeHoursAgo) {
+      const lastActivity = heartbeat ? new Date(heartbeat) : new Date(session.createdAt);
+      if (lastActivity < threeHoursAgo) {
         await LiveSession.findByIdAndUpdate(session._id, { status: 'ended' });
+        console.log(`[LIVE-SESSIONS] Hard-cap expired session ${session._id} (lastActivity: ${lastActivity})`);
+        console.log(`[LIVE-SESSIONS] Returning: isLive=false (hard-cap)`);
         return res.json({ success: true, isLive: false, session: null });
       }
     }
 
+    console.log(`[LIVE-SESSIONS] Returning: isLive=${!!session}`);
     res.json({ success: true, isLive: !!session, session: session || null });
   } catch (e) {
+    console.error(`[LIVE-SESSIONS] Error checking active for ${req.params.courseId}:`, e);
     res.status(500).json({ success: false, isLive: false });
   }
 });
@@ -142,7 +188,9 @@ router.post('/course/:courseId/set-live', authMiddleware, async (req, res) => {
       resultSession = await LiveSession.findByIdAndUpdate(
         toId(sessionId),
         // Clear stale attendees/waiting/hands/chat from any previous run of this session
-        { status: 'live', attendees: [], waitingStudents: [], raisedHands: [], chatMessages: [] },
+        // Reset instructorHeartbeat to NOW so auto-expire check passes immediately
+        // Refresh scheduledAt/startedAt so a reused session shows TODAY's date, not its original one
+        { status: 'live', instructorHeartbeat: new Date(), scheduledAt: new Date(), startedAt: new Date(), attendees: [], waitingStudents: [], raisedHands: [], chatMessages: [], polls: [] },
         { new: true }
       );
     }
@@ -153,12 +201,15 @@ router.post('/course/:courseId/set-live', authMiddleware, async (req, res) => {
         courseId: toId(req.params.courseId),
         instructorId: toId(req.user.id),
         status: 'live',
+        instructorHeartbeat: new Date(),
         title: title || 'Live Session',
         scheduledAt: new Date(),
+        startedAt: new Date(),
         attendees: [],
         waitingStudents: [],
         raisedHands: [],
         chatMessages: [],
+        polls: [],
       });
     }
 
@@ -229,6 +280,9 @@ router.post('/:id/join', authMiddleware, async (req, res) => {
         }
       }
     }
+
+    // Auto-attendance: student joined → mark present for today's session
+    if (!isInstructor) await markLivePresent(session, studentId);
 
     res.json({
       success: true,
@@ -481,6 +535,7 @@ router.post('/:id/admit/:studentId', authMiddleware, async (req, res) => {
     }
 
     await session.save();
+    await markLivePresent(session, studentId);
 
     res.json({ success: true, message: 'Student admitted' });
   } catch (e) {
@@ -499,7 +554,8 @@ router.post('/:id/admit-all', authMiddleware, async (req, res) => {
     }
 
     // Move all waiting students to attendees
-    session.waitingStudents.forEach(studentId => {
+    const admitted = [...session.waitingStudents];
+    admitted.forEach(studentId => {
       if (!session.attendees.includes(studentId)) {
         session.attendees.push(studentId);
       }
@@ -507,6 +563,9 @@ router.post('/:id/admit-all', authMiddleware, async (req, res) => {
 
     session.waitingStudents = [];
     await session.save();
+    for (const studentId of admitted) {
+      await markLivePresent(session, studentId);
+    }
 
     res.json({ success: true, message: 'All students admitted' });
   } catch (e) {
@@ -719,7 +778,8 @@ router.post('/:id/end-and-save', authMiddleware, async (req, res) => {
     const session = await LiveSession.findById(toId(req.params.id)).lean();
     if (!session) return res.status(404).json({ success: false, message: 'Session not found' });
 
-    const durationMinutes = Math.round((Date.now() - new Date(session.createdAt).getTime()) / 60000);
+    // Use startedAt (set on go-live) — createdAt can be days old for reused session docs
+    const durationMinutes = Math.round((Date.now() - new Date(session.startedAt || session.createdAt).getTime()) / 60000);
 
     // Mark session as completed
     await LiveSession.findByIdAndUpdate(toId(req.params.id), {
@@ -857,6 +917,94 @@ router.patch('/:id/set-recording-url', authMiddleware, async (req, res) => {
 });
 
 // GET /live-sessions/:id/transcript — fetch saved chat transcript for a session
+// ── PUT /:id/reschedule — reschedule with announcement ──────────────────────
+router.put('/:id/reschedule', authMiddleware, async (req, res) => {
+  try {
+    await connectMongoDB();
+    const { newDate, reason } = req.body;
+    const session = await LiveSession.findById(toId(req.params.id));
+    if (!session) return res.status(404).json({ success: false, message: 'Session not found' });
+
+    const oldDate = session.scheduledAt;
+    session.scheduledAt = new Date(newDate);
+    session.status = 'rescheduled';
+    if (!session.log) session.log = [];
+    session.log.push({ action: 'rescheduled', oldDate, newDate: session.scheduledAt, reason: reason || '', by: req.user.id, at: new Date() });
+    await session.save();
+
+    // Announce to course
+    try {
+      const Announcement = require('../models/Announcement');
+      await Announcement.create({
+        courseId: session.courseId,
+        instructorId: req.user.id,
+        title: `📅 Session Rescheduled: ${session.title}`,
+        body: `The live session "${session.title}" has been rescheduled to ${new Date(newDate).toLocaleString()}. ${reason ? 'Reason: ' + reason : ''}`,
+        type: 'session_rescheduled',
+        sessionId: session._id,
+      });
+    } catch (_) {}
+
+    // Push to enrolled students
+    try {
+      const { sendToUser } = require('../utils/pushNotifications');
+      const enrollments = await Enrollment.find({ courseId: session.courseId, status: 'active' }).select('userId').lean();
+      await Promise.all(enrollments.map(e => sendToUser(e.userId, {
+        title: '📅 Session Rescheduled',
+        body: `"${session.title}" rescheduled to ${new Date(newDate).toLocaleString()}`,
+        data: { type: 'session_rescheduled', sessionId: session._id.toString() },
+      }).catch(() => {})));
+    } catch (_) {}
+
+    res.json({ success: true, session });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+// ── PUT /:id/cancel — cancel with announcement ───────────────────────────────
+router.put('/:id/cancel', authMiddleware, async (req, res) => {
+  try {
+    await connectMongoDB();
+    const { reason } = req.body;
+    const session = await LiveSession.findById(toId(req.params.id));
+    if (!session) return res.status(404).json({ success: false, message: 'Session not found' });
+
+    session.status = 'cancelled';
+    if (!session.log) session.log = [];
+    session.log.push({ action: 'cancelled', reason: reason || '', by: req.user.id, at: new Date() });
+    await session.save();
+
+    // Announce to course
+    try {
+      const Announcement = require('../models/Announcement');
+      await Announcement.create({
+        courseId: session.courseId,
+        instructorId: req.user.id,
+        title: `❌ Session Cancelled: ${session.title}`,
+        body: `The live session "${session.title}" has been cancelled. ${reason ? 'Reason: ' + reason : ''}`,
+        type: 'session_cancelled',
+        sessionId: session._id,
+      });
+    } catch (_) {}
+
+    // Push to enrolled students
+    try {
+      const { sendToUser } = require('../utils/pushNotifications');
+      const enrollments = await Enrollment.find({ courseId: session.courseId, status: 'active' }).select('userId').lean();
+      await Promise.all(enrollments.map(e => sendToUser(e.userId, {
+        title: '❌ Session Cancelled',
+        body: `"${session.title}" has been cancelled. ${reason ? reason : ''}`,
+        data: { type: 'session_cancelled', sessionId: session._id.toString() },
+      }).catch(() => {})));
+    } catch (_) {}
+
+    res.json({ success: true, session });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
 router.get('/:id/transcript', authMiddleware, async (req, res) => {
   try {
     await connectMongoDB();

@@ -67,10 +67,6 @@ class LmsService {
     } catch (e) { return {'success': false}; }
   }
 
-  Future<void> cancelSession(String sessionId) async {
-    try { await _api.post('/live-sessions/$sessionId/cancel', {}); } catch (_) {}
-  }
-
   // ═══════════════════════════════════════════════════════════════════════
   // QUIZZES
   // ═══════════════════════════════════════════════════════════════════════
@@ -652,16 +648,29 @@ class LmsService {
     }
   }
 
+  // ═══════════════════════════════════════════════════════════════════════
+  // VOUCHERS
+  // ═══════════════════════════════════════════════════════════════════════
+
+  Future<List<dynamic>> getVouchers() async {
+    try {
+      final response = await _api.get('/vouchers');
+      return response.data['vouchers'] ?? [];
+    } catch (_) { return []; }
+  }
+
   Future<Map<String, dynamic>> createVoucher({
     required String code,
-    required int discountPercent,
+    required int discount,
+    String? courseId,
+    String? expiresAt,
   }) async {
     try {
       final response = await _api.post('/vouchers', {
         'code': code,
-        'discountPercent': discountPercent,
-        'isOneTime': true,
-        'isActive': true,
+        'discount': discount,
+        if (courseId != null) 'courseId': courseId,
+        if (expiresAt != null) 'expiresAt': expiresAt,
       });
       return response.data ?? {'success': true};
     } catch (e) {
@@ -669,23 +678,119 @@ class LmsService {
     }
   }
 
+  Future<Map<String, dynamic>> deleteVoucher(String voucherId) async {
+    try {
+      final response = await _api.delete('/vouchers/$voucherId');
+      return response.data ?? {'success': true};
+    } catch (e) {
+      return {'success': false, 'message': e.toString()};
+    }
+  }
+
+  Future<Map<String, dynamic>> validateVoucher(String code, {String? courseId}) async {
+    try {
+      final response = await _api.post('/vouchers/validate', {
+        'code': code,
+        if (courseId != null) 'courseId': courseId,
+      });
+      return response.data ?? {};
+    } catch (e) {
+      return {'success': false, 'message': e.toString().replaceAll('Exception: ', '')};
+    }
+  }
+
+  Future<Map<String, dynamic>> redeemVoucher(String code, {String? courseId}) async {
+    try {
+      final response = await _api.post('/vouchers/redeem', {
+        'code': code,
+        if (courseId != null) 'courseId': courseId,
+      });
+      return response.data ?? {};
+    } catch (e) {
+      return {'success': false, 'message': e.toString().replaceAll('Exception: ', '')};
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // INSTRUCTOR ROLES / INVITE TEACHER
+  // ═══════════════════════════════════════════════════════════════════════
+
   Future<Map<String, dynamic>> inviteTeacher({
     required String courseId,
     required String email,
+    String role = 'normal',
   }) async {
     try {
       final response = await _api.post('/courses/$courseId/invite-teacher', {
         'email': email,
+        'role': role,
       });
       return response.data ?? {'success': true};
     } catch (e) {
-      throw Exception('Failed to invite teacher: $e');
+      return {'success': false, 'message': e.toString().replaceAll('Exception: ', '')};
+    }
+  }
+
+  Future<List<dynamic>> getCourseInstructors(String courseId) async {
+    try {
+      final response = await _api.get('/courses/$courseId/instructors');
+      return response.data['instructors'] ?? [];
+    } catch (_) { return []; }
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // LIVE SESSION — RESCHEDULE / CANCEL
+  // ═══════════════════════════════════════════════════════════════════════
+
+  Future<Map<String, dynamic>> rescheduleSession(String sessionId, {required String newDate, String? reason}) async {
+    try {
+      final response = await _api.put('/live-sessions/$sessionId/reschedule', {
+        'newDate': newDate,
+        if (reason != null) 'reason': reason,
+      });
+      return response.data ?? {'success': true};
+    } catch (e) {
+      return {'success': false, 'message': e.toString().replaceAll('Exception: ', '')};
+    }
+  }
+
+  Future<Map<String, dynamic>> cancelSession(String sessionId, {String? reason}) async {
+    try {
+      final response = await _api.put('/live-sessions/$sessionId/cancel', {
+        if (reason != null) 'reason': reason,
+      });
+      return response.data ?? {'success': true};
+    } catch (e) {
+      return {'success': false, 'message': e.toString().replaceAll('Exception: ', '')};
     }
   }
 
   // ═══════════════════════════════════════════════════════════════════════
   // INSTRUCTOR - COURSES
   // ═══════════════════════════════════════════════════════════════════════
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // CERTIFICATES — APPROVAL
+  // ═══════════════════════════════════════════════════════════════════════
+
+  Future<List<dynamic>> getPendingCertificates(String courseId) async {
+    try {
+      final response = await _api.get('/certificates/pending/$courseId');
+      return response.data['certificates'] ?? [];
+    } catch (_) { return []; }
+  }
+
+  Future<Map<String, dynamic>> approveCertificate(String certId, {required String action, String? note}) async {
+    try {
+      final response = await _api.put('/certificates/$certId/approve', {
+        'action': action,
+        if (note != null) 'note': note,
+      });
+      return response.data ?? {'success': true};
+    } catch (e) {
+      return {'success': false, 'message': e.toString().replaceAll('Exception: ', '')};
+    }
+  }
 
   Future<Map<String, dynamic>> getInstructorCourses() async {
     final response = await _api.get('/courses');

@@ -19,6 +19,10 @@ const certificateSchema = new mongoose.Schema({
   qrCodeData: { type: String }, // Verification URL
   verificationCount: { type: Number, default: 0 },
   lastVerifiedAt: { type: Date },
+  approvalStatus: { type: String, enum: ['pending', 'approved', 'rejected'], default: 'approved' },
+  approvedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+  approvedAt: { type: Date, default: null },
+  approvalNote: { type: String, default: '' },
 }, { timestamps: true });
 
 // Generate certificate number: ICARE-YYYY-XXXXXX

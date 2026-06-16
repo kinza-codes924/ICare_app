@@ -1273,7 +1273,17 @@ class VoucherManagerWidget extends StatefulWidget {
 }
 
 class _VoucherManagerState extends State<VoucherManagerWidget> {
-  final List<Map<String, dynamic>> _vouchers = [];
+  final LmsService _lms = LmsService();
+  List<dynamic> _vouchers = [];
+  bool _loading = true;
+
+  @override
+  void initState() { super.initState(); _load(); }
+
+  Future<void> _load() async {
+    final v = await _lms.getVouchers();
+    if (mounted) setState(() { _vouchers = v; _loading = false; });
+  }
 
   String _generateCode() {
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -1281,9 +1291,9 @@ class _VoucherManagerState extends State<VoucherManagerWidget> {
     return List.generate(8, (_) => chars[rng.nextInt(chars.length)]).join();
   }
 
-  void _createVoucher() {
+  Future<void> _createVoucher() async {
     int selectedPercent = 20;
-    showDialog(
+    await showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(builder: (ctx, setLocal) => AlertDialog(
         title: const Row(children: [
@@ -1319,7 +1329,7 @@ class _VoucherManagerState extends State<VoucherManagerWidget> {
             child: Row(children: [
               const Icon(Icons.info_outline, color: Color(0xFF1A73E8), size: 16),
               const SizedBox(width: 8),
-              Expanded(child: Text('One-time use — deactivates after first use.',
+              Expanded(child: Text('One-time use only — code is deactivated after first use.',
                 style: TextStyle(fontSize: 11, color: Colors.blue.shade800))),
             ]),
           ),
@@ -1328,23 +1338,20 @@ class _VoucherManagerState extends State<VoucherManagerWidget> {
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
           ElevatedButton.icon(
             style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF1A73E8), foregroundColor: Colors.white),
-            onPressed: () {
+            onPressed: () async {
               Navigator.pop(ctx);
               final code = _generateCode();
-              setState(() {
-                _vouchers.insert(0, {
-                  'code': code,
-                  'discount': selectedPercent,
-                  'used': false,
-                  'createdAt': DateFormat('MMM d, yyyy').format(DateTime.now()),
-                });
-              });
-              LmsService().createVoucher(code: code, discountPercent: selectedPercent).catchError((_) {});
-              ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                content: Text('Voucher created: $code ($selectedPercent% off)'),
-                backgroundColor: Colors.green,
-                duration: const Duration(seconds: 4),
-              ));
+              final result = await _lms.createVoucher(code: code, discount: selectedPercent);
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                  content: Text(result['success'] == true
+                      ? 'Voucher created: $code ($selectedPercent% off)'
+                      : result['message'] ?? 'Failed'),
+                  backgroundColor: result['success'] == true ? Colors.green : Colors.red,
+                  duration: const Duration(seconds: 4),
+                ));
+                if (result['success'] == true) _load();
+              }
             },
             icon: const Icon(Icons.add_rounded, size: 18),
             label: const Text('Generate'),
@@ -1354,8 +1361,36 @@ class _VoucherManagerState extends State<VoucherManagerWidget> {
     );
   }
 
+  Future<void> _deleteVoucher(String id, String code) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete Voucher'),
+        content: Text('Delete voucher "$code"? This cannot be undone.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirm != true) return;
+    final result = await _lms.deleteVoucher(id);
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(result['success'] == true ? 'Voucher deleted.' : result['message'] ?? 'Failed'),
+        backgroundColor: result['success'] == true ? Colors.green : Colors.red,
+      ));
+      if (result['success'] == true) _load();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (_loading) return const Center(child: Padding(padding: EdgeInsets.all(24), child: CircularProgressIndicator()));
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       ElevatedButton.icon(
         onPressed: _createVoucher,
@@ -1367,34 +1402,52 @@ class _VoucherManagerState extends State<VoucherManagerWidget> {
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
         ),
       ),
-      if (_vouchers.isNotEmpty) ...[
+      if (_vouchers.isEmpty) ...[
+        const SizedBox(height: 24),
+        const Center(child: Text('No vouchers yet.', style: TextStyle(color: Color(0xFF94A3B8)))),
+      ] else ...[
         const SizedBox(height: 16),
-        ..._vouchers.map((v) => Container(
-          margin: const EdgeInsets.only(bottom: 8),
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-          decoration: BoxDecoration(
-            color: v['used'] == true ? Colors.grey.shade100 : Colors.green.shade50,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: v['used'] == true ? Colors.grey.shade200 : Colors.green.shade200),
-          ),
-          child: Row(children: [
-            Icon(Icons.local_offer_rounded, size: 18, color: v['used'] == true ? Colors.grey : Colors.green.shade700),
-            const SizedBox(width: 10),
-            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Row(children: [
-                Text(v['code'], style: const TextStyle(fontFamily: 'monospace', fontWeight: FontWeight.w800, fontSize: 14, color: Color(0xFF1A73E8))),
-                const SizedBox(width: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(color: const Color(0xFF1A73E8), borderRadius: BorderRadius.circular(10)),
-                  child: Text('${v['discount']}% OFF', style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w700)),
+        ..._vouchers.map((v) {
+          final isUsed = v['usedBy'] != null;
+          final id = v['_id']?.toString() ?? '';
+          final code = v['code']?.toString() ?? '';
+          final discount = v['discount'] ?? 0;
+          final createdAt = v['createdAt'] != null
+              ? DateFormat('MMM d, yyyy').format(DateTime.tryParse(v['createdAt'].toString()) ?? DateTime.now())
+              : '';
+          return Container(
+            margin: const EdgeInsets.only(bottom: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: isUsed ? Colors.grey.shade100 : Colors.green.shade50,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: isUsed ? Colors.grey.shade200 : Colors.green.shade200),
+            ),
+            child: Row(children: [
+              Icon(Icons.local_offer_rounded, size: 18, color: isUsed ? Colors.grey : Colors.green.shade700),
+              const SizedBox(width: 10),
+              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Row(children: [
+                  Text(code, style: const TextStyle(fontFamily: 'monospace', fontWeight: FontWeight.w800, fontSize: 14, color: Color(0xFF1A73E8))),
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(color: const Color(0xFF1A73E8), borderRadius: BorderRadius.circular(10)),
+                    child: Text('$discount% OFF', style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w700)),
+                  ),
+                ]),
+                Text('$createdAt · ${isUsed ? 'Used' : 'Active — one-time use'}',
+                    style: TextStyle(fontSize: 11, color: isUsed ? Colors.grey : Colors.green.shade700)),
+              ])),
+              if (!isUsed)
+                IconButton(
+                  icon: const Icon(Icons.delete_outline_rounded, size: 18, color: Colors.red),
+                  tooltip: 'Delete',
+                  onPressed: () => _deleteVoucher(id, code),
                 ),
-              ]),
-              Text('${v['createdAt']} · ${v['used'] ? 'Used' : 'Active'}',
-                  style: TextStyle(fontSize: 11, color: v['used'] == true ? Colors.grey : Colors.green.shade700)),
-            ])),
-          ]),
-        )),
+            ]),
+          );
+        }),
       ],
     ]);
   }

@@ -40,10 +40,20 @@ class _CertificatePageState extends State<CertificatePage> {
 
   Future<void> _load() async {
     try {
-      final cert = await _lms.generateCertificate(
+      final resp = await _lms.generateCertificate(
         courseId: widget.courseId,
         studentId: widget.studentId,
       );
+      // Backend wraps the document: { success, certificate: {...} }
+      final certData = resp['certificate'];
+      final cert = certData is Map
+          ? Map<String, dynamic>.from(certData)
+          : Map<String, dynamic>.from(resp);
+      // Model stores certificateNumber; page displays it as certificateId
+      cert['certificateId'] ??= cert['certificateNumber'];
+      if (resp['success'] == false) {
+        throw Exception(resp['message'] ?? 'Certificate could not be generated');
+      }
       if (mounted) setState(() { _certificate = cert; _loading = false; });
     } catch (e) {
       if (mounted) setState(() { _error = e.toString(); _loading = false; });
@@ -75,16 +85,60 @@ class _CertificatePageState extends State<CertificatePage> {
           ? const Center(child: CircularProgressIndicator())
           : _error != null
               ? _buildError()
-              : SingleChildScrollView(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    children: [
-                      _buildCertificate(),
-                      const SizedBox(height: 20),
-                      _buildActions(),
-                    ],
-                  ),
-                ),
+              : _certificate?['approvalStatus'] == 'pending'
+                  ? _buildPendingApproval()
+                  : _certificate?['approvalStatus'] == 'rejected'
+                      ? _buildRejected()
+                      : SingleChildScrollView(
+                          padding: const EdgeInsets.all(16),
+                          child: Column(
+                            children: [
+                              _buildCertificate(),
+                              const SizedBox(height: 20),
+                              _buildActions(),
+                            ],
+                          ),
+                        ),
+    );
+  }
+
+  Widget _buildPendingApproval() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+          const Icon(Icons.hourglass_top_rounded, size: 64, color: Colors.orange),
+          const SizedBox(height: 16),
+          const Text('Certificate Pending Approval', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
+          const SizedBox(height: 12),
+          const Text(
+            'Your instructor needs to manually approve your certificate. You\'ll be notified once it\'s approved.',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 14, color: Color(0xFF64748B)),
+          ),
+        ]),
+      ),
+    );
+  }
+
+  Widget _buildRejected() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+          const Icon(Icons.cancel_rounded, size: 64, color: Colors.red),
+          const SizedBox(height: 16),
+          const Text('Certificate Not Approved', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
+          const SizedBox(height: 12),
+          Text(
+            _certificate?['approvalNote']?.toString().isNotEmpty == true
+                ? 'Reason: ${_certificate!['approvalNote']}'
+                : 'Contact your instructor for more information.',
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontSize: 14, color: Color(0xFF64748B)),
+          ),
+        ]),
+      ),
     );
   }
 
@@ -97,6 +151,9 @@ class _CertificatePageState extends State<CertificatePage> {
     final studentName = _certificate?['studentName'] ?? 'Student Name';
     final instructorName = _certificate?['instructorName'] ?? 'Instructor';
     final issuedAt = _certificate?['issuedAt'];
+    final courseName = (_certificate?['courseName']?.toString().isNotEmpty ?? false)
+        ? _certificate!['courseName'].toString()
+        : widget.courseName;
 
     return Container(
       decoration: BoxDecoration(
@@ -187,7 +244,7 @@ class _CertificatePageState extends State<CertificatePage> {
                 const Text('has successfully completed the course',
                     style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
                 const SizedBox(height: 6),
-                Text(widget.courseName,
+                Text(courseName,
                     textAlign: TextAlign.center,
                     style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Color(0xFF1A237E))),
                 const SizedBox(height: 10),
@@ -430,7 +487,9 @@ class _CertificatePageState extends State<CertificatePage> {
                       pw.Text('has successfully completed the course',
                           style: pw.TextStyle(font: regularFont, fontSize: 12, color: greyText)),
                       pw.SizedBox(height: 6),
-                      pw.Text(widget.courseName,
+                      pw.Text((_certificate?['courseName']?.toString().isNotEmpty ?? false)
+                              ? _certificate!['courseName'].toString()
+                              : widget.courseName,
                           style: pw.TextStyle(font: boldFont, fontSize: 18, color: navy),
                           textAlign: pw.TextAlign.center),
                       pw.SizedBox(height: 10),

@@ -139,21 +139,49 @@ router.put('/enrollments/:id/progress', authMiddleware, async (req, res) => {
   }
 });
 
-// GET /certificates/my — get completed enrollments as certificates
+// GET /certificates/my — completed enrollments + issued Certificate docs, merged per course
 router.get('/certificates/my', authMiddleware, async (req, res) => {
   try {
     await connectMongoDB();
     const uId = toId(req.user.id);
     const enrollments = await Enrollment.find({ userId: uId, 'progress.completed': true }).lean();
-    const courseIds = enrollments.map(e => e.courseId);
+    const Certificate = require('../models/Certificate');
+    const issued = await Certificate.find({ studentId: uId }).lean();
+
+    const courseIds = [
+      ...enrollments.map(e => e.courseId),
+      ...issued.map(c => c.courseId),
+    ];
     const courses = await Course.find({ _id: { $in: courseIds } }).lean();
     const courseMap = {};
     courses.forEach(c => { courseMap[c._id.toString()] = c; });
-    const certificates = enrollments.map(e => ({
-      _id: e._id,
-      completedAt: e.progress?.completedAt,
-      course: courseMap[e.courseId.toString()] || null,
-    }));
+
+    const byCourse = {};
+    // Issued certificates take priority — they carry the number + verification code
+    issued.forEach(c => {
+      byCourse[c.courseId.toString()] = {
+        _id: c._id,
+        completedAt: c.completionDate,
+        createdAt: c.issuedAt || c.createdAt,
+        certificateNumber: c.certificateNumber,
+        verificationCode: c.verificationCode,
+        course: courseMap[c.courseId.toString()] || { _id: c.courseId, title: c.courseName },
+      };
+    });
+    enrollments.forEach(e => {
+      const key = e.courseId.toString();
+      if (!byCourse[key]) {
+        byCourse[key] = {
+          _id: e._id,
+          completedAt: e.progress?.completedAt,
+          createdAt: e.progress?.completedAt,
+          course: courseMap[key] || null,
+        };
+      }
+    });
+
+    const certificates = Object.values(byCourse)
+      .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
     res.json({ success: true, certificates, count: certificates.length });
   } catch (e) {
     res.status(500).json({ success: false, message: e.message });
@@ -276,11 +304,11 @@ router.post('/enrollments/:id/complete-module', authMiddleware, async (req, res)
   }
 });
 
-// POST /courses/:id/invite-teacher — invite co-teacher by email
+// POST /courses/:id/invite-teacher — invite co-teacher by email with role
 router.post('/:id/invite-teacher', authMiddleware, async (req, res) => {
   try {
     await connectMongoDB();
-    const { email } = req.body;
+    const { email, role } = req.body; // role: 'lead' | 'normal'
     if (!email) return res.status(400).json({ success: false, message: 'Email required' });
 
     const course = await Course.findById(toId(req.params.id)).lean();
@@ -293,14 +321,17 @@ router.post('/:id/invite-teacher', authMiddleware, async (req, res) => {
       return res.status(404).json({ success: false, message: `No user found with email: ${email}. They must register on iCare first.` });
     }
 
-    // Add as co-teacher if not already
-    const alreadyTeacher = course.coTeachers?.some(t => t.toString() === invitedUser._id.toString());
-    if (alreadyTeacher) {
-      return res.json({ success: true, message: 'This teacher is already in the course.' });
-    }
+    const teacherRole = role === 'lead' ? 'lead' : 'normal';
+
+    // Add as co-teacher with role if not already
+    const existingEntry = (course.coTeachers || []).find(t => {
+      const tid = t.userId ? t.userId.toString() : t.toString();
+      return tid === invitedUser._id.toString();
+    });
+    if (existingEntry) return res.json({ success: true, message: 'This teacher is already in the course.' });
 
     await Course.findByIdAndUpdate(toId(req.params.id), {
-      $addToSet: { coTeachers: invitedUser._id }
+      $addToSet: { coTeachers: { userId: invitedUser._id, role: teacherRole, name: invitedUser.name, email: invitedUser.email } }
     });
 
     // Send notification to invited teacher
@@ -309,12 +340,48 @@ router.post('/:id/invite-teacher', authMiddleware, async (req, res) => {
     await Notification.create({
       userId: invitedUser._id,
       type: 'general',
-      title: 'Co-Teacher Invitation',
-      message: `${inviter?.name || 'An instructor'} has invited you to co-teach "${course.title}"`,
+      title: `${teacherRole === 'lead' ? 'Lead' : 'Co'}-Teacher Invitation`,
+      message: `${inviter?.name || 'An instructor'} has invited you as ${teacherRole === 'lead' ? 'Lead' : 'Normal'} Instructor for "${course.title}"`,
       data: { courseId: course._id, courseName: course.title },
     }).catch(() => {});
 
+    // Email the invited teacher
+    try {
+      const nodemailer = require('nodemailer');
+      const transporter = nodemailer.createTransport({
+        service: 'Gmail',
+        auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS },
+      });
+      await transporter.sendMail({
+        from: `"iCare LMS" <${process.env.EMAIL_USER}>`,
+        to: invitedUser.email,
+        subject: `You're invited to teach on iCare: ${course.title}`,
+        html: `<p>Hi ${invitedUser.name || 'there'},</p>
+               <p><b>${inviter?.name || 'An instructor'}</b> has invited you as <b>${teacherRole === 'lead' ? 'Lead' : 'Normal'} Instructor</b> for the course <b>"${course.title}"</b> on iCare LMS.</p>
+               <p>Log in to your iCare account to accept and start teaching.</p>
+               <p>— iCare Team</p>`,
+      });
+    } catch (_) {}
+
     res.json({ success: true, message: `Invitation sent to ${invitedUser.name || email}` });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+// GET /courses/:id/instructors — list co-teachers for a course
+router.get('/:id/instructors', authMiddleware, async (req, res) => {
+  try {
+    await connectMongoDB();
+    const course = await Course.findById(toId(req.params.id)).lean();
+    if (!course) return res.status(404).json({ success: false, message: 'Not found' });
+    const instructors = (course.coTeachers || []).map(t => ({
+      _id: t.userId || t,
+      name: t.name || '',
+      email: t.email || '',
+      role: t.role || 'normal',
+    }));
+    res.json({ success: true, instructors });
   } catch (e) {
     res.status(500).json({ success: false, message: e.message });
   }

@@ -831,6 +831,59 @@ class _QuizTakeScreenState extends State<QuizTakeScreen> {
                     ],
                   ),
 
+                  const SizedBox(height: 16),
+
+                  // Marks summary box
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF0F9FF),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xFFBAE6FD)),
+                    ),
+                    child: Column(children: [
+                      _marksRow('Marks Obtained', '${attempt['marksObtained'] ?? score}', const Color(0xFF0F172A)),
+                      const Divider(height: 16),
+                      _marksRow('Maximum Marks', '${attempt['maxMarks'] ?? totalQuestions}', const Color(0xFF64748B)),
+                      const Divider(height: 16),
+                      _marksRow('Passing Marks', () {
+                        if (attempt['passingMarks'] != null) return attempt['passingMarks'].toString();
+                        final ps = widget.quiz['passingScore'];
+                        if (ps is num) return (ps / 100 * totalQuestions).round().toString();
+                        return '${(60 * totalQuestions / 100).round()}';
+                      }(), passed ? const Color(0xFF10B981) : const Color(0xFFEF4444)),
+                    ]),
+                  ),
+
+                  // Instructor feedback (if graded)
+                  if ((attempt['feedback'] ?? attempt['instructorFeedback'])?.toString().isNotEmpty == true) ...[
+                    const SizedBox(height: 16),
+                    Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: Colors.amber.shade50,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.amber.shade200),
+                      ),
+                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        const Row(children: [
+                          Icon(Icons.star_rounded, color: Colors.amber, size: 18),
+                          SizedBox(width: 6),
+                          Text('Instructor Feedback', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+                        ]),
+                        const SizedBox(height: 8),
+                        if ((attempt['stars'] ?? 0) > 0)
+                          Row(children: List.generate(5, (i) => Icon(
+                            i < (attempt['stars'] ?? 0) ? Icons.star_rounded : Icons.star_outline_rounded,
+                            color: Colors.amber, size: 20,
+                          ))),
+                        if ((attempt['stars'] ?? 0) > 0) const SizedBox(height: 6),
+                        Text(attempt['feedback'] ?? attempt['instructorFeedback'] ?? '',
+                          style: const TextStyle(fontSize: 13, color: Color(0xFF1E293B))),
+                      ]),
+                    ),
+                  ],
+
                   const SizedBox(height: 24),
 
                   // Per-question breakdown (if available)
@@ -956,6 +1009,14 @@ class _QuizTakeScreenState extends State<QuizTakeScreen> {
         ],
       ),
     );
+  }
+
+  Widget _marksRow(String label, String value, Color valueColor) {
+    return Row(children: [
+      Text(label, style: const TextStyle(fontSize: 13, color: Color(0xFF64748B))),
+      const Spacer(),
+      Text(value, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: valueColor)),
+    ]);
   }
 
   Widget _buildBreakdownItem(int index, dynamic item) {
