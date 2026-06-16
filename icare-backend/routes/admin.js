@@ -569,6 +569,45 @@ router.get('/lms/enrollments', authMiddleware, adminOnly, async (req, res) => {
   }
 });
 
+// GET /api/admin/doctor-tools — expiring licenses + no-referrer report
+router.get('/doctor-tools', authMiddleware, adminOnly, async (req, res) => {
+  try {
+    const { connectMongoDB } = require('../config/mongodb');
+    const User = require('../models/User');
+    const DoctorProfile = require('../models/DoctorProfile');
+    await connectMongoDB();
+
+    // Expiring within 30 days
+    const in30 = new Date();
+    in30.setDate(in30.getDate() + 30);
+    const expiring = await DoctorProfile.find({
+      licenseExpiry: { $lte: in30, $gte: new Date() }
+    }).populate('userId', 'name email').lean();
+
+    const expiringLicenses = expiring.map(d => ({
+      id: d._id,
+      name: d.userId?.name || 'Doctor',
+      email: d.userId?.email || '',
+      licenseExpiry: d.licenseExpiry,
+    }));
+
+    // No referrer: doctors where referredBy is null/empty
+    const noRef = await DoctorProfile.find({
+      $or: [{ referredBy: null }, { referredBy: '' }, { referredBy: { $exists: false } }]
+    }).populate('userId', 'name email').lean();
+
+    const noReferrerDoctors = noRef.map(d => ({
+      id: d._id,
+      name: d.userId?.name || 'Doctor',
+      email: d.userId?.email || '',
+    }));
+
+    res.json({ success: true, expiringLicenses, noReferrerDoctors });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message, expiringLicenses: [], noReferrerDoctors: [] });
+  }
+});
+
 router.all('/{*path}', (req, res) => {
   res.json({ success: true, users: [], data: [], count: 0 });
 });

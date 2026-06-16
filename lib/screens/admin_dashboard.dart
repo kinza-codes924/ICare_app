@@ -102,6 +102,9 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
       _fetchLeaveRequests();
     } else if (tab == 'Certificates') {
       _fetchCertificates();
+    } else if (tab == 'Community' || tab == 'Commission' || tab == 'DoctorTools') {
+      // These tabs load their own data via FutureBuilder
+      if (mounted) setState(() => _isLoading = false);
     } else {
       _fetchUsers();
     }
@@ -272,6 +275,8 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
                 _buildTabItemBadge('Certificates', Icons.workspace_premium_rounded,
                     _certificates.where((c) => c['status'] == 'pending').length),
                 _buildTabItem('Commission', Icons.monetization_on_rounded),
+                _buildTabItem('Community', Icons.forum_rounded),
+                _buildTabItem('DoctorTools', Icons.manage_accounts_rounded),
               ],
             ),
           ),
@@ -279,7 +284,8 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
       ),
       floatingActionButton: _currentTab != 'Pending' && _currentTab != 'PatientRecords'
           && _currentTab != 'LeaveRequests' && _currentTab != 'Certificates'
-          && _currentTab != 'Commission'
+          && _currentTab != 'Commission' && _currentTab != 'Community'
+          && _currentTab != 'DoctorTools'
           ? FloatingActionButton.extended(
               onPressed: () => _showAddUserDialog(),
               backgroundColor: AppColors.primaryColor,
@@ -299,6 +305,10 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
           ? _buildCertificatesTab()
           : _currentTab == 'Commission'
           ? _buildCommissionTab()
+          : _currentTab == 'Community'
+          ? _buildCommunityTab()
+          : _currentTab == 'DoctorTools'
+          ? _buildDoctorToolsTab()
           : _currentTab == 'PatientRecords'
           ? _buildPatientRecordsTab()
           : _isLoading
@@ -1321,5 +1331,357 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
         ],
       ),
     );
+  }
+
+  // ── Community Management Tab ───────────────────────────────────────────────
+  Widget _buildCommunityTab() {
+    return FutureBuilder<Map<String, dynamic>>(
+      future: _fetchCommunityData(),
+      builder: (context, snap) {
+        if (snap.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        final posts = (snap.data?['posts'] as List?) ?? [];
+        final topics = (snap.data?['topics'] as List?) ?? [];
+
+        return RefreshIndicator(
+          onRefresh: () async { setState(() {}); },
+          child: ListView(
+            padding: const EdgeInsets.all(16),
+            children: [
+              // ── Topics section ──────────────────────────────────────────
+              Row(children: [
+                const Expanded(child: Text('Community Topics', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: Color(0xFF0F172A)))),
+                ElevatedButton.icon(
+                  onPressed: _showAddTopicDialog,
+                  icon: const Icon(Icons.add_rounded, size: 16),
+                  label: const Text('Add Topic'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF7C3AED), foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10), elevation: 0,
+                  ),
+                ),
+              ]),
+              const SizedBox(height: 10),
+              if (topics.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 12),
+                  child: Text('No custom topics yet. Default topics are always available.', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 13)),
+                )
+              else
+                Wrap(
+                  spacing: 8, runSpacing: 8,
+                  children: topics.map<Widget>((t) {
+                    final name = t['name']?.toString() ?? t.toString();
+                    final id = t['_id']?.toString() ?? '';
+                    return Chip(
+                      label: Text(name, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                      backgroundColor: const Color(0xFFEDE9FE),
+                      side: const BorderSide(color: Color(0xFF7C3AED), width: 1),
+                      deleteIcon: const Icon(Icons.close_rounded, size: 16, color: Color(0xFF7C3AED)),
+                      onDeleted: id.isEmpty ? null : () => _deleteTopic(id, name),
+                    );
+                  }).toList(),
+                ),
+              const SizedBox(height: 24),
+              const Divider(color: Color(0xFFE2E8F0)),
+              const SizedBox(height: 12),
+              // ── Posts section ───────────────────────────────────────────
+              Text('All Posts (${posts.length})', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: Color(0xFF0F172A))),
+              const SizedBox(height: 10),
+              if (posts.isEmpty)
+                const Padding(padding: EdgeInsets.all(24), child: Center(child: Text('No posts yet.', style: TextStyle(color: Color(0xFF94A3B8)))))
+              else
+                ...posts.map((p) {
+                  final postId = p['_id']?.toString() ?? p['id']?.toString() ?? '';
+                  final author = p['userName']?.toString() ?? p['authorName']?.toString() ?? 'User';
+                  final content = p['content']?.toString() ?? '';
+                  final cat = p['category']?.toString() ?? 'General';
+                  final likes = (p['likeCount'] ?? (p['likes'] as List?)?.length ?? 0).toString();
+                  final comments = (p['commentCount'] ?? (p['comments'] as List?)?.length ?? 0).toString();
+                  return Card(
+                    margin: const EdgeInsets.only(bottom: 10),
+                    elevation: 1,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: const BorderSide(color: Color(0xFFE2E8F0))),
+                    child: ListTile(
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      leading: CircleAvatar(
+                        backgroundColor: AppColors.primaryColor.withValues(alpha: 0.1),
+                        child: Text(author.isNotEmpty ? author[0].toUpperCase() : 'U',
+                            style: const TextStyle(color: AppColors.primaryColor, fontWeight: FontWeight.bold)),
+                      ),
+                      title: Text(author, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+                      subtitle: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        Text(content, maxLines: 2, overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                        const SizedBox(height: 4),
+                        Row(children: [
+                          Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(color: const Color(0xFFF1F5F9), borderRadius: BorderRadius.circular(6)),
+                            child: Text(cat, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Color(0xFF64748B)))),
+                          const SizedBox(width: 8),
+                          const Icon(Icons.favorite_rounded, size: 12, color: Color(0xFFEF4444)),
+                          const SizedBox(width: 3),
+                          Text(likes, style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+                          const SizedBox(width: 8),
+                          const Icon(Icons.chat_bubble_rounded, size: 12, color: AppColors.primaryColor),
+                          const SizedBox(width: 3),
+                          Text(comments, style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+                        ]),
+                      ]),
+                      trailing: IconButton(
+                        icon: const Icon(Icons.delete_outline_rounded, color: Color(0xFFEF4444)),
+                        tooltip: 'Delete post',
+                        onPressed: postId.isEmpty ? null : () => _adminDeletePost(postId),
+                      ),
+                    ),
+                  );
+                }).toList(),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<Map<String, dynamic>> _fetchCommunityData() async {
+    try {
+      final postsRes = await _apiService.get('/community/posts');
+      final topicsRes = await _apiService.get('/community/categories-full');
+      return {
+        'posts': postsRes.data['posts'] ?? [],
+        'topics': topicsRes.data['topics'] ?? [],
+      };
+    } catch (_) {
+      try {
+        final postsRes = await _apiService.get('/community/posts');
+        return {'posts': postsRes.data['posts'] ?? [], 'topics': []};
+      } catch (_) {
+        return {'posts': [], 'topics': []};
+      }
+    }
+  }
+
+  void _showAddTopicDialog() {
+    final ctrl = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Add Community Topic', style: TextStyle(fontWeight: FontWeight.w800)),
+        content: TextField(
+          controller: ctrl, autofocus: true,
+          textCapitalization: TextCapitalization.words,
+          decoration: const InputDecoration(hintText: 'e.g. Dental Health', border: OutlineInputBorder()),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF7C3AED), foregroundColor: Colors.white),
+            onPressed: () async {
+              final name = ctrl.text.trim();
+              if (name.isEmpty) return;
+              Navigator.pop(ctx);
+              try {
+                await _apiService.post('/community/categories', {'name': name});
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Topic "$name" added!'), backgroundColor: Colors.green));
+                  setState(() {});
+                }
+              } catch (e) {
+                if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed: $e'), backgroundColor: Colors.red));
+              }
+            },
+            child: const Text('Add'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _deleteTopic(String id, String name) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete Topic', style: TextStyle(fontWeight: FontWeight.w800)),
+        content: Text('Delete topic "$name"? Existing posts in this topic are not affected.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+            onPressed: () => Navigator.pop(ctx, true), child: const Text('Delete')),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    try {
+      await _apiService.delete('/community/categories/$id');
+      if (mounted) { setState(() {}); ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Topic deleted'), backgroundColor: Colors.green)); }
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed: $e'), backgroundColor: Colors.red));
+    }
+  }
+
+  Future<void> _adminDeletePost(String postId) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete Post', style: TextStyle(fontWeight: FontWeight.w800)),
+        content: const Text('This post will be permanently deleted.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+              onPressed: () => Navigator.pop(ctx, true), child: const Text('Delete')),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    try {
+      await _apiService.delete('/community/posts/$postId');
+      if (mounted) { setState(() {}); ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Post deleted'), backgroundColor: Colors.green)); }
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed: $e'), backgroundColor: Colors.red));
+    }
+  }
+
+  // ── Doctor Tools Tab (6.1.4 license expiry, 6.1.5 max time, 6.1.6 no referrer) ─
+  Widget _buildDoctorToolsTab() {
+    return FutureBuilder<Map<String, dynamic>>(
+      future: _fetchDoctorToolsData(),
+      builder: (context, snap) {
+        if (snap.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        final expiringDoctors = (snap.data?['expiringLicenses'] as List?) ?? [];
+        final noReferrerDoctors = (snap.data?['noReferrerDoctors'] as List?) ?? [];
+
+        return ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            // ── Max Consultation Time (6.1.5) ──────────────────────────
+            Container(
+              padding: const EdgeInsets.all(16),
+              margin: const EdgeInsets.only(bottom: 16),
+              decoration: BoxDecoration(
+                color: Colors.white, borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+                boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 8)],
+              ),
+              child: Row(children: [
+                Container(padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(color: const Color(0xFF8B5CF6).withValues(alpha: 0.1), borderRadius: BorderRadius.circular(10)),
+                  child: const Icon(Icons.timer_rounded, color: Color(0xFF8B5CF6), size: 22)),
+                const SizedBox(width: 14),
+                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  const Text('Max Consultation Duration', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800)),
+                  Text('Currently: ${ConsultationTimer.maxDuration.inMinutes} min per session',
+                      style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                ])),
+                ElevatedButton(
+                  onPressed: _showConsultationTimeLimitDialog,
+                  style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF8B5CF6), foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)), elevation: 0),
+                  child: const Text('Change', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+                ),
+              ]),
+            ),
+
+            // ── Expiring Licenses (6.1.4) ────────────────────────────────
+            Row(children: [
+              const Icon(Icons.warning_amber_rounded, color: Color(0xFFF59E0B), size: 20),
+              const SizedBox(width: 8),
+              Text('Licenses Expiring Within 30 Days (${expiringDoctors.length})',
+                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: Color(0xFF0F172A))),
+            ]),
+            const SizedBox(height: 10),
+            if (expiringDoctors.isEmpty)
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(color: const Color(0xFFF0FDF4), borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xFF86EFAC))),
+                child: const Row(children: [
+                  Icon(Icons.check_circle_rounded, color: Color(0xFF10B981), size: 20),
+                  SizedBox(width: 10),
+                  Text('All doctor licenses are valid for more than 30 days.', style: TextStyle(color: Color(0xFF065F46), fontSize: 13, fontWeight: FontWeight.w600)),
+                ]),
+              )
+            else
+              ...expiringDoctors.map((d) {
+                final name = d['name']?.toString() ?? 'Doctor';
+                final expiry = d['licenseExpiry'] != null ? DateTime.tryParse(d['licenseExpiry'].toString()) : null;
+                final daysLeft = expiry != null ? expiry.difference(DateTime.now()).inDays : 0;
+                final color = daysLeft <= 7 ? Colors.red : const Color(0xFFF59E0B);
+                return Card(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  color: color.withValues(alpha: 0.06),
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10), side: BorderSide(color: color.withValues(alpha: 0.3))),
+                  child: ListTile(
+                    leading: Icon(Icons.person_rounded, color: color),
+                    title: Text(name, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+                    subtitle: Text(expiry != null ? 'Expires: ${DateFormat('dd MMM yyyy').format(expiry)}' : 'No expiry date',
+                        style: TextStyle(fontSize: 12, color: color, fontWeight: FontWeight.w600)),
+                    trailing: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(color: color.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(8)),
+                      child: Text('$daysLeft days', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: color)),
+                    ),
+                  ),
+                );
+              }),
+
+            const SizedBox(height: 24),
+            const Divider(color: Color(0xFFE2E8F0)),
+            const SizedBox(height: 12),
+
+            // ── No Referrer Report (6.1.6) ─────────────────────────────
+            Row(children: [
+              const Icon(Icons.link_off_rounded, color: Color(0xFFEF4444), size: 20),
+              const SizedBox(width: 8),
+              Text('No-Referrer Doctors (${noReferrerDoctors.length})',
+                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: Color(0xFF0F172A))),
+            ]),
+            const SizedBox(height: 6),
+            const Text('Doctors with no referral source recorded — admin-only view.',
+                style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8))),
+            const SizedBox(height: 10),
+            if (noReferrerDoctors.isEmpty)
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(color: const Color(0xFFF0FDF4), borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xFF86EFAC))),
+                child: const Row(children: [
+                  Icon(Icons.check_circle_rounded, color: Color(0xFF10B981), size: 20),
+                  SizedBox(width: 10),
+                  Text('All doctors have a referral source.', style: TextStyle(color: Color(0xFF065F46), fontSize: 13, fontWeight: FontWeight.w600)),
+                ]),
+              )
+            else
+              ...noReferrerDoctors.map((d) => Card(
+                margin: const EdgeInsets.only(bottom: 8), elevation: 1,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10), side: const BorderSide(color: Color(0xFFE2E8F0))),
+                child: ListTile(
+                  leading: const CircleAvatar(backgroundColor: Color(0xFFFEE2E2), child: Icon(Icons.person_off_rounded, color: Color(0xFFEF4444), size: 20)),
+                  title: Text(d['name']?.toString() ?? 'Doctor', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+                  subtitle: Text(d['email']?.toString() ?? '', style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                  trailing: const Chip(label: Text('No Referrer', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Color(0xFFEF4444))),
+                      backgroundColor: Color(0xFFFEE2E2), side: BorderSide.none, padding: EdgeInsets.symmetric(horizontal: 4)),
+                ),
+              )).toList(),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<Map<String, dynamic>> _fetchDoctorToolsData() async {
+    try {
+      final r = await _apiService.get('/admin/doctor-tools');
+      return {
+        'expiringLicenses': r.data['expiringLicenses'] ?? [],
+        'noReferrerDoctors': r.data['noReferrerDoctors'] ?? [],
+      };
+    } catch (_) {
+      return {'expiringLicenses': [], 'noReferrerDoctors': []};
+    }
   }
 }

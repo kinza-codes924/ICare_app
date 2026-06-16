@@ -316,4 +316,30 @@ class CourseService {
       rethrow;
     }
   }
+
+  // Get community categories (includes admin-added custom topics)
+  Future<List<String>> getCommunityCategories() async {
+    try {
+      final r = await _apiService.get('/community/categories');
+      final cats = (r.data['categories'] as List? ?? []).map((e) => e.toString()).toList();
+      return cats;
+    } catch (_) {
+      return ['General', 'Diabetes', 'Heart Health', 'Mental Wellness', 'Nutrition', 'Pregnancy', 'COVID-19'];
+    }
+  }
+
+  // Admin: add new community topic
+  Future<void> addCommunityTopic(String name) async {
+    await _apiService.post('/community/categories', {'name': name});
+  }
+
+  // Admin or owner: delete a post
+  Future<void> deleteForumPost(String postId) async {
+    await _apiService.delete('/community/posts/$postId');
+  }
+
+  // Admin or comment owner: delete a comment
+  Future<void> deleteForumComment(String postId, String commentId) async {
+    await _apiService.delete('/community/posts/$postId/comments/$commentId');
+  }
 }

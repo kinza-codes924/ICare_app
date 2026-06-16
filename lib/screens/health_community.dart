@@ -2,42 +2,53 @@ import 'dart:convert' show base64Encode;
 import 'dart:io' show File;
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:icare/utils/theme.dart';
 import 'package:icare/widgets/back_button.dart';
 import 'package:icare/services/course_service.dart';
+import 'package:icare/providers/auth_provider.dart';
 import 'package:intl/intl.dart';
 import 'package:image_picker/image_picker.dart';
 
-class HealthCommunityScreen extends StatefulWidget {
+class HealthCommunityScreen extends ConsumerStatefulWidget {
   const HealthCommunityScreen({super.key});
 
   @override
-  State<HealthCommunityScreen> createState() => _HealthCommunityScreenState();
+  ConsumerState<HealthCommunityScreen> createState() => _HealthCommunityScreenState();
 }
 
-class _HealthCommunityScreenState extends State<HealthCommunityScreen> {
+class _HealthCommunityScreenState extends ConsumerState<HealthCommunityScreen> {
   final CourseService _courseService = CourseService();
-  final List<String> _categories = [
-    'All',
-    'General',
-    'Diabetes',
-    'Heart Health',
-    'Mental Wellness',
-    'Nutrition',
-    'Pregnancy',
-    'COVID-19',
-  ];
+  // "All" always first, "General" always second, then custom topics
+  List<String> _categories = ['All', 'General', 'Diabetes', 'Heart Health', 'Mental Wellness', 'Nutrition', 'Pregnancy', 'COVID-19'];
   String _selectedCategory = 'All';
   List<dynamic> _posts = [];
   bool _isLoading = true;
   // Track which posts have comments section expanded — survives reloads
   final Set<String> _expandedPostIds = {};
 
+  bool get _isAdmin => ref.read(authProvider).userRole.toLowerCase() == 'admin';
+  String get _currentUserId => ref.read(authProvider).user?.id ?? '';
+
   @override
   void initState() {
     super.initState();
+    _loadCategories();
     _loadPosts();
+  }
+
+  Future<void> _loadCategories() async {
+    try {
+      final cats = await _courseService.getCommunityCategories();
+      if (mounted) {
+        setState(() {
+          // Always: All first, General second, rest in backend order
+          final rest = cats.where((c) => c != 'General').toList();
+          _categories = ['All', 'General', ...rest];
+        });
+      }
+    } catch (_) {}
   }
 
   Future<void> _loadPosts() async {
@@ -54,6 +65,90 @@ class _HealthCommunityScreenState extends State<HealthCommunityScreen> {
       debugPrint('Error loading community posts: $e');
       setState(() => _isLoading = false);
     }
+  }
+
+  Future<void> _deletePost(String postId) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Delete Post', style: TextStyle(fontWeight: FontWeight.w800)),
+        content: const Text('This post will be permanently deleted.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    try {
+      await _courseService.deleteForumPost(postId);
+      if (mounted) _loadPosts();
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Delete failed: $e'), backgroundColor: Colors.red),
+      );
+    }
+  }
+
+  Future<void> _deleteComment(String postId, String commentId) async {
+    try {
+      await _courseService.deleteForumComment(postId, commentId);
+      if (mounted) {
+        _expandedPostIds.add(postId);
+        _loadPosts();
+      }
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Delete failed: $e'), backgroundColor: Colors.red),
+      );
+    }
+  }
+
+  void _showAddTopicDialog() {
+    final ctrl = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Add New Topic', style: TextStyle(fontWeight: FontWeight.w800)),
+        content: TextField(
+          controller: ctrl,
+          autofocus: true,
+          decoration: const InputDecoration(hintText: 'e.g. Dental Health', border: OutlineInputBorder()),
+          textCapitalization: TextCapitalization.words,
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryColor, foregroundColor: Colors.white),
+            onPressed: () async {
+              final name = ctrl.text.trim();
+              if (name.isEmpty) return;
+              Navigator.pop(ctx);
+              try {
+                await _courseService.addCommunityTopic(name);
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Topic "$name" added!'), backgroundColor: Colors.green),
+                  );
+                  _loadCategories();
+                }
+              } catch (e) {
+                if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Failed: $e'), backgroundColor: Colors.red),
+                );
+              }
+            },
+            child: const Text('Add'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -108,15 +203,30 @@ class _HealthCommunityScreenState extends State<HealthCommunityScreen> {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _showCreatePostBottomSheet(),
-        backgroundColor: AppColors.primaryColor,
-        elevation: 8,
-        icon: const Icon(Icons.add_rounded, color: Colors.white),
-        label: const Text(
-          'New Post',
-          style: TextStyle(fontWeight: FontWeight.w800, color: Colors.white),
-        ),
+      floatingActionButton: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          if (_isAdmin) ...[
+            FloatingActionButton.extended(
+              heroTag: 'addTopic',
+              onPressed: _showAddTopicDialog,
+              backgroundColor: const Color(0xFF7C3AED),
+              elevation: 6,
+              icon: const Icon(Icons.add_circle_outline_rounded, color: Colors.white),
+              label: const Text('Add Topic', style: TextStyle(fontWeight: FontWeight.w800, color: Colors.white)),
+            ),
+            const SizedBox(height: 12),
+          ],
+          FloatingActionButton.extended(
+            heroTag: 'newPost',
+            onPressed: () => _showCreatePostBottomSheet(),
+            backgroundColor: AppColors.primaryColor,
+            elevation: 8,
+            icon: const Icon(Icons.add_rounded, color: Colors.white),
+            label: const Text('New Post', style: TextStyle(fontWeight: FontWeight.w800, color: Colors.white)),
+          ),
+        ],
       ),
     );
   }
@@ -299,6 +409,14 @@ class _HealthCommunityScreenState extends State<HealthCommunityScreen> {
                   ),
                 ),
                 _buildCategoryBadge(post['category'] ?? 'General'),
+                if (_isAdmin || (post['userId']?.toString() == _currentUserId))
+                  IconButton(
+                    onPressed: () => _deletePost(postId),
+                    icon: const Icon(Icons.delete_outline_rounded, size: 20, color: Color(0xFFEF4444)),
+                    tooltip: 'Delete post',
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                  ),
               ],
             ),
             const SizedBox(height: 16),
@@ -397,7 +515,7 @@ class _HealthCommunityScreenState extends State<HealthCommunityScreen> {
               const Divider(height: 32, color: Color(0xFFEDF2F7)),
               _buildInlineCommentInput(postId),
               const SizedBox(height: 16),
-              _buildCommentsSection(post['comments'] ?? []),
+              _buildCommentsSection(postId, post['comments'] ?? []),
             ],
           ],
         ),
@@ -472,7 +590,7 @@ class _HealthCommunityScreenState extends State<HealthCommunityScreen> {
     );
   }
 
-  Widget _buildCommentsSection(List<dynamic> comments) {
+  Widget _buildCommentsSection(String postId, List<dynamic> comments) {
     if (comments.isEmpty) return const SizedBox.shrink();
 
     return Column(
@@ -480,14 +598,8 @@ class _HealthCommunityScreenState extends State<HealthCommunityScreen> {
       children: [
         const Padding(
           padding: EdgeInsets.symmetric(vertical: 8),
-          child: Text(
-            'Most relevant',
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
-              color: Color(0xFF64748B),
-            ),
-          ),
+          child: Text('Most relevant',
+              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF64748B))),
         ),
         ListView.builder(
           shrinkWrap: true,
@@ -495,12 +607,12 @@ class _HealthCommunityScreenState extends State<HealthCommunityScreen> {
           itemCount: comments.length,
           itemBuilder: (context, index) {
             final comment = comments[index];
-            final author = comment['authorName'] ?? 'User';
+            final commentId = comment['_id']?.toString() ?? comment['id']?.toString() ?? '';
+            final author = comment['authorName'] ?? comment['userName'] ?? 'User';
             final content = comment['content'] ?? '';
             final timeRaw = comment['createdAt'];
-            final time = timeRaw != null
-                ? DateTime.parse(timeRaw)
-                : DateTime.now();
+            final time = timeRaw != null ? DateTime.parse(timeRaw) : DateTime.now();
+            final isMyComment = comment['userId']?.toString() == _currentUserId;
 
             return Padding(
               padding: const EdgeInsets.only(bottom: 20),
@@ -510,14 +622,8 @@ class _HealthCommunityScreenState extends State<HealthCommunityScreen> {
                   CircleAvatar(
                     radius: 16,
                     backgroundColor: const Color(0xFFF1F5F9),
-                    child: Text(
-                      author.isNotEmpty ? author[0] : 'U',
-                      style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF64748B),
-                      ),
-                    ),
+                    child: Text(author.isNotEmpty ? author[0] : 'U',
+                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF64748B))),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -526,9 +632,9 @@ class _HealthCommunityScreenState extends State<HealthCommunityScreen> {
                       children: [
                         Container(
                           padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFF8FAFC),
-                            borderRadius: const BorderRadius.only(
+                          decoration: const BoxDecoration(
+                            color: Color(0xFFF8FAFC),
+                            borderRadius: BorderRadius.only(
                               topRight: Radius.circular(16),
                               bottomLeft: Radius.circular(16),
                               bottomRight: Radius.circular(16),
@@ -538,35 +644,26 @@ class _HealthCommunityScreenState extends State<HealthCommunityScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                 children: [
-                                  Text(
-                                    author,
-                                    style: const TextStyle(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w800,
-                                      color: Color(0xFF1E293B),
-                                    ),
-                                  ),
-                                  Text(
-                                    DateFormat('h:mm a').format(time),
-                                    style: const TextStyle(
-                                      fontSize: 10,
-                                      color: Color(0xFF94A3B8),
-                                    ),
-                                  ),
+                                  Text(author,
+                                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: Color(0xFF1E293B))),
+                                  Row(children: [
+                                    Text(DateFormat('h:mm a').format(time),
+                                        style: const TextStyle(fontSize: 10, color: Color(0xFF94A3B8))),
+                                    if ((_isAdmin || isMyComment) && commentId.isNotEmpty) ...[
+                                      const SizedBox(width: 6),
+                                      GestureDetector(
+                                        onTap: () => _deleteComment(postId, commentId),
+                                        child: const Icon(Icons.delete_outline_rounded, size: 14, color: Color(0xFFEF4444)),
+                                      ),
+                                    ],
+                                  ]),
                                 ],
                               ),
                               const SizedBox(height: 4),
-                              Text(
-                                content,
-                                style: const TextStyle(
-                                  fontSize: 13,
-                                  color: Color(0xFF334155),
-                                  height: 1.4,
-                                ),
-                              ),
+                              Text(content,
+                                  style: const TextStyle(fontSize: 13, color: Color(0xFF334155), height: 1.4)),
                             ],
                           ),
                         ),

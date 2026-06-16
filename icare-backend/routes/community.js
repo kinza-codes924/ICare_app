@@ -29,6 +29,29 @@ router.get('/categories', async (req, res) => {
   }
 });
 
+// GET /api/community/categories-full — returns custom topic documents (admin use)
+router.get('/categories-full', authMiddleware, async (req, res) => {
+  try {
+    await connectMongoDB();
+    const topics = await CommunityTopic.find().sort({ createdAt: 1 }).lean();
+    res.json({ success: true, topics });
+  } catch (err) {
+    res.json({ success: true, topics: [] });
+  }
+});
+
+// DELETE /api/community/categories/:id — admin only
+router.delete('/categories/:id', authMiddleware, async (req, res) => {
+  try {
+    if (!isAdmin(req.user)) return res.status(403).json({ success: false, message: 'Admin only' });
+    await connectMongoDB();
+    await CommunityTopic.findByIdAndDelete(req.params.id);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Failed to delete topic' });
+  }
+});
+
 // POST /api/community/categories — admin only
 router.post('/categories', authMiddleware, async (req, res) => {
   try {

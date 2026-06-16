@@ -116,76 +116,66 @@ class _DoctorsListState extends State<DoctorsList> {
   }
 
   void _filterDoctors() {
-    setState(() {
-      _filteredDoctors = _doctors.where((doctor) {
-        bool matchesSearch = false;
-        
-        if (_searchMode == 'name') {
-          matchesSearch = _searchQuery.isEmpty ||
-              doctor.user.name.toLowerCase().contains(
-                _searchQuery.toLowerCase(),
-              );
-        } else if (_searchMode == 'specialty') {
-          matchesSearch = _searchQuery.isEmpty ||
-              (doctor.specialization?.toLowerCase().contains(
-                _searchQuery.toLowerCase(),
-              ) ?? false);
-        } else if (_searchMode == 'condition') {
-          final q = _searchQuery.toLowerCase();
-          final inSpec = doctor.specialization?.toLowerCase().contains(q) ?? false;
-          final inConditions = doctor.conditionsTreated.any((c) => c.toLowerCase().contains(q));
-          final inName = doctor.user.name.toLowerCase().contains(q);
-          // Match condition across specialization, conditions treated, or name
-          matchesSearch = _searchQuery.isEmpty || inSpec || inConditions || inName;
-        }
+    final filtered = _doctors.where((doctor) {
+      bool matchesSearch = false;
+      if (_searchMode == 'name') {
+        matchesSearch = _searchQuery.isEmpty ||
+            doctor.user.name.toLowerCase().contains(_searchQuery.toLowerCase());
+      } else if (_searchMode == 'specialty') {
+        matchesSearch = _searchQuery.isEmpty ||
+            (doctor.specialization?.toLowerCase().contains(_searchQuery.toLowerCase()) ?? false);
+      } else if (_searchMode == 'condition') {
+        final q = _searchQuery.toLowerCase();
+        matchesSearch = _searchQuery.isEmpty ||
+            (doctor.specialization?.toLowerCase().contains(q) ?? false) ||
+            doctor.conditionsTreated.any((c) => c.toLowerCase().contains(q)) ||
+            doctor.user.name.toLowerCase().contains(q);
+      }
 
-        final matchesSpecialization =
-            _selectedSpecialization == null ||
-            doctor.specialization == _selectedSpecialization;
+      final matchesSpecialization = _selectedSpecialization == null ||
+          doctor.specialization == _selectedSpecialization;
 
-        final matchesAvailability = _availabilityFilter == null ||
-            _availabilityFilter == 'all' ||
-            (_availabilityFilter == 'online' && doctor.isOnline) ||
-            (_availabilityFilter == 'offline' && !doctor.isOnline);
+      final matchesAvailability = _availabilityFilter == null ||
+          _availabilityFilter == 'all' ||
+          (_availabilityFilter == 'online' && doctor.isOnline) ||
+          (_availabilityFilter == 'offline' && !doctor.isOnline);
 
-        const matchesFees = true; // consultationFee not available in Doctor model yet
+      final matchesRating = _minRating == null || doctor.averageRating >= _minRating!;
 
-        final matchesRating = _minRating == null || doctor.averageRating >= _minRating!;
+      final matchesGender = _genderFilter == null ||
+          (doctor.user.gender?.toLowerCase() == _genderFilter!.toLowerCase());
 
-        // Gender filter temporarily disabled - gender field not in Doctor model
-        const matchesGender = true;
+      final matchesLanguage = _languageFilter == null ||
+          doctor.languages.contains(_languageFilter);
 
-        final matchesLanguage = _languageFilter == null ||
-            (doctor.languages.contains(_languageFilter) ?? false);
+      return matchesSearch && matchesSpecialization && matchesAvailability &&
+          matchesRating && matchesGender && matchesLanguage;
+    }).toList();
 
-        return matchesSearch && matchesSpecialization && matchesAvailability &&
-            matchesFees && matchesRating && matchesGender && matchesLanguage;
-      }).toList();
-      
-      _sortDoctors();
+    // Sort in-place — no extra setState
+    filtered.sort((a, b) {
+      if (_availabilityFilter == null || _availabilityFilter == 'all') {
+        final onlineCmp = (b.isOnline ? 1 : 0) - (a.isOnline ? 1 : 0);
+        if (onlineCmp != 0) return onlineCmp;
+      }
+      if (_sortBy == 'rating') return b.averageRating.compareTo(a.averageRating);
+      if (_sortBy == 'experience') {
+        final aExp = int.tryParse(a.experience?.replaceAll(RegExp(r'[^0-9]'), '') ?? '0') ?? 0;
+        final bExp = int.tryParse(b.experience?.replaceAll(RegExp(r'[^0-9]'), '') ?? '0') ?? 0;
+        return bExp.compareTo(aExp);
+      }
+      if (_sortBy == 'fees') {
+        final aFee = a.consultationFee ?? 0;
+        final bFee = b.consultationFee ?? 0;
+        return aFee.compareTo(bFee); // low to high
+      }
+      return 0;
     });
+
+    setState(() => _filteredDoctors = filtered);
   }
 
-  void _sortDoctors() {
-    setState(() {
-      _filteredDoctors.sort((a, b) {
-        // Online doctors always appear first when no specific filter is applied
-        if (_availabilityFilter == null || _availabilityFilter == 'all') {
-          final onlineCmp = (b.isOnline ? 1 : 0) - (a.isOnline ? 1 : 0);
-          if (onlineCmp != 0) return onlineCmp;
-        }
-        // Then by selected sort criteria
-        if (_sortBy == 'rating') {
-          return b.averageRating.compareTo(a.averageRating);
-        } else if (_sortBy == 'experience') {
-          final aExp = int.tryParse(a.experience?.replaceAll(RegExp(r'[^0-9]'), '') ?? '0') ?? 0;
-          final bExp = int.tryParse(b.experience?.replaceAll(RegExp(r'[^0-9]'), '') ?? '0') ?? 0;
-          return bExp.compareTo(aExp);
-        }
-        return 0;
-      });
-    });
-  }
+  void _sortDoctors() => _filterDoctors();
 
   bool _isAvailableToday(Doctor doctor) {
     if (doctor.isOnline) return true;
@@ -298,6 +288,7 @@ class _DoctorsListState extends State<DoctorsList> {
                       
                       // Search Bar
                       TextField(
+                        controller: _searchController,
                         onChanged: (value) {
                           _searchQuery = value;
                           _filterDoctors();
@@ -339,7 +330,7 @@ class _DoctorsListState extends State<DoctorsList> {
                             SizedBox(
                               width: isDesktop ? 200 : double.infinity,
                               child: DropdownButtonFormField<String>(
-                                initialValue: _selectedSpecialization,
+                                value: _selectedSpecialization,
                                 decoration: InputDecoration(
                                   labelText: 'Speciality'.tr(),
                                   border: OutlineInputBorder(
@@ -366,7 +357,7 @@ class _DoctorsListState extends State<DoctorsList> {
                           SizedBox(
                             width: isDesktop ? 150 : double.infinity,
                             child: DropdownButtonFormField<String>(
-                              initialValue: _availabilityFilter,
+                              value: _availabilityFilter,
                               decoration: InputDecoration(
                                 labelText: 'Availability'.tr(),
                                 border: OutlineInputBorder(
@@ -393,7 +384,7 @@ class _DoctorsListState extends State<DoctorsList> {
                           SizedBox(
                             width: isDesktop ? 150 : double.infinity,
                             child: DropdownButtonFormField<double>(
-                              initialValue: _minRating,
+                              value: _minRating,
                               decoration: InputDecoration(
                                 labelText: 'Min Rating'.tr(),
                                 border: OutlineInputBorder(
@@ -422,7 +413,7 @@ class _DoctorsListState extends State<DoctorsList> {
                           SizedBox(
                             width: isDesktop ? 130 : double.infinity,
                             child: DropdownButtonFormField<String>(
-                              initialValue: _genderFilter,
+                              value: _genderFilter,
                               decoration: InputDecoration(
                                 labelText: 'Gender'.tr(),
                                 border: OutlineInputBorder(
@@ -449,7 +440,7 @@ class _DoctorsListState extends State<DoctorsList> {
                           SizedBox(
                             width: isDesktop ? 150 : double.infinity,
                             child: DropdownButtonFormField<String>(
-                              initialValue: _languageFilter,
+                              value: _languageFilter,
                               decoration: InputDecoration(
                                 labelText: 'Language'.tr(),
                                 border: OutlineInputBorder(
