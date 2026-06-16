@@ -6,6 +6,7 @@ import 'package:icare/utils/theme.dart';
 import 'package:icare/widgets/back_button.dart';
 import 'package:icare/screens/lesson_detail_page.dart';
 import 'package:icare/screens/certificate_page.dart';
+import 'package:icare/screens/quiz_take_screen.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -288,14 +289,22 @@ class _ClassworkTab extends StatefulWidget {
 
 class _ClassworkTabState extends State<_ClassworkTab> {
   List<dynamic> _assignments = [];
+  List<dynamic> _quizzes = [];
   bool _loading = true;
 
   @override
   void initState() { super.initState(); _load(); }
 
   Future<void> _load() async {
-    final a = await widget.lms.getCourseAssignments(widget.courseId);
-    if (mounted) setState(() { _assignments = a; _loading = false; });
+    final results = await Future.wait([
+      widget.lms.getCourseAssignments(widget.courseId),
+      widget.lms.getCourseQuizzes(widget.courseId),
+    ]);
+    if (mounted) setState(() {
+      _assignments = results[0] as List;
+      _quizzes = results[1] as List;
+      _loading = false;
+    });
   }
 
   void _showCreateDialog() {
@@ -379,6 +388,18 @@ class _ClassworkTabState extends State<_ClassworkTab> {
               lms: widget.lms,
               isInstructor: widget.isInstructor,
               onRefresh: _load,
+            )),
+            const SizedBox(height: 24),
+            _SectionHeader(title: 'Quizzes', icon: Icons.quiz_outlined),
+            const SizedBox(height: 8),
+            if (_loading) const SizedBox.shrink(),
+            if (!_loading && _quizzes.isEmpty)
+              _EmptyState(icon: Icons.quiz_outlined, text: 'No quizzes yet'),
+            ..._quizzes.map((q) => _QuizCard(
+              quiz: q,
+              lms: widget.lms,
+              enrollmentId: widget.enrollmentId,
+              isInstructor: widget.isInstructor,
             )),
           ],
         ),
@@ -507,7 +528,11 @@ class _CourseLessons extends StatelessWidget {
                   ...quizzes.map((q) => ListTile(
                     leading: const Icon(Icons.quiz_outlined, color: Colors.orange, size: 20),
                     title: Text(q['title'] ?? 'Quiz', style: const TextStyle(fontSize: 13)),
+                    trailing: !isInstructor ? const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: Colors.grey) : null,
                     dense: true,
+                    onTap: isInstructor ? null : () => Navigator.push(context, MaterialPageRoute(
+                      builder: (_) => QuizTakeScreen(quiz: Map<String, dynamic>.from(q is Map ? q as Map : {}), enrollmentId: enrollmentId ?? ''),
+                    )),
                   )),
                   if (!isInstructor && moduleId.isNotEmpty)
                     Padding(
@@ -569,6 +594,74 @@ class _CourseLessons extends StatelessWidget {
       }
     }
   }
+}
+
+// ─── QUIZ CARD ────────────────────────────────────────────────────────────────
+class _QuizCard extends StatelessWidget {
+  final dynamic quiz;
+  final LmsService lms;
+  final String? enrollmentId;
+  final bool isInstructor;
+  const _QuizCard({required this.quiz, required this.lms, this.enrollmentId, required this.isInstructor});
+
+  @override
+  Widget build(BuildContext context) {
+    final questions = (quiz['questions'] as List? ?? []).length;
+    final totalMarks = quiz['totalMarks'] ?? quiz['passingScore'] ?? 0;
+    final timeLimit = quiz['timeLimit'];
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14),
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8)]),
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        leading: Container(
+          width: 44, height: 44,
+          decoration: BoxDecoration(color: Colors.indigo.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(10)),
+          child: const Icon(Icons.quiz_outlined, color: Colors.indigo, size: 22),
+        ),
+        title: Text(quiz['title'] ?? 'Quiz', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+        subtitle: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          if (quiz['description'] != null && quiz['description'].toString().isNotEmpty)
+            Padding(padding: const EdgeInsets.only(top: 2),
+              child: Text(quiz['description'], style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)), maxLines: 2, overflow: TextOverflow.ellipsis)),
+          const SizedBox(height: 4),
+          Row(children: [
+            Icon(Icons.help_outline_rounded, size: 12, color: Colors.grey[500]),
+            const SizedBox(width: 4),
+            Text('$questions questions', style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+            const SizedBox(width: 12),
+            Icon(Icons.score_rounded, size: 12, color: Colors.grey[500]),
+            const SizedBox(width: 4),
+            Text('$totalMarks marks', style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+            if (timeLimit != null) ...[
+              const SizedBox(width: 12),
+              Icon(Icons.timer_outlined, size: 12, color: Colors.grey[500]),
+              const SizedBox(width: 4),
+              Text('${timeLimit}m', style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+            ],
+          ]),
+        ]),
+        trailing: isInstructor
+            ? const Icon(Icons.visibility_outlined, color: Colors.grey, size: 20)
+            : ElevatedButton(
+                onPressed: () => Navigator.push(context, MaterialPageRoute(
+                  builder: (_) => QuizTakeScreen(quiz: _quizMap, enrollmentId: enrollmentId ?? ''),
+                )),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.indigo,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                ),
+                child: const Text('Attempt'),
+              ),
+      ),
+    );
+  }
+
+  Map<String, dynamic> get _quizMap => Map<String, dynamic>.from(quiz is Map ? quiz as Map : {});
 }
 
 class _AssignmentCard extends StatelessWidget {

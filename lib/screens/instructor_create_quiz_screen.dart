@@ -578,10 +578,13 @@ class _QuestionDialog extends StatefulWidget {
 class _QuestionDialogState extends State<_QuestionDialog> {
   final _questionController = TextEditingController();
   final _explanationController = TextEditingController();
+  // Stable controllers — never recreate inside build()
+  final List<TextEditingController> _optionControllers = List.generate(4, (_) => TextEditingController());
   String _type = 'mcq';
   int _points = 1;
-  final List<String> _options = ['', '', '', ''];
   String _correctAnswer = '';
+
+  List<String> get _options => _optionControllers.map((c) => c.text).toList();
 
   @override
   void initState() {
@@ -594,7 +597,7 @@ class _QuestionDialogState extends State<_QuestionDialog> {
       if (widget.question!['options'] != null) {
         final opts = List<String>.from(widget.question!['options']);
         for (int i = 0; i < opts.length && i < 4; i++) {
-          _options[i] = opts[i];
+          _optionControllers[i].text = opts[i];
         }
       }
       _correctAnswer = widget.question!['correctAnswer']?.toString() ?? '';
@@ -605,6 +608,7 @@ class _QuestionDialogState extends State<_QuestionDialog> {
   void dispose() {
     _questionController.dispose();
     _explanationController.dispose();
+    for (final c in _optionControllers) { c.dispose(); }
     super.dispose();
   }
 
@@ -664,21 +668,28 @@ class _QuestionDialogState extends State<_QuestionDialog> {
                 const SizedBox(height: 8),
                 for (int i = 0; i < 4; i++) ...[
                   TextField(
-                    controller: TextEditingController(text: _options[i]),
+                    controller: _optionControllers[i],
                     decoration: InputDecoration(
                       labelText: 'Option ${i + 1}',
                       border: const OutlineInputBorder(),
                     ),
-                    onChanged: (value) => _options[i] = value,
+                    // When text changes, if _correctAnswer was this option's old text, clear it
+                    onChanged: (value) => setState(() {
+                      // reset correct answer if it no longer matches any option
+                      if (!_optionControllers.any((c) => c.text == _correctAnswer)) {
+                        _correctAnswer = '';
+                      }
+                    }),
                   ),
                   const SizedBox(height: 8),
                 ],
                 const SizedBox(height: 8),
                 DropdownButtonFormField<String>(
-                  initialValue: _correctAnswer.isEmpty ? null : _correctAnswer,
+                  value: _options.any((o) => o == _correctAnswer && o.isNotEmpty) ? _correctAnswer : null,
                   decoration: const InputDecoration(
-                    labelText: 'Correct Answer',
+                    labelText: 'Correct Answer *',
                     border: OutlineInputBorder(),
+                    helperText: 'Select which option is correct',
                   ),
                   items: _options.where((o) => o.isNotEmpty).map((opt) {
                     return DropdownMenuItem(value: opt, child: Text(opt));
@@ -687,9 +698,9 @@ class _QuestionDialogState extends State<_QuestionDialog> {
                 ),
               ] else if (_type == 'true_false') ...[
                 DropdownButtonFormField<String>(
-                  initialValue: _correctAnswer.isEmpty ? null : _correctAnswer,
+                  value: _correctAnswer.isEmpty ? null : _correctAnswer,
                   decoration: const InputDecoration(
-                    labelText: 'Correct Answer',
+                    labelText: 'Correct Answer *',
                     border: OutlineInputBorder(),
                   ),
                   items: const [
