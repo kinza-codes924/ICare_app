@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const mongoose = require('mongoose');
-const auth = require('../middleware/auth');
+const { authMiddleware: auth } = require('../middleware/auth');
 
 // ─── Schema ───────────────────────────────────────────────────────────────────
 const voucherSchema = new mongoose.Schema({
