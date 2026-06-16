@@ -145,6 +145,7 @@ app.use('/api/health', healthRoutes);
 app.use('/api/consultations', consultationRoutes);
 app.use('/api/consultations-v2', consultationV2Routes);
 app.use('/api/prescriptions-v2', prescriptionV2Routes);
+app.use('/api/prescription-v2', prescriptionV2Routes); // alias — handles old email links
 app.use('/api/patient-history', patientHistoryRoutes);
 app.use('/api/lifestyle-advice', lifestyleAdviceRoutes);
 app.use('/api/upload', uploadRoutes);

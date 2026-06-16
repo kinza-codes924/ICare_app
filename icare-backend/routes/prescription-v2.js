@@ -28,8 +28,13 @@ router.get('/doctors/:doctorId/prescriptions', prescriptionV2Controller.getDocto
 // Update prescription status
 router.patch('/prescriptions/:prescriptionId/status', prescriptionV2Controller.updatePrescriptionStatus);
 
-// ─── PRINTABLE PRESCRIPTION PAGE — matches Flutter PDF template (public, no auth)
-router.get('/prescriptions/:prescriptionId/receipt', async (req, res) => {
+// ─── Old email link redirect: /receipt → /pdf ────────────────────────────────
+router.get('/prescriptions/:prescriptionId/receipt', (req, res) => {
+  res.redirect(301, `/api/prescriptions-v2/prescriptions/${req.params.prescriptionId}/pdf`);
+});
+
+// ─── PRINTABLE PRESCRIPTION PAGE — kept for direct browser access ─────────────
+router.get('/prescriptions/:prescriptionId/view', async (req, res) => {
   try {
     await connectMongoDB();
     const EnhancedPrescription = require('../models/EnhancedPrescription');
