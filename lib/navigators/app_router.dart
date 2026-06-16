@@ -25,6 +25,8 @@ import 'package:icare/screens/instructor_course_content_screen.dart';
 import 'package:icare/screens/instructor_course_analytics_screen.dart';
 import 'package:icare/screens/instructor_course_stream_screen.dart';
 import 'package:icare/screens/certificate_verification_page.dart';
+import 'package:icare/screens/otp_verification_screen.dart';
+import 'package:icare/screens/lms_public_course_detail.dart';
 import 'package:icare/utils/shared_pref.dart';
 import 'package:icare/utils/app_keys.dart';
 
@@ -59,7 +61,7 @@ final _routerNotifierProvider = Provider<_RouterNotifier>((ref) {
 });
 
 /// Public paths that don't require authentication.
-const _publicPaths = ['/home', '/login', '/signup', '/work-with-us', '/splash', '/lms/catalog', '/verify'];
+const _publicPaths = ['/home', '/login', '/signup', '/work-with-us', '/splash', '/lms/catalog', '/verify', '/lms/course'];
 
 final routerProvider = Provider<GoRouter>((ref) {
   // Trigger auth init as soon as router is created.
@@ -77,16 +79,33 @@ final routerProvider = Provider<GoRouter>((ref) {
       // Still loading auth from SharedPrefs → show splash.
       if (authInit.isLoading) return '/splash';
 
-      final isLoggedIn = ref.read(authProvider).isLoggedIn;
+      final auth = ref.read(authProvider);
+      final isLoggedIn = auth.isLoggedIn;
+      final user = auth.user;
       final path = state.matchedLocation;
-      final isPublic = _publicPaths.contains(path);
+      final isPublic = _publicPaths.any((p) => path == p || path.startsWith('$p/'));
 
       // Not logged in trying to access protected route → home.
       if (!isLoggedIn && !isPublic) return '/home';
 
-      // Logged in trying to visit public route → dashboard.
-      // /lms/catalog is accessible to both logged-in and logged-out users.
-      if (isLoggedIn && isPublic && path != '/splash' && path != '/lms/catalog') return '/dashboard';
+      if (isLoggedIn && user != null) {
+        // Mobile: both phone + email must be verified.
+        // Web: backend sets isPhoneVerified=true at registration, so only email checked.
+        final needsVerification =
+            !user.isPhoneVerified || !user.isEmailVerified;
+
+        // Unverified user → force to OTP screen (unless already there).
+        if (needsVerification && path != '/verify-otp') return '/verify-otp';
+
+        // Fully verified user landing on OTP screen → send to dashboard.
+        if (!needsVerification && path == '/verify-otp') return '/dashboard';
+
+        // Logged in visiting any other public route → dashboard.
+        // /lms/catalog and /verify remain accessible to everyone.
+        if (isPublic && path != '/splash' && path != '/lms/catalog') {
+          return '/dashboard';
+        }
+      }
 
       return null;
     },
@@ -94,9 +113,16 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/splash', builder: (_, _) => const SplashScreen()),
       GoRoute(path: '/home', builder: (_, _) => const PublicHome()),
       GoRoute(path: '/login', builder: (_, _) => const LoginScreen()),
-      GoRoute(path: '/signup', builder: (_, _) => const SignupScreen()),
+      GoRoute(
+        path: '/signup',
+        builder: (_, state) {
+          final role = state.uri.queryParameters['role'] ?? 'Patient';
+          return SignupScreen(role: role);
+        },
+      ),
       GoRoute(path: '/work-with-us', builder: (_, _) => const WorkWithUsSignup()),
       GoRoute(path: '/dashboard', builder: (_, _) => const TabsScreen()),
+      GoRoute(path: '/verify-otp', builder: (_, _) => const OtpVerificationScreen()),
       GoRoute(path: '/doctor/appointments', builder: (_, state) {
         final filter = state.uri.queryParameters['filter'] ?? 'all';
         return DoctorAppointmentsScreen(initialFilter: filter);
@@ -106,6 +132,13 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (_, state) {
           final extra = state.extra as Map<String, dynamic>?;
           return LmsPublicCatalog(audienceFilter: extra?['audienceFilter'] as String?);
+        },
+      ),
+      GoRoute(
+        path: '/lms/course/:id',
+        builder: (_, state) {
+          final courseId = state.pathParameters['id']!;
+          return LmsPublicCourseDetail(courseId: courseId);
         },
       ),
       GoRoute(

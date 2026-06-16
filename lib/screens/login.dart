@@ -709,7 +709,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                               ),
                               Expanded(
                                 child: GestureDetector(
-                                  onTap: () => setState(() => isLogin = false),
+                                  onTap: () => context.go('/signup'),
                                   child: AnimatedContainer(
                                     duration: const Duration(milliseconds: 250),
                                     curve: Curves.easeInOut,
@@ -1272,7 +1272,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                           ),
                           Expanded(
                             child: GestureDetector(
-                              onTap: () => setState(() => isLogin = false),
+                              onTap: () => context.go('/signup'),
                               child: Container(
                                 padding: EdgeInsets.symmetric(vertical: 15),
                                 decoration: BoxDecoration(
