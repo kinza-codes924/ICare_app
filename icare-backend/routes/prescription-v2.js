@@ -211,6 +211,8 @@ router.get('/prescriptions/:prescriptionId/pdf', async (req, res) => {
 
     // ── Build PDF ──────────────────────────────────────────────────────────────
     const doc = new PDFDocument({ margin: 50, size: 'A4' });
+    const path = require('path');
+    const fs   = require('fs');
 
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="iCare-Prescription-${rxId}.pdf"`);
@@ -223,20 +225,34 @@ router.get('/prescriptions/:prescriptionId/pdf', async (req, res) => {
     const pageWidth = doc.page.width - 100; // margins on both sides
 
     // ── Header ─────────────────────────────────────────────────────────────────
-    doc.fontSize(26).fillColor(BLUE).font('Helvetica-Bold').text('iCare', 50, 50);
-    doc.fontSize(9).fillColor(GREY).font('Helvetica')
-       .text('RM Health Solutions (Private) Limited', 50, 82)
-       .text('iCare Telemedicine Platform', 50, 94);
+    const logoPath = path.join(__dirname, '../assets/logo.png');
+    const logoExists = fs.existsSync(logoPath);
+
+    if (logoExists) {
+      // Logo top-left (height 60px, width auto)
+      doc.image(logoPath, 50, 36, { height: 60 });
+      // Brand text right of logo
+      const textX = 122;
+      doc.fontSize(22).fillColor(BLUE).font('Helvetica-Bold').text('iCare', textX, 44);
+      doc.fontSize(8.5).fillColor(GREY).font('Helvetica')
+         .text('RM Health Solutions (Private) Limited', textX, 70)
+         .text('iCare Telemedicine Platform', textX, 82);
+    } else {
+      // Fallback — no logo image
+      doc.fontSize(26).fillColor(BLUE).font('Helvetica-Bold').text('iCare', 50, 50);
+      doc.fontSize(9).fillColor(GREY).font('Helvetica')
+         .text('RM Health Solutions (Private) Limited', 50, 82)
+         .text('iCare Telemedicine Platform', 50, 94);
+    }
 
     // Date top-right
     doc.fontSize(11).fillColor(DARK).font('Helvetica-Bold')
-       .text(dateStr, 50, 50, { align: 'right', width: pageWidth });
+       .text(dateStr, 50, 44, { align: 'right', width: pageWidth });
     doc.fontSize(9).fillColor(GREY).font('Helvetica')
-       .text(timeStr, 50, 65, { align: 'right', width: pageWidth });
+       .text(timeStr, 50, 60, { align: 'right', width: pageWidth });
 
     // Blue divider
-    doc.moveDown(0.5);
-    const divY = 112;
+    const divY = 108;
     doc.rect(50, divY, pageWidth, 3).fill(BLUE);
 
     // ── Patient / Doctor columns ───────────────────────────────────────────────
