@@ -24,6 +24,11 @@ class _DoctorConnectNowListenerState extends State<DoctorConnectNowListener> {
   final SharedPref _sharedPref = SharedPref();
   Timer? _timer;
   bool _dialogShowing = false;
+  bool _isChecking = false; // prevents concurrent in-flight calls
+
+  // Cached role/token — avoids SharedPreferences hit every tick
+  String? _cachedRole;
+  String? _cachedToken;
 
   // In-memory cache (fast lookup)
   final Set<String> _handledRequestIds = {};
@@ -73,40 +78,45 @@ class _DoctorConnectNowListenerState extends State<DoctorConnectNowListener> {
   }
 
   void _startPolling() {
-    // Poll every 1.5 seconds so doctor gets request faster
-    _timer = Timer.periodic(const Duration(milliseconds: 1500), (_) => _checkPending());
-    // Also fire once immediately on start
+    // 6-second interval: fast enough for UX, won't pile up concurrent calls
+    // (Vercel cold start + DB lookup takes ~300–800ms, so 1.5s was causing 10+
+    // concurrent in-flight requests which caused Chrome OOM)
+    _timer = Timer.periodic(const Duration(seconds: 6), (_) => _checkPending());
+    // Fire once immediately on start
     Future.delayed(const Duration(milliseconds: 500), _checkPending);
   }
 
   Future<void> _checkPending() async {
-    if (_dialogShowing || !mounted) return;
+    // Hard guard: skip if a previous call is still in-flight or dialog is open
+    if (_isChecking || _dialogShowing || !mounted) return;
+    _isChecking = true;
+    try {
+      await _doCheckPending();
+    } finally {
+      _isChecking = false;
+    }
+  }
 
-    final userRole = await _sharedPref.getUserRole();
-    if (userRole == null) return;
-    if (userRole.toLowerCase() != 'doctor') return;
+  Future<void> _doCheckPending() async {
+    if (!mounted) return;
 
-    final token = await _sharedPref.getToken();
-    if (token == null || token.isEmpty) return;
+    // Use cached role/token to avoid SharedPreferences round-trip every tick
+    _cachedRole ??= await _sharedPref.getUserRole();
+    if (_cachedRole == null || _cachedRole!.toLowerCase() != 'doctor') return;
 
-    // Check if doctor has toggled "Available for Instant Consultation"
-    // Default = true so doctor receives requests as soon as they're online
+    _cachedToken ??= await _sharedPref.getToken();
+    if (_cachedToken == null || _cachedToken!.isEmpty) return;
+
+    // Check prefs flags (availability + in-consultation)
     try {
       final prefs = await SharedPreferences.getInstance();
       final isAvailable = prefs.getBool('doctor_instant_consult_available') ?? true;
-      if (!isAvailable) {
-        debugPrint('⏸️ Doctor not available for instant consultation — skipping poll');
-        return;
-      }
-      // Check if doctor is currently in a consultation
+      if (!isAvailable) return;
       final isInConsultation = prefs.getBool('doctor_in_consultation') ?? false;
-      if (isInConsultation) {
-        debugPrint('🔒 Doctor is in active consultation — skipping instant consult requests');
-        return;
-      }
+      if (isInConsultation) return;
     } catch (_) {}
 
-    debugPrint('🩺 Checking for Connect Now requests...');
+    if (!mounted) return;
 
     try {
       final result = await _service.checkPending();
@@ -115,12 +125,8 @@ class _DoctorConnectNowListenerState extends State<DoctorConnectNowListener> {
         final requestId = request['id']?.toString() ?? '';
 
         // Skip if already handled (persisted across restarts)
-        if (requestId.isNotEmpty && _handledRequestIds.contains(requestId)) {
-          debugPrint('⏭️ Skipping already-handled request: $requestId');
-          return;
-        }
+        if (requestId.isNotEmpty && _handledRequestIds.contains(requestId)) return;
 
-        debugPrint('🚨 Pending request found: ${request['patientName']}');
         _dialogShowing = true;
         try {
           await _showRequestDialog(request);
@@ -129,8 +135,7 @@ class _DoctorConnectNowListenerState extends State<DoctorConnectNowListener> {
         }
       }
     } catch (e) {
-      debugPrint('❌ Error checking pending requests: $e');
-      _dialogShowing = false;
+      debugPrint('❌ ConnectNow poll error: $e');
     }
   }
 
@@ -265,6 +270,8 @@ class _DoctorConnectNowListenerState extends State<DoctorConnectNowListener> {
   @override
   void dispose() {
     _timer?.cancel();
+    _cachedRole = null;
+    _cachedToken = null;
     super.dispose();
   }
 
