@@ -1229,11 +1229,11 @@ class _AttendanceTabState extends State<_AttendanceTab> {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                       decoration: BoxDecoration(
-                        color: isPresent ? Colors.green : Colors.red,
+                        color: status == 'present' ? Colors.green : status == 'late' ? Colors.orange : Colors.red,
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
-                        isPresent ? 'Present' : 'Absent',
+                        status == 'present' ? 'Present' : status == 'late' ? 'Late' : 'Absent',
                         style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700),
                       ),
                     ),
@@ -1309,49 +1309,73 @@ class _AttendanceTabState extends State<_AttendanceTab> {
               final session = _sessions[i];
               final records = session['records'] as List? ?? [];
               final presentCount = records.where((r) => r['status'] == 'present').length;
-              return Container(
-                margin: const EdgeInsets.only(bottom: 12),
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 6)],
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                session['sessionTitle'] ?? 'Class Session',
-                                style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                _formatDate(session['sessionDate']),
-                                style: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
-                              ),
-                            ],
-                          ),
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                          decoration: BoxDecoration(
-                            color: AppColors.primaryColor.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Text(
-                            '$presentCount/${records.length} Present',
-                            style: TextStyle(color: AppColors.primaryColor, fontSize: 12, fontWeight: FontWeight.w700),
-                          ),
-                        ),
-                      ],
+              final lateCount = records.where((r) => r['status'] == 'late').length;
+              final marked = records.isNotEmpty;
+              return InkWell(
+                onTap: () async {
+                  await Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => _MarkAttendanceScreen(
+                        session: session,
+                        courseId: widget.courseId,
+                        lms: widget.lms,
+                      ),
                     ),
-                  ],
+                  );
+                  _loadAttendance();
+                },
+                borderRadius: BorderRadius.circular(12),
+                child: Container(
+                  margin: const EdgeInsets.only(bottom: 12),
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: marked ? AppColors.primaryColor.withValues(alpha: 0.2) : const Color(0xFFE2E8F0)),
+                    boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 6)],
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: AppColors.primaryColor.withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Icon(Icons.how_to_reg_rounded, color: AppColors.primaryColor, size: 22),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              session['sessionTitle'] ?? 'Class Session',
+                              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+                            ),
+                            const SizedBox(height: 3),
+                            Text(
+                              _formatDate(session['sessionDate']),
+                              style: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
+                            ),
+                            if (marked) ...[
+                              const SizedBox(height: 6),
+                              Row(children: [
+                                _miniChip('$presentCount Present', Colors.green),
+                                const SizedBox(width: 6),
+                                if (lateCount > 0) _miniChip('$lateCount Late', Colors.orange),
+                                const SizedBox(width: 6),
+                                _miniChip('${records.length - presentCount - lateCount} Absent', Colors.red),
+                              ]),
+                            ] else
+                              const Text('Tap to mark attendance', style: TextStyle(fontSize: 11, color: Color(0xFF94A3B8))),
+                          ],
+                        ),
+                      ),
+                      const Icon(Icons.chevron_right_rounded, color: Color(0xFF94A3B8)),
+                    ],
+                  ),
                 ),
               );
             },
@@ -1406,6 +1430,14 @@ class _AttendanceTabState extends State<_AttendanceTab> {
     );
   }
 
+  Widget _miniChip(String label, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(color: color.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(6)),
+      child: Text(label, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: color)),
+    );
+  }
+
   String _formatDate(dynamic date) {
     if (date == null) return 'N/A';
     try {
@@ -1414,6 +1446,279 @@ class _AttendanceTabState extends State<_AttendanceTab> {
     } catch (e) {
       return date.toString();
     }
+  }
+}
+
+// ─── MARK ATTENDANCE SCREEN ───────────────────────────────────────────────────
+class _MarkAttendanceScreen extends StatefulWidget {
+  final Map<String, dynamic> session;
+  final String courseId;
+  final LmsService lms;
+  const _MarkAttendanceScreen({required this.session, required this.courseId, required this.lms});
+
+  @override
+  State<_MarkAttendanceScreen> createState() => _MarkAttendanceScreenState();
+}
+
+class _MarkAttendanceScreenState extends State<_MarkAttendanceScreen> {
+  bool _loading = true;
+  bool _saving = false;
+  List<Map<String, dynamic>> _students = [];
+  // studentId → status
+  final Map<String, String> _statusMap = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() => _loading = true);
+    try {
+      final students = await widget.lms.getCourseStudents(widget.courseId);
+      final existing = List<Map<String, dynamic>>.from(widget.session['records'] ?? []);
+      final statusMap = <String, String>{};
+      for (final r in existing) {
+        final id = r['studentId']?.toString() ?? '';
+        if (id.isNotEmpty) statusMap[id] = r['status']?.toString() ?? 'absent';
+      }
+      if (mounted) {
+        setState(() {
+          _students = List<Map<String, dynamic>>.from(students);
+          // Pre-fill from existing records; default absent
+          for (final s in _students) {
+            final id = s['_id']?.toString() ?? '';
+            _statusMap[id] = statusMap[id] ?? 'absent';
+          }
+          _loading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _save() async {
+    setState(() => _saving = true);
+    final records = _students.map((s) {
+      final id = s['_id']?.toString() ?? '';
+      return {'studentId': id, 'status': _statusMap[id] ?? 'absent'};
+    }).toList();
+
+    final sessionId = widget.session['_id']?.toString() ?? '';
+    final result = await widget.lms.updateSessionAttendance(sessionId: sessionId, records: records);
+    if (mounted) {
+      setState(() => _saving = false);
+      if (result['success'] == true) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Attendance saved'), backgroundColor: Colors.green),
+        );
+        Navigator.pop(context);
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(result['message'] ?? 'Failed to save'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
+  void _markAll(String status) {
+    setState(() {
+      for (final s in _students) {
+        final id = s['_id']?.toString() ?? '';
+        _statusMap[id] = status;
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final title = widget.session['sessionTitle'] ?? 'Class Session';
+    final date = _formatDate(widget.session['sessionDate']);
+
+    final presentCount = _statusMap.values.where((v) => v == 'present').length;
+    final lateCount = _statusMap.values.where((v) => v == 'late').length;
+    final absentCount = _statusMap.values.where((v) => v == 'absent').length;
+
+    return Scaffold(
+      backgroundColor: const Color(0xFFF8FAFC),
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Color(0xFF0F172A)),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(title, style: const TextStyle(color: Color(0xFF0F172A), fontWeight: FontWeight.w800, fontSize: 16)),
+            Text(date, style: const TextStyle(color: Color(0xFF64748B), fontSize: 12)),
+          ],
+        ),
+        actions: [
+          if (_saving)
+            const Padding(padding: EdgeInsets.all(16), child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)))
+          else
+            TextButton.icon(
+              onPressed: _students.isEmpty ? null : _save,
+              icon: const Icon(Icons.save_rounded, size: 18),
+              label: const Text('Save', style: TextStyle(fontWeight: FontWeight.w700)),
+              style: TextButton.styleFrom(foregroundColor: AppColors.primaryColor),
+            ),
+        ],
+      ),
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : Column(
+              children: [
+                // Summary bar
+                Container(
+                  margin: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                    children: [
+                      _summaryChip('Present', presentCount, Colors.green),
+                      _summaryChip('Late', lateCount, Colors.orange),
+                      _summaryChip('Absent', absentCount, Colors.red),
+                    ],
+                  ),
+                ),
+                // Quick mark all
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Row(children: [
+                    const Text('Mark all:', style: TextStyle(fontSize: 13, color: Color(0xFF64748B), fontWeight: FontWeight.w600)),
+                    const SizedBox(width: 12),
+                    _quickMarkBtn('Present', Colors.green),
+                    const SizedBox(width: 8),
+                    _quickMarkBtn('Late', Colors.orange),
+                    const SizedBox(width: 8),
+                    _quickMarkBtn('Absent', Colors.red),
+                  ]),
+                ),
+                const SizedBox(height: 12),
+                // Student list
+                Expanded(
+                  child: _students.isEmpty
+                      ? const Center(child: Text('No enrolled students', style: TextStyle(color: Color(0xFF94A3B8))))
+                      : ListView.builder(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          itemCount: _students.length,
+                          itemBuilder: (ctx, i) {
+                            final student = _students[i];
+                            final id = student['_id']?.toString() ?? '';
+                            final name = student['name']?.toString() ?? 'Student';
+                            final email = student['email']?.toString() ?? '';
+                            final status = _statusMap[id] ?? 'absent';
+
+                            return Container(
+                              margin: const EdgeInsets.only(bottom: 10),
+                              padding: const EdgeInsets.all(14),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: _borderColor(status).withValues(alpha: 0.3)),
+                              ),
+                              child: Row(
+                                children: [
+                                  CircleAvatar(
+                                    backgroundColor: _borderColor(status).withValues(alpha: 0.15),
+                                    radius: 22,
+                                    child: Text(
+                                      name.isNotEmpty ? name[0].toUpperCase() : '?',
+                                      style: TextStyle(fontWeight: FontWeight.w800, color: _borderColor(status), fontSize: 16),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(name, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+                                        if (email.isNotEmpty)
+                                          Text(email, style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8))),
+                                      ],
+                                    ),
+                                  ),
+                                  // Status toggle buttons
+                                  Row(children: [
+                                    _statusBtn(id, 'present', Icons.check_circle_rounded, Colors.green, status),
+                                    const SizedBox(width: 6),
+                                    _statusBtn(id, 'late', Icons.watch_later_rounded, Colors.orange, status),
+                                    const SizedBox(width: 6),
+                                    _statusBtn(id, 'absent', Icons.cancel_rounded, Colors.red, status),
+                                  ]),
+                                ],
+                              ),
+                            );
+                          },
+                        ),
+                ),
+              ],
+            ),
+    );
+  }
+
+  Widget _summaryChip(String label, int count, Color color) {
+    return Column(children: [
+      Text('$count', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: color)),
+      Text(label, style: TextStyle(fontSize: 11, color: color.withValues(alpha: 0.8))),
+    ]);
+  }
+
+  Widget _quickMarkBtn(String label, Color color) {
+    return GestureDetector(
+      onTap: () => _markAll(label.toLowerCase()),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: color.withValues(alpha: 0.3)),
+        ),
+        child: Text(label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: color)),
+      ),
+    );
+  }
+
+  Widget _statusBtn(String studentId, String status, IconData icon, Color color, String current) {
+    final selected = current == status;
+    return GestureDetector(
+      onTap: () => setState(() => _statusMap[studentId] = status),
+      child: Container(
+        padding: const EdgeInsets.all(6),
+        decoration: BoxDecoration(
+          color: selected ? color.withValues(alpha: 0.15) : Colors.transparent,
+          shape: BoxShape.circle,
+          border: Border.all(color: selected ? color : const Color(0xFFE2E8F0)),
+        ),
+        child: Icon(icon, size: 20, color: selected ? color : const Color(0xFFCBD5E1)),
+      ),
+    );
+  }
+
+  Color _borderColor(String status) {
+    switch (status) {
+      case 'present': return Colors.green;
+      case 'late': return Colors.orange;
+      default: return Colors.red;
+    }
+  }
+
+  String _formatDate(dynamic date) {
+    if (date == null) return '';
+    try {
+      final dt = DateTime.parse(date.toString());
+      return '${dt.day}/${dt.month}/${dt.year}';
+    } catch (_) { return date.toString(); }
   }
 }
 
