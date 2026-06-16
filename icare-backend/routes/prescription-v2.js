@@ -181,4 +181,191 @@ router.get('/prescriptions/:prescriptionId/receipt', async (req, res) => {
   }
 });
 
+// ─── PDF DOWNLOAD — direct prescription PDF download (public, no auth) ──────────
+router.get('/prescriptions/:prescriptionId/pdf', async (req, res) => {
+  try {
+    await connectMongoDB();
+    const EnhancedPrescription = require('../models/EnhancedPrescription');
+    const User = require('../models/User');
+    const PDFDocument = require('pdfkit');
+
+    const rx = await EnhancedPrescription.findById(new mongoose.Types.ObjectId(req.params.prescriptionId)).lean();
+    if (!rx) return res.status(404).json({ success: false, message: 'Prescription not found' });
+
+    const [patient, doctor] = await Promise.all([
+      User.findById(rx.patientId).select('name username').lean().catch(() => null),
+      User.findById(rx.doctorId).select('name username').lean().catch(() => null),
+    ]);
+
+    const patientName = patient?.name || patient?.username || 'Patient';
+    const doctorName = doctor?.name || doctor?.username || 'Doctor';
+    const dateObj = new Date(rx.createdAt || Date.now());
+    const dateStr = dateObj.toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric' });
+    const timeStr = dateObj.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+    const rxId = rx._id.toString().slice(-8).toUpperCase();
+
+    // ── Build PDF ──────────────────────────────────────────────────────────────
+    const doc = new PDFDocument({ margin: 50, size: 'A4' });
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="iCare-Prescription-${rxId}.pdf"`);
+    doc.pipe(res);
+
+    const BLUE = '#1D4ED8';
+    const DARK = '#0f172a';
+    const GREY = '#6B7280';
+    const RED  = '#991B1B';
+    const pageWidth = doc.page.width - 100; // margins on both sides
+
+    // ── Header ─────────────────────────────────────────────────────────────────
+    doc.fontSize(26).fillColor(BLUE).font('Helvetica-Bold').text('iCare', 50, 50);
+    doc.fontSize(9).fillColor(GREY).font('Helvetica')
+       .text('RM Health Solutions (Private) Limited', 50, 82)
+       .text('iCare Telemedicine Platform', 50, 94);
+
+    // Date top-right
+    doc.fontSize(11).fillColor(DARK).font('Helvetica-Bold')
+       .text(dateStr, 50, 50, { align: 'right', width: pageWidth });
+    doc.fontSize(9).fillColor(GREY).font('Helvetica')
+       .text(timeStr, 50, 65, { align: 'right', width: pageWidth });
+
+    // Blue divider
+    doc.moveDown(0.5);
+    const divY = 112;
+    doc.rect(50, divY, pageWidth, 3).fill(BLUE);
+
+    // ── Patient / Doctor columns ───────────────────────────────────────────────
+    const colY = divY + 16;
+    const colW = (pageWidth - 20) / 2;
+
+    // Patient column
+    doc.fontSize(7).fillColor(GREY).font('Helvetica-Bold').text('PATIENT', 50, colY);
+    doc.fontSize(13).fillColor(DARK).font('Helvetica-Bold').text(patientName, 50, colY + 12);
+    let ptY = colY + 28;
+    if (rx.patientAge) {
+      const ageGender = `Age: ${rx.patientAge}${rx.patientGender ? '  |  Gender: ' + rx.patientGender : ''}`;
+      doc.fontSize(9).fillColor(GREY).font('Helvetica').text(ageGender, 50, ptY);
+      ptY += 13;
+    }
+    if (rx.mrNumber || rx.patientMrNumber) {
+      doc.fontSize(9).fillColor(DARK).font('Helvetica-Bold').text(`MR# ${rx.mrNumber || rx.patientMrNumber}`, 50, ptY);
+    }
+
+    // Doctor column
+    const drX = 50 + colW + 20;
+    doc.fontSize(7).fillColor(GREY).font('Helvetica-Bold').text('DOCTOR', drX, colY);
+    doc.fontSize(13).fillColor(DARK).font('Helvetica-Bold').text(`Dr. ${doctorName}`, drX, colY + 12);
+    let drY = colY + 28;
+    if (rx.doctorPmdc) {
+      doc.fontSize(9).fillColor(GREY).font('Helvetica').text(`PMDC: ${rx.doctorPmdc}`, drX, drY);
+      drY += 13;
+    }
+    if (rx.doctorPhone) {
+      doc.fontSize(9).fillColor(GREY).font('Helvetica').text(`Phone: ${rx.doctorPhone}`, drX, drY);
+    }
+
+    // thin divider after patient/doctor block
+    let curY = Math.max(ptY, drY) + 24;
+    doc.rect(50, curY, pageWidth, 0.5).fill('#e2e8f0');
+    curY += 12;
+
+    // ── Diagnosis ──────────────────────────────────────────────────────────────
+    const diagnoses = rx.diagnoses || [];
+    if (diagnoses.length > 0) {
+      doc.fontSize(8).fillColor(BLUE).font('Helvetica-Bold').text('DIAGNOSIS', 50, curY);
+      curY += 14;
+      diagnoses.forEach((d) => {
+        const text = d.description || d.desc || d.diagnosis || d.name || (typeof d === 'string' ? d : '');
+        if (!text) return;
+        const tw = doc.widthOfString(text, { fontSize: 10 }) + 16;
+        doc.rect(50, curY - 3, tw, 18).fill('#FEF2F2').stroke('#FECACA');
+        doc.fontSize(10).fillColor(RED).font('Helvetica').text(text, 58, curY + 1);
+        curY += 24;
+      });
+      curY += 4;
+    }
+
+    // ── Medications ────────────────────────────────────────────────────────────
+    const medicines = rx.medicines || [];
+    if (medicines.length > 0) {
+      doc.fontSize(8).fillColor(BLUE).font('Helvetica-Bold').text('Rx   MEDICATIONS', 50, curY);
+      curY += 14;
+      medicines.forEach((m, i) => {
+        const name = m.medicineName || m.name || m.medicine || 'Medicine';
+        const dose = m.dosage || m.dose || '';
+        const freq = m.frequency || '';
+        const dur  = m.duration || '';
+        const details = [dose && `Dose: ${dose}`, freq && `Frequency: ${freq}`, dur && `Duration: ${dur}`].filter(Boolean).join('   ');
+
+        // card background
+        doc.rect(50, curY - 4, pageWidth, details ? 34 : 22).fill('#EFF6FF').stroke('#BFDBFE');
+        doc.fontSize(11).fillColor(DARK).font('Helvetica-Bold').text(`${i + 1}. ${name}`, 62, curY);
+        if (details) {
+          doc.fontSize(9).fillColor(GREY).font('Helvetica').text(details, 62, curY + 14);
+        }
+        curY += details ? 44 : 30;
+      });
+      curY += 4;
+    }
+
+    // ── Lab Tests ──────────────────────────────────────────────────────────────
+    const labTests = rx.labTests || [];
+    if (labTests.length > 0) {
+      doc.fontSize(8).fillColor(BLUE).font('Helvetica-Bold').text('LAB TESTS', 50, curY);
+      curY += 14;
+      labTests.forEach((t) => {
+        const name = typeof t === 'string' ? t : (t.testName || t.name || 'Lab Test');
+        doc.fontSize(10).fillColor(DARK).font('Helvetica').text(`•  ${name}`, 60, curY);
+        curY += 16;
+      });
+      curY += 4;
+    }
+
+    // ── Doctor Notes ───────────────────────────────────────────────────────────
+    if (rx.doctorNotes) {
+      doc.fontSize(8).fillColor(BLUE).font('Helvetica-Bold').text('DOCTOR NOTES', 50, curY);
+      curY += 12;
+      doc.fontSize(10).fillColor(DARK).font('Helvetica').text(rx.doctorNotes, 50, curY, { width: pageWidth });
+      curY += doc.heightOfString(rx.doctorNotes, { width: pageWidth }) + 10;
+    }
+
+    // ── Follow-up ──────────────────────────────────────────────────────────────
+    if (rx.followUpDate) {
+      doc.fontSize(8).fillColor(BLUE).font('Helvetica-Bold').text('FOLLOW-UP', 50, curY);
+      curY += 12;
+      doc.fontSize(10).fillColor(DARK).font('Helvetica').text(`Next visit: ${rx.followUpDate}`, 50, curY);
+      curY += 20;
+    }
+
+    // ── Signature block (bottom, right-aligned) ────────────────────────────────
+    curY += 20;
+    doc.rect(50, curY, pageWidth, 0.5).fill('#e2e8f0');
+    curY += 16;
+    const sigLineX = doc.page.width - 50 - 180;
+    doc.rect(sigLineX, curY, 180, 1).fill(DARK);
+    curY += 6;
+    doc.fontSize(11).fillColor(DARK).font('Helvetica-Bold').text(`Dr. ${doctorName}`, sigLineX, curY, { width: 180, align: 'center' });
+    curY += 14;
+    if (rx.doctorPmdc) {
+      doc.fontSize(9).fillColor(GREY).font('Helvetica').text(`PMDC Reg. No. ${rx.doctorPmdc}`, sigLineX, curY, { width: 180, align: 'center' });
+      curY += 12;
+    }
+    doc.fontSize(9).fillColor(GREY).font('Helvetica').text('Authorized Signature', sigLineX, curY, { width: 180, align: 'center' });
+
+    // ── Footer disclaimer ──────────────────────────────────────────────────────
+    const footerY = doc.page.height - 80;
+    doc.rect(50, footerY, pageWidth, 44).fill('#F3F4F6');
+    doc.fontSize(8).fillColor(GREY).font('Helvetica')
+       .text(
+         `This prescription has been electronically generated and authenticated via iCare — RM Health Solutions (Private) Limited.\nValid only for the stated patient and date.  |  www.icare.com.co  |  Prescription Ref: ${rxId}`,
+         58, footerY + 8, { width: pageWidth - 16, align: 'center' }
+       );
+
+    doc.end();
+  } catch (e) {
+    console.error('[Prescription] PDF error:', e.message);
+    if (!res.headersSent) res.status(500).json({ success: false, message: e.message });
+  }
+});
+
 module.exports = router;

@@ -261,9 +261,9 @@ exports.completePrescription = async (req, res) => {
                     <p style="color:#92400E;font-size:13px;margin:0;">This prescription is valid for <strong>30 days</strong>. Open the iCare app to order medicines or book lab tests.</p>
                   </div>
                   <div style="text-align:center;margin:24px 0 8px;">
-                    <a href="https://icare-backend-inky.vercel.app/api/prescription-v2/prescriptions/${prescription._id}/receipt" style="background:#0036BC;color:#fff;padding:13px 32px;border-radius:8px;text-decoration:none;font-weight:700;font-size:15px;display:inline-block;">📋 Download Prescription</a>
+                    <a href="https://icare-backend-inky.vercel.app/api/prescriptions-v2/prescriptions/${prescription._id}/pdf" style="background:#0036BC;color:#fff;padding:13px 32px;border-radius:8px;text-decoration:none;font-weight:700;font-size:15px;display:inline-block;">📥 Download Prescription PDF</a>
                   </div>
-                  <p style="color:#94a3b8;font-size:12px;text-align:center;margin:0 0 20px;">Click above to open your prescription — you can save it as PDF from your browser.</p>
+                  <p style="color:#94a3b8;font-size:12px;text-align:center;margin:0 0 20px;">Click above to download your prescription as a PDF file.</p>
                   <hr style="border:none;border-top:1px solid #e2e8f0;margin:20px 0;">
                   <p style="color:#94A3B8;font-size:12px;text-align:center;margin:0;">iCare Healthcare Platform &nbsp;|&nbsp; <a href="https://www.icare.com.co" style="color:#0036BC;text-decoration:none;">www.icare.com.co</a></p>
                 </div>
