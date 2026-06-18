@@ -250,13 +250,14 @@ router.post('/add_pharmacy_details', authMiddleware, async (req, res) => {
   try {
     await connectMongoDB();
     const userId = toId(req.user.id);
-    const { pharmacyName, licenseNumber, operatingHours, deliveryAvailable, deliveryFee, address, city, drapCompliance, profilePicture, latitude, longitude } = req.body;
+    const { pharmacyName, ownerName, licenseNumber, operatingHours, deliveryAvailable, deliveryFee, address, city, drapCompliance, profilePicture, latitude, longitude } = req.body;
+    const resolvedName = pharmacyName || ownerName;
 
     const profile = await PharmacyProfile.findOneAndUpdate(
       { user_id: userId },
       {
         $set: {
-          pharmacy_name: pharmacyName, license_number: licenseNumber,
+          pharmacy_name: resolvedName, license_number: licenseNumber,
           operating_hours: operatingHours, delivery_available: deliveryAvailable ?? false,
           delivery_fee: deliveryFee ?? 0, address, city,
           drap_compliance: drapCompliance ?? false,
@@ -267,9 +268,12 @@ router.post('/add_pharmacy_details', authMiddleware, async (req, res) => {
       { new: true, upsert: true }
     );
 
-    // Save profilePicture to User model
-    if (profilePicture !== undefined) {
-      await User.findByIdAndUpdate(userId, { $set: { profilePicture } });
+    // Save profilePicture and name to User model so auth state reflects it
+    const userUpdate = {};
+    if (profilePicture !== undefined) userUpdate.profilePicture = profilePicture;
+    if (resolvedName) { userUpdate.name = resolvedName; userUpdate.username = resolvedName; }
+    if (Object.keys(userUpdate).length > 0) {
+      await User.findByIdAndUpdate(userId, { $set: userUpdate });
     }
 
     res.json({ success: true, pharmacy: profile, existingProfile: profile });

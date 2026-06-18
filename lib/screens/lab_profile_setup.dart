@@ -1,23 +1,27 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:file_picker/file_picker.dart';
 // ignore: avoid_web_libraries_in_flutter
 import '../utils/html_stub.dart' as html
     if (dart.library.html) 'dart:html';
 import '../services/laboratory_service.dart';
+import '../services/api_service.dart';
+import '../models/user.dart';
+import '../providers/auth_provider.dart';
 import 'tabs.dart';
 import '../widgets/back_button.dart';
 
-class LabProfileSetup extends StatefulWidget {
+class LabProfileSetup extends ConsumerStatefulWidget {
   const LabProfileSetup({super.key});
 
   @override
-  State<LabProfileSetup> createState() => _LabProfileSetupState();
+  ConsumerState<LabProfileSetup> createState() => _LabProfileSetupState();
 }
 
-class _LabProfileSetupState extends State<LabProfileSetup>
+class _LabProfileSetupState extends ConsumerState<LabProfileSetup>
     with TickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
   final LaboratoryService _labService = LaboratoryService();
@@ -231,6 +235,13 @@ class _LabProfileSetupState extends State<LabProfileSetup>
       if (_imageBytes != null) {
         setState(() => _existingProfilePictureUrl = 'data:image/jpeg;base64,${base64Encode(_imageBytes!)}');
       }
+      // Refresh auth provider so dashboard/drawer reflect new name & picture
+      try {
+        final resp = await ApiService().get('/users/profile');
+        if (resp.data != null && mounted) {
+          await ref.read(authProvider.notifier).setUser(User.fromJson(resp.data));
+        }
+      } catch (_) {}
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

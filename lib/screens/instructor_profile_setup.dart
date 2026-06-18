@@ -1,23 +1,27 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:icare/services/instructor_service.dart';
+import 'package:icare/services/api_service.dart';
+import 'package:icare/models/user.dart';
+import 'package:icare/providers/auth_provider.dart';
 import 'package:icare/utils/theme.dart';
 import 'package:icare/widgets/back_button.dart';
 import 'package:icare/widgets/custom_button.dart';
 import 'package:icare/widgets/custom_text_input.dart';
 
-class InstructorProfileSetupScreen extends StatefulWidget {
+class InstructorProfileSetupScreen extends ConsumerStatefulWidget {
   const InstructorProfileSetupScreen({super.key});
 
   @override
-  State<InstructorProfileSetupScreen> createState() =>
+  ConsumerState<InstructorProfileSetupScreen> createState() =>
       _InstructorProfileSetupScreenState();
 }
 
 class _InstructorProfileSetupScreenState
-    extends State<InstructorProfileSetupScreen> {
+    extends ConsumerState<InstructorProfileSetupScreen> {
   final InstructorService _instructorService = InstructorService();
   final _formKey = GlobalKey<FormState>();
 
@@ -135,6 +139,13 @@ class _InstructorProfileSetupScreenState
       if (_imageBytes != null) {
         setState(() => _existingProfilePictureUrl = 'data:image/jpeg;base64,${base64Encode(_imageBytes!)}');
       }
+      // Refresh auth provider so dashboard/drawer reflect new picture
+      try {
+        final resp = await ApiService().get('/users/profile');
+        if (resp.data != null && mounted) {
+          await ref.read(authProvider.notifier).setUser(User.fromJson(resp.data));
+        }
+      } catch (_) {}
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

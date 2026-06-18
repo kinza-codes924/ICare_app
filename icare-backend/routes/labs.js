@@ -243,10 +243,13 @@ router.post('/add_laboratory_details', authMiddleware, async (req, res) => {
       { new: true, upsert: true }
     );
 
-    // Save profilePicture to User model
+    // Save profilePicture and lab name to User model so auth state reflects it
     const { profilePicture } = req.body;
-    if (profilePicture !== undefined) {
-      await User.findByIdAndUpdate(userId, { $set: { profilePicture } });
+    const userUpdate = {};
+    if (profilePicture !== undefined) userUpdate.profilePicture = profilePicture;
+    if (finalLabName) { userUpdate.name = finalLabName; userUpdate.username = finalLabName; }
+    if (Object.keys(userUpdate).length > 0) {
+      await User.findByIdAndUpdate(userId, { $set: userUpdate });
     }
 
     const result = { ...profile.toObject(), _id: profile._id.toString() };

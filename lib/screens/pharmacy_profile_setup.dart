@@ -1,21 +1,25 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 // ignore: avoid_web_libraries_in_flutter
 import '../utils/html_stub.dart' as html
     if (dart.library.html) 'dart:html';
 import '../services/pharmacy_service.dart';
+import '../services/api_service.dart';
+import '../models/user.dart';
+import '../providers/auth_provider.dart';
 import 'tabs.dart';
 
-class PharmacyProfileSetup extends StatefulWidget {
+class PharmacyProfileSetup extends ConsumerStatefulWidget {
   const PharmacyProfileSetup({super.key});
 
   @override
-  State<PharmacyProfileSetup> createState() => _PharmacyProfileSetupState();
+  ConsumerState<PharmacyProfileSetup> createState() => _PharmacyProfileSetupState();
 }
 
-class _PharmacyProfileSetupState extends State<PharmacyProfileSetup> {
+class _PharmacyProfileSetupState extends ConsumerState<PharmacyProfileSetup> {
   final _formKey = GlobalKey<FormState>();
   final PharmacyService _pharmacyService = PharmacyService();
 
@@ -138,6 +142,7 @@ class _PharmacyProfileSetupState extends State<PharmacyProfileSetup> {
 
     try {
       await _pharmacyService.updatePharmacyProfile({
+        'pharmacyName': _ownerNameController.text,
         'ownerName': _ownerNameController.text,
         'cnic': _cnicController.text,
         'licenseNumber': _licenseNumberController.text,
@@ -157,6 +162,13 @@ class _PharmacyProfileSetupState extends State<PharmacyProfileSetup> {
       if (_imageBytes != null) {
         setState(() => _existingProfilePictureUrl = 'data:image/jpeg;base64,${base64Encode(_imageBytes!)}');
       }
+      // Refresh auth provider so dashboard/drawer reflect new name & picture
+      try {
+        final resp = await ApiService().get('/users/profile');
+        if (resp.data != null && mounted) {
+          await ref.read(authProvider.notifier).setUser(User.fromJson(resp.data));
+        }
+      } catch (_) {}
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

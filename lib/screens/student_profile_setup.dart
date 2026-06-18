@@ -1,19 +1,23 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import '../services/student_service.dart';
+import '../services/api_service.dart';
+import '../models/user.dart';
+import '../providers/auth_provider.dart';
 import 'tabs.dart';
 import '../widgets/back_button.dart';
 
-class StudentProfileSetup extends StatefulWidget {
+class StudentProfileSetup extends ConsumerStatefulWidget {
   const StudentProfileSetup({super.key});
 
   @override
-  State<StudentProfileSetup> createState() => _StudentProfileSetupState();
+  ConsumerState<StudentProfileSetup> createState() => _StudentProfileSetupState();
 }
 
-class _StudentProfileSetupState extends State<StudentProfileSetup>
+class _StudentProfileSetupState extends ConsumerState<StudentProfileSetup>
     with TickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
   final StudentService _studentService = StudentService();
@@ -135,6 +139,13 @@ class _StudentProfileSetupState extends State<StudentProfileSetup>
       if (_imageBytes != null) {
         setState(() => _existingProfilePictureUrl = 'data:image/jpeg;base64,${base64Encode(_imageBytes!)}');
       }
+      // Refresh auth provider so dashboard/drawer reflect new name & picture
+      try {
+        final resp = await ApiService().get('/users/profile');
+        if (resp.data != null && mounted) {
+          await ref.read(authProvider.notifier).setUser(User.fromJson(resp.data));
+        }
+      } catch (_) {}
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
