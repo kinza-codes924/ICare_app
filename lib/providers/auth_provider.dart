@@ -39,9 +39,14 @@ class AuthNotifier extends StateNotifier<Auth> {
 
   Future<void> setUser(User user) async {
     final normalizedRole = _normalizeRole(user.role);
-    await SharedPref().setUserRole(normalizedRole);
-    await SharedPref().setUserData(user);
+    // Update in-memory state FIRST — UI rebuilds immediately regardless of storage outcome
     state = state.copyWith(user: user, userRole: normalizedRole);
+    // Persist to storage — wrapped in try/catch because large base64 images can exceed
+    // web localStorage quota and must not block the state update above
+    try {
+      await SharedPref().setUserRole(normalizedRole);
+      await SharedPref().setUserData(user);
+    } catch (_) {}
   }
 
   String _normalizeRole(String role) {

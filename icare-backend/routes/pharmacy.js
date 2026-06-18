@@ -230,12 +230,19 @@ router.get('/profile', authMiddleware, async (req, res) => {
       success: true,
       pharmacy: {
         id: user._id.toString(),
-        _id: user._id.toString(),   // always User._id — never let profile spread override this
+        _id: user._id.toString(),
         userId: user._id.toString(),
         username: user.username || user.name, email: user.email, phone: user.phone,
         profilePicture: user.profilePicture || null,
         ...profile,
-        _id: user._id.toString(),   // re-assert after spread so profile._id can't override
+        // Explicit camelCase fields Flutter reads — must come AFTER spread so they win
+        pharmacyName: profile?.pharmacy_name || user.name || user.username || '',
+        ownerName: profile?.pharmacy_name || user.name || user.username || '',
+        licenseNumber: profile?.license_number || '',
+        drugSaleLicense: profile?.license_number || '',
+        openHours: profile?.openHours || null,
+        cnic: profile?.cnic || user.cnic || null,
+        _id: user._id.toString(),
         id: user._id.toString(),
       },
     });
@@ -250,16 +257,22 @@ router.post('/add_pharmacy_details', authMiddleware, async (req, res) => {
   try {
     await connectMongoDB();
     const userId = toId(req.user.id);
-    const { pharmacyName, ownerName, licenseNumber, operatingHours, deliveryAvailable, deliveryFee, address, city, drapCompliance, profilePicture, latitude, longitude } = req.body;
+    const { pharmacyName, ownerName, cnic, licenseNumber, operatingHours, openHours, deliveryAvailable, deliveryFee, address, city, drapCompliance, profilePicture, latitude, longitude } = req.body;
     const resolvedName = pharmacyName || ownerName;
+    const resolvedHours = openHours || operatingHours || null;
 
     const profile = await PharmacyProfile.findOneAndUpdate(
       { user_id: userId },
       {
         $set: {
-          pharmacy_name: resolvedName, license_number: licenseNumber,
-          operating_hours: operatingHours, delivery_available: deliveryAvailable ?? false,
-          delivery_fee: deliveryFee ?? 0, address, city,
+          pharmacy_name: resolvedName,
+          license_number: licenseNumber,
+          cnic: cnic,
+          openHours: resolvedHours,
+          operating_hours: typeof resolvedHours === 'string' ? resolvedHours : null,
+          delivery_available: deliveryAvailable ?? false,
+          delivery_fee: deliveryFee ?? 0,
+          address, city,
           drap_compliance: drapCompliance ?? false,
           ...(latitude != null && { latitude: parseFloat(latitude) }),
           ...(longitude != null && { longitude: parseFloat(longitude) }),
