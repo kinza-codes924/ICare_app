@@ -739,11 +739,13 @@ class _QuizTakeScreenState extends State<QuizTakeScreen> {
   Widget _buildResultScreen() {
     final result = _result ?? {};
     final attempt = result['attempt'] ?? result;
-    final score = attempt['score'] ?? attempt['percentage'] ?? 0;
+    final score = attempt['percentage'] ?? attempt['score'] ?? 0;
     final passed = attempt['passed'] == true;
     final totalQuestions = _questions.length;
-    final correctCount = attempt['correctCount'] ?? attempt['correct'] ?? 0;
     final breakdown = attempt['breakdown'] as List? ?? attempt['answers'] as List? ?? [];
+    final correctCount = breakdown.where((a) =>
+      a is Map && (a['isCorrect'] == true || a['correct'] == true)
+    ).length;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
