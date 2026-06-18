@@ -65,6 +65,26 @@ class AuthNotifier extends StateNotifier<Auth> {
     }
   }
 
+  // Immediately patches just the profile picture in-memory (no SharedPref — base64 too large).
+  // Call this right after a successful profile save so the dashboard avatar updates instantly.
+  void patchPicture(String url) {
+    final u = state.user;
+    if (u == null) return;
+    state = state.copyWith(
+      user: User(
+        id: u.id, name: u.name, email: u.email,
+        phoneNumber: u.phoneNumber, role: u.role,
+        profilePicture: url,
+        createdAt: u.createdAt, gender: u.gender, age: u.age,
+        mrNumber: u.mrNumber, cnic: u.cnic,
+        specialization: u.specialization,
+        conditionsTreated: u.conditionsTreated,
+        isPhoneVerified: u.isPhoneVerified,
+        isEmailVerified: u.isEmailVerified,
+      ),
+    );
+  }
+
   Future<void> setUserLogout() async {
     await SharedPref().remove("userRole");
     await SharedPref().remove("token");

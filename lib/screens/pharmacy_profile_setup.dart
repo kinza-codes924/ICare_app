@@ -160,13 +160,20 @@ class _PharmacyProfileSetupState extends ConsumerState<PharmacyProfileSetup> {
           'profilePicture': 'data:image/jpeg;base64,${base64Encode(_imageBytes!)}',
       });
       if (_imageBytes != null) {
-        setState(() => _existingProfilePictureUrl = 'data:image/jpeg;base64,${base64Encode(_imageBytes!)}');
+        final pic = 'data:image/jpeg;base64,${base64Encode(_imageBytes!)}';
+        setState(() => _existingProfilePictureUrl = pic);
+        ref.read(authProvider.notifier).patchPicture(pic);
       }
-      // Refresh auth provider so dashboard/drawer reflect new name & picture
       try {
         final resp = await ApiService().get('/users/profile');
         if (resp.data != null && mounted) {
-          await ref.read(authProvider.notifier).setUser(User.fromJson(resp.data));
+          final fetched = User.fromJson(resp.data);
+          final localPic = _existingProfilePictureUrl;
+          if (fetched.profilePicture == null && localPic != null) {
+            ref.read(authProvider.notifier).patchPicture(localPic);
+          } else {
+            await ref.read(authProvider.notifier).setUser(fetched);
+          }
         }
       } catch (_) {}
 

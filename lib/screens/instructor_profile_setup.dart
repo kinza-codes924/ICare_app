@@ -161,14 +161,24 @@ class _InstructorProfileSetupScreenState
       });
 
       if (_imageBytes != null) {
-        setState(() => _existingProfilePictureUrl =
-            'data:image/jpeg;base64,${base64Encode(_imageBytes!)}');
+        final pic = 'data:image/jpeg;base64,${base64Encode(_imageBytes!)}';
+        setState(() => _existingProfilePictureUrl = pic);
+        // Patch auth state immediately so dashboard avatar updates right now
+        ref.read(authProvider.notifier).patchPicture(pic);
       }
 
+      // Also refresh other fields (name etc.) from backend
       try {
         final resp = await ApiService().get('/users/profile');
         if (resp.data != null && mounted) {
-          await ref.read(authProvider.notifier).setUser(User.fromJson(resp.data));
+          final fetched = User.fromJson(resp.data);
+          // If backend returned no picture but we have one locally, keep local
+          final localPic = _existingProfilePictureUrl;
+          if (fetched.profilePicture == null && localPic != null) {
+            ref.read(authProvider.notifier).patchPicture(localPic);
+          } else {
+            await ref.read(authProvider.notifier).setUser(fetched);
+          }
         }
       } catch (_) {}
 
