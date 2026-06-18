@@ -284,7 +284,6 @@ class _InstructorProfileSetupScreenState
                                 icon: Icons.notes_rounded,
                                 hint: 'Tell students about yourself...',
                                 maxLines: 3,
-                                validator: (v) => v?.isEmpty ?? true ? 'Required' : null,
                               ),
                               const SizedBox(height: 14),
                               _buildTextField(
@@ -292,7 +291,6 @@ class _InstructorProfileSetupScreenState
                                 label: 'Qualification',
                                 icon: Icons.history_edu_rounded,
                                 hint: 'e.g. PhD in Psychology',
-                                validator: (v) => v?.isEmpty ?? true ? 'Required' : null,
                               ),
                               const SizedBox(height: 14),
                               _buildTextField(
