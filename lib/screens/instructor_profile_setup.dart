@@ -1,4 +1,7 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:icare/services/instructor_service.dart';
 import 'package:icare/utils/theme.dart';
 import 'package:icare/widgets/back_button.dart';
@@ -35,6 +38,10 @@ class _InstructorProfileSetupScreenState
   TimeOfDay _endTime = const TimeOfDay(hour: 17, minute: 0);
   bool _isLoading = false;
 
+  Uint8List? _imageBytes;
+  String? _existingProfilePictureUrl;
+  final ImagePicker _picker = ImagePicker();
+
   final List<String> _weekDays = [
     'Monday',
     'Tuesday',
@@ -49,6 +56,14 @@ class _InstructorProfileSetupScreenState
   void initState() {
     super.initState();
     _loadProfile();
+  }
+
+  Future<void> _pickProfileImage() async {
+    final picked = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 80, maxWidth: 600);
+    if (picked != null) {
+      final bytes = await picked.readAsBytes();
+      if (mounted) setState(() => _imageBytes = bytes);
+    }
   }
 
   Future<void> _loadProfile() async {
@@ -67,6 +82,7 @@ class _InstructorProfileSetupScreenState
           _availabilityDays = List<String>.from(
             profile['availabilityDays'] ?? [],
           );
+          _existingProfilePictureUrl = profile['profilePicture']?.toString();
 
           if (profile['availabilityTime'] != null) {
             final start = profile['availabilityTime']['start']?.split(':');
@@ -113,6 +129,8 @@ class _InstructorProfileSetupScreenState
           'end':
               '${_endTime.hour.toString().padLeft(2, '0')}:${_endTime.minute.toString().padLeft(2, '0')}',
         },
+        if (_imageBytes != null)
+          'profilePicture': 'data:image/jpeg;base64,${base64Encode(_imageBytes!)}',
       });
 
       if (mounted) {
@@ -173,6 +191,45 @@ class _InstructorProfileSetupScreenState
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              Center(
+                child: GestureDetector(
+                  onTap: _pickProfileImage,
+                  child: Stack(
+                    children: [
+                      Container(
+                        width: 96,
+                        height: 96,
+                        decoration: BoxDecoration(
+                          color: AppColors.primaryColor.withValues(alpha: 0.1),
+                          shape: BoxShape.circle,
+                          border: Border.all(color: AppColors.primaryColor.withValues(alpha: 0.3), width: 3),
+                        ),
+                        child: ClipOval(
+                          child: _imageBytes != null
+                              ? Image.memory(_imageBytes!, fit: BoxFit.cover)
+                              : _existingProfilePictureUrl != null
+                                  ? Image.network(_existingProfilePictureUrl!, fit: BoxFit.cover,
+                                      errorBuilder: (_, _, _) => const Icon(Icons.person_rounded, size: 44, color: AppColors.primaryColor))
+                                  : const Icon(Icons.person_rounded, size: 44, color: AppColors.primaryColor),
+                        ),
+                      ),
+                      Positioned(
+                        bottom: 0,
+                        right: 0,
+                        child: Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: const BoxDecoration(
+                            color: AppColors.primaryColor,
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.camera_alt_rounded, size: 14, color: Colors.white),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
               _buildSection('Basic Information', [
                 CustomInputField(
                   controller: _bioController,

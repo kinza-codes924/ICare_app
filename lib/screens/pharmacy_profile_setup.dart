@@ -1,4 +1,4 @@
-import 'dart:io';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart';
@@ -37,12 +37,16 @@ class _PharmacyProfileSetupState extends State<PharmacyProfileSetup> {
   double? _longitude;
   bool _gettingLocation = false;
 
-  File? _profileImage;
+  Uint8List? _imageBytes;
+  String? _existingProfilePictureUrl;
   final ImagePicker _picker = ImagePicker();
 
   Future<void> _pickProfileImage() async {
     final picked = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 80, maxWidth: 600);
-    if (picked != null) setState(() => _profileImage = File(picked.path));
+    if (picked != null) {
+      final bytes = await picked.readAsBytes();
+      setState(() => _imageBytes = bytes);
+    }
   }
 
   @override
@@ -84,6 +88,7 @@ class _PharmacyProfileSetupState extends State<PharmacyProfileSetup> {
         _deliveryFeeController.text = (profile['deliveryFee'] ?? '').toString() == '0' ? '' : (profile['deliveryFee'] ?? '').toString();
         _latitude = (profile['latitude'] as num?)?.toDouble();
         _longitude = (profile['longitude'] as num?)?.toDouble();
+        _existingProfilePictureUrl = profile['profilePicture']?.toString();
         _isLoading = false;
       });
     } catch (e) {
@@ -146,6 +151,8 @@ class _PharmacyProfileSetupState extends State<PharmacyProfileSetup> {
         'deliveryFee': double.tryParse(_deliveryFeeController.text.trim()) ?? 0,
         if (_latitude != null) 'latitude': _latitude,
         if (_longitude != null) 'longitude': _longitude,
+        if (_imageBytes != null)
+          'profilePicture': 'data:image/jpeg;base64,${base64Encode(_imageBytes!)}',
       });
 
       if (mounted) {
@@ -204,9 +211,11 @@ class _PharmacyProfileSetupState extends State<PharmacyProfileSetup> {
                                 border: Border.all(color: const Color(0xFF00897B).withValues(alpha: 0.3), width: 3),
                               ),
                               child: ClipOval(
-                                child: _profileImage != null
-                                    ? Image.file(_profileImage!, fit: BoxFit.cover)
-                                    : const Icon(Icons.local_pharmacy_rounded, size: 44, color: Color(0xFF00897B)),
+                                child: _imageBytes != null
+                                    ? Image.memory(_imageBytes!, fit: BoxFit.cover)
+                                    : _existingProfilePictureUrl != null
+                                        ? Image.network(_existingProfilePictureUrl!, fit: BoxFit.cover)
+                                        : const Icon(Icons.local_pharmacy_rounded, size: 44, color: Color(0xFF00897B)),
                               ),
                             ),
                             Positioned(

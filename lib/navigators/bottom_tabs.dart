@@ -176,7 +176,7 @@ List<Widget> _pharmacistTabs(
           ? AppColors.primaryColor
           : AppColors.grayColor,
       image: ImagePaths.bookings,
-      title: 'prescriptions'.tr(),
+      title: 'orders'.tr(),
     ),
     SizedBox(width: 20),
     CustomTabButton(
@@ -233,16 +233,6 @@ List<Widget> _studentTabs(
         onSelect(2);
       },
       iconColor: currentIndex == 2
-          ? AppColors.primaryColor
-          : AppColors.grayColor,
-      image: ImagePaths.chat,
-      title: 'messages'.tr(),
-    ),
-    CustomTabButton(
-      onPressed: () {
-        onSelect(3);
-      },
-      iconColor: currentIndex == 3
           ? AppColors.primaryColor
           : AppColors.grayColor,
       image: ImagePaths.profile2,

@@ -1,4 +1,7 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
+import 'package:image_picker/image_picker.dart';
 import '../services/student_service.dart';
 import 'tabs.dart';
 import '../widgets/back_button.dart';
@@ -25,6 +28,10 @@ class _StudentProfileSetupState extends State<StudentProfileSetup>
   final _addressController = TextEditingController();
   final _educationLevelController = TextEditingController();
   final _preferencesController = TextEditingController();
+
+  Uint8List? _imageBytes;
+  String? _existingProfilePictureUrl;
+  final ImagePicker _picker = ImagePicker();
 
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
@@ -61,6 +68,14 @@ class _StudentProfileSetupState extends State<StudentProfileSetup>
     super.dispose();
   }
 
+  Future<void> _pickProfileImage() async {
+    final picked = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 80, maxWidth: 600);
+    if (picked != null) {
+      final bytes = await picked.readAsBytes();
+      if (mounted) setState(() => _imageBytes = bytes);
+    }
+  }
+
   Future<void> _loadProfile() async {
     try {
       final data = await _studentService.getProfile();
@@ -74,6 +89,7 @@ class _StudentProfileSetupState extends State<StudentProfileSetup>
         _educationLevelController.text = profile['educationLevel'] ?? '';
         _preferencesController.text =
             (profile['preferences'] as List?)?.join(', ') ?? '';
+        _existingProfilePictureUrl = profile['profilePicture']?.toString();
         _isLoading = false;
       });
       _animationController.forward();
@@ -103,6 +119,8 @@ class _StudentProfileSetupState extends State<StudentProfileSetup>
         'address': _addressController.text,
         'educationLevel': _educationLevelController.text,
         'preferences': prefs,
+        if (_imageBytes != null)
+          'profilePicture': 'data:image/jpeg;base64,${base64Encode(_imageBytes!)}',
       });
 
       if (mounted) {
@@ -299,17 +317,41 @@ class _StudentProfileSetupState extends State<StudentProfileSetup>
       ),
       child: Row(
         children: [
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
-            ),
-            child: const Icon(
-              Icons.school_rounded,
-              size: 48,
-              color: Colors.white,
+          GestureDetector(
+            onTap: _pickProfileImage,
+            child: Stack(
+              children: [
+                Container(
+                  width: 80,
+                  height: 80,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: Colors.white.withValues(alpha: 0.4), width: 2),
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(14),
+                    child: _imageBytes != null
+                        ? Image.memory(_imageBytes!, fit: BoxFit.cover)
+                        : _existingProfilePictureUrl != null
+                            ? Image.network(_existingProfilePictureUrl!, fit: BoxFit.cover,
+                                errorBuilder: (_, _, _) => const Icon(Icons.school_rounded, size: 40, color: Colors.white))
+                            : const Icon(Icons.school_rounded, size: 40, color: Colors.white),
+                  ),
+                ),
+                Positioned(
+                  bottom: 0,
+                  right: 0,
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: const BoxDecoration(
+                      color: accentColor,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.camera_alt_rounded, size: 14, color: Colors.white),
+                  ),
+                ),
+              ],
             ),
           ),
           const SizedBox(width: 20),

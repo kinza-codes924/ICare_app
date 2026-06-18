@@ -274,7 +274,7 @@ class _CertificatePageState extends State<CertificatePage> {
                           child: QrImageView(
                             data: verificationUrl,
                             version: QrVersions.auto,
-                            size: 72,
+                            size: 60,
                             backgroundColor: Colors.white,
                           ),
                         ),
@@ -290,9 +290,9 @@ class _CertificatePageState extends State<CertificatePage> {
 
                     // Three signatures
                     _signature('Verified by\nInstructor', instructorName),
-                    const SizedBox(width: 12),
+                    const SizedBox(width: 8),
                     _signature('Iqra University\nRegistrar', 'Registrar'),
-                    const SizedBox(width: 12),
+                    const SizedBox(width: 8),
                     _signature('iCare\nAdministrator', 'Administrator'),
                   ],
                 ),
@@ -313,7 +313,7 @@ class _CertificatePageState extends State<CertificatePage> {
   Widget _signature(String role, String name) {
     return Column(
       children: [
-        Container(width: 70, height: 1.5, color: const Color(0xFF475569)),
+        Container(width: 52, height: 1.5, color: const Color(0xFF475569)),
         const SizedBox(height: 4),
         Text(name,
             style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),

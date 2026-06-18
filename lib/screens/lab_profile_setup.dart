@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart';
@@ -45,6 +46,7 @@ class _LabProfileSetupState extends State<LabProfileSetup>
 
   // Profile Image
   Uint8List? _imageBytes;
+  String? _existingProfilePictureUrl;
   final ImagePicker _picker = ImagePicker();
 
   // Doctors Panel
@@ -126,6 +128,7 @@ class _LabProfileSetupState extends State<LabProfileSetup>
         _homeSampleAvailable = profile['homeSampleAvailable'] ?? false;
         _latitude = (profile['latitude'] as num?)?.toDouble();
         _longitude = (profile['longitude'] as num?)?.toDouble();
+        _existingProfilePictureUrl = profile['profilePicture']?.toString();
         _doctors.clear();
         _doctors.addAll(loadedDoctors);
         _collectors.clear();
@@ -222,6 +225,8 @@ class _LabProfileSetupState extends State<LabProfileSetup>
           'designation': c['designation']!.text.trim(),
         }).toList(),
         'documents': _documents,
+        if (_imageBytes != null)
+          'profilePicture': 'data:image/jpeg;base64,${base64Encode(_imageBytes!)}',
       });
 
       if (mounted) {
@@ -538,7 +543,9 @@ class _LabProfileSetupState extends State<LabProfileSetup>
                     borderRadius: BorderRadius.circular(14),
                     child: _imageBytes != null
                         ? Image.memory(_imageBytes!, fit: BoxFit.cover)
-                        : const Icon(Icons.science_rounded, size: 40, color: Colors.white),
+                        : _existingProfilePictureUrl != null
+                            ? Image.network(_existingProfilePictureUrl!, fit: BoxFit.cover)
+                            : const Icon(Icons.science_rounded, size: 40, color: Colors.white),
                   ),
                 ),
                 Positioned(

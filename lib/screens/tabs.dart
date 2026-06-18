@@ -337,7 +337,7 @@ class _TabsScreenState extends ConsumerState<TabsScreen> {
       } else if (currentIndex == 1) {
         activePage = Courses();
       } else if (currentIndex == 2) {
-        activePage = ChatListScreen();
+        activePage = const StudentProfileSetup();
       }
     } else if (role == "Admin") {
       if (currentIndex == 0) {

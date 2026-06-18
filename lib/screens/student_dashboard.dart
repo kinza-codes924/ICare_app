@@ -325,7 +325,7 @@ class _StudentDashboardState extends ConsumerState<StudentDashboard> {
                         } else if (progressData is Map)
                           progress = (progressData['percent'] ?? 0).toInt();
                         final status =
-                            (enrollment['status'] ?? 'active') as String;
+                            (enrollment['status'] ?? 'active').toString();
                         final enrollmentId =
                             enrollment['_id'] ?? enrollment['id'] as String?;
                         return _buildContinueLearningCard(
