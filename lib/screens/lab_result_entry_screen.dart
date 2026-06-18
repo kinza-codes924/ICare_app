@@ -124,11 +124,20 @@ class _LabResultEntryScreenState extends State<LabResultEntryScreen>
                 'severity': 'normal',
               })
           .toList();
-      await _labService.updateBooking(widget.booking['_id'], {
+      final payload = <String, dynamic>{
         'status': 'reporting_done',
         'results': results,
         'reportNotes': _notesController.text.trim(),
-      });
+      };
+      if (_selectedDoctor != null && _doctors.any((d) => d['name'] == _selectedDoctor)) {
+        final d = _doctors.firstWhere((d) => d['name'] == _selectedDoctor);
+        payload['approvedByDoctor'] = {
+          'name': d['name'] ?? '',
+          'qualification': d['qualification'] ?? '',
+          'designation': d['designation'] ?? '',
+        };
+      }
+      await _labService.updateBooking(widget.booking['_id'], payload);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -160,10 +169,19 @@ class _LabResultEntryScreenState extends State<LabResultEntryScreen>
     try {
       final bytes = await File(_selectedFile!.path!).readAsBytes();
       await _labService.uploadReport(widget.booking['_id'], bytes, _selectedFile!.name);
-      await _labService.updateBooking(widget.booking['_id'], {
+      final filePayload = <String, dynamic>{
         'status': 'reporting_done',
         'reportNotes': _notesController.text.trim(),
-      });
+      };
+      if (_selectedDoctor != null && _doctors.any((d) => d['name'] == _selectedDoctor)) {
+        final d = _doctors.firstWhere((d) => d['name'] == _selectedDoctor);
+        filePayload['approvedByDoctor'] = {
+          'name': d['name'] ?? '',
+          'qualification': d['qualification'] ?? '',
+          'designation': d['designation'] ?? '',
+        };
+      }
+      await _labService.updateBooking(widget.booking['_id'], filePayload);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(

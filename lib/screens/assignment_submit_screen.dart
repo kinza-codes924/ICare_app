@@ -367,6 +367,25 @@ class _AssignmentSubmitScreenState extends State<AssignmentSubmitScreen> {
                                   fontSize: 24,
                                   fontWeight: FontWeight.w900,
                                   color: Color(0xFF0F172A))),
+                          if (_existingSubmission!['stars'] != null) ...[
+                            const SizedBox(height: 12),
+                            Builder(builder: (_) {
+                              final starCount = (_existingSubmission!['stars'] as num).toInt();
+                              return Row(children: [
+                                ...List.generate(5, (i) => Icon(
+                                  i < starCount ? Icons.star_rounded : Icons.star_outline_rounded,
+                                  size: 22,
+                                  color: i < starCount ? const Color(0xFFF59E0B) : const Color(0xFFCBD5E1),
+                                )),
+                                const SizedBox(width: 8),
+                                Text('($starCount/5 Rating)',
+                                    style: const TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w600,
+                                        color: Color(0xFF374151))),
+                              ]);
+                            }),
+                          ],
                           if (_existingSubmission!['feedback'] != null &&
                               _existingSubmission!['feedback'].toString().isNotEmpty) ...[
                             const SizedBox(height: 12),

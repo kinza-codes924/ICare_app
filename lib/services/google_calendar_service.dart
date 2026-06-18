@@ -60,32 +60,24 @@ class GoogleCalendarService {
       if (token == null) return false;
 
       final endTime = scheduledFor.add(const Duration(minutes: 30));
+      // Use UTC ISO string — Google Calendar converts to user's local timezone
+      final startStr = scheduledFor.toUtc().toIso8601String();
+      final endStr = endTime.toUtc().toIso8601String();
       final event = {
         'summary': title,
         'description': description.isNotEmpty ? description : 'iCare Reminder',
-        'start': {
-          'dateTime': scheduledFor.toIso8601String(),
-          'timeZone': 'Asia/Karachi',
-        },
-        'end': {
-          'dateTime': endTime.toIso8601String(),
-          'timeZone': 'Asia/Karachi',
-        },
+        'start': {'dateTime': startStr},
+        'end': {'dateTime': endStr},
         'reminders': {
           'useDefault': false,
           'overrides': [
             {'method': 'popup', 'minutes': 15},
-            {'method': 'email', 'minutes': 30},
           ],
-        },
-        'source': {
-          'title': 'iCare App',
-          'url': 'https://icare-app-ten.vercel.app',
         },
       };
 
       final dio = Dio();
-      await dio.post(
+      final resp = await dio.post(
         'https://www.googleapis.com/calendar/v3/calendars/primary/events',
         data: event,
         options: Options(
@@ -93,7 +85,7 @@ class GoogleCalendarService {
           contentType: 'application/json',
         ),
       );
-      return true;
+      return resp.statusCode != null && resp.statusCode! < 300;
     } catch (e) {
       debugPrint('GoogleCalendarService addEvent error: $e');
       return false;
@@ -102,25 +94,33 @@ class GoogleCalendarService {
 
   Future<Map<String, int>> syncReminders(
       List<Map<String, dynamic>> reminders) async {
-    int success = 0, failed = 0;
+    int success = 0, failed = 0, skipped = 0;
     for (final r in reminders) {
       try {
         final scheduledStr = r['scheduledFor'] as String?;
-        if (scheduledStr == null || scheduledStr.isEmpty) {
-          failed++;
+        if (scheduledStr == null || scheduledStr.trim().isEmpty) {
+          skipped++;
           continue;
         }
-        final dt = DateTime.parse(scheduledStr);
+        DateTime dt;
+        try {
+          dt = DateTime.parse(scheduledStr);
+        } catch (_) {
+          skipped++;
+          continue;
+        }
         final ok = await addEvent(
           title: r['title'] as String? ?? 'iCare Reminder',
           description: r['instructions'] as String? ?? '',
           scheduledFor: dt,
         );
         if (ok) success++; else failed++;
+        // Small delay to avoid Google Calendar API rate limiting
+        await Future.delayed(const Duration(milliseconds: 150));
       } catch (_) {
         failed++;
       }
     }
-    return {'success': success, 'failed': failed};
+    return {'success': success, 'failed': failed, 'skipped': skipped};
   }
 }

@@ -16,7 +16,7 @@ import 'package:icare/widgets/custom_text_input.dart';
 import 'package:icare/widgets/svg_wrapper.dart';
 import 'package:icare/services/course_service.dart';
 import 'package:icare/screens/view_course.dart';
-import 'package:icare/screens/view_certificate.dart';
+import 'package:icare/screens/certificate_templates_screen.dart';
 
 class Courses extends ConsumerStatefulWidget {
   final bool myPurchased;
@@ -674,14 +674,14 @@ class _WebCoursesListState extends State<_WebCoursesList> {
   }
 }
 
-class _WebCertificatesList extends StatefulWidget {
+class _WebCertificatesList extends ConsumerStatefulWidget {
   const _WebCertificatesList();
 
   @override
-  State<_WebCertificatesList> createState() => _WebCertificatesListState();
+  ConsumerState<_WebCertificatesList> createState() => _WebCertificatesListState();
 }
 
-class _WebCertificatesListState extends State<_WebCertificatesList> {
+class _WebCertificatesListState extends ConsumerState<_WebCertificatesList> {
   final CourseService _courseService = CourseService();
   List<dynamic> _certificates = [];
   bool _isLoading = true;
@@ -771,7 +771,7 @@ class _WebCertificatesListState extends State<_WebCertificatesList> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Text(
-                      course['name'] ?? 'Untitled',
+                      course['title'] ?? course['name'] ?? 'Course',
                       style: const TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w700,
@@ -791,9 +791,9 @@ class _WebCertificatesListState extends State<_WebCertificatesList> {
                         color: const Color(0xFFF1F5F9),
                         borderRadius: BorderRadius.circular(6),
                       ),
-                      child: Text(
-                        '100% Completed (${item["completedUnits"]}/${course["totalUnits"]})',
-                        style: const TextStyle(
+                      child: const Text(
+                        '100% Completed',
+                        style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
                           color: Color(0xFF64748B),
@@ -805,12 +805,31 @@ class _WebCertificatesListState extends State<_WebCertificatesList> {
                       children: [
                         TextButton.icon(
                           onPressed: () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (ctx) =>
-                                    ViewCertificate(certificateData: item),
+                            final user = ref.read(authProvider).user;
+                            final courseTitle = course['title']?.toString() ?? course['name']?.toString() ?? 'Course';
+                            final courseId = (item['courseId'] ?? course['_id'])?.toString() ?? '';
+                            final enrollmentId = item['enrollmentId']?.toString() ?? '';
+                            final studentName = item['studentName']?.toString() ?? user?.name ?? 'Student';
+                            final instructorName = item['instructorName']?.toString() ?? 'Instructor';
+                            final completionDate = item['completedAt'] != null ? DateTime.tryParse(item['completedAt'].toString()) : null;
+                            CertificateTemplate tpl;
+                            switch ((item['template']?.toString() ?? '').toLowerCase()) {
+                              case 'modern':      tpl = CertificateTemplate.modern; break;
+                              case 'elegant':     tpl = CertificateTemplate.elegant; break;
+                              case 'achievement': tpl = CertificateTemplate.achievement; break;
+                              default:            tpl = CertificateTemplate.classic;
+                            }
+                            Navigator.of(context).push(MaterialPageRoute(
+                              builder: (_) => LmsCertificateScreen(
+                                studentName: studentName,
+                                courseTitle: courseTitle,
+                                instructorName: instructorName,
+                                template: tpl,
+                                completionDate: completionDate,
+                                enrollmentId: enrollmentId,
+                                courseId: courseId,
                               ),
-                            );
+                            ));
                           },
                           icon: const Icon(Icons.visibility_rounded, size: 16),
                           label: const Text("View"),
@@ -822,7 +841,33 @@ class _WebCertificatesListState extends State<_WebCertificatesList> {
                         ),
                         const SizedBox(width: 16),
                         TextButton.icon(
-                          onPressed: () {},
+                          onPressed: () {
+                            final user = ref.read(authProvider).user;
+                            final courseTitle = course['title']?.toString() ?? course['name']?.toString() ?? 'Course';
+                            final courseId = (item['courseId'] ?? course['_id'])?.toString() ?? '';
+                            final enrollmentId = item['enrollmentId']?.toString() ?? '';
+                            final studentName = item['studentName']?.toString() ?? user?.name ?? 'Student';
+                            final instructorName = item['instructorName']?.toString() ?? 'Instructor';
+                            final completionDate = item['completedAt'] != null ? DateTime.tryParse(item['completedAt'].toString()) : null;
+                            CertificateTemplate tpl;
+                            switch ((item['template']?.toString() ?? '').toLowerCase()) {
+                              case 'modern':      tpl = CertificateTemplate.modern; break;
+                              case 'elegant':     tpl = CertificateTemplate.elegant; break;
+                              case 'achievement': tpl = CertificateTemplate.achievement; break;
+                              default:            tpl = CertificateTemplate.classic;
+                            }
+                            Navigator.of(context).push(MaterialPageRoute(
+                              builder: (_) => LmsCertificateScreen(
+                                studentName: studentName,
+                                courseTitle: courseTitle,
+                                instructorName: instructorName,
+                                template: tpl,
+                                completionDate: completionDate,
+                                enrollmentId: enrollmentId,
+                                courseId: courseId,
+                              ),
+                            ));
+                          },
                           icon: const Icon(Icons.download_rounded, size: 16),
                           label: const Text("Download"),
                           style: TextButton.styleFrom(

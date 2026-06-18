@@ -310,6 +310,31 @@ class LmsService {
     }
   }
 
+  Future<Map<String, dynamic>> getAttendanceReport(String courseId) async {
+    try {
+      final response = await _api.get('/lms/attendance/course/$courseId/report');
+      return response.data is Map ? Map<String, dynamic>.from(response.data) : {};
+    } catch (e) {
+      return {'success': false, 'sessions': [], 'students': []};
+    }
+  }
+
+  Future<Map<String, dynamic>> markStudentAttendance({
+    required String sessionId,
+    required String studentId,
+    required String status,
+  }) async {
+    try {
+      final response = await _api.put('/lms/attendance/$sessionId/mark', {
+        'studentId': studentId,
+        'status': status,
+      });
+      return response.data is Map ? Map<String, dynamic>.from(response.data) : {};
+    } catch (e) {
+      return {'success': false, 'message': e.toString()};
+    }
+  }
+
   // ═══════════════════════════════════════════════════════════════════════
   // PEOPLE (Course Members)
   // ═══════════════════════════════════════════════════════════════════════
@@ -349,6 +374,31 @@ class LmsService {
       return response.data ?? {'success': true};
     } catch (e) {
       return {'success': false, 'message': e.toString()};
+    }
+  }
+
+  Future<Map<String, dynamic>> markLessonComplete({
+    required String enrollmentId,
+    required String lessonId,
+    String? moduleId,
+  }) async {
+    try {
+      final response = await _api.post(
+        '/courses/enrollments/$enrollmentId/complete-lesson',
+        {'lessonId': lessonId, if (moduleId != null) 'moduleId': moduleId},
+      );
+      return response.data is Map ? Map<String, dynamic>.from(response.data) : {'success': true};
+    } catch (e) {
+      return {'success': false, 'message': e.toString()};
+    }
+  }
+
+  Future<Map<String, dynamic>> getEnrollmentProgress(String enrollmentId) async {
+    try {
+      final response = await _api.get('/courses/enrollments/$enrollmentId/progress');
+      return response.data is Map ? Map<String, dynamic>.from(response.data) : {};
+    } catch (e) {
+      return {'success': false};
     }
   }
 
@@ -398,14 +448,18 @@ class LmsService {
   // ═══════════════════════════════════════════════════════════════════════
 
   Future<Map<String, dynamic>> generateCertificate({
-    required String courseId,
-    required String studentId,
+    String? courseId,
+    String? studentId,
+    String? enrollmentId,
+    String? template,
   }) async {
     try {
-      final response = await _api.post('/certificates', {
-        'courseId': courseId,
-        'studentId': studentId,
-      });
+      final body = <String, dynamic>{};
+      if (courseId != null) body['courseId'] = courseId;
+      if (studentId != null) body['studentId'] = studentId;
+      if (enrollmentId != null) body['enrollmentId'] = enrollmentId;
+      if (template != null) body['template'] = template;
+      final response = await _api.post('/certificates', body);
       return response.data ?? {};
     } catch (e) {
       throw Exception('Failed to generate certificate: $e');
@@ -827,5 +881,15 @@ class LmsService {
   Future<Map<String, dynamic>> unpublishCourse(String courseId) async {
     final response = await _api.put('/courses/$courseId', {'isPublished': false});
     return response.data;
+  }
+
+  Future<List<dynamic>> getMyAssessmentAssignments() async {
+    final response = await _api.get('/assignments/my');
+    return response.data['assignments'] ?? [];
+  }
+
+  Future<List<dynamic>> getMyAssessmentQuizzes() async {
+    final response = await _api.get('/quizzes/my');
+    return response.data['quizAttempts'] ?? [];
   }
 }

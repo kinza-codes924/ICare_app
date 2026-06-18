@@ -68,9 +68,20 @@ class _HealthTrackerState extends State<HealthTracker> {
             _loggedInToday = _weekActivity.any((d) => d['date'] == today && d['logged'] == true);
           }
         }
+        if (_weekActivity.isEmpty) _weekActivity = _buildFallbackWeek();
         _isLoading = false;
       });
     }
+  }
+
+  List<Map<String, dynamic>> _buildFallbackWeek() {
+    const labels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    final now = DateTime.now();
+    final monday = now.subtract(Duration(days: now.weekday - 1));
+    return List.generate(7, (i) {
+      final d = monday.add(Duration(days: i));
+      return {'day': labels[i], 'date': d.toIso8601String().split('T')[0], 'logged': false};
+    });
   }
 
   // Fallback map for rendering cards even if no data

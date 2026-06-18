@@ -1,5 +1,7 @@
+import 'dart:typed_data';
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import 'package:flutter/rendering.dart';
 import 'package:icare/services/lms_service.dart';
 import 'package:icare/utils/theme.dart';
 import 'package:icare/widgets/back_button.dart';
@@ -27,6 +29,7 @@ class CertificatePage extends StatefulWidget {
 
 class _CertificatePageState extends State<CertificatePage> {
   final LmsService _lms = LmsService();
+  final GlobalKey _repaintKey = GlobalKey();
   Map<String, dynamic>? _certificate;
   bool _loading = true;
   bool _downloading = false;
@@ -93,7 +96,7 @@ class _CertificatePageState extends State<CertificatePage> {
                           padding: const EdgeInsets.all(16),
                           child: Column(
                             children: [
-                              _buildCertificate(),
+                              RepaintBoundary(key: _repaintKey, child: _buildCertificate()),
                               const SizedBox(height: 20),
                               _buildActions(),
                             ],
@@ -145,8 +148,8 @@ class _CertificatePageState extends State<CertificatePage> {
   Widget _buildCertificate() {
     final verificationCode = _certificate?['verificationCode']?.toString() ?? '';
     final verificationUrl = verificationCode.isNotEmpty
-        ? 'https://icare-app-ten.vercel.app/verify?code=$verificationCode'
-        : 'https://icare-app-ten.vercel.app/verify';
+        ? 'https://www.icare.com.co/verify?code=$verificationCode'
+        : 'https://www.icare.com.co/verify';
     final certId = _certificate?['certificateId']?.toString() ?? '';
     final studentName = _certificate?['studentName'] ?? 'Student Name';
     final instructorName = _certificate?['instructorName'] ?? 'Instructor';
@@ -393,168 +396,30 @@ class _CertificatePageState extends State<CertificatePage> {
   }
 
   Future<Uint8List> _generatePdf() async {
-    final cert = _certificate!;
-    final studentName = cert['studentName'] ?? 'Student';
-    final instructorName = cert['instructorName'] ?? 'Instructor';
-    final certId = cert['certificateId']?.toString() ?? '';
-    final verificationCode = cert['verificationCode']?.toString() ?? '';
-    final verificationUrl = verificationCode.isNotEmpty
-        ? 'https://icare-app-ten.vercel.app/verify?code=$verificationCode'
-        : 'https://icare-app-ten.vercel.app/verify';
-    final issuedDate = _fmt(cert['issuedAt']);
+    // Capture the rendered certificate widget as a PNG image.
+    // This avoids asset-loading bugs in the pdf package on Flutter web
+    // (where rootBundle ByteData views can resolve to the wrong image bytes).
+    final boundary = _repaintKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
+    if (boundary == null) throw Exception('Certificate not rendered yet. Please wait and try again.');
 
-    // Load fonts
-    final regularFont = await PdfGoogleFonts.notoSansRegular();
-    final boldFont = await PdfGoogleFonts.notoSansBold();
-    final italicFont = await PdfGoogleFonts.notoSansItalic();
+    final ui.Image image = await boundary.toImage(pixelRatio: 3.0);
+    final ByteData? byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+    if (byteData == null) throw Exception('Failed to capture certificate image.');
 
-    // Load logos
-    pw.ImageProvider? icareImg;
-    pw.ImageProvider? iqraImg;
-    pw.ImageProvider? rmrImg;
-    try {
-      final icareBytes = await rootBundle.load('assets/Asset 1.png');
-      icareImg = pw.MemoryImage(icareBytes.buffer.asUint8List());
-    } catch (_) {}
-    try {
-      final iqraBytes = await rootBundle.load('assets/LOGO-IU-01-2048x495-1.png');
-      iqraImg = pw.MemoryImage(iqraBytes.buffer.asUint8List());
-    } catch (_) {}
-    try {
-      final rmrBytes = await rootBundle.load('assets/images/health.jpeg');
-      rmrImg = pw.MemoryImage(rmrBytes.buffer.asUint8List());
-    } catch (_) {}
-
-    final gold = PdfColor.fromHex('#B8860B');
-    final navy = PdfColor.fromHex('#1A237E');
-    final darkText = PdfColor.fromHex('#0F172A');
-    final greyText = PdfColor.fromHex('#64748B');
+    final pngBytes = byteData.buffer.asUint8List();
 
     final pdf = pw.Document();
+    final pdfImage = pw.MemoryImage(pngBytes);
 
     pdf.addPage(
       pw.Page(
         pageFormat: PdfPageFormat.a4.landscape,
-        margin: const pw.EdgeInsets.all(0),
-        build: (pw.Context context) {
-          return pw.Container(
-            decoration: pw.BoxDecoration(
-              border: pw.Border.all(color: navy, width: 3),
-            ),
-            child: pw.Column(
-              children: [
-                // Gold top bar
-                pw.Container(height: 10, color: gold),
-
-                pw.Padding(
-                  padding: const pw.EdgeInsets.fromLTRB(40, 24, 40, 24),
-                  child: pw.Column(
-                    children: [
-                      // Logo row
-                      pw.Row(
-                        mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                        children: [
-                          rmrImg != null
-                              ? pw.Image(rmrImg, width: 90, height: 40, fit: pw.BoxFit.contain)
-                              : pw.Text('RM Health Solutions', style: pw.TextStyle(font: boldFont, fontSize: 10)),
-                          iqraImg != null
-                              ? pw.Image(iqraImg, width: 130, height: 40, fit: pw.BoxFit.contain)
-                              : pw.Text('Iqra University', style: pw.TextStyle(font: boldFont, fontSize: 12)),
-                          icareImg != null
-                              ? pw.Image(icareImg, width: 90, height: 40, fit: pw.BoxFit.contain)
-                              : pw.Text('iCare', style: pw.TextStyle(font: boldFont, fontSize: 14, color: navy)),
-                        ],
-                      ),
-
-                      pw.SizedBox(height: 14),
-                      pw.Divider(color: gold, thickness: 1.5),
-                      pw.SizedBox(height: 16),
-
-                      // Title
-                      pw.Text('CERTIFICATE OF COMPLETION',
-                          style: pw.TextStyle(font: boldFont, fontSize: 22, color: navy, letterSpacing: 2)),
-                      pw.SizedBox(height: 6),
-                      pw.Container(width: 60, height: 2, color: gold),
-                      pw.SizedBox(height: 20),
-
-                      // Body
-                      pw.Text('This is to certify that',
-                          style: pw.TextStyle(font: italicFont, fontSize: 12, color: greyText)),
-                      pw.SizedBox(height: 8),
-                      pw.Text(studentName,
-                          style: pw.TextStyle(font: boldFont, fontSize: 28, color: darkText)),
-                      pw.SizedBox(height: 8),
-                      pw.Text('has successfully completed the course',
-                          style: pw.TextStyle(font: regularFont, fontSize: 12, color: greyText)),
-                      pw.SizedBox(height: 6),
-                      pw.Text((_certificate?['courseName']?.toString().isNotEmpty ?? false)
-                              ? _certificate!['courseName'].toString()
-                              : widget.courseName,
-                          style: pw.TextStyle(font: boldFont, fontSize: 18, color: navy),
-                          textAlign: pw.TextAlign.center),
-                      pw.SizedBox(height: 10),
-                      pw.Text('Issued on $issuedDate',
-                          style: pw.TextStyle(font: regularFont, fontSize: 11, color: greyText)),
-
-                      pw.SizedBox(height: 20),
-                      pw.Divider(color: gold, thickness: 1.5),
-                      pw.SizedBox(height: 16),
-
-                      // Bottom row — QR + signatures
-                      pw.Row(
-                        crossAxisAlignment: pw.CrossAxisAlignment.end,
-                        children: [
-                          // QR Code
-                          pw.Column(children: [
-                            pw.BarcodeWidget(
-                              barcode: pw.Barcode.qrCode(),
-                              data: verificationUrl,
-                              width: 70,
-                              height: 70,
-                            ),
-                            pw.SizedBox(height: 4),
-                            pw.Text(certId.isNotEmpty ? certId.substring(0, certId.length.clamp(0, 14)) : '',
-                                style: pw.TextStyle(font: regularFont, fontSize: 7, color: greyText)),
-                            pw.Text('Scan to verify',
-                                style: pw.TextStyle(font: italicFont, fontSize: 8, color: greyText)),
-                          ]),
-
-                          pw.Spacer(),
-
-                          // Signatures
-                          _pdfSignature(boldFont, regularFont, 'Verified by Instructor', instructorName),
-                          pw.SizedBox(width: 30),
-                          _pdfSignature(boldFont, regularFont, 'Iqra University Registrar', 'Registrar'),
-                          pw.SizedBox(width: 30),
-                          _pdfSignature(boldFont, regularFont, 'iCare Administrator', 'Administrator'),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-
-                // Gold bottom bar
-                pw.Container(height: 10, color: gold),
-              ],
-            ),
-          );
-        },
+        margin: pw.EdgeInsets.zero,
+        build: (ctx) => pw.Image(pdfImage, fit: pw.BoxFit.fill),
       ),
     );
 
     return pdf.save();
-  }
-
-  pw.Widget _pdfSignature(pw.Font boldFont, pw.Font regularFont, String role, String name) {
-    return pw.Column(
-      crossAxisAlignment: pw.CrossAxisAlignment.center,
-      children: [
-        pw.Container(width: 80, height: 1, color: PdfColor.fromHex('#475569')),
-        pw.SizedBox(height: 4),
-        pw.Text(name, style: pw.TextStyle(font: boldFont, fontSize: 9, color: PdfColor.fromHex('#0F172A'))),
-        pw.Text(role, style: pw.TextStyle(font: regularFont, fontSize: 8, color: PdfColor.fromHex('#64748B'))),
-      ],
-    );
   }
 
   Widget _buildError() {

@@ -5,7 +5,7 @@ import 'package:icare/utils/shared_pref.dart';
 import 'package:icare/utils/theme.dart';
 import 'package:icare/widgets/back_button.dart';
 import 'package:icare/screens/lesson_detail_page.dart';
-import 'package:icare/screens/certificate_page.dart';
+import 'package:icare/screens/certificate_templates_screen.dart';
 import 'package:icare/screens/quiz_take_screen.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -97,7 +97,7 @@ class _LmsCoursePageState extends State<LmsCoursePage> with SingleTickerProvider
           children: [
             _StreamTab(courseId: _courseId, lms: _lms, isInstructor: widget.isInstructor),
             _ClassworkTab(courseId: _courseId, lms: _lms, isInstructor: widget.isInstructor, course: widget.course, enrollmentId: widget.enrollmentId),
-            _GradesTab(courseId: _courseId, lms: _lms, isInstructor: widget.isInstructor),
+            _GradesTab(courseId: _courseId, lms: _lms, isInstructor: widget.isInstructor, course: widget.course, enrollmentId: widget.enrollmentId),
             _PeopleTab(courseId: _courseId, lms: _lms, course: widget.course, isInstructor: widget.isInstructor),
             _AttendanceTab(courseId: _courseId, lms: _lms, isInstructor: widget.isInstructor),
             _RecordingsTab(courseId: _courseId, lms: _lms),
@@ -1001,7 +1001,9 @@ class _GradesTab extends StatefulWidget {
   final String courseId;
   final LmsService lms;
   final bool isInstructor;
-  const _GradesTab({required this.courseId, required this.lms, required this.isInstructor});
+  final Map<String, dynamic> course;
+  final String? enrollmentId;
+  const _GradesTab({required this.courseId, required this.lms, required this.isInstructor, required this.course, this.enrollmentId});
 
   @override
   State<_GradesTab> createState() => _GradesTabState();
@@ -1011,6 +1013,7 @@ class _GradesTabState extends State<_GradesTab> {
   List<dynamic> _grades = [];
   List<dynamic> _pendingCerts = [];
   bool _loading = true;
+  bool _certLoading = false;
 
   @override
   void initState() { super.initState(); _load(); }
@@ -1155,29 +1158,59 @@ class _GradesTabState extends State<_GradesTab> {
             ),
           ],
 
-          // Certificate Button (show if average >= 70%)
-          if (!widget.isInstructor && _average >= 70)
+          // Certificate Button (show if released by instructor and average >= 70%)
+          if (!widget.isInstructor && widget.course['certificateReleased'] == true && _average >= 70)
             Container(
               margin: const EdgeInsets.only(bottom: 20),
               child: ElevatedButton.icon(
-                onPressed: () async {
-                  final user = await SharedPref().getUserData();
-                  final userId = user?.id;
-                  if (userId != null && context.mounted) {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => CertificatePage(
-                          courseId: widget.courseId,
-                          studentId: userId,
-                          courseName: '',
-                        ),
-                      ),
+                onPressed: _certLoading ? null : () async {
+                  setState(() => _certLoading = true);
+                  try {
+                    final user = await SharedPref().getUserData();
+                    final userId = user?.id;
+                    if (userId == null || !context.mounted) return;
+                    final result = await widget.lms.generateCertificate(
+                      courseId: widget.courseId,
+                      studentId: userId,
+                      enrollmentId: widget.enrollmentId,
+                      template: widget.course['certificateTemplate']?.toString(),
                     );
+                    if (!context.mounted) return;
+                    final cert = result['certificate'];
+                    if (cert == null) throw Exception('Certificate not found');
+                    CertificateTemplate tpl;
+                    switch ((cert['template']?.toString() ?? '').toLowerCase()) {
+                      case 'modern':      tpl = CertificateTemplate.modern; break;
+                      case 'elegant':     tpl = CertificateTemplate.elegant; break;
+                      case 'achievement': tpl = CertificateTemplate.achievement; break;
+                      default:            tpl = CertificateTemplate.classic;
+                    }
+                    Navigator.push(context, MaterialPageRoute(
+                      builder: (_) => LmsCertificateScreen(
+                        studentName: cert['studentName']?.toString() ?? user?.name ?? 'Student',
+                        courseTitle: cert['courseName']?.toString() ?? widget.course['title']?.toString() ?? 'Course',
+                        instructorName: cert['instructorName']?.toString() ?? 'Instructor',
+                        template: tpl,
+                        completionDate: cert['completionDate'] != null ? DateTime.tryParse(cert['completionDate'].toString()) : null,
+                        enrollmentId: cert['enrollmentId']?.toString() ?? widget.enrollmentId ?? '',
+                        courseId: widget.courseId,
+                      ),
+                    ));
+                  } catch (e) {
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                        content: Text('Could not load certificate: ${e.toString().replaceAll("Exception: ", "")}'),
+                        backgroundColor: Colors.red,
+                      ));
+                    }
+                  } finally {
+                    if (mounted) setState(() => _certLoading = false);
                   }
                 },
-                icon: const Icon(Icons.workspace_premium_rounded, size: 20),
-                label: const Text('View Certificate'),
+                icon: _certLoading
+                    ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                    : const Icon(Icons.workspace_premium_rounded, size: 20),
+                label: Text(_certLoading ? 'Loading...' : 'View Certificate'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.amber.shade600,
                   foregroundColor: Colors.white,

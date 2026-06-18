@@ -102,7 +102,7 @@ final routerProvider = Provider<GoRouter>((ref) {
 
         // Logged in visiting any other public route → dashboard.
         // /lms/catalog and /verify remain accessible to everyone.
-        if (isPublic && path != '/splash' && path != '/lms/catalog') {
+        if (isPublic && path != '/splash' && path != '/lms/catalog' && path != '/verify') {
           return '/dashboard';
         }
       }

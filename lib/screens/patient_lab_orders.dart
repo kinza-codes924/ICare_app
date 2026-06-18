@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:icare/providers/auth_provider.dart';
 import 'package:icare/services/laboratory_service.dart';
 import 'package:icare/widgets/back_button.dart';
+import 'package:icare/widgets/date_filter_bar.dart';
 import 'package:icare/screens/lab_booking_details.dart';
 import 'package:intl/intl.dart';
 import 'package:icare/utils/error_handler.dart';
@@ -22,6 +23,8 @@ class _PatientLabOrdersScreenState extends ConsumerState<PatientLabOrdersScreen>
   bool _isLoading = true;
   String? _error;
   final Set<String> _ratedBookings = {};
+  String _dateFilter = 'all';
+  DateTime? _customDate;
 
   @override
   void initState() {
@@ -283,65 +286,80 @@ ${messageCtrl.text.trim()}
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(
-                    Icons.error_outline,
-                    size: 64,
-                    color: Color(0xFFEF4444),
-                  ),
+                  const Icon(Icons.error_outline, size: 64, color: Color(0xFFEF4444)),
                   const SizedBox(height: 16),
                   Text('Error: $_error'),
                   const SizedBox(height: 16),
-                  ElevatedButton(
-                    onPressed: _fetchLabOrders,
-                    child: const Text('Retry'),
-                  ),
+                  ElevatedButton(onPressed: _fetchLabOrders, child: const Text('Retry')),
                 ],
               ),
             )
-          : _labOrders.isEmpty
-          ? Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(24),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF8B5CF6).withValues(alpha: 0.1),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.biotech_rounded,
-                      size: 64,
-                      color: Color(0xFF8B5CF6),
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  const Text(
-                    'No Lab Tests Yet',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w900,
-                      color: Color(0xFF0F172A),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'Your doctor will order lab tests when needed',
-                    style: TextStyle(fontSize: 14, color: Color(0xFF64748B)),
-                  ),
-                ],
-              ),
-            )
-          : RefreshIndicator(
-              onRefresh: _fetchLabOrders,
-              child: ListView.builder(
-                padding: const EdgeInsets.all(20),
-                itemCount: _labOrders.length,
-                itemBuilder: (context, index) {
-                  final order = _labOrders[index];
-                  return _buildLabOrderCard(order);
-                },
-              ),
+          : Column(
+              children: [
+                DateFilterBar(
+                  selected: _dateFilter,
+                  customDate: _customDate,
+                  onChanged: (filter, date) => setState(() {
+                    _dateFilter = filter;
+                    if (date != null) _customDate = date;
+                  }),
+                ),
+                Expanded(
+                  child: Builder(builder: (context) {
+                    final displayOrders = applyDateFilter<dynamic>(
+                      _labOrders,
+                      (o) {
+                        try {
+                          if (o['date'] != null) return DateTime.parse(o['date'].toString().replaceAll('/', '-'));
+                        } catch (_) {}
+                        try {
+                          if (o['createdAt'] != null) return DateTime.parse(o['createdAt'].toString());
+                        } catch (_) {}
+                        return DateTime.now();
+                      },
+                      _dateFilter,
+                      _customDate,
+                    );
+
+                    if (displayOrders.isEmpty) {
+                      return Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(24),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF8B5CF6).withValues(alpha: 0.1),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(Icons.biotech_rounded, size: 64, color: Color(0xFF8B5CF6)),
+                            ),
+                            const SizedBox(height: 24),
+                            Text(
+                              _dateFilter == 'all' ? 'No Lab Tests Yet' : 'No lab tests for this period',
+                              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: Color(0xFF0F172A)),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              _dateFilter == 'all' ? 'Your doctor will order lab tests when needed' : 'Try a different date filter',
+                              style: const TextStyle(fontSize: 14, color: Color(0xFF64748B)),
+                            ),
+                          ],
+                        ),
+                      );
+                    }
+
+                    return RefreshIndicator(
+                      onRefresh: _fetchLabOrders,
+                      child: ListView.builder(
+                        padding: const EdgeInsets.all(20),
+                        itemCount: displayOrders.length,
+                        itemBuilder: (context, index) => _buildLabOrderCard(displayOrders[index]),
+                      ),
+                    );
+                  }),
+                ),
+              ],
             ),
     );
   }

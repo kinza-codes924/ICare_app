@@ -94,6 +94,11 @@ const register = async (req, res) => {
       mrNumber = await generateMrNumber();
     }
 
+    // Web registrations skip phone OTP (Firebase Phone Auth requires paid plan on web).
+    // Mobile (android/ios) registrations require phone verification.
+    const platform = (req.headers['x-platform'] || '').toLowerCase();
+    const isWebPlatform = platform === 'web' || platform === '';
+
     const user = await User.create({
       username,
       name: username,
@@ -103,6 +108,8 @@ const register = async (req, res) => {
       role,
       is_approved: isApproved,
       is_active: true,
+      isPhoneVerified: isWebPlatform,
+      isEmailVerified: false,
       ...(mrNumber && { mrNumber }),
     });
 
@@ -134,6 +141,8 @@ const register = async (req, res) => {
           role: user.role,
           isApproved: user.is_approved,
           mrNumber: user.mrNumber || null,
+          isPhoneVerified: isWebPlatform,
+          isEmailVerified: false,
         },
       },
     });
@@ -243,6 +252,9 @@ const login = async (req, res) => {
           isApproved: user.is_approved !== false && user.isApproved !== false,
           profilePicture: user.profilePicture || null,
           mrNumber: user.mrNumber || null,
+          // Old accounts without these fields default to true (grandfathered)
+          isPhoneVerified: user.isPhoneVerified !== false,
+          isEmailVerified: user.isEmailVerified !== false,
         },
       },
     });
@@ -437,6 +449,8 @@ const googleLogin = async (req, res) => {
         is_active: true,
         authProvider: 'google',
         mrNumber,
+        isEmailVerified: true,
+        isPhoneVerified: true,
       });
     }
 
@@ -463,6 +477,8 @@ const googleLogin = async (req, res) => {
           isApproved: true,
           profilePicture: user.profilePicture || null,
           mrNumber: user.mrNumber || null,
+          isPhoneVerified: user.isPhoneVerified !== false,
+          isEmailVerified: user.isEmailVerified !== false,
         },
       },
     });
@@ -520,6 +536,8 @@ const appleLogin = async (req, res) => {
         is_active: true,
         authProvider: 'apple',
         mrNumber,
+        isEmailVerified: true,
+        isPhoneVerified: true,
       });
     }
 
@@ -546,6 +564,8 @@ const appleLogin = async (req, res) => {
           isApproved: true,
           profilePicture: user.profilePicture || null,
           mrNumber: user.mrNumber || null,
+          isPhoneVerified: user.isPhoneVerified !== false,
+          isEmailVerified: user.isEmailVerified !== false,
         },
       },
     });

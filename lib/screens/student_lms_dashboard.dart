@@ -88,10 +88,12 @@ class _StudentLmsDashboardState extends State<StudentLmsDashboard>
       if (courseId.isEmpty) continue;
       try {
         final result = await _lmsService.checkActiveLiveSession(courseId);
+        debugPrint('📡 Live check for $courseId: isLive=${result['isLive']}');
         if (result['isLive'] == true && mounted) {
           final courseTitle = course['title']?.toString() ?? 'Your Course';
           final sessionData = result['session'] as Map? ?? {};
           final sessionId = sessionData['_id']?.toString() ?? courseId;
+          debugPrint('🔴 LIVE DETECTED for $courseTitle ($courseId), sessionId=$sessionId');
           // Only update the banner state — dialog is handled by tabs.dart global poller
           // to avoid duplicate popups when both pollers run simultaneously.
           if (mounted) {
@@ -99,7 +101,9 @@ class _StudentLmsDashboardState extends State<StudentLmsDashboard>
           }
           return;
         }
-      } catch (_) {}
+      } catch (e) {
+        debugPrint('❌ Live check failed for $courseId: $e');
+      }
     }
     if (mounted) {
       setState(() => _activeLiveSession = null);
@@ -194,7 +198,9 @@ class _StudentLmsDashboardState extends State<StudentLmsDashboard>
   Future<void> _loadTodoItems(List<dynamic> enrollments) async {
     final List<Map<String, dynamic>> items = [];
     for (final enrollment in enrollments) {
-      final course = enrollment['course'] as Map<String, dynamic>? ?? {};
+      final rawTodoCourse = enrollment['course'];
+      final Map<String, dynamic> course =
+          (rawTodoCourse is Map) ? Map<String, dynamic>.from(rawTodoCourse) : {};
       final courseId = course['_id']?.toString() ?? '';
       final courseName = course['title'] ?? course['name'] ?? 'Unknown Course';
       if (courseId.isEmpty) continue;
@@ -495,11 +501,14 @@ class _StudentLmsDashboardState extends State<StudentLmsDashboard>
   }
 
   Widget _buildClassCard(dynamic enrollment, int index) {
-    final course = enrollment['course'] as Map<String, dynamic>? ?? {};
+    final rawCourse = enrollment['course'];
+    final Map<String, dynamic> course =
+        (rawCourse is Map) ? Map<String, dynamic>.from(rawCourse) : {};
     final title = course['title'] ?? course['name'] ?? 'Untitled Course';
-    final instructor = (course['instructor'] as Map?)?['name'] ??
-        (course['instructor'] as Map?)?['username'] ??
-        'iCare Instructor';
+    final rawInstructor = course['instructor'];
+    final instructor = (rawInstructor is Map)
+        ? (rawInstructor['name'] ?? rawInstructor['username'] ?? 'iCare Instructor').toString()
+        : 'iCare Instructor';
     final section = course['category'] ?? course['section'] ?? '';
     final progressData = enrollment['progress'];
     int progress = 0;
@@ -509,6 +518,7 @@ class _StudentLmsDashboardState extends State<StudentLmsDashboard>
       progress = (progressData['percent'] ?? 0).toInt();
     }
     final color = _cardColor(index);
+    final thumbnail = course['thumbnail']?.toString() ?? course['thumbnail_url']?.toString();
     final enrollmentId = enrollment['_id']?.toString();
     final courseId = course['_id']?.toString() ?? '';
     final isLive = _activeLiveSession?['courseId'] == courseId;
@@ -548,68 +558,108 @@ class _StudentLmsDashboardState extends State<StudentLmsDashboard>
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Colored header
-            Container(
-              height: 96,
-              decoration: BoxDecoration(
-                color: color,
-                borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(8),
-                  topRight: Radius.circular(8),
-                ),
+            // Header: thumbnail image if available, otherwise colored fallback
+            ClipRRect(
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(8),
+                topRight: Radius.circular(8),
               ),
-              padding: const EdgeInsets.fromLTRB(14, 14, 14, 8),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              child: Stack(
                 children: [
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      if (isLive) ...[
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                          decoration: BoxDecoration(color: Colors.red, borderRadius: BorderRadius.circular(4)),
-                          child: const Row(mainAxisSize: MainAxisSize.min, children: [
-                            Icon(Icons.circle, color: Colors.white, size: 8),
-                            SizedBox(width: 4),
-                            Text('LIVE', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w900)),
-                          ]),
-                        ),
-                        const SizedBox(width: 6),
-                      ],
-                      Expanded(
-                        child: Text(
-                          title,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w800,
-                            height: 1.2,
-                          ),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
+                  // Background: image or color
+                  if (thumbnail != null && thumbnail.isNotEmpty)
+                    SizedBox(
+                      height: 96,
+                      width: double.infinity,
+                      child: Image.network(
+                        thumbnail,
+                        height: 96,
+                        width: double.infinity,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, _, _) => Container(
+                          height: 96,
+                          color: color,
                         ),
                       ),
-                      Container(
-                        padding: const EdgeInsets.all(6),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.2),
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(Icons.menu_book_rounded,
-                            color: Colors.white, size: 16),
+                    )
+                  else
+                    Container(height: 96, color: color),
+                  // Dark overlay so text is always readable
+                  Container(
+                    height: 96,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Colors.black.withValues(alpha: thumbnail != null ? 0.45 : 0.0),
+                          Colors.black.withValues(alpha: thumbnail != null ? 0.65 : 0.0),
+                        ],
                       ),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  if (section.isNotEmpty)
-                    Text(
-                      section,
-                      style: const TextStyle(
-                          color: Colors.white70, fontSize: 11),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
                     ),
+                  ),
+                  // Text overlay
+                  Positioned.fill(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(14, 14, 14, 8),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              if (isLive) ...[
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                  decoration: BoxDecoration(color: Colors.red, borderRadius: BorderRadius.circular(4)),
+                                  child: const Row(mainAxisSize: MainAxisSize.min, children: [
+                                    Icon(Icons.circle, color: Colors.white, size: 8),
+                                    SizedBox(width: 4),
+                                    Text('LIVE', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w900)),
+                                  ]),
+                                ),
+                                const SizedBox(width: 6),
+                              ],
+                              Expanded(
+                                child: Text(
+                                  title,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w800,
+                                    height: 1.2,
+                                    shadows: [Shadow(color: Colors.black54, blurRadius: 4)],
+                                  ),
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.all(6),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withValues(alpha: 0.2),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(Icons.menu_book_rounded,
+                                    color: Colors.white, size: 16),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          if (section.isNotEmpty)
+                            Text(
+                              section,
+                              style: const TextStyle(
+                                  color: Colors.white70,
+                                  fontSize: 11,
+                                  shadows: [Shadow(color: Colors.black54, blurRadius: 4)]),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
                 ],
               ),
             ),

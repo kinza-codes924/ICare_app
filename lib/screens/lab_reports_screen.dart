@@ -4,6 +4,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:icare/services/laboratory_service.dart';
 import 'package:icare/services/medical_record_service.dart';
 import 'package:icare/utils/shared_pref.dart';
+import 'package:icare/utils/pdf_invoice_generator.dart';
 import 'package:icare/widgets/back_button.dart';
 import 'package:intl/intl.dart';
 
@@ -54,7 +55,7 @@ class _LabReportsScreenState extends State<LabReportsScreen>
 
       if (role == 'patient' || role == 'student') {
         bookings = await _labService.getMyBookings();
-      } else if (role == 'laboratory' || role == 'lab_technician') {
+      } else if (role == 'lab' || role == 'laboratory' || role == 'lab_technician') {
         final profile = await _labService.getProfile();
         final labId = profile['_id'];
         if (labId == null) throw 'Laboratory profile ID not found';
@@ -80,7 +81,7 @@ class _LabReportsScreenState extends State<LabReportsScreen>
       }
 
       // For lab: advised = bookings referred by a doctor
-      if (role == 'laboratory' || role == 'lab_technician') {
+      if (role == 'lab' || role == 'laboratory' || role == 'lab_technician') {
         advised = bookings.where((b) {
           final ref = (b['referredBy'] ?? b['referred_by'] ?? '').toString().trim();
           return ref.isNotEmpty;
@@ -105,17 +106,38 @@ class _LabReportsScreenState extends State<LabReportsScreen>
       final query = _searchQuery.toLowerCase();
       switch (_searchFilter) {
         case 'patient':
-          final name = (booking['patientName'] ?? booking['patient_name'] ?? booking['patient']?['name'] ?? booking['contactName'] ?? '').toString().toLowerCase();
+          final name = (booking['patientName'] ?? booking['patient_name'] ??
+              booking['patient']?['name'] ?? booking['contactName'] ?? '')
+              .toString().toLowerCase();
           return name.contains(query);
+
         case 'mr_number':
-          final mr = (booking['mrNumber'] ?? booking['mr_number'] ?? booking['patient']?['mrNumber'] ?? '').toString().toLowerCase();
-          return mr.contains(query);
+          // Check explicit mrNumber field first, then fall back to booking reference number
+          final mrField = (booking['mrNumber'] ?? booking['mr_number'] ??
+              booking['patient']?['mrNumber'] ?? '')
+              .toString().toLowerCase();
+          final bookingRef = (booking['bookingNumber'] ?? booking['_id'] ?? '')
+              .toString().toLowerCase();
+          return mrField.contains(query) || bookingRef.contains(query);
+
         case 'doctor':
-          final doc = (booking['referredBy'] ?? booking['referred_by'] ?? booking['doctor']?['name'] ?? '').toString().toLowerCase();
-          return doc.contains(query);
+          // Check referring doctor OR the doctor who approved/verified the result
+          final referredBy = (booking['referredBy'] ?? booking['referred_by'] ??
+              booking['doctor']?['name'] ?? '')
+              .toString().toLowerCase();
+          final approvedMap = booking['approvedByDoctor'];
+          final approvedName = (approvedMap is Map
+              ? (approvedMap['name'] ?? '')
+              : '')
+              .toString().toLowerCase();
+          return referredBy.contains(query) || approvedName.contains(query);
+
         case 'contact':
-          final contact = (booking['contact'] ?? booking['patient_phone'] ?? booking['patient']?['contact'] ?? '').toString().toLowerCase();
+          final contact = (booking['contact'] ?? booking['patient_phone'] ??
+              booking['patient']?['contact'] ?? '')
+              .toString().toLowerCase();
           return contact.contains(query);
+
         default:
           return true;
       }
@@ -211,7 +233,13 @@ class _LabReportsScreenState extends State<LabReportsScreen>
                                 setState(() => _searchQuery = value);
                               },
                               decoration: InputDecoration(
-                                hintText: 'Search records...',
+                                hintText: _searchFilter == 'patient'
+                                    ? 'Search by patient name...'
+                                    : _searchFilter == 'mr_number'
+                                        ? 'Search by MR number or booking ref...'
+                                        : _searchFilter == 'doctor'
+                                            ? 'Search by referring / approving doctor...'
+                                            : 'Search by contact number...',
                                 prefixIcon: const Icon(Icons.search_rounded, color: Color(0xFF64748B)),
                                 suffixIcon: _searchQuery.isNotEmpty
                                     ? IconButton(
@@ -259,7 +287,7 @@ class _LabReportsScreenState extends State<LabReportsScreen>
                               ),
                               items: const [
                                 DropdownMenuItem(value: 'patient', child: Text('Patient Name')),
-                                DropdownMenuItem(value: 'mr_number', child: Text('MR Number')),
+                                DropdownMenuItem(value: 'mr_number', child: Text('MR / Booking #')),
                                 DropdownMenuItem(value: 'doctor', child: Text('Doctor Name')),
                                 DropdownMenuItem(value: 'contact', child: Text('Contact Number')),
                               ],
@@ -640,13 +668,90 @@ class _RecordCardState extends State<_RecordCard>
     }
   }
 
+  Future<void> _downloadPdf(BuildContext context) async {
+    final b = widget.booking;
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final testName = (b['testName'] ?? b['test_type'] ?? b['testType'] ?? 'Lab Test').toString();
+
+      // Resolve patient name: booking field → SharedPref fallback
+      String patientName = (b['patientName'] ?? b['patient_name'] ?? b['contactName'] ?? '').toString().trim();
+      if (patientName.isEmpty || patientName == 'Unknown') {
+        final userData = await SharedPref().getUserData();
+        patientName = (userData?.name ?? 'Patient').toString().trim();
+        if (patientName.isEmpty) patientName = 'Patient';
+      }
+
+      final patientPhone = (b['contact'] ?? b['patient_phone'] ?? '').toString();
+      final bookingNumber = (b['bookingNumber'] ?? b['_id'] ?? 'LAB').toString();
+      final dateStr = (b['date'] ?? b['test_date'] ?? b['createdAt'] ?? '').toString();
+      final dateObj = DateTime.tryParse(dateStr) ?? DateTime.now();
+      final price = ((b['price'] ?? b['amount'] ?? b['totalAmount'] ?? 0) as num).toDouble();
+      final List<dynamic>? results = b['results'] as List<dynamic>?;
+      final String? notes = (b['reportNotes'] ?? b['report_notes'] ?? b['resultNotes'])?.toString();
+
+      // Sample collected by
+      final sampleCollectedBy = (b['sampleCollectedBy'] ?? b['sample_collected_by'] ?? '').toString().trim();
+
+      // Approved doctor from booking
+      String? approvedDoctorLine;
+      final approvedByDoc = b['approvedByDoctor'];
+      if (approvedByDoc is Map) {
+        final parts = [
+          approvedByDoc['name']?.toString() ?? '',
+          approvedByDoc['qualification']?.toString() ?? '',
+          approvedByDoc['designation']?.toString() ?? '',
+        ].where((s) => s.isNotEmpty).toList();
+        if (parts.isNotEmpty) approvedDoctorLine = parts.join(', ');
+      }
+
+      // Load all registered lab doctors from profile
+      List<Map<String, dynamic>>? labDoctors;
+      String labName = 'iCare Laboratory';
+      try {
+        final profile = await LaboratoryService().getProfile();
+        labName = profile['labName'] ?? profile['lab_name'] ?? profile['name'] ?? labName;
+        final rawDocs = (profile['doctors'] as List<dynamic>? ?? []);
+        labDoctors = rawDocs
+            .map((d) => {
+                  'name': d['name']?.toString() ?? '',
+                  'education': d['education']?.toString() ?? '',
+                  'designation': d['designation']?.toString() ?? '',
+                })
+            .where((d) => (d['name'] as String).isNotEmpty)
+            .toList();
+        if (labDoctors.isEmpty) labDoctors = null;
+      } catch (_) {}
+
+      await PdfInvoiceGenerator.generateLabInvoice(
+        bookingNumber: bookingNumber,
+        patientName: patientName,
+        patientPhone: patientPhone,
+        testName: testName,
+        testPrice: price == 0 ? 1000 : price,
+        bookingDate: dateObj,
+        labName: labName,
+        sampleCollectedBy: sampleCollectedBy.isNotEmpty ? sampleCollectedBy : null,
+        doctors: labDoctors,
+        approvedDoctorLine: approvedDoctorLine,
+        results: results,
+        resultNotes: notes,
+      );
+    } catch (e) {
+      messenger.showSnackBar(
+        SnackBar(content: Text('Could not generate PDF: $e'), backgroundColor: Colors.red),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final b = widget.booking;
     final showResults = widget.showResults;
 
     final testName = (b['testName'] ?? b['test_type'] ?? b['testType'] ?? 'Lab Test').toString();
-    final patientName = (b['patientName'] ?? b['patient_name'] ?? b['contactName'] ?? '').toString();
+    final _rawPatientName = (b['patientName'] ?? b['patient_name'] ?? b['contactName'] ?? '').toString().trim();
+    final patientName = (_rawPatientName.isEmpty || _rawPatientName == 'Unknown') ? '' : _rawPatientName;
     final mrNumber = (b['mrNumber'] ?? b['mr_number'] ?? '').toString();
     final referredBy = (b['referredBy'] ?? b['referred_by'] ?? '').toString();
     final contact = (b['contact'] ?? b['patient_phone'] ?? '').toString();
@@ -1148,6 +1253,25 @@ class _RecordCardState extends State<_RecordCard>
               ),
             ),
           ],
+
+          // Download PDF button — always visible for completed reports
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: () => _downloadPdf(context),
+              icon: const Icon(Icons.download_rounded, size: 16),
+              label: const Text('Download PDF Report',
+                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: primaryColor,
+                side: const BorderSide(color: primaryColor, width: 1.5),
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14)),
+              ),
+            ),
+          ),
         ],
       ),
     );

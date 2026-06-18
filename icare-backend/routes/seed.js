@@ -4,6 +4,7 @@ const { connectMongoDB } = require('../config/mongodb');
 const User = require('../models/User');
 const Product = require('../models/Product');
 const Course = require('../models/Course');
+const Quiz = require('../models/Quiz');
 
 const SAMPLE_PRODUCTS = [
   { name: 'Panadol (Paracetamol 500mg)', generic_name: 'Paracetamol', manufacturer: 'GSK Pakistan', price: 35, stock_quantity: 200, medicine_category: 'OTC', requires_prescription: false, description: 'Pain reliever and fever reducer' },
@@ -310,6 +311,17 @@ router.post('/rm-courses', async (req, res) => {
     res.json({ success: true, message: `RM Health courses seeded: ${created} created, ${skipped} already existed.` });
   } catch (err) {
     console.error('Seed RM courses error:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// POST /api/seed/fix-quizzes — publish all unpublished quizzes
+router.post('/fix-quizzes', async (req, res) => {
+  try {
+    await connectMongoDB();
+    const result = await Quiz.updateMany({ isPublished: false }, { $set: { isPublished: true } });
+    res.json({ success: true, message: `Fixed ${result.modifiedCount} unpublished quizzes.` });
+  } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
 });

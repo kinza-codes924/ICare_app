@@ -18,8 +18,9 @@ class HelpAndSupport extends ConsumerWidget {
     final isPharmacy = role == 'Pharmacy';
     final isLaboratory = role == 'Laboratory';
     final isDoctor = role == 'Doctor';
+    final isPatient = role == 'Patient' || (!isStudent && !isPharmacy && !isLaboratory && !isDoctor && role.isNotEmpty && role != 'Admin' && role != 'Instructor');
     if (MediaQuery.of(context).size.width > 600) {
-      return _WebHelpAndSupport(isStudent: isStudent, isPharmacy: isPharmacy, isLaboratory: isLaboratory, isDoctor: isDoctor);
+      return _WebHelpAndSupport(isStudent: isStudent, isPharmacy: isPharmacy, isLaboratory: isLaboratory, isDoctor: isDoctor, isPatient: isPatient);
     }
 
     // REFINED MOBILE LAYOUT
@@ -35,7 +36,7 @@ class HelpAndSupport extends ConsumerWidget {
           color: AppColors.primaryColor,
         ),
       ),
-      floatingActionButton: _WhatsAppFab(),
+      floatingActionButton: isPatient ? null : _WhatsAppFab(),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
         child: Column(
@@ -88,9 +89,9 @@ class HelpAndSupport extends ConsumerWidget {
                   ),
                   const SizedBox(height: 12),
                   _buildContactTile(
-                    Icons.help_center_outlined,
-                    "Technical Desk",
-                    "tech-support@icare.com",
+                    Icons.phone_outlined,
+                    isPatient ? "Helpline (Call Only)" : "Call Us",
+                    isPatient ? "0306-8961564" : "+92 306-8961564",
                   ),
                 ],
               ),
@@ -259,13 +260,14 @@ class _WebHelpAndSupport extends StatelessWidget {
   final bool isPharmacy;
   final bool isLaboratory;
   final bool isDoctor;
-  const _WebHelpAndSupport({this.isStudent = false, this.isPharmacy = false, this.isLaboratory = false, this.isDoctor = false});
+  final bool isPatient;
+  const _WebHelpAndSupport({this.isStudent = false, this.isPharmacy = false, this.isLaboratory = false, this.isDoctor = false, this.isPatient = false});
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF4F6FB),
-      floatingActionButton: _WhatsAppFab(),
+      floatingActionButton: isPatient ? null : _WhatsAppFab(),
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
@@ -356,8 +358,8 @@ class _WebHelpAndSupport extends StatelessWidget {
                         const SizedBox(height: 20),
                         _WebContactItem(
                           icon: Icons.phone_outlined,
-                          title: "Call Us",
-                          subtitle: "+923068961564",
+                          title: isPatient ? "Helpline (Call Only)" : "Call Us",
+                          subtitle: isPatient ? "0306-8961564" : "+92 306-8961564",
                         ),
                         const SizedBox(height: 12),
                         SizedBox(

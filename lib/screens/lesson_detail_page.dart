@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:icare/services/lms_service.dart';
 import 'package:icare/utils/theme.dart';
 import 'package:icare/widgets/back_button.dart';
 import 'package:icare/widgets/lesson_notes_editor.dart';
+import 'package:icare/widgets/video_player_widget.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 /// Lesson Detail Page with Video/Content and Notes Editor
@@ -24,7 +24,6 @@ class LessonDetailPage extends StatefulWidget {
 
 class _LessonDetailPageState extends State<LessonDetailPage> with SingleTickerProviderStateMixin {
   late TabController _tabController;
-  final LmsService _lms = LmsService();
 
   @override
   void initState() {
@@ -85,39 +84,10 @@ class _LessonDetailPageState extends State<LessonDetailPage> with SingleTickerPr
                 if (lessonType == 'content' && videoUrl != null && videoUrl.isNotEmpty)
                   Container(
                     margin: const EdgeInsets.only(bottom: 16),
-                    decoration: BoxDecoration(
-                      color: Colors.black,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
+                    color: Colors.black,
                     child: AspectRatio(
                       aspectRatio: 16 / 9,
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(12),
-                        child: Stack(
-                          alignment: Alignment.center,
-                          children: [
-                            Container(
-                              color: Colors.black87,
-                              child: const Center(
-                                child: Icon(Icons.play_circle_outline, size: 64, color: Colors.white70),
-                              ),
-                            ),
-                            Positioned(
-                              bottom: 12,
-                              right: 12,
-                              child: ElevatedButton.icon(
-                                onPressed: () => _launchUrl(videoUrl),
-                                icon: const Icon(Icons.open_in_new, size: 16),
-                                label: const Text('Open Video'),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: AppColors.primaryColor,
-                                  foregroundColor: Colors.white,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
+                      child: VideoPlayerWidget(videoUrl: videoUrl),
                     ),
                   ),
 

@@ -52,6 +52,7 @@ const securityRoutes = require('./routes/security');
 const gamificationRoutes = require('./routes/gamification');
 const reviewsRoutes = require('./routes/reviews');
 const vouchersRoutes = require('./routes/vouchers');
+const faqsRoutes = require('./routes/faqs');
 
 const app = express();
 
@@ -167,6 +168,7 @@ app.use('/api/security', securityRoutes);
 app.use('/api/gamification', gamificationRoutes);
 app.use('/api/reviews', reviewsRoutes);
 app.use('/api/vouchers', vouchersRoutes);
+app.use('/api/faqs', faqsRoutes);
 
 // Serve uploaded files (only in non-serverless environments)
 if (!process.env.VERCEL) {

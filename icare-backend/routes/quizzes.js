@@ -37,6 +37,63 @@ router.get('/course/:courseId', authMiddleware, async (req, res) => {
   }
 });
 
+// ── STUDENT: Get all my quiz attempts across enrolled courses ────────────────
+router.get('/my', authMiddleware, async (req, res) => {
+  try {
+    await connectMongoDB();
+    const studentId = toId(req.user.id);
+    const enrollments = await Enrollment.find({ userId: studentId }).lean();
+    const courseIds = enrollments.map(e => e.courseId);
+    if (courseIds.length === 0) return res.json({ success: true, quizAttempts: [] });
+
+    const quizzes = await Quiz.find({
+      courseId: { $in: courseIds }, isPublished: true,
+    }).select('_id title courseId totalMarks passingMarks').lean();
+
+    const quizIds = quizzes.map(q => q._id);
+    const attempts = await QuizAttempt.find({
+      quizId: { $in: quizIds }, studentId,
+    }).sort({ submittedAt: -1 }).lean();
+
+    const Course = require('../models/Course');
+    const courses = await Course.find({ _id: { $in: courseIds } }, 'title').lean();
+    const courseMap = {};
+    courses.forEach(c => { courseMap[c._id.toString()] = c.title; });
+    const quizMap = {};
+    quizzes.forEach(q => { quizMap[q._id.toString()] = q; });
+
+    // Best attempt per quiz
+    const bestAttemptMap = {};
+    attempts.forEach(a => {
+      const qid = a.quizId.toString();
+      if (!bestAttemptMap[qid] || a.score > bestAttemptMap[qid].score) {
+        bestAttemptMap[qid] = a;
+      }
+    });
+
+    const result = quizzes.map(q => {
+      const best = bestAttemptMap[q._id.toString()];
+      return {
+        quizId: q._id,
+        quizTitle: q.title,
+        courseId: q.courseId,
+        courseName: courseMap[q.courseId?.toString()] || '',
+        totalMarks: q.totalMarks,
+        passingMarks: q.passingMarks,
+        attempted: !!best,
+        score: best?.score ?? null,
+        passed: best?.passed ?? null,
+        submittedAt: best?.submittedAt ?? null,
+        attemptCount: attempts.filter(a => a.quizId.toString() === q._id.toString()).length,
+      };
+    });
+
+    res.json({ success: true, quizAttempts: result });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
 // ── STUDENT: Get quiz (without answers) ─────────────────────────────────────
 router.get('/:id', authMiddleware, async (req, res) => {
   try {

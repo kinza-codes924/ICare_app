@@ -16,6 +16,10 @@ import 'package:icare/services/laboratory_service.dart';
 import 'package:icare/screens/pharmacy_details.dart';
 import 'package:icare/screens/book_lab.dart';
 import 'package:icare/screens/gamification_screen.dart';
+import 'package:icare/screens/about_us.dart';
+import 'package:icare/screens/privacy_policy.dart';
+import 'package:icare/screens/terms_and_conditions.dart';
+import 'package:icare/screens/help_and_support.dart';
 
 // ── Auth guard — show sign-in/sign-up dialog if not logged in ─────────────────
 Future<bool> _requireAuth(BuildContext context) async {
@@ -1460,10 +1464,7 @@ class _HomeSuggestion {
 
 // ── Courses Section ───────────────────────────────────────────────────────────
 class _CoursesSection extends StatelessWidget {
-  static const _courses = [
-    {'title': 'Diet Plan & Health Courses', 'desc': 'For Patients — Learn to manage your health', 'icon': Icons.restaurant_menu_rounded, 'color': 0xFF10B981, 'audience': 'patient'},
-    {'title': 'Training Programs and Courses', 'desc': 'For Healthcare Professionals', 'icon': Icons.school_rounded, 'color': 0xFFF59E0B, 'audience': 'doctor'},
-  ];
+  const _CoursesSection();
 
   @override
   Widget build(BuildContext context) {
@@ -1483,36 +1484,59 @@ class _CoursesSection extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: isMobile
                   ? Column(
-                      children: _courses.map((c) => Padding(
-                        padding: const EdgeInsets.only(bottom: 14),
-                        child: _CourseCard(course: c),
-                      )).toList(),
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        _SimpleCourseCard(
+                          title: 'Diet Plan & Health Courses',
+                          desc: 'For Patients — Learn to manage your health',
+                          icon: Icons.restaurant_menu_rounded,
+                          color: const Color(0xFF10B981),
+                          onTap: () => context.push('/lms/catalog', extra: {'audienceFilter': 'patient'}),
+                        ),
+                        const SizedBox(height: 16),
+                        _SimpleCourseCard(
+                          title: 'Training Programs and Courses',
+                          desc: 'For Healthcare Professionals — Advance your clinical skills',
+                          icon: Icons.school_rounded,
+                          color: const Color(0xFFF59E0B),
+                          onTap: () => context.push('/lms/catalog', extra: {'audienceFilter': 'doctor'}),
+                        ),
+                      ],
                     )
-                  : GridView.count(
-                      crossAxisCount: 2,
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      crossAxisSpacing: 16,
-                      mainAxisSpacing: 16,
-                      childAspectRatio: 2.8,
-                      children: _courses.map((c) => _CourseCard(course: c)).toList(),
+                  : Row(
+                      children: [
+                        Expanded(
+                          child: _SimpleCourseCard(
+                            title: 'Diet Plan & Health Courses',
+                            desc: 'For Patients — Learn to manage your health',
+                            icon: Icons.restaurant_menu_rounded,
+                            color: const Color(0xFF10B981),
+                            onTap: () => context.push('/lms/catalog', extra: {'audienceFilter': 'patient'}),
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: _SimpleCourseCard(
+                            title: 'Training Programs and Courses',
+                            desc: 'For Healthcare Professionals — Advance your clinical skills',
+                            icon: Icons.school_rounded,
+                            color: const Color(0xFFF59E0B),
+                            onTap: () => context.push('/lms/catalog', extra: {'audienceFilter': 'doctor'}),
+                          ),
+                        ),
+                      ],
                     ),
             ),
             const SizedBox(height: 32),
-            // Explore All Courses Button
             ElevatedButton.icon(
-              onPressed: () {
-                context.go('/lms/catalog');
-              },
+              onPressed: () => context.go('/lms/catalog'),
               icon: const Icon(Icons.school_rounded, size: 20),
               label: const Text('Explore All Courses'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF6366F1),
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 elevation: 2,
               ),
             ),
@@ -1523,78 +1547,61 @@ class _CoursesSection extends StatelessWidget {
   }
 }
 
-class _CourseCard extends StatefulWidget {
-  final Map<String, Object> course;
-  const _CourseCard({required this.course});
+class _SimpleCourseCard extends StatefulWidget {
+  final String title;
+  final String desc;
+  final IconData icon;
+  final Color color;
+  final VoidCallback onTap;
+  const _SimpleCourseCard({required this.title, required this.desc, required this.icon, required this.color, required this.onTap});
 
   @override
-  State<_CourseCard> createState() => _CourseCardState();
+  State<_SimpleCourseCard> createState() => _SimpleCourseCardState();
 }
 
-class _CourseCardState extends State<_CourseCard> {
+class _SimpleCourseCardState extends State<_SimpleCourseCard> {
+  bool _hovered = false;
+
   @override
   Widget build(BuildContext context) {
-    final color = Color(widget.course['color'] as int);
     return GestureDetector(
-        onTap: () {
-          final audience = widget.course['audience'] as String? ?? 'patient';
-          context.push('/lms/catalog', extra: {'audienceFilter': audience});
-        },
-        child: MouseRegion(
-            cursor: SystemMouseCursors.click,
-            child: Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: const Color(0xFFF3F3F3), width: 2),
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    width: 52,
-                    height: 52,
-                    decoration: BoxDecoration(
-                      color: color.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: Icon(widget.course['icon'] as IconData, color: color, size: 26),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Row(
-                          children: [
-                            Flexible(
-                              child: Text(
-                                widget.course['title'] as String,
-                                style: const TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w700,
-                                  color: Color(0xFF0F172A),
-                                  fontFamily: 'Gilroy-Bold',
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          widget.course['desc'] as String,
-                          style: TextStyle(fontSize: 12, color: Colors.grey[600], height: 1.4),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
+      onTap: widget.onTap,
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        onEnter: (_) => setState(() => _hovered = true),
+        onExit: (_) => setState(() => _hovered = false),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 160),
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: _hovered ? widget.color.withValues(alpha: 0.5) : const Color(0xFFF3F3F3), width: 2),
+            boxShadow: _hovered ? [BoxShadow(color: widget.color.withValues(alpha: 0.08), blurRadius: 12, offset: const Offset(0, 4))] : [],
           ),
+          child: Row(
+            children: [
+              Container(
+                width: 52, height: 52,
+                decoration: BoxDecoration(color: widget.color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(14)),
+                child: Icon(widget.icon, color: widget.color, size: 26),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(widget.title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Color(0xFF0F172A), fontFamily: 'Gilroy-Bold')),
+                    const SizedBox(height: 4),
+                    Text(widget.desc, style: TextStyle(fontSize: 12, color: Colors.grey[600], height: 1.4), maxLines: 2, overflow: TextOverflow.ellipsis),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
@@ -3571,7 +3578,7 @@ class _Footer extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (isMobile) ..._buildMobileFooter() else ..._buildDesktopFooter(),
+          if (isMobile) ..._buildMobileFooter(context) else ..._buildDesktopFooter(context),
           const SizedBox(height: 32),
           const Divider(color: Color(0xFFE8ECF5), thickness: 1),
           const SizedBox(height: 20),
@@ -3581,7 +3588,7 @@ class _Footer extends StatelessWidget {
     );
   }
 
-  List<Widget> _buildDesktopFooter() {
+  List<Widget> _buildDesktopFooter(BuildContext context) {
     return [
       Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -3623,16 +3630,23 @@ class _Footer extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 40),
-          const Expanded(
+          Expanded(
             child: _FooterColumn(
               title: 'Company',
-              items: [
+              items: const [
                 'About Us',
-                'Careers',
+                'Work With Us',
                 'Privacy Policy',
                 'Terms of Service',
                 'Contact Us',
               ],
+              taps: {
+                'About Us': () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AboutUs())),
+                'Work With Us': () => context.go('/work-with-us'),
+                'Privacy Policy': () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PrivacyPolicy())),
+                'Terms of Service': () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TermsAndConditions())),
+                'Contact Us': () => Navigator.push(context, MaterialPageRoute(builder: (_) => const HelpAndSupport())),
+              },
             ),
           ),
         ],
@@ -3640,7 +3654,7 @@ class _Footer extends StatelessWidget {
     ];
   }
 
-  List<Widget> _buildMobileFooter() {
+  List<Widget> _buildMobileFooter(BuildContext context) {
     return [
       Image.asset(
         'assets/Asset 1.png',
@@ -3669,15 +3683,22 @@ class _Footer extends StatelessWidget {
         ],
       ),
       const SizedBox(height: 20),
-      const _FooterColumn(
+      _FooterColumn(
         title: 'Company',
-        items: [
+        items: const [
           'About Us',
-          'Careers',
+          'Work With Us',
           'Privacy Policy',
           'Terms of Service',
           'Contact Us',
         ],
+        taps: {
+          'About Us': () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AboutUs())),
+          'Work With Us': () => context.go('/work-with-us'),
+          'Privacy Policy': () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PrivacyPolicy())),
+          'Terms of Service': () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TermsAndConditions())),
+          'Contact Us': () => Navigator.push(context, MaterialPageRoute(builder: (_) => const HelpAndSupport())),
+        },
       ),
     ];
   }
@@ -3715,10 +3736,12 @@ class _Footer extends StatelessWidget {
 class _FooterColumn extends StatelessWidget {
   final String title;
   final List<String> items;
+  final Map<String, VoidCallback>? taps;
 
   const _FooterColumn({
     required this.title,
     required this.items,
+    this.taps,
   });
 
   @override
@@ -3736,16 +3759,32 @@ class _FooterColumn extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 12),
-        ...items.map((item) => Padding(
-          padding: const EdgeInsets.only(bottom: 8),
-          child: Text(
-            item,
-            style: TextStyle(
-              fontSize: 13,
-              color: Colors.grey[600],
-            ),
-          ),
-        )),
+        ...items.map((item) {
+          final onTap = taps?[item];
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: onTap != null
+                ? GestureDetector(
+                    onTap: onTap,
+                    child: Text(
+                      item,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        color: Color(0xFF0036BC),
+                        decoration: TextDecoration.underline,
+                        decorationColor: Color(0xFF0036BC),
+                      ),
+                    ),
+                  )
+                : Text(
+                    item,
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+          );
+        }),
       ],
     );
   }

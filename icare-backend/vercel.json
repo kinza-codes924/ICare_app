@@ -20,11 +20,28 @@
       "continue": false
     },
     {
+      "src": "/api/live-sessions/(.*)",
+      "headers": {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Requested-With, Accept",
+        "Cache-Control": "no-store, no-cache, must-revalidate, private, max-age=0",
+        "Pragma": "no-cache",
+        "Expires": "0",
+        "Surrogate-Control": "no-store"
+      },
+      "dest": "index.js"
+    },
+    {
       "src": "/(.*)",
       "headers": {
         "Access-Control-Allow-Origin": "*",
         "Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Requested-With, Accept"
+        "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Requested-With, Accept",
+        "Cache-Control": "no-store, no-cache, must-revalidate, private, max-age=0",
+        "Pragma": "no-cache",
+        "Expires": "0",
+        "Surrogate-Control": "no-store"
       },
       "dest": "index.js"
     }

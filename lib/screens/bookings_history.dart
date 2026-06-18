@@ -1,6 +1,7 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:icare/models/appointment_detail.dart';
+import 'package:icare/widgets/date_filter_bar.dart';
 import 'package:icare/screens/doctors_list.dart';
 import 'package:icare/screens/prescription_detail_screen.dart';
 import 'package:icare/screens/profile_or_appointement_view.dart';
@@ -26,6 +27,8 @@ class _BookingsHistoryScreenState extends State<BookingsHistoryScreen> {
   bool _isLoading = true;
   String _currentUserId = '';
   String _currentUserName = '';
+  String _dateFilter = 'all';
+  DateTime? _customDate;
 
   @override
   void initState() {
@@ -57,11 +60,14 @@ class _BookingsHistoryScreenState extends State<BookingsHistoryScreen> {
     }
   }
 
+  List<AppointmentDetail> get _displayAppointments =>
+      applyDateFilter<AppointmentDetail>(_appointments, (a) => a.date, _dateFilter, _customDate);
+
   int _count(String status) =>
-      _appointments.where((a) => a.status.toLowerCase() == status).length;
+      _displayAppointments.where((a) => a.status.toLowerCase() == status).length;
 
   List<AppointmentDetail> _byStatus(String status) =>
-      _appointments.where((a) => a.status.toLowerCase() == status).toList();
+      _displayAppointments.where((a) => a.status.toLowerCase() == status).toList();
 
   /// Extract the real Agora channel from an appointment.
   /// Tries channelName field first, then parses it from reason/notes text.
@@ -80,16 +86,14 @@ class _BookingsHistoryScreenState extends State<BookingsHistoryScreen> {
   ///    — older sessions are considered stale/ended
   List<AppointmentDetail> get _inProgress {
     final now = DateTime.now();
-    return _appointments.where((a) {
+    return _displayAppointments.where((a) {
       if (a.status.toLowerCase() != 'in_progress') return false;
-      // Must have a real video channel
       if (_extractChannel(a) == null) return false;
-      // Must be recently set to in_progress (within 60 min of last update)
       return now.difference(a.updatedAt).inMinutes <= 60;
     }).toList();
   }
 
-  List<AppointmentDetail> get _upcoming => _appointments
+  List<AppointmentDetail> get _upcoming => _displayAppointments
       .where((a) =>
           a.status.toLowerCase() == 'confirmed' &&
           a.date.isAfter(DateTime.now()))
@@ -260,11 +264,22 @@ class _BookingsHistoryScreenState extends State<BookingsHistoryScreen> {
   // ── Body list ─────────────────────────────────────────────────────────────
   List<Widget> _buildBody() {
     return [
+      // Date filter bar
+      DateFilterBar(
+        selected: _dateFilter,
+        customDate: _customDate,
+        onChanged: (filter, date) => setState(() {
+          _dateFilter = filter;
+          if (date != null) _customDate = date;
+        }),
+      ),
+      const SizedBox(height: 16),
+
       // Stats row — inside scrollable body, NOT in header
       if (!_isLoading)
         Row(
           children: [
-            _statCard('Total'.tr(), _appointments.length,
+            _statCard('Total'.tr(), _displayAppointments.length,
                 const Color(0xFF60A5FA), Icons.list_alt_rounded),
             const SizedBox(width: 10),
             _statCard('Live'.tr(), _inProgress.length,
@@ -322,7 +337,7 @@ class _BookingsHistoryScreenState extends State<BookingsHistoryScreen> {
           _count('cancelled'), const Color(0xFFEF4444),
           Icons.cancel_outlined, _byStatus('cancelled')),
 
-      if (_appointments.isEmpty) ...[
+      if (_displayAppointments.isEmpty) ...[
         const SizedBox(height: 40),
         Center(
           child: Column(

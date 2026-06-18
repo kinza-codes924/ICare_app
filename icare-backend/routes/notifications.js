@@ -3,6 +3,7 @@ const router = express.Router();
 const { connectMongoDB } = require('../config/mongodb');
 const { authMiddleware } = require('../middleware/auth');
 const User = require('../models/User');
+const Notification = require('../models/Notification');
 
 // POST /api/notifications/token  — save FCM token after login
 router.post('/token', authMiddleware, async (req, res) => {
@@ -65,14 +66,32 @@ router.put('/preferences', authMiddleware, async (req, res) => {
   }
 });
 
-// GET /api/notifications — list in-app notifications (stub, returns empty)
+// GET /api/notifications — list in-app notifications for current user
 router.get('/', authMiddleware, async (req, res) => {
-  res.json({ success: true, notifications: [], count: 0 });
+  try {
+    await connectMongoDB();
+    const notifications = await Notification.find({ userId: req.user.id })
+      .sort({ createdAt: -1 })
+      .limit(50)
+      .lean();
+    res.json({ success: true, notifications, count: notifications.length });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
 });
 
-// GET /api/notifications/history/:userId — notification history stub
+// GET /api/notifications/history/:userId — notification history
 router.get('/history/:userId', authMiddleware, async (req, res) => {
-  res.json({ success: true, notifications: [], count: 0 });
+  try {
+    await connectMongoDB();
+    const notifications = await Notification.find({ userId: req.params.userId })
+      .sort({ createdAt: -1 })
+      .limit(100)
+      .lean();
+    res.json({ success: true, notifications, count: notifications.length });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
 });
 
 // GET /api/notifications/preferences/:userId — preferences by userId (alias)
@@ -109,14 +128,29 @@ router.put('/preferences/:userId', authMiddleware, async (req, res) => {
   }
 });
 
-// PUT /api/notifications/:id/read — mark as read stub
+// PUT /api/notifications/:id/read — mark single notification as read
 router.put('/:id/read', authMiddleware, async (req, res) => {
-  res.json({ success: true });
+  try {
+    await connectMongoDB();
+    await Notification.findOneAndUpdate(
+      { _id: req.params.id, userId: req.user.id },
+      { read: true, updatedAt: new Date() }
+    );
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
 });
 
-// PUT /api/notifications/read-all — mark all as read stub
+// PUT /api/notifications/read-all — mark all notifications as read
 router.put('/read-all', authMiddleware, async (req, res) => {
-  res.json({ success: true });
+  try {
+    await connectMongoDB();
+    await Notification.updateMany({ userId: req.user.id, read: false }, { read: true, updatedAt: new Date() });
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
 });
 
 // POST stubs for critical-alert, status-update, report-ready

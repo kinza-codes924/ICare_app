@@ -7,6 +7,7 @@ import 'package:icare/services/pharmacy_service.dart';
 import 'package:icare/utils/utils.dart';
 import 'package:icare/widgets/rating_dialog.dart';
 import 'package:icare/utils/pdf_invoice_generator.dart';
+import 'package:icare/widgets/date_filter_bar.dart';
 import 'package:intl/intl.dart';
 
 class PharmacyOrders extends ConsumerStatefulWidget {
@@ -22,6 +23,8 @@ class _PharmacyOrdersState extends ConsumerState<PharmacyOrders>
   late TabController _tabController;
   bool _isLoading = true;
   List<Map<String, dynamic>> _orders = [];
+  String _dateFilter = 'all';
+  DateTime? _customDate;
 
   @override
   void initState() {
@@ -75,6 +78,7 @@ class _PharmacyOrdersState extends ConsumerState<PharmacyOrders>
             'customerName': user?['name'] ?? user?['username'] ?? 'Patient',
             'customerPhone': user?['phoneNumber'] ?? user?['phone'] ?? 'N/A',
             'customerEmail': user?['email'] ?? '',
+            'customerAddress': user?['address'] ?? '',
             'items': ((o['items'] as List?)?.length ?? 0) +
                 ((o['prescriptionItems'] as List?)?.length ?? 0),
             'itemsList': (o['items'] as List?) ?? [],
@@ -84,7 +88,11 @@ class _PharmacyOrdersState extends ConsumerState<PharmacyOrders>
                 ? DateTime.parse(o['createdAt'])
                 : DateTime.now(),
             'orderType': o['orderType'] ?? 'cart',
-            'deliveryAddress': o['deliveryAddress'] ?? o['delivery_address'] ?? '',
+            'deliveryAddress': (() {
+              final d = (o['deliveryAddress'] ?? o['delivery_address'] ?? '').toString().trim();
+              if (d.isNotEmpty) return d;
+              return (user?['address'] ?? '').toString().trim();
+            })(),
             'expectedDeliveryTime': o['expectedDeliveryTime'] ?? o['expected_delivery_time'] ?? '',
             'medicines': [
               ...((o['items'] as List?) ?? []).map((item) {
@@ -110,6 +118,7 @@ class _PharmacyOrdersState extends ConsumerState<PharmacyOrders>
             'prescriptionText': _sanitizeText(o['prescriptionText']?.toString()),
             'medicalRecord': o['medicalRecord'],
             'prescriptionId': o['prescriptionId'],
+            'doctorName': o['doctorName']?.toString(),
           };
         }).whereType<Map<String, dynamic>>().toList();
         debugPrint('✅ Processed ${_orders.length} valid orders');
@@ -501,37 +510,38 @@ class _PharmacyOrdersState extends ConsumerState<PharmacyOrders>
   }
 
   List<Map<String, dynamic>> _getOrdersByStatus(String status) {
-    if (status == 'all') return _orders;
+    List<Map<String, dynamic>> result;
 
-    if (status == 'processing') {
-      // Processing tab: confirmed, preparing, out_for_delivery, out-for-delivery
-      return _orders.where((o) {
+    if (status == 'all') {
+      result = _orders;
+    } else if (status == 'processing') {
+      result = _orders.where((o) {
         final s = (o['status']?.toString() ?? '').replaceAll('-', '_');
         return s == 'confirmed' || s == 'preparing' || s == 'out_for_delivery';
       }).toList();
-    }
-
-    if (status == 'pending') {
-      // Awaiting Fulfillment: pending orders
-      return _orders.where((o) {
+    } else if (status == 'pending') {
+      result = _orders.where((o) {
         final s = (o['status']?.toString() ?? '').replaceAll('-', '_');
         return s == 'pending';
       }).toList();
-    }
-
-    if (status == 'completed') {
-      // Dispensed: completed/delivered orders
-      return _orders.where((o) {
+    } else if (status == 'completed') {
+      result = _orders.where((o) {
         final s = (o['status']?.toString() ?? '').replaceAll('-', '_');
         return s == 'completed' || s == 'delivered';
       }).toList();
+    } else {
+      result = _orders.where((o) {
+        final s = (o['status']?.toString() ?? '').replaceAll('-', '_');
+        return s == status.replaceAll('-', '_');
+      }).toList();
     }
 
-    // Fallback: exact match
-    return _orders.where((o) {
-      final s = (o['status']?.toString() ?? '').replaceAll('-', '_');
-      return s == status.replaceAll('-', '_');
-    }).toList();
+    return applyDateFilter<Map<String, dynamic>>(
+      result,
+      (o) => o['date'] as DateTime,
+      _dateFilter,
+      _customDate,
+    );
   }
 
   @override
@@ -730,14 +740,25 @@ class _PharmacyOrdersState extends ConsumerState<PharmacyOrders>
                           itemBuilder: (_, i) {
                             final med = filtered[i];
                             final isSelected = selectedMedicines.any((s) => s['id'] == med['id']);
+                            final isZeroStock = (med['stock'] as num? ?? 0).toInt() == 0;
                             final isControlledMed = med['permission'] == 'Controlled' ||
                                 med['category'].toString().toLowerCase() == 'controlled' ||
                                 (med['medicine_category'] ?? '').toString().toLowerCase() == 'controlled';
                             return ListTile(
                               dense: true,
+                              enabled: !isZeroStock,
                               title: Row(children: [
-                                Expanded(child: Text(med['name'], style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600))),
-                                if (isControlledMed)
+                                Expanded(child: Text(med['name'],
+                                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600,
+                                        color: isZeroStock ? Colors.grey.shade400 : null))),
+                                if (isZeroStock)
+                                  Container(
+                                    margin: const EdgeInsets.only(left: 4),
+                                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                                    decoration: BoxDecoration(color: const Color(0xFF7F1D1D).withValues(alpha: 0.12), borderRadius: BorderRadius.circular(4)),
+                                    child: const Text('Out of Stock', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w800, color: Color(0xFF7F1D1D))),
+                                  )
+                                else if (isControlledMed)
                                   Container(
                                     margin: const EdgeInsets.only(left: 4),
                                     padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
@@ -745,11 +766,14 @@ class _PharmacyOrdersState extends ConsumerState<PharmacyOrders>
                                     child: const Text('Controlled', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w800, color: Color(0xFFDC2626))),
                                   ),
                               ]),
-                              subtitle: Text('PKR ${med['price'].toStringAsFixed(0)} • Stock: ${med['stock']}', style: const TextStyle(fontSize: 11)),
-                              trailing: isSelected
-                                  ? Icon(Icons.check_circle_rounded, color: AppColors.primaryColor, size: 20)
-                                  : Icon(Icons.add_circle_outline_rounded, color: Colors.grey.shade400, size: 20),
-                              onTap: () {
+                              subtitle: Text('PKR ${med['price'].toStringAsFixed(0)} • Stock: ${med['stock']}',
+                                  style: TextStyle(fontSize: 11, color: isZeroStock ? Colors.grey.shade400 : null)),
+                              trailing: isZeroStock
+                                  ? Icon(Icons.block_rounded, color: Colors.grey.shade300, size: 18)
+                                  : isSelected
+                                      ? Icon(Icons.check_circle_rounded, color: AppColors.primaryColor, size: 20)
+                                      : Icon(Icons.add_circle_outline_rounded, color: Colors.grey.shade400, size: 20),
+                              onTap: isZeroStock ? null : () {
                                 setModalState(() {
                                   if (isSelected) {
                                     selectedMedicines.removeWhere((s) => s['id'] == med['id']);
@@ -976,32 +1000,35 @@ class _PharmacyOrdersState extends ConsumerState<PharmacyOrders>
       return const Center(child: CircularProgressIndicator());
     }
 
-    if (orders.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.shopping_cart_outlined,
-              size: 64,
-              color: Colors.grey.shade300,
-            ),
-            const SizedBox(height: 16),
-            const Text(
-              'No orders found',
-              style: TextStyle(fontSize: 15, color: Color(0xFF64748B)),
-            ),
-          ],
+    return Column(
+      children: [
+        DateFilterBar(
+          selected: _dateFilter,
+          customDate: _customDate,
+          onChanged: (filter, date) => setState(() {
+            _dateFilter = filter;
+            if (date != null) _customDate = date;
+          }),
         ),
-      );
-    }
-
-    return ListView.builder(
-      padding: EdgeInsets.all(isDesktop ? 40 : 20),
-      itemCount: orders.length,
-      itemBuilder: (context, index) {
-        return _buildOrderCard(orders[index]);
-      },
+        Expanded(
+          child: orders.isEmpty
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.shopping_cart_outlined, size: 64, color: Colors.grey.shade300),
+                      const SizedBox(height: 16),
+                      const Text('No orders found', style: TextStyle(fontSize: 15, color: Color(0xFF64748B))),
+                    ],
+                  ),
+                )
+              : ListView.builder(
+                  padding: EdgeInsets.all(isDesktop ? 40 : 20),
+                  itemCount: orders.length,
+                  itemBuilder: (context, index) => _buildOrderCard(orders[index]),
+                ),
+        ),
+      ],
     );
   }
 
@@ -1009,7 +1036,7 @@ class _PharmacyOrdersState extends ConsumerState<PharmacyOrders>
     final status = order['status'] as String;
     final statusColor = _getStatusColor(status);
     final date = order['date'] as DateTime;
-    final isDoctorReferred = order['medicalRecord'] != null;
+    final isDoctorReferred = order['medicalRecord'] != null || order['doctorName'] != null;
     final isPrescriptionOrder = order['orderType'] == 'prescription';
     final isManualOrder = (order['orderType'] ?? '').toString().contains('walk');
     final hasPrescriptionText =
@@ -1096,7 +1123,9 @@ class _PharmacyOrdersState extends ConsumerState<PharmacyOrders>
                         Text(
                           isPrescriptionOrder
                               ? 'Prescription Order'
-                              : 'Doctor Referred',
+                              : (order['doctorName'] != null
+                                  ? 'Ordered by Dr. ${order['doctorName']}'
+                                  : 'Doctor Referred'),
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w700,

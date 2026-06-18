@@ -8,6 +8,7 @@ import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:responsive_framework/responsive_framework.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:firebase_core/firebase_core.dart';
+import 'package:icare/firebase_options.dart';
 import 'package:icare/services/fcm_service.dart';
 import 'package:icare/widgets/incoming_call_listener.dart';
 import 'package:icare/widgets/doctor_connect_now_listener.dart';
@@ -23,9 +24,19 @@ void main() async {
   // Use path-based URLs (no # hash) so /home, /login etc. work directly.
   usePathUrlStrategy();
 
-  if (!kIsWeb) {
-    await Firebase.initializeApp();
-    await FcmService().init();
+  // Web: Firebase initialized for Phone Auth (requires web appId in firebase_options.dart).
+  // Mobile: uses google-services.json — no options argument needed.
+  try {
+    if (kIsWeb) {
+      await Firebase.initializeApp(
+          options: DefaultFirebaseOptions.currentPlatform);
+    } else {
+      await Firebase.initializeApp();
+      await FcmService().init();
+    }
+  } catch (e) {
+    // Graceful fallback if firebase_options.dart still has placeholder appId.
+    debugPrint('Firebase init warning: $e');
   }
   runApp(
     EasyLocalization(

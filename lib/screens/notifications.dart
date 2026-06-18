@@ -37,22 +37,8 @@ class _NotificationScreenState extends State<NotificationScreen> {
         setState(() {
           if (result['success'] == true) {
             _notifications = result['notifications'] ?? [];
-            
-            // If no notifications from API, show sample data for testing
-            if (_notifications.isEmpty) {
-              _notifications = _getSampleNotifications();
-            }
           } else {
-            _notifications = _getSampleNotifications();
-            if (result['error'] != null) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Using sample data - API unavailable'.tr()),
-                  backgroundColor: Colors.orange,
-                  duration: const Duration(seconds: 2),
-                ),
-              );
-            }
+            _notifications = [];
           }
           _isLoading = false;
         });
@@ -60,16 +46,9 @@ class _NotificationScreenState extends State<NotificationScreen> {
     } catch (e) {
       if (mounted) {
         setState(() {
-          _notifications = _getSampleNotifications();
+          _notifications = [];
           _isLoading = false;
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Using sample data - Connection error'.tr()),
-            backgroundColor: Colors.orange,
-            duration: const Duration(seconds: 2),
-          ),
-        );
       }
     }
   }

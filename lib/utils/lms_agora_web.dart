@@ -26,6 +26,9 @@ external void _lmsStopRecordingAndUploadJS(JSString sessionId, JSString backendU
 @JS('lmsEnableMediaAndPublish')
 external JSPromise<JSAny?> _lmsEnableMediaAndPublishJS();
 
+@JS('lmsStudentEnableAudio')
+external JSPromise<JSString> _lmsStudentEnableAudioJS();
+
 // appId and token fetched by caller from AgoraService
 Future<void> lmsJoinChannel(String roomName, String appId, String token, bool isInstructor) async {
   await _lmsAgoraJoinJS(appId.toJS, roomName.toJS, token.toJS, 0.toJS, isInstructor.toJS).toDart;
@@ -40,6 +43,10 @@ void lmsStopRecordingAndUpload(String sessionId, String backendUrl, String authT
     _lmsStopRecordingAndUploadJS(sessionId.toJS, backendUrl.toJS, authToken.toJS);
 Future<void> lmsEnableMediaAndPublish() async {
   await _lmsEnableMediaAndPublishJS().toDart;
+}
+
+Future<void> lmsStudentEnableAudio() async {
+  await _lmsStudentEnableAudioJS().toDart;
 }
 
 void lmsSetCallbacks({void Function(int, bool)? onRemote, void Function()? onJoined}) {}

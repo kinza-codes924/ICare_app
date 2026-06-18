@@ -5,6 +5,7 @@ const doctorProfileSchema = new mongoose.Schema({
   specialization: String,
   experience_years: { type: Number, default: 0 },
   license_number: String,
+  licenseValidTill: Date,
   consultation_fee: { type: Number, default: 0 },
   available_days: [String],
   available_hours: String,

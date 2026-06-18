@@ -6,6 +6,7 @@ const liveSessionSchema = new mongoose.Schema({
   title: { type: String, required: true },
   description: String,
   scheduledAt: { type: Date, required: true },
+  startedAt: Date, // set each time the instructor goes live (scheduledAt may be reused/old)
   duration: { type: Number, default: 60 }, // minutes
   meetingLink: String,
   meetingId: String,

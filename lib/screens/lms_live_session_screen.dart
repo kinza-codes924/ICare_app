@@ -329,39 +329,30 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
 
       final sessionRoom = _sessionDocId.isNotEmpty ? _sessionDocId : widget.sessionId;
       final roomName = 'icare${sessionRoom.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '').substring(0, sessionRoom.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '').length.clamp(0, 20))}';
+      _agoraRoomName = roomName;
 
-      // Join after the platform view is in the DOM
-      WidgetsBinding.instance.addPostFrameCallback((_) async {
-        try {
-          final tokenData = await AgoraService().getToken(channelName: roomName, uid: 0);
-          final agoraToken = tokenData['data']?['token'] as String? ?? '';
-          final agoraAppId = tokenData['data']?['appId'] as String? ?? '';
-          await Future.delayed(const Duration(milliseconds: 400));
-          try {
-            await lmsJoinChannel(roomName, agoraAppId, agoraToken, widget.isInstructor);
-            debugPrint('LMS Agora join: room=$roomName isInstructor=${widget.isInstructor}');
-            // mic/cam activation is done via the overlay tap button (user gesture)
-            // so Chrome allows getUserMedia. Do NOT call lmsEnableMediaAndPublish here.
-          } catch (e) {
-            debugPrint('LMS Agora join error: $e');
-          }
-        } catch (e) {
-          debugPrint('LMS token fetch error: $e');
-        }
-      });
-
-      // Auto-show recording indicator for instructor (recording starts in JS after 3s)
-      if (widget.isInstructor) {
-        Future.delayed(const Duration(seconds: 4), () {
-          if (mounted) setState(() => _isRecording = true);
-        });
-      }
+      // Pre-fetch the token in the background. The actual Agora join (which also
+      // creates mic+cam tracks and publishes, like the doctor/patient call) happens
+      // in the overlay tap handler so everything runs inside the user gesture.
+      _agoraTokenFetch = () async {
+        final tokenData = await AgoraService().getToken(channelName: roomName, uid: 0);
+        _agoraToken = tokenData['data']?['token'] as String? ?? '';
+        _agoraAppId = tokenData['data']?['appId'] as String? ?? '';
+        debugPrint('LMS token pre-fetched for room=$roomName');
+      }();
     } catch (e) {
       debugPrint('LMS Jitsi init error: $e');
     }
   }
 
   String? _cameraViewName;
+
+  // Agora join params — pre-fetched in _initWebCamera, used on overlay tap
+  String? _agoraRoomName;
+  String? _agoraAppId;
+  String? _agoraToken;
+  Future<void>? _agoraTokenFetch;
+  bool _joining = false;
 
   Future<void> _notifyStudents() async {
     try {
@@ -533,6 +524,18 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
       ),
     );
     if (confirm == true && mounted) {
+      // Stop recording + upload FIRST — must run while the Agora tracks are still
+      // alive, because lmsLeaveChannel() closes the very tracks MediaRecorder is
+      // capturing. JS guards itself if no recorder is active, so no _isRecording check.
+      if (widget.isInstructor && kIsWeb && _sessionDocId.isNotEmpty) {
+        final token = await SharedPref().getToken();
+        lmsStopRecordingAndUpload(
+          _sessionDocId,
+          'https://icare-backend-inky.vercel.app/api',
+          token ?? '',
+        );
+      }
+
       lmsLeaveChannel();
 
       // Remove self from session attendees on backend so participant count stays accurate
@@ -541,15 +544,6 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
       }
 
       if (widget.isInstructor) {
-        // Stop recording + save to device (auto-download) + upload if Cloudinary configured
-        if (kIsWeb && _isRecording && _sessionDocId.isNotEmpty) {
-          final token = await SharedPref().getToken();
-          lmsStopRecordingAndUpload(
-            _sessionDocId,
-            'https://icare-backend-inky.vercel.app/api',
-            token ?? '',
-          );
-        }
 
         // Auto-save: end session + save chat transcript to lesson
         if (_sessionDocId.isNotEmpty && _sessionDocId != widget.courseId) {
@@ -799,14 +793,38 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
                           padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                         ),
-                        onPressed: () async {
+                        onPressed: _joining ? null : () async {
                           if (kIsWeb) {
-                            if (widget.isInstructor) {
-                              // Instructor: create mic+cam, publish, and hear students
-                              await lmsEnableMediaAndPublish();
-                            } else {
-                              // Student: create mic, publish, AND hear instructor
-                              await lmsStudentEnableAudio();
+                            setState(() => _joining = true);
+                            try {
+                              // Wait for the pre-fetched token (usually already done)
+                              try {
+                                if (_agoraTokenFetch != null) await _agoraTokenFetch;
+                              } catch (_) {}
+                              // Fallback: re-fetch if the background fetch failed
+                              if ((_agoraAppId ?? '').isEmpty && (_agoraRoomName ?? '').isNotEmpty) {
+                                final tokenData = await AgoraService()
+                                    .getToken(channelName: _agoraRoomName!, uid: 0);
+                                _agoraToken = tokenData['data']?['token'] as String? ?? '';
+                                _agoraAppId = tokenData['data']?['appId'] as String? ?? '';
+                              }
+                              // One-shot: join channel + create mic/cam + publish,
+                              // exactly like the working doctor/patient agoraJoin.
+                              await lmsJoinChannel(
+                                _agoraRoomName ?? '',
+                                _agoraAppId ?? '',
+                                _agoraToken ?? '',
+                                widget.isInstructor,
+                              );
+                              debugPrint('LMS joined+published room=$_agoraRoomName');
+                              // Recording auto-starts in JS 3s after instructor joins
+                              if (widget.isInstructor) {
+                                Future.delayed(const Duration(seconds: 4), () {
+                                  if (mounted) setState(() => _isRecording = true);
+                                });
+                              }
+                            } catch (e) {
+                              debugPrint('LMS join error: $e');
                             }
                           }
                           if (mounted) setState(() => _permissionsEnabled = true);

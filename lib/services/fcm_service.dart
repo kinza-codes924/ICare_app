@@ -3,6 +3,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter/foundation.dart';
 import '../services/api_service.dart';
+import '../utils/connect_now_events.dart';
 
 // Background message handler — must be top-level function
 @pragma('vm:entry-point')
@@ -92,7 +93,15 @@ class FcmService {
   }
 
   void _handleForegroundMessage(RemoteMessage message) {
-    debugPrint('📩 Foreground FCM: ${message.notification?.title}');
+    debugPrint('📩 Foreground FCM: ${message.notification?.title} | type=${message.data['type']}');
+
+    // Connect Now: trigger immediate dialog on doctor side — no polling delay
+    if (message.data['type'] == 'connect_now_request') {
+      debugPrint('🚨 [ConnectNow] FCM arrived → triggering immediate poll');
+      ConnectNowEvents.trigger(Map<String, dynamic>.from(message.data));
+      return; // Don't show a banner — the dialog will pop up from the listener
+    }
+
     final notification = message.notification;
     if (notification == null) return;
 
@@ -116,7 +125,12 @@ class FcmService {
   }
 
   void _handleNotificationTap(RemoteMessage message) {
-    debugPrint('👆 Notification tapped: ${message.data}');
+    debugPrint('👆 Notification tapped: type=${message.data['type']}');
+    // Connect Now tap (app in background): trigger immediate poll
+    if (message.data['type'] == 'connect_now_request') {
+      debugPrint('🚨 [ConnectNow] Notification tapped → triggering immediate poll');
+      ConnectNowEvents.trigger(Map<String, dynamic>.from(message.data));
+    }
   }
 
   Future<String?> getToken() async {

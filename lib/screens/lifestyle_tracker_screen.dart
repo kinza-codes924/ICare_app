@@ -61,6 +61,12 @@ class _LifestyleTrackerScreenState extends State<LifestyleTrackerScreen>
   int _pointsToday = 0;
   final GamificationService _gamificationService = GamificationService();
 
+  // Login streak
+  int _loginStreak = 0;
+  List<Map<String, dynamic>> _weekActivity = [];
+  bool _loggedInToday = false;
+  bool _checkingIn = false;
+
   // User name (loaded from SharedPref)
   String _userName = '';
 
@@ -118,6 +124,7 @@ class _LifestyleTrackerScreenState extends State<LifestyleTrackerScreen>
     _loadAllLogs();
     _loadPoints();
     _loadRxMeds();
+    _loadLoginStreak();
   }
 
   Future<void> _loadAllLogs() async {
@@ -226,10 +233,48 @@ class _LifestyleTrackerScreenState extends State<LifestyleTrackerScreen>
 
   Future<void> _loadUserName() async {
     final user = await SharedPref().getUserData();
-    if (mounted) {
+    if (mounted) setState(() => _userName = user?.name ?? '');
+  }
+
+  Future<void> _loadLoginStreak() async {
+    final result = await _gamificationService.getLoginStreak();
+    if (!mounted) return;
+    if (result['success'] == true) {
+      final today = DateTime.now().toIso8601String().split('T')[0];
+      final raw = result['weekActivity'];
+      final week = raw is List ? raw.map((e) => Map<String, dynamic>.from(e as Map)).toList() : <Map<String, dynamic>>[];
       setState(() {
-        _userName = user?.name ?? '';
+        _loginStreak = (result['loginStreak'] as num?)?.toInt() ?? 0;
+        _weekActivity = week;
+        _loggedInToday = week.any((d) => d['date'] == today && d['logged'] == true);
       });
+    }
+  }
+
+  Future<void> _doCheckIn() async {
+    if (_loggedInToday || _checkingIn) return;
+    setState(() => _checkingIn = true);
+    final result = await _gamificationService.recordDailyLogin();
+    if (!mounted) return;
+    if (result['success'] == true) {
+      final streak = (result['loginStreak'] as num?)?.toInt() ?? _loginStreak;
+      final raw = result['weekActivity'];
+      setState(() {
+        _loginStreak = streak;
+        _loggedInToday = true;
+        _checkingIn = false;
+        if (raw is List) _weekActivity = raw.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+        if (result['alreadyLoggedToday'] != true) _pointsToday += 5;
+      });
+      if (result['alreadyLoggedToday'] != true) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Day logged! +5 pts 🔥 Keep your streak alive!'),
+          backgroundColor: Color(0xFF10B981),
+          duration: Duration(seconds: 3),
+        ));
+      }
+    } else {
+      setState(() => _checkingIn = false);
     }
   }
 
@@ -1483,6 +1528,9 @@ class _LifestyleTrackerScreenState extends State<LifestyleTrackerScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          _buildLoginStreakCard(),
+          const SizedBox(height: 16),
+
           _sectionTitle('Overview', 'All your health data at a glance'),
           const SizedBox(height: 12),
 
@@ -1638,6 +1686,108 @@ class _LifestyleTrackerScreenState extends State<LifestyleTrackerScreen>
             ),
           ),
           const SizedBox(height: 80),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLoginStreakCard() {
+    final Color streakColor = _loginStreak >= 7
+        ? const Color(0xFFEF4444)
+        : _loginStreak >= 3 ? const Color(0xFFD97706) : AppColors.primaryColor;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8, offset: const Offset(0, 2))],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(color: streakColor.withValues(alpha: 0.12), shape: BoxShape.circle),
+                child: Icon(Icons.local_fire_department_rounded, color: streakColor, size: 22),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(
+                    _loginStreak > 0 ? '$_loginStreak Day${_loginStreak == 1 ? '' : 's'} Streak! 🔥' : 'Start Your Streak!',
+                    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
+                  ),
+                  Text(
+                    _loginStreak > 0 ? 'Log in daily for +5 pts each day' : 'Tap "Log In Today" to start — +5 pts/day',
+                    style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                  ),
+                ]),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(color: const Color(0xFF10B981).withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)),
+                child: const Text('+5/day', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF10B981))),
+              ),
+            ],
+          ),
+          if (_weekActivity.isNotEmpty) ...[
+            const SizedBox(height: 14),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: _weekActivity.map((day) {
+                final logged = day['logged'] == true;
+                final label = day['day'] as String;
+                final isToday = day['date'] == DateTime.now().toIso8601String().split('T')[0];
+                return Expanded(
+                  child: Column(children: [
+                    Text(label, style: TextStyle(fontSize: 10, fontWeight: isToday ? FontWeight.w800 : FontWeight.w500, color: isToday ? streakColor : const Color(0xFF94A3B8))),
+                    const SizedBox(height: 5),
+                    Container(
+                      width: 28, height: 28,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: logged ? streakColor : const Color(0xFFF1F5F9),
+                        border: isToday && !logged ? Border.all(color: streakColor, width: 2) : null,
+                      ),
+                      child: Center(
+                        child: logged
+                            ? const Icon(Icons.check_rounded, color: Colors.white, size: 14)
+                            : isToday ? Icon(Icons.circle, color: streakColor, size: 7) : const Icon(Icons.circle_outlined, color: Color(0xFFCBD5E1), size: 10),
+                      ),
+                    ),
+                  ]),
+                );
+              }).toList(),
+            ),
+          ],
+          const SizedBox(height: 14),
+          SizedBox(
+            width: double.infinity,
+            child: _loggedInToday
+                ? Container(
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    decoration: BoxDecoration(color: const Color(0xFF10B981).withValues(alpha: 0.1), borderRadius: BorderRadius.circular(10), border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.3))),
+                    child: const Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                      Icon(Icons.check_circle_rounded, color: Color(0xFF10B981), size: 16),
+                      SizedBox(width: 6),
+                      Text('Logged in today ✓', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF10B981))),
+                    ]),
+                  )
+                : ElevatedButton.icon(
+                    onPressed: _checkingIn ? null : _doCheckIn,
+                    icon: _checkingIn ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) : const Icon(Icons.login_rounded, size: 15),
+                    label: const Text('Log In Today', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: streakColor, foregroundColor: Colors.white, elevation: 0,
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                  ),
+          ),
         ],
       ),
     );

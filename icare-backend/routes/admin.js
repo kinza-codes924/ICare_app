@@ -279,6 +279,7 @@ const DoctorProfile = require('../models/DoctorProfile');
 router.get('/leave-requests', authMiddleware, adminOnly, async (req, res) => {
   try {
     await connectMongoDB();
+    const Appointment = require('../models/Appointment');
     const profiles = await DoctorProfile.find(
       { 'leaveRequests.0': { $exists: true } },
       { user_id: 1, leaveRequests: 1 }
@@ -288,13 +289,23 @@ router.get('/leave-requests', authMiddleware, adminOnly, async (req, res) => {
     for (const p of profiles) {
       const doctorName = p.user_id?.username || p.user_id?.name || 'Doctor';
       const doctorEmail = p.user_id?.email || '';
+      const doctorId = p.user_id?._id;
       for (const r of p.leaveRequests || []) {
+        let conflictingAppointments = 0;
+        if (doctorId && r.fromDate && r.toDate) {
+          conflictingAppointments = await Appointment.countDocuments({
+            doctor_id: doctorId,
+            status: { $nin: ['cancelled', 'rejected', 'completed'] },
+            appointment_date: { $gte: new Date(r.fromDate).toISOString().split('T')[0], $lte: new Date(r.toDate).toISOString().split('T')[0] },
+          }).catch(() => 0);
+        }
         all.push({
           ...r,
           _id: r._id?.toString(),
-          doctorId: p.user_id?._id?.toString(),
+          doctorId: doctorId?.toString(),
           doctorName,
           doctorEmail,
+          conflictingAppointments,
         });
       }
     }
@@ -572,38 +583,68 @@ router.get('/lms/enrollments', authMiddleware, adminOnly, async (req, res) => {
 // GET /api/admin/doctor-tools — expiring licenses + no-referrer report
 router.get('/doctor-tools', authMiddleware, adminOnly, async (req, res) => {
   try {
-    const { connectMongoDB } = require('../config/mongodb');
-    const User = require('../models/User');
-    const DoctorProfile = require('../models/DoctorProfile');
     await connectMongoDB();
 
-    // Expiring within 30 days
+    const now = new Date();
     const in30 = new Date();
     in30.setDate(in30.getDate() + 30);
+
+    // Doctors whose licenseValidTill falls within the next 30 days
     const expiring = await DoctorProfile.find({
-      licenseExpiry: { $lte: in30, $gte: new Date() }
-    }).populate('userId', 'name email').lean();
+      licenseValidTill: { $gte: now, $lte: in30 },
+    }).populate('user_id', 'name email').lean();
 
     const expiringLicenses = expiring.map(d => ({
       id: d._id,
-      name: d.userId?.name || 'Doctor',
-      email: d.userId?.email || '',
-      licenseExpiry: d.licenseExpiry,
+      name: d.user_id?.name || 'Doctor',
+      email: d.user_id?.email || '',
+      licenseExpiry: d.licenseValidTill,
     }));
 
-    // No referrer: doctors where referredBy is null/empty
+    // Create in-app notifications for admin (1.7.8) — one per expiring doctor, deduplicated by day
+    if (expiring.length > 0) {
+      try {
+        const Notification = require('../models/Notification');
+        const today = new Date(); today.setHours(0, 0, 0, 0);
+        for (const d of expiring) {
+          const doctorName = d.user_id?.name || 'A doctor';
+          const expDate = d.licenseValidTill ? new Date(d.licenseValidTill).toLocaleDateString('en-PK') : 'soon';
+          const daysLeft = d.licenseValidTill ? Math.ceil((new Date(d.licenseValidTill) - now) / 86400000) : 0;
+          // Skip if a similar notification was already created today for this doctor
+          const existing = await Notification.findOne({
+            userId: req.user.id,
+            type: 'system',
+            'data.doctorProfileId': d._id.toString(),
+            createdAt: { $gte: today },
+          });
+          if (!existing) {
+            await Notification.create({
+              userId: req.user.id,
+              type: 'system',
+              title: 'License Expiring Soon',
+              message: `${doctorName}'s medical license expires on ${expDate} (${daysLeft} days left).`,
+              read: false,
+              data: { doctorProfileId: d._id.toString() },
+            });
+          }
+        }
+      } catch (_) { /* non-blocking */ }
+    }
+
+    // No referrer: doctors where referredBy is null/empty (limit 100 for safety)
     const noRef = await DoctorProfile.find({
-      $or: [{ referredBy: null }, { referredBy: '' }, { referredBy: { $exists: false } }]
-    }).populate('userId', 'name email').lean();
+      $or: [{ referredBy: { $exists: false } }, { referredBy: null }, { referredBy: '' }],
+    }).populate('user_id', 'name email').limit(100).lean();
 
     const noReferrerDoctors = noRef.map(d => ({
       id: d._id,
-      name: d.userId?.name || 'Doctor',
-      email: d.userId?.email || '',
+      name: d.user_id?.name || 'Doctor',
+      email: d.user_id?.email || '',
     }));
 
     res.json({ success: true, expiringLicenses, noReferrerDoctors });
   } catch (err) {
+    console.error('doctor-tools error:', err.message);
     res.status(500).json({ success: false, message: err.message, expiringLicenses: [], noReferrerDoctors: [] });
   }
 });

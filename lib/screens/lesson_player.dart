@@ -1,6 +1,6 @@
-import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:icare/screens/certificate_templates_screen.dart';
+import 'package:icare/services/lms_service.dart';
 import 'package:icare/utils/shared_pref.dart';
 import 'package:icare/utils/theme.dart';
 import 'package:icare/widgets/back_button.dart';
@@ -15,8 +15,11 @@ class LessonPlayer extends StatefulWidget {
   final String? instructorName;
   final bool isLastLesson;
   final CertificateTemplate certificateTemplate;
-  final bool certificateReleased; // instructor must release before student can download
+  final bool certificateReleased;
   final String? enrollmentId;
+  final String? moduleId;
+  final bool initialIsCompleted;
+  final void Function(String lessonId)? onLessonCompleted;
 
   const LessonPlayer({
     super.key,
@@ -29,6 +32,9 @@ class LessonPlayer extends StatefulWidget {
     this.certificateTemplate = CertificateTemplate.classic,
     this.certificateReleased = false,
     this.enrollmentId,
+    this.moduleId,
+    this.initialIsCompleted = false,
+    this.onLessonCompleted,
   });
 
   @override
@@ -36,7 +42,15 @@ class LessonPlayer extends StatefulWidget {
 }
 
 class _LessonPlayerState extends State<LessonPlayer> {
-  bool _isCompleted = false;
+  late bool _isCompleted;
+  bool _markingComplete = false;
+  final LmsService _lms = LmsService();
+
+  @override
+  void initState() {
+    super.initState();
+    _isCompleted = widget.initialIsCompleted;
+  }
 
   // ── helpers ──────────────────────────────────────────────────────────────
 
@@ -63,52 +77,33 @@ class _LessonPlayerState extends State<LessonPlayer> {
     }
   }
 
-  /// Opens the YouTube/Vimeo iframe in a full-screen dialog.
-  /// The dialog is separate from the scrollable lesson page,
-  /// so NO iframe exists in the scrollable tree → scroll works freely.
-  void _openVideoDialog(BuildContext context, String videoUrl) {
-    showDialog(
-      context: context,
-      barrierDismissible: true,
-      builder: (ctx) {
-        return Dialog(
-          backgroundColor: Colors.transparent,
-          insetPadding: const EdgeInsets.all(12),
-          child: Stack(
-            children: [
-              // ── iframe video ──────────────────────────────────────────
-              AspectRatio(
-                aspectRatio: 16 / 9,
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
-                  child: VideoPlayerWidget(videoUrl: videoUrl),
-                ),
+  // ── build ─────────────────────────────────────────────────────────────────
+
+  Widget _buildVideoPlaceholderInline(String? ytId) {
+    return Container(
+      color: const Color(0xFF0F172A),
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 64,
+              height: 64,
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.1),
+                shape: BoxShape.circle,
               ),
-              // ── close button ──────────────────────────────────────────
-              Positioned(
-                top: 6,
-                right: 6,
-                child: GestureDetector(
-                  onTap: () => Navigator.of(ctx).pop(),
-                  child: Container(
-                    padding: const EdgeInsets.all(6),
-                    decoration: const BoxDecoration(
-                      color: Colors.black54,
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(Icons.close,
-                        color: Colors.white, size: 20),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        );
-      },
+              child: const Icon(Icons.play_circle_outline_rounded,
+                  color: Colors.white70, size: 36),
+            ),
+            const SizedBox(height: 10),
+            const Text('Tap to open video',
+                style: TextStyle(color: Colors.white70, fontSize: 13)),
+          ],
+        ),
+      ),
     );
   }
-
-  // ── build ─────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
@@ -126,222 +121,269 @@ class _LessonPlayerState extends State<LessonPlayer> {
         backgroundColor: Colors.white,
         elevation: 0,
         leading: const CustomBackButton(),
-        title: Text(
-          title,
-          style: const TextStyle(
-            color: Color(0xFF0F172A),
-            fontSize: 16,
-            fontWeight: FontWeight.w900,
-          ),
-          overflow: TextOverflow.ellipsis,
-        ),
-      ),
-      // ── fully scrollable body — NO iframe here ─────────────────────────
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // ── VIDEO CARD (thumbnail + play, no iframe) ────────────────
-            if (hasVideo)
-              _VideoThumbnailCard(
-                videoUrl: videoUrl,
-                youtubeId: ytId,
-                embeddable: embeddable,
-                onPlay: embeddable
-                    ? () => _openVideoDialog(context, videoUrl)
-                    : () => _openExternal(videoUrl),
-                onOpenTab: () => _openExternal(videoUrl),
-              ),
-
-            const SizedBox(height: 28),
-
-            // ── TITLE ────────────────────────────────────────────────────
-            Text(
-              title,
-              style: const TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.w900,
+        title: Text(title,
+            style: const TextStyle(
                 color: Color(0xFF0F172A),
-                letterSpacing: -0.3,
+                fontSize: 16,
+                fontWeight: FontWeight.w900),
+            overflow: TextOverflow.ellipsis),
+        actions: [
+          if (hasVideo)
+            IconButton(
+              onPressed: () => _openExternal(videoUrl),
+              icon: const Icon(Icons.open_in_new, color: Color(0xFF64748B)),
+              tooltip: 'Open in browser',
+            ),
+        ],
+      ),
+      // ── Video fixed at top, content scrolls below ──────────────────────
+      body: Column(
+        children: [
+          if (hasVideo)
+            Container(
+              color: Colors.black,
+              child: AspectRatio(
+                aspectRatio: 16 / 9,
+                child: embeddable
+                    ? VideoPlayerWidget(videoUrl: videoUrl)
+                    : GestureDetector(
+                        onTap: () => _openExternal(videoUrl),
+                        child: _buildVideoPlaceholderInline(ytId),
+                      ),
               ),
             ),
-
-            const SizedBox(height: 20),
-
-            // ── LESSON CONTENT ───────────────────────────────────────────
-            if (content.trim().isNotEmpty)
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: const Color(0xFFE2E8F0)),
-                  boxShadow: const [
-                    BoxShadow(
-                      color: Color(0x06000000),
-                      blurRadius: 8,
-                      offset: Offset(0, 2),
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SizedBox(height: 4),
+                  Text(title,
+                      style: const TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w900,
+                          color: Color(0xFF0F172A),
+                          letterSpacing: -0.3)),
+                  const SizedBox(height: 20),
+                  if (content.trim().isNotEmpty)
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                        boxShadow: const [
+                          BoxShadow(color: Color(0x06000000), blurRadius: 8, offset: Offset(0, 2))
+                        ],
+                      ),
+                      child: Text(content,
+                          style: const TextStyle(
+                              fontSize: 15, color: Color(0xFF475569), height: 1.7)),
                     ),
-                  ],
-                ),
-                child: Text(
-                  content,
-                  style: const TextStyle(
-                    fontSize: 15,
-                    color: Color(0xFF475569),
-                    height: 1.7,
-                  ),
-                ),
-              ),
-
-            const SizedBox(height: 20),
-
-            // ── MARK COMPLETE + NEXT (side by side) ──────────────────────
-            Row(
-              children: [
-                // Mark as Completed — small button on LEFT
-                OutlinedButton.icon(
-                  onPressed: () {
-                    setState(() => _isCompleted = !_isCompleted);
-                    if (_isCompleted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Lesson marked as completed!'),
-                          backgroundColor: Color(0xFF10B981),
-                          duration: Duration(seconds: 2),
+                  const SizedBox(height: 20),
+                  Row(
+                    children: [
+                      OutlinedButton.icon(
+                        onPressed: _markingComplete
+                            ? null
+                            : () async {
+                                final newState = !_isCompleted;
+                                final messenger = ScaffoldMessenger.of(context);
+                                setState(() {
+                                  _isCompleted = newState;
+                                  _markingComplete = true;
+                                });
+                                if (newState) {
+                                  final enrollmentId = widget.enrollmentId;
+                                  final lessonId = widget.lesson['_id']?.toString() ??
+                                      widget.lesson['id']?.toString() ?? '';
+                                  if (enrollmentId != null &&
+                                      enrollmentId.isNotEmpty &&
+                                      lessonId.isNotEmpty) {
+                                    await _lms.markLessonComplete(
+                                      enrollmentId: enrollmentId,
+                                      lessonId: lessonId,
+                                      moduleId: widget.moduleId,
+                                    );
+                                    widget.onLessonCompleted?.call(lessonId);
+                                  }
+                                  if (mounted) {
+                                    messenger.showSnackBar(
+                                      const SnackBar(
+                                        content: Text('Lesson marked as completed!'),
+                                        backgroundColor: Color(0xFF10B981),
+                                        duration: Duration(seconds: 2),
+                                      ),
+                                    );
+                                  }
+                                }
+                                if (mounted) setState(() => _markingComplete = false);
+                              },
+                        icon: Icon(
+                          _isCompleted
+                              ? Icons.check_circle_rounded
+                              : Icons.radio_button_unchecked_rounded,
+                          size: 18,
+                          color: _isCompleted
+                              ? const Color(0xFF10B981)
+                              : const Color(0xFF64748B),
                         ),
-                      );
-                    }
-                  },
-                  icon: Icon(
-                    _isCompleted ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded,
-                    size: 18,
-                    color: _isCompleted ? const Color(0xFF10B981) : const Color(0xFF64748B),
-                  ),
-                  label: Text(
-                    _isCompleted ? 'Completed' : 'Mark as Completed',
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: _isCompleted ? const Color(0xFF10B981) : const Color(0xFF475569),
-                    ),
-                  ),
-                  style: OutlinedButton.styleFrom(
-                    side: BorderSide(color: _isCompleted ? const Color(0xFF10B981) : const Color(0xFFE2E8F0)),
-                    backgroundColor: _isCompleted ? const Color(0xFFF0FDF4) : const Color(0xFFF8FAFC),
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  ),
-                ),
-
-                const Spacer(),
-
-                // Next Lesson — button on RIGHT
-                if (widget.nextLesson != null)
-                  ElevatedButton.icon(
-                    onPressed: () {
-                      Navigator.of(context).pushReplacement(
-                        MaterialPageRoute(
-                          builder: (ctx) => LessonPlayer(lesson: widget.nextLesson!),
-                        ),
-                      );
-                    },
-                    icon: const Icon(Icons.arrow_forward_rounded, size: 18),
-                    label: const Text('Next', style: TextStyle(fontWeight: FontWeight.w700)),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primaryColor,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      elevation: 0,
-                    ),
-                  ),
-              ],
-            ),
-
-            const SizedBox(height: 32),
-
-            // ── CERTIFICATE CARD (last lesson + completed) ──────────────
-            if (widget.isLastLesson && _isCompleted)
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: widget.certificateReleased
-                        ? [const Color(0xFFD4AF37).withValues(alpha: 0.15), const Color(0xFFD4AF37).withValues(alpha: 0.05)]
-                        : [const Color(0xFF64748B).withValues(alpha: 0.08), const Color(0xFF64748B).withValues(alpha: 0.04)],
-                  ),
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: widget.certificateReleased
-                      ? const Color(0xFFD4AF37).withValues(alpha: 0.4)
-                      : const Color(0xFF94A3B8).withValues(alpha: 0.4)),
-                ),
-                child: Column(
-                  children: [
-                    Icon(
-                      widget.certificateReleased ? Icons.workspace_premium_rounded : Icons.lock_clock_rounded,
-                      color: widget.certificateReleased ? const Color(0xFFD4AF37) : const Color(0xFF94A3B8),
-                      size: 40,
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      widget.certificateReleased ? '🎉 Congratulations!' : 'Course Completed!',
-                      style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: Color(0xFF0F172A)),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      widget.certificateReleased
-                          ? 'Your certificate is ready. View and download it below.'
-                          : 'Your instructor has not yet released the certificate for this course. Check back soon.',
-                      style: const TextStyle(fontSize: 13, color: Color(0xFF64748B)),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 12),
-                    if (widget.certificateReleased)
-                    ElevatedButton.icon(
-                      onPressed: () async {
-                        final user = await SharedPref().getUserData();
-                        if (!context.mounted) return;
-                        Navigator.push(context, MaterialPageRoute(
-                          builder: (_) => LmsCertificateScreen(
-                            studentName: widget.studentName ?? user?.name ?? 'Student',
-                            courseTitle: widget.courseTitle ?? 'Course',
-                            instructorName: widget.instructorName ?? 'Instructor',
-                            template: widget.certificateTemplate,
-                            completionDate: DateTime.now(),
-                            enrollmentId: widget.enrollmentId,
+                        label: Text(
+                          _isCompleted ? 'Completed' : 'Mark as Completed',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: _isCompleted
+                                ? const Color(0xFF10B981)
+                                : const Color(0xFF475569),
                           ),
-                        ));
-                      },
-                      icon: const Icon(Icons.workspace_premium_rounded, size: 18),
-                      label: const Text('View Certificate', style: TextStyle(fontWeight: FontWeight.w800)),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFFD4AF37),
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 12),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        elevation: 0,
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          side: BorderSide(
+                              color: _isCompleted
+                                  ? const Color(0xFF10B981)
+                                  : const Color(0xFFE2E8F0)),
+                          backgroundColor: _isCompleted
+                              ? const Color(0xFFF0FDF4)
+                              : const Color(0xFFF8FAFC),
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10)),
+                        ),
+                      ),
+                      const Spacer(),
+                      if (widget.nextLesson != null)
+                        ElevatedButton.icon(
+                          onPressed: () {
+                            Navigator.of(context).pushReplacement(
+                              MaterialPageRoute(
+                                builder: (ctx) =>
+                                    LessonPlayer(lesson: widget.nextLesson!),
+                              ),
+                            );
+                          },
+                          icon: const Icon(Icons.arrow_forward_rounded, size: 18),
+                          label: const Text('Next',
+                              style: TextStyle(fontWeight: FontWeight.w700)),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.primaryColor,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 20, vertical: 10),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10)),
+                            elevation: 0,
+                          ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 32),
+                  if (widget.isLastLesson && _isCompleted)
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: widget.certificateReleased
+                              ? [
+                                  const Color(0xFFD4AF37).withValues(alpha: 0.15),
+                                  const Color(0xFFD4AF37).withValues(alpha: 0.05)
+                                ]
+                              : [
+                                  const Color(0xFF64748B).withValues(alpha: 0.08),
+                                  const Color(0xFF64748B).withValues(alpha: 0.04)
+                                ],
+                        ),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                            color: widget.certificateReleased
+                                ? const Color(0xFFD4AF37).withValues(alpha: 0.4)
+                                : const Color(0xFF94A3B8).withValues(alpha: 0.4)),
+                      ),
+                      child: Column(
+                        children: [
+                          Icon(
+                            widget.certificateReleased
+                                ? Icons.workspace_premium_rounded
+                                : Icons.lock_clock_rounded,
+                            color: widget.certificateReleased
+                                ? const Color(0xFFD4AF37)
+                                : const Color(0xFF94A3B8),
+                            size: 40,
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            widget.certificateReleased
+                                ? '🎉 Congratulations!'
+                                : 'Course Completed!',
+                            style: const TextStyle(
+                                fontWeight: FontWeight.w900,
+                                fontSize: 18,
+                                color: Color(0xFF0F172A)),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            widget.certificateReleased
+                                ? 'Your certificate is ready. View and download it below.'
+                                : 'Your instructor has not yet released the certificate for this course. Check back soon.',
+                            style: const TextStyle(
+                                fontSize: 13, color: Color(0xFF64748B)),
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: 12),
+                          if (widget.certificateReleased)
+                            ElevatedButton.icon(
+                              onPressed: () async {
+                                final user = await SharedPref().getUserData();
+                                if (!context.mounted) return;
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => LmsCertificateScreen(
+                                      studentName: widget.studentName ??
+                                          user?.name ??
+                                          'Student',
+                                      courseTitle: widget.courseTitle ?? 'Course',
+                                      instructorName:
+                                          widget.instructorName ?? 'Instructor',
+                                      template: widget.certificateTemplate,
+                                      completionDate: DateTime.now(),
+                                      enrollmentId: widget.enrollmentId,
+                                    ),
+                                  ),
+                                );
+                              },
+                              icon: const Icon(Icons.workspace_premium_rounded,
+                                  size: 18),
+                              label: const Text('View Certificate',
+                                  style: TextStyle(fontWeight: FontWeight.w800)),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFFD4AF37),
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 28, vertical: 12),
+                                shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12)),
+                                elevation: 0,
+                              ),
+                            ),
+                        ],
                       ),
                     ),
-                  ],
-                ),
+                  const SizedBox(height: 32),
+                ],
               ),
-
-            const SizedBox(height: 32),
-          ],
-        ),
+            ),
+          ),
+        ],
       ),
     );
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Video thumbnail card — no iframe, fully Flutter-rendered → scroll works
-// ─────────────────────────────────────────────────────────────────────────────
-
+// ignore: unused_element
 class _VideoThumbnailCard extends StatelessWidget {
   final String videoUrl;
   final String? youtubeId;

@@ -14,6 +14,14 @@ const enrollmentSchema = new mongoose.Schema({
     moduleId: { type: String, required: true },
     completedAt: { type: Date, default: Date.now },
   }],
+  // Track individual lesson completions for per-lesson progress
+  lessonCompletions: [{
+    lessonId: { type: String, required: true },
+    moduleId: { type: String },
+    completedAt: { type: Date, default: Date.now },
+  }],
+  isCompleted: { type: Boolean, default: false },
+  completedAt: { type: Date },
   certificateUrl: { type: String },
 }, { timestamps: true });
 

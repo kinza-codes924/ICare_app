@@ -1291,6 +1291,8 @@ class _PharmacyDetailsScreenState extends State<PharmacyDetailsScreen> {
         (med['category'] ?? '').toString().toLowerCase() == 'vaccine' ||
         (med['productName'] ?? med['name'] ?? '').toString().toLowerCase().contains('vaccine') ||
         permission == 'Vaccine';
+    final stockQty = ((med['stock_quantity'] ?? med['stockQuantity'] ?? 0) as num).toInt();
+    final isOutOfStock = !id.startsWith('mock_') && stockQty <= 0;
 
     return GestureDetector(
       // Tap card body → open details dialog
@@ -1365,7 +1367,24 @@ class _PharmacyDetailsScreenState extends State<PharmacyDetailsScreen> {
                 ),
               ),
             ),
+            const SizedBox(height: 2),
+            if (!id.startsWith('mock_'))
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: isOutOfStock ? const Color(0xFFFEE2E2) : const Color(0xFFEFFEF4),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  isOutOfStock ? 'Out of Stock' : 'In Stock: $stockQty',
+                  style: TextStyle(
+                    fontSize: 9, fontWeight: FontWeight.w800,
+                    color: isOutOfStock ? const Color(0xFFDC2626) : const Color(0xFF065F46),
+                  ),
+                ),
+              ),
             const SizedBox(height: 4),
+            if (!isOutOfStock) ...[
             // Quantity controls: - | qty (typeable) | +
             GestureDetector(
               onTap: () {}, // absorb tap so card tap doesn't trigger
@@ -1411,6 +1430,18 @@ class _PharmacyDetailsScreenState extends State<PharmacyDetailsScreen> {
                           onChanged: (v) {
                             final parsed = int.tryParse(v);
                             if (parsed != null && parsed >= 0) {
+                              if (stockQty > 0 && parsed > stockQty) {
+                                _qtyControllers[id]?.text = stockQty.toString();
+                                _qtyControllers[id]?.selection = TextSelection.fromPosition(
+                                  TextPosition(offset: stockQty.toString().length));
+                                setState(() => _quantities[id] = stockQty);
+                                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                                  content: Text('Only $stockQty in stock. Book a consultation for larger orders.'),
+                                  backgroundColor: Colors.orange,
+                                  duration: const Duration(seconds: 2),
+                                ));
+                                return;
+                              }
                               // Cap at 30 for non-prescription medicines
                               if (!isPrescriptionOnly && parsed > 30) {
                                 _qtyControllers[id]?.text = '30';
@@ -1431,6 +1462,14 @@ class _PharmacyDetailsScreenState extends State<PharmacyDetailsScreen> {
                   GestureDetector(
                     onTap: () {
                       final current = _quantities[id] ?? 0;
+                      if (stockQty > 0 && current >= stockQty) {
+                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                          content: Text('Only $stockQty in stock. Book a consultation for larger orders.'),
+                          backgroundColor: Colors.orange,
+                          duration: const Duration(seconds: 2),
+                        ));
+                        return;
+                      }
                       if (!isPrescriptionOnly && current >= 30) {
                         _showOverLimitDialog();
                         return;
@@ -1506,6 +1545,7 @@ class _PharmacyDetailsScreenState extends State<PharmacyDetailsScreen> {
                 ),
               ),
             ],
+            ], // close if (!isOutOfStock)
           ],
         ),
       ),

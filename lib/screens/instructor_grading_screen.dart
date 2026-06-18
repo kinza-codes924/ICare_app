@@ -404,6 +404,7 @@ class _GradingDialogState extends State<_GradingDialog> {
   final _marksController = TextEditingController();
   final _feedbackController = TextEditingController();
   bool _isSubmitting = false;
+  int _starRating = 0;
 
   @override
   void initState() {
@@ -413,6 +414,9 @@ class _GradingDialogState extends State<_GradingDialog> {
     }
     if (widget.submission['feedback'] != null) {
       _feedbackController.text = widget.submission['feedback'].toString();
+    }
+    if (widget.submission['stars'] != null) {
+      _starRating = (widget.submission['stars'] as num).toInt();
     }
   }
 
@@ -439,6 +443,7 @@ class _GradingDialogState extends State<_GradingDialog> {
         widget.submission['_id'].toString(),
         marks,
         feedback: _feedbackController.text,
+        stars: _starRating > 0 ? _starRating : null,
       );
 
       if (mounted) {
@@ -543,6 +548,39 @@ class _GradingDialogState extends State<_GradingDialog> {
                   hintText: 'Enter marks',
                 ),
                 keyboardType: TextInputType.number,
+              ),
+              const SizedBox(height: 16),
+
+              // Star rating
+              const Text('Star Rating (optional)',
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF374151))),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  ...List.generate(5, (i) {
+                    final filled = i < _starRating;
+                    return GestureDetector(
+                      onTap: () => setState(() => _starRating = _starRating == i + 1 ? 0 : i + 1),
+                      child: Padding(
+                        padding: const EdgeInsets.only(right: 4),
+                        child: Icon(
+                          filled ? Icons.star_rounded : Icons.star_outline_rounded,
+                          size: 32,
+                          color: filled ? const Color(0xFFF59E0B) : const Color(0xFFCBD5E1),
+                        ),
+                      ),
+                    );
+                  }),
+                  const SizedBox(width: 8),
+                  Text(
+                    _starRating > 0 ? '$_starRating/5' : 'Tap to rate',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: _starRating > 0 ? const Color(0xFFF59E0B) : const Color(0xFF94A3B8),
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(height: 16),
 

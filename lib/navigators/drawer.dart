@@ -46,7 +46,6 @@ import 'package:icare/screens/tabs.dart';
 import 'package:icare/screens/tasks.dart';
 import 'package:icare/screens/wallet.dart';
 import 'package:icare/screens/certificates_screen.dart';
-import 'package:icare/screens/resource_library_screen.dart';
 import 'package:icare/screens/student_dashboard.dart';
 import 'package:icare/screens/instructor_dashboard.dart';
 import 'package:icare/screens/instructor_courses_management.dart';
@@ -396,11 +395,6 @@ class _CustomDrawerState extends ConsumerState<CustomDrawer> {
         _drawerItem('My Certificates', Icons.workspace_premium_outlined, () {
           Navigator.of(context).push(
             MaterialPageRoute(builder: (ctx) => const CertificatesScreen()),
-          );
-        }),
-        _drawerItem('Resource Library', Icons.library_books_outlined, () {
-          Navigator.of(context).push(
-            MaterialPageRoute(builder: (ctx) => const ResourceLibraryScreen()),
           );
         }),
         _drawerItem('Tasks & Quizzes', Icons.task_alt_outlined, () {

@@ -184,6 +184,107 @@ class _InstructorCourseContentScreenState extends State<InstructorCourseContentS
     } catch (_) {}
   }
 
+  void _showEditThumbnail() {
+    final urlCtrl = TextEditingController(text: _course?['thumbnail']?.toString() ?? _course?['thumbnail_url']?.toString() ?? '');
+    String? previewUrl = urlCtrl.text.isNotEmpty ? urlCtrl.text : null;
+    bool uploading = false;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => StatefulBuilder(
+        builder: (ctx, setSheetState) => Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          padding: EdgeInsets.fromLTRB(20, 16, 20, MediaQuery.of(context).viewInsets.bottom + 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2)))),
+              const SizedBox(height: 16),
+              const Text('Edit Thumbnail', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+              const SizedBox(height: 16),
+              if (previewUrl != null)
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: Image.network(previewUrl!, height: 160, width: double.infinity, fit: BoxFit.cover,
+                      errorBuilder: (_, _, _) => Container(height: 160, color: Colors.grey[200], child: const Icon(Icons.broken_image, size: 48, color: Colors.grey))),
+                ),
+              if (previewUrl != null) const SizedBox(height: 12),
+              // Upload from device
+              OutlinedButton.icon(
+                onPressed: uploading ? null : () async {
+                  final result = await FilePicker.platform.pickFiles(type: FileType.image, withData: true);
+                  if (result == null || result.files.isEmpty) return;
+                  final file = result.files.first;
+                  setSheetState(() => uploading = true);
+                  try {
+                    final sigRes = await ApiService().get('/upload/sign?folder=icare/thumbnails&resource_type=image');
+                    final sig = sigRes.data;
+                    final timestamp = sig['timestamp'].toString();
+                    final apiKey = sig['api_key'].toString();
+                    final signature = sig['signature'].toString();
+                    final cloudName = sig['cloud_name'].toString();
+                    final folder = (sig['folder'] ?? 'icare/thumbnails').toString();
+                    final formData = FormData.fromMap({
+                      'file': MultipartFile.fromBytes(file.bytes!, filename: file.name),
+                      'api_key': apiKey,
+                      'timestamp': timestamp,
+                      'signature': signature,
+                      'folder': folder,
+                    });
+                    final uploadRes = await Dio().post('https://api.cloudinary.com/v1_1/$cloudName/image/upload', data: formData);
+                    final url = uploadRes.data['secure_url'] as String;
+                    setSheetState(() { previewUrl = url; urlCtrl.text = url; uploading = false; });
+                  } catch (e) {
+                    setSheetState(() => uploading = false);
+                    if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Upload failed: $e')));
+                  }
+                },
+                icon: uploading ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.upload_rounded),
+                label: Text(uploading ? 'Uploading...' : 'Upload from Device'),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: urlCtrl,
+                decoration: InputDecoration(
+                  labelText: 'Or paste image URL',
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                  suffixIcon: IconButton(icon: const Icon(Icons.preview), onPressed: () => setSheetState(() => previewUrl = urlCtrl.text.isNotEmpty ? urlCtrl.text : null)),
+                ),
+                onChanged: (v) => setSheetState(() => previewUrl = v.isNotEmpty ? v : null),
+              ),
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: uploading ? null : () async {
+                    final url = urlCtrl.text.trim();
+                    if (url.isEmpty) return;
+                    try {
+                      await ApiService().put('/courses/${widget.courseId}', {'thumbnail': url, 'thumbnail_url': url});
+                      if (mounted) Navigator.pop(context);
+                      _loadCourse();
+                      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Thumbnail updated!'), backgroundColor: Colors.green));
+                    } catch (e) {
+                      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Save failed: $e')));
+                    }
+                  },
+                  style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryColor, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 14), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
+                  child: const Text('Save Thumbnail', style: TextStyle(fontWeight: FontWeight.w700)),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   void _showCourseTypeDialog() {
     showDialog(
       context: context,
@@ -432,6 +533,12 @@ class _InstructorCourseContentScreenState extends State<InstructorCourseContentS
           ],
         ),
         actions: [
+          // Edit Thumbnail
+          IconButton(
+            icon: const Icon(Icons.image_outlined, color: Color(0xFF6366F1)),
+            tooltip: 'Edit Thumbnail',
+            onPressed: _showEditThumbnail,
+          ),
           // Certificate template picker
           IconButton(
             icon: const Icon(Icons.workspace_premium_rounded, color: Color(0xFFD4AF37)),
@@ -512,6 +619,18 @@ class _InstructorCourseContentScreenState extends State<InstructorCourseContentS
     final description = module['description'] ?? '';
     final completions = List<Map<String, dynamic>>.from(module['completions'] ?? []);
     final completionCount = completions.length;
+    final unlockDays = module['unlockAfterDays'] as int? ?? 0;
+    final startDateRaw = _course?['startDate'];
+    String? unlockLabel;
+    if (_courseType == 'pragmatic' && startDateRaw != null) {
+      try {
+        final start = DateTime.parse(startDateRaw.toString());
+        final unlockDate = start.add(Duration(days: unlockDays));
+        unlockLabel = 'Unlocks ${unlockDate.day}/${unlockDate.month}/${unlockDate.year}';
+      } catch (_) {}
+    } else if (_courseType == 'pragmatic' && unlockDays > 0) {
+      unlockLabel = 'Unlocks Day $unlockDays';
+    }
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -547,14 +666,22 @@ class _InstructorCourseContentScreenState extends State<InstructorCourseContentS
               color: Color(0xFF0F172A),
             ),
           ),
-          subtitle: description.isNotEmpty
-              ? Text(
-                  description,
-                  style: const TextStyle(fontSize: 13, color: Color(0xFF64748B)),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                )
-              : null,
+          subtitle: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (description.isNotEmpty)
+                Text(description, style: const TextStyle(fontSize: 13, color: Color(0xFF64748B)), maxLines: 2, overflow: TextOverflow.ellipsis),
+              if (unlockLabel != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Row(mainAxisSize: MainAxisSize.min, children: [
+                    const Icon(Icons.lock_clock_rounded, size: 12, color: Color(0xFF6366F1)),
+                    const SizedBox(width: 4),
+                    Text(unlockLabel!, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF6366F1))),
+                  ]),
+                ),
+            ],
+          ),
           trailing: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -804,6 +931,7 @@ class _ModuleDialog extends StatefulWidget {
 class _ModuleDialogState extends State<_ModuleDialog> {
   final _titleController = TextEditingController();
   final _descriptionController = TextEditingController();
+  final _unlockDaysController = TextEditingController();
   final List<Map<String, dynamic>> _lessons = [];
 
   @override
@@ -812,6 +940,8 @@ class _ModuleDialogState extends State<_ModuleDialog> {
     if (widget.module != null) {
       _titleController.text = widget.module!['title'] ?? '';
       _descriptionController.text = widget.module!['description'] ?? '';
+      final days = widget.module!['unlockAfterDays'];
+      _unlockDaysController.text = (days != null && days != 0) ? days.toString() : '';
       if (widget.module!['lessons'] != null) {
         _lessons.addAll(List<Map<String, dynamic>>.from(widget.module!['lessons']));
       }
@@ -822,6 +952,7 @@ class _ModuleDialogState extends State<_ModuleDialog> {
   void dispose() {
     _titleController.dispose();
     _descriptionController.dispose();
+    _unlockDaysController.dispose();
     super.dispose();
   }
 
@@ -874,6 +1005,18 @@ class _ModuleDialogState extends State<_ModuleDialog> {
                   border: OutlineInputBorder(),
                 ),
                 maxLines: 3,
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: _unlockDaysController,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: 'Unlock After Days (Pragmatic mode)',
+                  hintText: 'e.g. 7 — leave blank to unlock immediately',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.lock_clock_rounded),
+                  helperText: 'Day 0 from course start date when this module unlocks',
+                ),
               ),
               const SizedBox(height: 16),
               Row(
@@ -949,6 +1092,7 @@ class _ModuleDialogState extends State<_ModuleDialog> {
               'description': _descriptionController.text,
               'lessons': _lessons,
               'order': widget.module?['order'] ?? 0,
+              'unlockAfterDays': int.tryParse(_unlockDaysController.text.trim()) ?? 0,
             });
           },
           style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryColor),

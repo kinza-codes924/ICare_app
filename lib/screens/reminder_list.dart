@@ -98,14 +98,22 @@ class _ReminderListState extends State<ReminderList> with SingleTickerProviderSt
       if (mounted) {
         final s = result['success'] ?? 0;
         final f = result['failed'] ?? 0;
+        final sk = result['skipped'] ?? 0;
+        String msg;
+        Color bg;
+        if (f == 0 && s == 0) {
+          msg = sk > 0 ? 'No reminders with a scheduled time to sync' : 'No reminders to sync';
+          bg = Colors.orange;
+        } else if (f == 0) {
+          msg = '$s reminder${s == 1 ? '' : 's'} synced to Google Calendar'
+              '${sk > 0 ? ' ($sk without time skipped)' : ''}';
+          bg = const Color(0xFF059669);
+        } else {
+          msg = '$s synced, $f failed${sk > 0 ? ', $sk skipped (no time)' : ''}';
+          bg = Colors.orange;
+        }
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(f == 0
-                ? '$s reminder${s == 1 ? '' : 's'} synced to Google Calendar'
-                : '$s synced, $f failed'),
-            backgroundColor: f == 0 ? const Color(0xFF059669) : Colors.orange,
-            duration: const Duration(seconds: 3),
-          ),
+          SnackBar(content: Text(msg), backgroundColor: bg, duration: const Duration(seconds: 4)),
         );
       }
     } catch (e) {

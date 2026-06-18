@@ -5,9 +5,37 @@ const { connectMongoDB } = require('../config/mongodb');
 const { authMiddleware } = require('../middleware/auth');
 const Course = require('../models/Course');
 const Enrollment = require('../models/Enrollment');
+const Assignment = require('../models/Assignment');
+const AssignmentSubmission = require('../models/AssignmentSubmission');
 
 function toId(id) {
   try { return new mongoose.Types.ObjectId(id); } catch { return null; }
+}
+
+async function computeProgress(enrollment) {
+  const course = await Course.findById(enrollment.courseId).lean();
+  const totalLessons = (course?.modules || []).reduce((sum, m) => sum + (m.lessons?.length || 0), 0);
+  const completedLessons = (enrollment.lessonCompletions || []).length;
+  const totalModules = (course?.modules || []).length;
+  const completedModules = (enrollment.moduleCompletions || []).length;
+
+  const assignments = await Assignment.find({ courseId: enrollment.courseId, isPublished: true }).lean();
+  const totalAssignments = assignments.length;
+  let submittedAssignments = 0;
+  if (totalAssignments > 0) {
+    const subs = await AssignmentSubmission.find({
+      assignmentId: { $in: assignments.map(a => a._id) },
+      studentId: enrollment.userId,
+    }).lean();
+    submittedAssignments = subs.length;
+  }
+
+  const totalItems = totalLessons + totalAssignments;
+  const completedItems = completedLessons + submittedAssignments;
+  const progressPct = totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0;
+
+  return { progressPct, totalLessons, completedLessons, totalModules, completedModules,
+           totalAssignments, submittedAssignments, course };
 }
 
 // GET /api/courses/public — list active courses WITHOUT auth (for browsing)
@@ -165,6 +193,11 @@ router.get('/certificates/my', authMiddleware, async (req, res) => {
         createdAt: c.issuedAt || c.createdAt,
         certificateNumber: c.certificateNumber,
         verificationCode: c.verificationCode,
+        studentName: c.studentName,
+        instructorName: c.instructorName,
+        template: c.template,
+        enrollmentId: c.enrollmentId?.toString(),
+        courseId: c.courseId?.toString(),
         course: courseMap[c.courseId.toString()] || { _id: c.courseId, title: c.courseName },
       };
     });
@@ -221,6 +254,35 @@ router.get('/:id', authMiddleware, async (req, res) => {
     await connectMongoDB();
     const course = await Course.findById(toId(req.params.id)).lean();
     if (!course) return res.status(404).json({ success: false, message: 'Course not found' });
+
+    // Attach module unlock info for student view
+    const now = new Date();
+    const enrollment = await Enrollment.findOne({ userId: toId(req.user.id), courseId: course._id }).lean();
+    const completedModuleIds = new Set((enrollment?.moduleCompletions || []).map(m => m.moduleId));
+
+    course.modules = (course.modules || []).map((mod, idx) => {
+      let isLocked = false;
+      let unlockDate = null;
+
+      if (course.courseType === 'pragmatic' && course.startDate) {
+        // Pragmatic: unlock only on scheduled date
+        const days = mod.unlockAfterDays || 0;
+        const unlock = new Date(course.startDate);
+        unlock.setDate(unlock.getDate() + days);
+        unlockDate = unlock.toISOString();
+        isLocked = now < unlock;
+      } else if (course.courseType === 'self-paced' && idx > 0) {
+        // Self-paced: previous module must be completed
+        const prevMod = course.modules[idx - 1];
+        const prevId = prevMod?._id?.toString();
+        isLocked = prevId ? !completedModuleIds.has(prevId) : false;
+      }
+
+      return { ...mod, isLocked, unlockDate };
+    });
+
+    course.enrollmentId = enrollment?._id?.toString() || null;
+    course.completedModuleIds = [...completedModuleIds];
     res.json({ success: true, course });
   } catch (e) {
     res.status(500).json({ success: false, message: e.message });
@@ -299,6 +361,86 @@ router.post('/enrollments/:id/complete-module', authMiddleware, async (req, res)
     } catch (_) { /* notification failure should not break the response */ }
 
     res.json({ success: true, enrollment });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+// POST /enrollments/:id/complete-lesson — mark individual lesson as complete + auto-complete module
+router.post('/enrollments/:id/complete-lesson', authMiddleware, async (req, res) => {
+  try {
+    await connectMongoDB();
+    const { lessonId, moduleId } = req.body;
+    if (!lessonId) return res.status(400).json({ success: false, message: 'lessonId required' });
+
+    const enrollment = await Enrollment.findById(toId(req.params.id));
+    if (!enrollment) return res.status(404).json({ success: false, message: 'Enrollment not found' });
+
+    // Add lesson completion if not already
+    const existingLesson = enrollment.lessonCompletions?.find(lc => lc.lessonId === lessonId);
+    if (!existingLesson) {
+      if (!enrollment.lessonCompletions) enrollment.lessonCompletions = [];
+      enrollment.lessonCompletions.push({ lessonId, moduleId: moduleId || null, completedAt: new Date() });
+    }
+
+    // Auto-complete module if all lessons in it are done
+    if (moduleId) {
+      const course = await Course.findById(enrollment.courseId).lean();
+      if (course) {
+        const module = (course.modules || []).find(m => m._id?.toString() === moduleId);
+        if (module) {
+          const moduleLessonIds = (module.lessons || []).map(l => l._id?.toString()).filter(Boolean);
+          const completedLessonIds = new Set((enrollment.lessonCompletions || []).map(lc => lc.lessonId));
+          const allDone = moduleLessonIds.every(id => completedLessonIds.has(id));
+          if (allDone) {
+            const alreadyCompleted = (enrollment.moduleCompletions || []).find(mc => mc.moduleId === moduleId);
+            if (!alreadyCompleted) {
+              if (!enrollment.moduleCompletions) enrollment.moduleCompletions = [];
+              enrollment.moduleCompletions.push({ moduleId, completedAt: new Date() });
+            }
+          }
+
+          // Auto-complete course if all modules done
+          const allModuleIds = (course.modules || []).map(m => m._id?.toString()).filter(Boolean);
+          const completedModuleIds = new Set((enrollment.moduleCompletions || []).map(mc => mc.moduleId));
+          if (allModuleIds.every(id => completedModuleIds.has(id))) {
+            enrollment.isCompleted = true;
+            enrollment.completedAt = enrollment.completedAt || new Date();
+          }
+        }
+      }
+    }
+
+    await enrollment.save();
+
+    const p = await computeProgress(enrollment);
+    res.json({ success: true, progressPct: p.progressPct, isCompleted: enrollment.isCompleted || false,
+               totalAssignments: p.totalAssignments, submittedAssignments: p.submittedAssignments });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+// GET /enrollments/:id/progress — get detailed lesson/module progress for a student
+router.get('/enrollments/:id/progress', authMiddleware, async (req, res) => {
+  try {
+    await connectMongoDB();
+    const enrollment = await Enrollment.findById(toId(req.params.id)).lean();
+    if (!enrollment) return res.status(404).json({ success: false, message: 'Enrollment not found' });
+    const p = await computeProgress(enrollment);
+    res.json({
+      success: true,
+      progressPct: p.progressPct,
+      totalLessons: p.totalLessons,
+      completedLessons: p.completedLessons,
+      totalModules: p.totalModules,
+      completedModules: p.completedModules,
+      totalAssignments: p.totalAssignments,
+      submittedAssignments: p.submittedAssignments,
+      lessonCompletions: enrollment.lessonCompletions || [],
+      moduleCompletions: enrollment.moduleCompletions || [],
+      isCompleted: enrollment.isCompleted || false,
+    });
   } catch (e) {
     res.status(500).json({ success: false, message: e.message });
   }

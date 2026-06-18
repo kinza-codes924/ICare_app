@@ -56,8 +56,11 @@ class _PaymentInvoicesState extends State<PaymentInvoices>
         setState(() {
           _invoices = orders.map((o) {
             final rawStatus = o['status']?.toString() ?? '';
-            // Only show completed/paid orders
-            final status = rawStatus == 'completed' ? 'Paid' : 'Paid';
+            final status = rawStatus == 'completed'
+                ? 'Paid'
+                : (rawStatus == 'cancelled' || rawStatus == 'rejected'
+                    ? 'Cancelled'
+                    : 'Pending');
             final dateStr = o['createdAt'] ?? o['date'] ?? '';
             DateTime? dateObj = DateTime.tryParse(dateStr);
             final formattedDate = dateObj != null
@@ -78,7 +81,7 @@ class _PaymentInvoicesState extends State<PaymentInvoices>
               "status": status,
               "method": o['paymentMethod'] ?? "Cash",
             };
-          }).where((inv) => inv['status'] == 'Paid').toList(); // Only show paid invoices
+          }).toList();
           _isLoading = false;
         });
       } else {
@@ -98,8 +101,10 @@ class _PaymentInvoicesState extends State<PaymentInvoices>
         final bookings = await _labService.getBookings(labId);
         setState(() {
           _invoices = bookings.map((b) {
-            // Only show completed/paid orders
-            final status = b['status'] == 'completed' ? 'Paid' : 'Paid';
+            final rawLabStatus = (b['status'] ?? '').toString();
+            final status = rawLabStatus == 'completed'
+                ? 'Paid'
+                : (rawLabStatus == 'cancelled' ? 'Cancelled' : 'Pending');
             final dateStr = b['createdAt'] ?? b['test_date'] ?? b['date'] ?? '';
             DateTime? dateObj = DateTime.tryParse(dateStr);
             final formattedDate = dateObj != null
@@ -141,7 +146,7 @@ class _PaymentInvoicesState extends State<PaymentInvoices>
               "status": status,
               "method": b['paymentMethod'] ?? "Cash",
             };
-          }).where((inv) => inv['status'] == 'Paid').toList(); // Only show paid invoices
+          }).toList();
           _isLoading = false;
         });
       }

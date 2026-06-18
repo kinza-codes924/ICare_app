@@ -10,6 +10,7 @@ import 'package:icare/screens/instructor_grading_screen.dart';
 import 'package:icare/screens/instructor_course_content_screen.dart';
 import 'package:icare/services/lms_service.dart';
 import 'package:icare/screens/lms_live_session_screen.dart';
+import 'package:icare/widgets/video_player_widget.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -59,6 +60,10 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
   Map<String, dynamic>? _myAttendance;
   bool _loadingGrades = true;
 
+  // Instructor attendance report
+  Map<String, dynamic> _attendanceReport = {};
+  bool _loadingAttendanceReport = false;
+
   // Live session detection
   bool _isSessionLive = false;
   Timer? _livePoller;
@@ -103,6 +108,8 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
     if (!widget.isInstructor) {
       _startLivePolling();
       _loadStudentGrades();
+    } else {
+      _loadAttendanceReport();
     }
   }
 
@@ -210,7 +217,7 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
         setState(() {
           _myGrades = grades;
           _myQuizAttempts = attempts;
-          _myAttendance = attendance.isNotEmpty ? attendance : null;
+          _myAttendance = (attendance['total'] as num? ?? 0) > 0 ? attendance : null;
           _loadingGrades = false;
         });
       }
@@ -1517,6 +1524,40 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
     }
   }
 
+  void _openVideoPlayer(String url) {
+    if (url.isEmpty) return;
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.all(12),
+        child: Stack(
+          children: [
+            AspectRatio(
+              aspectRatio: 16 / 9,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: VideoPlayerWidget(videoUrl: url),
+              ),
+            ),
+            Positioned(
+              top: 6, right: 6,
+              child: GestureDetector(
+                onTap: () => Navigator.of(ctx).pop(),
+                child: Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: const BoxDecoration(color: Colors.black54, shape: BoxShape.circle),
+                  child: const Icon(Icons.close, color: Colors.white, size: 20),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   void _showCompletedSessionOptions(String sessionId, String title, String recordingUrl) {
     showModalBottomSheet(
       context: context,
@@ -1548,16 +1589,9 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
                 ),
                 title: const Text('Watch Recording', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
                 subtitle: const Text('Full session video recording', style: TextStyle(fontSize: 12)),
-                onTap: () async {
+                onTap: () {
                   Navigator.pop(context);
-                  final uri = Uri.parse(recordingUrl);
-                  if (await canLaunchUrl(uri)) {
-                    await launchUrl(uri, mode: LaunchMode.externalApplication);
-                  } else if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Cannot open: $recordingUrl'), backgroundColor: Colors.red),
-                    );
-                  }
+                  _openVideoPlayer(recordingUrl);
                 },
               )
             else
@@ -1760,13 +1794,9 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
                 leading: const Icon(Icons.play_circle_filled_rounded, color: Color(0xFF1A73E8)),
                 title: const Text('Watch Recording', style: TextStyle(fontWeight: FontWeight.w700)),
                 subtitle: const Text('Full session video recording'),
-                onTap: () async {
+                onTap: () {
                   Navigator.pop(context);
-                  final url = data['recordingUrl']?.toString() ?? '';
-                  final uri = Uri.parse(url);
-                  if (await canLaunchUrl(uri)) {
-                    await launchUrl(uri, mode: LaunchMode.externalApplication);
-                  }
+                  _openVideoPlayer(data['recordingUrl']?.toString() ?? '');
                 },
               ),
             // Session — View Transcript (completed sessions)
@@ -1797,11 +1827,30 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
                   ));
                 },
               ),
-            ListTile(
-              leading: const Icon(Icons.edit_outlined, color: Color(0xFF444746)),
-              title: const Text('Edit'),
-              onTap: () => Navigator.pop(context),
-            ),
+            // Session — Reschedule (instructor only, upcoming sessions)
+            if (type == 'session' && widget.isInstructor &&
+                data['status']?.toString() != 'completed' && data['status']?.toString() != 'ended')
+              ListTile(
+                leading: const Icon(Icons.calendar_month_rounded, color: Color(0xFF6366F1)),
+                title: const Text('Reschedule', style: TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF6366F1))),
+                subtitle: const Text('Change session date with announcement'),
+                onTap: () async {
+                  Navigator.pop(context);
+                  await _rescheduleSession(id, data['title']?.toString() ?? 'Session');
+                },
+              ),
+            // Session — Cancel (instructor only)
+            if (type == 'session' && widget.isInstructor &&
+                data['status']?.toString() != 'completed' && data['status']?.toString() != 'ended' && data['status']?.toString() != 'cancelled')
+              ListTile(
+                leading: const Icon(Icons.cancel_rounded, color: Color(0xFFEF4444)),
+                title: const Text('Cancel Session', style: TextStyle(fontWeight: FontWeight.w600, color: Color(0xFFEF4444))),
+                subtitle: const Text('Notify students and log cancellation'),
+                onTap: () async {
+                  Navigator.pop(context);
+                  await _cancelSession(id, data['title']?.toString() ?? 'Session');
+                },
+              ),
             ListTile(
               leading: const Icon(Icons.delete_outline_rounded, color: Color(0xFFB3261E)),
               title: const Text('Delete', style: TextStyle(color: Color(0xFFB3261E))),
@@ -1811,6 +1860,116 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
         ),
       ),
     );
+  }
+
+  Future<void> _rescheduleSession(String sessionId, String sessionTitle) async {
+    if (sessionId.isEmpty) return;
+    DateTime? newDate;
+    TimeOfDay? newTime;
+    final reasonCtrl = TextEditingController();
+
+    await showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setS) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Text('Reschedule "$sessionTitle"', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.calendar_today_rounded, color: Color(0xFF6366F1)),
+                title: Text(newDate == null ? 'Pick new date' : '${newDate!.day}/${newDate!.month}/${newDate!.year}'),
+                onTap: () async {
+                  final d = await showDatePicker(context: ctx, initialDate: DateTime.now().add(const Duration(days: 1)),
+                    firstDate: DateTime.now(), lastDate: DateTime.now().add(const Duration(days: 365)));
+                  if (d != null) setS(() => newDate = d);
+                },
+              ),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.access_time_rounded, color: Color(0xFF6366F1)),
+                title: Text(newTime == null ? 'Pick new time' : newTime!.format(ctx)),
+                onTap: () async {
+                  final t = await showTimePicker(context: ctx, initialTime: TimeOfDay.now());
+                  if (t != null) setS(() => newTime = t);
+                },
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: reasonCtrl,
+                decoration: const InputDecoration(labelText: 'Reason (optional)', border: OutlineInputBorder()),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF6366F1), foregroundColor: Colors.white, elevation: 0),
+              onPressed: () async {
+                if (newDate == null) return;
+                final dt = DateTime(newDate!.year, newDate!.month, newDate!.day,
+                    newTime?.hour ?? 9, newTime?.minute ?? 0);
+                Navigator.pop(ctx);
+                try {
+                  await _lms.rescheduleSession(sessionId, newDate: dt.toIso8601String(), reason: reasonCtrl.text.trim().isNotEmpty ? reasonCtrl.text.trim() : null);
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Session rescheduled! Students notified.'), backgroundColor: Colors.green));
+                    _loadClasswork();
+                  }
+                } catch (e) {
+                  if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed: $e'), backgroundColor: Colors.red));
+                }
+              },
+              child: const Text('Reschedule'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _cancelSession(String sessionId, String sessionTitle) async {
+    if (sessionId.isEmpty) return;
+    final reasonCtrl = TextEditingController();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text('Cancel "$sessionTitle"?', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('Students will be notified about the cancellation.', style: TextStyle(color: Color(0xFF64748B))),
+            const SizedBox(height: 12),
+            TextField(
+              controller: reasonCtrl,
+              decoration: const InputDecoration(labelText: 'Reason (optional)', border: OutlineInputBorder()),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Back')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFEF4444), foregroundColor: Colors.white, elevation: 0),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Cancel Session'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    try {
+      await _lms.cancelSession(sessionId, reason: reasonCtrl.text.trim().isNotEmpty ? reasonCtrl.text.trim() : null);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Session cancelled. Students notified.'), backgroundColor: Colors.orange));
+        _loadClasswork();
+      }
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed: $e'), backgroundColor: Colors.red));
+    }
   }
 
   Widget _buildClassworkEmpty() {
@@ -1977,18 +2136,19 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
     final instructorName = instructor?['name']?.toString() ??
         instructor?['username']?.toString() ??
         'iCare Instructor';
+    final coTeachers = (widget.course['coTeachers'] as List?) ?? [];
 
     return RefreshIndicator(
       onRefresh: _loadPeople,
       child: ListView(
         padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
         children: [
-          // Teacher section
+          // Teacher section header
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               const Text(
-                'Teacher',
+                'Teachers',
                 style: TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.w400,
@@ -2007,15 +2167,23 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
           ),
           const Divider(color: Color(0xFF1A73E8), thickness: 1.5),
           const SizedBox(height: 8),
-          _personRow(instructorName, isTeacher: true),
+          // Lead instructor
+          _personRow(instructorName, isTeacher: true, roleLabel: 'Lead Instructor'),
+          // Co-teachers
+          ...coTeachers.map((ct) {
+            final ctName = ct['name']?.toString() ?? ct['email']?.toString() ?? 'Co-Teacher';
+            final ctRole = ct['role']?.toString() ?? 'normal';
+            final roleLabel = ctRole == 'lead' ? 'Lead Instructor' : 'Co-Instructor';
+            return _personRow(ctName, isTeacher: true, roleLabel: roleLabel, isLead: ctRole == 'lead');
+          }),
           const SizedBox(height: 24),
 
           // Students section
           Row(
             children: [
-              Text(
+              const Text(
                 'Students',
-                style: const TextStyle(
+                style: TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.w400,
                     color: Color(0xFF1A73E8)),
@@ -2056,16 +2224,17 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
     );
   }
 
-  Widget _personRow(String name, {required bool isTeacher}) {
+  Widget _personRow(String name, {required bool isTeacher, String? roleLabel, bool isLead = false}) {
+    final avatarColor = isTeacher
+        ? (isLead ? const Color(0xFF9334E6) : const Color(0xFF1A73E8))
+        : Colors.grey.shade300;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
         children: [
           CircleAvatar(
             radius: 18,
-            backgroundColor: isTeacher
-                ? const Color(0xFF1A73E8)
-                : Colors.grey.shade300,
+            backgroundColor: avatarColor,
             child: Text(
               name.isNotEmpty ? name[0].toUpperCase() : '?',
               style: TextStyle(
@@ -2077,13 +2246,32 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
           ),
           const SizedBox(width: 14),
           Expanded(
-            child: Text(
-              name,
-              style: const TextStyle(
-                  fontSize: 14, color: Color(0xFF202124)),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(name, style: const TextStyle(fontSize: 14, color: Color(0xFF202124))),
+                if (roleLabel != null)
+                  Text(roleLabel, style: const TextStyle(fontSize: 11, color: Color(0xFF70757A))),
+              ],
             ),
           ),
-          if (!isTeacher)
+          if (isTeacher && roleLabel != null)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: isLead ? const Color(0xFFF3E8FF) : const Color(0xFFE8F0FE),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                isLead ? 'Lead' : 'Co-Teacher',
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                  color: isLead ? const Color(0xFF7C3AED) : const Color(0xFF1A73E8),
+                ),
+              ),
+            )
+          else if (!isTeacher)
             IconButton(
               icon: const Icon(Icons.more_vert_rounded,
                   size: 18, color: Color(0xFF70757A)),
@@ -2107,7 +2295,7 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
     }
 
     final totalAssignments = _assignments.length;
-    final gradedCount = _myGrades.length;
+    final gradedCount = _myGrades.where((g) => g['submission']?['status'] == 'graded').length;
     final attendedSessions = (_myAttendance?['present'] ?? 0) as num;
     final totalSessions = (_myAttendance?['total'] ?? 0) as num;
     final attendancePct = totalSessions > 0
@@ -2155,16 +2343,22 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
             ..._assignments.map((a) {
               final assignId = a['_id']?.toString() ?? '';
               final grade = _myGrades.firstWhere(
-                (g) => g['assignmentId']?.toString() == assignId || g['assignment']?['_id']?.toString() == assignId,
+                (g) => g['assignment']?['_id']?.toString() == assignId,
                 orElse: () => null,
               );
+              final submission = grade?['submission'];
               final title = a['title']?.toString() ?? 'Assignment';
               final totalMarks = a['totalMarks']?.toString() ?? '--';
-              final obtained = grade?['obtainedMarks']?.toString() ?? grade?['marks']?.toString();
-              final status = grade != null
-                  ? (obtained != null ? 'Graded' : 'Submitted')
+              final obtained = submission?['marksObtained']?.toString();
+              final submissionStatus = submission?['status']?.toString();
+              final status = submission == null
+                  ? 'Pending'
+                  : submissionStatus == 'graded' ? 'Graded'
+                  : (submissionStatus == 'submitted' || submissionStatus == 'late') ? 'Submitted'
                   : 'Pending';
-              final feedback = grade?['feedback']?.toString() ?? '';
+              final feedback = submission?['feedback']?.toString() ?? '';
+              final stars = submission?['stars'];
+              final starCount = stars != null ? (stars as num).toInt() : 0;
 
               return Container(
                 margin: const EdgeInsets.only(bottom: 8),
@@ -2181,6 +2375,14 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
                     Expanded(child: Text(title, style: const TextStyle(fontSize: 14, color: Color(0xFF202124), fontWeight: FontWeight.w500))),
                     _gradeChip(status, obtained, totalMarks),
                   ]),
+                  if (starCount > 0) ...[
+                    const SizedBox(height: 8),
+                    Row(children: List.generate(5, (i) => Icon(
+                      i < starCount ? Icons.star_rounded : Icons.star_outline_rounded,
+                      size: 18,
+                      color: i < starCount ? const Color(0xFFF59E0B) : const Color(0xFFCBD5E1),
+                    ))),
+                  ],
                   if (feedback.isNotEmpty) ...[
                     const SizedBox(height: 8),
                     Container(
@@ -2280,6 +2482,40 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
                   const Text('⚠️ Attendance below 75% may affect course completion.',
                       style: TextStyle(fontSize: 12, color: Color(0xFFD93025))),
                 ],
+                () {
+                  final sessions = List<dynamic>.from(_myAttendance?['attendance'] ?? []);
+                  if (sessions.isEmpty) return const SizedBox.shrink();
+                  return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    const SizedBox(height: 12),
+                    const Divider(height: 1),
+                    const SizedBox(height: 10),
+                    const Text('Session Details', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF70757A))),
+                    const SizedBox(height: 8),
+                    ...sessions.map((s) {
+                      final st = s['status']?.toString() ?? 'absent';
+                      final dateStr = s['sessionDate']?.toString() ?? '';
+                      DateTime? date;
+                      try { date = DateTime.parse(dateStr); } catch (_) {}
+                      final stColor = st == 'present' ? const Color(0xFF188038) : st == 'late' ? const Color(0xFFE37400) : const Color(0xFFD93025);
+                      final stBg = st == 'present' ? const Color(0xFFE6F4EA) : st == 'late' ? const Color(0xFFFFF3E0) : const Color(0xFFFCE8E6);
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 6),
+                        child: Row(children: [
+                          Container(width: 8, height: 8, decoration: BoxDecoration(color: stColor, shape: BoxShape.circle)),
+                          const SizedBox(width: 8),
+                          Expanded(child: Text(s['sessionTitle']?.toString() ?? 'Session', style: const TextStyle(fontSize: 12, color: Color(0xFF202124)))),
+                          if (date != null) Text(DateFormat('MMM d').format(date), style: const TextStyle(fontSize: 11, color: Color(0xFF70757A))),
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(color: stBg, borderRadius: BorderRadius.circular(8)),
+                            child: Text(st[0].toUpperCase() + st.substring(1), style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: stColor)),
+                          ),
+                        ]),
+                      );
+                    }),
+                  ]);
+                }(),
               ]),
             ),
           ],
@@ -2351,78 +2587,156 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
   // GRADES TAB (instructor)
   // ════════════════════════════════════════════════
 
+  Future<void> _loadAttendanceReport() async {
+    if (_courseId.isEmpty) return;
+    setState(() => _loadingAttendanceReport = true);
+    try {
+      final data = await _lms.getAttendanceReport(_courseId);
+      if (mounted) setState(() => _attendanceReport = data);
+    } catch (_) {}
+    if (mounted) setState(() => _loadingAttendanceReport = false);
+  }
+
   Widget _buildGradesTab() {
     if (_loadingClasswork) {
       return const Center(child: CircularProgressIndicator(strokeWidth: 2));
     }
 
-    if (_assignments.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.grade_outlined, size: 64, color: Colors.grey.shade300),
-            const SizedBox(height: 16),
-            const Text('No assignments to grade yet',
-                style:
-                    TextStyle(fontSize: 16, color: Color(0xFF5F6368))),
+    return RefreshIndicator(
+      onRefresh: () async {
+        await _loadClasswork();
+        await _loadAttendanceReport();
+      },
+      child: ListView(
+        padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+        children: [
+          // ── Assignments section ──
+          if (_assignments.isNotEmpty) ...[
+            const Text('Assignments', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Color(0xFF202124))),
+            const SizedBox(height: 8),
+            ..._assignments.map((a) {
+              final id = a['_id']?.toString() ?? '';
+              final title = a['title']?.toString() ?? 'Assignment';
+              final count = ((a['submissionCount'] ?? 0) as num).toInt();
+              final total = a['totalMarks']?.toString() ?? '--';
+              return ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: Container(
+                  width: 36, height: 36,
+                  decoration: const BoxDecoration(color: Color(0xFF1A73E8), shape: BoxShape.circle),
+                  child: const Icon(Icons.assignment_outlined, color: Colors.white, size: 18),
+                ),
+                title: Text(title, style: const TextStyle(fontSize: 14, color: Color(0xFF202124))),
+                subtitle: Text('$count submitted  ·  $total pts', style: const TextStyle(fontSize: 12, color: Color(0xFF70757A))),
+                trailing: id.isNotEmpty
+                    ? OutlinedButton(
+                        onPressed: () => Navigator.push(context, MaterialPageRoute(
+                          builder: (_) => InstructorGradingScreen(assignmentId: id, assignmentTitle: title),
+                        )),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: const Color(0xFF1A73E8),
+                          side: const BorderSide(color: Color(0xFFDADCE0)),
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                        ),
+                        child: const Text('View grades', style: TextStyle(fontSize: 13)),
+                      )
+                    : null,
+              );
+            }),
+            const SizedBox(height: 24),
           ],
-        ),
+
+          // ── Attendance Report section ──
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text('Attendance Report', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Color(0xFF202124))),
+              TextButton.icon(
+                onPressed: _loadAttendanceReport,
+                icon: const Icon(Icons.refresh_rounded, size: 16),
+                label: const Text('Refresh'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          if (_loadingAttendanceReport)
+            const Center(child: Padding(padding: EdgeInsets.all(24), child: CircularProgressIndicator(strokeWidth: 2)))
+          else
+            _buildAttendanceReportTable(),
+
+          if (_assignments.isEmpty && (_attendanceReport['students'] as List? ?? []).isEmpty)
+            Center(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 60),
+                child: Column(mainAxisSize: MainAxisSize.min, children: [
+                  Icon(Icons.grade_outlined, size: 56, color: Colors.grey.shade300),
+                  const SizedBox(height: 12),
+                  const Text('No grades or attendance yet', style: TextStyle(fontSize: 15, color: Color(0xFF5F6368))),
+                ]),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAttendanceReportTable() {
+    final students = (_attendanceReport['students'] as List?) ?? [];
+
+    if (students.isEmpty) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 20),
+        child: Text('No attendance data yet. Sessions will appear here after live classes.',
+            style: TextStyle(fontSize: 13, color: Color(0xFF70757A))),
       );
     }
 
-    return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
-      itemCount: _assignments.length,
-      itemBuilder: (ctx, i) {
-        final a = _assignments[i];
-        final id = a['_id']?.toString() ?? '';
-        final title = a['title']?.toString() ?? 'Assignment';
-        final count = ((a['submissionCount'] ?? 0) as num).toInt();
-        final total = a['totalMarks']?.toString() ?? '--';
+    return Column(
+      children: students.map((s) {
+        final name = s['name']?.toString() ?? 'Student';
+        final pct = (s['percentage'] as num? ?? 0).toInt();
+        final present = (s['present'] as num? ?? 0).toInt();
+        final total = (s['total'] as num? ?? 0).toInt();
+        final late = (s['late'] as num? ?? 0).toInt();
+        final pctColor = pct >= 75 ? const Color(0xFF188038) : pct >= 50 ? const Color(0xFFE37400) : const Color(0xFFD93025);
 
-        return ListTile(
-          contentPadding: EdgeInsets.zero,
-          leading: Container(
-            width: 36,
-            height: 36,
-            decoration: const BoxDecoration(
-              color: Color(0xFF1A73E8),
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(Icons.assignment_outlined,
-                color: Colors.white, size: 18),
+        return Container(
+          margin: const EdgeInsets.only(bottom: 8),
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: const Color(0xFFDADCE0)),
           ),
-          title: Text(title,
-              style: const TextStyle(
-                  fontSize: 14, color: Color(0xFF202124))),
-          subtitle: Text(
-            '$count submitted  ·  $total pts',
-            style: const TextStyle(
-                fontSize: 12, color: Color(0xFF70757A)),
+          child: Row(
+            children: [
+              CircleAvatar(
+                radius: 16,
+                backgroundColor: pctColor.withValues(alpha: 0.12),
+                child: Text(name.isNotEmpty ? name[0].toUpperCase() : 'S',
+                    style: TextStyle(color: pctColor, fontWeight: FontWeight.w700, fontSize: 13)),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(name, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: Color(0xFF202124))),
+                  Text('$present present · $late late · ${total - present - late} absent (of $total)',
+                      style: const TextStyle(fontSize: 11, color: Color(0xFF70757A))),
+                ]),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: pctColor.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text('$pct%', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: pctColor)),
+              ),
+            ],
           ),
-          trailing: id.isNotEmpty
-              ? OutlinedButton(
-                  onPressed: () => Navigator.push(context, MaterialPageRoute(
-                    builder: (_) => InstructorGradingScreen(
-                      assignmentId: id,
-                      assignmentTitle: title,
-                    ),
-                  )),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: const Color(0xFF1A73E8),
-                    side: const BorderSide(color: Color(0xFFDADCE0)),
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 14, vertical: 6),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(4)),
-                  ),
-                  child: const Text('View grades',
-                      style: TextStyle(fontSize: 13)),
-                )
-              : null,
         );
-      },
+      }).toList(),
     );
   }
 }

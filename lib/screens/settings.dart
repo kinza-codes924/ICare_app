@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -22,6 +23,8 @@ import 'package:icare/services/biometric_service.dart';
 import 'package:icare/services/gamification_service.dart';
 import 'package:icare/screens/login_activity_screen.dart';
 import 'package:icare/screens/patient_lab_orders.dart';
+import 'package:icare/screens/lab_settings_screen.dart';
+import 'package:icare/screens/lab_tests_management.dart';
 import 'package:icare/screens/prescriptions.dart' show PrescriptionsScreen;
 import 'package:icare/services/health_settings_service.dart';
 import 'package:icare/services/api_service.dart';
@@ -580,15 +583,71 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 
   void _showDeleteAccountDialog(BuildContext ctx) {
-    showDialog(context: ctx, builder: (dc) => AlertDialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      title: const Row(children: [Icon(Icons.warning_rounded, color: Color(0xFFEF4444), size: 24), SizedBox(width: 10), Text('Delete Account', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16, color: Color(0xFFEF4444)))]),
-      content: const Text('Are you sure? This action is permanent and cannot be undone.', style: TextStyle(fontSize: 14, color: Color(0xFF475569), height: 1.5)),
-      actions: [
-        TextButton(onPressed: () => Navigator.pop(dc), child: const Text('Cancel', style: TextStyle(color: Color(0xFF64748B)))),
-        ElevatedButton.icon(onPressed: () { Navigator.pop(dc); ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(content: Text('Account deletion request submitted.'), backgroundColor: Color(0xFFEF4444))); }, icon: const Icon(Icons.delete_forever_rounded, size: 16), label: const Text('Delete My Account'), style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFEF4444), foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)))),
-      ],
-    ));
+    final confirmController = TextEditingController();
+    showDialog(
+      context: ctx,
+      builder: (dc) => StatefulBuilder(
+        builder: (dc, setS) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: const Row(children: [
+            Icon(Icons.warning_rounded, color: Color(0xFFEF4444), size: 24),
+            SizedBox(width: 10),
+            Text('Delete Account', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16, color: Color(0xFFEF4444))),
+          ]),
+          content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+            const Text('This action is permanent and cannot be undone. All your data will be deleted.', style: TextStyle(fontSize: 14, color: Color(0xFF475569), height: 1.5)),
+            const SizedBox(height: 16),
+            const Text('Type DELETE to confirm:', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF0F172A))),
+            const SizedBox(height: 8),
+            TextField(
+              controller: confirmController,
+              onChanged: (_) => setS(() {}),
+              decoration: InputDecoration(
+                hintText: 'DELETE',
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              ),
+            ),
+          ]),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(dc), child: const Text('Cancel', style: TextStyle(color: Color(0xFF64748B)))),
+            ElevatedButton.icon(
+              onPressed: confirmController.text.trim() == 'DELETE' ? () async {
+                Navigator.pop(dc);
+                await _doDeleteAccount(ctx);
+              } : null,
+              icon: const Icon(Icons.delete_forever_rounded, size: 16),
+              label: const Text('Delete My Account'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFEF4444),
+                foregroundColor: Colors.white,
+                disabledBackgroundColor: const Color(0xFFFCA5A5),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _doDeleteAccount(BuildContext ctx) async {
+    try {
+      final token = await SharedPref().getToken();
+      final dio = Dio(BaseOptions(baseUrl: 'https://icare-backend-inky.vercel.app/api'));
+      final resp = await dio.delete(
+        '/users/me',
+        options: Options(headers: {'Authorization': 'Bearer $token'}),
+      );
+      if (resp.data['success'] == true) {
+        ref.read(authProvider.notifier).setUserLogout();
+        if (mounted) context.go('/login');
+      } else {
+        if (ctx.mounted) ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text(resp.data['message'] ?? 'Failed to delete account'), backgroundColor: Colors.red));
+      }
+    } catch (e) {
+      if (ctx.mounted) ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(content: Text('Failed to delete account. Please try again.'), backgroundColor: Colors.red));
+    }
   }
 
   void _comingSoon(BuildContext ctx, String feature) {
@@ -1647,6 +1706,7 @@ class _WebSettingsLayout extends StatelessWidget {
         // Remove any blue background header - using clean white layout
         _ProfileEditCard(p: p), const SizedBox(height: 24),
         if (p.isDoctor) ...[_doctorProfessionalCard(context), const SizedBox(height: 24)],
+        if (p.isLaboratory) ...[_labManagementCard(context), const SizedBox(height: 24)],
         if (p.isPatient) ...[_healthProfile(context), const SizedBox(height: 24)],
         _notificationsCard(context), const SizedBox(height: 24),
         if (p.isPatient) ...[_remindersCard(context), const SizedBox(height: 24)],
@@ -1662,7 +1722,8 @@ class _WebSettingsLayout extends StatelessWidget {
         _languageCard(context), const SizedBox(height: 24),
         if (p.isPatient) ...[_trackerCard(context), const SizedBox(height: 24)],
         if (p.isPatient) ...[_healthModeCard(context), const SizedBox(height: 24)],
-        _aboutCard(context), const SizedBox(height: 32),
+        _aboutCard(context), const SizedBox(height: 24),
+        _dangerZoneCard(context), const SizedBox(height: 32),
         _logoutButton(context), const SizedBox(height: 24),
       ])))));
   }
@@ -2050,6 +2111,17 @@ class _WebSettingsLayout extends StatelessWidget {
       ])));
   }
 
+  // ── LAB MANAGEMENT ──
+  Widget _labManagementCard(BuildContext context) {
+    return Card(elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Padding(padding: const EdgeInsets.all(20), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        _sectionLabel('Lab Management'), const SizedBox(height: 16),
+        _settingsTile(icon: Icons.biotech_outlined, iconColor: const Color(0xFF0036BC), title: 'Lab Profile & Settings', subtitle: 'Update lab info, hours & services', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const LabSettingsScreen()))),
+        const Divider(height: 1),
+        _settingsTile(icon: Icons.science_outlined, iconColor: const Color(0xFF10B981), title: 'Test Catalog', subtitle: 'Manage available lab tests', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const LabTestsManagement()))),
+      ])));
+  }
+
   // ── LEARNING ──
   Widget _learningCard(BuildContext context) {
     return Card(elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -2224,6 +2296,31 @@ class _WebSettingsLayout extends StatelessWidget {
     );
   }
 
+  // ── DANGER ZONE ──
+  Widget _dangerZoneCard(BuildContext context) {
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      color: const Color(0xFFFFF1F2),
+      child: Padding(padding: const EdgeInsets.all(20), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: const [
+          Icon(Icons.warning_amber_rounded, size: 16, color: Color(0xFFDC2626)),
+          SizedBox(width: 8),
+          Text('Danger Zone', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Color(0xFFDC2626))),
+        ]),
+        const SizedBox(height: 16),
+        ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: const Color(0xFFEF4444).withValues(alpha: 0.12), borderRadius: BorderRadius.circular(10)), child: const Icon(Icons.delete_forever_rounded, color: Color(0xFFDC2626), size: 20)),
+          title: const Text('Delete Account', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: Color(0xFF7F1D1D))),
+          subtitle: const Text('Permanently delete your account and all data', style: TextStyle(fontSize: 12, color: Color(0xFFB91C1C))),
+          trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: Color(0xFFEF4444)),
+          onTap: () => p.onDeleteAccount(context),
+        ),
+      ])),
+    );
+  }
+
   // ── REUSABLE ──
   Widget _sectionLabel(String title) {
     return Row(children: [const Icon(Icons.circle, size: 8, color: AppColors.primaryColor), const SizedBox(width: 8), Text(title.tr(), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700))]);
@@ -2257,6 +2354,7 @@ class _MobileSettingsLayout extends StatelessWidget {
       body: SingleChildScrollView(padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         _ProfileEditCard(p: p), const SizedBox(height: 16),
         if (p.isDoctor) ...[_doctorProfessionalCard(context), const SizedBox(height: 16)],
+        if (p.isLaboratory) ...[_labManagementCard(context), const SizedBox(height: 16)],
         if (p.isPatient) ...[_healthProfile(context), const SizedBox(height: 16)],
         _notificationsCard(context), const SizedBox(height: 16),
         if (p.isPatient) ...[_remindersCard(context), const SizedBox(height: 16)],
@@ -2272,7 +2370,8 @@ class _MobileSettingsLayout extends StatelessWidget {
         _languageCard(context), const SizedBox(height: 16),
         if (p.isPatient) ...[_trackerCard(context), const SizedBox(height: 16)],
         if (p.isPatient) ...[_healthModeCard(context), const SizedBox(height: 16)],
-        _aboutCard(context), const SizedBox(height: 24),
+        _aboutCard(context), const SizedBox(height: 16),
+        _dangerZoneCard(context), const SizedBox(height: 24),
         _logoutButton(context), const SizedBox(height: 24),
       ])),
     );
@@ -2489,6 +2588,16 @@ class _MobileSettingsLayout extends StatelessWidget {
       ])));
   }
 
+  Widget _labManagementCard(BuildContext context) {
+    return Card(elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Padding(padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        _sectionLabel('Lab Management'), const SizedBox(height: 12),
+        _settingsTile(icon: Icons.biotech_outlined, iconColor: const Color(0xFF0036BC), title: 'Lab Profile & Settings', subtitle: 'Update lab info, hours & services', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const LabSettingsScreen()))),
+        const Divider(height: 1),
+        _settingsTile(icon: Icons.science_outlined, iconColor: const Color(0xFF10B981), title: 'Test Catalog', subtitle: 'Manage available lab tests', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const LabTestsManagement()))),
+      ])));
+  }
+
   Widget _learningCard(BuildContext context) {
     return Card(elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Padding(padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -2608,6 +2717,32 @@ class _MobileSettingsLayout extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+
+  // ── DANGER ZONE ──
+  Widget _dangerZoneCard(BuildContext context) {
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      color: const Color(0xFFFFF1F2),
+      child: Padding(padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: const [
+          Icon(Icons.warning_amber_rounded, size: 14, color: Color(0xFFDC2626)),
+          SizedBox(width: 7),
+          Text('Danger Zone', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Color(0xFFDC2626))),
+        ]),
+        const SizedBox(height: 12),
+        ListTile(
+          contentPadding: EdgeInsets.zero,
+          dense: true,
+          leading: Container(padding: const EdgeInsets.all(7), decoration: BoxDecoration(color: const Color(0xFFEF4444).withValues(alpha: 0.12), borderRadius: BorderRadius.circular(8)), child: const Icon(Icons.delete_forever_rounded, color: Color(0xFFDC2626), size: 18)),
+          title: const Text('Delete Account', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: Color(0xFF7F1D1D))),
+          subtitle: const Text('Permanently delete your account and all data', style: TextStyle(fontSize: 11, color: Color(0xFFB91C1C))),
+          trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 12, color: Color(0xFFEF4444)),
+          onTap: () => p.onDeleteAccount(context),
+        ),
+      ])),
     );
   }
 

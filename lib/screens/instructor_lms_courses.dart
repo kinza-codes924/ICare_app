@@ -1,8 +1,11 @@
+import 'package:dio/dio.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:icare/screens/classroom_course_view.dart';
 import 'package:icare/screens/instructor_lms_create_course.dart';
 import 'package:icare/screens/instructor_student_progress_screen.dart';
 import 'package:icare/screens/instructor_course_analytics_screen.dart';
+import 'package:icare/services/api_service.dart';
 import 'package:icare/services/lms_service.dart';
 import 'package:icare/utils/theme.dart';
 
@@ -111,6 +114,190 @@ class _InstructorLmsCoursesScreenState extends State<InstructorLmsCoursesScreen>
         }
       }
     }
+  }
+
+  Future<void> _editThumbnail(Map<String, dynamic> course) async {
+    final courseId = course['_id']?.toString() ?? '';
+    final currentUrl = course['thumbnail']?.toString() ?? '';
+    final urlController = TextEditingController(text: currentUrl);
+    bool uploading = false;
+    String? previewUrl = currentUrl.isNotEmpty ? currentUrl : null;
+
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (ctx) {
+        return StatefulBuilder(builder: (ctx, setModal) {
+          Future<void> save(String url) async {
+            if (url.trim().isEmpty) return;
+            try {
+              await _lmsService.updateCourse(courseId, {
+                'thumbnail': url.trim(),
+                'thumbnail_url': url.trim(),
+              });
+              if (!ctx.mounted) return;
+              Navigator.pop(ctx);
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Thumbnail updated!')),
+                );
+                _loadCourses();
+              }
+            } catch (e) {
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Error: $e')),
+                );
+              }
+            }
+          }
+
+          Future<void> pickAndUpload() async {
+            final result = await FilePicker.platform.pickFiles(
+              type: FileType.image,
+              withData: true,
+            );
+            if (result == null || result.files.isEmpty) return;
+            final file = result.files.first;
+            final bytes = file.bytes;
+            if (bytes == null) return;
+
+            setModal(() => uploading = true);
+            try {
+              final signRes = await ApiService().get(
+                  '/upload/sign?folder=icare/thumbnails&resource_type=image');
+              final cloudName =
+                  signRes.data['cloud_name']?.toString() ?? 'dzlcnyxgb';
+              final signature = signRes.data['signature']?.toString() ?? '';
+              final timestamp = signRes.data['timestamp']?.toString() ?? '';
+              final apiKey = signRes.data['api_key']?.toString() ?? '';
+              final folder =
+                  signRes.data['folder']?.toString() ?? 'icare/thumbnails';
+
+              final formData = FormData.fromMap({
+                'file': MultipartFile.fromBytes(bytes, filename: file.name),
+                'api_key': apiKey,
+                'timestamp': timestamp,
+                'signature': signature,
+                'folder': folder,
+              });
+              final res = await Dio().post(
+                'https://api.cloudinary.com/v1_1/$cloudName/image/upload',
+                data: formData,
+              );
+              final url = res.data['secure_url']?.toString() ?? '';
+              if (url.isNotEmpty) {
+                setModal(() {
+                  previewUrl = url;
+                  urlController.text = url;
+                  uploading = false;
+                });
+              }
+            } catch (e) {
+              setModal(() => uploading = false);
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Upload failed: $e')));
+              }
+            }
+          }
+
+          return Padding(
+            padding: EdgeInsets.only(
+                bottom: MediaQuery.of(ctx).viewInsets.bottom,
+                left: 24, right: 24, top: 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(children: [
+                  const Text('Edit Thumbnail',
+                      style: TextStyle(
+                          fontSize: 18, fontWeight: FontWeight.w800)),
+                  const Spacer(),
+                  IconButton(
+                      onPressed: () => Navigator.pop(ctx),
+                      icon: const Icon(Icons.close)),
+                ]),
+                const SizedBox(height: 16),
+
+                // Preview
+                if (previewUrl != null && previewUrl!.isNotEmpty)
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(10),
+                    child: Image.network(previewUrl!,
+                        height: 160, width: double.infinity,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, _, _) =>
+                            const SizedBox(height: 160)),
+                  ),
+                if (previewUrl != null) const SizedBox(height: 14),
+
+                // Upload button
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: uploading ? null : pickAndUpload,
+                    icon: uploading
+                        ? const SizedBox(
+                            width: 16, height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2))
+                        : const Icon(Icons.upload_rounded),
+                    label: Text(uploading
+                        ? 'Uploading...'
+                        : 'Upload Image from Device'),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      side: const BorderSide(color: Color(0xFF0036BC)),
+                      foregroundColor: const Color(0xFF0036BC),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10)),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+
+                // Or paste URL
+                TextField(
+                  controller: urlController,
+                  onChanged: (v) => setModal(() => previewUrl = v.trim()),
+                  decoration: InputDecoration(
+                    labelText: 'Or paste image URL',
+                    hintText: 'https://...',
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10)),
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 12),
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                SizedBox(
+                  width: double.infinity,
+                  height: 50,
+                  child: ElevatedButton(
+                    onPressed: () => save(urlController.text),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF0036BC),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10)),
+                    ),
+                    child: const Text('Save Thumbnail',
+                        style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white)),
+                  ),
+                ),
+                const SizedBox(height: 24),
+              ],
+            ),
+          );
+        });
+      },
+    );
   }
 
   @override
@@ -482,14 +669,15 @@ class _InstructorLmsCoursesScreenState extends State<InstructorLmsCoursesScreen>
             PopupMenuItem(
               child: const Row(
                 children: [
-                  Icon(Icons.copy, size: 20),
+                  Icon(Icons.image_outlined, size: 20, color: Color(0xFF0036BC)),
                   SizedBox(width: 12),
-                  Text('Duplicate'),
+                  Text('Edit Thumbnail', style: TextStyle(color: Color(0xFF0036BC))),
                 ],
               ),
-              onTap: () {
-                // TODO: Implement duplicate
-              },
+              onTap: () => Future.delayed(
+                const Duration(milliseconds: 100),
+                () => _editThumbnail(Map<String, dynamic>.from(course)),
+              ),
             ),
             PopupMenuItem(
               child: Row(

@@ -1,4 +1,3 @@
-import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:icare/screens/lms_purchase_flow.dart';
 import 'package:icare/services/api_service.dart';
@@ -478,7 +477,12 @@ class _LmsPublicCourseDetailState extends State<LmsPublicCourseDetail>
       padding: const EdgeInsets.all(20),
       itemCount: modules.length,
       itemBuilder: (context, index) {
-        return _ModuleCard(module: modules[index], moduleNumber: index + 1);
+        return _ModuleCard(
+          module: modules[index],
+          moduleNumber: index + 1,
+          courseType: _course!['courseType']?.toString() ?? 'self-paced',
+          courseStartDate: _course!['startDate']?.toString(),
+        );
       },
     );
   }
@@ -652,32 +656,73 @@ class _StatChip extends StatelessWidget {
 class _ModuleCard extends StatelessWidget {
   final Map<String, dynamic> module;
   final int moduleNumber;
+  final String courseType;
+  final String? courseStartDate;
 
-  const _ModuleCard({required this.module, required this.moduleNumber});
+  const _ModuleCard({
+    required this.module,
+    required this.moduleNumber,
+    this.courseType = 'self-paced',
+    this.courseStartDate,
+  });
+
+  String? _unlockLabel() {
+    if (courseType != 'pragmatic') return null;
+    final days = module['unlockAfterDays'];
+    if (days == null) return null;
+    final daysInt = days is int ? days : int.tryParse(days.toString()) ?? 0;
+    if (courseStartDate != null) {
+      try {
+        final start = DateTime.parse(courseStartDate!);
+        final unlock = start.add(Duration(days: daysInt));
+        final now = DateTime.now();
+        if (unlock.isAfter(now)) {
+          return 'Unlocks ${unlock.day}/${unlock.month}/${unlock.year}';
+        }
+        return null; // already unlocked
+      } catch (_) {}
+    }
+    return daysInt > 0 ? 'Unlocks Day $daysInt' : null;
+  }
 
   @override
   Widget build(BuildContext context) {
     final lessons = (module['lessons'] as List?) ?? [];
-    
+    final unlockLabel = _unlockLabel();
+    final isLocked = unlockLabel != null;
+
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isLocked ? const Color(0xFFF8FAFC) : Colors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        border: Border.all(color: isLocked ? const Color(0xFFCBD5E1) : const Color(0xFFE2E8F0)),
       ),
       child: ExpansionTile(
         tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        leading: isLocked ? const Icon(Icons.lock_rounded, color: Color(0xFF94A3B8), size: 20) : null,
         title: Text(
           'Module $moduleNumber: ${module['title'] ?? 'Untitled'}',
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 15,
             fontWeight: FontWeight.w700,
+            color: isLocked ? const Color(0xFF94A3B8) : const Color(0xFF0F172A),
           ),
         ),
-        subtitle: Text(
-          '${lessons.length} lessons',
-          style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('${lessons.length} lessons', style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+            if (unlockLabel != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 2),
+                child: Row(mainAxisSize: MainAxisSize.min, children: [
+                  const Icon(Icons.lock_clock_rounded, size: 11, color: Color(0xFF6366F1)),
+                  const SizedBox(width: 4),
+                  Text(unlockLabel, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF6366F1))),
+                ]),
+              ),
+          ],
         ),
         children: lessons.map<Widget>((lesson) {
           return ListTile(

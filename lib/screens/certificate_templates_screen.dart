@@ -363,31 +363,24 @@ class LmsCertificateScreen extends StatelessWidget {
     // Generate unique certificate ID
     final certId = 'CERT-${DateTime.now().millisecondsSinceEpoch}-${courseId?.substring(0, 6) ?? 'ICARE'}';
 
-    // Load logos
+    // Load logos separately — never share the same pw.MemoryImage across positions
     pw.ImageProvider? icareLogoImg;
     pw.ImageProvider? rmrLogoImg;
     pw.ImageProvider? iqraLogoImg;
     try {
-      final bytes = await rootBundle.load('assets/Asset 1.png');
-      icareLogoImg = pw.MemoryImage(bytes.buffer.asUint8List());
-      // For now, use same logo for all - client can replace with actual logos
-      rmrLogoImg = icareLogoImg;
-      iqraLogoImg = icareLogoImg;
+      final bd = await rootBundle.load('assets/Asset 1.png');
+      icareLogoImg = pw.MemoryImage(bd.buffer.asUint8List(bd.offsetInBytes, bd.lengthInBytes));
+    } catch (_) {}
+    try {
+      final bd = await rootBundle.load('assets/LOGO-IU-01-2048x495-1.png');
+      iqraLogoImg = pw.MemoryImage(bd.buffer.asUint8List(bd.offsetInBytes, bd.lengthInBytes));
+    } catch (_) {}
+    try {
+      final bd = await rootBundle.load('assets/images/health.jpeg');
+      rmrLogoImg = pw.MemoryImage(bd.buffer.asUint8List(bd.offsetInBytes, bd.lengthInBytes));
     } catch (_) {}
 
-    // Generate QR code for verification
-    // QR code will contain verification URL: https://icare.app/verify-certificate/{certId}
-    final qrData = 'https://icare.app/verify-certificate/$certId';
-    pw.ImageProvider? qrCodeImg;
-    try {
-      // Generate QR code using barcode package
-      final qrCode = pw.BarcodeWidget(
-        barcode: pw.Barcode.qrCode(),
-        data: qrData,
-        width: 80,
-        height: 80,
-      );
-    } catch (_) {}
+    final qrData = 'https://www.icare.com.co/verify?code=$certId';
 
     final t = template;
     PdfColor primary;

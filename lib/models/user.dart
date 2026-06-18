@@ -8,10 +8,12 @@ class User {
   final DateTime? createdAt;
   final String? gender;
   final String? age;
-  final String? mrNumber; // Auto-generated Medical Record Number (patients only)
+  final String? mrNumber;
   final String? cnic;
   final String? specialization;
   final List<String>? conditionsTreated;
+  final bool isPhoneVerified;
+  final bool isEmailVerified;
 
   User({
     required this.id,
@@ -27,6 +29,8 @@ class User {
     this.cnic,
     this.specialization,
     this.conditionsTreated,
+    this.isPhoneVerified = true,
+    this.isEmailVerified = true,
   });
 
   factory User.fromJson(Map<String, dynamic> json) {
@@ -48,6 +52,9 @@ class User {
       conditionsTreated: (json['conditionsTreated'] as List?)
           ?.map((e) => e.toString())
           .toList(),
+      // Old accounts without these fields default to true (grandfathered)
+      isPhoneVerified: json['isPhoneVerified'] as bool? ?? true,
+      isEmailVerified: json['isEmailVerified'] as bool? ?? true,
     );
   }
 
@@ -66,6 +73,8 @@ class User {
       if (cnic != null) 'cnic': cnic,
       if (specialization != null) 'specialization': specialization,
       if (conditionsTreated != null) 'conditionsTreated': conditionsTreated,
+      'isPhoneVerified': isPhoneVerified,
+      'isEmailVerified': isEmailVerified,
     };
   }
 
@@ -83,6 +92,8 @@ class User {
     String? cnic,
     String? specialization,
     List<String>? conditionsTreated,
+    bool? isPhoneVerified,
+    bool? isEmailVerified,
   }) {
     return User(
       id: id ?? this.id,
@@ -98,6 +109,8 @@ class User {
       cnic: cnic ?? this.cnic,
       specialization: specialization ?? this.specialization,
       conditionsTreated: conditionsTreated ?? this.conditionsTreated,
+      isPhoneVerified: isPhoneVerified ?? this.isPhoneVerified,
+      isEmailVerified: isEmailVerified ?? this.isEmailVerified,
     );
   }
 }

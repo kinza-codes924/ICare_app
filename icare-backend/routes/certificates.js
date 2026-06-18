@@ -146,8 +146,14 @@ router.post('/', authMiddleware, async (req, res) => {
 router.get('/verify/:code', async (req, res) => {
   try {
     await connectMongoDB();
+    const code = req.params.code;
     const certificate = await Certificate.findOne({
-      verificationCode: req.params.code.toUpperCase(),
+      $or: [
+        { verificationCode: code },
+        { verificationCode: code.toUpperCase() },
+        { certificateNumber: code },
+        { certificateNumber: code.toUpperCase() },
+      ],
     }).lean();
 
     if (!certificate) {

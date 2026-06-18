@@ -5,6 +5,7 @@ import '../services/connect_now_service.dart';
 import '../services/consultation_service.dart';
 import '../utils/shared_pref.dart';
 import '../utils/app_keys.dart';
+import '../utils/connect_now_events.dart';
 import '../screens/consultation_chat_screen_v2.dart';
 import '../models/appointment_detail.dart';
 import '../models/user.dart';
@@ -23,6 +24,7 @@ class _DoctorConnectNowListenerState extends State<DoctorConnectNowListener> {
   final ConnectNowService _service = ConnectNowService();
   final SharedPref _sharedPref = SharedPref();
   Timer? _timer;
+  StreamSubscription<Map<String, dynamic>>? _fcmSub;
   bool _dialogShowing = false;
   bool _isChecking = false; // prevents concurrent in-flight calls
 
@@ -40,12 +42,12 @@ class _DoctorConnectNowListenerState extends State<DoctorConnectNowListener> {
   void initState() {
     super.initState();
     _loadHandledIds().then((_) {
-      // Clear stuck in-consultation flag on fresh app start to prevent
-      // doctors from missing requests after a crash or forced kill
+      // Clear stuck in-consultation flag on fresh app start
       SharedPreferences.getInstance().then((prefs) {
         prefs.setBool('doctor_in_consultation', false);
       }).catchError((_) {});
       _startPolling();
+      _subscribeToFcmEvents();
     });
   }
 
@@ -77,12 +79,21 @@ class _DoctorConnectNowListenerState extends State<DoctorConnectNowListener> {
     }
   }
 
+  /// Subscribe to FCM-triggered events — fires _checkPending() immediately
+  /// when Firebase push notification arrives (no polling delay).
+  void _subscribeToFcmEvents() {
+    _fcmSub = ConnectNowEvents.onRequest.listen((data) {
+      debugPrint('🚨 [ConnectNow] FCM event received → immediate poll');
+      _checkPending();
+    });
+  }
+
   void _startPolling() {
-    // 6-second interval: fast enough for UX, won't pile up concurrent calls
-    // (Vercel cold start + DB lookup takes ~300–800ms, so 1.5s was causing 10+
-    // concurrent in-flight requests which caused Chrome OOM)
-    _timer = Timer.periodic(const Duration(seconds: 6), (_) => _checkPending());
-    // Fire once immediately on start
+    // 3-second fallback poll. FCM handles the instant case; this is the
+    // safety net for when FCM is delayed or app is backgrounded.
+    // _isChecking guard prevents concurrent in-flight calls.
+    _timer = Timer.periodic(const Duration(seconds: 3), (_) => _checkPending());
+    // Fire once immediately on start (500ms delay to let initState settle)
     Future.delayed(const Duration(milliseconds: 500), _checkPending);
   }
 
@@ -270,6 +281,7 @@ class _DoctorConnectNowListenerState extends State<DoctorConnectNowListener> {
   @override
   void dispose() {
     _timer?.cancel();
+    _fcmSub?.cancel();
     _cachedRole = null;
     _cachedToken = null;
     super.dispose();

@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:icare/providers/auth_provider.dart';
 import 'package:icare/services/consultation_service.dart';
 import 'package:icare/services/medical_record_service.dart';
+import 'package:icare/widgets/date_filter_bar.dart';
 import 'package:icare/services/laboratory_service.dart';
 import 'package:icare/services/pharmacy_service.dart';
 import 'package:icare/widgets/back_button.dart';
@@ -40,6 +41,8 @@ class _PatientPrescriptionsState extends ConsumerState<PatientPrescriptions> {
   bool _isLoading = true;
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
+  String _dateFilter = 'all';
+  DateTime? _customDate;
   Map<String, List<dynamic>> _labBookingsByPrescription = {};
   Map<String, List<dynamic>> _ordersByPrescription = {};
   List<dynamic> _allLabBookings = [];
@@ -254,7 +257,16 @@ class _PatientPrescriptionsState extends ConsumerState<PatientPrescriptions> {
                     ),
                   ),
                 ),
-                // â”€â”€ Result count â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+                // Date filter bar
+                DateFilterBar(
+                  selected: _dateFilter,
+                  customDate: _customDate,
+                  onChanged: (filter, date) => setState(() {
+                    _dateFilter = filter;
+                    if (date != null) _customDate = date;
+                  }),
+                ),
+                // Result count
                 if (_searchQuery.isNotEmpty)
                   Padding(
                     padding: EdgeInsets.fromLTRB(
@@ -263,8 +275,8 @@ class _PatientPrescriptionsState extends ConsumerState<PatientPrescriptions> {
                       alignment: Alignment.centerLeft,
                       child: Text(
                         _filtered.isEmpty
-                            ? 'No results for "$_searchQuery"'
-                            : '${_filtered.length} result${_filtered.length == 1 ? '' : 's'} for "$_searchQuery"',
+                            ? 'No results for “$_searchQuery”'
+                            : '${_filtered.length} result${_filtered.length == 1 ? '' : 's'} for “$_searchQuery”',
                         style: TextStyle(
                           fontSize: 12,
                           color: _filtered.isEmpty
@@ -275,52 +287,65 @@ class _PatientPrescriptionsState extends ConsumerState<PatientPrescriptions> {
                       ),
                     ),
                   ),
-                // â”€â”€ List â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+                // List
                 Expanded(
-                  child: _filtered.isEmpty && _searchQuery.isNotEmpty
-                      ? Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(Icons.search_off_rounded,
-                                  size: 56,
-                                  color: Colors.grey.shade300),
-                              const SizedBox(height: 16),
-                              Text(
-                                'No prescriptions match\n"$_searchQuery"',
-                                textAlign: TextAlign.center,
-                                style: const TextStyle(
-                                    fontSize: 15,
-                                    color: Color(0xFF64748B)),
-                              ),
-                            ],
-                          ),
-                        )
-                      : _prescriptions.isEmpty
-                          ? Center(
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(Icons.medication_outlined,
-                                      size: 64,
-                                      color: Colors.grey.shade300),
-                                  const SizedBox(height: 16),
-                                                  Text('No prescriptions yet'.tr(),
-                                      style: const TextStyle(
-                                          fontSize: 15,
-                                          color: Color(0xFF64748B))),
-                                ],
-                              ),
-                            )
-                          : RefreshIndicator(
-                              onRefresh: _loadPrescriptions,
-                              child: ListView.builder(
-                                padding: EdgeInsets.all(isDesktop ? 40 : 20),
-                                itemCount: _filtered.length,
-                                itemBuilder: (context, index) =>
-                                    _buildPrescriptionCard(_filtered[index]),
-                              ),
+                  child: Builder(builder: (context) {
+                    final displayPrescriptions = applyDateFilter<dynamic>(
+                      _filtered,
+                      (r) {
+                        final s = (r is Map ? (r['prescribedAt'] ?? r['createdAt'] ?? '') : '').toString();
+                        if (s.isNotEmpty) { try { return DateTime.parse(s); } catch (_) {} }
+                        return DateTime.now();
+                      },
+                      _dateFilter,
+                      _customDate,
+                    );
+
+                    if (displayPrescriptions.isEmpty && _searchQuery.isNotEmpty) {
+                      return Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.search_off_rounded, size: 56, color: Colors.grey.shade300),
+                            const SizedBox(height: 16),
+                            Text(
+                              'No prescriptions match\n”$_searchQuery”',
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(fontSize: 15, color: Color(0xFF64748B)),
                             ),
+                          ],
+                        ),
+                      );
+                    }
+
+                    if (_prescriptions.isEmpty || displayPrescriptions.isEmpty) {
+                      return Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.medication_outlined, size: 64, color: Colors.grey.shade300),
+                            const SizedBox(height: 16),
+                            Text(
+                              displayPrescriptions.isEmpty && _dateFilter != 'all'
+                                  ? 'No prescriptions for this period'
+                                  : 'No prescriptions yet'.tr(),
+                              style: const TextStyle(fontSize: 15, color: Color(0xFF64748B)),
+                            ),
+                          ],
+                        ),
+                      );
+                    }
+
+                    return RefreshIndicator(
+                      onRefresh: _loadPrescriptions,
+                      child: ListView.builder(
+                        padding: EdgeInsets.all(isDesktop ? 40 : 20),
+                        itemCount: displayPrescriptions.length,
+                        itemBuilder: (context, index) =>
+                            _buildPrescriptionCard(displayPrescriptions[index]),
+                      ),
+                    );
+                  }),
                 ),
               ],
             ),

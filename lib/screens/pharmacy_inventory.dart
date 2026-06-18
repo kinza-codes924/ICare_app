@@ -581,7 +581,8 @@ class _MedicineCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final stock = product['stock'] as int;
-    final isLow = stock < 30;
+    final isOutOfStock = stock == 0;
+    final isLow = !isOutOfStock && stock < 30;
     final isControlled = product['isControlled'] == true;
     final isPrescriptionOnly = (product['medicinePermission'] ?? '').toString() == 'Prescription Only';
     final expiry = product['expiry'] as DateTime;
@@ -592,7 +593,7 @@ class _MedicineCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: isControlled ? const Color(0xFF8B5CF6).withValues(alpha: 0.4) : isLow ? const Color(0xFFEF4444).withValues(alpha: 0.3) : const Color(0xFFE2E8F0)),
+        border: Border.all(color: isControlled ? const Color(0xFF8B5CF6).withValues(alpha: 0.4) : isOutOfStock ? const Color(0xFF7F1D1D).withValues(alpha: 0.4) : isLow ? const Color(0xFFEF4444).withValues(alpha: 0.3) : const Color(0xFFE2E8F0)),
         boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8, offset: const Offset(0, 2))],
       ),
       child: Column(
@@ -632,6 +633,15 @@ class _MedicineCard extends StatelessWidget {
                       padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
                       decoration: BoxDecoration(color: const Color(0xFF8B5CF6), borderRadius: BorderRadius.circular(20)),
                       child: const Text('CTRL', style: TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.w900)),
+                    ),
+                  )
+                else if (isOutOfStock)
+                  Positioned(
+                    top: 6, right: 6,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                      decoration: BoxDecoration(color: const Color(0xFF7F1D1D), borderRadius: BorderRadius.circular(20)),
+                      child: const Text('OOS', style: TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.w900)),
                     ),
                   )
                 else if (isLow)
@@ -685,11 +695,16 @@ class _MedicineCard extends StatelessWidget {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF10B981).withValues(alpha: 0.1),
+                        color: isOutOfStock
+                            ? const Color(0xFFEF4444).withValues(alpha: 0.12)
+                            : const Color(0xFF10B981).withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(6),
                       ),
                       child: Text('Qty: $stock',
-                          style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Color(0xFF10B981))),
+                          style: TextStyle(
+                            fontSize: 10, fontWeight: FontWeight.w700,
+                            color: isOutOfStock ? const Color(0xFFEF4444) : const Color(0xFF10B981),
+                          )),
                     ),
                   ],
                 ),

@@ -927,6 +927,24 @@ class DoctorProfileCard extends StatelessWidget {
                             style: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
                           ),
 
+                        // Languages
+                        if (displayDoctor.languages.isNotEmpty) ...[
+                          const SizedBox(height: 6),
+                          Wrap(
+                            spacing: 4,
+                            runSpacing: 2,
+                            children: displayDoctor.languages.take(3).map((lang) => Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF14B1FF).withValues(alpha: 0.08),
+                                borderRadius: BorderRadius.circular(4),
+                                border: Border.all(color: const Color(0xFF14B1FF).withValues(alpha: 0.25)),
+                              ),
+                              child: Text(lang, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Color(0xFF0369A1))),
+                            )).toList(),
+                          ),
+                        ],
+
                         const SizedBox(height: 8),
 
                         // Experience + Rating

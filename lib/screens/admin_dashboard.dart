@@ -36,6 +36,29 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
   bool _isLoadingLeaves = false;
   bool _isLoadingCerts = false;
 
+  // Community tab state
+  List<dynamic> _communityPosts = [];
+  List<dynamic> _communityTopics = [];
+  bool _isLoadingCommunity = false;
+  final Set<String> _expandedPostIds = {};
+
+  // Doctor Tools tab state
+  List<dynamic> _expiringLicenses = [];
+  List<dynamic> _noReferrerDoctors = [];
+  bool _isLoadingDoctorTools = false;
+
+  // FAQs tab state
+  List<dynamic> _faqs = [];
+  bool _isLoadingFaqs = false;
+
+  final ScrollController _tabScrollController = ScrollController();
+
+  @override
+  void dispose() {
+    _tabScrollController.dispose();
+    super.dispose();
+  }
+
   @override
   void initState() {
     super.initState();
@@ -102,8 +125,16 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
       _fetchLeaveRequests();
     } else if (tab == 'Certificates') {
       _fetchCertificates();
-    } else if (tab == 'Community' || tab == 'Commission' || tab == 'DoctorTools') {
-      // These tabs load their own data via FutureBuilder
+    } else if (tab == 'Community') {
+      if (mounted) setState(() => _isLoading = false);
+      _fetchCommunityData();
+    } else if (tab == 'DoctorTools') {
+      if (mounted) setState(() => _isLoading = false);
+      _fetchDoctorToolsData();
+    } else if (tab == 'FAQs') {
+      if (mounted) setState(() => _isLoading = false);
+      _fetchFaqs();
+    } else if (tab == 'Commission') {
       if (mounted) setState(() => _isLoading = false);
     } else {
       _fetchUsers();
@@ -163,7 +194,7 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
     try {
       final response = await _apiService.get('/medical-records/all');
       if (response.statusCode == 200) {
-        final records = response.data['records'] as List? ?? [];
+        final records = response.data['records'] is List ? response.data['records'] as List : [];
         final doctors = records
             .map((r) => r['doctor']?['name']?.toString() ?? '')
             .where((n) => n.isNotEmpty)
@@ -259,33 +290,29 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
         iconTheme: const IconThemeData(color: Colors.white),
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(60),
-          child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: [
-                _buildTabItem('Pending', Icons.pending_actions_rounded),
-                _buildTabItem('Doctor', Icons.medical_services_rounded),
-                _buildTabItem('Student', Icons.school_rounded),
-                _buildTabItem('Pharmacy', Icons.local_pharmacy_rounded),
-                _buildTabItem('Laboratory', Icons.science_rounded),
-                _buildTabItem('Instructor', Icons.person_add_rounded),
-                _buildTabItem('PatientRecords', Icons.folder_shared_rounded),
-                _buildTabItemBadge('LeaveRequests', Icons.event_busy_rounded,
-                    _leaveRequests.where((r) => r['status'] == 'pending').length),
-                _buildTabItemBadge('Certificates', Icons.workspace_premium_rounded,
-                    _certificates.where((c) => c['status'] == 'pending').length),
-                _buildTabItem('Commission', Icons.monetization_on_rounded),
-                _buildTabItem('Community', Icons.forum_rounded),
-                _buildTabItem('DoctorTools', Icons.manage_accounts_rounded),
-              ],
-            ),
-          ),
+          child: _buildAdminTabBar(),
         ),
       ),
-      floatingActionButton: _currentTab != 'Pending' && _currentTab != 'PatientRecords'
-          && _currentTab != 'LeaveRequests' && _currentTab != 'Certificates'
-          && _currentTab != 'Commission' && _currentTab != 'Community'
-          && _currentTab != 'DoctorTools'
+      floatingActionButton: _currentTab == 'FAQs'
+          ? FloatingActionButton.extended(
+              onPressed: () => _showFaqDialog(),
+              icon: const Icon(Icons.add_rounded),
+              label: const Text('Add FAQ'),
+              backgroundColor: AppColors.primaryColor,
+              foregroundColor: Colors.white,
+              elevation: 2,
+            )
+          : _currentTab == 'Community'
+          ? FloatingActionButton.extended(
+              onPressed: () => _showAddTopicDialog(),
+              icon: const Icon(Icons.add_rounded, color: Colors.white),
+              label: const Text('Add Topic', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              backgroundColor: const Color(0xFF7C3AED),
+              elevation: 2,
+            )
+          : _currentTab != 'Pending' && _currentTab != 'PatientRecords'
+              && _currentTab != 'LeaveRequests' && _currentTab != 'Certificates'
+              && _currentTab != 'Commission' && _currentTab != 'DoctorTools'
           ? FloatingActionButton.extended(
               onPressed: () => _showAddUserDialog(),
               backgroundColor: AppColors.primaryColor,
@@ -305,10 +332,12 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
           ? _buildCertificatesTab()
           : _currentTab == 'Commission'
           ? _buildCommissionTab()
-          : _currentTab == 'Community'
-          ? _buildCommunityTab()
           : _currentTab == 'DoctorTools'
           ? _buildDoctorToolsTab()
+          : _currentTab == 'Community'
+          ? _buildCommunityTab()
+          : _currentTab == 'FAQs'
+          ? _buildFaqsTab()
           : _currentTab == 'PatientRecords'
           ? _buildPatientRecordsTab()
           : _isLoading
@@ -794,6 +823,68 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
     );
   }
 
+  Widget _buildAdminTabBar() {
+    final pendingLeaves = _leaveRequests.where((r) => r['status'] == 'pending').length;
+    final pendingCerts  = _certificates.where((c) => c['status'] == 'pending').length;
+    return Container(
+      height: 60,
+      color: Colors.transparent,
+      child: Row(
+        children: [
+          // Left arrow
+          IconButton(
+            icon: const Icon(Icons.chevron_left_rounded, color: Colors.white, size: 28),
+            onPressed: () {
+              _tabScrollController.animateTo(
+                (_tabScrollController.offset - 180).clamp(0.0, _tabScrollController.position.maxScrollExtent),
+                duration: const Duration(milliseconds: 300),
+                curve: Curves.easeInOut,
+              );
+            },
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+          ),
+          // Scrollable tabs
+          Expanded(
+            child: SingleChildScrollView(
+              controller: _tabScrollController,
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  _buildTabItem('Pending',        Icons.pending_actions_rounded),
+                  _buildTabItem('Student',        Icons.school_rounded),
+                  _buildTabItem('Pharmacy',       Icons.local_pharmacy_rounded),
+                  _buildTabItem('Laboratory',     Icons.biotech_rounded),
+                  _buildTabItem('Instructor',     Icons.cast_for_education_rounded),
+                  _buildTabItem('PatientRecords', Icons.folder_shared_rounded),
+                  _buildTabItemBadge('LeaveRequests', Icons.event_note_rounded, pendingLeaves),
+                  _buildTabItemBadge('Certificates',  Icons.verified_rounded,   pendingCerts),
+                  _buildTabItem('Commission',     Icons.percent_rounded),
+                  _buildTabItem('DoctorTools',    Icons.manage_accounts_rounded),
+                  _buildTabItem('Community',      Icons.forum_rounded),
+                  _buildTabItem('FAQs',           Icons.help_outline_rounded),
+                ],
+              ),
+            ),
+          ),
+          // Right arrow
+          IconButton(
+            icon: const Icon(Icons.chevron_right_rounded, color: Colors.white, size: 28),
+            onPressed: () {
+              _tabScrollController.animateTo(
+                (_tabScrollController.offset + 180).clamp(0.0, _tabScrollController.position.maxScrollExtent),
+                duration: const Duration(milliseconds: 300),
+                curve: Curves.easeInOut,
+              );
+            },
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildTabItem(String title, IconData icon) {
     bool isActive = _currentTab == title;
     final displayTitle = title == 'PatientRecords' ? 'Patient Records' : title;
@@ -1032,7 +1123,7 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
         final iCareCommission = data['iCareCommission'] ?? data['platformCommission'] ?? 0;
         final doctorEarnings = data['doctorEarnings'] ?? 0;
         final commissionRate = data['commissionRate'] ?? 10;
-        final transactions = (data['transactions'] as List?) ?? [];
+        final transactions = data['transactions'] is List ? data['transactions'] as List : [];
 
         return SingleChildScrollView(
           padding: const EdgeInsets.all(20),
@@ -1335,132 +1426,268 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
 
   // ── Community Management Tab ───────────────────────────────────────────────
   Widget _buildCommunityTab() {
-    return FutureBuilder<Map<String, dynamic>>(
-      future: _fetchCommunityData(),
-      builder: (context, snap) {
-        if (snap.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        }
-        final posts = (snap.data?['posts'] as List?) ?? [];
-        final topics = (snap.data?['topics'] as List?) ?? [];
-
-        return RefreshIndicator(
-          onRefresh: () async { setState(() {}); },
-          child: ListView(
-            padding: const EdgeInsets.all(16),
-            children: [
-              // ── Topics section ──────────────────────────────────────────
-              Row(children: [
-                const Expanded(child: Text('Community Topics', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: Color(0xFF0F172A)))),
-                ElevatedButton.icon(
-                  onPressed: _showAddTopicDialog,
-                  icon: const Icon(Icons.add_rounded, size: 16),
-                  label: const Text('Add Topic'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF7C3AED), foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10), elevation: 0,
-                  ),
-                ),
-              ]),
-              const SizedBox(height: 10),
-              if (topics.isEmpty)
-                const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 12),
-                  child: Text('No custom topics yet. Default topics are always available.', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 13)),
-                )
-              else
-                Wrap(
-                  spacing: 8, runSpacing: 8,
-                  children: topics.map<Widget>((t) {
-                    final name = t['name']?.toString() ?? t.toString();
-                    final id = t['_id']?.toString() ?? '';
-                    return Chip(
-                      label: Text(name, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-                      backgroundColor: const Color(0xFFEDE9FE),
-                      side: const BorderSide(color: Color(0xFF7C3AED), width: 1),
-                      deleteIcon: const Icon(Icons.close_rounded, size: 16, color: Color(0xFF7C3AED)),
-                      onDeleted: id.isEmpty ? null : () => _deleteTopic(id, name),
-                    );
-                  }).toList(),
-                ),
-              const SizedBox(height: 24),
-              const Divider(color: Color(0xFFE2E8F0)),
-              const SizedBox(height: 12),
-              // ── Posts section ───────────────────────────────────────────
-              Text('All Posts (${posts.length})', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: Color(0xFF0F172A))),
-              const SizedBox(height: 10),
-              if (posts.isEmpty)
-                const Padding(padding: EdgeInsets.all(24), child: Center(child: Text('No posts yet.', style: TextStyle(color: Color(0xFF94A3B8)))))
-              else
-                ...posts.map((p) {
-                  final postId = p['_id']?.toString() ?? p['id']?.toString() ?? '';
-                  final author = p['userName']?.toString() ?? p['authorName']?.toString() ?? 'User';
-                  final content = p['content']?.toString() ?? '';
-                  final cat = p['category']?.toString() ?? 'General';
-                  final likes = (p['likeCount'] ?? (p['likes'] as List?)?.length ?? 0).toString();
-                  final comments = (p['commentCount'] ?? (p['comments'] as List?)?.length ?? 0).toString();
-                  return Card(
-                    margin: const EdgeInsets.only(bottom: 10),
-                    elevation: 1,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: const BorderSide(color: Color(0xFFE2E8F0))),
-                    child: ListTile(
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                      leading: CircleAvatar(
-                        backgroundColor: AppColors.primaryColor.withValues(alpha: 0.1),
-                        child: Text(author.isNotEmpty ? author[0].toUpperCase() : 'U',
-                            style: const TextStyle(color: AppColors.primaryColor, fontWeight: FontWeight.bold)),
-                      ),
-                      title: Text(author, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
-                      subtitle: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                        Text(content, maxLines: 2, overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
-                        const SizedBox(height: 4),
-                        Row(children: [
-                          Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                            decoration: BoxDecoration(color: const Color(0xFFF1F5F9), borderRadius: BorderRadius.circular(6)),
-                            child: Text(cat, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Color(0xFF64748B)))),
-                          const SizedBox(width: 8),
-                          const Icon(Icons.favorite_rounded, size: 12, color: Color(0xFFEF4444)),
-                          const SizedBox(width: 3),
-                          Text(likes, style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
-                          const SizedBox(width: 8),
-                          const Icon(Icons.chat_bubble_rounded, size: 12, color: AppColors.primaryColor),
-                          const SizedBox(width: 3),
-                          Text(comments, style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
-                        ]),
-                      ]),
-                      trailing: IconButton(
-                        icon: const Icon(Icons.delete_outline_rounded, color: Color(0xFFEF4444)),
-                        tooltip: 'Delete post',
-                        onPressed: postId.isEmpty ? null : () => _adminDeletePost(postId),
-                      ),
-                    ),
-                  );
-                }).toList(),
-            ],
-          ),
-        );
-      },
+    if (_isLoadingCommunity) return const Center(child: CircularProgressIndicator());
+    return RefreshIndicator(
+      onRefresh: _fetchCommunityData,
+      child: ListView(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
+        children: _buildCommunityChildren(),
+      ),
     );
   }
 
-  Future<Map<String, dynamic>> _fetchCommunityData() async {
+  List<Widget> _buildCommunityChildren() {
+    final List<Widget> widgets = [];
+
+    // ── Topics header ──────────────────────────────────────────────────
+    widgets.add(const Text('Community Topics',
+        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: Color(0xFF0F172A))));
+    widgets.add(const SizedBox(height: 10));
+
+    if (_communityTopics.isEmpty) {
+      widgets.add(const Padding(
+        padding: EdgeInsets.symmetric(vertical: 12),
+        child: Text('No custom topics yet. Default topics are always available.',
+            style: TextStyle(color: Color(0xFF94A3B8), fontSize: 13)),
+      ));
+    } else {
+      final List<Widget> chips = [];
+      for (final raw in _communityTopics) {
+        try {
+          final Map<String, dynamic> t = raw is Map<String, dynamic>
+              ? raw
+              : (raw is Map ? Map<String, dynamic>.from(raw) : <String, dynamic>{});
+          final name = t['name']?.toString() ?? '';
+          final id = t['_id']?.toString() ?? '';
+          if (name.isEmpty) continue;
+          chips.add(Chip(
+            label: Text(name, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+            backgroundColor: const Color(0xFFEDE9FE),
+            side: const BorderSide(color: Color(0xFF7C3AED), width: 1),
+            deleteIcon: const Icon(Icons.close_rounded, size: 16, color: Color(0xFF7C3AED)),
+            onDeleted: id.isEmpty ? null : () => _deleteTopic(id, name),
+          ));
+        } catch (_) {}
+      }
+      widgets.add(Wrap(spacing: 8, runSpacing: 8, children: chips));
+    }
+
+    widgets.add(const SizedBox(height: 24));
+    widgets.add(const Divider(color: Color(0xFFE2E8F0)));
+    widgets.add(const SizedBox(height: 12));
+
+    // ── Posts header ──────────────────────────────────────────────────
+    widgets.add(Text('All Posts (${_communityPosts.length})',
+        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: Color(0xFF0F172A))));
+    widgets.add(const SizedBox(height: 10));
+
+    if (_communityPosts.isEmpty) {
+      widgets.add(const Padding(
+        padding: EdgeInsets.all(24),
+        child: Center(child: Text('No posts yet.', style: TextStyle(color: Color(0xFF94A3B8)))),
+      ));
+    } else {
+      for (final raw in _communityPosts) {
+        try {
+          final Map<String, dynamic> p = raw is Map<String, dynamic>
+              ? raw
+              : (raw is Map ? Map<String, dynamic>.from(raw) : <String, dynamic>{});
+
+          final postId = p['_id']?.toString() ?? p['id']?.toString() ?? '';
+          final author = p['userName']?.toString() ?? p['authorName']?.toString() ?? 'User';
+          final content = p['content']?.toString() ?? '';
+          final cat = p['category']?.toString() ?? 'General';
+
+          // Safe numeric extraction (handles int, double, null)
+          int likesCount = 0;
+          final lc = p['likeCount'];
+          if (lc is int) {
+            likesCount = lc;
+          } else if (lc is num) {
+            likesCount = lc.toInt();
+          } else if (p['likes'] is List) {
+            likesCount = (p['likes'] as List).length;
+          }
+
+          int commentsCount = 0;
+          final cc = p['commentCount'];
+          if (cc is int) {
+            commentsCount = cc;
+          } else if (cc is num) {
+            commentsCount = cc.toInt();
+          } else if (p['comments'] is List) {
+            commentsCount = (p['comments'] as List).length;
+          }
+
+          widgets.add(Card(
+            margin: const EdgeInsets.only(bottom: 10),
+            elevation: 0,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: const BorderSide(color: Color(0xFFE2E8F0)),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(14),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  CircleAvatar(
+                    radius: 20,
+                    backgroundColor: AppColors.primaryColor.withValues(alpha: 0.1),
+                    child: Text(
+                      author.isNotEmpty ? author[0].toUpperCase() : 'U',
+                      style: const TextStyle(color: AppColors.primaryColor, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(child: Text(author,
+                                style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+                                overflow: TextOverflow.ellipsis)),
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                              decoration: BoxDecoration(
+                                  color: const Color(0xFFF1F5F9),
+                                  borderRadius: BorderRadius.circular(6)),
+                              child: Text(cat,
+                                  style: const TextStyle(
+                                      fontSize: 10, fontWeight: FontWeight.w700,
+                                      color: Color(0xFF64748B))),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        Text(content,
+                            maxLines: 3,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontSize: 13, color: Color(0xFF475569))),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            const Icon(Icons.favorite_rounded, size: 14, color: Color(0xFFEF4444)),
+                            const SizedBox(width: 4),
+                            Text('$likesCount',
+                                style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                            const SizedBox(width: 12),
+                            GestureDetector(
+                              onTap: commentsCount > 0 && postId.isNotEmpty
+                                  ? () => setState(() {
+                                        if (_expandedPostIds.contains(postId)) {
+                                          _expandedPostIds.remove(postId);
+                                        } else {
+                                          _expandedPostIds.add(postId);
+                                        }
+                                      })
+                                  : null,
+                              child: Row(children: [
+                                const Icon(Icons.chat_bubble_rounded, size: 14, color: AppColors.primaryColor),
+                                const SizedBox(width: 4),
+                                Text('$commentsCount',
+                                    style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                                if (commentsCount > 0) ...[
+                                  const SizedBox(width: 4),
+                                  Icon(
+                                    _expandedPostIds.contains(postId) ? Icons.expand_less_rounded : Icons.expand_more_rounded,
+                                    size: 14, color: AppColors.primaryColor,
+                                  ),
+                                ],
+                              ]),
+                            ),
+                            const Spacer(),
+                            if (postId.isNotEmpty)
+                              GestureDetector(
+                                onTap: () => _adminDeletePost(postId),
+                                child: const Icon(Icons.delete_outline_rounded,
+                                    size: 20, color: Color(0xFFEF4444)),
+                              ),
+                          ],
+                        ),
+                        // Expandable comments section
+                        if (_expandedPostIds.contains(postId)) ...[
+                          const SizedBox(height: 10),
+                          const Divider(height: 1, color: Color(0xFFE2E8F0)),
+                          const SizedBox(height: 8),
+                          ...() {
+                            final rawComments = p['comments'];
+                            if (rawComments is! List || rawComments.isEmpty) {
+                              return [const Text('No comments.', style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8)))];
+                            }
+                            return rawComments.map<Widget>((rc) {
+                              final c = rc is Map<String, dynamic> ? rc : (rc is Map ? Map<String, dynamic>.from(rc) : <String, dynamic>{});
+                              final commentId = c['_id']?.toString() ?? '';
+                              final commentAuthor = c['userName']?.toString() ?? 'User';
+                              final commentText = c['content']?.toString() ?? '';
+                              return Padding(
+                                padding: const EdgeInsets.only(bottom: 8),
+                                child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    CircleAvatar(
+                                      radius: 13,
+                                      backgroundColor: const Color(0xFFE0F2FE),
+                                      child: Text(commentAuthor.isNotEmpty ? commentAuthor[0].toUpperCase() : 'U',
+                                          style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF0284C7))),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                                        Text(commentAuthor, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700)),
+                                        Text(commentText, style: const TextStyle(fontSize: 12, color: Color(0xFF475569))),
+                                      ]),
+                                    ),
+                                    if (commentId.isNotEmpty)
+                                      GestureDetector(
+                                        onTap: () => _adminDeleteComment(postId, commentId, commentAuthor),
+                                        child: const Padding(
+                                          padding: EdgeInsets.only(left: 6),
+                                          child: Icon(Icons.delete_outline_rounded, size: 16, color: Color(0xFFEF4444)),
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              );
+                            }).toList();
+                          }(),
+                        ],
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ));
+        } catch (_) {}
+      }
+    }
+
+    return widgets;
+  }
+
+  Future<void> _fetchCommunityData() async {
+    if (mounted) setState(() => _isLoadingCommunity = true);
     try {
       final postsRes = await _apiService.get('/community/posts');
       final topicsRes = await _apiService.get('/community/categories-full');
-      return {
-        'posts': postsRes.data['posts'] ?? [],
-        'topics': topicsRes.data['topics'] ?? [],
-      };
+      if (mounted) setState(() {
+        _communityPosts = (postsRes.data['posts'] is List) ? postsRes.data['posts'] as List : [];
+        _communityTopics = (topicsRes.data['topics'] is List) ? topicsRes.data['topics'] as List : [];
+      });
     } catch (_) {
       try {
         final postsRes = await _apiService.get('/community/posts');
-        return {'posts': postsRes.data['posts'] ?? [], 'topics': []};
-      } catch (_) {
-        return {'posts': [], 'topics': []};
-      }
+        if (mounted) setState(() {
+          _communityPosts = (postsRes.data['posts'] is List) ? postsRes.data['posts'] as List : [];
+          _communityTopics = [];
+        });
+      } catch (_) {}
     }
+    if (mounted) setState(() => _isLoadingCommunity = false);
   }
 
   void _showAddTopicDialog() {
@@ -1487,7 +1714,7 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
                 await _apiService.post('/community/categories', {'name': name});
                 if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Topic "$name" added!'), backgroundColor: Colors.green));
-                  setState(() {});
+                  _fetchCommunityData();
                 }
               } catch (e) {
                 if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed: $e'), backgroundColor: Colors.red));
@@ -1517,7 +1744,7 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
     if (ok != true) return;
     try {
       await _apiService.delete('/community/categories/$id');
-      if (mounted) { setState(() {}); ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Topic deleted'), backgroundColor: Colors.green)); }
+      if (mounted) { _fetchCommunityData(); ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Topic deleted'), backgroundColor: Colors.green)); }
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed: $e'), backgroundColor: Colors.red));
     }
@@ -1539,7 +1766,29 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
     if (ok != true) return;
     try {
       await _apiService.delete('/community/posts/$postId');
-      if (mounted) { setState(() {}); ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Post deleted'), backgroundColor: Colors.green)); }
+      if (mounted) { _expandedPostIds.remove(postId); _fetchCommunityData(); ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Post deleted'), backgroundColor: Colors.green)); }
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed: $e'), backgroundColor: Colors.red));
+    }
+  }
+
+  Future<void> _adminDeleteComment(String postId, String commentId, String author) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete Comment', style: TextStyle(fontWeight: FontWeight.w800)),
+        content: Text('Delete this comment by $author?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+              onPressed: () => Navigator.pop(ctx, true), child: const Text('Delete')),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    try {
+      await _apiService.delete('/community/posts/$postId/comments/$commentId');
+      if (mounted) { _fetchCommunityData(); ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Comment deleted'), backgroundColor: Colors.green)); }
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed: $e'), backgroundColor: Colors.red));
     }
@@ -1547,14 +1796,10 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
 
   // ── Doctor Tools Tab (6.1.4 license expiry, 6.1.5 max time, 6.1.6 no referrer) ─
   Widget _buildDoctorToolsTab() {
-    return FutureBuilder<Map<String, dynamic>>(
-      future: _fetchDoctorToolsData(),
-      builder: (context, snap) {
-        if (snap.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        }
-        final expiringDoctors = (snap.data?['expiringLicenses'] as List?) ?? [];
-        final noReferrerDoctors = (snap.data?['noReferrerDoctors'] as List?) ?? [];
+    if (_isLoadingDoctorTools) return const Center(child: CircularProgressIndicator());
+    {
+        final expiringDoctors = _expiringLicenses;
+        final noReferrerDoctors = _noReferrerDoctors;
 
         return ListView(
           padding: const EdgeInsets.all(16),
@@ -1669,19 +1914,224 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
               )).toList(),
           ],
         );
-      },
+    }
+  }
+
+  Future<void> _fetchDoctorToolsData() async {
+    if (mounted) setState(() => _isLoadingDoctorTools = true);
+    try {
+      final r = await _apiService.get('/admin/doctor-tools');
+      if (mounted) setState(() {
+        _expiringLicenses = (r.data['expiringLicenses'] is List) ? r.data['expiringLicenses'] as List : [];
+        _noReferrerDoctors = (r.data['noReferrerDoctors'] is List) ? r.data['noReferrerDoctors'] as List : [];
+      });
+    } catch (_) {}
+    if (mounted) setState(() => _isLoadingDoctorTools = false);
+  }
+
+  // ─── FAQs Tab ─────────────────────────────────────────────────────────────
+
+  Future<void> _fetchFaqs() async {
+    if (mounted) setState(() => _isLoadingFaqs = true);
+    try {
+      final r = await _apiService.get('/faqs/all');
+      if (mounted) setState(() => _faqs = (r.data['faqs'] is List) ? r.data['faqs'] as List : []);
+    } catch (_) {}
+    if (mounted) setState(() => _isLoadingFaqs = false);
+  }
+
+  Future<void> _showFaqDialog({Map<String, dynamic>? existing}) async {
+    final questionCtrl = TextEditingController(text: existing?['question']?.toString() ?? '');
+    final answerCtrl = TextEditingController(text: existing?['answer']?.toString() ?? '');
+    String selectedType = existing?['accountType']?.toString() ?? 'general';
+
+    const accountTypes = ['general', 'patient', 'doctor', 'pharmacy', 'lab', 'instructor', 'student'];
+
+    await showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setS) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Text(existing == null ? 'Add FAQ' : 'Edit FAQ',
+              style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 17)),
+          content: SizedBox(
+            width: 480,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                DropdownButtonFormField<String>(
+                  value: selectedType,
+                  decoration: const InputDecoration(labelText: 'Account Type', border: OutlineInputBorder()),
+                  items: accountTypes.map((t) => DropdownMenuItem(value: t,
+                    child: Text(t[0].toUpperCase() + t.substring(1)))).toList(),
+                  onChanged: (v) => setS(() => selectedType = v ?? 'general'),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: questionCtrl,
+                  maxLines: 2,
+                  decoration: const InputDecoration(labelText: 'Question *', border: OutlineInputBorder()),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: answerCtrl,
+                  maxLines: 4,
+                  decoration: const InputDecoration(labelText: 'Answer *', border: OutlineInputBorder()),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryColor, foregroundColor: Colors.white, elevation: 0),
+              onPressed: () async {
+                final q = questionCtrl.text.trim();
+                final a = answerCtrl.text.trim();
+                if (q.isEmpty || a.isEmpty) return;
+                Navigator.pop(ctx);
+                try {
+                  if (existing == null) {
+                    await _apiService.post('/faqs', {'question': q, 'answer': a, 'accountType': selectedType});
+                  } else {
+                    await _apiService.put('/faqs/${existing['_id']}', {'question': q, 'answer': a, 'accountType': selectedType});
+                  }
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                      content: Text(existing == null ? 'FAQ added!' : 'FAQ updated!'),
+                      backgroundColor: Colors.green,
+                    ));
+                    _fetchFaqs();
+                  }
+                } catch (e) {
+                  if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed: $e'), backgroundColor: Colors.red));
+                }
+              },
+              child: Text(existing == null ? 'Add FAQ' : 'Save'),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
-  Future<Map<String, dynamic>> _fetchDoctorToolsData() async {
+  Future<void> _deleteFaq(String id) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete FAQ?'),
+        content: const Text('This FAQ will be permanently removed.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
     try {
-      final r = await _apiService.get('/admin/doctor-tools');
-      return {
-        'expiringLicenses': r.data['expiringLicenses'] ?? [],
-        'noReferrerDoctors': r.data['noReferrerDoctors'] ?? [],
-      };
-    } catch (_) {
-      return {'expiringLicenses': [], 'noReferrerDoctors': []};
+      await _apiService.delete('/faqs/$id');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('FAQ deleted'), backgroundColor: Colors.green));
+        _fetchFaqs();
+      }
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed: $e'), backgroundColor: Colors.red));
     }
+  }
+
+  Widget _buildFaqsTab() {
+    if (_isLoadingFaqs) return const Center(child: CircularProgressIndicator());
+    const typeColors = {
+      'general': Color(0xFF6366F1),
+      'patient': Color(0xFF10B981),
+      'doctor': Color(0xFF3B82F6),
+      'pharmacy': Color(0xFFF59E0B),
+      'lab': Color(0xFF8B5CF6),
+      'instructor': Color(0xFFEF4444),
+      'student': Color(0xFF06B6D4),
+    };
+    return _faqs.isEmpty
+          ? Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.help_outline_rounded, size: 64, color: Colors.grey.shade300),
+                  const SizedBox(height: 16),
+                  const Text('No FAQs yet', style: TextStyle(fontSize: 16, color: Color(0xFF94A3B8), fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 24),
+                  ElevatedButton.icon(
+                    onPressed: () => _showFaqDialog(),
+                    icon: const Icon(Icons.add_rounded),
+                    label: const Text('Add First FAQ'),
+                    style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryColor, foregroundColor: Colors.white, elevation: 0),
+                  ),
+                ],
+              ),
+            )
+          : ListView.builder(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
+              itemCount: _faqs.length,
+              itemBuilder: (_, i) {
+                final Map<String, dynamic> faq = _faqs[i] is Map<String, dynamic>
+                    ? _faqs[i] as Map<String, dynamic>
+                    : (_faqs[i] is Map ? Map<String, dynamic>.from(_faqs[i] as Map) : <String, dynamic>{});
+                final id = faq['_id']?.toString() ?? '';
+                final q = faq['question']?.toString() ?? '';
+                final a = faq['answer']?.toString() ?? '';
+                final type = faq['accountType']?.toString() ?? 'general';
+                final color = typeColors[type] ?? const Color(0xFF6366F1);
+                return Card(
+                  margin: const EdgeInsets.only(bottom: 10),
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    side: const BorderSide(color: Color(0xFFE2E8F0)),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(14),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(color: color.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(8)),
+                          child: Text(type[0].toUpperCase() + type.substring(1),
+                              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: color)),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(q, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: Color(0xFF0F172A))),
+                              const SizedBox(height: 6),
+                              Text(a, style: const TextStyle(fontSize: 13, color: Color(0xFF64748B))),
+                            ],
+                          ),
+                        ),
+                        Column(
+                          children: [
+                            IconButton(
+                              icon: const Icon(Icons.edit_rounded, size: 18, color: Color(0xFF6366F1)),
+                              tooltip: 'Edit',
+                              onPressed: () => _showFaqDialog(existing: faq),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.delete_outline_rounded, size: 18, color: Color(0xFFEF4444)),
+                              tooltip: 'Delete',
+                              onPressed: () => _deleteFaq(id),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            );
   }
 }

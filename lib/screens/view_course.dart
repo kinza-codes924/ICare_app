@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:icare/services/lms_service.dart';
 import 'package:icare/models/course.dart';
 import 'package:icare/screens/lesson_player.dart';
 import 'package:icare/screens/lms_course_page.dart';
@@ -23,6 +24,7 @@ class ViewCourse extends ConsumerStatefulWidget {
 
 class _ViewCourseState extends ConsumerState<ViewCourse> {
   final CourseService _courseService = CourseService();
+  final LmsService _lms = LmsService();
   final TextEditingController _questionController = TextEditingController();
   bool _isPurchased = false;
   String? _currentEnrollmentId;
@@ -30,6 +32,8 @@ class _ViewCourseState extends ConsumerState<ViewCourse> {
   List<dynamic> _questions = [];
   bool _loadingQuestions = false;
   bool _isInstructor = false;
+  final Set<String> _completedModuleIds = {};
+  final Set<String> _completedLessonIds = {};
 
   @override
   void initState() {
@@ -765,29 +769,111 @@ class _ViewCourseState extends ConsumerState<ViewCourse> {
       instructorName = instrVal2['name']?.toString() ?? instructorName;
     } else if (instrVal2 is String) instructorName = instrVal2;
 
+    // Course type + lock metadata from backend
+    final courseType = widget.courseData?['courseType']?.toString() ?? 'self-paced';
+    final startDateRaw = widget.courseData?['startDate'];
+    DateTime? courseStartDate;
+    if (startDateRaw != null) {
+      try { courseStartDate = DateTime.parse(startDateRaw.toString()); } catch (_) {}
+    }
+    // Backend-provided completed module IDs (for self-paced sequential lock)
+    final completedModuleIds = <String>{
+      ...((widget.courseData?['completedModuleIds'] as List?) ?? []).map((e) => e.toString()),
+      ..._completedModuleIds,
+    };
+
     return Column(
       children: modules.asMap().entries.map((mEntry) {
         final mIndex = mEntry.key;
         final module = mEntry.value;
         final lessons = module['lessons'] as List? ?? [];
 
+        // Prefer backend-computed isLocked + unlockDate fields, fall back to client-side
+        bool isModuleLocked = module['isLocked'] == true;
+        String? moduleLockLabel;
+
+        if (isPurchased && !_isInstructor) {
+          if (isModuleLocked) {
+            // Use backend-provided unlock date if available
+            final unlockRaw = module['unlockDate']?.toString() ?? '';
+            if (unlockRaw.isNotEmpty) {
+              try {
+                final unlockDate = DateTime.parse(unlockRaw);
+                moduleLockLabel = 'Unlocks ${unlockDate.day}/${unlockDate.month}/${unlockDate.year}';
+              } catch (_) {}
+            } else if (courseType == 'pragmatic' && courseStartDate != null) {
+              final unlockDays = (module['unlockAfterDays'] as num?)?.toInt() ?? 0;
+              final unlockDate = courseStartDate.add(Duration(days: unlockDays));
+              moduleLockLabel = 'Unlocks ${unlockDate.day}/${unlockDate.month}/${unlockDate.year}';
+            } else if (courseType == 'self-paced' && mIndex > 0) {
+              moduleLockLabel = 'Complete the previous module first';
+            }
+          } else if (!isModuleLocked && courseType == 'pragmatic') {
+            // Client-side fallback for pragmatic if backend didn't set isLocked
+            final unlockDays = (module['unlockAfterDays'] as num?)?.toInt() ?? 0;
+            if (unlockDays > 0 && courseStartDate != null) {
+              final unlockDate = courseStartDate.add(Duration(days: unlockDays));
+              if (DateTime.now().isBefore(unlockDate)) {
+                isModuleLocked = true;
+                moduleLockLabel = 'Unlocks ${unlockDate.day}/${unlockDate.month}/${unlockDate.year}';
+              }
+            }
+          } else if (!isModuleLocked && courseType == 'self-paced' && mIndex > 0) {
+            // Client-side fallback for self-paced sequential lock
+            final prevModule = modules[mIndex - 1];
+            final prevId = prevModule['_id']?.toString() ?? '';
+            if (prevId.isNotEmpty && !completedModuleIds.contains(prevId)) {
+              isModuleLocked = true;
+              moduleLockLabel = 'Complete the previous module first';
+            }
+          }
+        }
+
         return Container(
           margin: const EdgeInsets.only(bottom: 12),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: isModuleLocked ? const Color(0xFFF8FAFC) : Colors.white,
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: const Color(0xFFE2E8F0)),
+            border: Border.all(color: isModuleLocked ? const Color(0xFFCBD5E1) : const Color(0xFFE2E8F0)),
           ),
           child: ExpansionTile(
-            initiallyExpanded: mIndex == 0,
-            title: Text(
-              module['title'] ?? "Module ${mIndex + 1}",
-              style: const TextStyle(
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF0F172A),
-              ),
+            initiallyExpanded: mIndex == 0 && !isModuleLocked,
+            leading: isModuleLocked
+                ? const Icon(Icons.lock_rounded, color: Color(0xFF94A3B8), size: 20)
+                : null,
+            title: Row(
+              children: [
+                Expanded(child: Text(
+                  module['title'] ?? "Module ${mIndex + 1}",
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: isModuleLocked ? const Color(0xFF94A3B8) : const Color(0xFF0F172A),
+                  ),
+                )),
+                if (moduleLockLabel != null)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(color: const Color(0xFFF1F5F9), borderRadius: BorderRadius.circular(6)),
+                    child: Text(moduleLockLabel, style: const TextStyle(fontSize: 11, color: Color(0xFF64748B), fontWeight: FontWeight.w600)),
+                  ),
+              ],
             ),
             children: [
+              if (isModuleLocked)
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.schedule_rounded, color: Color(0xFF94A3B8), size: 18),
+                      const SizedBox(width: 8),
+                      Text(
+                        moduleLockLabel ?? 'Locked',
+                        style: const TextStyle(color: Color(0xFF94A3B8), fontStyle: FontStyle.italic),
+                      ),
+                    ],
+                  ),
+                )
+              else
               ...lessons.map((lesson) {
                 return ListTile(
                   leading: const Icon(
@@ -829,7 +915,9 @@ class _ViewCourseState extends ConsumerState<ViewCourse> {
                                 courseTitle: courseTitle,
                                 instructorName: instructorName,
                                 certificateReleased: widget.courseData?['certificateReleased'] == true,
-                                enrollmentId: _currentEnrollmentId, // for saving to My Certificates
+                                enrollmentId: _currentEnrollmentId,
+                                initialIsCompleted: lessonId != null && _completedLessonIds.contains(lessonId),
+                                onLessonCompleted: (id) => setState(() => _completedLessonIds.add(id)),
                               ),
                             ),
                           );
@@ -845,7 +933,49 @@ class _ViewCourseState extends ConsumerState<ViewCourse> {
                         },
                 );
               }),
-              if (module['quiz'] != null) ...[
+              // Mark Module Complete button (students, unlocked modules, enrolled)
+              if (!isModuleLocked && isPurchased && !_isInstructor && _currentEnrollmentId != null) ...[
+                const Divider(height: 1),
+                Builder(builder: (ctx) {
+                  final moduleId = module['_id']?.toString() ?? '';
+                  final isDone = _completedModuleIds.contains(moduleId);
+                  return ListTile(
+                    leading: Icon(
+                      isDone ? Icons.check_circle_rounded : Icons.check_circle_outline_rounded,
+                      color: isDone ? const Color(0xFF10B981) : const Color(0xFF64748B),
+                    ),
+                    title: Text(
+                      isDone ? 'Module Completed' : 'Mark Module as Complete',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        color: isDone ? const Color(0xFF10B981) : const Color(0xFF14B1FF),
+                      ),
+                    ),
+                    onTap: isDone ? null : () async {
+                      if (moduleId.isEmpty) return;
+                      final result = await _lms.markModuleComplete(
+                        enrollmentId: _currentEnrollmentId!,
+                        moduleId: moduleId,
+                      );
+                      if (mounted) {
+                        if (result['success'] != false) {
+                          setState(() => _completedModuleIds.add(moduleId));
+                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                            content: Text('Module marked as complete!'),
+                            backgroundColor: Color(0xFF10B981),
+                          ));
+                        } else {
+                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                            content: Text(result['message']?.toString() ?? 'Failed'),
+                            backgroundColor: Colors.red,
+                          ));
+                        }
+                      }
+                    },
+                  );
+                }),
+              ],
+              if (!isModuleLocked && module['quiz'] != null) ...[
                 const Divider(height: 1),
                 ListTile(
                   leading: const Icon(

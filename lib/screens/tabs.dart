@@ -46,8 +46,7 @@ import 'package:icare/screens/lifestyle_tracker_screen.dart';
 import 'package:icare/screens/emergency_contacts_screen.dart';
 import 'package:icare/screens/security_audit_log_screen.dart';
 import 'package:icare/screens/certificates_screen.dart';
-import 'package:icare/screens/resource_library_screen.dart';
-import 'package:icare/screens/tasks.dart';
+import 'package:icare/screens/assessments_screen.dart';
 import 'package:icare/screens/health_community.dart';
 import 'package:icare/screens/settings.dart';
 import 'package:icare/screens/patient_book_lab_flow.dart';
@@ -154,6 +153,7 @@ class _TabsScreenState extends ConsumerState<TabsScreen> {
         if (courseId.isEmpty) continue;
         try {
           final result = await _lms.checkActiveLiveSession(courseId);
+          debugPrint('📡 Tab poller - $courseTitle ($courseId): isLive=${result['isLive']}');
 
           if (result['isLive'] != true) {
             // Session ended — clear snooze so next session shows fresh
@@ -456,9 +456,10 @@ class _TabsScreenState extends ConsumerState<TabsScreen> {
         body: Stack(
           children: [
             activePage,
-            WhatsAppFloatingButton(
-              bottomOffset: (role == 'Pharmacy' && currentIndex == 1) ? 90 : 20,
-            ),
+            if (role != 'Patient')
+              WhatsAppFloatingButton(
+                bottomOffset: (role == 'Pharmacy' && currentIndex == 1) ? 90 : 20,
+              ),
           ],
         ),
         bottomNavigationBar: BottomTabBar(
@@ -531,9 +532,10 @@ class _TabsScreenState extends ConsumerState<TabsScreen> {
               ),
             ],
           ),
-          WhatsAppFloatingButton(
-            bottomOffset: (role == 'Pharmacy' && currentIndex == 1) ? 90 : 20,
-          ),
+          if (role != 'Patient')
+            WhatsAppFloatingButton(
+              bottomOffset: (role == 'Pharmacy' && currentIndex == 1) ? 90 : 20,
+            ),
         ],
       ),
     );
@@ -633,13 +635,6 @@ class _WebSidebarState extends ConsumerState<_WebSidebar> {
           Icons.workspace_premium_outlined,
           () => Navigator.of(context).push(
             MaterialPageRoute(builder: (ctx) => const CertificatesScreen()),
-          ),
-        ),
-        _SidebarAction(
-          'Resource Library',
-          Icons.library_books_outlined,
-          () => Navigator.of(context).push(
-            MaterialPageRoute(builder: (ctx) => const ResourceLibraryScreen()),
           ),
         ),
       ];
@@ -1354,23 +1349,11 @@ class _WebSidebarState extends ConsumerState<_WebSidebar> {
                   ),
                   _buildExtraNavItem(
                     context,
-                    Icons.library_books_outlined,
-                    'Resource Library',
-                    () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (ctx) => const ResourceLibraryScreen(),
-                        ),
-                      );
-                    },
-                  ),
-                  _buildExtraNavItem(
-                    context,
                     Icons.task_alt_outlined,
                     'Assessments',
                     () {
                       Navigator.of(context).push(
-                        MaterialPageRoute(builder: (ctx) => const TaskScreen()),
+                        MaterialPageRoute(builder: (ctx) => const AssessmentsScreen()),
                       );
                     },
                   ),

@@ -61,14 +61,23 @@ const courseSchema = new mongoose.Schema({
     ref: 'User',
     required: true,
   },
+  // Co-instructors with role: lead | normal
+  coTeachers: [{
+    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    name: String,
+    email: String,
+    role: { type: String, enum: ['lead', 'normal'], default: 'normal' },
+  }],
+  // Mark as RM Health Solutions / RMS UK course for public home display
+  isRmsCourse: { type: Boolean, default: false },
   modules: [moduleSchema],
   assigned_to: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
   is_active: { type: Boolean, default: true },
   rating: { type: Number, default: 0 },
   total_reviews: { type: Number, default: 0 },
-  // Instructor must explicitly release certificate before students can download
   certificateReleased: { type: Boolean, default: false },
   certificateTemplate: { type: String, default: 'classic' },
+  price: { type: Number, default: 0 },
 }, { timestamps: true });
 
 // No pre-save hooks — sync logic is handled in route handlers

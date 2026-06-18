@@ -32,7 +32,7 @@ class _InstructorCreateQuizScreenState extends State<InstructorCreateQuizScreen>
   int _passingScore = 60;
   int _maxAttempts = 3;
   bool _showCorrectAnswers = true;
-  bool _isPublished = false;
+  bool _isPublished = true;
 
   // Questions
   final List<Map<String, dynamic>> _questions = [];

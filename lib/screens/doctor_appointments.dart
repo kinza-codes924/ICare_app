@@ -1,6 +1,7 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:icare/models/appointment_detail.dart';
+import 'package:icare/widgets/date_filter_bar.dart';
 import 'package:icare/screens/consultation_chat_screen_v2.dart';
 import 'package:icare/screens/profile_or_appointement_view.dart';
 import 'package:icare/services/appointment_service.dart';
@@ -27,6 +28,8 @@ class _DoctorAppointmentsScreenState extends State<DoctorAppointmentsScreen> {
   List<AppointmentDetail> _appointments = [];
   bool _isLoading = true;
   late String _selectedFilter;
+  String _dateFilter = 'all';
+  DateTime? _customDate;
 
   @override
   void initState() {
@@ -76,15 +79,19 @@ class _DoctorAppointmentsScreenState extends State<DoctorAppointmentsScreen> {
   }
 
   List<AppointmentDetail> get _filteredAppointments {
-    if (_selectedFilter == 'all') return _appointments;
-    if (_selectedFilter == 'in_progress') {
-      return _appointments
+    List<AppointmentDetail> byStatus;
+    if (_selectedFilter == 'all') {
+      byStatus = _appointments;
+    } else if (_selectedFilter == 'in_progress') {
+      byStatus = _appointments
           .where((a) => a.status.toLowerCase() == 'in_progress' || a.status.toLowerCase() == 'in-progress')
           .toList();
+    } else {
+      byStatus = _appointments
+          .where((a) => a.status.toLowerCase() == _selectedFilter)
+          .toList();
     }
-    return _appointments
-        .where((a) => a.status.toLowerCase() == _selectedFilter)
-        .toList();
+    return applyDateFilter<AppointmentDetail>(byStatus, (a) => a.date, _dateFilter, _customDate);
   }
 
   Color _getStatusColor(String status) {
@@ -220,6 +227,16 @@ class _DoctorAppointmentsScreenState extends State<DoctorAppointmentsScreen> {
                 ],
               ),
             ),
+          ),
+
+          // Date Filter Bar
+          DateFilterBar(
+            selected: _dateFilter,
+            customDate: _customDate,
+            onChanged: (filter, date) => setState(() {
+              _dateFilter = filter;
+              if (date != null) _customDate = date;
+            }),
           ),
 
           // Appointments List
