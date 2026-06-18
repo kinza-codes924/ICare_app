@@ -21,6 +21,7 @@ class _StudentProfileSetupState extends State<StudentProfileSetup>
   bool _isLoading = true;
   bool _isSaving = false;
 
+  final _nameController = TextEditingController();
   final _bioController = TextEditingController();
   final _qualificationController = TextEditingController();
   final _ageController = TextEditingController();
@@ -58,6 +59,7 @@ class _StudentProfileSetupState extends State<StudentProfileSetup>
   @override
   void dispose() {
     _animationController.dispose();
+    _nameController.dispose();
     _bioController.dispose();
     _qualificationController.dispose();
     _ageController.dispose();
@@ -79,14 +81,20 @@ class _StudentProfileSetupState extends State<StudentProfileSetup>
   Future<void> _loadProfile() async {
     try {
       final data = await _studentService.getProfile();
-      final profile = data['student'];
+      final profile = data['student'] as Map<String, dynamic>?;
+      if (profile == null) {
+        setState(() => _isLoading = false);
+        _animationController.forward();
+        return;
+      }
       setState(() {
-        _bioController.text = profile['bio'] ?? '';
-        _qualificationController.text = profile['qualification'] ?? '';
+        _nameController.text = profile['name']?.toString() ?? '';
+        _bioController.text = profile['bio']?.toString() ?? '';
+        _qualificationController.text = profile['qualification']?.toString() ?? '';
         _ageController.text = profile['age']?.toString() ?? '';
-        _genderController.text = profile['gender'] ?? '';
-        _addressController.text = profile['address'] ?? '';
-        _educationLevelController.text = profile['educationLevel'] ?? '';
+        _genderController.text = profile['gender']?.toString() ?? '';
+        _addressController.text = profile['address']?.toString() ?? '';
+        _educationLevelController.text = profile['educationLevel']?.toString() ?? '';
         _preferencesController.text =
             (profile['preferences'] as List?)?.join(', ') ?? '';
         _existingProfilePictureUrl = profile['profilePicture']?.toString();
@@ -112,6 +120,7 @@ class _StudentProfileSetupState extends State<StudentProfileSetup>
           .toList();
 
       await _studentService.updateProfile({
+        'name': _nameController.text,
         'bio': _bioController.text,
         'qualification': _qualificationController.text,
         'age': int.tryParse(_ageController.text) ?? 0,
@@ -122,6 +131,10 @@ class _StudentProfileSetupState extends State<StudentProfileSetup>
         if (_imageBytes != null)
           'profilePicture': 'data:image/jpeg;base64,${base64Encode(_imageBytes!)}',
       });
+      // Update displayed image URL so it persists if user stays on this page
+      if (_imageBytes != null) {
+        setState(() => _existingProfilePictureUrl = 'data:image/jpeg;base64,${base64Encode(_imageBytes!)}');
+      }
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -193,6 +206,13 @@ class _StudentProfileSetupState extends State<StudentProfileSetup>
                             'Personal Details',
                             Icons.person_outline_rounded,
                             [
+                              _buildTextField(
+                                controller: _nameController,
+                                label: 'Full Name',
+                                icon: Icons.badge_outlined,
+                                hint: 'Your full name',
+                              ),
+                              const SizedBox(height: 16),
                               Row(
                                 children: [
                                   Expanded(

@@ -181,6 +181,7 @@ router.get('/profile', authMiddleware, async (req, res) => {
     const lab = {
       id: user._id.toString(), _id: user._id.toString(),
       username: user.username || user.name, email: user.email, phone: user.phone,
+      profilePicture: user.profilePicture || null,
       ...profile,
       // Re-assert user._id AFTER spread so profile._id never overrides it
       _id: user._id.toString(),

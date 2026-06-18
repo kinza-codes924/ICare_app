@@ -41,7 +41,17 @@ router.get('/me', authMiddleware, async (req, res) => {
     const user = await User.findById(userId).lean();
     let profile = await InstructorProfile.findOne({ user_id: userId }).lean();
     if (!profile) profile = await InstructorProfile.create({ user_id: userId });
-    res.json({ success: true, instructor: { _id: profile._id.toString(), user_id: userId.toString(), name: user?.username || user?.name || '', email: user?.email || '', ...profile } });
+    res.json({
+      success: true,
+      instructor: {
+        _id: profile._id.toString(),
+        user_id: userId.toString(),
+        name: user?.username || user?.name || '',
+        email: user?.email || '',
+        profilePicture: user?.profilePicture || null,
+        ...profile,
+      },
+    });
   } catch (e) {
     res.status(500).json({ success: false, message: e.message });
   }
@@ -52,9 +62,14 @@ router.post('/add_instructor_details', authMiddleware, async (req, res) => {
     await connectMongoDB();
     const userId = toId(req.user.id);
     const update = {};
-    const fields = ['bio', 'specialization', 'experience_years', 'profile_image'];
+    const fields = ['bio', 'specialization', 'experience_years', 'profile_image', 'qualification', 'experience', 'gender', 'age', 'address', 'specialties', 'languages', 'availabilityDays', 'availabilityTime'];
     fields.forEach(f => { if (req.body[f] !== undefined) update[f] = req.body[f]; });
     const profile = await InstructorProfile.findOneAndUpdate({ user_id: userId }, { $set: update }, { new: true, upsert: true });
+    // Save profilePicture and name to User model
+    const userUpdate = {};
+    if (req.body.profilePicture !== undefined) userUpdate.profilePicture = req.body.profilePicture;
+    if (req.body.name) { userUpdate.name = req.body.name; userUpdate.username = req.body.name; }
+    if (Object.keys(userUpdate).length > 0) await User.findByIdAndUpdate(userId, { $set: userUpdate });
     res.json({ success: true, instructor: profile });
   } catch (e) {
     res.status(500).json({ success: false, message: e.message });

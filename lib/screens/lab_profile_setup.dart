@@ -228,6 +228,9 @@ class _LabProfileSetupState extends State<LabProfileSetup>
         if (_imageBytes != null)
           'profilePicture': 'data:image/jpeg;base64,${base64Encode(_imageBytes!)}',
       });
+      if (_imageBytes != null) {
+        setState(() => _existingProfilePictureUrl = 'data:image/jpeg;base64,${base64Encode(_imageBytes!)}');
+      }
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

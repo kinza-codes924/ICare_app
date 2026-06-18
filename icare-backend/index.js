@@ -23,6 +23,7 @@ const agoraRoutes = require('./routes/agora');
 const callRoutes = require('./routes/call');
 const connectNowRoutes = require('./routes/connect-now');
 const instructorsRoutes = require('./routes/instructors');
+const studentsRoutes = require('./routes/students');
 const courseQuestionsRoutes = require('./routes/course-questions');
 const callChatRoutes = require('./routes/call-chat');
 const clinicalRoutes = require('./routes/clinical');
@@ -127,6 +128,7 @@ app.use('/api/agora', agoraRoutes);
 app.use('/api/call', callRoutes);
 app.use('/api/connect-now', connectNowRoutes);
 app.use('/api/instructors', instructorsRoutes);
+app.use('/api/students', studentsRoutes);
 app.use('/api/course-questions', courseQuestionsRoutes);
 
 // Stub routes — return empty success so Flutter doesn't crash on 404

@@ -233,6 +233,7 @@ router.get('/profile', authMiddleware, async (req, res) => {
         _id: user._id.toString(),   // always User._id — never let profile spread override this
         userId: user._id.toString(),
         username: user.username || user.name, email: user.email, phone: user.phone,
+        profilePicture: user.profilePicture || null,
         ...profile,
         _id: user._id.toString(),   // re-assert after spread so profile._id can't override
         id: user._id.toString(),

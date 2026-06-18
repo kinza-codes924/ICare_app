@@ -82,7 +82,7 @@ class _InstructorProfileSetupScreenState
           _availabilityDays = List<String>.from(
             profile['availabilityDays'] ?? [],
           );
-          _existingProfilePictureUrl = profile['profilePicture']?.toString();
+          _existingProfilePictureUrl = (profile['profilePicture'] ?? profile['profile_image'])?.toString();
 
           if (profile['availabilityTime'] != null) {
             final start = profile['availabilityTime']['start']?.split(':');
@@ -132,6 +132,9 @@ class _InstructorProfileSetupScreenState
         if (_imageBytes != null)
           'profilePicture': 'data:image/jpeg;base64,${base64Encode(_imageBytes!)}',
       });
+      if (_imageBytes != null) {
+        setState(() => _existingProfilePictureUrl = 'data:image/jpeg;base64,${base64Encode(_imageBytes!)}');
+      }
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
