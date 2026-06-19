@@ -20,6 +20,7 @@ import 'package:icare/screens/about_us.dart';
 import 'package:icare/screens/privacy_policy.dart';
 import 'package:icare/screens/terms_and_conditions.dart';
 import 'package:icare/screens/help_and_support.dart';
+import 'package:icare/utils/utils.dart' show buildProfileImageProvider;
 
 // ── Auth guard — show sign-in/sign-up dialog if not logged in ─────────────────
 Future<bool> _requireAuth(BuildContext context) async {
@@ -2323,8 +2324,8 @@ class _DoctorCardState extends State<_DoctorCard> {
                   ),
                   child: ClipOval(
                     child: imgUrl != null && imgUrl.isNotEmpty
-                        ? Image.network(
-                            imgUrl,
+                        ? Image(
+                            image: buildProfileImageProvider(imgUrl)!,
                             fit: BoxFit.cover,
                             errorBuilder: (_, _, _) => Container(
                               color: const Color(0xFF0036BC),
@@ -2483,7 +2484,7 @@ class _PharmaciesGrid extends StatelessWidget {
         physics: const NeverScrollableScrollPhysics(),
         crossAxisSpacing: 14,
         mainAxisSpacing: 14,
-        childAspectRatio: isMobile ? 1.3 : 1.5,
+        childAspectRatio: isMobile ? 0.85 : 1.5,
         children: _pharmacies.map((p) => _ServiceCard(
           name: p['name']!,
           subtitle: p['area']!,
@@ -2524,7 +2525,7 @@ class _LaboratoriesGrid extends StatelessWidget {
         physics: const NeverScrollableScrollPhysics(),
         crossAxisSpacing: 14,
         mainAxisSpacing: 14,
-        childAspectRatio: isMobile ? 1.3 : 1.5,
+        childAspectRatio: isMobile ? 0.85 : 1.5,
         children: _labs.map((l) => _ServiceCard(
           name: l['name']!,
           subtitle: l['area']!,
@@ -2673,7 +2674,7 @@ class _SpecialtyGrid extends StatelessWidget {
         physics: const NeverScrollableScrollPhysics(),
         crossAxisSpacing: 14,
         mainAxisSpacing: 14,
-        childAspectRatio: isMobile ? 1.3 : 1.5,
+        childAspectRatio: isMobile ? 0.95 : 1.5,
         children: _specialties.map((spec) {
           return _SpecialtyCard(
             name: spec['name'] as String,
@@ -2804,7 +2805,7 @@ class _ConditionGrid extends StatelessWidget {
         physics: const NeverScrollableScrollPhysics(),
         crossAxisSpacing: 14,
         mainAxisSpacing: 14,
-        childAspectRatio: isMobile ? 1.3 : 1.5,
+        childAspectRatio: isMobile ? 0.95 : 1.5,
         children: _conditions.map((cond) {
           return _ConditionCard(
             name: cond['name'] as String,

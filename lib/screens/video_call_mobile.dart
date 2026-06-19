@@ -396,6 +396,7 @@ class _VideoCallMobileState extends State<VideoCall> {
 
   void _toggleCam() async {
     _camOff = !_camOff;
+    await _engine?.enableLocalVideo(!_camOff);
     await _engine?.muteLocalVideoStream(_camOff);
     if (mounted) setState(() {});
   }

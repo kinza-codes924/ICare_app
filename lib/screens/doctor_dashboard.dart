@@ -73,9 +73,18 @@ class _DoctorDashboardState extends ConsumerState<DoctorDashboard> {
 
     try {
       final results = await Future.wait([
-        _appointmentService.getMyAppointmentsDetailed(),
-        _doctorService.getStats().catchError((_) => <String, dynamic>{'success': false, 'stats': {}}),
-        _doctorService.getClinicalRejectionFlags().catchError((_) => <String, dynamic>{'success': false, 'flags': []}),
+        _appointmentService.getMyAppointmentsDetailed().timeout(
+          const Duration(seconds: 25),
+          onTimeout: () => {'success': false, 'appointments': []},
+        ),
+        _doctorService.getStats().catchError((_) => <String, dynamic>{'success': false, 'stats': {}}).timeout(
+          const Duration(seconds: 25),
+          onTimeout: () => {'success': false, 'stats': {}},
+        ),
+        _doctorService.getClinicalRejectionFlags().catchError((_) => <String, dynamic>{'success': false, 'flags': []}).timeout(
+          const Duration(seconds: 25),
+          onTimeout: () => {'success': false, 'flags': []},
+        ),
       ]);
 
       if (mounted) {

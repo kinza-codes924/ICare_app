@@ -1092,7 +1092,8 @@ class _ConsultationChatScreenV2State extends State<ConsultationChatScreenV2> {
   Widget _buildAttachmentPreview(String url, bool isMe) {
     final lower = url.toLowerCase();
     final isImage = lower.endsWith('.jpg') || lower.endsWith('.jpeg') ||
-        lower.endsWith('.png') || lower.endsWith('.gif') || lower.endsWith('.webp');
+        lower.endsWith('.png') || lower.endsWith('.gif') || lower.endsWith('.webp') ||
+        (lower.contains('cloudinary.com') && lower.contains('/image/upload/'));
     if (isImage) {
       return GestureDetector(
         onTap: () => _showImagePreview(url),
