@@ -135,10 +135,16 @@ class _CoursesListState extends State<CoursesList> {
             courseData['isPurchased'] = true;
           }
 
+          // Pick the first non-empty thumbnail field the backend might return
+          final thumbRaw = courseData["thumbnail_url"] ??
+              courseData["thumbnail"] ??
+              courseData["image"];
+          final thumbStr = (thumbRaw is String && thumbRaw.trim().isNotEmpty)
+              ? thumbRaw.trim()
+              : ImagePaths.course1;
+
           return CourseCard(
-            image: (courseData["image"] is String)
-                ? (courseData["image"] as String)
-                : ImagePaths.course1,
+            image: thumbStr,
             title: (courseData["title"] is String)
                 ? (courseData["title"] as String)
                 : ((courseData["name"] is String)

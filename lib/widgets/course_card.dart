@@ -86,7 +86,10 @@ class CourseCard extends StatelessWidget {
   }
 
   Widget _buildImage(BuildContext context) {
-    String? rawPath = image ?? courseData?['image'] ?? courseData?['thumbnail'];
+    String? rawPath = image ??
+        courseData?['thumbnail_url'] ??
+        courseData?['thumbnail'] ??
+        courseData?['image'];
     String imagePath = (rawPath != null && rawPath.trim().isNotEmpty)
         ? rawPath.trim()
         : ImagePaths.course1;

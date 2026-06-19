@@ -772,7 +772,18 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
 
 
     // Mobile — same layout as login mobile
-    return Scaffold(
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) {
+          if (context.canPop()) {
+            context.pop();
+          } else {
+            context.go('/login');
+          }
+        }
+      },
+      child: Scaffold(
       body: Container(
         width: Utils.windowWidth(context),
         height: Utils.windowHeight(context),
@@ -860,7 +871,13 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
               top: MediaQuery.of(context).padding.top + 12,
               left: 16,
               child: GestureDetector(
-                onTap: () => Navigator.pop(context),
+                onTap: () {
+                  if (context.canPop()) {
+                    context.pop();
+                  } else {
+                    context.go('/login');
+                  }
+                },
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
                   decoration: BoxDecoration(
@@ -882,6 +899,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
           ],
         ),
       ),
-    );
+    ),  // Scaffold
+    );  // PopScope
   }
 }

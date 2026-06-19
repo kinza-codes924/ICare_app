@@ -2279,7 +2279,8 @@ class _DoctorCardState extends State<_DoctorCard> {
     final reviews = d['reviews']?.toString() ?? d['totalReviews']?.toString() ?? '0';
     final isOnline = d['isOnline'] == true || d['isOnline'] == 'true';
     final imgAsset = d['img']?.toString();
-    final imgUrl = d['profilePicture']?.toString();
+    // profilePicture may be at top level or nested under 'user'
+    final imgUrl = (d['profilePicture'] ?? (d['user'] as Map?)?['profilePicture'])?.toString();
     final ratingVal = double.tryParse(rating) ?? 4.5;
 
     return MouseRegion(
