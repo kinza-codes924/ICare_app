@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:icare/models/user.dart';
+import 'package:icare/utils/utils.dart' show buildProfileImageProvider;
 import 'package:icare/widgets/back_button.dart';
 import 'package:intl/intl.dart';
 import 'package:icare/services/course_service.dart';
@@ -103,17 +104,40 @@ class _PatientProfileViewState extends State<PatientProfileView> {
                             ),
                           ],
                         ),
-                        child: Center(
-                          child: Text(
-                            widget.patient.name.isNotEmpty
-                                ? widget.patient.name[0].toUpperCase()
-                                : 'P',
-                            style: const TextStyle(
-                              fontSize: 48,
-                              fontWeight: FontWeight.w900,
-                              color: Color(0xFF6366F1),
-                            ),
-                          ),
+                        child: ClipOval(
+                          child: widget.patient.profilePicture != null &&
+                                  widget.patient.profilePicture!.isNotEmpty
+                              ? Image(
+                                  image: buildProfileImageProvider(
+                                      widget.patient.profilePicture)!,
+                                  width: 120,
+                                  height: 120,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, __, ___) => Center(
+                                    child: Text(
+                                      widget.patient.name.isNotEmpty
+                                          ? widget.patient.name[0].toUpperCase()
+                                          : 'P',
+                                      style: const TextStyle(
+                                        fontSize: 48,
+                                        fontWeight: FontWeight.w900,
+                                        color: Color(0xFF6366F1),
+                                      ),
+                                    ),
+                                  ),
+                                )
+                              : Center(
+                                  child: Text(
+                                    widget.patient.name.isNotEmpty
+                                        ? widget.patient.name[0].toUpperCase()
+                                        : 'P',
+                                    style: const TextStyle(
+                                      fontSize: 48,
+                                      fontWeight: FontWeight.w900,
+                                      color: Color(0xFF6366F1),
+                                    ),
+                                  ),
+                                ),
                         ),
                       ),
                       const SizedBox(height: 20),

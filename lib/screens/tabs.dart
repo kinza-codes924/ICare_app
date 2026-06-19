@@ -318,6 +318,8 @@ class _TabsScreenState extends ConsumerState<TabsScreen> {
         activePage = const LabBookingsManagement();
       } else if (currentIndex == 2) {
         activePage = const LabReportsScreen();
+      } else if (currentIndex == 3) {
+        activePage = const LabProfileSetup();
       }
     } else if (role == "Doctor") {
       if (currentIndex == 0) {

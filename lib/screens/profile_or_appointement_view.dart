@@ -87,100 +87,328 @@ class ProfileOrAppointmentViewScreen extends ConsumerWidget {
         ),
       ),
       body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            ProfileInfoWidget(
-              name: otherPerson?.name ?? 'User',
-              // Doctors do not see patient contact details
-              email: selectedRole == 'Doctor' ? '' : (otherPerson?.email ?? 'N/A'),
-              appointmentId: appointment.id,
-              patient: appointment.patient,
-            ),
-            // Status badge
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            // Header card with avatar + name + booking ID + status
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF6366F1).withValues(alpha: 0.3),
+                    blurRadius: 20,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
+              ),
               child: Row(
                 children: [
-                  const Text('Status:', style: TextStyle(fontSize: 13, color: Color(0xFF64748B))),
-                  const SizedBox(width: 8),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                    width: 64,
+                    height: 64,
+                    decoration: const BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
+                    ),
+                    child: ClipOval(
+                      child: otherPerson?.profilePicture != null &&
+                              otherPerson!.profilePicture!.isNotEmpty
+                          ? Image(
+                              image: buildProfileImageProvider(
+                                  otherPerson.profilePicture)!,
+                              width: 64,
+                              height: 64,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => Center(
+                                child: Text(
+                                  otherPerson.name.isNotEmpty
+                                      ? otherPerson.name[0].toUpperCase()
+                                      : 'P',
+                                  style: const TextStyle(
+                                    fontSize: 26,
+                                    fontWeight: FontWeight.w900,
+                                    color: Color(0xFF6366F1),
+                                  ),
+                                ),
+                              ),
+                            )
+                          : Center(
+                              child: Text(
+                                otherPerson?.name.isNotEmpty == true
+                                    ? otherPerson!.name[0].toUpperCase()
+                                    : 'P',
+                                style: const TextStyle(
+                                  fontSize: 26,
+                                  fontWeight: FontWeight.w900,
+                                  color: Color(0xFF6366F1),
+                                ),
+                              ),
+                            ),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          otherPerson?.name ?? 'Unknown',
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w900,
+                            color: Colors.white,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            'ID: #${appointment.id.length >= 8 ? appointment.id.substring(appointment.id.length - 8) : appointment.id}',
+                            style: const TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.white),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 6),
                     decoration: BoxDecoration(
-                      color: statusColor.withValues(alpha: 0.12),
+                      color: Colors.white,
                       borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: statusColor.withValues(alpha: 0.4)),
                     ),
                     child: Text(
                       appointment.status.toUpperCase(),
-                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: statusColor),
+                      style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w900,
+                          color: statusColor),
                     ),
                   ),
                 ],
               ),
             ),
-            DetailsInfoWidget(
-              title: "Scheduled Appointment",
-              data: {
-                "Date": formattedDate,
-                "Time": appointment.timeSlot,
-                "Booking for": "Self",
-              },
+            // View Full Details (Doctor only)
+            if (selectedRole == 'Doctor' && appointment.patient != null) ...[
+              const SizedBox(height: 12),
+              GestureDetector(
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (ctx) =>
+                        PatientProfileView(patient: appointment.patient!),
+                  ),
+                ),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 16, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEEF2FF),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                        color:
+                            const Color(0xFF6366F1).withValues(alpha: 0.3)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: const [
+                      Icon(Icons.person_rounded,
+                          size: 16, color: Color(0xFF6366F1)),
+                      SizedBox(width: 6),
+                      Text(
+                        'View Full Patient Profile',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF6366F1),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+            const SizedBox(height: 16),
+            // Date/Time card
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+                boxShadow: [
+                  BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.04),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2)),
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: statusColor.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Icon(Icons.calendar_today_rounded,
+                            size: 18, color: statusColor),
+                      ),
+                      const SizedBox(width: 10),
+                      const Text(
+                        'Scheduled Appointment',
+                        style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w800,
+                            color: Color(0xFF0F172A)),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  _detailRow('Date', formattedDate),
+                  const SizedBox(height: 8),
+                  _detailRow('Time', appointment.timeSlot),
+                  const SizedBox(height: 8),
+                  _detailRow('Booking for', 'Self'),
+                ],
+              ),
             ),
-            DetailsInfoWidget(
-              title: selectedRole == 'Doctor' ? "Patient Info" : "Doctor Info",
-              data: selectedRole == 'Patient'
-                  ? {
-                      "Name": otherPerson?.name ?? 'N/A',
-                      "Reason": appointment.reason ?? 'N/A',
-                    }
-                  : {
-                      // Contact details hidden from doctor — only name + reason visible
-                      "Name": otherPerson?.name ?? 'N/A',
-                      "Reason": appointment.reason ?? 'N/A',
-                    },
+            const SizedBox(height: 12),
+            // Patient/Doctor info card
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+                boxShadow: [
+                  BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.04),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2)),
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF6366F1).withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Icon(
+                          selectedRole == 'Doctor'
+                              ? Icons.person_rounded
+                              : Icons.medical_services_rounded,
+                          size: 18,
+                          color: const Color(0xFF6366F1),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Text(
+                        selectedRole == 'Doctor' ? 'Patient Info' : 'Doctor Info',
+                        style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w800,
+                            color: Color(0xFF0F172A)),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  _detailRow('Name', otherPerson?.name ?? 'N/A'),
+                  if (appointment.reason != null &&
+                      appointment.reason!.isNotEmpty &&
+                      !appointment.reason!.contains('Channel:')) ...[
+                    const SizedBox(height: 8),
+                    _detailRow('Reason', appointment.reason!),
+                  ],
+                ],
+              ),
             ),
-            if (selectedRole == "lab_technician") ...[Tests()],
-
+            if (selectedRole == "lab_technician") ...[
+              const SizedBox(height: 12),
+              Tests(),
+            ],
             if (selectedRole == "Doctor") ...[
-              Padding(
-                padding: EdgeInsets.symmetric(
-                  horizontal: ScallingConfig.scale(20),
-                  vertical: ScallingConfig.scale(13),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
                 ),
                 child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    CustomText(
-                      text: "Soap Notes",
-                      underline: true,
-                      isBold: true,
-                      onTap: () {
-                        Navigator.of(context).push(
+                    Expanded(
+                      child: TextButton.icon(
+                        onPressed: () => Navigator.of(context).push(
                           MaterialPageRoute(
                             builder: (ctx) =>
                                 SoapNotesScreen(appointment: appointment),
                           ),
-                        );
-                      },
+                        ),
+                        icon: const Icon(Icons.notes_rounded, size: 16),
+                        label: const Text('Soap Notes',
+                            style: TextStyle(
+                                fontSize: 13, fontWeight: FontWeight.w700)),
+                        style: TextButton.styleFrom(
+                          foregroundColor: const Color(0xFF6366F1),
+                          padding:
+                              const EdgeInsets.symmetric(vertical: 12),
+                        ),
+                      ),
                     ),
-                    CustomText(
-                      text: "Intake Notes",
-                      underline: true,
-                      isBold: true,
-                      onTap: () {
-                        Navigator.of(context).push(
+                    Container(
+                        width: 1,
+                        height: 32,
+                        color: const Color(0xFFE2E8F0)),
+                    Expanded(
+                      child: TextButton.icon(
+                        onPressed: () => Navigator.of(context).push(
                           MaterialPageRoute(
-                            builder: (ctx) =>
-                                IntakeNotesScreen(appointment: appointment, isReadOnly: selectedRole == "Doctor"),
+                            builder: (ctx) => IntakeNotesScreen(
+                                appointment: appointment,
+                                isReadOnly: selectedRole == "Doctor"),
                           ),
-                        );
-                      },
+                        ),
+                        icon: const Icon(Icons.assignment_rounded, size: 16),
+                        label: const Text('Intake Notes',
+                            style: TextStyle(
+                                fontSize: 13, fontWeight: FontWeight.w700)),
+                        style: TextButton.styleFrom(
+                          foregroundColor: const Color(0xFF6366F1),
+                          padding:
+                              const EdgeInsets.symmetric(vertical: 12),
+                        ),
+                      ),
                     ),
                   ],
                 ),
               ),
             ],
-            SizedBox(height: ScallingConfig.scale(15)),
+            const SizedBox(height: 16),
 
             if (selectedRole == "Doctor" && appointment.status.toLowerCase() == 'pending' && appointment.status.toLowerCase() != 'completed' && appointment.status.toLowerCase() != 'cancelled') ...[
               const SizedBox(height: 16),
@@ -253,6 +481,36 @@ class ProfileOrAppointmentViewScreen extends ConsumerWidget {
       ),
     );
   }
+}
+
+Widget _detailRow(String label, String value) {
+  return Row(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      SizedBox(
+        width: 90,
+        child: Text(
+          label,
+          style: const TextStyle(
+            fontSize: 13,
+            color: Color(0xFF64748B),
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
+      const SizedBox(width: 8),
+      Expanded(
+        child: Text(
+          value,
+          style: const TextStyle(
+            fontSize: 13,
+            color: Color(0xFF0F172A),
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ),
+    ],
+  );
 }
 
 Future<void> _showReviewDialog(BuildContext context, AppointmentDetail appointment) async {

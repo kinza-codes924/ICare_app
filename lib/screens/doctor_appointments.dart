@@ -500,42 +500,27 @@ class _DoctorAppointmentsScreenState extends State<DoctorAppointmentsScreen> {
                     ),
                     child: Row(
                       children: [
-                        Container(
-                          width: 56,
-                          height: 56,
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                              colors: [
-                                const Color(0xFF3B82F6),
-                                const Color(0xFF8B5CF6),
-                              ],
-                            ),
-                            borderRadius: BorderRadius.circular(16),
-                            boxShadow: [
-                              BoxShadow(
-                                color: const Color(
-                                  0xFF3B82F6,
-                                ).withValues(alpha: 0.3),
-                                blurRadius: 12,
-                                offset: const Offset(0, 4),
-                              ),
-                            ],
-                          ),
-                          child: Center(
-                            child: Text(
-                              appointment.patient?.name
-                                      .substring(0, 1)
-                                      .toUpperCase() ??
-                                  'P',
-                              style: const TextStyle(
-                                fontSize: 24,
-                                fontWeight: FontWeight.w900,
-                                color: Colors.white,
-                              ),
-                            ),
-                          ),
+                        CircleAvatar(
+                          radius: 28,
+                          backgroundImage: appointment.patient?.profilePicture != null &&
+                                  appointment.patient!.profilePicture!.isNotEmpty
+                              ? buildProfileImageProvider(appointment.patient!.profilePicture)
+                              : null,
+                          backgroundColor: const Color(0xFF3B82F6),
+                          child: appointment.patient?.profilePicture == null ||
+                                  appointment.patient!.profilePicture!.isEmpty
+                              ? Text(
+                                  appointment.patient?.name
+                                          .substring(0, 1)
+                                          .toUpperCase() ??
+                                      'P',
+                                  style: const TextStyle(
+                                    fontSize: 22,
+                                    fontWeight: FontWeight.w900,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : null,
                         ),
                         const SizedBox(width: 16),
                         Expanded(

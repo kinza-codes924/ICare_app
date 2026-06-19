@@ -206,10 +206,16 @@ class _ConsultationChatScreenV2State extends State<ConsultationChatScreenV2> {
             .toList();
         final hadNewMessages = newList.length != _messages.length;
         print('📥 Previous message count: ${_messages.length}, New count: ${newList.length}');
-        setState(() {
-          _messages = newList;
-          if (!silent) _isLoading = false;
-        });
+        // Only replace messages if we got a valid non-empty response
+        // (empty list from backend usually means an error/session issue, not real empty chat)
+        if (newList.isNotEmpty || _messages.isEmpty) {
+          setState(() {
+            _messages = newList;
+            if (!silent) _isLoading = false;
+          });
+        } else if (!silent && mounted) {
+          setState(() => _isLoading = false);
+        }
         // Sync timer from EARLIEST message timestamp (both doctor & patient show same time)
         if (newList.isNotEmpty && !_timerSynced) {
           _timerSynced = true;
@@ -331,7 +337,7 @@ class _ConsultationChatScreenV2State extends State<ConsultationChatScreenV2> {
           senderId: widget.currentUserId,
           senderName: widget.currentUserName,
           senderRole: widget.isDoctor ? 'doctor' : 'patient',
-          message: '📎 $fileName',
+          message: '',
           attachmentUrl: url,
         );
         await _loadMessages();
@@ -535,10 +541,13 @@ class _ConsultationChatScreenV2State extends State<ConsultationChatScreenV2> {
 
     if (confirmed == true) {
       try {
-        final result = await _consultationService.endConsultationV2(
-          consultationId: _consultationId!,
-          duration: _timer.elapsed.inSeconds,
-        );
+        final result = _consultationId != null
+            ? await _consultationService.endConsultationV2(
+                consultationId: _consultationId!,
+                duration: _timer.elapsed.inSeconds,
+              )
+            : {'success': false, 'message': 'No active consultation session'};
+
         if (result['success'] == true && mounted) {
           _timer.stop();
           await _clearConsultationState();
@@ -617,6 +626,34 @@ class _ConsultationChatScreenV2State extends State<ConsultationChatScreenV2> {
           } else {
             // Doctor side - just go back
             if (mounted) Navigator.pop(context);
+          }
+        } else if (mounted) {
+          // Backend returned success: false — show error with force-exit option
+          final errorMsg = result['message']?.toString() ?? 'Server error';
+          final forceEnd = await showDialog<bool>(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              title: const Text('Unable to End Consultation'),
+              content: Text(
+                  'Could not end on server: $errorMsg\n\nWould you like to exit anyway?'),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx, false),
+                  child: const Text('Stay'),
+                ),
+                ElevatedButton(
+                  onPressed: () => Navigator.pop(ctx, true),
+                  style:
+                      ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                  child: const Text('Exit Anyway'),
+                ),
+              ],
+            ),
+          );
+          if (forceEnd == true && mounted) {
+            _timer.stop();
+            await _clearConsultationState();
+            Navigator.pop(context);
           }
         }
       } catch (e) {
@@ -1028,15 +1065,16 @@ class _ConsultationChatScreenV2State extends State<ConsultationChatScreenV2> {
           children: [
             if (message.attachmentUrl != null) ...[
               _buildAttachmentPreview(message.attachmentUrl!, isMe),
-              const SizedBox(height: 8),
+              if (message.message.isNotEmpty) const SizedBox(height: 8),
             ],
-            Text(
-              message.message,
-              style: TextStyle(
-                color: isMe ? Colors.white : const Color(0xFF0F172A),
-                fontSize: 14,
+            if (message.message.isNotEmpty)
+              Text(
+                message.message,
+                style: TextStyle(
+                  color: isMe ? Colors.white : const Color(0xFF0F172A),
+                  fontSize: 14,
+                ),
               ),
-            ),
             const SizedBox(height: 4),
             Text(
               DateFormat('HH:mm').format(message.timestamp),
