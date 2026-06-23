@@ -500,13 +500,14 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
                         ],
                         // ── Registration details block ───────────────────
                         Builder(builder: (ctx) {
-                          final details = user['profileDetails'] as Map? ?? {};
+                          // verificationDetails is the sub-document the backend saves
+                          final vd = user['verificationDetails'] as Map? ?? {};
                           final role = user['role']?.toString() ?? '';
                           final rows = <Widget>[];
 
                           void addRow(IconData icon, String label, dynamic val) {
                             final s = val?.toString() ?? '';
-                            if (s.isEmpty) return;
+                            if (s.isEmpty || s == 'null') return;
                             rows.add(Padding(
                               padding: const EdgeInsets.only(bottom: 5),
                               child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -519,38 +520,44 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
                           }
 
                           addRow(Icons.phone_outlined, 'Phone', user['phone']);
-                          addRow(Icons.location_city_outlined, 'City', user['city']);
+                          addRow(Icons.location_city_outlined, 'City', user['city'] ?? vd['location']);
                           addRow(Icons.location_on_outlined, 'Address', user['address']);
 
                           if (role == 'doctor') {
-                            addRow(Icons.school_outlined, 'Qualification', details['qualification'] ?? user['qualification']);
-                            addRow(Icons.psychology_outlined, 'Specialization', details['specialization'] ?? user['specialization']);
-                            addRow(Icons.numbers_rounded, 'PMDC No.', details['pmdcNumber'] ?? user['pmdcNumber']);
-                            addRow(Icons.timeline_outlined, 'Experience', details['experience'] ?? user['experience']);
-                            addRow(Icons.local_hospital_outlined, 'Workplace', details['workplace'] ?? user['workplace']);
-                            addRow(Icons.schedule_outlined, 'Timings', details['availableTimings'] ?? user['availableTimings']);
+                            addRow(Icons.school_outlined, 'Qualification', vd['qualification']);
+                            addRow(Icons.psychology_outlined, 'Specialization', vd['specialization']);
+                            addRow(Icons.numbers_rounded, 'PMDC No.', vd['pmdcNumber'] ?? vd['licenseNumber']);
+                            addRow(Icons.timeline_outlined, 'Experience', vd['experience']);
+                            addRow(Icons.local_hospital_outlined, 'Workplace', vd['organizationName']);
+                            addRow(Icons.schedule_outlined, 'Timings', vd['availableTimings']);
+                            final days = vd['availableDays'];
+                            if (days != null) addRow(Icons.calendar_today_outlined, 'Available Days', (days as List?)?.join(', ') ?? days.toString());
                           } else if (role == 'pharmacy') {
-                            addRow(Icons.local_pharmacy_outlined, 'Pharmacy Name', details['pharmacyName'] ?? user['pharmacyName']);
-                            addRow(Icons.badge_outlined, 'Drug License', details['drugLicenseNumber'] ?? user['drugLicenseNumber']);
-                            addRow(Icons.person_outline, 'Pharmacist', details['pharmacistName'] ?? user['pharmacistName']);
-                            addRow(Icons.timeline_outlined, 'Years Operating', details['yearsOfOperation'] ?? user['yearsOfOperation']);
+                            addRow(Icons.local_pharmacy_outlined, 'Pharmacy Name', vd['pharmacyName'] ?? vd['organizationName']);
+                            addRow(Icons.badge_outlined, 'Drug License', vd['drugLicenseNumber'] ?? vd['licenseNumber']);
+                            addRow(Icons.person_outline, 'Pharmacist', vd['pharmacistName'] ?? vd['credentials']);
+                            addRow(Icons.timeline_outlined, 'Years Operating', vd['yearsOfOperation']);
+                            addRow(Icons.schedule_outlined, 'Operating Hours', vd['operatingHours']);
+                            final days = vd['operatingDays'];
+                            if (days != null) addRow(Icons.calendar_today_outlined, 'Operating Days', (days as List?)?.join(', ') ?? days.toString());
                           } else if (role == 'lab') {
-                            addRow(Icons.biotech_outlined, 'Lab Name', details['labName'] ?? user['labName']);
-                            addRow(Icons.badge_outlined, 'License No.', details['labLicenseNumber'] ?? user['labLicenseNumber']);
-                            addRow(Icons.timeline_outlined, 'Years Operating', details['yearsOfOperation'] ?? user['yearsOfOperation']);
+                            addRow(Icons.biotech_outlined, 'Lab Name', vd['labName'] ?? vd['organizationName']);
+                            addRow(Icons.badge_outlined, 'License No.', vd['labLicenseNumber'] ?? vd['licenseNumber']);
+                            addRow(Icons.timeline_outlined, 'Years Operating', vd['yearsOfOperation']);
+                            addRow(Icons.schedule_outlined, 'Operating Hours', vd['operatingHours']);
                           } else if (role == 'student') {
-                            addRow(Icons.account_balance_outlined, 'University', details['university'] ?? user['university']);
-                            addRow(Icons.menu_book_outlined, 'Program', details['program'] ?? user['program']);
-                            addRow(Icons.timeline_outlined, 'Current Year', details['currentYear'] ?? user['currentYear']);
-                            addRow(Icons.badge_outlined, 'Student ID', details['studentId'] ?? user['studentId']);
+                            addRow(Icons.account_balance_outlined, 'University', vd['university'] ?? vd['organizationName']);
+                            addRow(Icons.menu_book_outlined, 'Program', vd['program'] ?? vd['credentials']);
+                            addRow(Icons.timeline_outlined, 'Current Year', vd['currentYear']);
+                            addRow(Icons.badge_outlined, 'Student ID', vd['studentId']);
                           } else if (role == 'instructor') {
-                            addRow(Icons.school_outlined, 'Qualification', details['qualification'] ?? user['qualification']);
-                            addRow(Icons.psychology_outlined, 'Specialization', details['specialization'] ?? user['specialization']);
-                            addRow(Icons.timeline_outlined, 'Experience', details['experience'] ?? user['experience']);
-                            addRow(Icons.account_balance_outlined, 'Institution', details['institution'] ?? user['institution']);
-                            addRow(Icons.menu_book_outlined, 'Proposed Courses', details['proposedCourses'] ?? user['proposedCourses']);
+                            addRow(Icons.school_outlined, 'Qualification', vd['qualification']);
+                            addRow(Icons.psychology_outlined, 'Specialization', vd['specialization']);
+                            addRow(Icons.timeline_outlined, 'Experience', vd['experience']);
+                            addRow(Icons.account_balance_outlined, 'Institution', vd['institution'] ?? vd['organizationName']);
+                            addRow(Icons.menu_book_outlined, 'Proposed Courses', vd['proposedCourses']);
                           }
-                          addRow(Icons.comment_outlined, 'Comments', details['comments'] ?? user['comments']);
+                          addRow(Icons.comment_outlined, 'Comments', vd['comments']);
 
                           if (rows.isEmpty) return const SizedBox.shrink();
                           return Container(

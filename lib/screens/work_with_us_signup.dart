@@ -312,55 +312,76 @@ class _WorkWithUsSignupState extends State<WorkWithUsSignup> {
 
       final api = ApiService();
 
-      // Build role-specific details map
-      final details = <String, dynamic>{};
+      // Build verificationDetails — the sub-document the backend User model saves
+      final vd = <String, dynamic>{};
+      final city = _cityCtrl.text.trim();
+      final address = _addressCtrl.text.trim();
+
       if (_selectedRole == 'Doctor') {
-        details['qualification'] = _qualificationCtrl.text.trim();
-        details['specialization'] = _specializationCtrl.text.trim();
-        details['pmdcNumber'] = _pmdcCtrl.text.trim();
-        details['experience'] = _docExpCtrl.text.trim();
-        details['workplace'] = _workplaceCtrl.text.trim();
-        details['availableDays'] = _docAvailDays.toList();
-        details['availableTimings'] = _docTimingsCtrl.text.trim();
-        details['comments'] = _docCommentsCtrl.text.trim();
+        vd['organizationName'] = _workplaceCtrl.text.trim();
+        vd['location'] = [city, address].where((s) => s.isNotEmpty).join(', ');
+        vd['licenseNumber'] = _pmdcCtrl.text.trim();
+        vd['credentials'] = [_qualificationCtrl.text.trim(), _specializationCtrl.text.trim()].where((s) => s.isNotEmpty).join(' | ');
+        vd['qualification'] = _qualificationCtrl.text.trim();
+        vd['specialization'] = _specializationCtrl.text.trim();
+        vd['experience'] = _docExpCtrl.text.trim();
+        vd['pmdcNumber'] = _pmdcCtrl.text.trim();
+        vd['availableDays'] = _docAvailDays.toList();
+        vd['availableTimings'] = _docTimingsCtrl.text.trim();
+        vd['comments'] = _docCommentsCtrl.text.trim();
       } else if (_selectedRole == 'Pharmacy') {
-        details['pharmacyName'] = _pharmNameCtrl.text.trim();
-        details['drugLicenseNumber'] = _drugLicenseCtrl.text.trim();
-        details['pharmacistName'] = _pharmacistNameCtrl.text.trim();
-        details['yearsOfOperation'] = _pharmYearsCtrl.text.trim();
-        details['deliveryAvailable'] = _pharmDelivery;
-        details['operatingDays'] = _pharmOpDays.toList();
-        details['operatingHours'] = _pharmHoursCtrl.text.trim();
-        details['onlineOrders'] = _pharmOnlineOrders;
-        details['hasPOS'] = _pharmHasPOS;
-        details['posDetails'] = _pharmPOSDetailCtrl.text.trim();
-        details['willingToIntegrate'] = _pharmWillingIntegrate;
-        details['comments'] = _pharmCommentsCtrl.text.trim();
+        vd['organizationName'] = _pharmNameCtrl.text.trim();
+        vd['location'] = [city, address].where((s) => s.isNotEmpty).join(', ');
+        vd['licenseNumber'] = _drugLicenseCtrl.text.trim();
+        vd['credentials'] = _pharmacistNameCtrl.text.trim();
+        vd['pharmacyName'] = _pharmNameCtrl.text.trim();
+        vd['drugLicenseNumber'] = _drugLicenseCtrl.text.trim();
+        vd['pharmacistName'] = _pharmacistNameCtrl.text.trim();
+        vd['yearsOfOperation'] = _pharmYearsCtrl.text.trim();
+        vd['deliveryAvailable'] = _pharmDelivery;
+        vd['operatingDays'] = _pharmOpDays.toList();
+        vd['operatingHours'] = _pharmHoursCtrl.text.trim();
+        vd['onlineOrders'] = _pharmOnlineOrders;
+        vd['hasPOS'] = _pharmHasPOS;
+        vd['posDetails'] = _pharmPOSDetailCtrl.text.trim();
+        vd['willingToIntegrate'] = _pharmWillingIntegrate;
+        vd['comments'] = _pharmCommentsCtrl.text.trim();
       } else if (_selectedRole == 'Laboratory') {
-        details['labName'] = _labNameCtrl.text.trim();
-        details['labLicenseNumber'] = _labLicenseCtrl.text.trim();
-        details['yearsOfOperation'] = _labYearsCtrl.text.trim();
-        details['homeSamplingAvailable'] = _labHomeSampling;
-        details['operatingDays'] = _labOpDays.toList();
-        details['operatingHours'] = _labHoursCtrl.text.trim();
-        details['onlineReports'] = _labOnlineReports;
-        details['hasLIS'] = _labHasLIS;
-        details['lisDetails'] = _labLISDetailCtrl.text.trim();
-        details['willingToIntegrate'] = _labWillingIntegrate;
-        details['comments'] = _labCommentsCtrl.text.trim();
+        vd['organizationName'] = _labNameCtrl.text.trim();
+        vd['location'] = [city, address].where((s) => s.isNotEmpty).join(', ');
+        vd['licenseNumber'] = _labLicenseCtrl.text.trim();
+        vd['credentials'] = _labNameCtrl.text.trim();
+        vd['labName'] = _labNameCtrl.text.trim();
+        vd['labLicenseNumber'] = _labLicenseCtrl.text.trim();
+        vd['yearsOfOperation'] = _labYearsCtrl.text.trim();
+        vd['homeSamplingAvailable'] = _labHomeSampling;
+        vd['operatingDays'] = _labOpDays.toList();
+        vd['operatingHours'] = _labHoursCtrl.text.trim();
+        vd['onlineReports'] = _labOnlineReports;
+        vd['hasLIS'] = _labHasLIS;
+        vd['lisDetails'] = _labLISDetailCtrl.text.trim();
+        vd['willingToIntegrate'] = _labWillingIntegrate;
+        vd['comments'] = _labCommentsCtrl.text.trim();
       } else if (_selectedRole == 'Student') {
-        details['university'] = _studentUniversityCtrl.text.trim();
-        details['program'] = _studentProgramCtrl.text.trim();
-        details['currentYear'] = _studentYearCtrl.text.trim();
-        details['studentId'] = _studentIdCtrl.text.trim();
-        details['comments'] = _studentCommentsCtrl.text.trim();
+        vd['organizationName'] = _studentUniversityCtrl.text.trim();
+        vd['location'] = [city, address].where((s) => s.isNotEmpty).join(', ');
+        vd['credentials'] = _studentProgramCtrl.text.trim();
+        vd['university'] = _studentUniversityCtrl.text.trim();
+        vd['program'] = _studentProgramCtrl.text.trim();
+        vd['currentYear'] = _studentYearCtrl.text.trim();
+        vd['studentId'] = _studentIdCtrl.text.trim();
+        vd['comments'] = _studentCommentsCtrl.text.trim();
       } else if (_selectedRole == 'Instructor') {
-        details['qualification'] = _instrQualificationCtrl.text.trim();
-        details['specialization'] = _instrSpecializationCtrl.text.trim();
-        details['experience'] = _instrExpCtrl.text.trim();
-        details['institution'] = _instrInstitutionCtrl.text.trim();
-        details['proposedCourses'] = _instrCoursesCtrl.text.trim();
-        details['comments'] = _instrCommentsCtrl.text.trim();
+        vd['organizationName'] = _instrInstitutionCtrl.text.trim();
+        vd['location'] = [city, address].where((s) => s.isNotEmpty).join(', ');
+        vd['licenseNumber'] = '';
+        vd['credentials'] = [_instrQualificationCtrl.text.trim(), _instrSpecializationCtrl.text.trim()].where((s) => s.isNotEmpty).join(' | ');
+        vd['qualification'] = _instrQualificationCtrl.text.trim();
+        vd['specialization'] = _instrSpecializationCtrl.text.trim();
+        vd['experience'] = _instrExpCtrl.text.trim();
+        vd['institution'] = _instrInstitutionCtrl.text.trim();
+        vd['proposedCourses'] = _instrCoursesCtrl.text.trim();
+        vd['comments'] = _instrCommentsCtrl.text.trim();
       }
 
       final response = await api.post('/auth/register', {
@@ -370,10 +391,9 @@ class _WorkWithUsSignupState extends State<WorkWithUsSignup> {
         'password': _passwordCtrl.text,
         'phone': _phoneCtrl.text.trim(),
         'role': backendRole,
-        'city': _cityCtrl.text.trim(),
-        'address': _addressCtrl.text.trim(),
-        'profileDetails': details,
-        ...details,
+        'city': city,
+        'address': address,
+        'verificationDetails': vd,
       });
 
       final resData = response.data;
