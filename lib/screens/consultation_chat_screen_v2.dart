@@ -199,10 +199,8 @@ class _ConsultationChatScreenV2State extends State<ConsultationChatScreenV2> {
   Future<void> _loadMessages({bool silent = false}) async {
     if (_consultationId == null) return;
     try {
-      print('📥 LOADING MESSAGES for consultationId: $_consultationId');
       final messages = await _consultationService.getMessagesV2(
           consultationId: _consultationId!);
-      print('📥 RECEIVED ${messages.length} messages');
       if (mounted) {
         var newList = messages
             .map((m) => ConsultationMessage.fromJson(m as Map<String, dynamic>))
@@ -210,7 +208,6 @@ class _ConsultationChatScreenV2State extends State<ConsultationChatScreenV2> {
         // Keep only the last 100 messages to bound memory usage
         if (newList.length > 100) newList = newList.sublist(newList.length - 100);
         final hadNewMessages = newList.length != _messages.length;
-        print('📥 Previous message count: ${_messages.length}, New count: ${newList.length}');
         // Only replace messages if we got a valid non-empty response
         if (newList.isNotEmpty || _messages.isEmpty) {
           setState(() {
@@ -228,10 +225,7 @@ class _ConsultationChatScreenV2State extends State<ConsultationChatScreenV2> {
               a.timestamp.isBefore(b.timestamp) ? a : b);
           _timer.syncFromStartTime(earliest.timestamp);
         }
-        if (hadNewMessages) {
-          print('📥 New messages detected, scrolling to bottom');
-          _scrollToBottom();
-        }
+        if (hadNewMessages) _scrollToBottom();
       }
     } catch (e) {
       print('❌ ERROR LOADING MESSAGES: $e');
@@ -257,25 +251,17 @@ class _ConsultationChatScreenV2State extends State<ConsultationChatScreenV2> {
     final message = _messageController.text.trim();
     if (message.isEmpty || _isSending || _consultationId == null) return;
 
-    print('📤 SENDING MESSAGE:');
-    print('  consultationId: $_consultationId');
-    print('  senderId: ${widget.currentUserId}');
-    print('  senderName: ${widget.currentUserName}');
-    print('  senderRole: ${widget.isDoctor ? 'doctor' : 'patient'}');
-    print('  message: $message');
-
     setState(() => _isSending = true);
     _messageController.clear();
 
     try {
-      final result = await _consultationService.sendMessageV2(
+      await _consultationService.sendMessageV2(
         consultationId: _consultationId!,
         senderId: widget.currentUserId,
         senderName: widget.currentUserName,
         senderRole: widget.isDoctor ? 'doctor' : 'patient',
         message: message,
       );
-      print('📤 SEND MESSAGE RESULT: $result');
       await _loadMessages();
     } catch (e) {
       print('❌ ERROR IN _sendMessage: $e');

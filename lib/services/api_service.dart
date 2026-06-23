@@ -32,25 +32,9 @@ class ApiService {
   final SharedPref _sharedPref = SharedPref();
 
   Future<void> _setAuthToken({String? providedToken}) async {
-    String? token = providedToken;
-
-    if (token == null) {
-      token = await _sharedPref.getToken();
-      debugPrint(
-        "🔑 ApiService: Token from SharedPref: ${token != null ? '${token.substring(0, 20)}...' : 'null'}",
-      );
-    } else {
-      debugPrint(
-        "🔑 ApiService: Using provided token: ${token.substring(0, 20)}...",
-      );
-    }
-
+    String? token = providedToken ?? await _sharedPref.getToken();
     if (token != null) {
-      token = token.trim();
-      _dio.options.headers['Authorization'] = 'Bearer $token';
-      debugPrint("✅ ApiService: Authorization header set");
-    } else {
-      debugPrint("⚠️ ApiService: No token found, request will be unauthorized");
+      _dio.options.headers['Authorization'] = 'Bearer ${token.trim()}';
     }
   }
 
@@ -92,7 +76,6 @@ class ApiService {
   void forceSetToken(String token) {
     final trimmed = token.trim();
     _dio.options.headers['Authorization'] = 'Bearer $trimmed';
-    debugPrint('✅ ApiService: Token force-set directly on Dio headers');
   }
 
   // Support for file uploads

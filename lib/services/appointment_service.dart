@@ -60,29 +60,19 @@ class AppointmentService {
 
   Future<Map<String, dynamic>> getMyAppointmentsDetailed() async {
     try {
-      debugPrint('📋 Fetching my appointments...');
-
       final response = await _apiService.get('/appointments/getAppointments');
       final data = response.data as Map<String, dynamic>;
-
-      debugPrint('✅ Appointments fetched successfully');
-      debugPrint('Count: ${data['count']}');
-      debugPrint('Raw appointments data: ${data['appointments']}');
 
       final List<AppointmentDetail> appointments = [];
       if (data['appointments'] != null) {
         for (var appointmentJson in data['appointments']) {
           try {
-            debugPrint('📝 Parsing appointment: $appointmentJson');
             appointments.add(AppointmentDetail.fromJson(appointmentJson));
           } catch (e) {
             debugPrint('⚠️ Error parsing appointment: $e');
-            debugPrint('Appointment data: $appointmentJson');
           }
         }
       }
-
-      debugPrint('✅ Successfully parsed ${appointments.length} appointments');
 
       return {
         'success': true,
@@ -91,7 +81,6 @@ class AppointmentService {
       };
     } on DioException catch (e) {
       debugPrint('❌ Get appointments error: ${e.message}');
-      debugPrint('Response data: ${e.response?.data}');
 
       return {
         'success': false,

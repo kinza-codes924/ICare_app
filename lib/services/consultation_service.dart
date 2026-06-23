@@ -70,13 +70,6 @@ class ConsultationService {
     bool isSystemMessage = false,
   }) async {
     try {
-      print('📤 SENDING MESSAGE:');
-      print('  consultationId: $consultationId');
-      print('  senderId: $senderId');
-      print('  senderName: $senderName');
-      print('  senderRole: $senderRole');
-      print('  message: $message');
-
       final token = await _sharedPref.getToken();
       final response = await _dio.post(
         '/consultations-v2/$consultationId/messages',
@@ -90,11 +83,9 @@ class ConsultationService {
         },
         options: Options(headers: {'Authorization': 'Bearer $token'}),
       );
-      print('✅ MESSAGE SENT SUCCESSFULLY: ${response.data}');
       return response.data;
     } on DioException catch (e) {
       print('❌ ERROR SENDING MESSAGE: ${e.message}');
-      print('❌ Response: ${e.response?.data}');
       return {'success': false, 'message': e.response?.data['message'] ?? e.message};
     }
   }
@@ -111,17 +102,15 @@ class ConsultationService {
         '/consultations-v2/$consultationId/messages?limit=$limit&skip=$skip',
         options: Options(headers: {'Authorization': 'Bearer $token'}),
       );
-      print('📥 GET MESSAGES RESPONSE:');
-      print('  consultationId: $consultationId');
-      print('  success: ${response.data['success']}');
-      print('  message count: ${response.data['messages']?.length ?? 0}');
       if (response.data['success'] == true) {
         return response.data['messages'] ?? [];
       }
       return [];
     } on DioException catch (e) {
-      print('❌ ERROR GETTING MESSAGES: ${e.message}');
-      print('❌ Response: ${e.response?.data}');
+      // Only log errors — success path is silent (called every 8s by polling timer)
+      if (e.response?.statusCode != null && e.response!.statusCode! >= 500) {
+        print('❌ ERROR GETTING MESSAGES: ${e.message}');
+      }
       return [];
     }
   }
@@ -475,7 +464,6 @@ class ConsultationService {
       );
       print('📋 HISTORY GET RESPONSE: ${response.statusCode}');
       print('  Data keys: ${response.data is Map ? (response.data as Map).keys.toList() : response.data.runtimeType}');
-      print('  Full data: ${response.data}');
       final data = response.data;
       if (data is Map<String, dynamic>) {
         if (data['success'] == true) {
