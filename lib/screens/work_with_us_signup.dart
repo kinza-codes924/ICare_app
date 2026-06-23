@@ -401,6 +401,30 @@ class _WorkWithUsSignupState extends State<WorkWithUsSignup> {
           (resData is Map && resData['success'] == true);
 
       if (isSuccess) {
+        // Save role-specific details using the returned auth token
+        final regToken = resData is Map
+            ? (resData['token'] ?? resData['accessToken'] ?? resData['data']?['token'])?.toString()
+            : null;
+        if (regToken != null && regToken.isNotEmpty && vd.isNotEmpty) {
+          try {
+            await api.put('/users/profile', {'verificationDetails': vd}, token: regToken);
+          } catch (_) {}
+          // For doctors, also hit the doctor-specific details endpoint
+          if (backendRole == 'doctor') {
+            try {
+              await api.post('/doctors/add_doctor_details', {
+                'specialization': vd['specialization'] ?? '',
+                'qualification': vd['qualification'] ?? '',
+                'experience': vd['experience'] ?? '',
+                'pmdcNumber': vd['pmdcNumber'] ?? '',
+                'workplace': vd['organizationName'] ?? '',
+                'availableDays': vd['availableDays'] ?? [],
+                'availableTimings': vd['availableTimings'] ?? '',
+              }, token: regToken);
+            } catch (_) {}
+          }
+        }
+
         if (mounted) {
           Navigator.of(context).pushReplacement(
             MaterialPageRoute(
