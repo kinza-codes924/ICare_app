@@ -733,12 +733,21 @@ class _VideoCallWebState extends State<VideoCall> {
       }
 
       if (!mounted) return;
+
+      // Fetch existing history to pre-fill the form if it was saved before
+      final consultService = ConsultationService();
+      final existingHistory = await consultService.getHistoryByConsultation(consultationId!);
+      final existingHistoryId = existingHistory?['_id']?.toString();
+
+      if (!mounted) return;
       await Navigator.push(
         context,
         MaterialPageRoute(
           builder: (_) => PatientHistoryFormScreen(
             appointment: appointment,
             consultationId: consultationId!,
+            existingHistoryId: existingHistoryId,
+            initialData: existingHistory,
           ),
         ),
       );
