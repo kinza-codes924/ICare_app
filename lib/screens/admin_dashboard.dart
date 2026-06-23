@@ -18,6 +18,8 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
   final ApiService _apiService = ApiService();
   bool _isLoading = true;
   List<dynamic> _users = [];
+  // Extra profile details fetched per-user (keyed by userId)
+  final Map<String, Map<String, dynamic>> _extraDetails = {};
   String _currentTab =
       'Pending'; // 'Pending', 'Student', 'Pharmacy', 'Laboratory', 'Instructor', 'PatientRecords'
 
@@ -102,14 +104,59 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
 
       if (response.statusCode == 200) {
         final data = response.data;
-        setState(() {
-          _users = data['users'] ?? [];
-        });
+        final users = List<dynamic>.from(data['users'] ?? []);
+        setState(() { _users = users; });
+
+        // Fetch extra details per-user in background (backend pending-users only returns 6 fields)
+        if (_currentTab == 'Pending') {
+          _fetchExtraDetailsForPendingUsers(users);
+        }
       }
     } catch (e) {
       debugPrint('Error fetching users: $e');
     } finally {
       if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _fetchExtraDetailsForPendingUsers(List<dynamic> users) async {
+    for (final u in users) {
+      final id = u['_id']?.toString() ?? '';
+      final role = u['role']?.toString() ?? '';
+      if (id.isEmpty || _extraDetails.containsKey(id)) continue;
+      try {
+        if (role == 'doctor') {
+          final r = await _apiService.get('/doctors/$id');
+          if (r.statusCode == 200) {
+            final d = r.data;
+            final doc = (d is Map && d['doctor'] != null) ? d['doctor'] : (d is Map ? d : null);
+            if (doc != null && mounted) {
+              setState(() => _extraDetails[id] = Map<String, dynamic>.from(doc as Map));
+            }
+          }
+        } else if (role == 'pharmacy') {
+          // Try common pharmacy profile endpoints
+          for (final ep in ['/pharmacy/profile/$id', '/pharmacies/$id', '/pharmacy/$id']) {
+            try {
+              final r = await _apiService.get(ep);
+              if (r.statusCode == 200 && r.data is Map) {
+                if (mounted) setState(() => _extraDetails[id] = Map<String, dynamic>.from(r.data as Map));
+                break;
+              }
+            } catch (_) {}
+          }
+        } else if (role == 'lab') {
+          for (final ep in ['/labs/$id', '/lab/$id', '/lab/profile/$id']) {
+            try {
+              final r = await _apiService.get(ep);
+              if (r.statusCode == 200 && r.data is Map) {
+                if (mounted) setState(() => _extraDetails[id] = Map<String, dynamic>.from(r.data as Map));
+                break;
+              }
+            } catch (_) {}
+          }
+        }
+      } catch (_) {}
     }
   }
 
@@ -500,8 +547,12 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
                         ],
                         // ── Registration details block ───────────────────
                         Builder(builder: (ctx) {
-                          // verificationDetails is the sub-document the backend saves
-                          final vd = user['verificationDetails'] as Map? ?? {};
+                          final userId = user['_id']?.toString() ?? '';
+                          // Merge verificationDetails + extra profile data fetched per-user
+                          final vd = <String, dynamic>{
+                            ...?user['verificationDetails'] as Map?,
+                            ...?_extraDetails[userId],
+                          };
                           final role = user['role']?.toString() ?? '';
                           final rows = <Widget>[];
 
@@ -523,25 +574,36 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
                           addRow(Icons.location_city_outlined, 'City', user['city'] ?? vd['location']);
                           addRow(Icons.location_on_outlined, 'Address', user['address']);
 
+                          // Registration date (always available from backend)
+                          final createdAt = user['createdAt']?.toString() ?? '';
+                          if (createdAt.isNotEmpty) {
+                            try {
+                              final dt = DateTime.parse(createdAt).toLocal();
+                              addRow(Icons.calendar_today_outlined, 'Registered', '${dt.day}/${dt.month}/${dt.year}');
+                            } catch (_) {}
+                          }
+
                           if (role == 'doctor') {
+                            // Fields from Doctor model (fetched via GET /doctors/$id)
                             addRow(Icons.school_outlined, 'Qualification', vd['qualification']);
-                            addRow(Icons.psychology_outlined, 'Specialization', vd['specialization']);
+                            addRow(Icons.psychology_outlined, 'Specialization', vd['specialization'] ?? (vd['specialties'] as List?)?.join(', '));
                             addRow(Icons.numbers_rounded, 'PMDC No.', vd['pmdcNumber'] ?? vd['licenseNumber']);
-                            addRow(Icons.timeline_outlined, 'Experience', vd['experience']);
-                            addRow(Icons.local_hospital_outlined, 'Workplace', vd['organizationName']);
+                            addRow(Icons.timeline_outlined, 'Experience', vd['experience'] != null ? '${vd['experience']} yrs' : null);
+                            addRow(Icons.local_hospital_outlined, 'Clinic/Workplace', vd['clinicName'] ?? vd['organizationName']);
+                            addRow(Icons.location_on_outlined, 'Clinic Address', vd['clinicAddress']);
                             addRow(Icons.schedule_outlined, 'Timings', vd['availableTimings']);
                             final days = vd['availableDays'];
-                            if (days != null) addRow(Icons.calendar_today_outlined, 'Available Days', (days as List?)?.join(', ') ?? days.toString());
+                            if (days != null && (days as List).isNotEmpty) addRow(Icons.event_outlined, 'Available Days', days.join(', '));
                           } else if (role == 'pharmacy') {
-                            addRow(Icons.local_pharmacy_outlined, 'Pharmacy Name', vd['pharmacyName'] ?? vd['organizationName']);
+                            addRow(Icons.local_pharmacy_outlined, 'Pharmacy Name', vd['pharmacyName'] ?? vd['organizationName'] ?? vd['name']);
                             addRow(Icons.badge_outlined, 'Drug License', vd['drugLicenseNumber'] ?? vd['licenseNumber']);
                             addRow(Icons.person_outline, 'Pharmacist', vd['pharmacistName'] ?? vd['credentials']);
                             addRow(Icons.timeline_outlined, 'Years Operating', vd['yearsOfOperation']);
                             addRow(Icons.schedule_outlined, 'Operating Hours', vd['operatingHours']);
                             final days = vd['operatingDays'];
-                            if (days != null) addRow(Icons.calendar_today_outlined, 'Operating Days', (days as List?)?.join(', ') ?? days.toString());
+                            if (days != null && (days as List).isNotEmpty) addRow(Icons.event_outlined, 'Operating Days', days.join(', '));
                           } else if (role == 'lab') {
-                            addRow(Icons.biotech_outlined, 'Lab Name', vd['labName'] ?? vd['organizationName']);
+                            addRow(Icons.biotech_outlined, 'Lab Name', vd['labName'] ?? vd['organizationName'] ?? vd['name']);
                             addRow(Icons.badge_outlined, 'License No.', vd['labLicenseNumber'] ?? vd['licenseNumber']);
                             addRow(Icons.timeline_outlined, 'Years Operating', vd['yearsOfOperation']);
                             addRow(Icons.schedule_outlined, 'Operating Hours', vd['operatingHours']);
@@ -553,7 +615,7 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
                           } else if (role == 'instructor') {
                             addRow(Icons.school_outlined, 'Qualification', vd['qualification']);
                             addRow(Icons.psychology_outlined, 'Specialization', vd['specialization']);
-                            addRow(Icons.timeline_outlined, 'Experience', vd['experience']);
+                            addRow(Icons.timeline_outlined, 'Experience', vd['experience'] != null ? '${vd['experience']} yrs' : null);
                             addRow(Icons.account_balance_outlined, 'Institution', vd['institution'] ?? vd['organizationName']);
                             addRow(Icons.menu_book_outlined, 'Proposed Courses', vd['proposedCourses']);
                           }
