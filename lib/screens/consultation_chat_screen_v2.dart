@@ -458,8 +458,11 @@ class _ConsultationChatScreenV2State extends State<ConsultationChatScreenV2> {
       return;
     }
     if (widget.appointment == null) return;
+    print('🩺 OPEN HISTORY FORM — consultationId: $_consultationId');
     final existingHistory = await _consultationService.getHistoryByConsultation(_consultationId!);
+    print('🩺 existingHistory: ${existingHistory != null ? "loaded (keys: ${existingHistory.keys.toList()})" : "NULL — form will open blank"}');
     final existingHistoryId = existingHistory?['_id']?.toString();
+    print('🩺 existingHistoryId: $existingHistoryId');
     if (!mounted) return;
     Navigator.push(
       context,

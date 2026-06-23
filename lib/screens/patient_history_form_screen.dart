@@ -173,12 +173,14 @@ class _PatientHistoryFormScreenState extends State<PatientHistoryFormScreen> {
 
   void _prefillFromData(Map<String, dynamic> d) {
     try {
+      print('🩺 PREFILLING HISTORY FORM — data keys: ${d.keys.toList()}');
       // Ensure createdAt is present so PatientHistoryForm.fromJson doesn't throw
       final safeData = {
         'createdAt': DateTime.now().toIso8601String(),
         ...d,
       };
       final form = PatientHistoryForm.fromJson(safeData);
+      print('🩺 PatientHistoryForm parsed OK — chiefComplaints: ${form.chiefComplaints.length}');
 
       // 1. Chief complaints
       _chiefComplaints.addAll(form.chiefComplaints);
@@ -294,8 +296,9 @@ class _PatientHistoryFormScreenState extends State<PatientHistoryFormScreen> {
         _mobilityController.text = gf.mobilityGait;
         _examNotesController.text = ve.notes;
       }
-    } catch (e) {
-      print('⚠️ Error pre-filling history form: $e');
+    } catch (e, st) {
+      print('❌ Error pre-filling history form: $e');
+      print('  Stack: $st');
     }
   }
 

@@ -465,16 +465,34 @@ class ConsultationService {
   Future<Map<String, dynamic>?> getHistoryByConsultation(String consultationId) async {
     try {
       final token = await _sharedPref.getToken();
+      print('🔍 FETCHING HISTORY for consultationId: $consultationId');
       final response = await _dio.get(
         '/patient-history/consultation/$consultationId',
-        options: Options(headers: {'Authorization': 'Bearer $token'}),
+        options: Options(
+          headers: {'Authorization': 'Bearer $token'},
+          validateStatus: (s) => s != null && s < 600,
+        ),
       );
-      if (response.data['success'] == true) {
-        return response.data['history'];
+      print('📋 HISTORY GET RESPONSE: ${response.statusCode}');
+      print('  Data keys: ${response.data is Map ? (response.data as Map).keys.toList() : response.data.runtimeType}');
+      print('  Full data: ${response.data}');
+      final data = response.data;
+      if (data is Map<String, dynamic>) {
+        if (data['success'] == true) {
+          final history = data['history'];
+          print('  History field type: ${history?.runtimeType}');
+          if (history is Map<String, dynamic>) return history;
+          if (history is Map) return Map<String, dynamic>.from(history);
+          print('  ⚠️ history field is null or unexpected type');
+          return null;
+        }
+        print('  ⚠️ success != true: ${data['message'] ?? data['error'] ?? data}');
       }
       return null;
     } on DioException catch (e) {
-      print('Error getting history by consultation: ${e.message}');
+      print('❌ Error getting history by consultation: ${e.message}');
+      print('  Status: ${e.response?.statusCode}');
+      print('  Data: ${e.response?.data}');
       return null;
     }
   }
@@ -587,36 +605,40 @@ class ConsultationService {
   }
 
   // Upload attachment — web (bytes, no file path)
-  // Uploads directly to Cloudinary to avoid CORS issues with the backend /upload endpoint.
+  // Uses the authenticated backend /upload endpoint (same as mobile path).
   Future<Map<String, dynamic>> uploadAttachmentBytes({
     required Uint8List bytes,
     required String fileName,
   }) async {
     try {
-      const cloudName = 'dzlcnyxgb';
-      const uploadPreset = 'icare_videos';
+      final token = await _sharedPref.getToken();
       final formData = FormData.fromMap({
         'file': MultipartFile.fromBytes(bytes, filename: fileName),
-        'upload_preset': uploadPreset,
       });
-      final response = await Dio().post(
-        'https://api.cloudinary.com/v1_1/$cloudName/auto/upload',
+      print('📤 UPLOADING FILE: $fileName (${bytes.length} bytes)');
+      final response = await _dio.post(
+        '/upload',
         data: formData,
+        options: Options(headers: {'Authorization': 'Bearer $token'}),
       );
+      print('✅ UPLOAD RESPONSE: ${response.statusCode} — ${response.data}');
       if (response.data is Map) {
-        final url = response.data['secure_url']?.toString() ?? '';
+        final map = response.data as Map;
+        final url = map['url']?.toString() ?? map['secure_url']?.toString() ?? '';
         if (url.isNotEmpty) return {'success': true, 'url': url};
         return {'success': false, 'message': 'Upload succeeded but no URL returned'};
       }
-      return {'success': false, 'message': 'Unexpected response from Cloudinary'};
+      return {'success': false, 'message': 'Unexpected response from server'};
     } on DioException catch (e) {
-      String? msg;
-      if (e.response?.data is Map) {
-        final errObj = (e.response!.data as Map)['error'];
-        if (errObj is Map) msg = errObj['message']?.toString();
-      }
-      return {'success': false, 'message': msg ?? e.message ?? 'Upload failed'};
+      print('❌ UPLOAD FAILED: ${e.message}');
+      print('  Status: ${e.response?.statusCode}');
+      print('  Response: ${e.response?.data}');
+      final data = e.response?.data;
+      String msg = e.message ?? 'Upload failed';
+      if (data is Map) msg = data['message']?.toString() ?? data['error']?.toString() ?? msg;
+      return {'success': false, 'message': msg};
     } catch (e) {
+      print('❌ UPLOAD EXCEPTION: $e');
       return {'success': false, 'message': e.toString()};
     }
   }
