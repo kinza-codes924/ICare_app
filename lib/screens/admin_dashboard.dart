@@ -498,6 +498,76 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
                             ),
                           ),
                         ],
+                        // ── Registration details block ───────────────────
+                        Builder(builder: (ctx) {
+                          final details = user['profileDetails'] as Map? ?? {};
+                          final role = user['role']?.toString() ?? '';
+                          final rows = <Widget>[];
+
+                          void addRow(IconData icon, String label, dynamic val) {
+                            final s = val?.toString() ?? '';
+                            if (s.isEmpty) return;
+                            rows.add(Padding(
+                              padding: const EdgeInsets.only(bottom: 5),
+                              child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                                Icon(icon, size: 13, color: const Color(0xFF64748B)),
+                                const SizedBox(width: 6),
+                                Text('$label: ', style: const TextStyle(fontSize: 12, color: Color(0xFF64748B), fontWeight: FontWeight.w600)),
+                                Expanded(child: Text(s, style: const TextStyle(fontSize: 12, color: Color(0xFF0F172A)))),
+                              ]),
+                            ));
+                          }
+
+                          addRow(Icons.phone_outlined, 'Phone', user['phone']);
+                          addRow(Icons.location_city_outlined, 'City', user['city']);
+                          addRow(Icons.location_on_outlined, 'Address', user['address']);
+
+                          if (role == 'doctor') {
+                            addRow(Icons.school_outlined, 'Qualification', details['qualification'] ?? user['qualification']);
+                            addRow(Icons.psychology_outlined, 'Specialization', details['specialization'] ?? user['specialization']);
+                            addRow(Icons.numbers_rounded, 'PMDC No.', details['pmdcNumber'] ?? user['pmdcNumber']);
+                            addRow(Icons.timeline_outlined, 'Experience', details['experience'] ?? user['experience']);
+                            addRow(Icons.local_hospital_outlined, 'Workplace', details['workplace'] ?? user['workplace']);
+                            addRow(Icons.schedule_outlined, 'Timings', details['availableTimings'] ?? user['availableTimings']);
+                          } else if (role == 'pharmacy') {
+                            addRow(Icons.local_pharmacy_outlined, 'Pharmacy Name', details['pharmacyName'] ?? user['pharmacyName']);
+                            addRow(Icons.badge_outlined, 'Drug License', details['drugLicenseNumber'] ?? user['drugLicenseNumber']);
+                            addRow(Icons.person_outline, 'Pharmacist', details['pharmacistName'] ?? user['pharmacistName']);
+                            addRow(Icons.timeline_outlined, 'Years Operating', details['yearsOfOperation'] ?? user['yearsOfOperation']);
+                          } else if (role == 'lab') {
+                            addRow(Icons.biotech_outlined, 'Lab Name', details['labName'] ?? user['labName']);
+                            addRow(Icons.badge_outlined, 'License No.', details['labLicenseNumber'] ?? user['labLicenseNumber']);
+                            addRow(Icons.timeline_outlined, 'Years Operating', details['yearsOfOperation'] ?? user['yearsOfOperation']);
+                          } else if (role == 'student') {
+                            addRow(Icons.account_balance_outlined, 'University', details['university'] ?? user['university']);
+                            addRow(Icons.menu_book_outlined, 'Program', details['program'] ?? user['program']);
+                            addRow(Icons.timeline_outlined, 'Current Year', details['currentYear'] ?? user['currentYear']);
+                            addRow(Icons.badge_outlined, 'Student ID', details['studentId'] ?? user['studentId']);
+                          } else if (role == 'instructor') {
+                            addRow(Icons.school_outlined, 'Qualification', details['qualification'] ?? user['qualification']);
+                            addRow(Icons.psychology_outlined, 'Specialization', details['specialization'] ?? user['specialization']);
+                            addRow(Icons.timeline_outlined, 'Experience', details['experience'] ?? user['experience']);
+                            addRow(Icons.account_balance_outlined, 'Institution', details['institution'] ?? user['institution']);
+                            addRow(Icons.menu_book_outlined, 'Proposed Courses', details['proposedCourses'] ?? user['proposedCourses']);
+                          }
+                          addRow(Icons.comment_outlined, 'Comments', details['comments'] ?? user['comments']);
+
+                          if (rows.isEmpty) return const SizedBox.shrink();
+                          return Container(
+                            margin: const EdgeInsets.only(top: 12),
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: Colors.indigo.shade50,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: Colors.indigo.shade100),
+                            ),
+                            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                              const Text('Registration Details', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Color(0xFF3B4DA8))),
+                              const SizedBox(height: 8),
+                              ...rows,
+                            ]),
+                          );
+                        }),
                         if (_currentTab == 'Pending') ...[
                           const SizedBox(height: 16),
                           const Divider(),

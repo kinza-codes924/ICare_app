@@ -694,36 +694,128 @@
 
     window.lmsSetPanelWidth = function(panelOpen) {};
 
-    // Start recording using the Agora tracks already captured (no second getUserMedia needed)
+    // Composite recording: instructor (right) + student (left) side-by-side on canvas
     window.lmsStartRecording = async function() {
       try {
         if (window._lmsRecorder && window._lmsRecorder.state === 'recording') return;
 
-        // Build a MediaStream from the Agora local tracks (already acquired by the browser)
-        var stream = new MediaStream();
-        if (window._lmsLocalAudio) {
-          try { stream.addTrack(window._lmsLocalAudio.getMediaStreamTrack()); } catch(_) {}
-        }
+        // ── Build hidden video elements from Agora tracks ───────────────
+        // Elements MUST be in the DOM for browser hardware decoding to activate
+        var _hiddenStyle = function(el) {
+          el.style.position = 'fixed';
+          el.style.top = '-9999px'; el.style.left = '-9999px';
+          el.style.width = '2px'; el.style.height = '2px';
+          el.style.opacity = '0'; el.style.pointerEvents = 'none';
+        };
+
+        var localVid = document.createElement('video');
+        localVid.autoplay = true; localVid.muted = true; localVid.playsInline = true;
+        _hiddenStyle(localVid);
         if (window._lmsLocalVideo) {
-          try { stream.addTrack(window._lmsLocalVideo.getMediaStreamTrack()); } catch(_) {}
+          var ls = new MediaStream();
+          try { ls.addTrack(window._lmsLocalVideo.getMediaStreamTrack()); } catch(_) {}
+          localVid.srcObject = ls;
+        }
+        document.body.appendChild(localVid);
+
+        var remoteVid = null;
+        var remoteUsers = window._lmsAgoraClient ? window._lmsAgoraClient.remoteUsers : [];
+        if (remoteUsers.length > 0 && remoteUsers[0].videoTrack) {
+          remoteVid = document.createElement('video');
+          remoteVid.autoplay = true; remoteVid.muted = true; remoteVid.playsInline = true;
+          _hiddenStyle(remoteVid);
+          var rs = new MediaStream();
+          try { rs.addTrack(remoteUsers[0].videoTrack.getMediaStreamTrack()); } catch(_) {}
+          remoteVid.srcObject = rs;
+          document.body.appendChild(remoteVid);
+          remoteVid.play().catch(function(){});
+        }
+        localVid.play().catch(function(){});
+
+        // ── Canvas composite ─────────────────────────────────────────────
+        var W = 1280, H = 720;
+        var canvas = document.createElement('canvas');
+        canvas.width = W; canvas.height = H;
+        var ctx = canvas.getContext('2d');
+        window._lmsRecordCanvas = canvas;
+        window._lmsRecordLocalVid = localVid;
+        window._lmsRecordRemoteVid = remoteVid;
+
+        var drawFrame = function() {
+          if (!window._lmsRecorder || window._lmsRecorder.state !== 'recording') return;
+          ctx.fillStyle = '#111';
+          ctx.fillRect(0, 0, W, H);
+          var hasRemote = remoteVid && remoteVid.readyState >= 2 && remoteVid.videoWidth > 0;
+          var hasLocal  = localVid  && localVid.readyState  >= 2 && localVid.videoWidth  > 0;
+          if (hasRemote && hasLocal) {
+            ctx.drawImage(remoteVid, 0,   0, W/2, H);   // student  — left
+            ctx.drawImage(localVid,  W/2, 0, W/2, H);   // instructor — right
+          } else if (hasLocal) {
+            ctx.drawImage(localVid, 0, 0, W, H);
+          } else if (hasRemote) {
+            ctx.drawImage(remoteVid, 0, 0, W, H);
+          }
+          requestAnimationFrame(drawFrame);
+        };
+        // Start drawing after delay — DOM-attached video needs time to decode first frame
+        setTimeout(drawFrame, 1500);
+
+        // ── MediaRecorder from canvas stream + mixed audio ───────────────
+        var canvasStream = canvas.captureStream(24);
+
+        // Mix local mic + all remote audio tracks via Web Audio API
+        try {
+          var audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+          var dest = audioCtx.createMediaStreamDestination();
+          var audioSourceCount = 0;
+          if (window._lmsLocalAudio) {
+            try {
+              var localStream = new MediaStream([window._lmsLocalAudio.getMediaStreamTrack()]);
+              audioCtx.createMediaStreamSource(localStream).connect(dest);
+              audioSourceCount++;
+            } catch(ae) { console.warn('LMS rec: local audio mix error:', ae.message); }
+          }
+          if (window._lmsAgoraClient) {
+            window._lmsAgoraClient.remoteUsers.forEach(function(u) {
+              if (u.audioTrack) {
+                try {
+                  var remStream = new MediaStream([u.audioTrack.getMediaStreamTrack()]);
+                  audioCtx.createMediaStreamSource(remStream).connect(dest);
+                  audioSourceCount++;
+                } catch(re) { console.warn('LMS rec: remote audio mix error:', re.message); }
+              }
+            });
+          }
+          var mixedTrack = dest.stream.getAudioTracks()[0];
+          if (mixedTrack) {
+            canvasStream.addTrack(mixedTrack);
+            console.log('LMS: mixed ' + audioSourceCount + ' audio source(s) into recording');
+          }
+        } catch(audioErr) {
+          // Fallback: local only
+          if (window._lmsLocalAudio) {
+            try { canvasStream.addTrack(window._lmsLocalAudio.getMediaStreamTrack()); } catch(_) {}
+          }
+          console.warn('LMS rec: audio mix failed, falling back to local only:', audioErr.message);
         }
 
-        // Fallback: request a fresh stream only if Agora tracks are unavailable
-        if (stream.getTracks().length === 0) {
-          stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
-          window._lmsStream = stream;
+        // Fallback: if canvas captureStream not supported, record tracks directly
+        if (!canvas.captureStream) {
+          canvasStream = new MediaStream();
+          if (window._lmsLocalAudio) { try { canvasStream.addTrack(window._lmsLocalAudio.getMediaStreamTrack()); } catch(_) {} }
+          if (window._lmsLocalVideo) { try { canvasStream.addTrack(window._lmsLocalVideo.getMediaStreamTrack()); } catch(_) {} }
         }
 
         window._lmsChunks = [];
         var mimeType = ['video/webm;codecs=vp9','video/webm;codecs=vp8','video/webm']
           .find(function(t) { return MediaRecorder.isTypeSupported(t); }) || 'video/webm';
 
-        window._lmsRecorder = new MediaRecorder(stream, { mimeType: mimeType, videoBitsPerSecond: 500000 });
+        window._lmsRecorder = new MediaRecorder(canvasStream, { mimeType: mimeType, videoBitsPerSecond: 800000 });
         window._lmsRecorder.ondataavailable = function(e) {
           if (e.data && e.data.size > 0) window._lmsChunks.push(e.data);
         };
-        window._lmsRecorder.start(5000); // collect a chunk every 5 seconds
-        console.log('LMS: recording started (' + stream.getTracks().length + ' track(s))');
+        window._lmsRecorder.start(5000);
+        console.log('LMS: composite recording started (canvas ' + W + 'x' + H + ')');
       } catch(e) {
         console.warn('LMS: recording unavailable:', e.message);
       }
@@ -734,6 +826,10 @@
       if (!window._lmsRecorder) return;
 
       var doSave = async function() {
+        // Clean up canvas recording helpers
+        if (window._lmsRecordLocalVid) { try { window._lmsRecordLocalVid.pause(); window._lmsRecordLocalVid.srcObject = null; if (window._lmsRecordLocalVid.parentNode) window._lmsRecordLocalVid.parentNode.removeChild(window._lmsRecordLocalVid); } catch(_){} window._lmsRecordLocalVid = null; }
+        if (window._lmsRecordRemoteVid) { try { window._lmsRecordRemoteVid.pause(); window._lmsRecordRemoteVid.srcObject = null; if (window._lmsRecordRemoteVid.parentNode) window._lmsRecordRemoteVid.parentNode.removeChild(window._lmsRecordRemoteVid); } catch(_){} window._lmsRecordRemoteVid = null; }
+        window._lmsRecordCanvas = null;
         if (window._lmsStream) {
           window._lmsStream.getTracks().forEach(function(t) { t.stop(); });
           window._lmsStream = null;
@@ -761,7 +857,8 @@
 
           // Step 2: upload blob directly to Cloudinary (signed — bypasses Vercel 4.5 MB limit)
           var fd = new FormData();
-          fd.append('file', blob, 'icare-session-' + sessionId + '.webm');
+          var recTs = new Date().toISOString().replace(/[:.]/g,'-').slice(0,19);
+          fd.append('file', blob, 'icare-session-' + sessionId + '-' + recTs + '.webm');
           fd.append('api_key', sign.api_key);
           fd.append('timestamp', String(sign.timestamp));
           fd.append('signature', sign.signature);
