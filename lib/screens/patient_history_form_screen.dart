@@ -172,184 +172,130 @@ class _PatientHistoryFormScreenState extends State<PatientHistoryFormScreen> {
   }
 
   void _prefillFromData(Map<String, dynamic> d) {
-    // Chief complaints
-    final cc = d['chiefComplaints'];
-    if (cc is List) {
-      for (final c in cc) {
-        if (c is Map) {
-          _chiefComplaints.add(ChiefComplaint(
-            complaint: c['complaint']?.toString() ?? '',
-            duration: c['duration']?.toString() ?? '',
-          ));
-        }
-      }
-    }
+    try {
+      // Ensure createdAt is present so PatientHistoryForm.fromJson doesn't throw
+      final safeData = {
+        'createdAt': DateTime.now().toIso8601String(),
+        ...d,
+      };
+      final form = PatientHistoryForm.fromJson(safeData);
 
-    // HPI
-    final hpi = d['hpi'];
-    if (hpi is Map) {
-      _onsetController.text = hpi['onset']?.toString() ?? '';
-      _hpiDurationController.text = hpi['duration']?.toString() ?? '';
-      _progressionController.text = hpi['progression']?.toString() ?? '';
-      _locationController.text = hpi['location']?.toString() ?? '';
-      _radiationController.text = hpi['radiation']?.toString() ?? '';
-      _characterController.text = hpi['character']?.toString() ?? '';
-      _severityController.text = hpi['severity']?.toString() ?? '';
-      _aggravatingController.text = hpi['aggravatingFactors']?.toString() ?? '';
-      _relievingController.text = hpi['relievingFactors']?.toString() ?? '';
-      _associatedController.text = hpi['associatedSymptoms']?.toString() ?? '';
-      _previousController.text = hpi['previousEpisodes']?.toString() ?? '';
-      _treatmentController.text = hpi['treatmentTaken']?.toString() ?? '';
-      _additionalController.text = hpi['additionalNotes']?.toString() ?? '';
-    }
+      // 1. Chief complaints
+      _chiefComplaints.addAll(form.chiefComplaints);
 
-    // Past Medical History
-    final pmh = d['pastMedicalHistory'];
-    if (pmh is Map) {
-      _hypertension = pmh['hypertension'] == true;
-      _diabetes = pmh['diabetesMellitus'] == true;
-      _ihd = pmh['ischemicHeartDisease'] == true;
-      _asthma = pmh['asthma'] == true;
-      _tb = pmh['tuberculosis'] == true;
-      _hepatitis = pmh['hepatitis'] == true;
-      _thyroid = pmh['thyroidDisease'] == true;
-      _renal = pmh['renalDisease'] == true;
-      _epilepsy = pmh['epilepsy'] == true;
-      _psychiatric = pmh['psychiatricIllness'] == true;
-    }
+      // 2. HPI
+      final hpi = form.hpi;
+      if (hpi != null) {
+        _onsetController.text = hpi.onset;
+        _hpiDurationController.text = hpi.duration;
+        _progressionController.text = hpi.progression;
+        _locationController.text = hpi.location;
+        _radiationController.text = hpi.radiation;
+        _characterController.text = hpi.character;
+        _severityController.text = hpi.severity;
+        _aggravatingController.text = hpi.aggravatingFactors;
+        _relievingController.text = hpi.relievingFactors;
+        _associatedController.text = hpi.associatedSymptoms;
+        _previousController.text = hpi.previousEpisodes;
+        _treatmentController.text = hpi.treatmentTaken;
+        _additionalController.text = hpi.additionalNotes;
+      }
 
-    // Surgical History
-    final sh = d['surgicalHistory'];
-    if (sh is List) {
-      for (final s in sh) {
-        if (s is Map) {
-          _surgicalHistory.add(SurgicalHistory(
-            surgeryProcedure: s['surgeryProcedure']?.toString() ?? '',
-            year: int.tryParse(s['year']?.toString() ?? '') ?? 0,
-            hospitalRemarks: s['hospitalRemarks']?.toString() ?? '',
-          ));
-        }
+      // 3. Past Medical History
+      final pmh = form.pastMedicalHistory;
+      if (pmh != null) {
+        _hypertension = pmh.hypertension;
+        _diabetes = pmh.diabetesMellitus;
+        _ihd = pmh.ischemicHeartDisease;
+        _asthma = pmh.asthma;
+        _tb = pmh.tuberculosis;
+        _hepatitis = pmh.hepatitis;
+        _thyroid = pmh.thyroidDisease;
+        _renal = pmh.renalDisease;
+        _epilepsy = pmh.epilepsy;
+        _psychiatric = pmh.psychiatricIllness;
       }
-    }
 
-    // Drug History
-    final dh = d['drugHistory'];
-    if (dh is Map) {
-      final meds = dh['currentMedications'];
-      if (meds is List) {
-        for (final m in meds) {
-          if (m is Map) {
-            _currentMedications.add(CurrentMedication(
-              medication: m['medication']?.toString() ?? '',
-              dose: m['dose']?.toString() ?? '',
-              frequency: m['frequency']?.toString() ?? '',
-              duration: m['duration']?.toString() ?? '',
-            ));
-          }
-        }
-      }
-      final allergies = dh['allergies'];
-      if (allergies is List) {
-        for (final a in allergies) {
-          if (a is Map) {
-            final typeStr = a['type']?.toString() ?? 'other';
-            _allergies.add(Allergy(
-              type: AllergyType.values.firstWhere(
-                (e) => e.name == typeStr, orElse: () => AllergyType.other),
-              allergen: a['allergen']?.toString() ?? '',
-              reaction: a['reaction']?.toString() ?? '',
-            ));
-          }
-        }
-      }
-    }
+      // 4. Surgical History
+      _surgicalHistory.addAll(form.surgicalHistory);
 
-    // Family History
-    final fh = d['familyHistory'];
-    if (fh is Map) {
-      final father = fh['father'];
-      if (father is Map && (father['diseaseCondition']?.toString() ?? '').isNotEmpty) {
-        _father = FamilyMemberHistory(
-          diseaseCondition: father['diseaseCondition']?.toString() ?? '',
-          ageAtDiagnosis: int.tryParse(father['ageAtDiagnosis']?.toString() ?? ''),
-        );
+      // 5. Drug History
+      final dh = form.drugHistory;
+      if (dh != null) {
+        _currentMedications.addAll(dh.currentMedications);
+        _allergies.addAll(dh.allergies);
       }
-      final mother = fh['mother'];
-      if (mother is Map && (mother['diseaseCondition']?.toString() ?? '').isNotEmpty) {
-        _mother = FamilyMemberHistory(
-          diseaseCondition: mother['diseaseCondition']?.toString() ?? '',
-          ageAtDiagnosis: int.tryParse(mother['ageAtDiagnosis']?.toString() ?? ''),
-        );
-      }
-    }
 
-    // Personal & Social History
-    final psh = d['personalSocialHistory'];
-    if (psh is Map) {
-      _diet = psh['diet']?.toString() ?? '';
-      _appetite = psh['appetite']?.toString() ?? '';
-      _sleep = psh['sleep']?.toString() ?? '';
-      _bowelHabits = psh['bowelHabits']?.toString() ?? '';
-      _bladderHabits = psh['bladderHabits']?.toString() ?? '';
-      final smokingStr = psh['smoking']?.toString() ?? 'never';
-      _smoking = SmokingStatus.values.firstWhere(
-        (e) => e.name == smokingStr, orElse: () => SmokingStatus.never);
-      final alcoholStr = psh['alcoholUse']?.toString() ?? 'never';
-      _alcohol = AlcoholStatus.values.firstWhere(
-        (e) => e.name == alcoholStr, orElse: () => AlcoholStatus.never);
-      _substanceAbuse = psh['substanceAbuse'] == true;
-      _exercise = psh['exercise']?.toString() ?? '';
-      _sexualHistory = psh['sexualHistory']?.toString() ?? '';
-      _occupationalExposure = psh['occupationalExposure']?.toString() ?? '';
-      _travelHistory = psh['travelHistory']?.toString() ?? '';
-      _vaccinationHistory = psh['vaccinationHistory']?.toString() ?? '';
-    }
-
-    // Review of Systems
-    final ros = d['reviewOfSystems'];
-    if (ros is Map) {
-      _generalController.text = ros['general']?.toString() ?? '';
-      _cardiovascularController.text = ros['cardiovascular']?.toString() ?? '';
-      _respiratoryController.text = ros['respiratory']?.toString() ?? '';
-      _giController.text = ros['gastrointestinal']?.toString() ?? '';
-      _guController.text = ros['genitourinary']?.toString() ?? '';
-      _neuroController.text = ros['neurological']?.toString() ?? '';
-      _musculoskeletalController.text = ros['musculoskeletal']?.toString() ?? '';
-      _endocrineController.text = ros['endocrine']?.toString() ?? '';
-      _skinController.text = ros['skin']?.toString() ?? '';
-      _psychiatricController.text = ros['psychiatric']?.toString() ?? '';
-    }
-
-    // Virtual Examination
-    final ve = d['virtualExamination'];
-    if (ve is Map) {
-      final vs = ve['vitalSigns'];
-      if (vs is Map) {
-        _bpController.text = vs['bloodPressure']?.toString() ?? '';
-        _pulseController.text = vs['pulseRate']?.toString() ?? '';
-        _rrController.text = vs['respiratoryRate']?.toString() ?? '';
-        _tempController.text = vs['temperature']?.toString() ?? '';
-        _spo2Controller.text = vs['oxygenSaturation']?.toString() ?? '';
-        _weightController.text = vs['weight']?.toString() ?? '';
-        _heightController.text = vs['height']?.toString() ?? '';
-        _bmiController.text = vs['bmi']?.toString() ?? '';
+      // 6. Family History
+      final fh = form.familyHistory;
+      if (fh != null) {
+        _father = fh.father;
+        _mother = fh.mother;
+        _siblings.addAll(fh.siblings);
+        _children.addAll(fh.children);
       }
-      final gf = ve['generalFindings'];
-      if (gf is Map) {
-        _appearanceController.text = gf['generalAppearance']?.toString() ?? '';
-        _consciousnessController.text = gf['levelOfConsciousness']?.toString() ?? '';
-        _orientationController.text = gf['orientation']?.toString() ?? '';
-        _hydrationController.text = gf['hydration']?.toString() ?? '';
-        _pallor = gf['pallor'] == true;
-        _icterus = gf['icterus'] == true;
-        _cyanosis = gf['cyanosis'] == true;
-        _clubbing = gf['clubbing'] == true;
-        _edema = gf['edema'] == true;
-        _lymphadenopathy = gf['lymphadenopathy'] == true;
-        _nutritionalController.text = gf['nutritionalStatus']?.toString() ?? '';
-        _mobilityController.text = gf['mobilityGait']?.toString() ?? '';
+
+      // 7. Personal & Social History
+      final psh = form.personalSocialHistory;
+      if (psh != null) {
+        _diet = psh.diet;
+        _appetite = psh.appetite;
+        _sleep = psh.sleep;
+        _bowelHabits = psh.bowelHabits;
+        _bladderHabits = psh.bladderHabits;
+        _smoking = psh.smoking;
+        _alcohol = psh.alcoholUse;
+        _substanceAbuse = psh.substanceAbuse;
+        _exercise = psh.exercise;
+        _sexualHistory = psh.sexualHistory ?? '';
+        _occupationalExposure = psh.occupationalExposure ?? '';
+        _travelHistory = psh.travelHistory ?? '';
+        _vaccinationHistory = psh.vaccinationHistory ?? '';
       }
-      _examNotesController.text = ve['notes']?.toString() ?? '';
+
+      // 9. Review of Systems
+      final ros = form.reviewOfSystems;
+      if (ros != null) {
+        _generalController.text = ros.general;
+        _cardiovascularController.text = ros.cardiovascular;
+        _respiratoryController.text = ros.respiratory;
+        _giController.text = ros.gastrointestinal;
+        _guController.text = ros.genitourinary;
+        _neuroController.text = ros.neurological;
+        _musculoskeletalController.text = ros.musculoskeletal;
+        _endocrineController.text = ros.endocrine;
+        _skinController.text = ros.skin;
+        _psychiatricController.text = ros.psychiatric;
+      }
+
+      // 10. Virtual Examination
+      final ve = form.virtualExamination;
+      if (ve != null) {
+        _bpController.text = ve.vitalSigns.bloodPressure ?? '';
+        _pulseController.text = ve.vitalSigns.pulseRate ?? '';
+        _rrController.text = ve.vitalSigns.respiratoryRate ?? '';
+        _tempController.text = ve.vitalSigns.temperature ?? '';
+        _spo2Controller.text = ve.vitalSigns.oxygenSaturation ?? '';
+        _weightController.text = ve.vitalSigns.weight ?? '';
+        _heightController.text = ve.vitalSigns.height ?? '';
+        _bmiController.text = ve.vitalSigns.bmi ?? '';
+        final gf = ve.generalFindings;
+        _appearanceController.text = gf.generalAppearance;
+        _consciousnessController.text = gf.levelOfConsciousness;
+        _orientationController.text = gf.orientation;
+        _hydrationController.text = gf.hydration;
+        _pallor = gf.pallor;
+        _icterus = gf.icterus;
+        _cyanosis = gf.cyanosis;
+        _clubbing = gf.clubbing;
+        _edema = gf.edema;
+        _lymphadenopathy = gf.lymphadenopathy;
+        _nutritionalController.text = gf.nutritionalStatus;
+        _mobilityController.text = gf.mobilityGait;
+        _examNotesController.text = ve.notes;
+      }
+    } catch (e) {
+      print('⚠️ Error pre-filling history form: $e');
     }
   }
 

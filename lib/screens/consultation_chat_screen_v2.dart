@@ -63,6 +63,9 @@ class _ConsultationChatScreenV2State extends State<ConsultationChatScreenV2> {
   @override
   void initState() {
     super.initState();
+    // Cap Flutter's image cache to 40 MB to prevent "Aw Snap" OOM crashes
+    // during long consultations where images accumulate unreleased in the cache.
+    PaintingBinding.instance.imageCache.maximumSizeBytes = 40 * 1024 * 1024;
     _initializeTimer();
     _initializeConsultation();
   }
@@ -170,12 +173,12 @@ class _ConsultationChatScreenV2State extends State<ConsultationChatScreenV2> {
     }
   }
 
-  // Poll for new messages every 4 seconds so both parties see updates in real-time
+  // Poll for new messages every 8 seconds — 4 s caused memory pressure over long sessions
   void _startMessagePolling() {
     _messagePollTimer?.cancel();
-    _messagePollTimer = Timer.periodic(const Duration(seconds: 4), (_) {
+    _messagePollTimer = Timer.periodic(const Duration(seconds: 8), (_) {
       if (mounted && _consultationId != null) {
-        _loadMessages(silent: true).catchError((_) {}); // catch unhandled Future errors
+        _loadMessages(silent: true).catchError((_) {});
       }
     });
   }
@@ -201,13 +204,14 @@ class _ConsultationChatScreenV2State extends State<ConsultationChatScreenV2> {
           consultationId: _consultationId!);
       print('📥 RECEIVED ${messages.length} messages');
       if (mounted) {
-        final newList = messages
+        var newList = messages
             .map((m) => ConsultationMessage.fromJson(m as Map<String, dynamic>))
             .toList();
+        // Keep only the last 100 messages to bound memory usage
+        if (newList.length > 100) newList = newList.sublist(newList.length - 100);
         final hadNewMessages = newList.length != _messages.length;
         print('📥 Previous message count: ${_messages.length}, New count: ${newList.length}');
         // Only replace messages if we got a valid non-empty response
-        // (empty list from backend usually means an error/session issue, not real empty chat)
         if (newList.isNotEmpty || _messages.isEmpty) {
           setState(() {
             _messages = newList;
@@ -1078,9 +1082,15 @@ class _ConsultationChatScreenV2State extends State<ConsultationChatScreenV2> {
           children: [
             if (message.attachmentUrl != null) ...[
               _buildAttachmentPreview(message.attachmentUrl!, isMe),
-              if (message.message.isNotEmpty) const SizedBox(height: 8),
+              if (message.message.isNotEmpty &&
+                  message.message != '[Image]' &&
+                  message.message != '[Document]')
+                const SizedBox(height: 8),
             ],
-            if (message.message.isNotEmpty)
+            // Hide auto-generated attachment labels — show real captions only
+            if (message.message.isNotEmpty &&
+                message.message != '[Image]' &&
+                message.message != '[Document]')
               Text(
                 message.message,
                 style: TextStyle(

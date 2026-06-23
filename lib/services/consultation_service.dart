@@ -587,30 +587,35 @@ class ConsultationService {
   }
 
   // Upload attachment — web (bytes, no file path)
+  // Uploads directly to Cloudinary to avoid CORS issues with the backend /upload endpoint.
   Future<Map<String, dynamic>> uploadAttachmentBytes({
     required Uint8List bytes,
     required String fileName,
   }) async {
     try {
-      final token = await _sharedPref.getToken();
+      const cloudName = 'dzlcnyxgb';
+      const uploadPreset = 'icare_videos';
       final formData = FormData.fromMap({
         'file': MultipartFile.fromBytes(bytes, filename: fileName),
+        'upload_preset': uploadPreset,
       });
-      final response = await _dio.post(
-        '/upload',
+      final response = await Dio().post(
+        'https://api.cloudinary.com/v1_1/$cloudName/auto/upload',
         data: formData,
-        options: Options(headers: {'Authorization': 'Bearer $token'}),
       );
-      if (response.data is Map<String, dynamic>) {
-        return response.data as Map<String, dynamic>;
-      }
       if (response.data is Map) {
-        return Map<String, dynamic>.from(response.data as Map);
+        final url = response.data['secure_url']?.toString() ?? '';
+        if (url.isNotEmpty) return {'success': true, 'url': url};
+        return {'success': false, 'message': 'Upload succeeded but no URL returned'};
       }
-      return {'success': false, 'message': 'Unexpected response'};
+      return {'success': false, 'message': 'Unexpected response from Cloudinary'};
     } on DioException catch (e) {
-      final serverMsg = (e.response?.data is Map) ? (e.response!.data as Map)['message'] : null;
-      return {'success': false, 'message': serverMsg?.toString() ?? e.message ?? 'Upload failed'};
+      String? msg;
+      if (e.response?.data is Map) {
+        final errObj = (e.response!.data as Map)['error'];
+        if (errObj is Map) msg = errObj['message']?.toString();
+      }
+      return {'success': false, 'message': msg ?? e.message ?? 'Upload failed'};
     } catch (e) {
       return {'success': false, 'message': e.toString()};
     }
