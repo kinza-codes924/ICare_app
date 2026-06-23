@@ -332,12 +332,15 @@ class _ConsultationChatScreenV2State extends State<ConsultationChatScreenV2> {
       // Accept both {success:true, url:...} and bare {url:...} from backend
       final url = uploadResult['url']?.toString() ?? '';
       if (url.isNotEmpty) {
+        final ext = fileName.split('.').last.toLowerCase();
+        final isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp'].contains(ext);
+        final attachmentLabel = isImage ? '[Image]' : '[Document]';
         await _consultationService.sendMessageV2(
           consultationId: _consultationId!,
           senderId: widget.currentUserId,
           senderName: widget.currentUserName,
           senderRole: widget.isDoctor ? 'doctor' : 'patient',
-          message: '',
+          message: attachmentLabel,
           attachmentUrl: url,
         );
         await _loadMessages();
@@ -442,7 +445,7 @@ class _ConsultationChatScreenV2State extends State<ConsultationChatScreenV2> {
     );
   }
 
-  void _openHistoryForm() {
+  Future<void> _openHistoryForm() async {
     if (!widget.isDoctor) return;
     if (_consultationId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -451,12 +454,17 @@ class _ConsultationChatScreenV2State extends State<ConsultationChatScreenV2> {
       return;
     }
     if (widget.appointment == null) return;
+    final existingHistory = await _consultationService.getHistoryByConsultation(_consultationId!);
+    final existingHistoryId = existingHistory?['_id']?.toString();
+    if (!mounted) return;
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (ctx) => PatientHistoryFormScreen(
           appointment: widget.appointment!,
           consultationId: _consultationId!,
+          existingHistoryId: existingHistoryId,
+          initialData: existingHistory,
         ),
       ),
     );
@@ -786,10 +794,15 @@ class _ConsultationChatScreenV2State extends State<ConsultationChatScreenV2> {
   Widget _buildConsultationHeader() {
     // When appointment is available use its names;
     // when null (patient joined via call notification) use current/remote names.
-    final patientName = widget.appointment?.patient?.name
-        ?? (!widget.isDoctor ? widget.currentUserName : (widget.remoteUserName ?? 'Patient'));
-    final doctorName = widget.appointment?.doctor?.name
-        ?? (widget.isDoctor ? widget.currentUserName : (widget.remoteUserName?.replaceFirst('Dr. ', '') ?? 'Doctor'));
+    // Treat placeholder names ('Doctor', 'Patient') as missing — fall back to real names
+    final apptPatientName = widget.appointment?.patient?.name;
+    final patientName = (apptPatientName != null && apptPatientName != 'Patient' && apptPatientName.isNotEmpty)
+        ? apptPatientName
+        : (!widget.isDoctor ? widget.currentUserName : (widget.remoteUserName ?? 'Patient'));
+    final apptDoctorName = widget.appointment?.doctor?.name;
+    final doctorName = (apptDoctorName != null && apptDoctorName != 'Doctor' && apptDoctorName.isNotEmpty)
+        ? apptDoctorName
+        : (widget.isDoctor ? widget.currentUserName : (widget.remoteUserName?.replaceFirst('Dr. ', '') ?? 'Doctor'));
     final mins = (_timer.elapsed.inSeconds ~/ 60).toString().padLeft(2, '0');
     final secs = (_timer.elapsed.inSeconds % 60).toString().padLeft(2, '0');
 
