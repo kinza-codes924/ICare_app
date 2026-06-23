@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:icare/services/lms_service.dart';
 import 'package:icare/utils/shared_pref.dart';
 import 'package:icare/utils/theme.dart';
@@ -7,8 +6,8 @@ import 'package:icare/widgets/back_button.dart';
 import 'package:icare/screens/lesson_detail_page.dart';
 import 'package:icare/screens/certificate_templates_screen.dart';
 import 'package:icare/screens/quiz_take_screen.dart';
+import 'package:icare/widgets/video_player_widget.dart';
 import 'package:intl/intl.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 class LmsCoursePage extends StatefulWidget {
   final Map<String, dynamic> course;
@@ -521,6 +520,7 @@ class _CourseLessons extends StatelessWidget {
                           lesson: l,
                           courseId: course['_id']?.toString() ?? '',
                           moduleId: moduleId,
+                          enrollmentId: enrollmentId,
                         ),
                       ),
                     ),
@@ -2127,13 +2127,29 @@ class _RecordingsTabState extends State<_RecordingsTab> {
   Future<void> _load() async {
     try {
       final sessions = await widget.lms.getCourseSessions(widget.courseId);
-      final recs = sessions
-          .where((s) {
-            final url = s['recordingUrl']?.toString() ?? '';
-            return url.isNotEmpty;
-          })
-          .map<Map<String, dynamic>>((s) => Map<String, dynamic>.from(s))
-          .toList();
+      final recs = <Map<String, dynamic>>[];
+      for (final s in sessions) {
+        final base = Map<String, dynamic>.from(s as Map);
+        // Handle array of recordings per session (if backend supports it)
+        final urlList = (s['recordingUrls'] as List?)?.cast<dynamic>() ?? [];
+        if (urlList.isNotEmpty) {
+          for (int i = 0; i < urlList.length; i++) {
+            final u = urlList[i]?.toString() ?? '';
+            if (u.isNotEmpty) {
+              final entry = Map<String, dynamic>.from(base);
+              entry['recordingUrl'] = u;
+              // Prefer per-entry date if available
+              if (urlList[i] is Map) {
+                entry['scheduledAt'] = (urlList[i] as Map)['recordedAt'] ?? base['scheduledAt'];
+              }
+              recs.add(entry);
+            }
+          }
+        } else {
+          final url = s['recordingUrl']?.toString() ?? '';
+          if (url.isNotEmpty) recs.add(base);
+        }
+      }
       // Most recent first
       recs.sort((a, b) {
         final da = DateTime.tryParse(a['scheduledAt']?.toString() ?? '') ?? DateTime(2000);
@@ -2147,16 +2163,17 @@ class _RecordingsTabState extends State<_RecordingsTab> {
   }
 
   Future<void> _openVideo(String url) async {
-    if (kIsWeb) {
-      // Open in new browser tab on web
-      final uri = Uri.tryParse(url);
-      if (uri != null) await launchUrl(uri, mode: LaunchMode.externalApplication);
-    } else {
-      final uri = Uri.tryParse(url);
-      if (uri != null && await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
-      }
-    }
+    Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => Scaffold(
+        backgroundColor: Colors.black,
+        appBar: AppBar(
+          backgroundColor: Colors.black,
+          foregroundColor: Colors.white,
+          title: const Text('Recording', style: TextStyle(color: Colors.white)),
+        ),
+        body: Center(child: VideoPlayerWidget(videoUrl: url)),
+      ),
+    ));
   }
 
   String _formatDuration(dynamic seconds) {

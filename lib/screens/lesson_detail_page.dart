@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:icare/services/lms_service.dart';
 import 'package:icare/utils/theme.dart';
 import 'package:icare/widgets/back_button.dart';
 import 'package:icare/widgets/lesson_notes_editor.dart';
@@ -10,12 +11,16 @@ class LessonDetailPage extends StatefulWidget {
   final Map<String, dynamic> lesson;
   final String courseId;
   final String moduleId;
+  final String? enrollmentId;
+  final void Function(String lessonId)? onLessonCompleted;
 
   const LessonDetailPage({
     super.key,
     required this.lesson,
     required this.courseId,
     required this.moduleId,
+    this.enrollmentId,
+    this.onLessonCompleted,
   });
 
   @override
@@ -24,17 +29,47 @@ class LessonDetailPage extends StatefulWidget {
 
 class _LessonDetailPageState extends State<LessonDetailPage> with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  final LmsService _lms = LmsService();
+  bool _isCompleted = false;
+  bool _markingComplete = false;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    _isCompleted = widget.lesson['isCompleted'] == true;
   }
 
   @override
   void dispose() {
     _tabController.dispose();
     super.dispose();
+  }
+
+  Future<void> _toggleComplete() async {
+    if (_markingComplete) return;
+    final lessonId = widget.lesson['_id']?.toString() ?? widget.lesson['id']?.toString() ?? '';
+    final enrollmentId = widget.enrollmentId;
+    if (enrollmentId == null || enrollmentId.isEmpty || lessonId.isEmpty) return;
+
+    setState(() { _markingComplete = true; _isCompleted = !_isCompleted; });
+    try {
+      if (_isCompleted) {
+        await _lms.markLessonComplete(
+          enrollmentId: enrollmentId,
+          lessonId: lessonId,
+          moduleId: widget.moduleId.isNotEmpty ? widget.moduleId : null,
+        );
+        widget.onLessonCompleted?.call(lessonId);
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Lesson marked as completed!'), backgroundColor: Color(0xFF10B981), duration: Duration(seconds: 2)),
+        );
+      }
+    } catch (_) {
+      if (mounted) setState(() => _isCompleted = !_isCompleted);
+    } finally {
+      if (mounted) setState(() => _markingComplete = false);
+    }
   }
 
   @override
@@ -259,6 +294,68 @@ class _LessonDetailPageState extends State<LessonDetailPage> with SingleTickerPr
                       ],
                     ),
                   ),
+                // Mark as Completed (only for enrolled students/patients)
+                if (widget.enrollmentId != null && widget.enrollmentId!.isNotEmpty) ...[
+                  const SizedBox(height: 24),
+                  GestureDetector(
+                    onTap: _toggleComplete,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                      decoration: BoxDecoration(
+                        color: _isCompleted
+                            ? const Color(0xFF10B981).withValues(alpha: 0.1)
+                            : AppColors.primaryColor.withValues(alpha: 0.06),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: _isCompleted
+                              ? const Color(0xFF10B981)
+                              : AppColors.primaryColor.withValues(alpha: 0.3),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          _markingComplete
+                              ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2))
+                              : AnimatedContainer(
+                                  duration: const Duration(milliseconds: 200),
+                                  width: 22, height: 22,
+                                  decoration: BoxDecoration(
+                                    color: _isCompleted ? const Color(0xFF10B981) : Colors.transparent,
+                                    borderRadius: BorderRadius.circular(6),
+                                    border: Border.all(
+                                      color: _isCompleted ? const Color(0xFF10B981) : const Color(0xFF94A3B8),
+                                      width: 2,
+                                    ),
+                                  ),
+                                  child: _isCompleted
+                                      ? const Icon(Icons.check_rounded, size: 14, color: Colors.white)
+                                      : null,
+                                ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  _isCompleted ? 'Completed!' : 'Mark as Completed',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w700,
+                                    color: _isCompleted ? const Color(0xFF10B981) : AppColors.primaryColor,
+                                  ),
+                                ),
+                                if (!_isCompleted)
+                                  const Text('Tap to mark this lesson as done',
+                                      style: TextStyle(fontSize: 11, color: Color(0xFF94A3B8))),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                ],
               ],
             ),
           ),

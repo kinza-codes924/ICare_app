@@ -159,7 +159,7 @@ class _MyLearningScreenState extends ConsumerState<MyLearningScreen>
             builder: (ctx) =>
                 ViewCourse(courseData: course, enrollmentId: enrollmentId),
           ),
-        );
+        ).then((_) => _loadData());
       },
       child: Container(
         margin: const EdgeInsets.only(bottom: 16),

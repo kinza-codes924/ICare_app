@@ -152,7 +152,7 @@ class _AdminPanelScreenState extends ConsumerState<AdminPanelScreen>
                 fontFamily: 'Gilroy-Bold',
               ),
               tabs: [
-                Tab(text: 'DOCTOR APPROVALS (${_pendingDoctors.length})'),
+                Tab(text: 'PENDING APPROVALS (${_pendingDoctors.length})'),
                 Tab(text: 'LABORATORIES (${_laboratories.length})'),
                 Tab(text: 'PHARMACIES (${_pharmacies.length})'),
                 Tab(text: 'INSTRUCTORS (${_instructors.length})'),
@@ -218,7 +218,7 @@ class _AdminPanelScreenState extends ConsumerState<AdminPanelScreen>
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            'Pending Doctor Approvals',
+            'Pending Approvals',
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.w800,
@@ -227,7 +227,7 @@ class _AdminPanelScreenState extends ConsumerState<AdminPanelScreen>
           ),
           const SizedBox(height: 8),
           const Text(
-            'Review and approve doctor registrations',
+            'Review and approve user registrations (doctors, pharmacies, labs, instructors, students)',
             style: TextStyle(fontSize: 13, color: Color(0xFF64748B)),
           ),
           const SizedBox(height: 20),
@@ -331,18 +331,134 @@ class _AdminPanelScreenState extends ConsumerState<AdminPanelScreen>
   }
 
   Widget _buildDoctorApprovalCard(Map<String, dynamic> d) {
-    return Container(margin: const EdgeInsets.only(bottom: 16), padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16)),
-      child: Column(children: [
-        Row(children: [const CircleAvatar(child: Icon(Icons.person)), const SizedBox(width: 12),
-          Expanded(child: Text('Dr. ${d['name'] ?? 'Unknown'}', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800)))]),
-        const SizedBox(height: 16),
-        Row(children: [
-          Expanded(child: OutlinedButton(onPressed: () => _rejectDoctor(d), child: const Text('Reject'))),
-          const SizedBox(width: 12),
-          Expanded(flex: 2, child: ElevatedButton(onPressed: () => _approveDoctor(d), child: const Text('Approve'))),
+    final role = d['role']?.toString() ?? 'unknown';
+    final details = d['profileDetails'] as Map? ?? {};
+
+    Widget _infoRow(IconData icon, String label, String? value) {
+      if (value == null || value.isEmpty) return const SizedBox.shrink();
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 6),
+        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Icon(icon, size: 14, color: const Color(0xFF64748B)),
+          const SizedBox(width: 6),
+          Text('$label: ', style: const TextStyle(fontSize: 12, color: Color(0xFF64748B), fontWeight: FontWeight.w600)),
+          Expanded(child: Text(value, style: const TextStyle(fontSize: 12, color: Color(0xFF0F172A)))),
         ]),
-      ]));
+      );
+    }
+
+    String _roleLabel() {
+      switch (role) {
+        case 'doctor': return 'Doctor';
+        case 'pharmacy': return 'Pharmacy';
+        case 'lab': return 'Laboratory';
+        case 'student': return 'Student';
+        case 'instructor': return 'Instructor';
+        default: return role.isNotEmpty ? role[0].toUpperCase() + role.substring(1) : 'Unknown';
+      }
+    }
+
+    final Color roleColor;
+    switch (role) {
+      case 'doctor': roleColor = const Color(0xFF0036BC); break;
+      case 'pharmacy': roleColor = const Color(0xFF10B981); break;
+      case 'lab': roleColor = const Color(0xFF8B5CF6); break;
+      case 'student': roleColor = const Color(0xFFF59E0B); break;
+      case 'instructor': roleColor = const Color(0xFFEF4444); break;
+      default: roleColor = AppColors.primaryColor;
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFF1F5F9)),
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 10, offset: const Offset(0, 4))],
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        // Header
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: roleColor.withValues(alpha: 0.05),
+            borderRadius: const BorderRadius.only(topLeft: Radius.circular(16), topRight: Radius.circular(16)),
+          ),
+          child: Row(children: [
+            CircleAvatar(
+              backgroundColor: roleColor.withValues(alpha: 0.15),
+              child: Icon(Icons.person, color: roleColor),
+            ),
+            const SizedBox(width: 12),
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(d['name'] ?? 'Unknown', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Color(0xFF0F172A))),
+              const SizedBox(height: 2),
+              Text(d['email']?.toString() ?? '', style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+            ])),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(color: roleColor.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(20)),
+              child: Text(_roleLabel(), style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: roleColor)),
+            ),
+          ]),
+        ),
+        // Details
+        Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            _infoRow(Icons.phone_outlined, 'Phone', d['phone']?.toString()),
+            _infoRow(Icons.location_city_outlined, 'City', d['city']?.toString()),
+            _infoRow(Icons.location_on_outlined, 'Address', d['address']?.toString()),
+            if (role == 'doctor') ...[
+              _infoRow(Icons.school_outlined, 'Qualification', (details['qualification'] ?? d['qualification'])?.toString()),
+              _infoRow(Icons.psychology_outlined, 'Specialization', (details['specialization'] ?? d['specialization'])?.toString()),
+              _infoRow(Icons.numbers_rounded, 'PMDC No.', (details['pmdcNumber'] ?? d['pmdcNumber'])?.toString()),
+              _infoRow(Icons.timeline_outlined, 'Experience', (details['experience'] ?? d['experience'])?.toString()),
+              _infoRow(Icons.local_hospital_outlined, 'Workplace', (details['workplace'] ?? d['workplace'])?.toString()),
+              _infoRow(Icons.schedule_outlined, 'Timings', (details['availableTimings'] ?? d['availableTimings'])?.toString()),
+            ] else if (role == 'pharmacy') ...[
+              _infoRow(Icons.local_pharmacy_outlined, 'Pharmacy Name', (details['pharmacyName'] ?? d['pharmacyName'])?.toString()),
+              _infoRow(Icons.badge_outlined, 'Drug License', (details['drugLicenseNumber'] ?? d['drugLicenseNumber'])?.toString()),
+              _infoRow(Icons.person_outline, 'Pharmacist', (details['pharmacistName'] ?? d['pharmacistName'])?.toString()),
+              _infoRow(Icons.timeline_outlined, 'Years Operating', (details['yearsOfOperation'] ?? d['yearsOfOperation'])?.toString()),
+            ] else if (role == 'lab') ...[
+              _infoRow(Icons.biotech_outlined, 'Lab Name', (details['labName'] ?? d['labName'])?.toString()),
+              _infoRow(Icons.badge_outlined, 'License No.', (details['labLicenseNumber'] ?? d['labLicenseNumber'])?.toString()),
+              _infoRow(Icons.timeline_outlined, 'Years Operating', (details['yearsOfOperation'] ?? d['yearsOfOperation'])?.toString()),
+            ] else if (role == 'student') ...[
+              _infoRow(Icons.account_balance_outlined, 'University', (details['university'] ?? d['university'])?.toString()),
+              _infoRow(Icons.menu_book_outlined, 'Program', (details['program'] ?? d['program'])?.toString()),
+              _infoRow(Icons.timeline_outlined, 'Current Year', (details['currentYear'] ?? d['currentYear'])?.toString()),
+              _infoRow(Icons.badge_outlined, 'Student ID', (details['studentId'] ?? d['studentId'])?.toString()),
+            ] else if (role == 'instructor') ...[
+              _infoRow(Icons.school_outlined, 'Qualification', (details['qualification'] ?? d['qualification'])?.toString()),
+              _infoRow(Icons.psychology_outlined, 'Specialization', (details['specialization'] ?? d['specialization'])?.toString()),
+              _infoRow(Icons.timeline_outlined, 'Experience', (details['experience'] ?? d['experience'])?.toString()),
+              _infoRow(Icons.account_balance_outlined, 'Institution', (details['institution'] ?? d['institution'])?.toString()),
+              _infoRow(Icons.menu_book_outlined, 'Proposed Courses', (details['proposedCourses'] ?? d['proposedCourses'])?.toString()),
+            ],
+            if ((details['comments'] ?? d['comments'])?.toString().isNotEmpty == true)
+              _infoRow(Icons.comment_outlined, 'Comments', (details['comments'] ?? d['comments'])?.toString()),
+            const SizedBox(height: 12),
+            Row(children: [
+              Expanded(child: OutlinedButton.icon(
+                onPressed: () => _rejectDoctor(d),
+                icon: const Icon(Icons.close_rounded, size: 16),
+                label: const Text('Reject'),
+                style: OutlinedButton.styleFrom(foregroundColor: Colors.red, side: const BorderSide(color: Colors.red), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
+              )),
+              const SizedBox(width: 12),
+              Expanded(flex: 2, child: ElevatedButton.icon(
+                onPressed: () => _approveDoctor(d),
+                icon: const Icon(Icons.check_circle_outline_rounded, size: 16),
+                label: const Text('Approve'),
+                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF10B981), foregroundColor: Colors.white, elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
+              )),
+            ]),
+          ]),
+        ),
+      ]),
+    );
   }
 
   Widget _buildLabCard(Map<String, dynamic> lab) {
@@ -476,45 +592,73 @@ class _AdminPanelScreenState extends ConsumerState<AdminPanelScreen>
   }
 
   void _approveDoctor(Map<String, dynamic> d) async {
+    final userId = d['_id']?.toString() ?? d['id']?.toString() ?? '';
+    if (userId.isEmpty) return;
     setState(() => _isLoading = true);
     try {
-      // Call backend API to approve doctor
-      await Future.delayed(const Duration(seconds: 1));
-      setState(() {
-        _pendingDoctors.remove(d);
-        _isLoading = false;
-      });
+      await _api.put('/admin/users/$userId/approve', {'status': 'approved'});
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Dr. ${d['name']} approved successfully'),
-            backgroundColor: const Color(0xFF10B981),
-          ),
-        );
+        setState(() { _pendingDoctors.remove(d); _isLoading = false; });
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('${d['name'] ?? 'User'} approved successfully'),
+          backgroundColor: const Color(0xFF10B981),
+        ));
       }
     } catch (e) {
-      setState(() => _isLoading = false);
+      // Fallback: try alternate endpoint pattern
+      try {
+        await _api.post('/admin/approve-user', {'userId': userId});
+        if (mounted) {
+          setState(() { _pendingDoctors.remove(d); _isLoading = false; });
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text('${d['name'] ?? 'User'} approved successfully'),
+            backgroundColor: const Color(0xFF10B981),
+          ));
+        }
+      } catch (e2) {
+        if (mounted) {
+          setState(() => _isLoading = false);
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text('Failed to approve: $e2'),
+            backgroundColor: Colors.red,
+          ));
+        }
+      }
     }
   }
 
   void _rejectDoctor(Map<String, dynamic> d) async {
+    final userId = d['_id']?.toString() ?? d['id']?.toString() ?? '';
+    if (userId.isEmpty) return;
     setState(() => _isLoading = true);
     try {
-      await Future.delayed(const Duration(seconds: 1));
-      setState(() {
-        _pendingDoctors.remove(d);
-        _isLoading = false;
-      });
+      await _api.put('/admin/users/$userId/reject', {'status': 'rejected'});
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Dr. ${d['name']} rejected'),
-            backgroundColor: const Color(0xFFF59E0B),
-          ),
-        );
+        setState(() { _pendingDoctors.remove(d); _isLoading = false; });
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('${d['name'] ?? 'User'} rejected'),
+          backgroundColor: const Color(0xFFF59E0B),
+        ));
       }
     } catch (e) {
-      setState(() => _isLoading = false);
+      try {
+        await _api.post('/admin/reject-user', {'userId': userId});
+        if (mounted) {
+          setState(() { _pendingDoctors.remove(d); _isLoading = false; });
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text('${d['name'] ?? 'User'} rejected'),
+            backgroundColor: const Color(0xFFF59E0B),
+          ));
+        }
+      } catch (e2) {
+        if (mounted) {
+          setState(() => _isLoading = false);
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text('Failed to reject: $e2'),
+            backgroundColor: Colors.red,
+          ));
+        }
+      }
     }
   }
 

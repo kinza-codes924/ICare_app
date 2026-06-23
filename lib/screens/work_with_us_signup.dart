@@ -150,6 +150,107 @@ class _WorkWithUsSignupState extends State<WorkWithUsSignup> {
     },
   ];
 
+  // ── Password strength helpers ──────────────────────────────────────────────
+  List<bool> _pwdChecks(String v) => [
+    v.length >= 8,
+    v.contains(RegExp(r'[A-Z]')),
+    v.contains(RegExp(r'[0-9]')),
+    v.contains(RegExp(r'[!@#$%^&*()\-_+=\[\]{};:,.<>?\\|`~]')),
+  ];
+
+  String _pwdLabel(int n) {
+    if (n == 0) return '';
+    if (n == 1) return 'Weak';
+    if (n == 2) return 'Fair';
+    if (n == 3) return 'Good';
+    return 'Strong';
+  }
+
+  Color _pwdColor(int n) {
+    if (n <= 1) return const Color(0xFFEF4444);
+    if (n == 2) return const Color(0xFFF97316);
+    if (n == 3) return const Color(0xFFF59E0B);
+    return const Color(0xFF10B981);
+  }
+
+  Widget _buildPasswordStrength() {
+    final v = _passwordCtrl.text;
+    if (v.isEmpty) return const SizedBox.shrink();
+    final checks = _pwdChecks(v);
+    final met = checks.where((c) => c).length;
+    final color = _pwdColor(met);
+    final label = _pwdLabel(met);
+    const reqLabels = [
+      'At least 8 characters',
+      'One uppercase letter (A–Z)',
+      'One number (0–9)',
+      r'One special character (!@#$…)',
+    ];
+    return Container(
+      margin: const EdgeInsets.only(top: 10),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFC),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Strength bars
+          Row(
+            children: List.generate(4, (i) => Expanded(
+              child: Container(
+                height: 4,
+                margin: EdgeInsets.only(right: i < 3 ? 5 : 0),
+                decoration: BoxDecoration(
+                  color: i < met ? color : const Color(0xFFE2E8F0),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            )),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              if (label.isNotEmpty)
+                Text(label, style: TextStyle(color: color, fontWeight: FontWeight.w700, fontSize: 13)),
+              Text('$met/4 requirements met',
+                  style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+            ],
+          ),
+          const SizedBox(height: 10),
+          ...List.generate(4, (i) => Padding(
+            padding: const EdgeInsets.only(bottom: 6),
+            child: Row(
+              children: [
+                Container(
+                  width: 22, height: 22,
+                  decoration: BoxDecoration(
+                    color: checks[i] ? const Color(0xFF10B981).withValues(alpha: 0.12) : const Color(0xFFF1F5F9),
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: checks[i] ? const Color(0xFF10B981) : const Color(0xFFCBD5E1)),
+                  ),
+                  child: checks[i]
+                      ? const Icon(Icons.check_rounded, size: 14, color: Color(0xFF10B981))
+                      : null,
+                ),
+                const SizedBox(width: 10),
+                Text(reqLabels[i],
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: checks[i] ? const Color(0xFF10B981) : const Color(0xFF64748B),
+                      fontWeight: checks[i] ? FontWeight.w600 : FontWeight.normal,
+                    )),
+              ],
+            ),
+          )),
+        ],
+      ),
+    );
+  }
+
   @override
   void dispose() {
     _nameCtrl.dispose(); _contactPersonCtrl.dispose(); _phoneCtrl.dispose();
@@ -210,6 +311,58 @@ class _WorkWithUsSignupState extends State<WorkWithUsSignup> {
       final capturedName = _nameCtrl.text.trim();
 
       final api = ApiService();
+
+      // Build role-specific details map
+      final details = <String, dynamic>{};
+      if (_selectedRole == 'Doctor') {
+        details['qualification'] = _qualificationCtrl.text.trim();
+        details['specialization'] = _specializationCtrl.text.trim();
+        details['pmdcNumber'] = _pmdcCtrl.text.trim();
+        details['experience'] = _docExpCtrl.text.trim();
+        details['workplace'] = _workplaceCtrl.text.trim();
+        details['availableDays'] = _docAvailDays.toList();
+        details['availableTimings'] = _docTimingsCtrl.text.trim();
+        details['comments'] = _docCommentsCtrl.text.trim();
+      } else if (_selectedRole == 'Pharmacy') {
+        details['pharmacyName'] = _pharmNameCtrl.text.trim();
+        details['drugLicenseNumber'] = _drugLicenseCtrl.text.trim();
+        details['pharmacistName'] = _pharmacistNameCtrl.text.trim();
+        details['yearsOfOperation'] = _pharmYearsCtrl.text.trim();
+        details['deliveryAvailable'] = _pharmDelivery;
+        details['operatingDays'] = _pharmOpDays.toList();
+        details['operatingHours'] = _pharmHoursCtrl.text.trim();
+        details['onlineOrders'] = _pharmOnlineOrders;
+        details['hasPOS'] = _pharmHasPOS;
+        details['posDetails'] = _pharmPOSDetailCtrl.text.trim();
+        details['willingToIntegrate'] = _pharmWillingIntegrate;
+        details['comments'] = _pharmCommentsCtrl.text.trim();
+      } else if (_selectedRole == 'Laboratory') {
+        details['labName'] = _labNameCtrl.text.trim();
+        details['labLicenseNumber'] = _labLicenseCtrl.text.trim();
+        details['yearsOfOperation'] = _labYearsCtrl.text.trim();
+        details['homeSamplingAvailable'] = _labHomeSampling;
+        details['operatingDays'] = _labOpDays.toList();
+        details['operatingHours'] = _labHoursCtrl.text.trim();
+        details['onlineReports'] = _labOnlineReports;
+        details['hasLIS'] = _labHasLIS;
+        details['lisDetails'] = _labLISDetailCtrl.text.trim();
+        details['willingToIntegrate'] = _labWillingIntegrate;
+        details['comments'] = _labCommentsCtrl.text.trim();
+      } else if (_selectedRole == 'Student') {
+        details['university'] = _studentUniversityCtrl.text.trim();
+        details['program'] = _studentProgramCtrl.text.trim();
+        details['currentYear'] = _studentYearCtrl.text.trim();
+        details['studentId'] = _studentIdCtrl.text.trim();
+        details['comments'] = _studentCommentsCtrl.text.trim();
+      } else if (_selectedRole == 'Instructor') {
+        details['qualification'] = _instrQualificationCtrl.text.trim();
+        details['specialization'] = _instrSpecializationCtrl.text.trim();
+        details['experience'] = _instrExpCtrl.text.trim();
+        details['institution'] = _instrInstitutionCtrl.text.trim();
+        details['proposedCourses'] = _instrCoursesCtrl.text.trim();
+        details['comments'] = _instrCommentsCtrl.text.trim();
+      }
+
       final response = await api.post('/auth/register', {
         'username': capturedName,
         'name': capturedName,
@@ -219,6 +372,8 @@ class _WorkWithUsSignupState extends State<WorkWithUsSignup> {
         'role': backendRole,
         'city': _cityCtrl.text.trim(),
         'address': _addressCtrl.text.trim(),
+        'profileDetails': details,
+        ...details,
       });
 
       final resData = response.data;
@@ -468,6 +623,7 @@ class _WorkWithUsSignupState extends State<WorkWithUsSignup> {
           TextFormField(
             controller: _passwordCtrl,
             obscureText: _obscurePassword,
+            onChanged: (_) => setState(() {}),
             decoration: InputDecoration(
               labelText: 'Create Password',
               prefixIcon: const Icon(Icons.lock_outline_rounded),
@@ -481,10 +637,12 @@ class _WorkWithUsSignupState extends State<WorkWithUsSignup> {
             ),
             validator: (v) {
               if (v == null || v.isEmpty) return 'Password is required';
-              if (v.length < 6) return 'Password must be at least 6 characters';
+              final checks = _pwdChecks(v);
+              if (checks.where((c) => c).length < 4) return 'Password must meet all 4 requirements';
               return null;
             },
           ),
+          _buildPasswordStrength(),
           const SizedBox(height: 14),
           _inputField(_cityCtrl, 'City', Icons.location_city_outlined,
               validator: (v) => v == null || v.isEmpty ? 'City is required' : null),
