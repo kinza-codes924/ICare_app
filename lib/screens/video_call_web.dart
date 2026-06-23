@@ -671,14 +671,27 @@ class _VideoCallWebState extends State<VideoCall> {
     if (widget.appointmentId == null || widget.appointmentId!.isEmpty) return;
     try {
       final api = ApiService();
-      final response = await api.get('/appointments/getAppointments');
-      final appts = response.data['appointments'] as List? ?? [];
-      final match = appts.firstWhere(
-        (a) => (a['_id'] ?? a['id'])?.toString() == widget.appointmentId,
-        orElse: () => null,
-      );
-      if (match == null) throw Exception('Appointment not found');
-      final appointment = AppointmentDetail.fromJson(match);
+
+      // Use the direct endpoint — list endpoint doesn't populate patient/doctor
+      Map<String, dynamic>? apptJson;
+      try {
+        final directRes = await api.get('/appointments/${widget.appointmentId}');
+        apptJson = (directRes.data['appointment'] ?? directRes.data) as Map<String, dynamic>?;
+      } catch (_) {}
+
+      // Fallback to list endpoint if direct call fails
+      if (apptJson == null) {
+        final response = await api.get('/appointments/getAppointments');
+        final appts = response.data['appointments'] as List? ?? [];
+        final match = appts.firstWhere(
+          (a) => (a['_id'] ?? a['id'])?.toString() == widget.appointmentId,
+          orElse: () => null,
+        );
+        if (match == null) throw Exception('Appointment not found');
+        apptJson = match as Map<String, dynamic>;
+      }
+
+      final appointment = AppointmentDetail.fromJson(apptJson!);
 
       // Use consultationId only if it is a valid MongoDB ObjectId.
       // The channelName (e.g. "connect_now_...") is NOT a valid ObjectId and

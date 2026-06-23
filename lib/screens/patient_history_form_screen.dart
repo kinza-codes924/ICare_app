@@ -13,12 +13,15 @@ class PatientHistoryFormScreen extends StatefulWidget {
   final AppointmentDetail appointment;
   final String consultationId;
   final Function(String)? onHistoryComplete;
+  /// If provided, the form will UPDATE this history instead of creating a new one
+  final String? existingHistoryId;
 
   const PatientHistoryFormScreen({
     super.key,
     required this.appointment,
     required this.consultationId,
     this.onHistoryComplete,
+    this.existingHistoryId,
   });
 
   @override
@@ -308,15 +311,24 @@ class _PatientHistoryFormScreenState extends State<PatientHistoryFormScreen> {
         createdAt: DateTime.now(),
       );
 
-      final result = await _consultationService.savePatientHistory(
-        historyData: historyForm.toJson(),
-      );
+      final Map<String, dynamic> result;
+      final existingId = widget.existingHistoryId;
+      if (existingId != null && existingId.isNotEmpty) {
+        result = await _consultationService.updatePatientHistory(
+          historyId: existingId,
+          historyData: historyForm.toJson(),
+        );
+      } else {
+        result = await _consultationService.savePatientHistory(
+          historyData: historyForm.toJson(),
+        );
+      }
 
       if (result['success'] == true && mounted) {
-        widget.onHistoryComplete?.call(result['historyId'] ?? '');
+        widget.onHistoryComplete?.call(result['historyId'] ?? existingId ?? '');
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Patient history saved successfully'),
+          SnackBar(
+            content: Text(existingId != null ? 'History updated successfully' : 'Patient history saved successfully'),
             backgroundColor: Colors.green,
           ),
         );

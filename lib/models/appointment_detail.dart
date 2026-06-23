@@ -37,7 +37,6 @@ class AppointmentDetail {
       if (json['doctor'] != null && json['doctor'] is Map) {
         doctor = User.fromJson(json['doctor'] as Map<String, dynamic>);
       } else if (json['doctor_name'] != null || json['doctor_email'] != null) {
-        // Flat format from backend
         doctor = User(
           id: json['doctor_id']?.toString() ?? '',
           name: json['doctor_name']?.toString() ?? 'Doctor',
@@ -45,6 +44,11 @@ class AppointmentDetail {
           phoneNumber: json['doctor_phone']?.toString() ?? '',
           role: 'doctor',
         );
+      } else if (json['doctor'] is String && json['doctor']!.toString().length > 5) {
+        // Backend returned doctor as plain string ID
+        doctor = User(id: json['doctor'].toString(), name: 'Doctor', email: '', phoneNumber: '', role: 'doctor');
+      } else if (json['doctor_id'] != null) {
+        doctor = User(id: json['doctor_id'].toString(), name: 'Doctor', email: '', phoneNumber: '', role: 'doctor');
       }
     } catch (e) {
       print('⚠️ Error parsing doctor: $e');
@@ -54,7 +58,6 @@ class AppointmentDetail {
       if (json['patient'] != null && json['patient'] is Map) {
         patient = User.fromJson(json['patient'] as Map<String, dynamic>);
       } else if (json['patient_name'] != null || json['patient_id'] != null) {
-        // Flat format from backend
         patient = User(
           id: json['patient_id']?.toString() ?? '',
           name: json['patient_name']?.toString() ?? 'Patient',
@@ -67,6 +70,9 @@ class AppointmentDetail {
               json['patient_profile_picture']?.toString() ??
               json['patientProfilePicture']?.toString(),
         );
+      } else if (json['patient'] is String && json['patient']!.toString().length > 5) {
+        // Backend returned patient as plain string ID
+        patient = User(id: json['patient'].toString(), name: 'Patient', email: '', phoneNumber: '', role: 'patient');
       }
     } catch (e) {
       print('⚠️ Error parsing patient: $e');

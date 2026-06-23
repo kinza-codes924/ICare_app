@@ -409,6 +409,36 @@ class ConsultationService {
     }
   }
 
+  // Update existing patient history
+  Future<Map<String, dynamic>> updatePatientHistory({
+    required String historyId,
+    required Map<String, dynamic> historyData,
+  }) async {
+    try {
+      final token = await _sharedPref.getToken();
+      final cleanData = _removeNulls(historyData);
+      final response = await _dio.put(
+        '/patient-history/$historyId',
+        data: cleanData,
+        options: Options(
+          headers: {'Authorization': 'Bearer $token'},
+          validateStatus: (s) => s != null && s < 600,
+        ),
+      );
+      final data = response.data;
+      if (data is Map<String, dynamic> && data['success'] == true) return data;
+      if (response.statusCode != null && response.statusCode! < 300) return {'success': true};
+      final msg = (data is Map ? data['message']?.toString() ?? data['error']?.toString() : null) ?? 'Update failed (${response.statusCode})';
+      return {'success': false, 'message': msg};
+    } on DioException catch (e) {
+      final data = e.response?.data;
+      final msg = (data is Map ? data['message']?.toString() : null) ?? e.message ?? 'Network error';
+      return {'success': false, 'message': msg};
+    } catch (e) {
+      return {'success': false, 'message': 'Unexpected error: $e'};
+    }
+  }
+
   // Get patient history
   Future<List<dynamic>> getPatientHistory({
     required String patientId,
