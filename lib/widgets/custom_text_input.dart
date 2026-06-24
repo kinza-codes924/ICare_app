@@ -122,6 +122,11 @@ class _CustomInputFieldState extends State<CustomInputField> {
                     maxLines: widget.maxLines ?? 1,
                     controller: widget.controller,
                     obscureText: widget.isPassword ? _obscureText : false,
+                    enableInteractiveSelection: true,
+                    contextMenuBuilder: (context, editableTextState) =>
+                        AdaptiveTextSelectionToolbar.editableText(
+                          editableTextState: editableTextState,
+                        ),
                     onChanged: widget.onChanged,
                     validator: widget.validator,
                     keyboardType: widget.keyboardType,

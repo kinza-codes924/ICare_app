@@ -91,6 +91,11 @@ class _ProfessionalSignupState extends State<ProfessionalSignup> {
         controller: controller,
         readOnly: readOnly,
         obscureText: obscure,
+        enableInteractiveSelection: true,
+        contextMenuBuilder: (context, editableTextState) =>
+            AdaptiveTextSelectionToolbar.editableText(
+              editableTextState: editableTextState,
+            ),
         keyboardType: keyboardType,
         validator: validator ??
             (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,

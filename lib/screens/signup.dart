@@ -251,6 +251,11 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
         controller: controller,
         readOnly: readOnly,
         obscureText: obscure,
+        enableInteractiveSelection: true,
+        contextMenuBuilder: (context, editableTextState) =>
+            AdaptiveTextSelectionToolbar.editableText(
+              editableTextState: editableTextState,
+            ),
         keyboardType: keyboard,
         autofillHints: readOnly ? null : autofillHints,
         validator: validator ??

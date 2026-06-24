@@ -667,6 +667,11 @@ class _WorkWithUsSignupState extends State<WorkWithUsSignup> {
           TextFormField(
             controller: _passwordCtrl,
             obscureText: _obscurePassword,
+            enableInteractiveSelection: true,
+            contextMenuBuilder: (context, editableTextState) =>
+                AdaptiveTextSelectionToolbar.editableText(
+                  editableTextState: editableTextState,
+                ),
             onChanged: (_) => setState(() {}),
             decoration: InputDecoration(
               labelText: 'Create Password',

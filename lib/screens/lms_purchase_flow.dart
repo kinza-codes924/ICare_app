@@ -370,6 +370,11 @@ class _LmsPurchaseFlowState extends State<LmsPurchaseFlow> {
             TextFormField(
               controller: _passwordController,
               obscureText: _obscurePassword,
+              enableInteractiveSelection: true,
+              contextMenuBuilder: (context, editableTextState) =>
+                  AdaptiveTextSelectionToolbar.editableText(
+                    editableTextState: editableTextState,
+                  ),
               decoration: InputDecoration(
                 labelText: 'Password',
                 prefixIcon: const Icon(Icons.lock_outline),
@@ -401,6 +406,11 @@ class _LmsPurchaseFlowState extends State<LmsPurchaseFlow> {
             TextFormField(
               controller: _confirmPasswordController,
               obscureText: _obscureConfirmPassword,
+              enableInteractiveSelection: true,
+              contextMenuBuilder: (context, editableTextState) =>
+                  AdaptiveTextSelectionToolbar.editableText(
+                    editableTextState: editableTextState,
+                  ),
               decoration: InputDecoration(
                 labelText: 'Confirm Password',
                 prefixIcon: const Icon(Icons.lock_outline),
