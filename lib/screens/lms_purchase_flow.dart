@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:icare/screens/lms_document_upload.dart';
 import 'package:icare/screens/select_payment_method.dart';
@@ -24,19 +25,22 @@ class LmsPurchaseFlow extends StatefulWidget {
 class _LmsPurchaseFlowState extends State<LmsPurchaseFlow> {
   final ApiService _api = ApiService();
   final _formKey = GlobalKey<FormState>();
-  
+
   // Form controllers
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
   final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
-  
+
   bool _isLoading = false;
+  bool _checkingLogin = true; // true while token check is in progress
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
   bool _isLoggedIn = false;
-  
+  // Hard guard against double-tap before setState rebuild
+  bool _submitting = false;
+
   @override
   void initState() {
     super.initState();
@@ -55,11 +59,12 @@ class _LmsPurchaseFlowState extends State<LmsPurchaseFlow> {
 
   Future<void> _checkLoginStatus() async {
     final token = await SharedPref().getToken();
+    if (!mounted) return;
     setState(() {
       _isLoggedIn = token != null && token.isNotEmpty;
+      _checkingLogin = false;
     });
 
-    // If already logged in, force-set token on Dio and go directly to payment
     if (_isLoggedIn && token != null) {
       _api.forceSetToken(token);
       _proceedToPayment();
@@ -67,22 +72,24 @@ class _LmsPurchaseFlowState extends State<LmsPurchaseFlow> {
   }
 
   Future<void> _handleSignupAndPurchase() async {
-    if (!_formKey.currentState!.validate()) return;
-    
+    // Hard guard: prevent any concurrent submissions
+    if (_submitting || _isLoading) return;
+    // Safe null check — form may have been disposed if login check raced ahead
+    if (_formKey.currentState?.validate() != true) return;
+
+    _submitting = true;
     setState(() => _isLoading = true);
-    
+
     try {
-      // Step 1: Create account
       final signupResponse = await _api.post('/auth/register', {
         'name': _nameController.text.trim(),
         'email': _emailController.text.trim(),
         'phone': _phoneController.text.trim(),
         'password': _passwordController.text,
-        'role': 'Student', // Default role for LMS users
+        'role': 'Student',
       });
-      
+
       if (signupResponse.data['success'] == true) {
-        // Save token — check multiple possible locations in the response
         final token = signupResponse.data['token']?.toString()
             ?? signupResponse.data['data']?['token']?.toString()
             ?? signupResponse.data['accessToken']?.toString();
@@ -93,26 +100,48 @@ class _LmsPurchaseFlowState extends State<LmsPurchaseFlow> {
 
         await SharedPref().setToken(token);
         await SharedPref().setUserRole('Student');
-        // Force-set Dio headers immediately so next call doesn't hit null token
         _api.forceSetToken(token);
 
-        // Step 2: Proceed to payment
-        if (mounted) {
-          _proceedToPayment();
-        }
+        if (mounted) _proceedToPayment();
       } else {
         throw Exception(signupResponse.data['message'] ?? 'Signup failed');
       }
     } catch (e) {
+      _submitting = false;
+      if (!mounted) return;
       setState(() => _isLoading = false);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(e.toString().replaceAll('Exception: ', '')),
-            backgroundColor: Colors.red,
-          ),
-        );
+
+      // Extract a human-readable message from DioException or plain Exception
+      String msg = 'Signup failed. Please try again.';
+      if (e is DioException) {
+        final data = e.response?.data;
+        if (data is Map) {
+          msg = data['message']?.toString() ?? data['error']?.toString() ?? msg;
+        }
+      } else {
+        msg = e.toString().replaceAll('Exception: ', '');
       }
+
+      // Detect "already exists" → suggest login
+      final lower = msg.toLowerCase();
+      final alreadyExists = lower.contains('already') || lower.contains('exists') || lower.contains('duplicate') || e is DioException && e.response?.statusCode == 409;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(alreadyExists
+              ? 'This email is already registered. Please log in instead.'
+              : msg),
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 4),
+          action: alreadyExists
+              ? SnackBarAction(
+                  label: 'Login',
+                  textColor: Colors.white,
+                  onPressed: () => Navigator.pushNamed(context, '/login'),
+                )
+              : null,
+        ),
+      );
     }
   }
 
@@ -440,10 +469,11 @@ class _LmsPurchaseFlowState extends State<LmsPurchaseFlow> {
   }
 
   Widget _buildPurchaseButton() {
+    final busy = _isLoading || _checkingLogin;
     return SizedBox(
       width: double.infinity,
       child: ElevatedButton(
-        onPressed: _isLoading ? null : _handleSignupAndPurchase,
+        onPressed: busy ? null : _handleSignupAndPurchase,
         style: ElevatedButton.styleFrom(
           backgroundColor: AppColors.primaryColor,
           foregroundColor: Colors.white,
@@ -453,7 +483,7 @@ class _LmsPurchaseFlowState extends State<LmsPurchaseFlow> {
           ),
           elevation: 0,
         ),
-        child: _isLoading
+        child: busy
             ? const SizedBox(
                 height: 20,
                 width: 20,
