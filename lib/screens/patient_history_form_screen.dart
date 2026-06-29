@@ -1313,6 +1313,7 @@ class _PatientHistoryFormScreenState extends State<PatientHistoryFormScreen> {
                   decoration: _inputDec('Details'),
                   controller: TextEditingController(text: _substanceDetails),
                   onChanged: (v) => _substanceDetails = v.isEmpty ? null : v,
+                  textDirection: TextDirection.ltr,
                 ),
               ],
             ],
@@ -1333,6 +1334,7 @@ class _PatientHistoryFormScreenState extends State<PatientHistoryFormScreen> {
         decoration: _inputDec(label),
         controller: TextEditingController(text: value),
         onChanged: onChanged,
+        textDirection: TextDirection.ltr,
       ),
     );
   }

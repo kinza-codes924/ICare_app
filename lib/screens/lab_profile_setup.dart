@@ -213,18 +213,13 @@ class _LabProfileSetupState extends ConsumerState<LabProfileSetup>
       setState(() => _gettingLocation = false);
       final msg = e.toString().toLowerCase();
       final String userMsg;
-      if (msg.contains('denied') || msg.contains('notallowed') ||
-          msg.contains('not allowed') || msg.contains('permission') ||
-          msg.contains('code: 1') || msg.contains('geolocationpositionerror: 1')) {
-        userMsg = 'Location access denied. Click the 🔒 icon in the address bar, allow location, then try again.';
-      } else if (msg.contains('timeout') || msg.contains('code: 3') ||
+      if (msg.contains('timeout') || msg.contains('code: 3') ||
           msg.contains('geolocationpositionerror: 3')) {
         userMsg = 'Location request timed out. Please try again.';
-      } else if (msg.contains('unavailable') || msg.contains('code: 2') ||
-          msg.contains('geolocationpositionerror: 2')) {
-        userMsg = 'Location unavailable. Make sure the site is on HTTPS and try again.';
       } else {
-        userMsg = 'Could not get location. Please allow location access in your browser settings and try again.';
+        // Covers: denied, notallowed, security, incognito policy, unavailable, and
+        // any browser error whose toString() doesn't include expected keywords.
+        userMsg = 'Location access blocked. Click the 🔒 icon in the address bar and allow location, then try again. (Incognito mode may block this.)';
       }
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(

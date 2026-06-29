@@ -285,7 +285,6 @@ class LaboratoryService {
           'test_type': tests,
           'collectionType': collectionType,
           'source': 'walk-in',
-          'status': 'confirmed',
           'urgency': isUrgent ? 'Urgent' : 'Normal',
           'is_urgent': isUrgent,
           if (turnaroundTime != null) 'turnaroundTime': turnaroundTime,
