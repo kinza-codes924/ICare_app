@@ -663,12 +663,20 @@ class LmsService {
     required String sessionId,
     String? lessonId,
     String? moduleId,
+    List<Map<String, dynamic>>? chatMessages,
   }) async {
     try {
-      final response = await _api.post('/live-sessions/$sessionId/end-and-save', {
-        if (lessonId != null) 'lessonId': lessonId,
-        if (moduleId != null) 'moduleId': moduleId,
-      });
+      final body = <String, dynamic>{};
+      if (lessonId != null) body['lessonId'] = lessonId;
+      if (moduleId != null) body['moduleId'] = moduleId;
+      if (chatMessages != null && chatMessages.isNotEmpty) {
+        body['chatTranscript'] = chatMessages.map((m) => {
+          'sender': m['sender'] ?? '',
+          'text': m['text'] ?? '',
+          'time': m['time'] ?? '',
+        }).toList();
+      }
+      final response = await _api.post('/live-sessions/$sessionId/end-and-save', body);
       return response.data ?? {'success': true};
     } catch (e) {
       return {'success': false, 'message': e.toString()};

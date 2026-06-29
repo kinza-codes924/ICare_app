@@ -1,5 +1,8 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:icare/models/user.dart';
+import 'package:icare/providers/auth_provider.dart';
 import 'package:icare/screens/lms_document_upload.dart';
 import 'package:icare/screens/select_payment_method.dart';
 import 'package:icare/services/api_service.dart';
@@ -13,16 +16,16 @@ import 'package:icare/widgets/back_button.dart';
 /// Step 3: Process payment
 /// Step 4: Grant limited access (only this course)
 /// Step 5: Request document upload for verification
-class LmsPurchaseFlow extends StatefulWidget {
+class LmsPurchaseFlow extends ConsumerStatefulWidget {
   final Map<String, dynamic> course;
 
   const LmsPurchaseFlow({super.key, required this.course});
 
   @override
-  State<LmsPurchaseFlow> createState() => _LmsPurchaseFlowState();
+  ConsumerState<LmsPurchaseFlow> createState() => _LmsPurchaseFlowState();
 }
 
-class _LmsPurchaseFlowState extends State<LmsPurchaseFlow> {
+class _LmsPurchaseFlowState extends ConsumerState<LmsPurchaseFlow> {
   final ApiService _api = ApiService();
   final _formKey = GlobalKey<FormState>();
 
@@ -101,6 +104,22 @@ class _LmsPurchaseFlowState extends State<LmsPurchaseFlow> {
         await SharedPref().setToken(token);
         await SharedPref().setUserRole('Student');
         _api.forceSetToken(token);
+
+        // Build user object from response (or form data as fallback) and store
+        // in authProvider so the dashboard shows the real name instead of "User"
+        final rawUser = signupResponse.data['user']
+            ?? signupResponse.data['data']?['user']
+            ?? signupResponse.data['data'];
+        final user = rawUser is Map<String, dynamic>
+            ? User.fromJson(rawUser)
+            : User(
+                id: signupResponse.data['_id']?.toString() ?? '',
+                name: _nameController.text.trim(),
+                email: _emailController.text.trim(),
+                phoneNumber: _phoneController.text.trim(),
+                role: 'Student',
+              );
+        await ref.read(authProvider.notifier).setUser(user);
 
         if (mounted) _proceedToPayment();
       } else {

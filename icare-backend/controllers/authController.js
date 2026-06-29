@@ -8,8 +8,11 @@ const DoctorProfile = require('../models/DoctorProfile');
 const LabProfile = require('../models/LabProfile');
 const PharmacyProfile = require('../models/PharmacyProfile');
 
-const GOOGLE_CLIENT_ID = '1076307742101-avj49igc93qipdcnqbqsk3u14gdcb2oh.apps.googleusercontent.com';
-const googleClient = new OAuth2Client(GOOGLE_CLIENT_ID);
+const GOOGLE_CLIENT_IDS = [
+  '1076307742101-avj49igc93qipdcnqbqsk3u14gdcb2oh.apps.googleusercontent.com', // web
+  '564788374793-1eptqsl65ohkvsquqhc4qnhlia592v2f.apps.googleusercontent.com',   // android
+];
+const googleClient = new OAuth2Client();
 
 function detectDevice(req) {
   const platform = (req.headers['x-platform'] || '').toLowerCase();
@@ -412,7 +415,7 @@ const googleLogin = async (req, res) => {
       try {
         const ticket = await googleClient.verifyIdToken({
           idToken,
-          audience: GOOGLE_CLIENT_ID,
+          audience: GOOGLE_CLIENT_IDS,
         });
         const payload = ticket.getPayload();
         googleEmail = payload.email;

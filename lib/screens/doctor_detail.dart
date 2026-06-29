@@ -71,10 +71,8 @@ class DoctorDetailScreen extends ConsumerWidget {
                   CircleAvatar(
                     radius: 50,
                     backgroundColor: AppColors.primaryColor.withValues(alpha: 0.1),
-                    backgroundImage: (doctor.user.profilePicture != null && doctor.user.profilePicture!.isNotEmpty)
-                        ? NetworkImage(doctor.user.profilePicture!)
-                        : null,
-                    child: (doctor.user.profilePicture == null || doctor.user.profilePicture!.isEmpty)
+                    backgroundImage: buildProfileImageProvider(doctor.user.profilePicture),
+                    child: buildProfileImageProvider(doctor.user.profilePicture) == null
                         ? Text(
                             doctor.user.name.isNotEmpty ? doctor.user.name.substring(0, 1).toUpperCase() : 'D',
                             style: TextStyle(fontSize: 40, fontWeight: FontWeight.bold, color: AppColors.primaryColor),
@@ -542,10 +540,8 @@ class DoctorDetailScreen extends ConsumerWidget {
                               child: CircleAvatar(
                                 radius: isDesktop ? 65 : 55,
                                 backgroundColor: const Color(0xFFF0F9FF),
-                                backgroundImage: (doctor.user.profilePicture != null && doctor.user.profilePicture!.isNotEmpty)
-                                    ? NetworkImage(doctor.user.profilePicture!)
-                                    : null,
-                                child: (doctor.user.profilePicture == null || doctor.user.profilePicture!.isEmpty)
+                                backgroundImage: buildProfileImageProvider(doctor.user.profilePicture),
+                                child: buildProfileImageProvider(doctor.user.profilePicture) == null
                                     ? Text(
                                         doctor.user.name.isNotEmpty ? doctor.user.name.substring(0, 1).toUpperCase() : 'D',
                                         style: TextStyle(fontSize: isDesktop ? 56 : 48, fontWeight: FontWeight.w900, color: AppColors.primaryColor),

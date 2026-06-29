@@ -843,12 +843,8 @@ class DoctorProfileCard extends StatelessWidget {
                   CircleAvatar(
                     radius: 32,
                     backgroundColor: AppColors.primaryColor.withValues(alpha: 0.1),
-                    backgroundImage: displayDoctor.user.profilePicture != null &&
-                            displayDoctor.user.profilePicture!.isNotEmpty
-                        ? NetworkImage(displayDoctor.user.profilePicture!)
-                        : null,
-                    child: displayDoctor.user.profilePicture == null ||
-                            displayDoctor.user.profilePicture!.isEmpty
+                    backgroundImage: buildProfileImageProvider(displayDoctor.user.profilePicture),
+                    child: buildProfileImageProvider(displayDoctor.user.profilePicture) == null
                         ? Text(
                             displayDoctor.user.name.isNotEmpty
                                 ? displayDoctor.user.name.substring(0, 1).toUpperCase()

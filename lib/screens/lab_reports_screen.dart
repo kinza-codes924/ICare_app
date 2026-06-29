@@ -30,6 +30,7 @@ class _LabReportsScreenState extends State<LabReportsScreen>
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
   String _searchFilter = 'patient'; // patient, mr_number, doctor, contact
+  int _quickDays = 0; // 0 = all, 5, 7, 30
 
   @override
   void initState() {
@@ -100,9 +101,21 @@ class _LabReportsScreenState extends State<LabReportsScreen>
   }
 
   List<dynamic> _filterBookings(List<dynamic> bookings) {
-    if (_searchQuery.isEmpty) return bookings;
+    var result = bookings;
 
-    return bookings.where((booking) {
+    // Date range filter
+    if (_quickDays > 0) {
+      final cutoff = DateTime.now().subtract(Duration(days: _quickDays));
+      result = result.where((b) {
+        final raw = (b['createdAt'] ?? b['date'] ?? b['test_date'] ?? '').toString();
+        final dt = DateTime.tryParse(raw);
+        return dt != null && dt.isAfter(cutoff);
+      }).toList();
+    }
+
+    if (_searchQuery.isEmpty) return result;
+
+    return result.where((booking) {
       final query = _searchQuery.toLowerCase();
       switch (_searchFilter) {
         case 'patient':
@@ -301,6 +314,42 @@ class _LabReportsScreenState extends State<LabReportsScreen>
                         ],
                       ),
                     ),
+                  ),
+                ),
+                // Quick date filter bar
+                Container(
+                  color: Colors.white,
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                  child: Row(
+                    children: [
+                      const Text('Period:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF64748B))),
+                      const SizedBox(width: 10),
+                      ...([0, 5, 7, 30]).map((days) {
+                        final label = days == 0 ? 'All' : '${days}D';
+                        final isSelected = _quickDays == days;
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 8),
+                          child: GestureDetector(
+                            onTap: () => setState(() => _quickDays = days),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: isSelected ? primaryColor : const Color(0xFFF1F5F9),
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Text(
+                                label,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  color: isSelected ? Colors.white : const Color(0xFF64748B),
+                                ),
+                              ),
+                            ),
+                          ),
+                        );
+                      }),
+                    ],
                   ),
                 ),
                 Expanded(

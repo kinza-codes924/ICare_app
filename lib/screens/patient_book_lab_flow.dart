@@ -57,6 +57,7 @@ class _PatientBookLabFlowState extends State<PatientBookLabFlow> {
   List<Lab> _labs = [];
   bool _loadingLabs = false;
   String _selectedRadius = '10 km';
+  String _labSearchQuery = '';
 
   @override
   void initState() {
@@ -124,11 +125,41 @@ class _PatientBookLabFlowState extends State<PatientBookLabFlow> {
     ).toList();
   }
 
+  bool _labOffersTest(Lab lab, String selectedTest) {
+    if (lab.tests == null || lab.tests!.isEmpty) return false;
+    // Extract meaningful words (length > 2) from the selected test name
+    final words = selectedTest.toLowerCase()
+        .replaceAll(RegExp(r'[^\w\s]'), '')
+        .split(' ')
+        .where((w) => w.length > 2)
+        .toList();
+    return lab.tests!.any((t) {
+      final lt = t.toLowerCase();
+      return words.any((w) => lt.contains(w));
+    });
+  }
+
   List<Lab> get _filteredLabs {
+    var result = _labs;
+    // Filter by sample type
     if (_sampleType == 'home') {
-      return _labs.where((l) => (l.delivery ?? '').contains('Home')).toList();
+      result = result.where((l) => (l.delivery ?? '').contains('Home')).toList();
     }
-    return _labs;
+    // Filter by selected tests — only labs that offer at least one selected test
+    if (_selectedTests.isNotEmpty) {
+      result = result.where((l) =>
+        _selectedTests.any((st) => _labOffersTest(l, st))
+      ).toList();
+    }
+    // Filter by lab name search
+    if (_labSearchQuery.trim().isNotEmpty) {
+      final q = _labSearchQuery.toLowerCase();
+      result = result.where((l) =>
+        (l.title ?? '').toLowerCase().contains(q) ||
+        (l.address ?? '').toLowerCase().contains(q)
+      ).toList();
+    }
+    return result;
   }
 
   @override
@@ -530,24 +561,47 @@ class _PatientBookLabFlowState extends State<PatientBookLabFlow> {
                 }).toList(),
               ),
               const SizedBox(height: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFEFF6FF),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: const Color(0xFFBFDBFE)),
-                ),
-                child: const Row(
-                  children: [
-                    Icon(Icons.location_on_rounded, color: Color(0xFF3B82F6), size: 16),
-                    SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Select a lab below to book your test.',
-                        style: TextStyle(fontSize: 12, color: Color(0xFF1D4ED8)),
+              if (_selectedTests.isNotEmpty)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryColor.withValues(alpha: 0.06),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: AppColors.primaryColor.withValues(alpha: 0.2)),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.filter_list_rounded, color: AppColors.primaryColor, size: 14),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          'Showing labs that offer: ${_selectedTests.take(2).join(', ')}${_selectedTests.length > 2 ? '...' : ''}',
+                          style: TextStyle(fontSize: 11, color: AppColors.primaryColor, fontWeight: FontWeight.w600),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
+                ),
+              const SizedBox(height: 8),
+              TextField(
+                onChanged: (v) => setState(() => _labSearchQuery = v),
+                decoration: InputDecoration(
+                  hintText: 'Search labs by name or area...',
+                  hintStyle: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
+                  prefixIcon: const Icon(Icons.search_rounded, size: 18, color: Color(0xFF94A3B8)),
+                  suffixIcon: _labSearchQuery.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(Icons.clear_rounded, size: 16),
+                          onPressed: () => setState(() => _labSearchQuery = ''),
+                        )
+                      : null,
+                  filled: true,
+                  fillColor: const Color(0xFFF8FAFC),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                  contentPadding: const EdgeInsets.symmetric(vertical: 10),
                 ),
               ),
             ],
@@ -596,7 +650,12 @@ class _PatientBookLabFlowState extends State<PatientBookLabFlow> {
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
         onTap: () => Navigator.of(context).push(MaterialPageRoute(
-          builder: (_) => BookLabScreen(labId: lab.id ?? '', labTitle: lab.title),
+          builder: (_) => BookLabScreen(
+            labId: lab.id ?? '',
+            labProfileId: lab.id,
+            labTitle: lab.title,
+            preSelectedTests: _selectedTests.toList(),
+          ),
         )),
         child: Padding(
           padding: const EdgeInsets.all(16),

@@ -508,15 +508,123 @@ class _PharmacyInventoryState extends State<PharmacyInventory> {
                           crossAxisCount: isDesktop ? 4 : 2,
                           crossAxisSpacing: 12,
                           mainAxisSpacing: 12,
-                          mainAxisExtent: 182,
+                          mainAxisExtent: 210,
                         ),
                         itemCount: _products.length,
-                        itemBuilder: (_, i) => _MedicineCard(product: _products[i]),
+                        itemBuilder: (_, i) => _MedicineCard(
+                          product: _products[i],
+                          onEdit: () => _showEditModal(_products[i]),
+                        ),
                       ),
           ),
         ],
       ),
     );
+  }
+
+  void _showEditModal(Map<String, dynamic> product) {
+    final id = product['_id']?.toString() ?? '';
+    if (id.isEmpty || id.startsWith('dummy_')) {
+      _showSnack('Cannot edit demo items', isError: true);
+      return;
+    }
+    final qtyCtrl = TextEditingController(text: (product['stock'] ?? 0).toString());
+    final priceCtrl = TextEditingController(text: (product['price'] ?? 0).toStringAsFixed(0));
+    bool saving = false;
+
+    showDialog(
+      context: context,
+      builder: (_) => StatefulBuilder(
+        builder: (ctx, setSt) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Row(
+            children: [
+              Icon(Icons.edit_rounded, color: AppColors.primaryColor, size: 20),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  product['name']?.toString() ?? 'Edit Medicine',
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: qtyCtrl,
+                keyboardType: TextInputType.number,
+                decoration: InputDecoration(
+                  labelText: 'Quantity in Stock',
+                  prefixIcon: const Icon(Icons.inventory_2_rounded),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                  filled: true,
+                  fillColor: const Color(0xFFF8FAFC),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: priceCtrl,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                decoration: InputDecoration(
+                  labelText: 'Price (PKR)',
+                  prefixIcon: const Icon(Icons.attach_money_rounded),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                  filled: true,
+                  fillColor: const Color(0xFFF8FAFC),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: saving
+                  ? null
+                  : () async {
+                      setSt(() => saving = true);
+                      try {
+                        final qty = int.tryParse(qtyCtrl.text.trim()) ?? 0;
+                        final price = double.tryParse(priceCtrl.text.trim()) ?? 0;
+                        await _pharmacyService.updateMedicine(id, {
+                          'quantity': qty,
+                          'stock_quantity': qty,
+                          'stock': qty,
+                          'price': price,
+                        });
+                        if (ctx.mounted) Navigator.pop(ctx);
+                        await _loadProducts();
+                        if (mounted) _showSnack('${product['name']} updated successfully');
+                      } catch (e) {
+                        setSt(() => saving = false);
+                        if (ctx.mounted) {
+                          ScaffoldMessenger.of(ctx).showSnackBar(
+                            SnackBar(content: Text('Update failed: $e'), backgroundColor: Colors.red),
+                          );
+                        }
+                      }
+                    },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primaryColor,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+              child: saving
+                  ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                  : const Text('Save'),
+            ),
+          ],
+        ),
+      ),
+    ).whenComplete(() {
+      qtyCtrl.dispose();
+      priceCtrl.dispose();
+    });
   }
 
   Widget _buildEmpty() => Center(
@@ -538,7 +646,8 @@ class _PharmacyInventoryState extends State<PharmacyInventory> {
 // ── Medicine Card ─────────────────────────────────────────────────────────────
 class _MedicineCard extends StatelessWidget {
   final Map<String, dynamic> product;
-  const _MedicineCard({required this.product});
+  final VoidCallback? onEdit;
+  const _MedicineCard({required this.product, this.onEdit});
 
   Color get _categoryColor {
     switch ((product['category'] as String).toLowerCase()) {
@@ -717,6 +826,20 @@ class _MedicineCard extends StatelessWidget {
                       style: TextStyle(fontSize: 9,
                           color: expiringSoon ? const Color(0xFFF59E0B) : const Color(0xFF94A3B8))),
                 ]),
+                const SizedBox(height: 6),
+                const Divider(height: 1, color: Color(0xFFF1F5F9)),
+                const SizedBox(height: 2),
+                GestureDetector(
+                  onTap: onEdit,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.edit_rounded, size: 11, color: AppColors.primaryColor),
+                      const SizedBox(width: 4),
+                      Text('Edit', style: TextStyle(fontSize: 11, color: AppColors.primaryColor, fontWeight: FontWeight.w700)),
+                    ],
+                  ),
+                ),
               ],
             ),
           ),
@@ -779,6 +902,7 @@ class _AddMedicineModalState extends State<_AddMedicineModal> {
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _saving = true);
+    final qty = int.parse(_qty.text.trim());
     await widget.onSave({
       'name': _name.text.trim(),
       'productName': _name.text.trim(),
@@ -787,7 +911,9 @@ class _AddMedicineModalState extends State<_AddMedicineModal> {
       'category': _category,
       'medicineType': _type,
       'price': double.parse(_price.text.trim()),
-      'quantity': int.parse(_qty.text.trim()),
+      'quantity': qty,
+      'stock_quantity': qty,
+      'stock': qty,
       'amount': _amount.text.trim(),
       'details': _details.text.trim(),
       'precautions': _precautions.text.trim(),

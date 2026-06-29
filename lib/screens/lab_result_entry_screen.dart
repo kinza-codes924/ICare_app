@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:intl/intl.dart';
@@ -167,7 +168,15 @@ class _LabResultEntryScreenState extends State<LabResultEntryScreen>
     }
     setState(() => _isSubmitting = true);
     try {
-      final bytes = await File(_selectedFile!.path!).readAsBytes();
+      // On web, use bytes directly; on mobile/desktop, read from file path
+      List<int> bytes;
+      if (kIsWeb) {
+        final webBytes = _selectedFile!.bytes;
+        if (webBytes == null) throw Exception('Could not read file. Please try selecting it again.');
+        bytes = webBytes;
+      } else {
+        bytes = await File(_selectedFile!.path!).readAsBytes();
+      }
       await _labService.uploadReport(widget.booking['_id'], bytes, _selectedFile!.name);
       final filePayload = <String, dynamic>{
         'status': 'reporting_done',
@@ -193,8 +202,13 @@ class _LabResultEntryScreenState extends State<LabResultEntryScreen>
       }
     } catch (e) {
       if (mounted) {
+        final reason = e.toString().replaceAll('Exception: ', '').replaceAll('DioException [', '').split(']').first;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Unable to upload report. Please try again.'), backgroundColor: Colors.red),
+          SnackBar(
+            content: Text('Upload failed: $reason'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 6),
+          ),
         );
       }
     } finally {

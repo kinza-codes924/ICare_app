@@ -168,36 +168,6 @@ class AuthService {
   }
 
   Future<Map<String, dynamic>> forgotPassword({required String email}) async {
-    // Pre-check: verify the email exists by attempting login with a dummy password.
-    // Key insight: backends return "Invalid credentials" for non-existent users but
-    // "Incorrect/Invalid password" (containing the word "password") for wrong passwords.
-    // We use presence of "password" in the message as the reliable user-exists signal.
-    try {
-      await _apiService.post(ApiConfig.login, {'email': email, 'password': '__ICARE_EMAIL_CHECK__'});
-      // If login somehow succeeds, continue to OTP
-    } on DioException catch (e) {
-      final raw = (e.response?.data ?? {});
-      final backendMsg = (raw is Map ? raw['message']?.toString() : null) ?? '';
-      final lower = backendMsg.toLowerCase();
-
-      // User EXISTS if backend returns 2FA trigger or an explicit password mismatch
-      final requiresOtp = (raw is Map) && raw['requiresOtp'] == true;
-      // "password" appears in "Incorrect password", "Invalid password", "Wrong password"
-      // but NOT in "Invalid credentials" (which backends use for non-existent users)
-      final isPasswordError = lower.contains('password');
-
-      if (requiresOtp || isPasswordError) {
-        // User exists — fall through to send OTP
-      } else if (e.response == null) {
-        // Pure network error — cannot confirm, proceed anyway
-      } else {
-        // Server responded but no password mention → email not registered
-        return {'success': false, 'message': 'No account found with this email address. Please check and try again.'};
-      }
-    } catch (_) {
-      // Unexpected error during pre-check — proceed anyway
-    }
-
     try {
       final response = await _apiService.post(ApiConfig.forgetPassword, {'email': email});
       if (response.statusCode == 200) {

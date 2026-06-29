@@ -167,10 +167,15 @@ class _LabProfileSetupState extends ConsumerState<LabProfileSetup>
       final pos = await html.window.navigator.geolocation
           .getCurrentPosition()
           .timeout(const Duration(seconds: 15));
+      final lat = pos.coords?.latitude?.toDouble();
+      final lng = pos.coords?.longitude?.toDouble();
+      if (lat == null || lng == null) {
+        throw Exception('Coordinates could not be read from browser');
+      }
       if (mounted) {
         setState(() {
-          _latitude = pos.coords?.latitude?.toDouble();
-          _longitude = pos.coords?.longitude?.toDouble();
+          _latitude = lat;
+          _longitude = lng;
           _gettingLocation = false;
         });
         ScaffoldMessenger.of(context).showSnackBar(
@@ -181,13 +186,25 @@ class _LabProfileSetupState extends ConsumerState<LabProfileSetup>
           ),
         );
       }
-    } catch (_) {
+    } catch (e) {
       if (mounted) {
         setState(() => _gettingLocation = false);
+        final msg = e.toString().toLowerCase();
+        final String userMsg;
+        if (msg.contains('denied') || msg.contains('permission') || msg.contains('1')) {
+          userMsg = 'Location access denied. Please allow location in your browser settings and try again.';
+        } else if (msg.contains('timeout') || msg.contains('3')) {
+          userMsg = 'Location request timed out. Please try again.';
+        } else if (msg.contains('unavailable') || msg.contains('2')) {
+          userMsg = 'Location unavailable. Ensure the site is opened over HTTPS.';
+        } else {
+          userMsg = 'Could not get location. Please enable location access and use HTTPS.';
+        }
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Could not get location. Please allow location access.'),
+          SnackBar(
+            content: Text(userMsg),
             backgroundColor: Colors.red,
+            duration: const Duration(seconds: 5),
             behavior: SnackBarBehavior.floating,
           ),
         );

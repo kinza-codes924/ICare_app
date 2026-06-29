@@ -6,7 +6,7 @@ import 'package:dio/dio.dart';
 // Steps: console.cloud.google.com → APIs & Services → Credentials → OAuth 2.0
 // Authorized origins: https://icare-app-ten.vercel.app  and  http://localhost
 const String _kGoogleClientId =
-    '1076307742101-avj49igc93qipdcnqbqsk3u14gdcb2oh.apps.googleusercontent.com';
+    '564788374793-1eptqsl65ohkvsquqhc4qnhlia592v2f.apps.googleusercontent.com';
 
 const String _kCalendarScope = 'https://www.googleapis.com/auth/calendar';
 
@@ -27,7 +27,14 @@ class GoogleCalendarService {
   Future<bool> signIn() async {
     try {
       final account = await _googleSignIn.signIn();
-      return account != null;
+      if (account == null) return false;
+      // On web, GIS auth flow gives id_token only — explicitly request
+      // the authorization code/token flow to get an accessToken for APIs
+      if (kIsWeb) {
+        final granted = await _googleSignIn.requestScopes([_kCalendarScope]);
+        return granted;
+      }
+      return true;
     } catch (e) {
       debugPrint('GoogleCalendarService signIn error: $e');
       return false;
@@ -43,6 +50,14 @@ class GoogleCalendarService {
       var account = _googleSignIn.currentUser;
       account ??= await _googleSignIn.signInSilently();
       if (account == null) return null;
+      // On web, ensure Calendar scope is authorized (triggers token flow)
+      if (kIsWeb) {
+        final hasScope = await _googleSignIn.canAccessScopes([_kCalendarScope]);
+        if (!hasScope) {
+          final granted = await _googleSignIn.requestScopes([_kCalendarScope]);
+          if (!granted) return null;
+        }
+      }
       final auth = await account.authentication;
       return auth.accessToken;
     } catch (_) {

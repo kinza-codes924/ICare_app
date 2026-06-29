@@ -38,16 +38,29 @@ class BiometricService {
     }
   }
 
-  /// Returns a human-readable label for the available biometric type.
+  /// Returns a human-readable label for the available biometric type(s).
   Future<String> getBiometricLabel() async {
     try {
       final biometrics = await _auth.getAvailableBiometrics();
-      if (biometrics.contains(BiometricType.face)) return 'Face Unlock';
-      if (biometrics.contains(BiometricType.fingerprint)) return 'Fingerprint';
+      final hasFace = biometrics.contains(BiometricType.face);
+      final hasFingerprint = biometrics.contains(BiometricType.fingerprint);
+      if (hasFace && hasFingerprint) return 'Face ID / Fingerprint';
+      if (hasFace) return 'Face ID';
+      if (hasFingerprint) return 'Fingerprint';
       if (biometrics.contains(BiometricType.iris)) return 'Iris Scan';
       return 'Biometrics';
     } catch (_) {
       return 'Biometrics';
+    }
+  }
+
+  /// Returns true if the device supports face unlock specifically.
+  Future<bool> hasFaceUnlock() async {
+    try {
+      final biometrics = await _auth.getAvailableBiometrics();
+      return biometrics.contains(BiometricType.face);
+    } catch (_) {
+      return false;
     }
   }
 

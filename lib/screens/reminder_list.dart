@@ -324,10 +324,11 @@ class _ReminderListState extends State<ReminderList> with SingleTickerProviderSt
               children: [
                 const Text("Today's Reminders", style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900, color: Colors.white)),
                 const SizedBox(height: 6),
-                Row(
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 6,
                   children: [
                     _statPill(Icons.medical_services_rounded, '$doctorCount Doctor-Assigned'),
-                    const SizedBox(width: 8),
                     _statPill(Icons.person_rounded, '$selfCount My Reminders'),
                   ],
                 ),

@@ -8,7 +8,8 @@ class BookLabScreen extends StatefulWidget {
   final String? labId;
   final String? labProfileId;
   final String? labTitle;
-  const BookLabScreen({super.key, this.labId, this.labProfileId, this.labTitle});
+  final List<String>? preSelectedTests;
+  const BookLabScreen({super.key, this.labId, this.labProfileId, this.labTitle, this.preSelectedTests});
 
   @override
   State<BookLabScreen> createState() => _BookLabScreenState();
@@ -458,6 +459,7 @@ class _BookLabScreenState extends State<BookLabScreen> {
             'city': _cityController.text,
             'address': _addressController.text,
             'homeSample': _homeSample,
+            'preSelectedTests': widget.preSelectedTests ?? [],
           },
         ),
       ),

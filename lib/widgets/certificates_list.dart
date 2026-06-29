@@ -60,9 +60,16 @@ class _CertificatesListState extends State<CertificatesList> {
         itemCount: _certificates.length,
         itemBuilder: (ctx, i) {
           final item = _certificates[i] as Map<String, dynamic>;
+          // Backend may return title at top level, inside 'course', or 'courseId'
+          final courseMap = item['course'] as Map? ?? item['courseId'] as Map? ?? {};
+          final resolvedTitle = item['title']?.toString() ??
+              item['courseTitle']?.toString() ??
+              courseMap['title']?.toString() ??
+              courseMap['name']?.toString() ??
+              'Completed Program';
           return CertifcateCard(
             certificateData: item,
-            courseTitle: item['title'] ?? 'Completed Program',
+            courseTitle: resolvedTitle,
             completedSections: '100', // Completed
             totalSections: '100',
             completionPercentage: '100',
@@ -156,8 +163,10 @@ class CertifcateCard extends StatelessWidget {
                 onTap: () {
                   Navigator.of(context).push(
                     MaterialPageRoute(
-                      builder: (ctx) =>
-                          ViewCertificate(certificateData: certificateData),
+                      builder: (ctx) => ViewCertificate(
+                        certificateData: certificateData,
+                        resolvedTitle: courseTitle,
+                      ),
                     ),
                   );
                 },
@@ -171,9 +180,14 @@ class CertifcateCard extends StatelessWidget {
                 fontFamily: "Gilroy-Bold",
                 fontWeight: FontWeight.bold,
                 onTap: () {
-                  // Additional actual PDF download logic can go here
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Downloading Certificate...')),
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (ctx) => ViewCertificate(
+                        certificateData: certificateData,
+                        resolvedTitle: courseTitle,
+                        autoDownload: true,
+                      ),
+                    ),
                   );
                 },
               ),

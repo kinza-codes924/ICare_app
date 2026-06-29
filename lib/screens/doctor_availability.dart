@@ -145,6 +145,7 @@ class _DoctorAvailabilityState extends State<DoctorAvailability> {
         setState(() {
           final loadedDays = List<String>.from(
             availability!['availableDays'] ??
+                availability!['available_days'] ??
                 ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
           );
 
@@ -157,7 +158,7 @@ class _DoctorAvailabilityState extends State<DoctorAvailability> {
 
           String startStr = '09:00';
           String endStr = '17:00';
-          final at = availability!['availableTime'];
+          final at = availability!['availableTime'] ?? availability!['available_hours'];
           if (at is Map) {
             startStr = at['start']?.toString() ?? '09:00';
             endStr = at['end']?.toString() ?? '17:00';
@@ -169,20 +170,8 @@ class _DoctorAvailabilityState extends State<DoctorAvailability> {
             }
           }
 
-          final startParts = startStr.split(':');
-          final endParts = endStr.split(':');
-          if (startParts.length >= 2) {
-            _startTime = TimeOfDay(
-              hour: int.tryParse(startParts[0]) ?? 9,
-              minute: int.tryParse(startParts[1]) ?? 0,
-            );
-          }
-          if (endParts.length >= 2) {
-            _endTime = TimeOfDay(
-              hour: int.tryParse(endParts[0]) ?? 17,
-              minute: int.tryParse(endParts[1]) ?? 0,
-            );
-          }
+          _startTime = _parseTimeOfDay(startStr, fallbackHour: 9);
+          _endTime = _parseTimeOfDay(endStr, fallbackHour: 17);
 
           if (availability!['unavailableDates'] != null) {
             _unavailableDates.clear();
@@ -201,6 +190,29 @@ class _DoctorAvailabilityState extends State<DoctorAvailability> {
     } catch (e) {
       if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  TimeOfDay _parseTimeOfDay(String timeStr, {required int fallbackHour}) {
+    // Handle HH:mm (24h) — e.g. "09:00" or "17:00"
+    final parts = timeStr.split(':');
+    if (parts.length >= 2) {
+      final h = int.tryParse(parts[0].trim());
+      final minRaw = parts[1].trim();
+      // Strip AM/PM if present (e.g. "44 PM" → 44)
+      final mStr = minRaw.replaceAll(RegExp(r'[^0-9]'), '');
+      final m = int.tryParse(mStr);
+      if (h != null && m != null && h >= 0 && h <= 23 && m >= 0 && m <= 59) {
+        // If original had PM and hour < 12, convert
+        if (minRaw.toUpperCase().contains('PM') && h < 12) {
+          return TimeOfDay(hour: h + 12, minute: m);
+        }
+        if (minRaw.toUpperCase().contains('AM') && h == 12) {
+          return TimeOfDay(hour: 0, minute: m);
+        }
+        return TimeOfDay(hour: h, minute: m);
+      }
+    }
+    return TimeOfDay(hour: fallbackHour, minute: 0);
   }
 
   void _addUnavailableDate() async {

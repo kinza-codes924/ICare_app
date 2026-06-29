@@ -14,6 +14,8 @@ import 'package:icare/screens/pharmacy_profile_setup.dart';
 import 'package:icare/screens/student_profile_setup.dart';
 import 'package:icare/services/auth_service.dart';
 import 'package:icare/services/biometric_service.dart';
+import 'package:icare/services/face_auth_service.dart';
+import 'package:icare/screens/face_capture_screen.dart';
 import 'package:icare/services/user_service.dart';
 import 'package:icare/utils/shared_pref.dart';
 import 'package:icare/models/user.dart' as app_user;
@@ -49,6 +51,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
   final AuthService _authService = AuthService();
   final UserService _userService = UserService();
   final BiometricService _biometricService = BiometricService();
+  final FaceAuthService _faceAuthService = FaceAuthService();
 
   bool rememberMe = false;
   bool isLogin = true;
@@ -60,6 +63,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
   bool _biometricAvailable = false;
   bool _biometricEnabled = false;
   bool _biometricLoading = false;
+
+  // Face auth state
+  bool _faceEnabled = false;
+  bool _faceLoading = false;
 
   // Social sign-in state
   bool _googleLoading = false;
@@ -118,14 +125,18 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
   Future<void> _initBiometrics() async {
     final available = await _biometricService.isAvailable();
     final enabled = await _biometricService.isBiometricEnabled();
+    final faceEnabled = await _faceAuthService.isFaceEnabled();
     if (!mounted) return;
     setState(() {
       _biometricAvailable = available;
       _biometricEnabled = enabled;
+      _faceEnabled = faceEnabled;
     });
-    // Auto-trigger biometric prompt if enabled and user has a saved token
-    if (available && enabled) {
-      // Small delay so the screen renders first
+    // Auto-trigger face login first; fall back to fingerprint
+    if (faceEnabled) {
+      await Future.delayed(const Duration(milliseconds: 400));
+      if (mounted) _triggerFaceLogin(auto: true);
+    } else if (available && enabled) {
       await Future.delayed(const Duration(milliseconds: 600));
       if (mounted) _triggerBiometricLogin();
     }
@@ -179,6 +190,141 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
       setState(() => _biometricLoading = false);
       _showError('Biometric authentication failed. Please use your password.');
     }
+  }
+
+  Future<void> _triggerFaceLogin({bool auto = false}) async {
+    if (_faceLoading) return;
+    setState(() => _faceLoading = true);
+    try {
+      final path = await Navigator.push<String>(
+        context,
+        MaterialPageRoute(
+          builder: (_) => const FaceCaptureScreen(mode: FaceCaptureMode.verify),
+        ),
+      );
+      if (!mounted) return;
+      if (path == null) {
+        // User cancelled
+        setState(() => _faceLoading = false);
+        return;
+      }
+      final result = await _faceAuthService.verifyFace(path);
+      if (!mounted) return;
+      setState(() => _faceLoading = false);
+
+      switch (result) {
+        case FaceVerifyResult.match:
+          final token = await SharedPref().getBiometricToken();
+          final user = await SharedPref().getBiometricUserData();
+          if (token != null && token.isNotEmpty && user != null && mounted) {
+            await ref.read(authProvider.notifier).setUserToken(token);
+            await ref.read(authProvider.notifier).setUser(user);
+            if (mounted) context.go('/dashboard');
+          } else {
+            _showError('Session expired. Please sign in with your password first.');
+          }
+          break;
+        case FaceVerifyResult.noMatch:
+          _showError('Face not recognised. Please try again or use your password.');
+          break;
+        case FaceVerifyResult.noFace:
+          _showError('No face detected. Please try again in good lighting.');
+          break;
+        case FaceVerifyResult.multipleFaces:
+          _showError('Multiple faces detected. Please ensure only your face is visible.');
+          break;
+        case FaceVerifyResult.notRegistered:
+          _showError('Face ID not set up. Please sign in with your password first.');
+          break;
+        case FaceVerifyResult.error:
+          _showError('Face ID error. Please try again.');
+          break;
+      }
+    } catch (e) {
+      debugPrint('Face login error: $e');
+      if (mounted) {
+        setState(() => _faceLoading = false);
+        _showError('Face ID failed. Please use your password.');
+      }
+    }
+  }
+
+  Future<void> _offerFaceSetup(String email) async {
+    final alreadySet = await _faceAuthService.isFaceEnabled();
+    if (alreadySet) return;
+    if (!mounted) return;
+
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        icon: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppColors.primaryColor.withValues(alpha: 0.1),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(Icons.face_retouching_natural, color: AppColors.primaryColor, size: 36),
+        ),
+        title: const Text(
+          'Enable Face ID?',
+          textAlign: TextAlign.center,
+          style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18),
+        ),
+        content: const Text(
+          'Sign in faster next time by looking at your camera — works on any Android device.',
+          textAlign: TextAlign.center,
+          style: TextStyle(fontSize: 14, color: Color(0xFF64748B), height: 1.5),
+        ),
+        actionsAlignment: MainAxisAlignment.center,
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Not Now', style: TextStyle(color: Color(0xFF64748B))),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(ctx);
+              await Future.delayed(const Duration(milliseconds: 300));
+              if (!mounted) return;
+              final path = await Navigator.push<String>(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const FaceCaptureScreen(mode: FaceCaptureMode.register),
+                ),
+              );
+              if (path == null || !mounted) return;
+              final error = await _faceAuthService.registerFace(path);
+              if (!mounted) return;
+              if (error == null) {
+                // Save token so face login can retrieve the session
+                final token = await SharedPref().getToken();
+                final user = await SharedPref().getUserData();
+                await _biometricService.enableBiometrics(email, token: token, user: user);
+                setState(() { _faceEnabled = true; });
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Face ID enabled! You can now sign in with your face.'),
+                    backgroundColor: Color(0xFF059669),
+                  ),
+                );
+              } else {
+                _showError(error);
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primaryColor,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              elevation: 0,
+            ),
+            child: const Text('Set Up Face ID'),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _handleGoogleSignIn() async {
@@ -258,7 +404,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
             shape: BoxShape.circle,
           ),
           child: Icon(
-            label == 'Face Unlock' ? Icons.face_retouching_natural : Icons.fingerprint,
+            label.contains('Face') ? Icons.face_retouching_natural : Icons.fingerprint,
             color: AppColors.primaryColor,
             size: 36,
           ),
@@ -709,7 +855,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                               ),
                               Expanded(
                                 child: GestureDetector(
-                                  onTap: () => context.go('/signup'),
+                                  onTap: () => context.push('/signup'),
                                   child: AnimatedContainer(
                                     duration: const Duration(milliseconds: 250),
                                     curve: Curves.easeInOut,
@@ -1131,7 +1277,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                                   ),
                                 ],
                                 // Biometric / Face Unlock sign-in button — show whenever hardware is available
-                                if (_biometricAvailable) ...[
+                                if (_faceEnabled || (_biometricAvailable && _biometricEnabled)) ...[
                                   const SizedBox(height: 12),
                                   _buildBiometricButton(isDesktop: true),
                                 ],
@@ -1272,7 +1418,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                           ),
                           Expanded(
                             child: GestureDetector(
-                              onTap: () => context.go('/signup'),
+                              onTap: () => context.push('/signup'),
                               child: Container(
                                 padding: EdgeInsets.symmetric(vertical: 15),
                                 decoration: BoxDecoration(
@@ -1700,8 +1846,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
             ],
           ],
         ),
-        // Biometric / Face Unlock sign-in button — show whenever hardware is available
-        if (_biometricAvailable) ...[
+        // Face ID (camera) or hardware biometric sign-in
+        if (_faceEnabled || (_biometricAvailable && _biometricEnabled)) ...[
           const SizedBox(height: 12),
           _buildBiometricButton(isDesktop: false),
         ],
@@ -1710,69 +1856,95 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
   }
 
   Widget _buildBiometricButton({required bool isDesktop}) {
-    return FutureBuilder<String>(
-      future: _biometricService.getBiometricLabel(),
-      builder: (ctx, snap) {
-        final label = snap.data ?? 'Biometrics';
-        final icon = label == 'Face Unlock'
-            ? Icons.face_retouching_natural
-            : Icons.fingerprint;
-        if (isDesktop) {
-          return GestureDetector(
-            onTap: _biometricLoading ? null : _triggerBiometricLogin,
-            child: Container(
-              padding: const EdgeInsets.symmetric(vertical: 14),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: AppColors.primaryColor.withValues(alpha: 0.4), width: 1.5),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  _biometricLoading
-                      ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2))
-                      : Icon(icon, color: AppColors.primaryColor, size: 24),
-                  const SizedBox(width: 10),
-                  Text(
-                    _biometricLoading ? 'Authenticating…' : 'Sign in with $label',
-                    style: TextStyle(
-                      color: AppColors.primaryColor,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 14,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          );
-        }
-        // Mobile
-        return GestureDetector(
-          onTap: _biometricLoading ? null : _triggerBiometricLogin,
-          child: Container(
-            padding: const EdgeInsets.symmetric(vertical: 13, horizontal: 20),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(30),
-              border: Border.all(color: AppColors.primaryColor.withValues(alpha: 0.4)),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _biometricLoading
-                    ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                    : Icon(icon, color: AppColors.primaryColor, size: 22),
-                const SizedBox(width: 8),
-                Text(
-                  _biometricLoading ? 'Authenticating…' : 'Sign in with $label',
-                  style: TextStyle(color: AppColors.primaryColor, fontSize: 13, fontWeight: FontWeight.w600),
-                ),
-              ],
-            ),
+    return Column(
+      children: [
+        // Face ID button (camera-based, works on all Android devices)
+        if (_faceEnabled) ...[
+          _authButton(
+            icon: Icons.face_retouching_natural,
+            label: 'Sign in with Face ID',
+            loading: _faceLoading,
+            onTap: _triggerFaceLogin,
+            isDesktop: isDesktop,
           ),
-        );
-      },
+          const SizedBox(height: 10),
+        ],
+        // Hardware biometrics (fingerprint)
+        if (_biometricAvailable && _biometricEnabled)
+          FutureBuilder<String>(
+            future: _biometricService.getBiometricLabel(),
+            builder: (ctx, snap) {
+              final label = snap.data ?? 'Fingerprint';
+              final icon = label.contains('Face') ? Icons.face_retouching_natural : Icons.fingerprint;
+              return _authButton(
+                icon: icon,
+                label: 'Sign in with $label',
+                loading: _biometricLoading,
+                onTap: _triggerBiometricLogin,
+                isDesktop: isDesktop,
+              );
+            },
+          ),
+      ],
+    );
+  }
+
+  Widget _authButton({
+    required IconData icon,
+    required String label,
+    required bool loading,
+    required VoidCallback onTap,
+    required bool isDesktop,
+  }) {
+    if (isDesktop) {
+      return GestureDetector(
+        onTap: loading ? null : onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 14),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: AppColors.primaryColor.withValues(alpha: 0.4), width: 1.5),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              loading
+                  ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2))
+                  : Icon(icon, color: AppColors.primaryColor, size: 24),
+              const SizedBox(width: 10),
+              Text(
+                loading ? 'Authenticating…' : label,
+                style: TextStyle(color: AppColors.primaryColor, fontWeight: FontWeight.w600, fontSize: 14),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+    return GestureDetector(
+      onTap: loading ? null : onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 13, horizontal: 20),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(30),
+          border: Border.all(color: AppColors.primaryColor.withValues(alpha: 0.4)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            loading
+                ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                : Icon(icon, color: AppColors.primaryColor, size: 22),
+            const SizedBox(width: 8),
+            Text(
+              loading ? 'Authenticating…' : label,
+              style: TextStyle(color: AppColors.primaryColor, fontSize: 13, fontWeight: FontWeight.w600),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -2001,9 +2173,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
               "✅ Logged in as: ${user.name} (${user.email}) - Role: ${user.role}",
             );
 
-            // Offer biometric setup after first successful password login
-            await _offerBiometricSetup(usernameController.text.trim());
-            context.go('/dashboard');
+            // Offer biometric / face setup after first successful password login
+            final loginEmail = usernameController.text.trim();
+            await _offerFaceSetup(loginEmail);
+            if (mounted) await _offerBiometricSetup(loginEmail);
+            if (mounted) context.go('/dashboard');
           } else {
             debugPrint("❌ Failed to fetch profile: ${profileResult['message']}");
             _showError(

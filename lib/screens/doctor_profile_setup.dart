@@ -228,13 +228,21 @@ class _DoctorProfileSetupState extends ConsumerState<DoctorProfileSetup> {
   }
 
   Future<void> _selectTime(TextEditingController controller) async {
+    // Parse existing HH:mm text as initial time, fallback to now
+    TimeOfDay initial = TimeOfDay.now();
+    final parts = controller.text.split(':');
+    if (parts.length == 2) {
+      final h = int.tryParse(parts[0]);
+      final m = int.tryParse(parts[1]);
+      if (h != null && m != null) initial = TimeOfDay(hour: h, minute: m);
+    }
     final TimeOfDay? picked = await showTimePicker(
       context: context,
-      initialTime: TimeOfDay.now(),
+      initialTime: initial,
     );
     if (picked != null) {
       setState(() {
-        controller.text = picked.format(context);
+        controller.text = '${picked.hour.toString().padLeft(2, '0')}:${picked.minute.toString().padLeft(2, '0')}';
       });
     }
   }

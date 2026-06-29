@@ -178,7 +178,7 @@ class _HealthJourneyScreenState extends State<HealthJourneyScreen> {
                               crossAxisCount: isDesktop ? 4 : 3,
                               crossAxisSpacing: 12,
                               mainAxisSpacing: 12,
-                              childAspectRatio: 1.45,
+                              childAspectRatio: isDesktop ? 1.45 : 0.95,
                             ),
                             itemCount: _vitalData.length,
                             itemBuilder: (context, index) {

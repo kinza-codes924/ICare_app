@@ -70,6 +70,7 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
   // Session info
   String _currentUserName = 'You';
   String _currentUserId = '';
+  String _instructorName = ''; // populated from session doc for student view
   String _sessionDocId = ''; // actual MongoDB _id of the LiveSession document
   Timer? _sessionTimer;
   Timer? _syncTimer; // polls backend for chat/participants/raised hands
@@ -200,6 +201,16 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
       final session = data['session'];
       if (session == null || !mounted) return;
 
+      // Extract instructor name from session document (for student label)
+      final instrMap = session['instructor'] as Map? ??
+          session['createdBy'] as Map? ??
+          session['instructorId'] as Map? ??
+          {};
+      final instrName = (session['instructorName'] as String?) ??
+          instrMap['name']?.toString() ??
+          instrMap['username']?.toString() ??
+          '';
+
       // Update participants from attendees
       final attendees = (session['attendees'] as List?) ?? [];
       final newParticipants = attendees.map<Map<String, dynamic>>((a) => {
@@ -258,6 +269,7 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
         final prevWaitingCount = _waitingStudents.length;
 
         setState(() {
+          if (instrName.isNotEmpty) _instructorName = instrName;
           _participants.clear();
           // Add self first
           _participants.add({'name': '$_currentUserName (You)', 'isInstructor': widget.isInstructor, 'id': _currentUserId});
@@ -391,13 +403,23 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
       return;
     }
 
-    // Mobile: lmsJoinChannel (stub) opens Jitsi in external browser
+    // Mobile: real Agora RTC via lms_agora_stub.dart
     lmsSetCallbacks(
       onJoined: () {
         if (mounted && !_joined) {
           setState(() { _joined = true; _loading = false; });
           _startSessionTimer();
         }
+      },
+      onRemote: (uid, joined) {
+        if (!mounted) return;
+        setState(() {
+          if (joined) {
+            if (!_remoteUids.contains(uid)) _remoteUids.add(uid);
+          } else {
+            _remoteUids.remove(uid);
+          }
+        });
       },
     );
 
@@ -551,6 +573,7 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
             sessionId: _sessionDocId,
             lessonId: widget.lessonId,
             moduleId: widget.moduleId,
+            chatMessages: List<Map<String, dynamic>>.from(_chatMessages),
           );
           if (mounted && result['success'] == true) {
             final msg = widget.lessonId != null
@@ -874,12 +897,18 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
 
     return Stack(
       children: [
-        // Video grid (mobile / fallback)
-        _remoteUids.isEmpty
-            ? _buildSelfVideoTile(isLarge: true)
-            : _buildVideoGrid(),
+        // Video area
+        if (_remoteUids.isEmpty)
+          // No remote users — show self full-screen
+          _buildSelfVideoTile(isLarge: true)
+        else if (_remoteUids.length == 1)
+          // 1 remote user — full screen remote view
+          SizedBox.expand(child: _buildRemoteVideoTile(_remoteUids[0]))
+        else
+          // Multiple remote users — grid
+          _buildVideoGrid(),
 
-        // Self preview (small, when others present)
+        // Self preview (small corner, when others present)
         if (_remoteUids.isNotEmpty)
           Positioned(
             right: 12,
@@ -1016,7 +1045,10 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
                       style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
                 ),
                 const SizedBox(height: 8),
-                const Text('Participant', style: TextStyle(color: Colors.white70, fontSize: 12)),
+                Text(
+                  widget.isInstructor ? 'Student' : (_instructorName.isNotEmpty ? _instructorName : 'Instructor'),
+                  style: const TextStyle(color: Colors.white70, fontSize: 12),
+                ),
               ]),
             ),
           Positioned(
@@ -1025,10 +1057,18 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
               decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(4)),
-              child: const Row(mainAxisSize: MainAxisSize.min, children: [
-                Icon(Icons.mic_rounded, size: 12, color: Colors.white),
-                SizedBox(width: 4),
-                Text('Student', style: TextStyle(color: Colors.white, fontSize: 11)),
+              child: Row(mainAxisSize: MainAxisSize.min, children: [
+                const Icon(Icons.mic_rounded, size: 12, color: Colors.white),
+                const SizedBox(width: 4),
+                Text(
+                  widget.isInstructor
+                    ? (_participants.firstWhere(
+                        (p) => p['id']?.toString() != _currentUserId,
+                        orElse: () => {'name': 'Student'},
+                      )['name']?.toString() ?? 'Student')
+                    : (_instructorName.isNotEmpty ? _instructorName : 'Instructor'),
+                  style: const TextStyle(color: Colors.white, fontSize: 11),
+                ),
               ]),
             ),
           ),

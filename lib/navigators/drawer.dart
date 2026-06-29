@@ -41,6 +41,7 @@ import 'package:icare/screens/my_learning.dart';
 import 'package:icare/screens/student_lms_dashboard.dart';
 import 'package:icare/screens/instructor_lms_dashboard.dart';
 import 'package:icare/screens/lms_public_catalog.dart';
+import 'package:icare/screens/gamification_screen.dart';
 import 'package:icare/screens/settings.dart';
 import 'package:icare/screens/tabs.dart';
 import 'package:icare/screens/tasks.dart';
@@ -219,6 +220,11 @@ class _CustomDrawerState extends ConsumerState<CustomDrawer> {
             MaterialPageRoute(builder: (ctx) => const HealthCommunityScreen()),
           );
         }),
+        _drawerItem('Achievements & Rewards', Icons.emoji_events_outlined, () {
+          Navigator.of(context).push(
+            MaterialPageRoute(builder: (ctx) => const GamificationScreen()),
+          );
+        }),
         _drawerItem('Settings', Icons.settings_outlined, () {
           Navigator.of(context).push(
             MaterialPageRoute(builder: (ctx) => const SettingsScreen()),
@@ -311,11 +317,8 @@ class _CustomDrawerState extends ConsumerState<CustomDrawer> {
           ).push(MaterialPageRoute(builder: (ctx) => const SettingsScreen()));
         }),
         _drawerItem('iCare Pharmacist Support', Icons.headset_mic_rounded, () {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Direct support chat coming soon. For now, email support@icare.com'),
-              duration: Duration(seconds: 3),
-            ),
+          Navigator.of(context).push(
+            MaterialPageRoute(builder: (ctx) => const HelpAndSupport()),
           );
         }),
       ];
@@ -401,11 +404,6 @@ class _CustomDrawerState extends ConsumerState<CustomDrawer> {
           Navigator.of(
             context,
           ).push(MaterialPageRoute(builder: (ctx) => const TaskScreen()));
-        }),
-        _drawerItem('Health Community', Icons.people_outline_rounded, () {
-          Navigator.of(context).push(
-            MaterialPageRoute(builder: (ctx) => const HealthCommunityScreen()),
-          );
         }),
         _drawerItem('Help & Support', Icons.help_outline_rounded, () {
           Navigator.of(

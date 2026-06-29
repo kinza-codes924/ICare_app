@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:icare/screens/certificate_templates_screen.dart';
 import 'package:icare/services/lms_service.dart';
@@ -140,18 +141,24 @@ class _LessonPlayerState extends State<LessonPlayer> {
       body: Column(
         children: [
           if (hasVideo)
-            Container(
-              color: Colors.black,
-              child: AspectRatio(
-                aspectRatio: 16 / 9,
-                child: embeddable
-                    ? VideoPlayerWidget(videoUrl: videoUrl)
-                    : GestureDetector(
-                        onTap: () => _openExternal(videoUrl),
-                        child: _buildVideoPlaceholderInline(ytId),
-                      ),
-              ),
-            ),
+            Builder(builder: (ctx) {
+              final maxH = MediaQuery.of(ctx).size.height * 0.42;
+              return ConstrainedBox(
+                constraints: BoxConstraints(maxHeight: kIsWeb ? maxH : double.infinity),
+                child: Container(
+                  color: Colors.black,
+                  child: AspectRatio(
+                    aspectRatio: 16 / 9,
+                    child: embeddable
+                        ? VideoPlayerWidget(videoUrl: videoUrl)
+                        : GestureDetector(
+                            onTap: () => _openExternal(videoUrl),
+                            child: _buildVideoPlaceholderInline(ytId),
+                          ),
+                  ),
+                ),
+              );
+            }),
           Expanded(
             child: SingleChildScrollView(
               padding: const EdgeInsets.all(24),

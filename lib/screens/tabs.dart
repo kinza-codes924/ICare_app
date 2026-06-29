@@ -47,6 +47,7 @@ import 'package:icare/screens/emergency_contacts_screen.dart';
 import 'package:icare/screens/security_audit_log_screen.dart';
 import 'package:icare/screens/certificates_screen.dart';
 import 'package:icare/screens/assessments_screen.dart';
+import 'package:icare/screens/gamification_screen.dart';
 import 'package:icare/screens/health_community.dart';
 import 'package:icare/screens/settings.dart';
 import 'package:icare/screens/patient_book_lab_flow.dart';
@@ -686,7 +687,7 @@ class _WebSidebarState extends ConsumerState<_WebSidebar> {
                       builder: (context, ref, child) {
                         final user = ref.watch(authProvider).user;
                         final imgProvider = buildProfileImageProvider(user?.profilePicture);
-                        final initial = (user?.name ?? 'U').isNotEmpty ? (user!.name[0].toUpperCase()) : 'U';
+                        final initial = (user != null && user.name.isNotEmpty) ? user.name[0].toUpperCase() : 'U';
                         return CircleAvatar(
                           radius: 24,
                           backgroundColor: AppColors.primaryColor.withValues(alpha: 0.1),
@@ -962,6 +963,18 @@ class _WebSidebarState extends ConsumerState<_WebSidebar> {
                       Navigator.of(context).push(
                         MaterialPageRoute(
                           builder: (ctx) => const HealthCommunityScreen(),
+                        ),
+                      );
+                    },
+                  ),
+                  _buildExtraNavItem(
+                    context,
+                    Icons.emoji_events_outlined,
+                    'Achievements & Rewards',
+                    () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (ctx) => const GamificationScreen(),
                         ),
                       );
                     },
@@ -1823,7 +1836,7 @@ class _WebTopBar extends ConsumerWidget {
                     builder: (context, ref, child) {
                       final user = ref.watch(authProvider).user;
                       final imgProvider = buildProfileImageProvider(user?.profilePicture);
-                      final initial = (user?.name ?? 'U').isNotEmpty ? user!.name[0].toUpperCase() : 'U';
+                      final initial = (user != null && user.name.isNotEmpty) ? user.name[0].toUpperCase() : 'U';
                       return CircleAvatar(
                         radius: 20,
                         backgroundColor: AppColors.primaryColor.withValues(alpha: 0.1),

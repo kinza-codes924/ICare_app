@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:icare/services/api_service.dart';
 import 'package:icare/utils/theme.dart';
-import 'package:icare/widgets/back_button.dart';
 
 /// Public LMS Course Catalog - Browse courses without login
 /// Inspired by Moodle & Coursera course marketplace
@@ -126,7 +125,10 @@ class _LmsPublicCatalogState extends State<LmsPublicCatalog> {
             expandedHeight: 160,
             pinned: true,
             backgroundColor: AppColors.primaryColor,
-            leading: const CustomBackButton(color: Colors.white),
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 20),
+              onPressed: () => context.canPop() ? context.pop() : context.go('/home'),
+            ),
             actions: [
               IconButton(
                 icon: const Icon(Icons.login_rounded, color: Colors.white),

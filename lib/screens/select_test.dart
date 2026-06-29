@@ -46,10 +46,32 @@ class _SelectTestState extends State<SelectTest> {
         );
       }).toList();
 
+      // Pre-select any tests whose names match what the patient chose in Step 2
+      final preSelected = (widget.bookingData['preSelectedTests'] as List?)
+          ?.map((t) => t.toString().toLowerCase())
+          .toList() ?? [];
+      final preSelectedTests = <LabTest>[];
+      if (preSelected.isNotEmpty) {
+        for (final test in loadedTests) {
+          final testNameLower = test.name.toLowerCase();
+          final matches = preSelected.any((pre) {
+            final words = pre.replaceAll(RegExp(r'[^\w\s]'), '')
+                .split(' ')
+                .where((w) => w.length > 2)
+                .toList();
+            return words.any((w) => testNameLower.contains(w));
+          });
+          if (matches) preSelectedTests.add(test);
+        }
+      }
+
       if (mounted) {
         setState(() {
           _allTests = loadedTests;
           _filteredTests = loadedTests;
+          if (preSelectedTests.isNotEmpty) {
+            _selectedTests.addAll(preSelectedTests);
+          }
           _isLoading = false;
         });
       }
