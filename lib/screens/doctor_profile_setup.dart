@@ -313,12 +313,12 @@ class _DoctorProfileSetupState extends ConsumerState<DoctorProfileSetup> {
       profileImage: _imageBytes,
     );
 
-    // Sync the same days/times to the availability endpoint so Manage Availability shows the same data
+    // Sync the same days/times to doctor profile so Manage Availability shows the same data
     try {
-      await DoctorService().updateAvailability(
+      await DoctorService().patchAvailabilityOnProfile(
         availableDays: availableDays,
-        availableTime: {'start': startTimeController.text, 'end': endTimeController.text},
-        unavailableDates: [],
+        startTime: startTimeController.text,
+        endTime: endTimeController.text,
       );
     } catch (_) {}
 

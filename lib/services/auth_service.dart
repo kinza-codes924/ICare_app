@@ -169,33 +169,33 @@ class AuthService {
 
   Future<Map<String, dynamic>> forgotPassword({required String email}) async {
     // Pre-check: verify the email exists by attempting login with a dummy password.
-    // The backend returns different error messages for "user not found" vs "wrong password",
-    // which lets us distinguish a non-existent account from an existing one.
+    // Key insight: backends return "Invalid credentials" for non-existent users but
+    // "Incorrect/Invalid password" (containing the word "password") for wrong passwords.
+    // We use presence of "password" in the message as the reliable user-exists signal.
     try {
       await _apiService.post(ApiConfig.login, {'email': email, 'password': '__ICARE_EMAIL_CHECK__'});
-      // If login somehow succeeds (should never happen), continue to OTP
+      // If login somehow succeeds, continue to OTP
     } on DioException catch (e) {
       final raw = (e.response?.data ?? {});
       final backendMsg = (raw is Map ? raw['message']?.toString() : null) ?? '';
       final lower = backendMsg.toLowerCase();
-      // "Invalid password" / "incorrect password" / "wrong password" → user exists → OK
-      final isPasswordError = lower.contains('password') || lower.contains('credential') ||
-          lower.contains('incorrect') || lower.contains('invalid');
-      // "User not found" / "no account" / "not registered" / etc → reject
-      final isNotFound = lower.contains('not found') || lower.contains('no user') ||
-          lower.contains('does not exist') || lower.contains('no account') ||
-          lower.contains('not registered') || lower.contains('user not') ||
-          lower.contains('email not') || lower.contains('not exist');
-      if (isNotFound && !isPasswordError) {
+
+      // User EXISTS if backend returns 2FA trigger or an explicit password mismatch
+      final requiresOtp = (raw is Map) && raw['requiresOtp'] == true;
+      // "password" appears in "Incorrect password", "Invalid password", "Wrong password"
+      // but NOT in "Invalid credentials" (which backends use for non-existent users)
+      final isPasswordError = lower.contains('password');
+
+      if (requiresOtp || isPasswordError) {
+        // User exists — fall through to send OTP
+      } else if (e.response == null) {
+        // Pure network error — cannot confirm, proceed anyway
+      } else {
+        // Server responded but no password mention → email not registered
         return {'success': false, 'message': 'No account found with this email address. Please check and try again.'};
       }
-      // requiresOtp / 2FA → user exists
-      if ((raw is Map) && raw['requiresOtp'] == true) {
-        // user exists, fall through to send OTP
-      }
-      // Any other error (network, 500, etc) — let the OTP call proceed anyway
     } catch (_) {
-      // Network or unexpected error during pre-check — proceed anyway
+      // Unexpected error during pre-check — proceed anyway
     }
 
     try {
