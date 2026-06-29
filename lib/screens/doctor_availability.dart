@@ -301,32 +301,26 @@ class _DoctorAvailabilityState extends State<DoctorAvailability> {
     final startStr = '${_startTime.hour.toString().padLeft(2, '0')}:${_startTime.minute.toString().padLeft(2, '0')}';
     final endStr = '${_endTime.hour.toString().padLeft(2, '0')}:${_endTime.minute.toString().padLeft(2, '0')}';
 
-    final result = await _doctorService.updateAvailability(
+    // Primary save: write to doctor profile endpoint (works). The /update_availability
+    // endpoint 404s on this backend, so we skip it entirely.
+    final result = await _doctorService.patchAvailabilityOnProfile(
       availableDays: _availableDays,
-      availableTime: {'start': startStr, 'end': endStr},
-      unavailableDates: [],
-      bufferTime: _bufferTime,
-      emergencySlots: _emergencySlots,
+      startTime: startStr,
+      endTime: endStr,
     );
-
-    // Sync days/times to the doctor profile endpoint so Edit Profile shows the same values
-    try {
-      await _doctorService.patchAvailabilityOnProfile(
-        availableDays: _availableDays,
-        startTime: startStr,
-        endTime: endStr,
-      );
-    } catch (_) {}
 
     setState(() => _isSaving = false);
 
-    if (result['success'] && mounted) {
+    if (result['success'] == true && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Availability updated successfully')),
+        const SnackBar(
+          content: Text('Availability updated successfully'),
+          backgroundColor: Colors.green,
+        ),
       );
     } else if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(result['message'] ?? 'Failed to update availability')),
+        SnackBar(content: Text(result['message'] ?? 'Failed to update availability'), backgroundColor: Colors.red),
       );
     }
   }

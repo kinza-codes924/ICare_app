@@ -37,21 +37,46 @@ class _CredentialVaultScreenState extends State<CredentialVaultScreen> {
         creds = credsResp.data['credentials'] ?? [];
       } catch (_) {}
 
-      // Load verification documents from user profile
+      // Load verification documents — check multiple sources since different backend
+      // endpoints expose different fields.
       final verDocs = <Map<String, String>>[];
+      void _extractVerDocs(Map? vd) {
+        if (vd == null) return;
+        if (vd['cnicDocument'] != null && vd['cnicDocument'].toString().isNotEmpty)
+          verDocs.add({'title': 'CNIC / National ID', 'type': 'Identity Document', 'documentUrl': vd['cnicDocument'].toString(), 'name': vd['cnicDocumentName']?.toString() ?? 'cnic'});
+        if (vd['pmdcCertDocument'] != null && vd['pmdcCertDocument'].toString().isNotEmpty)
+          verDocs.add({'title': 'PMDC Certificate', 'type': 'Medical License', 'documentUrl': vd['pmdcCertDocument'].toString(), 'name': vd['pmdcCertDocumentName']?.toString() ?? 'pmdc_cert'});
+        if (vd['experienceCertDocument'] != null && vd['experienceCertDocument'].toString().isNotEmpty)
+          verDocs.add({'title': 'Experience Certificate', 'type': 'Professional Document', 'documentUrl': vd['experienceCertDocument'].toString(), 'name': vd['experienceCertDocumentName']?.toString() ?? 'experience_cert'});
+      }
+
+      // Source 1: /users/profile → user.verificationDetails
       try {
         final profileResp = await _apiService.get('/users/profile');
         final data = profileResp.data;
-        final user = (data is Map && data['user'] is Map) ? data['user'] as Map : (data is Map ? data : null);
+        final user = (data is Map && data['user'] is Map) ? data['user'] as Map
+                   : (data is Map ? data : null);
         if (user != null) {
-          final vd = user['verificationDetails'] as Map?;
-          if (vd != null) {
-            if (vd['cnicDocument'] != null) verDocs.add({'title': 'CNIC / National ID', 'type': 'Identity Document', 'documentUrl': vd['cnicDocument'].toString(), 'name': vd['cnicDocumentName']?.toString() ?? 'cnic'});
-            if (vd['pmdcCertDocument'] != null) verDocs.add({'title': 'PMDC Certificate', 'type': 'Medical License', 'documentUrl': vd['pmdcCertDocument'].toString(), 'name': vd['pmdcCertDocumentName']?.toString() ?? 'pmdc_cert'});
-            if (vd['experienceCertDocument'] != null) verDocs.add({'title': 'Experience Certificate', 'type': 'Professional Document', 'documentUrl': vd['experienceCertDocument'].toString(), 'name': vd['experienceCertDocumentName']?.toString() ?? 'experience_cert'});
-          }
+          _extractVerDocs(user['verificationDetails'] as Map?);
+          // Some backends also store docs at top-level of user
+          _extractVerDocs(user as Map?);
         }
       } catch (_) {}
+
+      // Source 2: /doctors/my-profile → doctor.verificationDetails (separate doctor collection)
+      if (verDocs.isEmpty) {
+        try {
+          final docResp = await _apiService.get('/doctors/my-profile');
+          final data = docResp.data;
+          final doc = (data is Map && data['doctor'] is Map) ? data['doctor'] as Map
+                    : (data is Map ? data : null);
+          if (doc != null) {
+            _extractVerDocs(doc['verificationDetails'] as Map?);
+            // Also check if documents are stored directly on doctor doc
+            _extractVerDocs(doc as Map?);
+          }
+        } catch (_) {}
+      }
 
       if (mounted) {
         setState(() {

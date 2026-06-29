@@ -168,11 +168,40 @@ class AuthService {
   }
 
   Future<Map<String, dynamic>> forgotPassword({required String email}) async {
+    // Pre-check: verify the email exists by attempting login with a dummy password.
+    // The backend returns different error messages for "user not found" vs "wrong password",
+    // which lets us distinguish a non-existent account from an existing one.
+    try {
+      await _apiService.post(ApiConfig.login, {'email': email, 'password': '__ICARE_EMAIL_CHECK__'});
+      // If login somehow succeeds (should never happen), continue to OTP
+    } on DioException catch (e) {
+      final raw = (e.response?.data ?? {});
+      final backendMsg = (raw is Map ? raw['message']?.toString() : null) ?? '';
+      final lower = backendMsg.toLowerCase();
+      // "Invalid password" / "incorrect password" / "wrong password" → user exists → OK
+      final isPasswordError = lower.contains('password') || lower.contains('credential') ||
+          lower.contains('incorrect') || lower.contains('invalid');
+      // "User not found" / "no account" / "not registered" / etc → reject
+      final isNotFound = lower.contains('not found') || lower.contains('no user') ||
+          lower.contains('does not exist') || lower.contains('no account') ||
+          lower.contains('not registered') || lower.contains('user not') ||
+          lower.contains('email not') || lower.contains('not exist');
+      if (isNotFound && !isPasswordError) {
+        return {'success': false, 'message': 'No account found with this email address. Please check and try again.'};
+      }
+      // requiresOtp / 2FA → user exists
+      if ((raw is Map) && raw['requiresOtp'] == true) {
+        // user exists, fall through to send OTP
+      }
+      // Any other error (network, 500, etc) — let the OTP call proceed anyway
+    } catch (_) {
+      // Network or unexpected error during pre-check — proceed anyway
+    }
+
     try {
       final response = await _apiService.post(ApiConfig.forgetPassword, {'email': email});
       if (response.statusCode == 200) {
         final d = response.data as Map<String, dynamic>? ?? {};
-        // Backend may return HTTP 200 but with success:false for non-existent emails
         final backendSuccess = d['success'];
         if (backendSuccess == false) {
           final msg = d['message']?.toString() ?? '';
@@ -183,7 +212,6 @@ class AuthService {
           }
           return {'success': false, 'message': msg};
         }
-        // Also catch "not found" messages inside a 200 success wrapper
         final msg = d['message']?.toString() ?? '';
         final lower = msg.toLowerCase();
         if (lower.contains('not found') || lower.contains('no account') ||
@@ -193,7 +221,7 @@ class AuthService {
         return {
           'success': true,
           'message': msg.isNotEmpty ? msg : 'OTP sent',
-          'emailSent': d['emailSent'] ?? false,
+          'emailSent': d['emailSent'],
           'emailError': d['emailError'],
         };
       }

@@ -250,15 +250,27 @@ class DoctorService {
 
   /// Updates ONLY the availableDays and availableTime on the doctor profile document,
   /// leaving all other fields (specialization, degrees, etc.) untouched.
-  Future<void> patchAvailabilityOnProfile({
+  Future<Map<String, dynamic>> patchAvailabilityOnProfile({
     required List<String> availableDays,
     required String startTime,
     required String endTime,
   }) async {
-    await _apiService.post('/doctors/add_doctor_details', {
-      'availableDays': availableDays,
-      'availableTime': {'start': startTime, 'end': endTime},
-    });
+    try {
+      final response = await _apiService.post('/doctors/add_doctor_details', {
+        'availableDays': availableDays,
+        'availableTime': {'start': startTime, 'end': endTime},
+      });
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        return {'success': true};
+      }
+      return {'success': false, 'message': 'Failed to save availability'};
+    } on DioException catch (e) {
+      debugPrint('patchAvailabilityOnProfile error: ${e.response?.statusCode} ${e.response?.data}');
+      return {'success': false, 'message': e.response?.data?['message'] ?? 'Network error'};
+    } catch (e) {
+      debugPrint('patchAvailabilityOnProfile error: $e');
+      return {'success': false, 'message': 'Unexpected error'};
+    }
   }
 
   Future<Map<String, dynamic>> getAvailability() async {
