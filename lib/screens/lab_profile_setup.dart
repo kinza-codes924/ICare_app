@@ -182,13 +182,12 @@ class _LabProfileSetupState extends ConsumerState<LabProfileSetup>
     setState(() => _gettingLocation = true);
 
     try {
+      // No internal timeout — Chrome's network-based geolocation can take 15-30s
+      // on desktop even with permission granted. Let the browser use its own pacing
+      // and rely on the outer .timeout() as a last-resort guard.
       final pos = await html.window.navigator.geolocation
-          .getCurrentPosition(
-            enableHighAccuracy: false,
-            timeout: const Duration(seconds: 12),
-            maximumAge: const Duration(minutes: 1),
-          )
-          .timeout(const Duration(seconds: 15));
+          .getCurrentPosition(enableHighAccuracy: false)
+          .timeout(const Duration(seconds: 40));
 
       final lat = pos.coords?.latitude?.toDouble();
       final lng = pos.coords?.longitude?.toDouble();
@@ -213,13 +212,12 @@ class _LabProfileSetupState extends ConsumerState<LabProfileSetup>
       setState(() => _gettingLocation = false);
       final msg = e.toString().toLowerCase();
       final String userMsg;
-      if (msg.contains('timeout') || msg.contains('code: 3') ||
-          msg.contains('geolocationpositionerror: 3')) {
-        userMsg = 'Location request timed out. Please try again.';
+      if (msg.contains('timeout') || msg.contains('future not completed')) {
+        userMsg = 'Location is taking too long. Try again or enter coordinates manually.';
+      } else if (msg.contains('denied') || msg.contains('notallowed') || msg.contains('permission')) {
+        userMsg = 'Location permission denied. Click the 🔒 icon in the address bar, allow location, then try again.';
       } else {
-        // Covers: denied, notallowed, security, incognito policy, unavailable, and
-        // any browser error whose toString() doesn't include expected keywords.
-        userMsg = 'Location access blocked. Click the 🔒 icon in the address bar and allow location, then try again. (Incognito mode may block this.)';
+        userMsg = 'Could not get location. Make sure location is allowed in your browser settings, then try again.';
       }
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
