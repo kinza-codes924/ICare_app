@@ -12,6 +12,7 @@ class User {
   final String? cnic;
   final String? specialization;
   final List<String>? conditionsTreated;
+  final List<Map<String, String>>? emergencyContacts;
   final bool isPhoneVerified;
   final bool isEmailVerified;
 
@@ -29,6 +30,7 @@ class User {
     this.cnic,
     this.specialization,
     this.conditionsTreated,
+    this.emergencyContacts,
     this.isPhoneVerified = true,
     this.isEmailVerified = true,
   });
@@ -52,6 +54,10 @@ class User {
       conditionsTreated: (json['conditionsTreated'] as List?)
           ?.map((e) => e.toString())
           .toList(),
+      emergencyContacts: (json['emergencyContacts'] as List?)
+          ?.map((e) => Map<String, String>.from(
+              (e as Map).map((k, v) => MapEntry(k.toString(), v?.toString() ?? ''))))
+          .toList(),
       // Old accounts without these fields default to true (grandfathered)
       isPhoneVerified: json['isPhoneVerified'] as bool? ?? true,
       isEmailVerified: json['isEmailVerified'] as bool? ?? true,
@@ -73,6 +79,7 @@ class User {
       if (cnic != null) 'cnic': cnic,
       if (specialization != null) 'specialization': specialization,
       if (conditionsTreated != null) 'conditionsTreated': conditionsTreated,
+      if (emergencyContacts != null) 'emergencyContacts': emergencyContacts,
       'isPhoneVerified': isPhoneVerified,
       'isEmailVerified': isEmailVerified,
     };
@@ -92,6 +99,7 @@ class User {
     String? cnic,
     String? specialization,
     List<String>? conditionsTreated,
+    List<Map<String, String>>? emergencyContacts,
     bool? isPhoneVerified,
     bool? isEmailVerified,
   }) {
@@ -109,6 +117,7 @@ class User {
       cnic: cnic ?? this.cnic,
       specialization: specialization ?? this.specialization,
       conditionsTreated: conditionsTreated ?? this.conditionsTreated,
+      emergencyContacts: emergencyContacts ?? this.emergencyContacts,
       isPhoneVerified: isPhoneVerified ?? this.isPhoneVerified,
       isEmailVerified: isEmailVerified ?? this.isEmailVerified,
     );

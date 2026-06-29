@@ -1,4 +1,6 @@
+import 'dart:convert';
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:go_router/go_router.dart';
@@ -43,8 +45,11 @@ class _WorkWithUsSignupState extends State<WorkWithUsSignup> {
   final Set<String> _docAvailDays = {};
   final _docTimingsCtrl = TextEditingController();
   String? _docCnic;
+  Uint8List? _docCnicBytes;
   String? _docPmdcCert;
+  Uint8List? _docPmdcCertBytes;
   String? _docExpCert;
+  Uint8List? _docExpCertBytes;
   final bool _docConfirmInfo = false;
   final bool _docAgreeOnboarding = false;
   final _docCommentsCtrl = TextEditingController();
@@ -329,6 +334,19 @@ class _WorkWithUsSignupState extends State<WorkWithUsSignup> {
         vd['availableDays'] = _docAvailDays.toList();
         vd['availableTimings'] = _docTimingsCtrl.text.trim();
         vd['comments'] = _docCommentsCtrl.text.trim();
+        // Encode uploaded documents as base64 data URIs so admin can view them
+        if (_docCnicBytes != null) {
+          vd['cnicDocument'] = 'data:application/octet-stream;base64,${base64Encode(_docCnicBytes!)}';
+          vd['cnicDocumentName'] = _docCnic ?? 'cnic';
+        }
+        if (_docPmdcCertBytes != null) {
+          vd['pmdcCertDocument'] = 'data:application/octet-stream;base64,${base64Encode(_docPmdcCertBytes!)}';
+          vd['pmdcCertDocumentName'] = _docPmdcCert ?? 'pmdc_cert';
+        }
+        if (_docExpCertBytes != null) {
+          vd['experienceCertDocument'] = 'data:application/octet-stream;base64,${base64Encode(_docExpCertBytes!)}';
+          vd['experienceCertDocumentName'] = _docExpCert ?? 'experience_cert';
+        }
       } else if (_selectedRole == 'Pharmacy') {
         vd['organizationName'] = _pharmNameCtrl.text.trim();
         vd['location'] = [city, address].where((s) => s.isNotEmpty).join(', ');
@@ -822,13 +840,15 @@ class _WorkWithUsSignupState extends State<WorkWithUsSignup> {
             const Color(0xFF0036BC)),
         const SizedBox(height: 12),
         _fileUploadRow('CNIC / ID', _docCnic, (v) => setState(() => _docCnic = v),
-            required: true),
+            required: true, onBytesChanged: (b) => _docCnicBytes = b),
         const SizedBox(height: 10),
         _fileUploadRow('PMDC Certificate', _docPmdcCert,
-            (v) => setState(() => _docPmdcCert = v), required: true),
+            (v) => setState(() => _docPmdcCert = v), required: true,
+            onBytesChanged: (b) => _docPmdcCertBytes = b),
         const SizedBox(height: 10),
         _fileUploadRow('Experience Certificates', _docExpCert,
-            (v) => setState(() => _docExpCert = v), required: false),
+            (v) => setState(() => _docExpCert = v), required: false,
+            onBytesChanged: (b) => _docExpCertBytes = b),
         const SizedBox(height: 24),
 
         _sectionHeader('3. Additional Comments', Icons.comment_outlined,
@@ -1246,7 +1266,8 @@ class _WorkWithUsSignupState extends State<WorkWithUsSignup> {
   Widget _fileUploadRow(
       String label, String? fileName, ValueChanged<String?> onPicked,
       {required bool required,
-      Color color = AppColors.primaryColor}) {
+      Color color = AppColors.primaryColor,
+      void Function(Uint8List?)? onBytesChanged}) {
     final hasFile = fileName != null;
     return Container(
       padding: const EdgeInsets.all(14),
@@ -1296,12 +1317,13 @@ class _WorkWithUsSignupState extends State<WorkWithUsSignup> {
                   type: FileType.custom,
                   allowedExtensions: ['pdf', 'jpg', 'jpeg', 'png'],
                   allowMultiple: false,
+                  withData: true,
                 );
                 if (result != null && result.files.isNotEmpty) {
                   onPicked(result.files.first.name);
+                  onBytesChanged?.call(result.files.first.bytes);
                 }
               } catch (e) {
-                // Fallback if file picker fails
                 onPicked('${label.replaceAll(' ', '_')}.pdf');
               }
             },

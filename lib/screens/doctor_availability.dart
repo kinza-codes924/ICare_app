@@ -125,16 +125,29 @@ class _DoctorAvailabilityState extends State<DoctorAvailability> {
     try {
       final result = await _doctorService.getAvailability();
 
-      if (result['success'] && mounted) {
-        final availability = result['availability'];
+      Map<String, dynamic>? availability;
+      if (result['success'] == true && result['availability'] != null) {
+        availability = result['availability'] as Map<String, dynamic>;
+      } else {
+        // Availability endpoint failed or returned empty — fall back to doctor profile
+        final profileResult = await _doctorService.getMyDoctorProfile();
+        if (profileResult['success'] == true && profileResult['doctor'] != null) {
+          final doc = profileResult['doctor'] as Map<String, dynamic>;
+          // Build an availability-shaped map from the profile doc
+          availability = <String, dynamic>{
+            'availableDays': doc['availableDays'],
+            'availableTime': doc['availableTime'],
+          };
+        }
+      }
 
+      if (availability != null && mounted) {
         setState(() {
           final loadedDays = List<String>.from(
-            availability['availableDays'] ??
+            availability!['availableDays'] ??
                 ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
           );
 
-          // Re-init slots based on loaded available days
           _weeklySlots = {for (final day in _days) day: <Map<String, String>>[]};
           for (final day in loadedDays) {
             _weeklySlots[day] = [
@@ -142,35 +155,51 @@ class _DoctorAvailabilityState extends State<DoctorAvailability> {
             ];
           }
 
-          final startStr = availability['availableTime']?['start'] ?? '09:00';
-          final endStr = availability['availableTime']?['end'] ?? '17:00';
-          final startParts = startStr.split(':');
-          final endParts = endStr.split(':');
-          _startTime = TimeOfDay(
-            hour: int.parse(startParts[0]),
-            minute: int.parse(startParts[1]),
-          );
-          _endTime = TimeOfDay(
-            hour: int.parse(endParts[0]),
-            minute: int.parse(endParts[1]),
-          );
-
-          if (availability['unavailableDates'] != null) {
-            _unavailableDates.clear();
-            for (var dateStr in availability['unavailableDates']) {
-              _unavailableDates.add(DateTime.parse(dateStr));
+          String startStr = '09:00';
+          String endStr = '17:00';
+          final at = availability!['availableTime'];
+          if (at is Map) {
+            startStr = at['start']?.toString() ?? '09:00';
+            endStr = at['end']?.toString() ?? '17:00';
+          } else if (at is String && at.contains('-')) {
+            final parts = at.split('-');
+            if (parts.length == 2) {
+              startStr = parts[0].trim();
+              endStr = parts[1].trim();
             }
           }
 
-          _bufferTime = availability['bufferTime'] ?? 15;
-          _emergencySlots = availability['emergencySlots'] == true;
+          final startParts = startStr.split(':');
+          final endParts = endStr.split(':');
+          if (startParts.length >= 2) {
+            _startTime = TimeOfDay(
+              hour: int.tryParse(startParts[0]) ?? 9,
+              minute: int.tryParse(startParts[1]) ?? 0,
+            );
+          }
+          if (endParts.length >= 2) {
+            _endTime = TimeOfDay(
+              hour: int.tryParse(endParts[0]) ?? 17,
+              minute: int.tryParse(endParts[1]) ?? 0,
+            );
+          }
+
+          if (availability!['unavailableDates'] != null) {
+            _unavailableDates.clear();
+            for (var dateStr in availability!['unavailableDates']) {
+              try { _unavailableDates.add(DateTime.parse(dateStr.toString())); } catch (_) {}
+            }
+          }
+
+          _bufferTime = availability!['bufferTime'] ?? 15;
+          _emergencySlots = availability!['emergencySlots'] == true;
           _isLoading = false;
         });
       } else {
-        setState(() => _isLoading = false);
+        if (mounted) setState(() => _isLoading = false);
       }
     } catch (e) {
-      setState(() => _isLoading = false);
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 

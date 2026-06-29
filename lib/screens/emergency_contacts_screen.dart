@@ -1,19 +1,21 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:icare/providers/auth_provider.dart';
 import 'package:icare/services/user_service.dart';
 import 'package:icare/utils/theme.dart';
 import 'package:icare/widgets/back_button.dart';
 import 'package:icare/widgets/custom_text_input.dart';
 
-class EmergencyContactsScreen extends StatefulWidget {
+class EmergencyContactsScreen extends ConsumerStatefulWidget {
   const EmergencyContactsScreen({super.key});
 
   @override
-  State<EmergencyContactsScreen> createState() =>
+  ConsumerState<EmergencyContactsScreen> createState() =>
       _EmergencyContactsScreenState();
 }
 
-class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
+class _EmergencyContactsScreenState extends ConsumerState<EmergencyContactsScreen> {
   final _formKey = GlobalKey<FormState>();
 
   // Contact 1
@@ -28,6 +30,49 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
 
   bool _isSaving = false;
   final UserService _userService = UserService();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadExistingContacts();
+  }
+
+  Future<void> _loadExistingContacts() async {
+    // First try to populate from cached user (fast path)
+    final cachedUser = ref.read(authProvider).user;
+    if (cachedUser?.emergencyContacts != null && cachedUser!.emergencyContacts!.isNotEmpty) {
+      _populateFromList(cachedUser.emergencyContacts!);
+    }
+    // Always fetch latest from backend to ensure we show saved data
+    final result = await _userService.getUserProfile();
+    if (!mounted) return;
+    if (result['success'] == true && result['user'] is Map) {
+      final rawList = result['user']['emergencyContacts'];
+      if (rawList is List && rawList.isNotEmpty) {
+        final contacts = rawList
+            .map((e) => Map<String, String>.from(
+                (e as Map).map((k, v) => MapEntry(k.toString(), v?.toString() ?? ''))))
+            .toList();
+        _populateFromList(contacts);
+      }
+    }
+    if (mounted) setState(() {});
+  }
+
+  void _populateFromList(List<Map<String, String>> contacts) {
+    if (contacts.isNotEmpty) {
+      final c1 = contacts[0];
+      _name1Controller.text = c1['name'] ?? '';
+      _relation1Controller.text = c1['relationship'] ?? c1['relation'] ?? '';
+      _phone1Controller.text = c1['phone'] ?? '';
+    }
+    if (contacts.length > 1) {
+      final c2 = contacts[1];
+      _name2Controller.text = c2['name'] ?? '';
+      _relation2Controller.text = c2['relationship'] ?? c2['relation'] ?? '';
+      _phone2Controller.text = c2['phone'] ?? '';
+    }
+  }
 
   @override
   void dispose() {

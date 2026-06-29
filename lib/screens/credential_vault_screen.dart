@@ -18,6 +18,7 @@ class CredentialVaultScreen extends StatefulWidget {
 class _CredentialVaultScreenState extends State<CredentialVaultScreen> {
   final ApiService _apiService = ApiService();
   List<dynamic> _credentials = [];
+  List<Map<String, String>> _verificationDocs = [];
   bool _isLoading = true;
 
   @override
@@ -29,10 +30,33 @@ class _CredentialVaultScreenState extends State<CredentialVaultScreen> {
   Future<void> _fetchCredentials() async {
     setState(() => _isLoading = true);
     try {
-      final response = await _apiService.get('/credentials/me');
+      // Load LMS credentials
+      List<dynamic> creds = [];
+      try {
+        final credsResp = await _apiService.get('/credentials/me');
+        creds = credsResp.data['credentials'] ?? [];
+      } catch (_) {}
+
+      // Load verification documents from user profile
+      final verDocs = <Map<String, String>>[];
+      try {
+        final profileResp = await _apiService.get('/users/profile');
+        final data = profileResp.data;
+        final user = (data is Map && data['user'] is Map) ? data['user'] as Map : (data is Map ? data : null);
+        if (user != null) {
+          final vd = user['verificationDetails'] as Map?;
+          if (vd != null) {
+            if (vd['cnicDocument'] != null) verDocs.add({'title': 'CNIC / National ID', 'type': 'Identity Document', 'documentUrl': vd['cnicDocument'].toString(), 'name': vd['cnicDocumentName']?.toString() ?? 'cnic'});
+            if (vd['pmdcCertDocument'] != null) verDocs.add({'title': 'PMDC Certificate', 'type': 'Medical License', 'documentUrl': vd['pmdcCertDocument'].toString(), 'name': vd['pmdcCertDocumentName']?.toString() ?? 'pmdc_cert'});
+            if (vd['experienceCertDocument'] != null) verDocs.add({'title': 'Experience Certificate', 'type': 'Professional Document', 'documentUrl': vd['experienceCertDocument'].toString(), 'name': vd['experienceCertDocumentName']?.toString() ?? 'experience_cert'});
+          }
+        }
+      } catch (_) {}
+
       if (mounted) {
         setState(() {
-          _credentials = response.data['credentials'] ?? [];
+          _credentials = creds;
+          _verificationDocs = verDocs;
           _isLoading = false;
         });
       }
@@ -578,13 +602,32 @@ class _CredentialVaultScreenState extends State<CredentialVaultScreen> {
           Expanded(
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator())
-                : _credentials.isEmpty
-                ? _buildEmptyState()
-                : ListView.builder(
+                : ListView(
                     padding: const EdgeInsets.symmetric(horizontal: 20),
-                    itemCount: _credentials.length,
-                    itemBuilder: (ctx, i) =>
-                        _buildCredentialCard(_credentials[i]),
+                    children: [
+                      // Verification documents uploaded during Work With Us signup
+                      if (_verificationDocs.isNotEmpty) ...[
+                        const Padding(
+                          padding: EdgeInsets.only(top: 20, bottom: 10),
+                          child: Text(
+                            'Verification Documents',
+                            style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
+                          ),
+                        ),
+                        ..._verificationDocs.map((doc) => _buildVerificationDocCard(doc)),
+                        const Padding(
+                          padding: EdgeInsets.only(top: 20, bottom: 10),
+                          child: Text(
+                            'LMS Certificates',
+                            style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
+                          ),
+                        ),
+                      ],
+                      if (_credentials.isEmpty && _verificationDocs.isEmpty)
+                        _buildEmptyState()
+                      else
+                        ..._credentials.map((c) => _buildCredentialCard(c)),
+                    ],
                   ),
           ),
         ],
@@ -669,6 +712,56 @@ class _CredentialVaultScreenState extends State<CredentialVaultScreen> {
               fontSize: 11,
               fontWeight: FontWeight.bold,
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildVerificationDocCard(Map<String, String> doc) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: const [BoxShadow(color: Color(0x06000000), blurRadius: 8, offset: Offset(0, 2))],
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: AppColors.primaryColor.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Icon(Icons.verified_user_rounded, color: AppColors.primaryColor, size: 24),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(doc['title'] ?? '', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Color(0xFF0F172A))),
+                const SizedBox(height: 2),
+                Text(doc['type'] ?? '', style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                const SizedBox(height: 4),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFDCFCE7),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: const Text('Uploaded', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF16A34A))),
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            onPressed: () => _viewDocument({'documentUrl': doc['documentUrl'] ?? '', 'title': doc['title'] ?? '', 'type': doc['type'] ?? ''}),
+            icon: const Icon(Icons.visibility_rounded, color: Color(0xFF64748B), size: 20),
+            tooltip: 'View',
           ),
         ],
       ),

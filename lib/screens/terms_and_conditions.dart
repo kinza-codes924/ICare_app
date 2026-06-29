@@ -128,7 +128,7 @@ const List<List<String>> _sections = [
   ["MODIFICATIONS",
     "iCare reserves the right to update, revise, modify, or replace these Terms & Conditions at any time without prior notice. Updated versions become effective immediately upon publication on the Platform. Continued use of the Platform after modifications constitutes acceptance of revised Terms."],
   ["USER ACKNOWLEDGMENT",
-    "By using the Platform, users acknowledge that they have carefully read, understood, and voluntarily agreed to these Terms & Conditions, understand the limitations of telemedicine services, consent to electronic healthcare delivery systems, and accept all associated operational, technical, legal, and medical risks.\n\nOfficial registered office address, legal contact details, support information, and communication channels are available on the official website."],
+    "By using the Platform, users acknowledge that they have carefully read, understood, and voluntarily agreed to these Terms & Conditions, understand the limitations of telemedicine services, consent to electronic healthcare delivery systems, and accept all associated operational, technical, legal, and medical risks.\n\nRegistered Office: Office Number 4, First Floor, Mall Square, Zamzama Boulevard, Phase 5, DHA, Karachi, Pakistan.\n\nFor support, legal inquiries, or any communication, users may contact iCare through the Platform's official support channels or visit the registered office address stated above."],
 ];
 
 class _WebTermsAndConditions extends StatelessWidget {

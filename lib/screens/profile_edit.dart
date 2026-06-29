@@ -188,6 +188,50 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
       debugPrint('🟦 [EditProfile] calling _loadDoctorProfile...');
       _loadDoctorProfile();
     }
+    if (role == 'Patient') {
+      // Pre-populate emergency contacts from cache; backend fetch refreshes them
+      if (user?.emergencyContacts != null && user!.emergencyContacts!.isNotEmpty) {
+        _populateEmergencyContacts(user.emergencyContacts!);
+      }
+      _loadPatientProfile();
+    }
+  }
+
+  Future<void> _loadPatientProfile() async {
+    final result = await _userService.getUserProfile();
+    if (!mounted) return;
+    if (result['success'] == true && result['user'] is Map) {
+      final rawList = result['user']['emergencyContacts'];
+      if (rawList is List && rawList.isNotEmpty) {
+        final contacts = rawList
+            .map((e) => Map<String, String>.from(
+                (e as Map).map((k, v) => MapEntry(k.toString(), v?.toString() ?? ''))))
+            .toList();
+        setState(() => _populateEmergencyContacts(contacts));
+      }
+      // Also refresh address if stored
+      final addr = result['user']['address']?.toString();
+      if (addr != null && addr.isNotEmpty) {
+        setState(() => addressController.text = addr);
+      }
+    }
+  }
+
+  void _populateEmergencyContacts(List<Map<String, String>> contacts) {
+    // Ensure list is big enough
+    while (_emergencyContacts.length < contacts.length) {
+      _emergencyContacts.add({
+        'name': TextEditingController(),
+        'relation': TextEditingController(),
+        'phone': TextEditingController(),
+      });
+    }
+    for (int i = 0; i < contacts.length; i++) {
+      final c = contacts[i];
+      _emergencyContacts[i]['name']!.text = c['name'] ?? '';
+      _emergencyContacts[i]['relation']!.text = c['relationship'] ?? c['relation'] ?? '';
+      _emergencyContacts[i]['phone']!.text = c['phone'] ?? '';
+    }
   }
 
   Future<void> _loadDoctorProfile() async {
@@ -324,6 +368,9 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
           conditionsTreated: isDoctor
               ? _selectedDoctorConditions.toList()
               : existingUser.conditionsTreated,
+          emergencyContacts: isPatient && ecList.isNotEmpty
+              ? ecList.map((e) => Map<String, String>.from(e)).toList()
+              : existingUser.emergencyContacts,
         );
         debugPrint('🟩 [EditProfile] updatedUser: name=${updatedUser.name}, spec=${updatedUser.specialization}, conds=${updatedUser.conditionsTreated}');
         await ref.read(authProvider.notifier).setUser(updatedUser);

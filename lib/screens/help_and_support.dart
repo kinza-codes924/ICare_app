@@ -93,6 +93,12 @@ class HelpAndSupport extends ConsumerWidget {
                     isPatient ? "Helpline (Call Only)" : "Call Us",
                     isPatient ? "0306-8961564" : "+92 306-8961564",
                   ),
+                  const SizedBox(height: 12),
+                  _buildContactTile(
+                    Icons.location_on_outlined,
+                    "Office Address",
+                    "Office No. 4, 1st Floor, Mall Square,\nZamzama Blvd, Phase 5, DHA, Karachi",
+                  ),
                 ],
               ),
             ),
@@ -360,6 +366,12 @@ class _WebHelpAndSupport extends StatelessWidget {
                           icon: Icons.phone_outlined,
                           title: isPatient ? "Helpline (Call Only)" : "Call Us",
                           subtitle: isPatient ? "0306-8961564" : "+92 306-8961564",
+                        ),
+                        const SizedBox(height: 20),
+                        _WebContactItem(
+                          icon: Icons.location_on_outlined,
+                          title: "Office Address",
+                          subtitle: "Office No. 4, 1st Floor, Mall Square,\nZamzama Blvd, Phase 5, DHA, Karachi",
                         ),
                         const SizedBox(height: 12),
                         SizedBox(

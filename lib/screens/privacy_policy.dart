@@ -126,7 +126,7 @@ const List<List<String>> _sections = [
   ["POLICY CHANGES",
     "iCare reserves the right to update, modify, revise, or replace this Privacy Policy at any time without prior notice. Updated versions become effective immediately upon publication on the Platform. Continued access to or use of the Platform after updates constitutes acceptance of the revised Privacy Policy."],
   ["USER ACKNOWLEDGMENT",
-    "By using iCare services, users acknowledge that they have read and understood this Privacy Policy and voluntarily consent to the collection, storage, processing, sharing, and use of their information as described herein.\n\nOfficial contact details, registered office address, support information, and legal communication channels are available on the official website."],
+    "By using iCare services, users acknowledge that they have read and understood this Privacy Policy and voluntarily consent to the collection, storage, processing, sharing, and use of their information as described herein.\n\nFor privacy-related inquiries, data requests, or support, users may contact iCare through the Help & Support section available within the Platform."],
 ];
 
 class _WebPrivacyPolicy extends StatelessWidget {

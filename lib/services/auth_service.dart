@@ -172,9 +172,27 @@ class AuthService {
       final response = await _apiService.post(ApiConfig.forgetPassword, {'email': email});
       if (response.statusCode == 200) {
         final d = response.data as Map<String, dynamic>? ?? {};
+        // Backend may return HTTP 200 but with success:false for non-existent emails
+        final backendSuccess = d['success'];
+        if (backendSuccess == false) {
+          final msg = d['message']?.toString() ?? '';
+          final lower = msg.toLowerCase();
+          if (lower.contains('not found') || lower.contains('no account') ||
+              lower.contains('does not exist') || lower.contains('no user') || msg.isEmpty) {
+            return {'success': false, 'message': 'No account found with this email address. Please check and try again.'};
+          }
+          return {'success': false, 'message': msg};
+        }
+        // Also catch "not found" messages inside a 200 success wrapper
+        final msg = d['message']?.toString() ?? '';
+        final lower = msg.toLowerCase();
+        if (lower.contains('not found') || lower.contains('no account') ||
+            lower.contains('does not exist') || lower.contains('no user')) {
+          return {'success': false, 'message': 'No account found with this email address. Please check and try again.'};
+        }
         return {
           'success': true,
-          'message': d['message'] ?? 'OTP sent',
+          'message': msg.isNotEmpty ? msg : 'OTP sent',
           'emailSent': d['emailSent'] ?? false,
           'emailError': d['emailError'],
         };
