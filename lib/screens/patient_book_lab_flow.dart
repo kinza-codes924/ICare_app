@@ -59,10 +59,14 @@ class _PatientBookLabFlowState extends State<PatientBookLabFlow> {
   String _selectedRadius = '10 km';
   String _labSearchQuery = '';
 
+  // Dynamic tests merged from all labs' catalogs + static list
+  List<Map<String, dynamic>> _dynamicTests = [];
+
   @override
   void initState() {
     super.initState();
     _testSearch.addListener(() => setState(() => _searchQuery = _testSearch.text.toLowerCase()));
+    _loadLabs(); // load early so step 2 shows lab-specific tests
   }
 
   @override
@@ -86,7 +90,7 @@ class _PatientBookLabFlowState extends State<PatientBookLabFlow> {
     }
     if (_step < 2) {
       setState(() => _step++);
-      if (_step == 2) _loadLabs();
+      if (_step == 2 && _labs.isEmpty) _loadLabs();
     }
   }
 
@@ -111,15 +115,34 @@ class _PatientBookLabFlowState extends State<PatientBookLabFlow> {
         rating: (json['rating'] ?? 4.5).toString(),
         tests: (json['availableTests'] as List?)?.map((t) => t['name'].toString()).toList() ?? [],
       )).toList();
-      if (mounted) setState(() { _labs = labs; _loadingLabs = false; });
+      if (mounted) {
+        // Merge lab custom tests with static list (deduplicate by name)
+        final labTestNames = <String>{};
+        for (final l in labs) {
+          for (final t in (l.tests ?? [])) {
+            labTestNames.add(t);
+          }
+        }
+        final staticNames = _allTests.map((t) => t['name'] as String).toSet();
+        final extraTests = labTestNames
+            .where((name) => !staticNames.contains(name))
+            .map((name) => <String, dynamic>{'name': name, 'price': 0.0, 'category': 'Other'})
+            .toList();
+        setState(() {
+          _labs = labs;
+          _loadingLabs = false;
+          _dynamicTests = [..._allTests, ...extraTests];
+        });
+      }
     } catch (_) {
-      if (mounted) setState(() => _loadingLabs = false);
+      if (mounted) setState(() { _loadingLabs = false; _dynamicTests = List.from(_allTests); });
     }
   }
 
   List<Map<String, dynamic>> get _filteredTests {
-    if (_searchQuery.isEmpty) return _allTests;
-    return _allTests.where((t) =>
+    final tests = _dynamicTests.isNotEmpty ? _dynamicTests : _allTests;
+    if (_searchQuery.isEmpty) return tests;
+    return tests.where((t) =>
       t['name'].toString().toLowerCase().contains(_searchQuery) ||
       t['category'].toString().toLowerCase().contains(_searchQuery)
     ).toList();

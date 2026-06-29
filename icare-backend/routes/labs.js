@@ -622,7 +622,7 @@ router.post('/:labId/bookings', authMiddleware, async (req, res) => {
       test_type: finalTest,
       test_date: testDate || date || null,
       price: price,
-      status: req.body.status || 'pending',
+      status: 'pending',
       urgency: urgency || (is_urgent ? 'Urgent' : 'Normal'),
       is_urgent: is_urgent || urgency === 'Urgent' || false,
       collection_type: collectionType || collection_type || 'in-lab',

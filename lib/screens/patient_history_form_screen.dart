@@ -1,7 +1,6 @@
 // Patient History Form Screen
 // Complete 10-section history form as per client requirements
 
-import 'package:easy_localization/easy_localization.dart' hide TextDirection;
 import 'package:flutter/material.dart';
 import 'package:icare/models/appointment_detail.dart';
 import 'package:icare/models/patient_history_form.dart';
@@ -505,7 +504,9 @@ class _PatientHistoryFormScreenState extends State<PatientHistoryFormScreen> {
       _AccordionSection(index: _showGynecologicalHistory ? 9 : 8, title: 'Virtual Physical Examination', icon: Icons.monitor_heart_rounded, child: _buildVirtualExaminationSection()),
     ];
 
-    return Scaffold(
+    return Directionality(
+      textDirection: TextDirection.ltr,
+      child: Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
         backgroundColor: Colors.white,
@@ -592,6 +593,7 @@ class _PatientHistoryFormScreenState extends State<PatientHistoryFormScreen> {
           ),
         ],
       ),
+    ), // Directionality
     );
   }
 

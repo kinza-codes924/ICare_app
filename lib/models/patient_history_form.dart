@@ -59,12 +59,19 @@ class PatientHistoryForm {
     this.updatedAt,
   });
 
+  static String _extractId(dynamic val) {
+    if (val == null) return '';
+    if (val is String) return val;
+    if (val is Map) return (val['_id'] ?? val['id'] ?? '').toString();
+    return val.toString();
+  }
+
   factory PatientHistoryForm.fromJson(Map<String, dynamic> json) {
     return PatientHistoryForm(
-      id: json['_id'],
-      patientId: json['patientId'] ?? '',
-      consultationId: json['consultationId'] ?? '',
-      doctorId: json['doctorId'] ?? '',
+      id: _extractId(json['_id']),
+      patientId: _extractId(json['patientId']),
+      consultationId: _extractId(json['consultationId']),
+      doctorId: _extractId(json['doctorId']),
       chiefComplaints: (json['chiefComplaints'] as List?)
           ?.map((e) => ChiefComplaint.fromJson(e))
           .toList() ?? [],

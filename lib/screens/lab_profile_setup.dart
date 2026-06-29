@@ -191,20 +191,24 @@ class _LabProfileSetupState extends ConsumerState<LabProfileSetup>
         setState(() => _gettingLocation = false);
         final msg = e.toString().toLowerCase();
         final String userMsg;
-        if (msg.contains('denied') || msg.contains('permission') || msg.contains('1')) {
-          userMsg = 'Location access denied. Please allow location in your browser settings and try again.';
-        } else if (msg.contains('timeout') || msg.contains('3')) {
+        // Check for permission denied (code 1) or security/permission keywords
+        if (msg.contains('denied') || msg.contains('permission') ||
+            msg.contains('geolocationpositionerror: 1') || msg.contains('code: 1') ||
+            msg.contains('notallowed') || msg.contains('not allowed')) {
+          userMsg = 'Location access denied. Please click the location icon in your browser\'s address bar and allow access, then try again.';
+        } else if (msg.contains('timeout') || msg.contains('geolocationpositionerror: 3') || msg.contains('code: 3')) {
           userMsg = 'Location request timed out. Please try again.';
-        } else if (msg.contains('unavailable') || msg.contains('2')) {
+        } else if (msg.contains('unavailable') || msg.contains('geolocationpositionerror: 2') || msg.contains('code: 2')) {
           userMsg = 'Location unavailable. Ensure the site is opened over HTTPS.';
         } else {
-          userMsg = 'Could not get location. Please enable location access and use HTTPS.';
+          // Most likely a permission denied not matching above patterns
+          userMsg = 'Could not get location. Please allow location access in your browser and ensure you are on HTTPS.';
         }
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(userMsg),
             backgroundColor: Colors.red,
-            duration: const Duration(seconds: 5),
+            duration: const Duration(seconds: 6),
             behavior: SnackBarBehavior.floating,
           ),
         );

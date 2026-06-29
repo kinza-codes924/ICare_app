@@ -233,9 +233,14 @@ router.post('/add_doctor_details', authMiddleware, async (req, res) => {
     if (consultationFee !== undefined) update.consultation_fee = parseFloat(consultationFee) || 0;
     if (availableDays !== undefined) update.available_days = availableDays;
     if (availableTime !== undefined) {
-      update.available_hours = typeof availableTime === 'object'
-        ? `${availableTime.start || ''} - ${availableTime.end || ''}`
-        : availableTime;
+      if (typeof availableTime === 'object' && availableTime !== null) {
+        update.available_hours = { start: availableTime.start || '09:00', end: availableTime.end || '17:00' };
+      } else if (typeof availableTime === 'string' && availableTime.includes('-')) {
+        const parts = availableTime.split('-');
+        update.available_hours = { start: parts[0].trim(), end: parts[1].trim() };
+      } else {
+        update.available_hours = availableTime;
+      }
     }
     if (degrees !== undefined) update.degrees = degrees;
     if (clinicName !== undefined) update.clinic_name = clinicName;
@@ -312,9 +317,19 @@ router.get('/availability/me', authMiddleware, async (req, res) => {
     if (!doctorId) return res.json({ success: true, availability: {} });
 
     const profile = await DoctorProfile.findOne({ user_id: doctorId }).lean();
+    let timeStart = '09:00', timeEnd = '17:00';
+    const ah = profile?.available_hours;
+    if (ah && typeof ah === 'object') {
+      timeStart = ah.start || '09:00';
+      timeEnd = ah.end || '17:00';
+    } else if (ah && typeof ah === 'string' && ah.includes('-')) {
+      const parts = ah.split('-');
+      timeStart = parts[0].trim() || '09:00';
+      timeEnd = parts[1].trim() || '17:00';
+    }
     const availability = {
       availableDays: profile?.available_days || ['Monday','Tuesday','Wednesday','Thursday','Friday'],
-      availableTime: { start: profile?.available_hours?.start || '09:00', end: profile?.available_hours?.end || '17:00' },
+      availableTime: { start: timeStart, end: timeEnd },
       unavailableDates: profile?.unavailableDates || [],
       bufferTime: profile?.bufferTime || 15,
       leaveRequests: (profile?.leaveRequests || []).filter(r => r.status === 'approved'),

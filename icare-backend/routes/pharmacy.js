@@ -834,11 +834,12 @@ router.post('/products', authMiddleware, async (req, res) => {
 router.put('/products/:id', authMiddleware, async (req, res) => {
   try {
     await connectMongoDB();
-    const { name, price, stockQuantity, category, description, genericName, medicineCategory } = req.body;
+    const { name, price, stockQuantity, stock_quantity, quantity, stock, category, description, genericName, medicineCategory } = req.body;
     const update = {};
     if (name) update.name = name;
     if (price !== undefined) update.price = price;
-    if (stockQuantity !== undefined) update.stock_quantity = stockQuantity;
+    const resolvedQty = stockQuantity ?? stock_quantity ?? quantity ?? stock;
+    if (resolvedQty !== undefined) update.stock_quantity = Number(resolvedQty);
     if (category) update.category = category;
     if (description) update.description = description;
     if (genericName !== undefined) update.generic_name = genericName;
