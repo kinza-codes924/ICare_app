@@ -59,7 +59,11 @@ class Geoposition {
 }
 
 class Geolocation {
-  Future<Geoposition> getCurrentPosition() async {
+  Future<Geoposition> getCurrentPosition({
+    bool? enableHighAccuracy,
+    Duration? timeout,
+    Duration? maximumAge,
+  }) async {
     throw UnsupportedError('Geolocation not supported on this platform');
   }
 }
@@ -69,8 +73,14 @@ class Navigator {
   MediaDevices get mediaDevices => MediaDevices();
 }
 
+class Location {
+  String get protocol => 'https:';
+  String get hostname => 'localhost';
+}
+
 class Window {
   Navigator get navigator => Navigator();
+  Location get location => Location();
   void open(String url, String target) {}
 }
 

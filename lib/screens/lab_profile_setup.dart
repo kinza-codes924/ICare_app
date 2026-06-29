@@ -161,17 +161,39 @@ class _LabProfileSetupState extends ConsumerState<LabProfileSetup>
   }
 
   Future<void> _getGpsLocation() async {
-    if (!kIsWeb) return;
+    if (!kIsWeb) {
+      _showManualCoordinatesDialog(
+          reason: 'Auto-location is only available on web. Enter coordinates manually.');
+      return;
+    }
+
+    // HTTPS / secure-context check
+    try {
+      final protocol = html.window.location.protocol;
+      final hostname = html.window.location.hostname;
+      if (protocol != 'https:' && hostname != 'localhost' && hostname != '127.0.0.1') {
+        _showManualCoordinatesDialog(
+            reason: 'Location detection requires a secure HTTPS connection. '
+                'Enter your lab coordinates manually.');
+        return;
+      }
+    } catch (_) {}
+
     setState(() => _gettingLocation = true);
+
     try {
       final pos = await html.window.navigator.geolocation
-          .getCurrentPosition()
+          .getCurrentPosition(
+            enableHighAccuracy: false,
+            timeout: const Duration(seconds: 12),
+            maximumAge: const Duration(minutes: 1),
+          )
           .timeout(const Duration(seconds: 15));
+
       final lat = pos.coords?.latitude?.toDouble();
       final lng = pos.coords?.longitude?.toDouble();
-      if (lat == null || lng == null) {
-        throw Exception('Coordinates could not be read from browser');
-      }
+      if (lat == null || lng == null) throw Exception('Null coordinates returned');
+
       if (mounted) {
         setState(() {
           _latitude = lat;
@@ -187,33 +209,184 @@ class _LabProfileSetupState extends ConsumerState<LabProfileSetup>
         );
       }
     } catch (e) {
-      if (mounted) {
-        setState(() => _gettingLocation = false);
-        final msg = e.toString().toLowerCase();
-        final String userMsg;
-        // Check for permission denied (code 1) or security/permission keywords
-        if (msg.contains('denied') || msg.contains('permission') ||
-            msg.contains('geolocationpositionerror: 1') || msg.contains('code: 1') ||
-            msg.contains('notallowed') || msg.contains('not allowed')) {
-          userMsg = 'Location access denied. Please click the location icon in your browser\'s address bar and allow access, then try again.';
-        } else if (msg.contains('timeout') || msg.contains('geolocationpositionerror: 3') || msg.contains('code: 3')) {
-          userMsg = 'Location request timed out. Please try again.';
-        } else if (msg.contains('unavailable') || msg.contains('geolocationpositionerror: 2') || msg.contains('code: 2')) {
-          userMsg = 'Location unavailable. Ensure the site is opened over HTTPS.';
-        } else {
-          // Most likely a permission denied not matching above patterns
-          userMsg = 'Could not get location. Please allow location access in your browser and ensure you are on HTTPS.';
-        }
+      if (!mounted) return;
+      setState(() => _gettingLocation = false);
+      final msg = e.toString().toLowerCase();
+
+      if (msg.contains('timeout') || msg.contains('code: 3') ||
+          msg.contains('geolocationpositionerror: 3')) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(userMsg),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 6),
+            content: const Text('Location request timed out. Try again or enter manually.'),
+            backgroundColor: Colors.orange,
+            duration: const Duration(seconds: 7),
             behavior: SnackBarBehavior.floating,
+            action: SnackBarAction(
+              label: 'Enter Manually',
+              textColor: Colors.white,
+              onPressed: _showManualCoordinatesDialog,
+            ),
           ),
+        );
+      } else {
+        // Denied, unavailable, SecurityError, or any unknown error → manual fallback
+        final isDenied = msg.contains('denied') || msg.contains('notallowed') ||
+            msg.contains('not allowed') || msg.contains('permission') ||
+            msg.contains('code: 1') || msg.contains('geolocationpositionerror: 1');
+        _showManualCoordinatesDialog(
+          reason: isDenied
+              ? 'Location access is blocked. Click the 🔒 icon in the address bar '
+                'to allow it, or enter your coordinates below.'
+              : 'Could not detect location automatically. '
+                'Please enter your lab coordinates manually.',
         );
       }
     }
+  }
+
+  void _showManualCoordinatesDialog({String? reason}) {
+    if (!mounted) return;
+    final latCtrl =
+        TextEditingController(text: _latitude?.toStringAsFixed(6) ?? '');
+    final lngCtrl =
+        TextEditingController(text: _longitude?.toStringAsFixed(6) ?? '');
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Row(
+          children: [
+            Icon(Icons.pin_drop_rounded, color: Color(0xFF1565C0)),
+            SizedBox(width: 10),
+            Expanded(
+              child: Text('Enter Lab Coordinates',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+            ),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (reason != null) ...[
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFFBEB),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: const Color(0xFFFCD34D)),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Icon(Icons.info_outline_rounded,
+                          size: 16, color: Color(0xFFF59E0B)),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(reason,
+                            style: const TextStyle(
+                                fontSize: 12, color: Color(0xFF92400E))),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ],
+              TextField(
+                controller: latCtrl,
+                keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true, signed: true),
+                decoration: InputDecoration(
+                  labelText: 'Latitude',
+                  hintText: 'e.g. 31.5204',
+                  prefixIcon: const Icon(Icons.swap_vert_rounded),
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: lngCtrl,
+                keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true, signed: true),
+                decoration: InputDecoration(
+                  labelText: 'Longitude',
+                  hintText: 'e.g. 74.3587',
+                  prefixIcon: const Icon(Icons.swap_horiz_rounded),
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                '💡 Tip: Open Google Maps, right-click your lab\'s location, '
+                'and the coordinates appear at the top of the menu.',
+                style: TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel')),
+          ElevatedButton.icon(
+            onPressed: () {
+              final lat = double.tryParse(latCtrl.text.trim());
+              final lng = double.tryParse(lngCtrl.text.trim());
+              if (lat == null || lng == null) {
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                  content: Text('Enter valid decimal numbers.'),
+                  backgroundColor: Colors.red,
+                ));
+                return;
+              }
+              if (lat < -90 || lat > 90) {
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                  content: Text('Latitude must be between -90 and 90.'),
+                  backgroundColor: Colors.red,
+                ));
+                return;
+              }
+              if (lng < -180 || lng > 180) {
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                  content: Text('Longitude must be between -180 and 180.'),
+                  backgroundColor: Colors.red,
+                ));
+                return;
+              }
+              if (mounted) setState(() { _latitude = lat; _longitude = lng; });
+              Navigator.pop(ctx);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Location saved successfully!'),
+                  backgroundColor: Color(0xFF10B981),
+                  behavior: SnackBarBehavior.floating,
+                ),
+              );
+            },
+            icon: const Icon(Icons.check_rounded, size: 16),
+            label: const Text('Save Location'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF1565C0),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10)),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _saveProfile() async {
@@ -426,37 +599,60 @@ class _LabProfileSetupState extends ConsumerState<LabProfileSetup>
                                 hint: 'Lahore',
                               ),
                               const SizedBox(height: 16),
-                              // GPS Location Button
-                              SizedBox(
-                                width: double.infinity,
-                                child: OutlinedButton.icon(
-                                  onPressed: _gettingLocation ? null : _getGpsLocation,
-                                  icon: _gettingLocation
-                                      ? const SizedBox(
-                                          width: 16,
-                                          height: 16,
-                                          child: CircularProgressIndicator(strokeWidth: 2),
-                                        )
-                                      : Icon(
-                                          _latitude != null ? Icons.my_location_rounded : Icons.location_searching_rounded,
-                                          color: _latitude != null ? const Color(0xFF10B981) : const Color(0xFF1565C0),
-                                        ),
-                                  label: Text(
-                                    _latitude != null
-                                        ? '✓ Location saved (${_latitude!.toStringAsFixed(4)}, ${_longitude!.toStringAsFixed(4)})'
-                                        : 'Use My Current Location',
-                                    style: TextStyle(
-                                      color: _latitude != null ? const Color(0xFF10B981) : const Color(0xFF1565C0),
-                                    ),
+                              // GPS Location Buttons
+                              if (_latitude != null)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFECFDF5),
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(color: const Color(0xFF10B981)),
                                   ),
-                                  style: OutlinedButton.styleFrom(
-                                    side: BorderSide(
-                                      color: _latitude != null ? const Color(0xFF10B981) : const Color(0xFF1565C0),
-                                    ),
-                                    padding: const EdgeInsets.symmetric(vertical: 12),
+                                  child: Row(
+                                    children: [
+                                      const Icon(Icons.my_location_rounded, color: Color(0xFF10B981), size: 18),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(
+                                          '✓ (${_latitude!.toStringAsFixed(4)}, ${_longitude!.toStringAsFixed(4)})',
+                                          style: const TextStyle(color: Color(0xFF10B981), fontSize: 13),
+                                        ),
+                                      ),
+                                      GestureDetector(
+                                        onTap: () => _showManualCoordinatesDialog(),
+                                        child: const Icon(Icons.edit_rounded, size: 16, color: Color(0xFF10B981)),
+                                      ),
+                                    ],
                                   ),
                                 ),
-                              ),
+                              if (_latitude == null) ...[
+                                SizedBox(
+                                  width: double.infinity,
+                                  child: OutlinedButton.icon(
+                                    onPressed: _gettingLocation ? null : _getGpsLocation,
+                                    icon: _gettingLocation
+                                        ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                                        : const Icon(Icons.location_searching_rounded, color: Color(0xFF1565C0)),
+                                    label: Text(
+                                      _gettingLocation ? 'Detecting...' : 'Use My Current Location',
+                                      style: const TextStyle(color: Color(0xFF1565C0)),
+                                    ),
+                                    style: OutlinedButton.styleFrom(
+                                      side: const BorderSide(color: Color(0xFF1565C0)),
+                                      padding: const EdgeInsets.symmetric(vertical: 12),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                SizedBox(
+                                  width: double.infinity,
+                                  child: TextButton.icon(
+                                    onPressed: _showManualCoordinatesDialog,
+                                    icon: const Icon(Icons.pin_drop_rounded, size: 16, color: Color(0xFF64748B)),
+                                    label: const Text('Enter Coordinates Manually', style: TextStyle(color: Color(0xFF64748B), fontSize: 13)),
+                                  ),
+                                ),
+                              ],
                             ],
                           ),
                           const SizedBox(height: 20),

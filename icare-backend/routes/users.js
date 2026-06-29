@@ -43,6 +43,7 @@ router.get('/profile', authMiddleware, async (req, res) => {
       height: user.height || null,
       weight: user.weight || null,
       emergencyContacts: user.emergency_contacts || [],
+      verificationDetails: user.verificationDetails || null,
       specialization: null,
       conditionsTreated: null,
     };

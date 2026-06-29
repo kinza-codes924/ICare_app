@@ -145,9 +145,10 @@ class _CredentialVaultScreenState extends State<CredentialVaultScreen> {
   }
 
   void _viewDocument(dynamic cred) {
-    // documentUrl can be stored under different keys — check both
+    // documentUrl can be stored under different keys — check all variants
     final docUrl = (cred['documentUrl'] as String?)?.trim() ??
-                   (cred['document_url'] as String?)?.trim() ?? '';
+                   (cred['document_url'] as String?)?.trim() ??
+                   (cred['url'] as String?)?.trim() ?? '';
     final title  = cred['title']?.toString() ?? 'Document';
     final type   = cred['type']?.toString() ?? '';
 

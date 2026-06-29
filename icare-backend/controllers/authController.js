@@ -1,6 +1,7 @@
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
+const mongoose = require('mongoose');
 const { OAuth2Client } = require('google-auth-library');
 const { connectMongoDB } = require('../config/mongodb');
 const User = require('../models/User');
@@ -133,9 +134,9 @@ const register = async (req, res) => {
       if (vd.availableTimings) docProfileData.available_hours = vd.availableTimings;
       // Save uploaded documents as credentials so they appear in the dashboard
       const credentials = [];
-      if (vd.cnicDocument) credentials.push({ type: 'CNIC', url: vd.cnicDocument, name: vd.cnicDocumentName || 'cnic', createdAt: new Date() });
-      if (vd.pmdcCertDocument) credentials.push({ type: 'PMDC Certificate', url: vd.pmdcCertDocument, name: vd.pmdcCertDocumentName || 'pmdc_cert', createdAt: new Date() });
-      if (vd.experienceCertDocument) credentials.push({ type: 'Experience Certificate', url: vd.experienceCertDocument, name: vd.experienceCertDocumentName || 'experience_cert', createdAt: new Date() });
+      if (vd.cnicDocument) credentials.push({ _id: new mongoose.Types.ObjectId(), type: 'CNIC', title: 'CNIC / National ID', documentUrl: vd.cnicDocument, status: 'pending', createdAt: new Date(), updatedAt: new Date() });
+      if (vd.pmdcCertDocument) credentials.push({ _id: new mongoose.Types.ObjectId(), type: 'PMDC Certificate', title: 'PMDC Certificate', documentUrl: vd.pmdcCertDocument, status: 'pending', createdAt: new Date(), updatedAt: new Date() });
+      if (vd.experienceCertDocument) credentials.push({ _id: new mongoose.Types.ObjectId(), type: 'Experience Certificate', title: 'Experience Certificate', documentUrl: vd.experienceCertDocument, status: 'pending', createdAt: new Date(), updatedAt: new Date() });
       if (credentials.length > 0) docProfileData.credentials = credentials;
       await DoctorProfile.create(docProfileData);
     } else if (role === 'lab') {

@@ -376,7 +376,16 @@ router.get('/credentials', authMiddleware, adminOnly, async (req, res) => {
     for (const p of profiles) {
       const doctorName = p.user_id?.username || p.user_id?.name || 'Doctor';
       for (const c of p.credentials || []) {
-        all.push({ ...c, _id: c._id?.toString(), doctorId: p.user_id?._id?.toString(), doctorName });
+        const credId = c._id?.toString();
+        if (!credId) continue; // skip legacy entries without _id
+        all.push({
+          ...c,
+          _id: credId,
+          documentUrl: c.documentUrl || c.url || '',
+          title: c.title || c.name || c.type || 'Certificate',
+          doctorId: p.user_id?._id?.toString(),
+          doctorName,
+        });
       }
     }
     res.json({ success: true, credentials: all });

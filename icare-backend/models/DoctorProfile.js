@@ -8,7 +8,7 @@ const doctorProfileSchema = new mongoose.Schema({
   licenseValidTill: Date,
   consultation_fee: { type: Number, default: 0 },
   available_days: [String],
-  available_hours: String,
+  available_hours: { type: mongoose.Schema.Types.Mixed },
   rating: { type: Number, default: 0 },
   total_reviews: { type: Number, default: 0 },
   degrees: [String],
