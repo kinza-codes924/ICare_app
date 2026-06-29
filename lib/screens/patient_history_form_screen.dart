@@ -89,12 +89,14 @@ class _PatientHistoryFormScreenState extends State<PatientHistoryFormScreen> {
   final List<CurrentMedication> _currentMedications = [];
   final List<Allergy> _allergies = [];
 
-  // Section 6: Family History
-  FamilyMemberHistory? _father;
-  FamilyMemberHistory? _mother;
+  // Section 6: Family History — persistent controllers prevent RTL/IME reset on rebuild
+  final TextEditingController _fatherDiseaseCtrl = TextEditingController();
+  final TextEditingController _fatherAgeCtrl = TextEditingController();
+  final TextEditingController _motherDiseaseCtrl = TextEditingController();
+  final TextEditingController _motherAgeCtrl = TextEditingController();
+  final TextEditingController _otherFamilyCtrl = TextEditingController();
   final List<FamilyMemberHistory> _siblings = [];
   final List<FamilyMemberHistory> _children = [];
-  String? _otherFamilyHistory;
 
   // Section 7: Personal & Social History
   String _diet = '';
@@ -230,8 +232,11 @@ class _PatientHistoryFormScreenState extends State<PatientHistoryFormScreen> {
       // 6. Family History
       final fh = form.familyHistory;
       if (fh != null) {
-        _father = fh.father;
-        _mother = fh.mother;
+        _fatherDiseaseCtrl.text = fh.father?.diseaseCondition ?? '';
+        _fatherAgeCtrl.text = fh.father?.ageAtDiagnosis?.toString() ?? '';
+        _motherDiseaseCtrl.text = fh.mother?.diseaseCondition ?? '';
+        _motherAgeCtrl.text = fh.mother?.ageAtDiagnosis?.toString() ?? '';
+        _otherFamilyCtrl.text = fh.otherRelevantHistory ?? '';
         _siblings.addAll(fh.siblings);
         _children.addAll(fh.children);
       }
@@ -369,11 +374,21 @@ class _PatientHistoryFormScreenState extends State<PatientHistoryFormScreen> {
           allergies: _allergies,
         ),
         familyHistory: FamilyHistory(
-          father: _father,
-          mother: _mother,
+          father: (_fatherDiseaseCtrl.text.isEmpty && _fatherAgeCtrl.text.isEmpty)
+              ? null
+              : FamilyMemberHistory(
+                  diseaseCondition: _fatherDiseaseCtrl.text.isEmpty ? null : _fatherDiseaseCtrl.text,
+                  ageAtDiagnosis: int.tryParse(_fatherAgeCtrl.text),
+                ),
+          mother: (_motherDiseaseCtrl.text.isEmpty && _motherAgeCtrl.text.isEmpty)
+              ? null
+              : FamilyMemberHistory(
+                  diseaseCondition: _motherDiseaseCtrl.text.isEmpty ? null : _motherDiseaseCtrl.text,
+                  ageAtDiagnosis: int.tryParse(_motherAgeCtrl.text),
+                ),
           siblings: _siblings,
           children: _children,
-          otherRelevantHistory: _otherFamilyHistory,
+          otherRelevantHistory: _otherFamilyCtrl.text.isEmpty ? null : _otherFamilyCtrl.text,
         ),
         personalSocialHistory: PersonalSocialHistory(
           diet: _diet,
@@ -1183,9 +1198,9 @@ class _PatientHistoryFormScreenState extends State<PatientHistoryFormScreen> {
         children: [
           _sectionHeader('Family History'),
           const SizedBox(height: 20),
-          _familyMemberRow('Father', _father, (v) => setState(() => _father = v)),
+          _familyMemberRow('Father', _fatherDiseaseCtrl, _fatherAgeCtrl),
           const SizedBox(height: 12),
-          _familyMemberRow('Mother', _mother, (v) => setState(() => _mother = v)),
+          _familyMemberRow('Mother', _motherDiseaseCtrl, _motherAgeCtrl),
           const SizedBox(height: 20),
           const Divider(),
           const SizedBox(height: 12),
@@ -1193,10 +1208,9 @@ class _PatientHistoryFormScreenState extends State<PatientHistoryFormScreen> {
               style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15, color: Color(0xFF475569))),
           const SizedBox(height: 8),
           TextField(
+            controller: _otherFamilyCtrl,
             decoration: _inputDec('Describe hereditary conditions, patterns, etc.'),
             maxLines: 3,
-            controller: TextEditingController(text: _otherFamilyHistory),
-            onChanged: (v) => setState(() => _otherFamilyHistory = v.isEmpty ? null : v),
             textDirection: TextDirection.ltr,
           ),
         ],
@@ -1204,7 +1218,11 @@ class _PatientHistoryFormScreenState extends State<PatientHistoryFormScreen> {
     );
   }
 
-  Widget _familyMemberRow(String member, FamilyMemberHistory? h, Function(FamilyMemberHistory) onChanged) {
+  Widget _familyMemberRow(
+    String member,
+    TextEditingController diseaseCtrl,
+    TextEditingController ageCtrl,
+  ) {
     return _card(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1216,12 +1234,8 @@ class _PatientHistoryFormScreenState extends State<PatientHistoryFormScreen> {
               Expanded(
                 flex: 3,
                 child: TextField(
+                  controller: diseaseCtrl,
                   decoration: _inputDec('Disease / Condition'),
-                  controller: TextEditingController(text: h?.diseaseCondition),
-                  onChanged: (v) => onChanged(FamilyMemberHistory(
-                    diseaseCondition: v.isEmpty ? null : v,
-                    ageAtDiagnosis: h?.ageAtDiagnosis,
-                  )),
                   textDirection: TextDirection.ltr,
                 ),
               ),
@@ -1229,13 +1243,9 @@ class _PatientHistoryFormScreenState extends State<PatientHistoryFormScreen> {
               Expanded(
                 flex: 2,
                 child: TextField(
+                  controller: ageCtrl,
                   decoration: _inputDec('Age at Diagnosis'),
                   keyboardType: TextInputType.number,
-                  controller: TextEditingController(text: h?.ageAtDiagnosis?.toString()),
-                  onChanged: (v) => onChanged(FamilyMemberHistory(
-                    diseaseCondition: h?.diseaseCondition,
-                    ageAtDiagnosis: int.tryParse(v),
-                  )),
                   textDirection: TextDirection.ltr,
                 ),
               ),
@@ -1591,7 +1601,11 @@ class _PatientHistoryFormScreenState extends State<PatientHistoryFormScreen> {
     _scrollController.dispose();
     _complaintController.dispose();
     _durationController.dispose();
-    // Dispose all other controllers
+    _fatherDiseaseCtrl.dispose();
+    _fatherAgeCtrl.dispose();
+    _motherDiseaseCtrl.dispose();
+    _motherAgeCtrl.dispose();
+    _otherFamilyCtrl.dispose();
     super.dispose();
   }
 }

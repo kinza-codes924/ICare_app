@@ -407,7 +407,7 @@ class ConsultationService {
       final token = await _sharedPref.getToken();
       final cleanData = _removeNulls(historyData);
       final response = await _dio.put(
-        '/patient-history/$historyId',
+        '/patient-history/$historyId/update',
         data: cleanData,
         options: Options(
           headers: {'Authorization': 'Bearer $token'},

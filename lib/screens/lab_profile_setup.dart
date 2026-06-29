@@ -7,6 +7,8 @@ import 'package:file_picker/file_picker.dart';
 // ignore: avoid_web_libraries_in_flutter
 import '../utils/html_stub.dart' as html
     if (dart.library.html) 'dart:html';
+import '../utils/geo_locator_stub.dart'
+    if (dart.library.html) '../utils/geo_locator_web.dart';
 import '../services/laboratory_service.dart';
 import '../services/api_service.dart';
 import '../models/user.dart';
@@ -181,53 +183,47 @@ class _LabProfileSetupState extends ConsumerState<LabProfileSetup>
 
     setState(() => _gettingLocation = true);
 
-    try {
-      // No internal timeout — Chrome's network-based geolocation can take 15-30s
-      // on desktop even with permission granted. Let the browser use its own pacing
-      // and rely on the outer .timeout() as a last-resort guard.
-      final pos = await html.window.navigator.geolocation
-          .getCurrentPosition(enableHighAccuracy: false)
-          .timeout(const Duration(seconds: 40));
+    int? errorCode;
+    final coords = await getGpsCoords((code) => errorCode = code);
 
-      final lat = pos.coords?.latitude?.toDouble();
-      final lng = pos.coords?.longitude?.toDouble();
-      if (lat == null || lng == null) throw Exception('Null coordinates returned');
+    if (!mounted) return;
+    setState(() => _gettingLocation = false);
 
-      if (mounted) {
-        setState(() {
-          _latitude = lat;
-          _longitude = lng;
-          _gettingLocation = false;
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Location captured successfully!'),
-            backgroundColor: Color(0xFF10B981),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      }
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _gettingLocation = false);
-      final msg = e.toString().toLowerCase();
-      final String userMsg;
-      if (msg.contains('timeout') || msg.contains('future not completed')) {
-        userMsg = 'Location is taking too long. Try again or enter coordinates manually.';
-      } else if (msg.contains('denied') || msg.contains('notallowed') || msg.contains('permission')) {
-        userMsg = 'Location permission denied. Click the 🔒 icon in the address bar, allow location, then try again.';
-      } else {
-        userMsg = 'Could not get location. Make sure location is allowed in your browser settings, then try again.';
-      }
+    if (coords != null) {
+      setState(() {
+        _latitude = coords[0];
+        _longitude = coords[1];
+      });
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(userMsg),
-          backgroundColor: Colors.red,
-          duration: const Duration(seconds: 7),
+        const SnackBar(
+          content: Text('Location captured successfully!'),
+          backgroundColor: Color(0xFF10B981),
           behavior: SnackBarBehavior.floating,
         ),
       );
+      return;
     }
+
+    // Location failed — show manual dialog with helpful message
+    final String reason;
+    switch (errorCode ?? 0) {
+      case 1:
+        reason = 'Location access is blocked by the browser.\n\n'
+            'To fix: click the 🔒 lock icon in your browser address bar → '
+            'click "Location" → select "Allow" → then tap the location button again.';
+        break;
+      case 2:
+        reason = 'Your device could not determine the location '
+            '(GPS or network unavailable).\n\n'
+            'Please enter your lab coordinates manually below.';
+        break;
+      case 3:
+      default:
+        reason = 'Could not detect location automatically.\n\n'
+            'Tip: Open Google Maps, long-press your lab location, '
+            'and copy the coordinates shown at the top.';
+    }
+    _showManualCoordinatesDialog(reason: reason);
   }
 
   void _showManualCoordinatesDialog({String? reason}) {
