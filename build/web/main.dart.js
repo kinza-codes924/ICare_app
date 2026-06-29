@@ -234300,7 +234300,6 @@ J.aa(k,"testType",b1)
 J.aa(k,"test_type",b1)
 J.aa(k,"collectionType",a1)
 J.aa(k,"source","walk-in")
-J.aa(k,"status","confirmed")
 d=a4?"Urgent":"Normal"
 J.aa(k,"urgency",d)
 J.aa(k,"is_urgent",a4)
