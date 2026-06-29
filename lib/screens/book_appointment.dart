@@ -66,12 +66,26 @@ class _BookAppointmentScreenState extends ConsumerState<BookAppointmentScreen> {
     {'text': 'I was extremely satisfied with my consultation. The doctor was extremely attentive to listening to my issues and had extremely professional and practical advice.', 'patient': 'Verified Patient U', 'ago': '19 days ago'},
   ];
 
+  static const _dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+
+  bool _isDayAvailable(DateTime date) {
+    final days = widget.doctor.availableDays;
+    if (days.isEmpty) return true; // no restriction → all days open
+    final dayName = _dayNames[date.weekday - 1]; // DateTime.weekday: 1=Mon…7=Sun
+    return days.any((d) => d.trim().toLowerCase() == dayName.toLowerCase());
+  }
+
   @override
   void initState() {
     super.initState();
-    // Generate next 8 days starting from today (no past dates)
+    // Generate next 30 days and keep only those matching the doctor's available days
     final today = DateTime.now();
-    _dateRange = List.generate(8, (i) => today.add(Duration(days: i)));
+    final allDays = List.generate(30, (i) => today.add(Duration(days: i)));
+    _dateRange = allDays.where(_isDayAvailable).take(14).toList();
+    if (_dateRange.isEmpty) {
+      // Fallback: show all days if none matched (safety net)
+      _dateRange = List.generate(8, (i) => today.add(Duration(days: i)));
+    }
     // Generate slots from doctor's working hours
     _generateSlotsFromDoctorHours();
     // Auto-fill user details for "Myself"

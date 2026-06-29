@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import '../utils/shared_pref.dart';
@@ -180,6 +181,16 @@ class AuthService {
       }
       return {'success': false, 'message': 'Failed to send OTP'};
     } on DioException catch (e) {
+      final status = e.response?.statusCode;
+      if (status == 404 || status == 400) {
+        final backendMsg = (e.response?.data as Map?)?['message']?.toString() ?? '';
+        final lower = backendMsg.toLowerCase();
+        if (lower.contains('not found') || lower.contains('no account') ||
+            lower.contains('does not exist') || lower.isEmpty || status == 404) {
+          return {'success': false, 'message': 'No account found with this email address. Please check and try again.'};
+        }
+        return {'success': false, 'message': backendMsg};
+      }
       return {'success': false, 'message': _friendlyError(e)};
     } catch (_) {
       return {'success': false, 'message': 'Unexpected error. Please try again.'};
@@ -203,7 +214,9 @@ class AuthService {
   Future<Map<String, dynamic>> loginWithGoogle() async {
     try {
       final googleSignIn = GoogleSignIn(
-        clientId: '1076307742101-avj49igc93qipdcnqbqsk3u14gdcb2oh.apps.googleusercontent.com',
+        // Web needs clientId; Android needs serverClientId to get idToken
+        clientId: kIsWeb ? '564788374793-1eptqsl65ohkvsquqhc4qnhlia592v2f.apps.googleusercontent.com' : null,
+        serverClientId: kIsWeb ? null : '564788374793-1eptqsl65ohkvsquqhc4qnhlia592v2f.apps.googleusercontent.com',
         scopes: ['email', 'profile'],
       );
       final account = await googleSignIn.signIn();

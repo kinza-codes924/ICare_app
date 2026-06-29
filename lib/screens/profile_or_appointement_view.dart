@@ -8,7 +8,7 @@ import 'package:icare/screens/decline_appointment_redesign.dart';
 import 'package:icare/screens/intake_notes_screen.dart';
 import 'package:icare/screens/patient_profile_view.dart';
 import 'package:icare/screens/soap_notes_screen.dart';
-import 'package:icare/screens/video_call.dart';
+import 'package:icare/screens/consultation_chat_screen_v2.dart';
 import 'package:icare/services/appointment_service.dart';
 import 'package:icare/screens/prescription_detail_screen.dart';
 import 'package:icare/services/consultation_service.dart';
@@ -1391,14 +1391,12 @@ class _WebPatientProfileViewState extends State<_WebPatientProfileView> {
                                 Navigator.push(
                                   context,
                                   MaterialPageRoute(
-                                    builder: (_) => VideoCall(
-                                      channelName: appointment.id ?? 'consultation',
-                                      remoteUserName: otherPerson?.name ?? 'Patient',
-                                      isAudioOnly: false,
-                                      appointmentId: appointment.id,
-                                      patientId: otherPerson?.id,
-                                      currentUserName: me?.name ?? 'Doctor',
+                                    builder: (_) => ConsultationChatScreenV2(
+                                      appointment: appointment,
+                                      isDoctor: true,
                                       currentUserId: me?.id ?? '',
+                                      currentUserName: me?.name ?? 'Doctor',
+                                      remoteUserName: otherPerson?.name ?? 'Patient',
                                     ),
                                   ),
                                 );

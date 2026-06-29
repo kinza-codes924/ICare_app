@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:icare/providers/auth_provider.dart';
 import 'package:icare/screens/add_card.dart';
 import 'package:icare/screens/connect_now_waiting_screen.dart';
+import 'package:icare/services/doctor_service.dart';
 import 'package:icare/utils/theme.dart';
 import 'package:icare/widgets/back_button.dart';
 
@@ -269,14 +270,43 @@ class _ConsultationDetailsScreenState
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
-                    onPressed: () {
+                    onPressed: () async {
                       Navigator.pop(ctx); // close bottom sheet
+                      // Check if any doctor is online before proceeding
+                      try {
+                        final result = await DoctorService().getAllDoctors();
+                        final doctors = (result['doctors'] as List?) ?? [];
+                        final anyOnline = doctors.any((d) {
+                          if (d is Map) return d['isOnline'] == true;
+                          return false;
+                        });
+                        if (!anyOnline && mounted) {
+                          showDialog(
+                            context: context,
+                            builder: (c) => AlertDialog(
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                              title: const Row(children: [
+                                Icon(Icons.info_outline_rounded, color: Color(0xFF6366F1)),
+                                SizedBox(width: 8),
+                                Text('No Doctors Available', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+                              ]),
+                              content: const Text('No doctors are online right now. Please try again later or book an advance appointment.', style: TextStyle(fontSize: 14)),
+                              actions: [
+                                TextButton(onPressed: () => Navigator.pop(c), child: const Text('OK', style: TextStyle(fontWeight: FontWeight.bold))),
+                              ],
+                            ),
+                          );
+                          return;
+                        }
+                      } catch (_) {}
                       // Navigate to waiting screen
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => const ConnectNowWaitingScreen(),
-                        ),
-                      );
+                      if (mounted) {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => const ConnectNowWaitingScreen(),
+                          ),
+                        );
+                      }
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.primaryColor,

@@ -87,10 +87,18 @@ class _DoctorProfileSetupState extends ConsumerState<DoctorProfileSetup> {
   Future<void> _loadProfile() async {
     setState(() => _isLoadingProfile = true);
     try {
-      final result = await DoctorService().getMyDoctorProfile();
+      // Load profile and availability in parallel
+      final results = await Future.wait([
+        DoctorService().getMyDoctorProfile(),
+        DoctorService().getAvailability(),
+      ]);
+      final profileResult = results[0];
+      final availResult = results[1];
       if (!mounted) return;
-      if (result['success'] == true && result['doctor'] != null) {
-        final doc = result['doctor'] as Map<String, dynamic>;
+      if (profileResult['success'] == true && profileResult['doctor'] != null) {
+        final doc = profileResult['doctor'] as Map<String, dynamic>;
+        // Availability endpoint is the authoritative source for days/times when it has data
+        final availData = (availResult['success'] == true) ? availResult['availability'] as Map? : null;
         setState(() {
           // Basic info
           specializationController.text = doc['specialization']?.toString() ?? '';
@@ -126,27 +134,36 @@ class _DoctorProfileSetupState extends ConsumerState<DoctorProfileSetup> {
             _selectedLanguages.addAll(languages.map((l) => l.toString()));
           }
 
-          // Availability days
-          final availableDays = doc['availableDays'];
-          if (availableDays is List) {
-            for (final day in availableDays) {
+          // Availability days — prefer the dedicated availability endpoint, fall back to profile doc
+          final daySource = availData != null
+              ? (availData['availableDays'] ?? doc['availableDays'])
+              : doc['availableDays'];
+          if (daySource is List && daySource.isNotEmpty) {
+            selectedDays.updateAll((k, _) => false);
+            for (final day in daySource) {
               final dayStr = day.toString();
-              if (selectedDays.containsKey(dayStr)) {
-                selectedDays[dayStr] = true;
-              }
+              if (selectedDays.containsKey(dayStr)) selectedDays[dayStr] = true;
             }
           }
 
-          // Availability time
-          final availableTime = doc['availableTime'];
-          if (availableTime is Map<String, dynamic>) {
-            startTimeController.text = availableTime['start']?.toString() ?? '';
-            endTimeController.text = availableTime['end']?.toString() ?? '';
-          } else if (availableTime is String && availableTime.contains('-')) {
-            final parts = availableTime.split('-');
-            if (parts.length == 2) {
-              startTimeController.text = parts[0].trim();
-              endTimeController.text = parts[1].trim();
+          // Availability time — prefer the dedicated availability endpoint
+          Map<String, dynamic>? timeSource;
+          if (availData != null && availData['availableTime'] is Map) {
+            timeSource = Map<String, dynamic>.from(availData['availableTime'] as Map);
+          } else if (doc['availableTime'] is Map) {
+            timeSource = Map<String, dynamic>.from(doc['availableTime'] as Map);
+          }
+          if (timeSource != null) {
+            startTimeController.text = timeSource['start']?.toString() ?? '';
+            endTimeController.text = timeSource['end']?.toString() ?? '';
+          } else {
+            final at = doc['availableTime'];
+            if (at is String && at.contains('-')) {
+              final parts = at.split('-');
+              if (parts.length == 2) {
+                startTimeController.text = parts[0].trim();
+                endTimeController.text = parts[1].trim();
+              }
             }
           }
 
@@ -295,6 +312,15 @@ class _DoctorProfileSetupState extends ConsumerState<DoctorProfileSetup> {
       endTime: endTimeController.text,
       profileImage: _imageBytes,
     );
+
+    // Sync the same days/times to the availability endpoint so Manage Availability shows the same data
+    try {
+      await DoctorService().updateAvailability(
+        availableDays: availableDays,
+        availableTime: {'start': startTimeController.text, 'end': endTimeController.text},
+        unavailableDates: [],
+      );
+    } catch (_) {}
 
     // Save specialties separately
     if (_selectedSpecialties.isNotEmpty) {

@@ -269,16 +269,25 @@ class _DoctorAvailabilityState extends State<DoctorAvailability> {
   void _saveAvailability() async {
     setState(() => _isSaving = true);
 
+    final startStr = '${_startTime.hour.toString().padLeft(2, '0')}:${_startTime.minute.toString().padLeft(2, '0')}';
+    final endStr = '${_endTime.hour.toString().padLeft(2, '0')}:${_endTime.minute.toString().padLeft(2, '0')}';
+
     final result = await _doctorService.updateAvailability(
       availableDays: _availableDays,
-      availableTime: {
-        'start': '${_startTime.hour.toString().padLeft(2, '0')}:${_startTime.minute.toString().padLeft(2, '0')}',
-        'end': '${_endTime.hour.toString().padLeft(2, '0')}:${_endTime.minute.toString().padLeft(2, '0')}',
-      },
+      availableTime: {'start': startStr, 'end': endStr},
       unavailableDates: [],
       bufferTime: _bufferTime,
       emergencySlots: _emergencySlots,
     );
+
+    // Sync days/times to the doctor profile endpoint so Edit Profile shows the same values
+    try {
+      await _doctorService.patchAvailabilityOnProfile(
+        availableDays: _availableDays,
+        startTime: startStr,
+        endTime: endStr,
+      );
+    } catch (_) {}
 
     setState(() => _isSaving = false);
 

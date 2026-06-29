@@ -248,6 +248,19 @@ class DoctorService {
     }
   }
 
+  /// Updates ONLY the availableDays and availableTime on the doctor profile document,
+  /// leaving all other fields (specialization, degrees, etc.) untouched.
+  Future<void> patchAvailabilityOnProfile({
+    required List<String> availableDays,
+    required String startTime,
+    required String endTime,
+  }) async {
+    await _apiService.post('/doctors/add_doctor_details', {
+      'availableDays': availableDays,
+      'availableTime': {'start': startTime, 'end': endTime},
+    });
+  }
+
   Future<Map<String, dynamic>> getAvailability() async {
     try {
       final response = await _apiService.get('/doctors/availability/me');

@@ -20,6 +20,8 @@ import 'package:icare/screens/terms_and_conditions.dart' show TermsAndConditions
 import 'package:icare/utils/theme.dart';
 import 'package:icare/services/security_service.dart';
 import 'package:icare/services/biometric_service.dart';
+import 'package:icare/services/face_auth_service.dart';
+import 'package:icare/screens/face_capture_screen.dart';
 import 'package:icare/services/gamification_service.dart';
 import 'package:icare/screens/login_activity_screen.dart';
 import 'package:icare/screens/patient_lab_orders.dart';
@@ -62,6 +64,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   final SecurityService _securityService = SecurityService();
   final HealthSettingsService _healthSettingsService = HealthSettingsService();
   final BiometricService _biometricService = BiometricService();
+  final FaceAuthService _faceAuthService = FaceAuthService();
   final GamificationService _gamificationService = GamificationService();
   int _totalPoints = 0;
   List<dynamic> _pointsHistory = [];
@@ -70,6 +73,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   bool _is2FAEnabled = false;
   bool _isBiometricEnabled = false;
   bool _biometricAvailable = false;
+  bool _isFaceEnabled = false;
   String _medicalConditions = '';
   String _allergies = '';
   String _currentMedications = '';
@@ -231,10 +235,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   Future<void> _loadBiometricState() async {
     final available = await _biometricService.isAvailable();
     final enabled = await _biometricService.isBiometricEnabled();
+    final faceEnabled = await _faceAuthService.isFaceEnabled();
     if (mounted) {
       setState(() {
         _biometricAvailable = available;
         _isBiometricEnabled = enabled;
+        _isFaceEnabled = faceEnabled;
       });
     }
   }
@@ -520,6 +526,49 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     try {
       await _securityService.updateBiometricPreference(value);
     } catch (_) {}
+  }
+
+  Future<void> _toggleFaceId(bool value) async {
+    if (value) {
+      // Open camera to register face
+      final path = await Navigator.push<String>(
+        context,
+        MaterialPageRoute(
+          builder: (_) => const FaceCaptureScreen(mode: FaceCaptureMode.register),
+        ),
+      );
+      if (path == null || !mounted) return;
+      final error = await _faceAuthService.registerFace(path);
+      if (!mounted) return;
+      if (error == null) {
+        // Also save token/user so Face ID can log in
+        final authState = ref.read(authProvider);
+        final email = authState.user?.email ?? '';
+        final token = authState.token ?? await SharedPref().getToken() ?? '';
+        final user = authState.user;
+        await _biometricService.enableBiometrics(
+          email,
+          token: token.isNotEmpty ? token : null,
+          user: user,
+        );
+        setState(() => _isFaceEnabled = true);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Face ID enabled'), backgroundColor: Colors.green),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(error)),
+        );
+      }
+    } else {
+      await _faceAuthService.disableFace();
+      setState(() => _isFaceEnabled = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Face ID disabled')),
+        );
+      }
+    }
   }
 
   void _handleLogout() {
@@ -1562,7 +1611,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       isPatient: isPatient, isPharmacy: isPharmacy, isLaboratory: isLaboratory,
       isDoctor: isDoctor, isStudent: isStudent, isInstructor: isInstructor,
       is2FAEnabled: _is2FAEnabled, isBiometricEnabled: _isBiometricEnabled,
-      biometricAvailable: _biometricAvailable, prescriptionEmailEnabled: _prescriptionEmailEnabled,
+      biometricAvailable: _biometricAvailable, isFaceEnabled: _isFaceEnabled, prescriptionEmailEnabled: _prescriptionEmailEnabled,
       trackerToggles: _trackerToggles, healthModeEnabled: _healthModeEnabled,
       selectedConditions: _selectedConditions,
       medicalConditions: _medicalConditions, allergies: _allergies,
@@ -1575,7 +1624,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       medReminderTime: _medReminderTime, healthCheckReminderTime: _healthCheckReminderTime,
       appointmentRemindersEnabled: _appointmentRemindersEnabled,
       preferHomeSample: _preferHomeSample, reportDelivery: _reportDelivery,
-      onToggle2FA: _toggle2FA, onToggleBiometrics: _toggleBiometrics,
+      onToggle2FA: _toggle2FA, onToggleBiometrics: _toggleBiometrics, onToggleFaceId: _toggleFaceId,
       onTogglePrescriptionEmail: _togglePrescriptionEmail,
       onTrackerToggle: _updateTrackerToggle, onHealthModeToggle: _toggleHealthMode,
       onLogout: _handleLogout, onComingSoon: _comingSoon,
@@ -1610,7 +1659,7 @@ class _SettingsLayoutParams {
   final String role;
   final app_user.User? user;
   final bool isPatient, isPharmacy, isLaboratory, isDoctor, isStudent, isInstructor;
-  final bool is2FAEnabled, isBiometricEnabled, biometricAvailable, healthModeEnabled;
+  final bool is2FAEnabled, isBiometricEnabled, biometricAvailable, isFaceEnabled, healthModeEnabled;
   final bool prescriptionEmailEnabled;
   final List<String> selectedConditions;
   final String medicalConditions, allergies, currentMedications, healthGoals;
@@ -1633,7 +1682,7 @@ class _SettingsLayoutParams {
   // Notification preferences
   final Map<String, bool> notifPrefs;
   final void Function(String, bool) onSaveNotifPref;
-  final void Function(bool) onToggle2FA, onToggleBiometrics, onTogglePrescriptionEmail;
+  final void Function(bool) onToggle2FA, onToggleBiometrics, onToggleFaceId, onTogglePrescriptionEmail;
   final void Function(String, bool) onTrackerToggle, onHealthModeToggle;
   final VoidCallback onLogout;
   final void Function(BuildContext, String) onComingSoon;
@@ -1657,7 +1706,7 @@ class _SettingsLayoutParams {
     required this.isPatient, required this.isPharmacy, required this.isLaboratory,
     required this.isDoctor, required this.isStudent, required this.isInstructor,
     required this.is2FAEnabled, required this.isBiometricEnabled,
-    required this.biometricAvailable, required this.prescriptionEmailEnabled,
+    required this.biometricAvailable, required this.isFaceEnabled, required this.prescriptionEmailEnabled,
     required this.healthModeEnabled, required this.selectedConditions,
     required this.medicalConditions, required this.allergies,
     required this.currentMedications, required this.healthGoals,
@@ -1670,7 +1719,7 @@ class _SettingsLayoutParams {
     required this.appointmentRemindersEnabled,
     required this.preferHomeSample, required this.reportDelivery,
     required this.onToggle2FA, required this.onToggleBiometrics,
-    required this.onTogglePrescriptionEmail,
+    required this.onToggleFaceId, required this.onTogglePrescriptionEmail,
     required this.onTrackerToggle, required this.onHealthModeToggle,
     required this.onLogout, required this.onComingSoon,
     required this.onReportIssue, required this.onDeleteAccount,
@@ -1799,6 +1848,10 @@ class _WebSettingsLayout extends StatelessWidget {
           _switchTile(icon: Icons.update_rounded, title: 'Delivery Status Updates', subtitle: 'Real-time delivery tracking notifications', value: p.notifPrefs['delivery_updates'] ?? true, onChanged: (v) => p.onSaveNotifPref('delivery_updates', v)),
           const Divider(height: 1),
           _switchTile(icon: Icons.warning_amber_outlined, title: 'System Alerts', subtitle: 'Platform & maintenance notifications', value: p.notifPrefs['system_alerts'] ?? true, onChanged: (v) => p.onSaveNotifPref('system_alerts', v)),
+          const Divider(height: 1),
+          _switchTile(icon: Icons.volume_up_outlined, title: 'Sound Notifications', subtitle: 'Play sound for notifications', value: p.notifPrefs['sound_notifications'] ?? true, onChanged: (v) => p.onSaveNotifPref('sound_notifications', v)),
+        ] else if (p.isStudent) ...[
+          _switchTile(icon: Icons.local_offer_outlined, title: 'Promotions & Offers', subtitle: 'Special deals & health tips', value: p.notifPrefs['promotions'] ?? false, onChanged: (v) => p.onSaveNotifPref('promotions', v)),
           const Divider(height: 1),
           _switchTile(icon: Icons.volume_up_outlined, title: 'Sound Notifications', subtitle: 'Play sound for notifications', value: p.notifPrefs['sound_notifications'] ?? true, onChanged: (v) => p.onSaveNotifPref('sound_notifications', v)),
         ] else ...[
@@ -2145,11 +2198,14 @@ class _WebSettingsLayout extends StatelessWidget {
         _settingsTile(icon: Icons.lock_outline, iconColor: const Color(0xFF64748B), title: 'Change Password', subtitle: 'Update your password', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ChangePassword()))),
         const Divider(height: 1),
         _settingsTile(icon: Icons.history_outlined, iconColor: const Color(0xFF64748B), title: 'Login Activity', subtitle: 'Review recent login sessions', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const LoginActivityScreen()))),
-        // Biometric — shown for all roles if device supports it
+        // Fingerprint biometric
         if (p.biometricAvailable) ...[
           const Divider(height: 1),
-          _switchTile(icon: Icons.fingerprint, title: 'Biometric Sign-In', subtitle: p.isBiometricEnabled ? 'Tap to disable fingerprint / Face ID' : 'Enable fingerprint or Face ID sign-in', value: p.isBiometricEnabled, onChanged: p.onToggleBiometrics),
+          _switchTile(icon: Icons.fingerprint, title: 'Fingerprint Sign-In', subtitle: p.isBiometricEnabled ? 'Tap to disable fingerprint login' : 'Enable fingerprint login', value: p.isBiometricEnabled, onChanged: p.onToggleBiometrics),
         ],
+        // Face ID (camera-based, works on all Android devices)
+        const Divider(height: 1),
+        _switchTile(icon: Icons.face_retouching_natural, title: 'Face ID Sign-In', subtitle: p.isFaceEnabled ? 'Tap to disable Face ID login' : 'Enable camera Face ID login (works on all phones)', value: p.isFaceEnabled, onChanged: p.onToggleFaceId),
         if (p.isPatient) ...[
           const Divider(height: 1),
           _switchTile(icon: Icons.verified_user_outlined, title: 'Two-Factor Authentication (2FA)', subtitle: p.is2FAEnabled ? 'Enabled' : 'Extra layer of security', value: p.is2FAEnabled, onChanged: p.onToggle2FA),
@@ -2296,28 +2352,20 @@ class _WebSettingsLayout extends StatelessWidget {
     );
   }
 
-  // ── DANGER ZONE ──
+  // ── DELETE ACCOUNT ──
   Widget _dangerZoneCard(BuildContext context) {
     return Card(
       elevation: 0,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       color: const Color(0xFFFFF1F2),
-      child: Padding(padding: const EdgeInsets.all(20), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: const [
-          Icon(Icons.warning_amber_rounded, size: 16, color: Color(0xFFDC2626)),
-          SizedBox(width: 8),
-          Text('Danger Zone', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Color(0xFFDC2626))),
-        ]),
-        const SizedBox(height: 16),
-        ListTile(
-          contentPadding: EdgeInsets.zero,
-          leading: Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: const Color(0xFFEF4444).withValues(alpha: 0.12), borderRadius: BorderRadius.circular(10)), child: const Icon(Icons.delete_forever_rounded, color: Color(0xFFDC2626), size: 20)),
-          title: const Text('Delete Account', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: Color(0xFF7F1D1D))),
-          subtitle: const Text('Permanently delete your account and all data', style: TextStyle(fontSize: 12, color: Color(0xFFB91C1C))),
-          trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: Color(0xFFEF4444)),
-          onTap: () => p.onDeleteAccount(context),
-        ),
-      ])),
+      child: Padding(padding: const EdgeInsets.all(20), child: ListTile(
+        contentPadding: EdgeInsets.zero,
+        leading: Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: const Color(0xFFEF4444).withValues(alpha: 0.12), borderRadius: BorderRadius.circular(10)), child: const Icon(Icons.delete_forever_rounded, color: Color(0xFFDC2626), size: 20)),
+        title: const Text('Delete Account', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: Color(0xFF7F1D1D))),
+        subtitle: const Text('Permanently delete your account and all data', style: TextStyle(fontSize: 12, color: Color(0xFFB91C1C))),
+        trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: Color(0xFFEF4444)),
+        onTap: () => p.onDeleteAccount(context),
+      )),
     );
   }
 
@@ -2474,6 +2522,9 @@ class _MobileSettingsLayout extends StatelessWidget {
           const Divider(height: 1), _switchTile(icon: Icons.update_rounded, title: 'Delivery Status Updates', subtitle: 'Real-time delivery tracking notifications', value: p.notifPrefs['delivery_updates'] ?? true, onChanged: (v) => p.onSaveNotifPref('delivery_updates', v)),
           const Divider(height: 1), _switchTile(icon: Icons.warning_amber_outlined, title: 'System Alerts', subtitle: 'Platform & maintenance notifications', value: p.notifPrefs['system_alerts'] ?? true, onChanged: (v) => p.onSaveNotifPref('system_alerts', v)),
           const Divider(height: 1), _switchTile(icon: Icons.volume_up_outlined, title: 'Sound Notifications', subtitle: 'Play sound', value: p.notifPrefs['sound_notifications'] ?? true, onChanged: (v) => p.onSaveNotifPref('sound_notifications', v)),
+        ] else if (p.isStudent) ...[
+          _switchTile(icon: Icons.local_offer_outlined, title: 'Promotions & Offers', subtitle: 'Special deals', value: p.notifPrefs['promotions'] ?? false, onChanged: (v) => p.onSaveNotifPref('promotions', v)),
+          const Divider(height: 1), _switchTile(icon: Icons.volume_up_outlined, title: 'Sound Notifications', subtitle: 'Play sound', value: p.notifPrefs['sound_notifications'] ?? true, onChanged: (v) => p.onSaveNotifPref('sound_notifications', v)),
         ] else ...[
           _switchTile(icon: Icons.calendar_today_outlined, title: 'Booking Updates', subtitle: 'Appointment confirmations & changes', value: p.notifPrefs['booking_updates'] ?? true, onChanged: (v) => p.onSaveNotifPref('booking_updates', v)),
           const Divider(height: 1), _switchTile(icon: Icons.message_outlined, title: 'Doctor Messages', subtitle: 'Messages from providers', value: p.notifPrefs['doctor_messages'] ?? true, onChanged: (v) => p.onSaveNotifPref('doctor_messages', v)),
@@ -2615,10 +2666,12 @@ class _MobileSettingsLayout extends StatelessWidget {
         _sectionLabel('Security'), const SizedBox(height: 12),
         _settingsTile(icon: Icons.lock_outline, iconColor: const Color(0xFF64748B), title: 'Change Password', subtitle: 'Update password', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ChangePassword()))),
         const Divider(height: 1), _settingsTile(icon: Icons.history_outlined, iconColor: const Color(0xFF64748B), title: 'Login Activity', subtitle: 'Review sessions', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const LoginActivityScreen()))),
-        // Biometric — shown for all roles if device supports it
+        // Fingerprint biometric
         if (p.biometricAvailable) ...[
-          const Divider(height: 1), _switchTile(icon: Icons.fingerprint, title: 'Biometric Sign-In', subtitle: p.isBiometricEnabled ? 'Tap to disable' : 'Enable fingerprint / Face ID', value: p.isBiometricEnabled, onChanged: p.onToggleBiometrics),
+          const Divider(height: 1), _switchTile(icon: Icons.fingerprint, title: 'Fingerprint Sign-In', subtitle: p.isBiometricEnabled ? 'Tap to disable' : 'Enable fingerprint', value: p.isBiometricEnabled, onChanged: p.onToggleBiometrics),
         ],
+        // Face ID (camera-based)
+        const Divider(height: 1), _switchTile(icon: Icons.face_retouching_natural, title: 'Face ID Sign-In', subtitle: p.isFaceEnabled ? 'Tap to disable' : 'Enable Face ID (camera)', value: p.isFaceEnabled, onChanged: p.onToggleFaceId),
         if (p.isPatient) ...[
           const Divider(height: 1), _switchTile(icon: Icons.verified_user_outlined, title: '2FA', subtitle: p.is2FAEnabled ? 'Enabled' : 'Extra security', value: p.is2FAEnabled, onChanged: p.onToggle2FA),
         ],
@@ -2720,29 +2773,21 @@ class _MobileSettingsLayout extends StatelessWidget {
     );
   }
 
-  // ── DANGER ZONE ──
+  // ── DELETE ACCOUNT ──
   Widget _dangerZoneCard(BuildContext context) {
     return Card(
       elevation: 0,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       color: const Color(0xFFFFF1F2),
-      child: Padding(padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: const [
-          Icon(Icons.warning_amber_rounded, size: 14, color: Color(0xFFDC2626)),
-          SizedBox(width: 7),
-          Text('Danger Zone', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Color(0xFFDC2626))),
-        ]),
-        const SizedBox(height: 12),
-        ListTile(
-          contentPadding: EdgeInsets.zero,
-          dense: true,
-          leading: Container(padding: const EdgeInsets.all(7), decoration: BoxDecoration(color: const Color(0xFFEF4444).withValues(alpha: 0.12), borderRadius: BorderRadius.circular(8)), child: const Icon(Icons.delete_forever_rounded, color: Color(0xFFDC2626), size: 18)),
-          title: const Text('Delete Account', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: Color(0xFF7F1D1D))),
-          subtitle: const Text('Permanently delete your account and all data', style: TextStyle(fontSize: 11, color: Color(0xFFB91C1C))),
-          trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 12, color: Color(0xFFEF4444)),
-          onTap: () => p.onDeleteAccount(context),
-        ),
-      ])),
+      child: Padding(padding: const EdgeInsets.all(16), child: ListTile(
+        contentPadding: EdgeInsets.zero,
+        dense: true,
+        leading: Container(padding: const EdgeInsets.all(7), decoration: BoxDecoration(color: const Color(0xFFEF4444).withValues(alpha: 0.12), borderRadius: BorderRadius.circular(8)), child: const Icon(Icons.delete_forever_rounded, color: Color(0xFFDC2626), size: 18)),
+        title: const Text('Delete Account', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: Color(0xFF7F1D1D))),
+        subtitle: const Text('Permanently delete your account and all data', style: TextStyle(fontSize: 11, color: Color(0xFFB91C1C))),
+        trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 12, color: Color(0xFFEF4444)),
+        onTap: () => p.onDeleteAccount(context),
+      )),
     );
   }
 
