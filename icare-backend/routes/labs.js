@@ -1,6 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const mongoose = require('mongoose');
+const multer = require('multer');
+const cloudinary = require('../config/cloudinary');
 const { connectMongoDB } = require('../config/mongodb');
 const User = require('../models/User');
 const LabProfile = require('../models/LabProfile');
@@ -8,6 +10,18 @@ const LabTestRequest = require('../models/LabTestRequest');
 const { authMiddleware } = require('../middleware/auth');
 const { sendToUser } = require('../services/notificationService');
 const { sendEmail } = require('../utils/email');
+
+const _reportUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
+
+function _uploadToCloudinary(buffer, folder, resourceType = 'image') {
+  return new Promise((resolve, reject) => {
+    const stream = cloudinary.uploader.upload_stream(
+      { folder, resource_type: resourceType },
+      (err, result) => (err ? reject(err) : resolve(result))
+    );
+    stream.end(buffer);
+  });
+}
 
 function toId(id) {
   try { return new mongoose.Types.ObjectId(id); } catch { return null; }
@@ -766,13 +780,23 @@ router.post('/bookings/:bookingId/rate', authMiddleware, async (req, res) => {
 });
 
 // ─── UPLOAD REPORT ────────────────────────────────────────────────────────────
-router.post('/bookings/:bookingId/upload-report', authMiddleware, async (req, res) => {
+router.post('/bookings/:bookingId/upload-report', authMiddleware, _reportUpload.single('report'), async (req, res) => {
   try {
     await connectMongoDB();
-    const { reportUrl, reportNotes } = req.body;
+    let reportUrl = (req.body && req.body.reportUrl) || null;
+    const reportNotes = (req.body && req.body.reportNotes) || '';
+
+    // If a file was uploaded, push it to Cloudinary and get a persistent URL
+    if (req.file) {
+      const isPdf = req.file.mimetype === 'application/pdf';
+      const resourceType = isPdf ? 'raw' : 'image';
+      const result = await _uploadToCloudinary(req.file.buffer, 'icare/lab-reports', resourceType);
+      reportUrl = result.secure_url;
+    }
+
     const booking = await LabTestRequest.findByIdAndUpdate(
       toId(req.params.bookingId),
-      { $set: { report_url: reportUrl, report_notes: reportNotes || '', status: 'reporting_done' } },
+      { $set: { ...(reportUrl ? { report_url: reportUrl } : {}), report_notes: reportNotes, status: 'reporting_done' } },
       { new: true }
     );
     if (!booking) return res.status(404).json({ success: false, message: 'Booking not found' });
