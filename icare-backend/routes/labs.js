@@ -106,6 +106,10 @@ async function getAllLabs() {
       homeSample: p.home_sample ?? true,
       home_sample: p.home_sample ?? true,
       rating: p.rating ?? 0, total_reviews: p.total_reviews ?? 0,
+      availableTests: p.availableTests || p.available_tests || [],
+      description: p.description || '',
+      homeSampleAvailable: p.homeSampleAvailable ?? p.home_sample ?? true,
+      workingHours: p.workingHours || p.operating_hours || '8AM - 10PM',
     };
   });
 }

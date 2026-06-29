@@ -1,7 +1,7 @@
 // Patient History Form Screen
 // Complete 10-section history form as per client requirements
 
-import 'package:easy_localization/easy_localization.dart';
+import 'package:easy_localization/easy_localization.dart' hide TextDirection;
 import 'package:flutter/material.dart';
 import 'package:icare/models/appointment_detail.dart';
 import 'package:icare/models/patient_history_form.dart';
@@ -693,7 +693,12 @@ class _PatientHistoryFormScreenState extends State<PatientHistoryFormScreen> {
   Widget _buildField(String label, TextEditingController controller, {int maxLines = 1}) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 14),
-      child: TextField(controller: controller, decoration: _inputDec(label), maxLines: maxLines),
+      child: TextField(
+        controller: controller,
+        decoration: _inputDec(label),
+        maxLines: maxLines,
+        textDirection: TextDirection.ltr,
+      ),
     );
   }
 
@@ -770,9 +775,9 @@ class _PatientHistoryFormScreenState extends State<PatientHistoryFormScreen> {
           const SizedBox(height: 20),
           Row(
             children: [
-              Expanded(flex: 3, child: TextField(controller: _complaintController, decoration: _inputDec('Complaint'))),
+              Expanded(flex: 3, child: TextField(controller: _complaintController, decoration: _inputDec('Complaint'), textDirection: TextDirection.ltr)),
               const SizedBox(width: 10),
-              Expanded(flex: 2, child: TextField(controller: _durationController, decoration: _inputDec('Duration', hint: 'e.g. 3 days'))),
+              Expanded(flex: 2, child: TextField(controller: _durationController, decoration: _inputDec('Duration', hint: 'e.g. 3 days'), textDirection: TextDirection.ltr)),
               const SizedBox(width: 8),
               ElevatedButton(
                 onPressed: _addComplaint,
@@ -899,6 +904,7 @@ class _PatientHistoryFormScreenState extends State<PatientHistoryFormScreen> {
                 decoration: _inputDec('Details', hint: 'Duration, severity, treatment...'),
                 controller: TextEditingController(text: details),
                 onChanged: (v) => onDetails(v.isEmpty ? null : v),
+                textDirection: TextDirection.ltr,
               ),
             ),
         ],
@@ -958,13 +964,13 @@ class _PatientHistoryFormScreenState extends State<PatientHistoryFormScreen> {
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            TextField(controller: procCtrl, decoration: _inputDec('Surgery / Procedure')),
+            TextField(controller: procCtrl, decoration: _inputDec('Surgery / Procedure'), textDirection: TextDirection.ltr),
             const SizedBox(height: 12),
             Row(
               children: [
-                Expanded(child: TextField(controller: yearCtrl, decoration: _inputDec('Year'), keyboardType: TextInputType.number)),
+                Expanded(child: TextField(controller: yearCtrl, decoration: _inputDec('Year'), keyboardType: TextInputType.number, textDirection: TextDirection.ltr)),
                 const SizedBox(width: 12),
-                Expanded(child: TextField(controller: hospitalCtrl, decoration: _inputDec('Hospital / Remarks'))),
+                Expanded(child: TextField(controller: hospitalCtrl, decoration: _inputDec('Hospital / Remarks'), textDirection: TextDirection.ltr)),
               ],
             ),
           ],
@@ -1080,17 +1086,17 @@ class _PatientHistoryFormScreenState extends State<PatientHistoryFormScreen> {
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            TextField(controller: medCtrl, decoration: _inputDec('Medication Name')),
+            TextField(controller: medCtrl, decoration: _inputDec('Medication Name'), textDirection: TextDirection.ltr),
             const SizedBox(height: 10),
             Row(
               children: [
-                Expanded(child: TextField(controller: doseCtrl, decoration: _inputDec('Dose'))),
+                Expanded(child: TextField(controller: doseCtrl, decoration: _inputDec('Dose'), textDirection: TextDirection.ltr)),
                 const SizedBox(width: 10),
-                Expanded(child: TextField(controller: freqCtrl, decoration: _inputDec('Frequency'))),
+                Expanded(child: TextField(controller: freqCtrl, decoration: _inputDec('Frequency'), textDirection: TextDirection.ltr)),
               ],
             ),
             const SizedBox(height: 10),
-            TextField(controller: durCtrl, decoration: _inputDec('Duration')),
+            TextField(controller: durCtrl, decoration: _inputDec('Duration'), textDirection: TextDirection.ltr),
           ],
         ),
         actions: [
@@ -1138,9 +1144,9 @@ class _PatientHistoryFormScreenState extends State<PatientHistoryFormScreen> {
                 onChanged: (v) => setS(() => selectedType = v!),
               ),
               const SizedBox(height: 10),
-              TextField(controller: allergenCtrl, decoration: _inputDec('Allergen Name')),
+              TextField(controller: allergenCtrl, decoration: _inputDec('Allergen Name'), textDirection: TextDirection.ltr),
               const SizedBox(height: 10),
-              TextField(controller: reactionCtrl, decoration: _inputDec('Reaction / Symptoms')),
+              TextField(controller: reactionCtrl, decoration: _inputDec('Reaction / Symptoms'), textDirection: TextDirection.ltr),
             ],
           ),
           actions: [
@@ -1189,6 +1195,7 @@ class _PatientHistoryFormScreenState extends State<PatientHistoryFormScreen> {
             maxLines: 3,
             controller: TextEditingController(text: _otherFamilyHistory),
             onChanged: (v) => setState(() => _otherFamilyHistory = v.isEmpty ? null : v),
+            textDirection: TextDirection.ltr,
           ),
         ],
       ),
@@ -1213,6 +1220,7 @@ class _PatientHistoryFormScreenState extends State<PatientHistoryFormScreen> {
                     diseaseCondition: v.isEmpty ? null : v,
                     ageAtDiagnosis: h?.ageAtDiagnosis,
                   )),
+                  textDirection: TextDirection.ltr,
                 ),
               ),
               const SizedBox(width: 12),
@@ -1226,6 +1234,7 @@ class _PatientHistoryFormScreenState extends State<PatientHistoryFormScreen> {
                     diseaseCondition: h?.diseaseCondition,
                     ageAtDiagnosis: int.tryParse(v),
                   )),
+                  textDirection: TextDirection.ltr,
                 ),
               ),
             ],

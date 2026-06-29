@@ -116,9 +116,28 @@ const register = async (req, res) => {
       ...(mrNumber && { mrNumber }),
     });
 
-    // Create role-specific profile
+    // Save verificationDetails to user document
+    const vd = req.body.verificationDetails || {};
+    if (Object.keys(vd).length > 0) {
+      await User.findByIdAndUpdate(user._id, { $set: { verificationDetails: vd } }, { strict: false });
+    }
+
+    // Create role-specific profile, seeding fields from verificationDetails
     if (role === 'doctor') {
-      await DoctorProfile.create({ user_id: user._id });
+      const docProfileData = { user_id: user._id };
+      if (vd.specialization) docProfileData.specialization = vd.specialization;
+      if (vd.pmdcNumber) docProfileData.pmdcNumber = vd.pmdcNumber;
+      if (vd.licenseNumber) docProfileData.license_number = vd.licenseNumber;
+      if (vd.experience) docProfileData.experience_years = vd.experience;
+      if (vd.availableDays?.length) docProfileData.available_days = vd.availableDays;
+      if (vd.availableTimings) docProfileData.available_hours = vd.availableTimings;
+      // Save uploaded documents as credentials so they appear in the dashboard
+      const credentials = [];
+      if (vd.cnicDocument) credentials.push({ type: 'CNIC', url: vd.cnicDocument, name: vd.cnicDocumentName || 'cnic', createdAt: new Date() });
+      if (vd.pmdcCertDocument) credentials.push({ type: 'PMDC Certificate', url: vd.pmdcCertDocument, name: vd.pmdcCertDocumentName || 'pmdc_cert', createdAt: new Date() });
+      if (vd.experienceCertDocument) credentials.push({ type: 'Experience Certificate', url: vd.experienceCertDocument, name: vd.experienceCertDocumentName || 'experience_cert', createdAt: new Date() });
+      if (credentials.length > 0) docProfileData.credentials = credentials;
+      await DoctorProfile.create(docProfileData);
     } else if (role === 'lab') {
       await LabProfile.create({ user_id: user._id });
     } else if (role === 'pharmacy') {
@@ -303,8 +322,7 @@ const forgotPassword = async (req, res) => {
 
     const user = await User.findOne({ email: email.toLowerCase().trim() });
     if (!user) {
-      // Don't reveal whether user exists — just say OTP sent
-      return res.status(200).json({ success: true, message: 'OTP sent to your email' });
+      return res.status(404).json({ success: false, message: 'No account found with this email address. Please check and try again.' });
     }
 
     // Generate 6-digit OTP

@@ -39,6 +39,10 @@ router.get('/profile', authMiddleware, async (req, res) => {
       gender: user.gender || null,
       age: user.age != null ? user.age.toString() : null,
       cnic: user.cnic || null,
+      address: user.address || null,
+      height: user.height || null,
+      weight: user.weight || null,
+      emergencyContacts: user.emergency_contacts || [],
       specialization: null,
       conditionsTreated: null,
     };
@@ -148,6 +152,10 @@ router.put('/profile', authMiddleware, async (req, res) => {
       gender: user.gender || null,
       age: user.age != null ? user.age.toString() : null,
       cnic: user.cnic || null,
+      address: user.address || null,
+      height: user.height || null,
+      weight: user.weight || null,
+      emergencyContacts: user.emergency_contacts || [],
       specialization: specialization || null,
       conditionsTreated: conditionsTreated || null,
     };
