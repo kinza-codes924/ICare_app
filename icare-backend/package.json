@@ -33,6 +33,6 @@
     "pg": "^8.20.0",
     "qrcode": "^1.5.4",
     "speakeasy": "^2.0.0",
-    "@vercel/blob": "^0.29.0"
+    "@vercel/blob": "^2.5.0"
   }
 }
