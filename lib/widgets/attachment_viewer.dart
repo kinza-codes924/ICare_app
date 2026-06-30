@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../utils/api_constants.dart';
+import '../utils/shared_pref.dart';
 import 'video_player_widget.dart';
 import 'doc_preview_widget.dart';
 
@@ -188,8 +188,7 @@ class AttachmentViewer extends StatelessWidget {
   Future<String> _resolveUrl(String original) async {
     if (!original.contains('res.cloudinary.com')) return original;
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString('token') ?? '';
+      final token = await SharedPref().getToken() ?? '';
       if (token.isEmpty) return original;
       final encoded = Uri.encodeComponent(original);
       return '${ApiConstants.baseUrl}/upload/doc-stream?url=$encoded&token=${Uri.encodeComponent(token)}';
