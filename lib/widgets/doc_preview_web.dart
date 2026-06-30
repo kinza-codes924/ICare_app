@@ -21,8 +21,12 @@ class _DocPreviewDialogState extends State<DocPreviewDialog> {
     super.initState();
     _viewId = 'doc-preview-${DateTime.now().microsecondsSinceEpoch}';
     ui_web.platformViewRegistry.registerViewFactory(_viewId, (int id) {
+      // Use Google Docs Viewer to render the PDF — it fetches via its own servers
+      // and handles the rendering, bypassing any Chrome embedded-PDF restrictions.
+      final gviewUrl =
+          'https://docs.google.com/viewer?url=${Uri.encodeComponent(widget.proxyUrl)}&embedded=true';
       return html.IFrameElement()
-        ..src = widget.proxyUrl
+        ..src = gviewUrl
         ..style.cssText = 'width:100%;height:100%;border:none;background:#f8f9fa;';
     });
   }
