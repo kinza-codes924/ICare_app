@@ -11,7 +11,9 @@ import 'package:icare/widgets/back_button.dart';
 /// Collects patient details (Myself / Someone else), reason, and certification.
 /// After validation → shows Pay Now bottom sheet → then waiting screen.
 class ConsultationDetailsScreen extends ConsumerStatefulWidget {
-  const ConsultationDetailsScreen({super.key});
+  final String? targetDoctorId;
+
+  const ConsultationDetailsScreen({super.key, this.targetDoctorId});
 
   @override
   ConsumerState<ConsultationDetailsScreen> createState() =>
@@ -303,7 +305,7 @@ class _ConsultationDetailsScreenState
                       if (mounted) {
                         Navigator.of(context).push(
                           MaterialPageRoute(
-                            builder: (_) => const ConnectNowWaitingScreen(),
+                            builder: (_) => ConnectNowWaitingScreen(targetDoctorId: widget.targetDoctorId),
                           ),
                         );
                       }

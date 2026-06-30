@@ -5,7 +5,6 @@ import 'package:icare/services/doctor_service.dart';
 import 'package:icare/screens/doctor_reviews.dart';
 import 'package:icare/utils/theme.dart';
 import 'package:icare/widgets/back_button.dart';
-import 'package:intl/intl.dart';
 
 class DoctorAnalytics extends StatefulWidget {
   const DoctorAnalytics({super.key});

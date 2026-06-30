@@ -1,4 +1,3 @@
-import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:icare/models/appointment_detail.dart';
 import 'package:icare/services/clinical_service.dart';

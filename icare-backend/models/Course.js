@@ -9,7 +9,12 @@ const lessonSchema = new mongoose.Schema({
   duration_minutes: { type: Number, default: 0 }, // legacy alias
   order: { type: Number, default: 0 },
   resources: { type: Array, default: [] },
-});
+  documentUrl: String,       // attached document
+  documentName: String,
+  // Feature 2: live session scheduled for this lesson (reminder only, not auto-start)
+  liveSessionDateTime: { type: Date, default: null },
+  liveSessionNote: { type: String, default: '' },
+}, { strict: false });
 
 const moduleSchema = new mongoose.Schema({
   title: String,

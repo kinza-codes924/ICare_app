@@ -9,7 +9,9 @@ import 'package:icare/models/appointment_detail.dart';
 import 'package:icare/models/user.dart';
 
 class ConnectNowWaitingScreen extends StatefulWidget {
-  const ConnectNowWaitingScreen({super.key});
+  final String? targetDoctorId;
+
+  const ConnectNowWaitingScreen({super.key, this.targetDoctorId});
 
   @override
   State<ConnectNowWaitingScreen> createState() => _ConnectNowWaitingScreenState();
@@ -45,7 +47,7 @@ class _ConnectNowWaitingScreenState extends State<ConnectNowWaitingScreen>
 
   Future<void> _initiateRequest() async {
     try {
-      final result = await _service.initiateConnect();
+      final result = await _service.initiateConnect(targetDoctorId: widget.targetDoctorId);
       if (result['success'] == true) {
         setState(() {
           _requestId = result['requestId'];
@@ -114,7 +116,7 @@ class _ConnectNowWaitingScreenState extends State<ConnectNowWaitingScreen>
     
     final sharedPref = SharedPref();
     final userData = await sharedPref.getUserData();
-    final patientName = (userData?.name?.trim().isNotEmpty == true) ? userData!.name.trim() : 'Patient';
+    final patientName = (userData?.name.trim().isNotEmpty == true) ? userData!.name.trim() : 'Patient';
     final patientId = userData?.id ?? '';
 
     if (!mounted) return;

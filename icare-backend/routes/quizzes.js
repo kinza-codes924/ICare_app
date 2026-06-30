@@ -113,7 +113,16 @@ router.get('/:id', authMiddleware, async (req, res) => {
         question: q.question,
         options: q.options,
         points: q.points,
-        order: q.order
+        order: q.order,
+        // Media attachments — needed for student display
+        imageUrl: q.imageUrl,
+        videoUrl: q.videoUrl,
+        videoFileUrl: q.videoFileUrl,
+        documentUrl: q.documentUrl,
+        documentName: q.documentName,
+        scenarioText: q.scenarioText,
+        instructions: q.instructions,
+        rubric: q.rubric,
       }))
     };
 

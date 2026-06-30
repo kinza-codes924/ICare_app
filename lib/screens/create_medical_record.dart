@@ -1639,7 +1639,7 @@ class _CreateMedicalRecordScreenState extends State<CreateMedicalRecordScreen> {
                             Switch(
                               value: _referToEmergency,
                               onChanged: (val) => setState(() => _referToEmergency = val),
-                              activeColor: const Color(0xFFEF4444),
+                              activeThumbColor: const Color(0xFFEF4444),
                             ),
                             const SizedBox(width: 8),
                             const Text(
@@ -1651,7 +1651,7 @@ class _CreateMedicalRecordScreenState extends State<CreateMedicalRecordScreen> {
                         if (_referToEmergency) ...[
                           const SizedBox(height: 12),
                           DropdownButtonFormField<String>(
-                            value: _emergencyReason,
+                            initialValue: _emergencyReason,
                             isExpanded: true,
                             decoration: _modernInputDecoration(
                               'Select Reason',

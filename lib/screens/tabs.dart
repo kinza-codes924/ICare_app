@@ -694,7 +694,7 @@ class _WebSidebarState extends ConsumerState<_WebSidebar> {
                           child: ClipOval(
                             child: imgProvider != null
                               ? Image(image: imgProvider, width: 48, height: 48, fit: BoxFit.cover,
-                                  errorBuilder: (_, __, ___) => Text(initial, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.primaryColor)))
+                                  errorBuilder: (_, _, _) => Text(initial, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.primaryColor)))
                               : Text(initial, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.primaryColor)),
                           ),
                         );
@@ -1843,7 +1843,7 @@ class _WebTopBar extends ConsumerWidget {
                         child: ClipOval(
                           child: imgProvider != null
                             ? Image(image: imgProvider, width: 40, height: 40, fit: BoxFit.cover,
-                                errorBuilder: (_, __, ___) => Text(initial, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.primaryColor)))
+                                errorBuilder: (_, _, _) => Text(initial, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.primaryColor)))
                             : Text(initial, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.primaryColor)),
                         ),
                       );

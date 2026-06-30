@@ -14,7 +14,6 @@ import 'package:icare/utils/utils.dart';
 import 'package:icare/utils/shared_pref.dart';
 import 'package:icare/widgets/back_button.dart';
 import 'package:icare/widgets/custom_text.dart';
-import 'package:intl/intl.dart';
 
 class BookingsScreen extends ConsumerStatefulWidget {
   const BookingsScreen({super.key, this.tabs = false});

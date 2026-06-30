@@ -37,7 +37,7 @@ class REceiptScreen extends StatelessWidget {
     final int testCount = tests.isNotEmpty ? tests.length : 1;
     final totalPrice = bookingData?['totalPrice'] ?? bookingData?['price'] ?? (testCount * 3000);
     final date = bookingData?['test_date'] ?? bookingData?['date'] ?? "Not set";
-    final time = bookingData?['time'] ?? "Not set";
+    final time = bookingData?['preferred_time'] ?? bookingData?['time'] ?? "Not set";
     final bookingId = bookingData?['_id'] ?? bookingData?['id'] ?? "N/A";
 
     return Scaffold(

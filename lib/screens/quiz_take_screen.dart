@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:icare/services/lms_service.dart';
 import 'package:icare/utils/theme.dart';
+import 'package:icare/widgets/attachment_viewer.dart';
 import 'package:icare/widgets/back_button.dart';
 
 class QuizTakeScreen extends StatefulWidget {
@@ -435,8 +436,11 @@ class _QuizTakeScreenState extends State<QuizTakeScreen> {
                 ),
                 const SizedBox(height: 20),
 
+                // Media attachments (image / video / document)
+                _buildQuestionMedia(question),
+
                 // Answer section
-                if (qType == 'MCQ' || options.isNotEmpty) ...[
+                if (qType == 'MCQ' || qType == 'TRUE_FALSE') ...[
                   const Text('Select an answer:',
                       style: TextStyle(
                           fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF64748B))),
@@ -539,6 +543,41 @@ class _QuizTakeScreenState extends State<QuizTakeScreen> {
         _buildBottomNav(),
       ],
     );
+  }
+
+  Widget _buildQuestionMedia(dynamic question) {
+    final widgets = <Widget>[];
+    
+    // Image / clinical_scenario — detect from imageUrl or options[0]
+    final imageUrl = question['imageUrl']?.toString() ?? '';
+    if (imageUrl.startsWith('http')) {
+      widgets.add(AttachmentViewer(url: imageUrl, label: 'Reference Image'));
+      widgets.add(const SizedBox(height: 16));
+    }
+
+    // Video / clinical_video — detect from videoFileUrl or videoUrl
+    final vFile = question['videoFileUrl']?.toString() ?? '';
+    final vUrl = question['videoUrl']?.toString() ?? '';
+    final videoUrl = vFile.startsWith('http') ? vFile : vUrl;
+    if (videoUrl.startsWith('http')) {
+      widgets.add(AttachmentViewer(url: videoUrl, name: 'Clinical Video', label: 'Watch video'));
+      widgets.add(const SizedBox(height: 16));
+    }
+
+    // Document attachment
+    final docUrl = question['documentUrl']?.toString() ?? '';
+    final docName = question['documentName']?.toString() ?? '';
+    if (docUrl.startsWith('http')) {
+      widgets.add(AttachmentViewer(
+        url: docUrl,
+        name: docName.isNotEmpty ? docName : 'Reference Document',
+        label: 'Tap to open document',
+      ));
+      widgets.add(const SizedBox(height: 16));
+    }
+
+    if (widgets.isEmpty) return const SizedBox.shrink();
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: widgets);
   }
 
   Widget _buildBottomNav() {
@@ -828,7 +867,7 @@ class _QuizTakeScreenState extends State<QuizTakeScreen> {
                       Expanded(child: _statCard('Correct', correctCount.toString(), Icons.check_circle_rounded, const Color(0xFF10B981))),
                       const SizedBox(width: 12),
                       Expanded(child: _statCard('Wrong',
-                          (totalQuestions - (correctCount is int ? correctCount : 0)).toString(),
+                          (totalQuestions - (correctCount)).toString(),
                           Icons.cancel_rounded, const Color(0xFFEF4444))),
                     ],
                   ),

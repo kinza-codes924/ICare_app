@@ -136,7 +136,7 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
           }
         } else if (role == 'pharmacy') {
           // Try common pharmacy profile endpoints
-          for (final ep in ['/pharmacy/profile/$id', '/pharmacies/$id', '/pharmacy/$id']) {
+          for (final ep in ['/pharmacy/profile/$id', '/pharmacy/$id']) {
             try {
               final r = await _apiService.get(ep);
               if (r.statusCode == 200 && r.data is Map) {
@@ -360,6 +360,7 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
           : _currentTab != 'Pending' && _currentTab != 'PatientRecords'
               && _currentTab != 'LeaveRequests' && _currentTab != 'Certificates'
               && _currentTab != 'Commission' && _currentTab != 'DoctorTools'
+              && _currentTab != 'CourseCategories'
           ? FloatingActionButton.extended(
               onPressed: () => _showAddUserDialog(),
               backgroundColor: AppColors.primaryColor,
@@ -387,6 +388,8 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
           ? _buildFaqsTab()
           : _currentTab == 'PatientRecords'
           ? _buildPatientRecordsTab()
+          : _currentTab == 'CourseCategories'
+          ? _buildCourseCategoriesTab()
           : _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _users.isEmpty
@@ -1000,6 +1003,7 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
                   _buildTabItemBadge('Certificates',  Icons.verified_rounded,   pendingCerts),
                   _buildTabItem('Commission',     Icons.percent_rounded),
                   _buildTabItem('DoctorTools',    Icons.manage_accounts_rounded),
+                  _buildTabItem('CourseCategories', Icons.category_rounded),
                   _buildTabItem('Community',      Icons.forum_rounded),
                   _buildTabItem('FAQs',           Icons.help_outline_rounded),
                 ],
@@ -1024,9 +1028,16 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
     );
   }
 
+  // ── Course Categories Tab ────────────────────────────────────────────────
+  Widget _buildCourseCategoriesTab() {
+    return _CourseCategoriesPanel(apiService: _apiService);
+  }
+
   Widget _buildTabItem(String title, IconData icon) {
     bool isActive = _currentTab == title;
-    final displayTitle = title == 'PatientRecords' ? 'Patient Records' : title;
+    final displayTitle = title == 'PatientRecords' ? 'Patient Records'
+        : title == 'CourseCategories' ? 'Course Categories'
+        : title;
     return GestureDetector(
       onTap: () => _onTabChanged(title),
       child: Container(
@@ -1813,17 +1824,21 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
     try {
       final postsRes = await _apiService.get('/community/posts');
       final topicsRes = await _apiService.get('/community/categories-full');
-      if (mounted) setState(() {
+      if (mounted) {
+        setState(() {
         _communityPosts = (postsRes.data['posts'] is List) ? postsRes.data['posts'] as List : [];
         _communityTopics = (topicsRes.data['topics'] is List) ? topicsRes.data['topics'] as List : [];
       });
+      }
     } catch (_) {
       try {
         final postsRes = await _apiService.get('/community/posts');
-        if (mounted) setState(() {
+        if (mounted) {
+          setState(() {
           _communityPosts = (postsRes.data['posts'] is List) ? postsRes.data['posts'] as List : [];
           _communityTopics = [];
         });
+        }
       } catch (_) {}
     }
     if (mounted) setState(() => _isLoadingCommunity = false);
@@ -2050,7 +2065,7 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
                   trailing: const Chip(label: Text('No Referrer', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Color(0xFFEF4444))),
                       backgroundColor: Color(0xFFFEE2E2), side: BorderSide.none, padding: EdgeInsets.symmetric(horizontal: 4)),
                 ),
-              )).toList(),
+              )),
           ],
         );
     }
@@ -2060,10 +2075,12 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
     if (mounted) setState(() => _isLoadingDoctorTools = true);
     try {
       final r = await _apiService.get('/admin/doctor-tools');
-      if (mounted) setState(() {
+      if (mounted) {
+        setState(() {
         _expiringLicenses = (r.data['expiringLicenses'] is List) ? r.data['expiringLicenses'] as List : [];
         _noReferrerDoctors = (r.data['noReferrerDoctors'] is List) ? r.data['noReferrerDoctors'] as List : [];
       });
+      }
     } catch (_) {}
     if (mounted) setState(() => _isLoadingDoctorTools = false);
   }
@@ -2099,7 +2116,7 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 DropdownButtonFormField<String>(
-                  value: selectedType,
+                  initialValue: selectedType,
                   decoration: const InputDecoration(labelText: 'Account Type', border: OutlineInputBorder()),
                   items: accountTypes.map((t) => DropdownMenuItem(value: t,
                     child: Text(t[0].toUpperCase() + t.substring(1)))).toList(),
@@ -2272,5 +2289,148 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
                 );
               },
             );
+  }
+}
+
+// ── Course Categories Panel ─────────────────────────────────────────────────
+class _CourseCategoriesPanel extends StatefulWidget {
+  final ApiService apiService;
+  const _CourseCategoriesPanel({required this.apiService});
+  @override
+  State<_CourseCategoriesPanel> createState() => _CourseCategoriesPanelState();
+}
+
+class _CourseCategoriesPanelState extends State<_CourseCategoriesPanel> {
+  List<Map<String, dynamic>> _categories = [];
+  bool _loading = true;
+
+  @override
+  void initState() { super.initState(); _load(); }
+
+  Future<void> _load() async {
+    setState(() => _loading = true);
+    try {
+      final res = await widget.apiService.get('/admin/categories?all=true');
+      if (mounted) setState(() {
+        _categories = List<Map<String, dynamic>>.from(res.data['categories'] ?? []);
+        _loading = false;
+      });
+    } catch (_) { if (mounted) setState(() => _loading = false); }
+  }
+
+  void _showAddDialog() {
+    final nameCtrl = TextEditingController();
+    final descCtrl = TextEditingController();
+    showDialog(context: context, builder: (_) => AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      title: const Text('Add Course Category', style: TextStyle(fontWeight: FontWeight.w800)),
+      content: Column(mainAxisSize: MainAxisSize.min, children: [
+        TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Category Name *', border: OutlineInputBorder())),
+        const SizedBox(height: 12),
+        TextField(controller: descCtrl, decoration: const InputDecoration(labelText: 'Description (optional)', border: OutlineInputBorder()), maxLines: 2),
+      ]),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+        ElevatedButton(
+          onPressed: () async {
+            if (nameCtrl.text.trim().isEmpty) return;
+            Navigator.pop(context);
+            try {
+              await widget.apiService.post('/admin/categories', {'name': nameCtrl.text.trim(), 'description': descCtrl.text.trim()});
+              _load();
+            } catch (e) {
+              if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red));
+            }
+          },
+          style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryColor),
+          child: const Text('Add', style: TextStyle(color: Colors.white)),
+        ),
+      ],
+    ));
+  }
+
+  Future<void> _toggleActive(Map<String, dynamic> cat) async {
+    try {
+      await widget.apiService.put('/admin/categories/${cat['_id']}', {'isActive': !(cat['isActive'] as bool? ?? true)});
+      _load();
+    } catch (_) {}
+  }
+
+  Future<void> _delete(Map<String, dynamic> cat) async {
+    final confirm = await showDialog<bool>(context: context, builder: (_) => AlertDialog(
+      title: const Text('Delete Category'),
+      content: Text('Delete "${cat['name']}"? It will be hidden from instructors.'),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+        ElevatedButton(onPressed: () => Navigator.pop(context, true), style: ElevatedButton.styleFrom(backgroundColor: Colors.red), child: const Text('Delete', style: TextStyle(color: Colors.white))),
+      ],
+    ));
+    if (confirm != true) return;
+    try { await widget.apiService.delete('/admin/categories/${cat['_id']}'); _load(); } catch (_) {}
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.all(20),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          const Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('Course Categories', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: Color(0xFF0F172A))),
+            SizedBox(height: 4),
+            Text('Manage categories shown to instructors when creating courses.', style: TextStyle(color: Color(0xFF64748B), fontSize: 13)),
+          ])),
+          ElevatedButton.icon(
+            onPressed: _showAddDialog,
+            icon: const Icon(Icons.add_rounded, size: 18),
+            label: const Text('Add Category'),
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryColor, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
+          ),
+        ]),
+        const SizedBox(height: 20),
+        if (_loading)
+          const Center(child: CircularProgressIndicator())
+        else if (_categories.isEmpty)
+          Center(child: Padding(padding: const EdgeInsets.all(40), child: Column(children: [
+            const Icon(Icons.category_outlined, size: 56, color: Color(0xFFCBD5E1)),
+            const SizedBox(height: 12),
+            const Text('No categories yet.', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 15)),
+            const SizedBox(height: 8),
+            ElevatedButton(onPressed: _showAddDialog, child: const Text('Add First Category')),
+          ])))
+        else
+          Expanded(child: RefreshIndicator(
+            onRefresh: _load,
+            child: ListView.separated(
+              itemCount: _categories.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 10),
+              itemBuilder: (_, i) {
+                final cat = _categories[i];
+                final isActive = cat['isActive'] as bool? ?? true;
+                return Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: isActive ? const Color(0xFFE2E8F0) : const Color(0xFFFECACA)),
+                    boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 6, offset: const Offset(0, 2))],
+                  ),
+                  child: Row(children: [
+                    Container(width: 10, height: 10, decoration: BoxDecoration(color: isActive ? const Color(0xFF10B981) : const Color(0xFFCBD5E1), shape: BoxShape.circle)),
+                    const SizedBox(width: 12),
+                    Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Text(cat['name']?.toString() ?? '', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15, color: Color(0xFF0F172A))),
+                      if ((cat['description'] ?? '').toString().isNotEmpty)
+                        Text(cat['description'].toString(), style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                    ])),
+                    Switch(value: isActive, onChanged: (_) => _toggleActive(cat), activeColor: const Color(0xFF10B981)),
+                    IconButton(icon: const Icon(Icons.delete_outline_rounded, color: Colors.red, size: 20), onPressed: () => _delete(cat)),
+                  ]),
+                );
+              },
+            ),
+          )),
+      ]),
+    );
   }
 }

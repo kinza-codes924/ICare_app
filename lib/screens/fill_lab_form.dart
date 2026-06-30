@@ -1,7 +1,9 @@
 import 'dart:developer';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_size_matters/flutter_size_matters.dart';
+import 'package:icare/providers/auth_provider.dart';
 import 'package:icare/screens/receipt.dart';
 import 'package:icare/services/laboratory_service.dart';
 import 'package:icare/utils/theme.dart';
@@ -12,7 +14,7 @@ import 'package:icare/widgets/custom_text.dart';
 import 'package:icare/widgets/custom_text_input.dart';
 import 'package:intl/intl.dart';
 
-class FillLabForm extends StatefulWidget {
+class FillLabForm extends ConsumerStatefulWidget {
   final Map<String, dynamic>? labData;
   final List<String>? selectedTests;
   final String? prescriptionId;
@@ -20,10 +22,10 @@ class FillLabForm extends StatefulWidget {
   const FillLabForm({super.key, this.labData, this.selectedTests, this.prescriptionId});
 
   @override
-  State<FillLabForm> createState() => _FillLabFormState();
+  ConsumerState<FillLabForm> createState() => _FillLabFormState();
 }
 
-class _FillLabFormState extends State<FillLabForm> {
+class _FillLabFormState extends ConsumerState<FillLabForm> {
   final _labService = LaboratoryService();
 
   final _nameController = TextEditingController();
@@ -44,7 +46,27 @@ class _FillLabFormState extends State<FillLabForm> {
     _dateController.text = DateFormat('yyyy-MM-dd').format(DateTime.now());
     _timeController.text = "10:00 AM";
     if (widget.labData?['address'] != null) {
-      _locationController.text = widget.labData?['address'];
+      _locationController.text = widget.labData!['address'];
+    }
+    // Pre-fill patient details from logged-in account
+    final user = ref.read(authProvider).user;
+    if (user != null) {
+      final name = user.name ?? '';
+      if (name.isNotEmpty) {
+        _nameController.text = name;
+        _patientNameController.text = name;
+      }
+      final age = user.age ?? '';
+      if (age.isNotEmpty) _ageController.text = age;
+      final phone = user.phoneNumber ?? '';
+      if (phone.isNotEmpty) _phoneController.text = phone;
+      final gender = (user.gender ?? '').trim();
+      if (gender.isNotEmpty) {
+        final g = gender[0].toUpperCase() + gender.substring(1).toLowerCase();
+        if (g == 'Male' || g == 'Female' || g == 'Other') {
+          _selectedGender = g;
+        }
+      }
     }
   }
 
@@ -102,7 +124,8 @@ class _FillLabFormState extends State<FillLabForm> {
         'patient_address': _locationController.text.trim(),
         'collectionType': _homeSample ? 'home' : 'in-lab',
         'collection_type': _homeSample ? 'home' : 'in-lab',
-        'notes': 'Requester: ${_nameController.text.trim()}, Time: ${_timeController.text}',
+        'preferred_time': _timeController.text,
+        'notes': 'Requester: ${_nameController.text.trim()}',
         if (widget.prescriptionId != null && widget.prescriptionId!.isNotEmpty)
           'prescriptionId': widget.prescriptionId,
         if (widget.prescriptionId != null && widget.prescriptionId!.isNotEmpty)

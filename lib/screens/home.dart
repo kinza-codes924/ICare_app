@@ -30,7 +30,6 @@ import 'package:icare/widgets/laboratory.dart';
 import 'package:icare/widgets/student_home.dart';
 import 'package:icare/widgets/svg_wrapper.dart';
 import 'package:easy_date_timeline/easy_date_timeline.dart';
-import 'package:intl/intl.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});

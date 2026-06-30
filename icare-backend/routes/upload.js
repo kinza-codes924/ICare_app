@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const crypto = require('crypto');
 const multer = require('multer');
 const { v2: cloudinary } = require('cloudinary');
 const { authMiddleware: protect } = require('../middleware/auth');
@@ -35,7 +36,7 @@ router.post('/', protect, upload.single('file'), async (req, res) => {
       return res.status(400).json({ success: false, message: 'No file provided' });
     }
     const isPdf = req.file.mimetype === 'application/pdf';
-    const resourceType = isPdf ? 'raw' : 'image';
+    const resourceType = isPdf ? 'auto' : 'image';
     const folder = req.body.folder || 'icare/consultation-attachments';
     const result = await uploadToCloudinary(req.file.buffer, folder, resourceType);
     res.json({ success: true, url: result.secure_url, publicId: result.public_id, resourceType });
@@ -69,7 +70,7 @@ router.post('/prescription', protect, upload.single('file'), async (req, res) =>
     // PDFs must use resource_type:'raw' so Cloudinary stores them as documents,
     // not images. Images use the default 'image' resource type.
     const isPdf = req.file.mimetype === 'application/pdf';
-    const resourceType = isPdf ? 'raw' : 'image';
+    const resourceType = isPdf ? 'auto' : 'image';
     const result = await uploadToCloudinary(req.file.buffer, 'icare/prescriptions', resourceType);
     res.json({ success: true, url: result.secure_url, publicId: result.public_id, resourceType });
   } catch (err) {
@@ -133,6 +134,68 @@ router.get('/sign', protect, async (req, res) => {
   } catch (err) {
     console.error('Sign error:', err);
     res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// GET /api/upload/doc-url?url=<encoded_cloudinary_url>
+// Returns a signed delivery URL for Cloudinary raw/document resources.
+// Required because some Cloudinary accounts restrict raw file public delivery (returns 401).
+// Signed URLs bypass delivery restrictions by embedding a timed auth signature.
+router.get('/doc-url', protect, async (req, res) => {
+  try {
+    const rawUrl = decodeURIComponent(req.query.url || '');
+    if (!rawUrl) return res.status(400).json({ success: false, message: 'url required' });
+
+    // If not a Cloudinary URL, return as-is (nothing to sign)
+    if (!rawUrl.includes('res.cloudinary.com')) {
+      return res.json({ success: true, url: rawUrl });
+    }
+
+    // Parse resource_type and public_id from URL
+    // Format: https://res.cloudinary.com/{cloud}/{resource_type}/upload/[v123/]{public_id}
+    const match = rawUrl.match(/res\.cloudinary\.com\/[^/]+\/([^/]+)\/upload\/(?:v\d+\/)?(.+)$/);
+    if (!match) return res.json({ success: true, url: rawUrl });
+
+    const resourceType = match[1]; // 'raw', 'image', 'video', 'auto'
+    const publicId = match[2];     // 'icare/quiz/docs/filename.pdf'
+
+    // Bypass the Cloudinary SDK's private_download_url because it incorrectly includes
+    // `resource_type` and `format` in the HMAC signature, but Cloudinary's download endpoint
+    // only signs: attachment, expires_at, public_id, timestamp.
+    // Extra params in the signature cause Cloudinary to return "Resource not found" (its
+    // deliberate security response to invalid signatures, not a real 404).
+    const apiKey    = cloudinary.config().api_key;
+    const apiSecret = process.env.CLOUDINARY_API_SECRET || cloudinary.config().api_secret;
+    const cloudName = cloudinary.config().cloud_name;
+    if (!apiSecret) return res.json({ success: true, url: rawUrl });
+
+    const resolvedType = resourceType === 'auto' ? 'raw' : resourceType;
+    const timestamp  = Math.floor(Date.now() / 1000);
+    const expiresAt  = timestamp + 7200; // 2 hours
+
+    // Keep extension embedded in public_id — do NOT split it out as a separate 'format' param.
+    // Cloudinary's download API resolves "filename.pdf" to the stored resource correctly.
+    const paramsToSign = { attachment: false, expires_at: expiresAt, public_id: publicId, timestamp };
+    const toSign = Object.keys(paramsToSign).sort()
+      .map(k => `${k}=${paramsToSign[k]}`).join('&') + apiSecret;
+    const signature = crypto.createHash('sha1').update(toSign).digest('hex');
+
+    const qs = new URLSearchParams({
+      public_id: publicId,
+      attachment: 'false',
+      expires_at: String(expiresAt),
+      timestamp:  String(timestamp),
+      api_key:    apiKey,
+      signature,
+    }).toString();
+
+    const downloadUrl = `https://api.cloudinary.com/v1_1/${cloudName}/${resolvedType}/download?${qs}`;
+    console.log(`doc-url manual-sign: type=${resolvedType} pid=${publicId}`);
+    res.json({ success: true, url: downloadUrl });
+  } catch (e) {
+    console.error('doc-url error:', e);
+    // Fallback — return original URL so the app doesn't break
+    res.json({ success: true, url: decodeURIComponent(req.query.url || '') });
   }
 });
 

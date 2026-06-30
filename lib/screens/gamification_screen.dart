@@ -730,8 +730,11 @@ class _GamificationScreenState extends State<GamificationScreen>
       if (dateStr.isEmpty) continue;
       try {
         final key = DateFormat('MMM yy').format(DateTime.parse(dateStr).toLocal());
-        if (pts > 0) earned[key] = (earned[key] ?? 0) + pts;
-        else spent[key] = (spent[key] ?? 0) + pts.abs();
+        if (pts > 0) {
+          earned[key] = (earned[key] ?? 0) + pts;
+        } else {
+          spent[key] = (spent[key] ?? 0) + pts.abs();
+        }
       } catch (_) {}
     }
 

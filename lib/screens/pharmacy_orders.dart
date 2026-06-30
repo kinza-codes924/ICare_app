@@ -736,7 +736,7 @@ class _PharmacyOrdersState extends ConsumerState<PharmacyOrders>
                         child: ListView.separated(
                           shrinkWrap: true,
                           itemCount: filtered.length,
-                          separatorBuilder: (_, __) => const Divider(height: 1),
+                          separatorBuilder: (_, _) => const Divider(height: 1),
                           itemBuilder: (_, i) {
                             final med = filtered[i];
                             final isSelected = selectedMedicines.any((s) => s['id'] == med['id']);

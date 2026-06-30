@@ -8,6 +8,16 @@ const instructorProfileSchema = new mongoose.Schema({
   profile_image: String,
   rating: { type: Number, default: 0 },
   total_reviews: { type: Number, default: 0 },
-}, { timestamps: true });
+  // Extended profile fields
+  qualification: String,
+  experience: String,
+  gender: String,
+  age: mongoose.Schema.Types.Mixed,
+  address: String,
+  specialties: [String],
+  languages: [String],
+  availabilityDays: [String],
+  availabilityTime: mongoose.Schema.Types.Mixed,
+}, { timestamps: true, strict: false });
 
 module.exports = mongoose.models.InstructorProfile || mongoose.model('InstructorProfile', instructorProfileSchema);

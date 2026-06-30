@@ -5,7 +5,6 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:icare/services/doctor_service.dart';
 import 'package:icare/utils/imagePaths.dart';
 import 'package:icare/widgets/back_button.dart';
-import 'package:intl/intl.dart';
 
 class DoctorReviews extends ConsumerStatefulWidget {
   const DoctorReviews({super.key});

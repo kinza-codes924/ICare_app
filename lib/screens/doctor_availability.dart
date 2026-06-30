@@ -145,7 +145,7 @@ class _DoctorAvailabilityState extends State<DoctorAvailability> {
         setState(() {
           final loadedDays = List<String>.from(
             availability!['availableDays'] ??
-                availability!['available_days'] ??
+                availability['available_days'] ??
                 ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
           );
 
@@ -158,7 +158,7 @@ class _DoctorAvailabilityState extends State<DoctorAvailability> {
 
           String startStr = '09:00';
           String endStr = '17:00';
-          final at = availability!['availableTime'] ?? availability!['available_hours'];
+          final at = availability['availableTime'] ?? availability['available_hours'];
           if (at is Map) {
             startStr = at['start']?.toString() ?? '09:00';
             endStr = at['end']?.toString() ?? '17:00';
@@ -173,15 +173,15 @@ class _DoctorAvailabilityState extends State<DoctorAvailability> {
           _startTime = _parseTimeOfDay(startStr, fallbackHour: 9);
           _endTime = _parseTimeOfDay(endStr, fallbackHour: 17);
 
-          if (availability!['unavailableDates'] != null) {
+          if (availability['unavailableDates'] != null) {
             _unavailableDates.clear();
-            for (var dateStr in availability!['unavailableDates']) {
+            for (var dateStr in availability['unavailableDates']) {
               try { _unavailableDates.add(DateTime.parse(dateStr.toString())); } catch (_) {}
             }
           }
 
-          _bufferTime = availability!['bufferTime'] ?? 15;
-          _emergencySlots = availability!['emergencySlots'] == true;
+          _bufferTime = availability['bufferTime'] ?? 15;
+          _emergencySlots = availability['emergencySlots'] == true;
           _isLoading = false;
         });
       } else {

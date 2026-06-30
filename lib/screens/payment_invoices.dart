@@ -8,7 +8,6 @@ import 'package:icare/widgets/custom_text.dart';
 import 'package:icare/utils/pdf_invoice_generator.dart';
 import '../services/laboratory_service.dart';
 import '../services/pharmacy_service.dart';
-import 'package:intl/intl.dart';
 
 class PaymentInvoices extends StatefulWidget {
   final bool isPharmacy;

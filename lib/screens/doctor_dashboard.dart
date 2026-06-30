@@ -368,7 +368,7 @@ class _DoctorDashboardState extends ConsumerState<DoctorDashboard> {
             backgroundColor: AppColors.primaryColor.withValues(alpha: 0.1),
             child: ClipOval(child: () {
               final img = buildProfileImageProvider(profilePic);
-              if (img != null) return Image(image: img, width: 56, height: 56, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.person, color: AppColors.primaryColor, size: 30));
+              if (img != null) return Image(image: img, width: 56, height: 56, fit: BoxFit.cover, errorBuilder: (_, _, _) => const Icon(Icons.person, color: AppColors.primaryColor, size: 30));
               return const Icon(Icons.person, color: AppColors.primaryColor, size: 30);
             }()),
           ),

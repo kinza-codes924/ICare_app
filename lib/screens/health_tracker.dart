@@ -46,7 +46,7 @@ class _HealthTrackerState extends State<HealthTracker> {
 
     final gamificationResult = results[0];
     final entriesResult = results[1];
-    final loginResult = results[2] as Map<String, dynamic>;
+    final loginResult = results[2];
 
     if (mounted) {
       setState(() {

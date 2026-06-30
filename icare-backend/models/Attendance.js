@@ -9,6 +9,9 @@ const attendanceSchema = new mongoose.Schema({
   records: [{
     studentId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     status:    { type: String, enum: ['present', 'absent', 'late'], default: 'absent' },
+    joinedAt:  { type: Date, default: null },
+    leftAt:    { type: Date, default: null },
+    durationMinutes: { type: Number, default: null },
   }],
 }, { timestamps: true });
 

@@ -81,6 +81,7 @@ class _InstructorLmsCreateCourseScreenState extends State<InstructorLmsCreateCou
   String _category = 'HealthProgram';
   String _targetAudience = 'Patient';
   String _difficulty = 'Beginner';
+  List<Map<String, dynamic>> _categories = [];
   final _durationDaysController = TextEditingController();
   final _durationWeeksController = TextEditingController();
   final _durationMonthsController = TextEditingController();
@@ -98,6 +99,25 @@ class _InstructorLmsCreateCourseScreenState extends State<InstructorLmsCreateCou
 
   // Modules
   final List<Map<String, dynamic>> _modules = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCategories();
+  }
+
+  Future<void> _loadCategories() async {
+    final cats = await _lmsService.getCourseCategories();
+    if (mounted) {
+      setState(() {
+        _categories = cats;
+        // If current _category isn't in fetched list, keep it; else use first
+        if (cats.isNotEmpty && !cats.any((c) => c['value'] == _category)) {
+          _category = cats.first['value']?.toString() ?? _category;
+        }
+      });
+    }
+  }
 
   Future<void> _pickAndUploadThumbnail() async {
     try {
@@ -492,19 +512,21 @@ class _InstructorLmsCreateCourseScreenState extends State<InstructorLmsCreateCou
               const SizedBox(height: 32),
               
               DropdownButtonFormField<String>(
-                initialValue: _category,
+                value: _categories.any((c) => c['value'] == _category) ? _category : (_categories.isNotEmpty ? _categories.first['value']?.toString() : null),
                 decoration: const InputDecoration(
                   labelText: 'Category',
                   border: OutlineInputBorder(),
                 ),
-                items: const [
-                  DropdownMenuItem(value: 'HealthProgram', child: Text('Health Program')),
-                  DropdownMenuItem(value: 'FCPSPart1', child: Text('FCPS Part 1')),
-                  DropdownMenuItem(value: 'Medical Training', child: Text('Medical Training (For health care professionals only)')),
-                  DropdownMenuItem(value: 'Wellness', child: Text('Wellness')),
-                  DropdownMenuItem(value: 'Nutrition', child: Text('Nutrition')),
-                  DropdownMenuItem(value: 'Mental Health', child: Text('Mental Health')),
-                ],
+                items: _categories.isNotEmpty
+                    ? _categories.map((c) => DropdownMenuItem(value: c['value']?.toString() ?? '', child: Text(c['name']?.toString() ?? ''))).toList()
+                    : const [
+                        DropdownMenuItem(value: 'HealthProgram', child: Text('Health Program')),
+                        DropdownMenuItem(value: 'FCPSPart1', child: Text('FCPS Part 1')),
+                        DropdownMenuItem(value: 'Medical Training', child: Text('Medical Training')),
+                        DropdownMenuItem(value: 'Wellness', child: Text('Wellness')),
+                        DropdownMenuItem(value: 'Nutrition', child: Text('Nutrition')),
+                        DropdownMenuItem(value: 'Mental Health', child: Text('Mental Health')),
+                      ],
                 onChanged: (value) => setState(() => _category = value!),
               ),
               const SizedBox(height: 20),
@@ -939,6 +961,7 @@ class _InstructorLmsCreateCourseScreenState extends State<InstructorLmsCreateCou
                         if ((lesson['duration'] ?? 0) > 0) Text('${lesson['duration']} min', style: const TextStyle(fontSize: 11)),
                         if (lesson['videoUrl'] != null && (lesson['videoUrl'] as String).isNotEmpty) ...[const SizedBox(width: 8), const Icon(Icons.videocam_rounded, size: 14, color: Color(0xFF3B82F6))],
                         if (lesson['documentUrl'] != null && (lesson['documentUrl'] as String).isNotEmpty) ...[const SizedBox(width: 6), const Icon(Icons.description_outlined, size: 14, color: Color(0xFF10B981))],
+                        if (lesson['liveSessionDateTime'] != null) ...[const SizedBox(width: 6), const Icon(Icons.video_call_rounded, size: 14, color: Color(0xFF6366F1))],
                       ]),
                     );
                   }),
@@ -1005,18 +1028,25 @@ class _LmsLessonForm {
   final TextEditingController titleCtrl = TextEditingController();
   final TextEditingController contentCtrl = TextEditingController();
   final TextEditingController durationCtrl = TextEditingController();
+  final TextEditingController liveNoteCtrl = TextEditingController();
   String? videoUrl;
   String? documentUrl;
   String? documentName;
+  DateTime? liveSessionDateTime;
 
   _LmsLessonForm({Map<String, dynamic>? existing}) {
     if (existing != null) {
       titleCtrl.text = existing['title']?.toString() ?? '';
       contentCtrl.text = existing['content']?.toString() ?? '';
       durationCtrl.text = existing['duration']?.toString() ?? '';
+      liveNoteCtrl.text = existing['liveSessionNote']?.toString() ?? '';
       videoUrl = existing['videoUrl']?.toString();
       documentUrl = existing['documentUrl']?.toString();
       documentName = existing['documentName']?.toString();
+      final lsdt = existing['liveSessionDateTime'];
+      if (lsdt != null) {
+        liveSessionDateTime = DateTime.tryParse(lsdt.toString());
+      }
     }
   }
 
@@ -1028,12 +1058,15 @@ class _LmsLessonForm {
         if (videoUrl != null && videoUrl!.isNotEmpty) 'videoUrl': videoUrl,
         if (documentUrl != null && documentUrl!.isNotEmpty) 'documentUrl': documentUrl,
         if (documentName != null) 'documentName': documentName,
+        if (liveSessionDateTime != null) 'liveSessionDateTime': liveSessionDateTime!.toIso8601String(),
+        if (liveNoteCtrl.text.trim().isNotEmpty) 'liveSessionNote': liveNoteCtrl.text.trim(),
       };
 
   void dispose() {
     titleCtrl.dispose();
     contentCtrl.dispose();
     durationCtrl.dispose();
+    liveNoteCtrl.dispose();
   }
 }
 
@@ -1311,6 +1344,51 @@ class _LmsInlineLessonWidgetState extends State<_LmsInlineLessonWidget> {
               _uploadTile(icon: Icons.play_circle_outline_rounded, color: const Color(0xFF3B82F6), title: 'Video', subtitle: f.videoUrl ?? 'Upload .mp4, .webm, or video file (max 100MB)', has: f.videoUrl != null, loading: _uploadingVideo, onTap: _pickVideo, onClear: () => setState(() { f.videoUrl = null; })),
               const SizedBox(height: 10),
               _uploadTile(icon: Icons.description_outlined, color: const Color(0xFF10B981), title: 'Document', subtitle: f.documentName ?? (f.documentUrl != null ? 'Attached' : 'PDF, DOC, PPT, XLS (max 50MB)'), has: f.documentUrl != null, loading: _uploadingDoc, onTap: _pickDocument, onClear: () => setState(() { f.documentUrl = null; f.documentName = null; })),
+              const SizedBox(height: 14),
+              // ── Feature 2: Live Session Date/Time ──────────────────────────
+              const Text('Live Session (optional)', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF6366F1))),
+              const SizedBox(height: 6),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                decoration: BoxDecoration(
+                  color: f.liveSessionDateTime != null ? const Color(0xFF6366F1).withValues(alpha: 0.06) : const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: f.liveSessionDateTime != null ? const Color(0xFF6366F1).withValues(alpha: 0.4) : const Color(0xFFE2E8F0)),
+                ),
+                child: Row(children: [
+                  const Icon(Icons.video_call_rounded, color: Color(0xFF6366F1), size: 20),
+                  const SizedBox(width: 10),
+                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(
+                      f.liveSessionDateTime != null
+                          ? '${f.liveSessionDateTime!.day}/${f.liveSessionDateTime!.month}/${f.liveSessionDateTime!.year}  ${f.liveSessionDateTime!.hour.toString().padLeft(2,'0')}:${f.liveSessionDateTime!.minute.toString().padLeft(2,'0')}'
+                          : 'Schedule live session for this lesson',
+                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: f.liveSessionDateTime != null ? const Color(0xFF6366F1) : const Color(0xFF94A3B8)),
+                    ),
+                    const Text('For reminders only — not auto-started', style: TextStyle(fontSize: 10, color: Color(0xFF94A3B8))),
+                  ])),
+                  if (f.liveSessionDateTime != null)
+                    GestureDetector(onTap: () => setState(() => f.liveSessionDateTime = null), child: const Icon(Icons.close_rounded, size: 16, color: Colors.red))
+                  else
+                    GestureDetector(
+                      onTap: () async {
+                        final date = await showDatePicker(context: context, initialDate: DateTime.now().add(const Duration(days: 1)), firstDate: DateTime.now(), lastDate: DateTime.now().add(const Duration(days: 365)));
+                        if (date == null || !mounted) return;
+                        final time = await showTimePicker(context: context, initialTime: TimeOfDay(hour: 10, minute: 0));
+                        if (time == null || !mounted) return;
+                        setState(() => f.liveSessionDateTime = DateTime(date.year, date.month, date.day, time.hour, time.minute));
+                      },
+                      child: const Icon(Icons.add_circle_outline_rounded, color: Color(0xFF6366F1), size: 18),
+                    ),
+                ]),
+              ),
+              if (f.liveSessionDateTime != null) ...[
+                const SizedBox(height: 8),
+                TextField(
+                  controller: f.liveNoteCtrl,
+                  decoration: const InputDecoration(labelText: 'Live session note (optional)', border: OutlineInputBorder(), isDense: true, hintText: 'e.g. Join via Zoom link in announcements'),
+                ),
+              ],
             ]),
           ),
         ],

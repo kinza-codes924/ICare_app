@@ -1,0 +1,4 @@
+Vercel CLI 54.11.1 (Node.js 24.15.0)
+Retrieving project…
+Deploying wajahatfrontdev-8765s-projects/icare-app
+Uploading [--------------------] (0.0B/107.5MB)

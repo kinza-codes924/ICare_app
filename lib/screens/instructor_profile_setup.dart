@@ -317,7 +317,7 @@ class _InstructorProfileSetupScreenState
                                   Expanded(
                                     flex: 3,
                                     child: DropdownButtonFormField<String>(
-                                      value: _selectedGender,
+                                      initialValue: _selectedGender,
                                       decoration: InputDecoration(
                                         labelText: 'Gender',
                                         prefixIcon: const Icon(Icons.people_outline_rounded, color: _accent),
@@ -435,8 +435,11 @@ class _InstructorProfileSetupScreenState
                                   final selected = _availabilityDays.contains(day);
                                   return GestureDetector(
                                     onTap: () => setState(() {
-                                      if (selected) _availabilityDays.remove(day);
-                                      else _availabilityDays.add(day);
+                                      if (selected) {
+                                        _availabilityDays.remove(day);
+                                      } else {
+                                        _availabilityDays.add(day);
+                                      }
                                     }),
                                     child: Container(
                                       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),

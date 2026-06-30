@@ -525,7 +525,7 @@ class _DoctorProfileSetupState extends ConsumerState<DoctorProfileSetup> {
                             child: _imageBytes != null
                                 ? Image.memory(_imageBytes!, fit: BoxFit.cover)
                                 : _existingProfilePictureUrl != null && _existingProfilePictureUrl!.isNotEmpty
-                                ? Image.network(_existingProfilePictureUrl!, fit: BoxFit.cover, errorBuilder: (_, __, ___) => Icon(Icons.person_rounded, size: 44, color: AppColors.primaryColor))
+                                ? Image.network(_existingProfilePictureUrl!, fit: BoxFit.cover, errorBuilder: (_, _, _) => Icon(Icons.person_rounded, size: 44, color: AppColors.primaryColor))
                                 : Icon(Icons.person_rounded, size: 44, color: AppColors.primaryColor),
                           ),
                         ),
@@ -771,7 +771,7 @@ class _DoctorProfileSetupState extends ConsumerState<DoctorProfileSetup> {
                                     child: _imageBytes != null
                                         ? Image.memory(_imageBytes!, fit: BoxFit.cover)
                                         : _existingProfilePictureUrl != null && _existingProfilePictureUrl!.isNotEmpty
-                                        ? Image.network(_existingProfilePictureUrl!, fit: BoxFit.cover, errorBuilder: (_, __, ___) => Icon(Icons.person_rounded, size: 50, color: AppColors.primaryColor))
+                                        ? Image.network(_existingProfilePictureUrl!, fit: BoxFit.cover, errorBuilder: (_, _, _) => Icon(Icons.person_rounded, size: 50, color: AppColors.primaryColor))
                                         : Icon(Icons.person_rounded, size: 50, color: AppColors.primaryColor),
                                   ),
                                 ),

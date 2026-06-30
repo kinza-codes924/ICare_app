@@ -7,13 +7,16 @@ class ConnectNowService {
   final SharedPref _sharedPref = SharedPref();
 
   // Patient: initiate instant consultation
-  Future<Map<String, dynamic>> initiateConnect() async {
+  // Pass [targetDoctorId] to send the request only to a specific doctor.
+  Future<Map<String, dynamic>> initiateConnect({String? targetDoctorId}) async {
     try {
       final userData = await _sharedPref.getUserData();
-      final patientName = (userData?.name?.trim().isNotEmpty == true) ? userData!.name.trim() : 'Patient';
-      final response = await _apiService.post('/connect-now/initiate', {
-        'patientName': patientName,
-      });
+      final patientName = (userData?.name.trim().isNotEmpty == true) ? userData!.name.trim() : 'Patient';
+      final body = <String, dynamic>{'patientName': patientName};
+      if (targetDoctorId != null && targetDoctorId.isNotEmpty) {
+        body['targetDoctorId'] = targetDoctorId;
+      }
+      final response = await _apiService.post('/connect-now/initiate', body);
       return response.data;
     } catch (e) {
       debugPrint('Initiate connect error: $e');

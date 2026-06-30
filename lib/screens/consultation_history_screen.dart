@@ -5,7 +5,6 @@ import 'package:icare/services/medical_record_service.dart';
 import 'package:icare/screens/medical_record_detail.dart';
 import 'package:icare/utils/theme.dart';
 import 'package:icare/widgets/back_button.dart';
-import 'package:intl/intl.dart';
 
 class ConsultationHistoryScreen extends StatefulWidget {
   const ConsultationHistoryScreen({super.key});

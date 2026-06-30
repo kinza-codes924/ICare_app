@@ -330,7 +330,7 @@ class _DoctorsListState extends State<DoctorsList> {
                             SizedBox(
                               width: isDesktop ? 200 : double.infinity,
                               child: DropdownButtonFormField<String>(
-                                value: _selectedSpecialization,
+                                initialValue: _selectedSpecialization,
                                 decoration: InputDecoration(
                                   labelText: 'Speciality'.tr(),
                                   border: OutlineInputBorder(
@@ -357,7 +357,7 @@ class _DoctorsListState extends State<DoctorsList> {
                           SizedBox(
                             width: isDesktop ? 150 : double.infinity,
                             child: DropdownButtonFormField<String>(
-                              value: _availabilityFilter,
+                              initialValue: _availabilityFilter,
                               decoration: InputDecoration(
                                 labelText: 'Availability'.tr(),
                                 border: OutlineInputBorder(
@@ -384,7 +384,7 @@ class _DoctorsListState extends State<DoctorsList> {
                           SizedBox(
                             width: isDesktop ? 150 : double.infinity,
                             child: DropdownButtonFormField<double>(
-                              value: _minRating,
+                              initialValue: _minRating,
                               decoration: InputDecoration(
                                 labelText: 'Min Rating'.tr(),
                                 border: OutlineInputBorder(
@@ -413,7 +413,7 @@ class _DoctorsListState extends State<DoctorsList> {
                           SizedBox(
                             width: isDesktop ? 130 : double.infinity,
                             child: DropdownButtonFormField<String>(
-                              value: _genderFilter,
+                              initialValue: _genderFilter,
                               decoration: InputDecoration(
                                 labelText: 'Gender'.tr(),
                                 border: OutlineInputBorder(
@@ -440,7 +440,7 @@ class _DoctorsListState extends State<DoctorsList> {
                           SizedBox(
                             width: isDesktop ? 150 : double.infinity,
                             child: DropdownButtonFormField<String>(
-                              value: _languageFilter,
+                              initialValue: _languageFilter,
                               decoration: InputDecoration(
                                 labelText: 'Language'.tr(),
                                 border: OutlineInputBorder(

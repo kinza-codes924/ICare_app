@@ -16,6 +16,7 @@ import 'package:icare/screens/help_and_support.dart' show HelpAndSupport;
 import 'package:icare/screens/current_medications_page.dart';
 import 'package:icare/screens/notification_settings.dart' show NotificationSettings;
 import 'package:icare/screens/privacy_policy.dart' show PrivacyPolicy;
+import 'package:icare/screens/refund_policy.dart' show RefundPolicy;
 import 'package:icare/screens/terms_and_conditions.dart' show TermsAndConditions;
 import 'package:icare/utils/theme.dart';
 import 'package:icare/services/security_service.dart';
@@ -76,7 +77,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   bool _isFaceEnabled = false;
   String _medicalConditions = '';
   String _allergies = '';
-  String _currentMedications = '';
+  final String _currentMedications = '';
   String _healthGoals = '';
   int _waterReminderMinutes = 60;
   String _selectedLanguage = 'English';
@@ -1007,12 +1008,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ]))
         : ListView.separated(
             itemCount: _savedAddresses.length,
-            separatorBuilder: (_, __) => const Divider(height: 1),
+            separatorBuilder: (_, _) => const Divider(height: 1),
             itemBuilder: (_, i) {
               final addr = _savedAddresses[i];
               return ListTile(
                 contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                leading: Container(width: 34, height: 34, decoration: BoxDecoration(color: const Color(0xFF10B981).withOpacity(0.1), borderRadius: BorderRadius.circular(8)), child: const Icon(Icons.location_on_outlined, color: Color(0xFF10B981), size: 18)),
+                leading: Container(width: 34, height: 34, decoration: BoxDecoration(color: const Color(0xFF10B981).withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)), child: const Icon(Icons.location_on_outlined, color: Color(0xFF10B981), size: 18)),
                 title: Text(addr['label'] ?? 'Address ${i + 1}', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
                 subtitle: Text('${addr['street'] ?? ''}${(addr['city'] ?? '').isNotEmpty ? ', ${addr['city']}' : ''}', style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8))),
                 trailing: IconButton(icon: const Icon(Icons.delete_outline, size: 18, color: Color(0xFFEF4444)), onPressed: () {
@@ -1073,14 +1074,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         builder: (_, snap) {
           if (snap.connectionState != ConnectionState.done) return const Center(child: CircularProgressIndicator());
           final orders = snap.data?.data['orders'] as List? ?? [];
-          if (orders.isEmpty) return const Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+          if (orders.isEmpty) {
+            return const Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
             Icon(Icons.shopping_bag_outlined, size: 48, color: Color(0xFFCBD5E1)),
             SizedBox(height: 12),
             Text('No pharmacy orders yet', style: TextStyle(fontSize: 14, color: Color(0xFF94A3B8))),
           ]));
+          }
           return ListView.separated(
             itemCount: orders.length,
-            separatorBuilder: (_, __) => const Divider(height: 1),
+            separatorBuilder: (_, _) => const Divider(height: 1),
             itemBuilder: (_, i) {
               final o = orders[i];
               final amount = o['total_amount'] ?? o['totalAmount'] ?? 0;
@@ -1092,12 +1095,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               final statusColor = status == 'delivered' ? Colors.green : (status == 'cancelled' ? Colors.red : const Color(0xFFF59E0B));
               return ListTile(
                 contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-                leading: Container(width: 36, height: 36, decoration: BoxDecoration(color: const Color(0xFF3B82F6).withOpacity(0.1), borderRadius: BorderRadius.circular(8)), child: const Icon(Icons.medication_outlined, color: Color(0xFF3B82F6), size: 18)),
+                leading: Container(width: 36, height: 36, decoration: BoxDecoration(color: const Color(0xFF3B82F6).withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)), child: const Icon(Icons.medication_outlined, color: Color(0xFF3B82F6), size: 18)),
                 title: Text(itemNames.isNotEmpty ? itemNames : 'Order #${(o['order_number'] ?? o['_id'] ?? '').toString().split('-').last}', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
                 subtitle: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Text(fmtDate, style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8))),
                   const SizedBox(height: 3),
-                  Container(padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2), decoration: BoxDecoration(color: statusColor.withOpacity(0.1), borderRadius: BorderRadius.circular(4)), child: Text(status.toUpperCase(), style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: statusColor))),
+                  Container(padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2), decoration: BoxDecoration(color: statusColor.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(4)), child: Text(status.toUpperCase(), style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: statusColor))),
                 ]),
                 trailing: amount != 0 ? Text('PKR $amount', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF1E293B))) : null,
                 isThreeLine: true,
@@ -1174,7 +1177,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       pw.ImageProvider? logoImage;
       try { final bytes = await rootBundle.load('assets/Asset 1.png'); logoImage = pw.MemoryImage(bytes.buffer.asUint8List()); } catch (_) {}
 
-      String _fmt(dynamic rawDate) {
+      String fmt(dynamic rawDate) {
         try { final dt = DateTime.parse(rawDate.toString()); return '${dt.day}/${dt.month}/${dt.year}'; } catch (_) { return rawDate?.toString() ?? ''; }
       }
 
@@ -1214,7 +1217,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 child: pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
                   pw.Expanded(child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
                     pw.Text('Dr. $doctor', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 11)),
-                    pw.Text('Date: ${_fmt(a['date'] ?? a['createdAt'])}  |  Status: ${a['status'] ?? ''}', style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey)),
+                    pw.Text('Date: ${fmt(a['date'] ?? a['createdAt'])}  |  Status: ${a['status'] ?? ''}', style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey)),
                   ])),
                   pw.Text(feeStr, style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold, color: PdfColors.blue800)),
                 ]),
@@ -1238,7 +1241,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 child: pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
                   pw.Expanded(child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
                     pw.Text(testName.toString(), style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 11)),
-                    pw.Text('Lab: $labName  |  Date: ${_fmt(b['createdAt'] ?? b['test_date'])}', style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey)),
+                    pw.Text('Lab: $labName  |  Date: ${fmt(b['createdAt'] ?? b['test_date'])}', style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey)),
                   ])),
                   pw.Text(price != 0 ? 'PKR $price' : 'N/A', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold, color: PdfColors.green800)),
                 ]),
@@ -1262,7 +1265,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 child: pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
                   pw.Expanded(child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
                     pw.Text(itemNames.isNotEmpty ? itemNames : 'Medicine Order', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 11)),
-                    pw.Text('Date: ${_fmt(o['createdAt'])}  |  Status: $status', style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey)),
+                    pw.Text('Date: ${fmt(o['createdAt'])}  |  Status: $status', style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey)),
                   ])),
                   pw.Text(amount != 0 ? 'PKR $amount' : 'N/A', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold, color: PdfColors.purple)),
                 ]),
@@ -1392,7 +1395,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ? const Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.receipt_long_outlined, size: 48, color: Color(0xFFCBD5E1)), SizedBox(height: 12), Text('No billing history yet', style: TextStyle(fontSize: 14, color: Color(0xFF94A3B8)))]))
           : ListView.separated(
               itemCount: _billingItems.length,
-              separatorBuilder: (_, __) => const Divider(height: 1),
+              separatorBuilder: (_, _) => const Divider(height: 1),
               itemBuilder: (_, i) {
                 final item = _billingItems[i];
                 final rawDate = item['date'] as String? ?? '';
@@ -1404,7 +1407,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
                   leading: Container(
                     width: 36, height: 36,
-                    decoration: BoxDecoration(color: (item['color'] as Color? ?? const Color(0xFF10B981)).withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
+                    decoration: BoxDecoration(color: (item['color'] as Color? ?? const Color(0xFF10B981)).withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)),
                     child: Icon(item['icon'] as IconData? ?? Icons.receipt_rounded, color: item['color'] as Color? ?? const Color(0xFF10B981), size: 18),
                   ),
                   title: Text(item['title'] as String? ?? '', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
@@ -1785,7 +1788,7 @@ class _WebSettingsLayout extends StatelessWidget {
           CircleAvatar(radius: 32, backgroundColor: AppColors.primaryColor.withValues(alpha: 0.1),
             child: ClipOval(child: () {
               final img = buildProfileImageProvider(p.user?.profilePicture);
-              if (img != null) return Image(image: img, width: 64, height: 64, fit: BoxFit.cover, errorBuilder: (_, __, ___) => Text((p.user?.name ?? 'U').substring(0, 1).toUpperCase(), style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: AppColors.primaryColor)));
+              if (img != null) return Image(image: img, width: 64, height: 64, fit: BoxFit.cover, errorBuilder: (_, _, _) => Text((p.user?.name ?? 'U').substring(0, 1).toUpperCase(), style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: AppColors.primaryColor)));
               return Text((p.user?.name ?? 'U').substring(0, 1).toUpperCase(), style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: AppColors.primaryColor));
             }())),
           const SizedBox(width: 16),
@@ -2061,7 +2064,7 @@ class _WebSettingsLayout extends StatelessWidget {
                 ]))
               : ListView.separated(
                   itemCount: redemptions.length,
-                  separatorBuilder: (_, __) => const Divider(height: 1),
+                  separatorBuilder: (_, _) => const Divider(height: 1),
                   itemBuilder: (_, i) {
                     final item = redemptions[i];
                     final title = (item is Map ? item['title'] ?? item['rewardId'] ?? 'Reward' : 'Reward').toString();
@@ -2092,7 +2095,7 @@ class _WebSettingsLayout extends StatelessWidget {
         ? const Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.history_outlined, size: 48, color: Color(0xFFCBD5E1)), SizedBox(height: 12), Text('No reward history yet', style: TextStyle(color: Color(0xFF64748B)))]))
         : ListView.separated(
             itemCount: p.pointsHistory.length,
-            separatorBuilder: (_, __) => const Divider(height: 1),
+            separatorBuilder: (_, _) => const Divider(height: 1),
             itemBuilder: (_, i) {
               final item = p.pointsHistory[i];
               final pts = (item is Map ? item['points'] ?? item['amount'] ?? 0 : 0) as num;
@@ -2148,6 +2151,8 @@ class _WebSettingsLayout extends StatelessWidget {
         _settingsTile(icon: Icons.description_outlined, iconColor: const Color(0xFF64748B), title: 'Terms & Conditions', subtitle: 'Review terms of service', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TermsAndConditions()))),
         const Divider(height: 1),
         _settingsTile(icon: Icons.privacy_tip_outlined, iconColor: const Color(0xFF64748B), title: 'Privacy Policy', subtitle: 'How we handle your data', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PrivacyPolicy()))),
+        const Divider(height: 1),
+        _settingsTile(icon: Icons.receipt_long_outlined, iconColor: const Color(0xFF64748B), title: 'Refund Policy', subtitle: 'Refunds & cancellations', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RefundPolicy()))),
       ])));
   }
 
@@ -2468,7 +2473,7 @@ class _MobileSettingsLayout extends StatelessWidget {
           CircleAvatar(radius: 28, backgroundColor: AppColors.primaryColor.withValues(alpha: 0.1),
             child: ClipOval(child: () {
               final img = buildProfileImageProvider(p.user?.profilePicture);
-              if (img != null) return Image(image: img, width: 56, height: 56, fit: BoxFit.cover, errorBuilder: (_, __, ___) => Text((p.user?.name ?? 'U').substring(0, 1).toUpperCase(), style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: AppColors.primaryColor)));
+              if (img != null) return Image(image: img, width: 56, height: 56, fit: BoxFit.cover, errorBuilder: (_, _, _) => Text((p.user?.name ?? 'U').substring(0, 1).toUpperCase(), style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: AppColors.primaryColor)));
               return Text((p.user?.name ?? 'U').substring(0, 1).toUpperCase(), style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: AppColors.primaryColor));
             }())),
           const SizedBox(width: 14),
@@ -2626,6 +2631,7 @@ class _MobileSettingsLayout extends StatelessWidget {
         const Divider(height: 1), _settingsTile(icon: Icons.bug_report_outlined, iconColor: const Color(0xFFEF4444), title: 'Report an Issue', subtitle: 'Report bugs', onTap: () => p.onReportIssue(context)),
         const Divider(height: 1), _settingsTile(icon: Icons.description_outlined, iconColor: const Color(0xFF64748B), title: 'Terms & Conditions', subtitle: 'Review terms', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TermsAndConditions()))),
         const Divider(height: 1), _settingsTile(icon: Icons.privacy_tip_outlined, iconColor: const Color(0xFF64748B), title: 'Privacy Policy', subtitle: 'Data handling', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PrivacyPolicy()))),
+        const Divider(height: 1), _settingsTile(icon: Icons.receipt_long_outlined, iconColor: const Color(0xFF64748B), title: 'Refund Policy', subtitle: 'Refunds & cancellations', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RefundPolicy()))),
       ])));
   }
 
@@ -2926,7 +2932,7 @@ class _MobileSettingsLayout extends StatelessWidget {
                 ]))
               : ListView.separated(
                   itemCount: redemptions.length,
-                  separatorBuilder: (_, __) => const Divider(height: 1),
+                  separatorBuilder: (_, _) => const Divider(height: 1),
                   itemBuilder: (_, i) {
                     final item = redemptions[i];
                     final title = (item is Map ? item['title'] ?? item['rewardId'] ?? 'Reward' : 'Reward').toString();
@@ -2957,7 +2963,7 @@ class _MobileSettingsLayout extends StatelessWidget {
         ? const Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.history_outlined, size: 48, color: Color(0xFFCBD5E1)), SizedBox(height: 12), Text('No reward history yet', style: TextStyle(color: Color(0xFF64748B)))]))
         : ListView.separated(
             itemCount: p.pointsHistory.length,
-            separatorBuilder: (_, __) => const Divider(height: 1),
+            separatorBuilder: (_, _) => const Divider(height: 1),
             itemBuilder: (_, i) {
               final item = p.pointsHistory[i];
               final pts = (item is Map ? item['points'] ?? item['amount'] ?? 0 : 0) as num;
@@ -3104,7 +3110,7 @@ class _ProfileEditCardState extends ConsumerState<_ProfileEditCard> {
                     backgroundColor: AppColors.primaryColor.withValues(alpha: 0.1),
                     child: ClipOval(child: () {
                       final img = buildProfileImageProvider(u?.profilePicture);
-                      if (img != null) return Image(image: img, width: 64, height: 64, fit: BoxFit.cover, errorBuilder: (_, __, ___) => Text((u?.name ?? 'U').substring(0, 1).toUpperCase(), style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: AppColors.primaryColor)));
+                      if (img != null) return Image(image: img, width: 64, height: 64, fit: BoxFit.cover, errorBuilder: (_, _, _) => Text((u?.name ?? 'U').substring(0, 1).toUpperCase(), style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: AppColors.primaryColor)));
                       return Text((u?.name ?? 'U').substring(0, 1).toUpperCase(), style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: AppColors.primaryColor));
                     }()),
                   ),

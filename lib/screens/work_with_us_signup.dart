@@ -6,6 +6,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:go_router/go_router.dart';
 import 'package:icare/screens/terms_and_conditions.dart';
 import 'package:icare/screens/privacy_policy.dart';
+import 'package:icare/screens/refund_policy.dart';
 import 'package:icare/services/api_service.dart';
 import 'package:icare/utils/theme.dart';
 import 'package:icare/utils/utils.dart';
@@ -1505,6 +1506,26 @@ class _WorkWithUsSignupState extends State<WorkWithUsSignup> {
                 ),
                 child: Text(
                   'Privacy Policy',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: color,
+                    fontWeight: FontWeight.w700,
+                    decoration: TextDecoration.underline,
+                    decorationColor: color,
+                  ),
+                ),
+              ),
+              const Text(
+                ' and ',
+                style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+              ),
+              GestureDetector(
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const RefundPolicy()),
+                ),
+                child: Text(
+                  'Refund Policy',
                   style: TextStyle(
                     fontSize: 12,
                     color: color,

@@ -6,7 +6,7 @@ import 'package:icare/screens/pharmacy_inventory.dart';
 import 'package:icare/screens/pharmacy_orders.dart';
 import 'package:icare/screens/payment_invoices.dart';
 import 'package:icare/services/pharmacy_service.dart';
-import 'package:intl/intl.dart'; // DateFormat
+// DateFormat
 
 class PharmacistDashboard extends ConsumerStatefulWidget {
   const PharmacistDashboard({super.key});

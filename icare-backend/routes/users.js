@@ -44,6 +44,12 @@ router.get('/profile', authMiddleware, async (req, res) => {
       weight: user.weight || null,
       emergencyContacts: user.emergency_contacts || [],
       verificationDetails: user.verificationDetails || null,
+      blood_group: user.blood_group || null,
+      bloodGroup: user.blood_group || null,
+      existing_conditions: user.existing_conditions || null,
+      existingConditions: user.existing_conditions || null,
+      health_goals: user.health_goals || null,
+      healthGoals: user.health_goals || null,
       specialization: null,
       conditionsTreated: null,
     };
@@ -87,10 +93,12 @@ router.put('/profile', authMiddleware, async (req, res) => {
   try {
     await connectMongoDB();
     const { 
-      name, phoneNumber, phone, profilePicture, cnic, age, gender, 
+      name, phoneNumber, phone, profilePicture, cnic, age, gender,
       height, weight, address, existingConditions, healthGoals,
-      emergencyContacts, specialization, conditionsTreated 
+      emergencyContacts, specialization, conditionsTreated,
+      bloodGroup, blood_group,
     } = req.body;
+    const finalBloodGroup = bloodGroup || blood_group;
     
     const update = {};
     if (name) { update.name = name; update.username = name; }
@@ -106,6 +114,7 @@ router.put('/profile', authMiddleware, async (req, res) => {
     if (existingConditions !== undefined) update.existing_conditions = existingConditions;
     if (healthGoals !== undefined) update.health_goals = healthGoals;
     if (emergencyContacts !== undefined) update.emergency_contacts = emergencyContacts;
+    if (finalBloodGroup !== undefined && finalBloodGroup !== null) update.blood_group = finalBloodGroup;
 
     const user = await User.findByIdAndUpdate(
       toId(req.user.id),
@@ -157,6 +166,12 @@ router.put('/profile', authMiddleware, async (req, res) => {
       height: user.height || null,
       weight: user.weight || null,
       emergencyContacts: user.emergency_contacts || [],
+      blood_group: user.blood_group || null,
+      bloodGroup: user.blood_group || null,
+      existing_conditions: user.existing_conditions || null,
+      existingConditions: user.existing_conditions || null,
+      health_goals: user.health_goals || null,
+      healthGoals: user.health_goals || null,
       specialization: specialization || null,
       conditionsTreated: conditionsTreated || null,
     };

@@ -113,7 +113,7 @@ class _PatientProfileViewState extends State<PatientProfileView> {
                                   width: 120,
                                   height: 120,
                                   fit: BoxFit.cover,
-                                  errorBuilder: (_, __, ___) => Center(
+                                  errorBuilder: (_, _, _) => Center(
                                     child: Text(
                                       widget.patient.name.isNotEmpty
                                           ? widget.patient.name[0].toUpperCase()

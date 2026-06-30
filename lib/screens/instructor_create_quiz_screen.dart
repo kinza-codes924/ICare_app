@@ -1,5 +1,9 @@
-﻿import 'package:flutter/material.dart';
+﻿import 'dart:typed_data';
+import 'package:flutter/material.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:dio/dio.dart';
 import 'package:icare/services/lms_service.dart';
+import 'package:icare/services/api_service.dart';
 import 'package:icare/utils/theme.dart';
 
 /// Quiz Creation Screen - Google Classroom style
@@ -584,7 +588,68 @@ class _QuestionDialogState extends State<_QuestionDialog> {
   int _points = 1;
   String _correctAnswer = '';
 
+  // Feature 5: video + document upload
+  String? _videoFileUrl;   // uploaded video URL (for clinical_video)
+  String? _documentUrl;
+  String? _documentName;
+  bool _uploadingVideo = false;
+  bool _uploadingDoc = false;
+
   List<String> get _options => _optionControllers.map((c) => c.text).toList();
+
+  Future<String?> _cloudinaryUpload(Uint8List bytes, String filename, String folder, String resourceType) async {
+    final signRes = await ApiService().get('/upload/sign?folder=${Uri.encodeQueryComponent(folder)}&resource_type=$resourceType');
+    if (signRes.data['success'] != true) throw Exception('Sign error');
+    final cloudName = signRes.data['cloud_name']?.toString() ?? 'dzlcnyxgb';
+    final formData = FormData.fromMap({
+      'file': MultipartFile.fromBytes(bytes, filename: filename),
+      'api_key':   signRes.data['api_key']?.toString() ?? '',
+      'timestamp': signRes.data['timestamp']?.toString() ?? '',
+      'signature': signRes.data['signature']?.toString() ?? '',
+      'folder':    signRes.data['folder']?.toString() ?? folder,
+    });
+    final res = await Dio().post(
+      'https://api.cloudinary.com/v1_1/$cloudName/$resourceType/upload',
+      data: formData,
+      options: Options(validateStatus: (s) => s != null && s < 600),
+    );
+    if (res.statusCode == 200 && res.data['secure_url'] != null) return res.data['secure_url'] as String;
+    throw Exception('Upload failed: ${res.data}');
+  }
+
+  Future<void> _pickVideo() async {
+    try {
+      final result = await FilePicker.platform.pickFiles(type: FileType.any, withData: true);
+      if (result == null || result.files.isEmpty || result.files.first.bytes == null) return;
+      final file = result.files.first;
+      if (file.size > 200 * 1024 * 1024) {
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Max 200MB for videos'), backgroundColor: Colors.red));
+        return;
+      }
+      setState(() => _uploadingVideo = true);
+      final url = await _cloudinaryUpload(file.bytes!, file.name, 'icare/quiz/videos', 'auto');
+      if (mounted) setState(() { _videoFileUrl = url; _uploadingVideo = false; });
+    } catch (e) {
+      if (mounted) { setState(() => _uploadingVideo = false); ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Upload failed: $e'), backgroundColor: Colors.red)); }
+    }
+  }
+
+  Future<void> _pickDocument() async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['pdf', 'doc', 'docx', 'ppt', 'pptx', 'xls', 'xlsx', 'txt'],
+        withData: true,
+      );
+      if (result == null || result.files.isEmpty || result.files.first.bytes == null) return;
+      final file = result.files.first;
+      setState(() => _uploadingDoc = true);
+      final url = await _cloudinaryUpload(file.bytes!, file.name, 'icare/quiz/docs', 'auto');
+      if (mounted) setState(() { _documentUrl = url; _documentName = file.name; _uploadingDoc = false; });
+    } catch (e) {
+      if (mounted) { setState(() => _uploadingDoc = false); ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Upload failed: $e'), backgroundColor: Colors.red)); }
+    }
+  }
 
   @override
   void initState() {
@@ -601,6 +666,9 @@ class _QuestionDialogState extends State<_QuestionDialog> {
         }
       }
       _correctAnswer = widget.question!['correctAnswer']?.toString() ?? '';
+      _videoFileUrl  = widget.question!['videoFileUrl']?.toString();
+      _documentUrl   = widget.question!['documentUrl']?.toString();
+      _documentName  = widget.question!['documentName']?.toString();
     }
   }
 
@@ -685,7 +753,7 @@ class _QuestionDialogState extends State<_QuestionDialog> {
                 ],
                 const SizedBox(height: 8),
                 DropdownButtonFormField<String>(
-                  value: _options.any((o) => o == _correctAnswer && o.isNotEmpty) ? _correctAnswer : null,
+                  initialValue: _options.any((o) => o == _correctAnswer && o.isNotEmpty) ? _correctAnswer : null,
                   decoration: const InputDecoration(
                     labelText: 'Correct Answer *',
                     border: OutlineInputBorder(),
@@ -698,7 +766,7 @@ class _QuestionDialogState extends State<_QuestionDialog> {
                 ),
               ] else if (_type == 'true_false') ...[
                 DropdownButtonFormField<String>(
-                  value: _correctAnswer.isEmpty ? null : _correctAnswer,
+                  initialValue: _correctAnswer.isEmpty ? null : _correctAnswer,
                   decoration: const InputDecoration(
                     labelText: 'Correct Answer *',
                     border: OutlineInputBorder(),
@@ -746,13 +814,38 @@ class _QuestionDialogState extends State<_QuestionDialog> {
                   onChanged: (value) => _correctAnswer = value,
                 ),
               ] else if (_type == 'clinical_video') ...[
+                // Upload whole video file
+                GestureDetector(
+                  onTap: _uploadingVideo ? null : _pickVideo,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: _videoFileUrl != null ? const Color(0xFF3B82F6).withValues(alpha: 0.06) : const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: _videoFileUrl != null ? const Color(0xFF3B82F6).withValues(alpha: 0.3) : const Color(0xFFE2E8F0)),
+                    ),
+                    child: Row(children: [
+                      const Icon(Icons.video_library_outlined, color: Color(0xFF3B82F6), size: 20),
+                      const SizedBox(width: 10),
+                      Expanded(child: Text(
+                        _videoFileUrl != null ? 'Video uploaded' : 'Upload video file (mp4, webm — max 200MB)',
+                        style: TextStyle(fontSize: 13, color: _videoFileUrl != null ? const Color(0xFF3B82F6) : const Color(0xFF94A3B8)),
+                      )),
+                      if (_uploadingVideo) const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                      else if (_videoFileUrl != null) GestureDetector(onTap: () => setState(() => _videoFileUrl = null), child: const Icon(Icons.close_rounded, size: 16, color: Colors.red))
+                      else const Icon(Icons.add_circle_outline_rounded, color: Color(0xFF3B82F6), size: 18),
+                    ]),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                // OR paste video URL
                 TextField(
                   controller: TextEditingController(text: _options.isNotEmpty ? _options[0] : ''),
                   decoration: const InputDecoration(
-                    labelText: 'Video URL (Clinical Video)',
+                    labelText: 'OR paste Video URL',
                     hintText: 'https://example.com/procedure.mp4',
                     border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.video_library_outlined),
+                    prefixIcon: Icon(Icons.link_rounded),
                   ),
                   onChanged: (value) {
                     if (_options.isEmpty) {
@@ -810,6 +903,30 @@ class _QuestionDialogState extends State<_QuestionDialog> {
               ],
 
               const SizedBox(height: 16),
+              // Document upload for all question types
+              GestureDetector(
+                onTap: _uploadingDoc ? null : _pickDocument,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: _documentUrl != null ? const Color(0xFF10B981).withValues(alpha: 0.06) : const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: _documentUrl != null ? const Color(0xFF10B981).withValues(alpha: 0.3) : const Color(0xFFE2E8F0)),
+                  ),
+                  child: Row(children: [
+                    const Icon(Icons.attach_file_rounded, color: Color(0xFF10B981), size: 20),
+                    const SizedBox(width: 10),
+                    Expanded(child: Text(
+                      _documentUrl != null ? (_documentName ?? 'Document attached') : 'Attach document (PDF, DOC, PPT, XLS)',
+                      style: TextStyle(fontSize: 13, color: _documentUrl != null ? const Color(0xFF10B981) : const Color(0xFF94A3B8)),
+                    )),
+                    if (_uploadingDoc) const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                    else if (_documentUrl != null) GestureDetector(onTap: () => setState(() { _documentUrl = null; _documentName = null; }), child: const Icon(Icons.close_rounded, size: 16, color: Colors.red))
+                    else const Icon(Icons.add_circle_outline_rounded, color: Color(0xFF10B981), size: 18),
+                  ]),
+                ),
+              ),
+              const SizedBox(height: 12),
               TextField(
                 controller: _explanationController,
                 decoration: const InputDecoration(
@@ -856,11 +973,17 @@ class _QuestionDialogState extends State<_QuestionDialog> {
               question['correctAnswer'] = _correctAnswer;
             } else if (_type == 'clinical_video') {
               question['videoUrl'] = _options.isNotEmpty ? _options[0] : '';
+              question['videoFileUrl'] = _videoFileUrl ?? '';
               question['correctAnswer'] = _correctAnswer;
             } else if (_type == 'osce_station') {
               question['instructions'] = _options.isNotEmpty ? _options[0] : '';
               question['rubric'] = _options.length > 1 ? _options[1] : '';
               question['correctAnswer'] = _correctAnswer;
+            }
+
+            if (_documentUrl != null) {
+              question['documentUrl'] = _documentUrl!;
+              question['documentName'] = _documentName ?? '';
             }
 
             widget.onSave(question);

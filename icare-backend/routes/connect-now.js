@@ -87,6 +87,40 @@ async function _notifyAllDoctors(requestId, patientName, channelName) {
   }
 }
 
+// Notify a single specific doctor
+async function _notifySpecificDoctor(requestId, patientName, channelName, doctorId) {
+  try {
+    const mongoose = require('mongoose');
+    const doctor = await User.findById(doctorId).select('fcm_tokens').lean();
+    const tokens = [...new Set((doctor?.fcm_tokens || []).filter(Boolean))];
+    if (tokens.length === 0) {
+      console.log(`[ConnectNow] No FCM tokens for doctor ${doctorId}`);
+      return 0;
+    }
+    const admin = getFirebaseAdmin();
+    await admin.messaging().sendEachForMulticast({
+      tokens,
+      notification: {
+        title: '🚨 Instant Consultation Request',
+        body: `${patientName} needs a doctor right now! Tap to accept.`,
+      },
+      data: {
+        type: 'connect_now_request',
+        requestId: String(requestId),
+        patientName: String(patientName),
+        channelName: String(channelName),
+      },
+      android: { priority: 'high', notification: { sound: 'default', channelId: 'icare_high_importance' } },
+      apns: { headers: { 'apns-priority': '10' }, payload: { aps: { sound: 'default', badge: 1, contentAvailable: true } } },
+    });
+    console.log(`[ConnectNow] Notified specific doctor ${doctorId}`);
+    return 1;
+  } catch (err) {
+    console.error('[ConnectNow] _notifySpecificDoctor failed:', err.message);
+    return 0;
+  }
+}
+
 // POST /api/connect-now/initiate — patient initiates instant consultation
 router.post('/initiate', authMiddleware, async (req, res) => {
   const initiateStart = Date.now();
@@ -94,6 +128,7 @@ router.post('/initiate', authMiddleware, async (req, res) => {
     await connectMongoDB();
 
     const patientName = req.body.patientName || 'Patient';
+    const targetDoctorId = req.body.targetDoctorId || null;
     const channelName = `connect_now_${Date.now()}_${req.user.id}`;
 
     // Check for duplicate active request from same patient (idempotency)
@@ -119,6 +154,7 @@ router.post('/initiate', authMiddleware, async (req, res) => {
       patientId: req.user.id,
       patientName,
       channelName,
+      ...(targetDoctorId ? { targetDoctorId } : {}),
     });
 
     const dbTime = Date.now() - initiateStart;
@@ -135,10 +171,15 @@ router.post('/initiate', authMiddleware, async (req, res) => {
     });
 
     // ─── SEND FCM IN BACKGROUND (fire-and-forget after response) ───────────
-    // Vercel keeps function alive until event loop drains — FCM completes.
-    _notifyAllDoctors(request._id, patientName, channelName)
-      .then(count => console.log(`[ConnectNow] Notified ${count} doctors for request ${request._id}`))
-      .catch(err => console.error('[ConnectNow] Background FCM failed:', err.message));
+    if (targetDoctorId) {
+      _notifySpecificDoctor(request._id, patientName, channelName, targetDoctorId)
+        .then(count => console.log(`[ConnectNow] Notified specific doctor ${targetDoctorId} for request ${request._id}`))
+        .catch(err => console.error('[ConnectNow] Background FCM failed:', err.message));
+    } else {
+      _notifyAllDoctors(request._id, patientName, channelName)
+        .then(count => console.log(`[ConnectNow] Notified ${count} doctors for request ${request._id}`))
+        .catch(err => console.error('[ConnectNow] Background FCM failed:', err.message));
+    }
 
   } catch (err) {
     console.error('[ConnectNow] initiate error:', err);
@@ -158,6 +199,11 @@ router.get('/pending', authMiddleware, async (req, res) => {
     const request = await ConnectNow.findOne({
       status: 'pending',
       createdAt: { $gte: fiveMinAgo },
+      $or: [
+        { targetDoctorId: null },
+        { targetDoctorId: { $exists: false } },
+        { targetDoctorId: req.user.id.toString() },
+      ],
     }).sort({ createdAt: 1 }).lean();
 
     if (!request) {

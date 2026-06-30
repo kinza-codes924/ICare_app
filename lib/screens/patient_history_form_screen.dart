@@ -98,21 +98,21 @@ class _PatientHistoryFormScreenState extends State<PatientHistoryFormScreen> {
   final List<FamilyMemberHistory> _siblings = [];
   final List<FamilyMemberHistory> _children = [];
 
-  // Section 7: Personal & Social History
-  String _diet = '';
-  String _appetite = '';
-  String _sleep = '';
-  String _bowelHabits = '';
-  String _bladderHabits = '';
+  // Section 7: Personal & Social History — persistent controllers prevent RTL/IME reset
+  final TextEditingController _dietCtrl = TextEditingController();
+  final TextEditingController _appetiteCtrl = TextEditingController();
+  final TextEditingController _sleepCtrl = TextEditingController();
+  final TextEditingController _bowelHabitsCtrl = TextEditingController();
+  final TextEditingController _bladderHabitsCtrl = TextEditingController();
   SmokingStatus _smoking = SmokingStatus.never;
   AlcoholStatus _alcohol = AlcoholStatus.never;
   bool _substanceAbuse = false;
-  String? _substanceDetails;
-  String _exercise = '';
-  String _sexualHistory = '';
-  String _occupationalExposure = '';
-  String _travelHistory = '';
-  String _vaccinationHistory = '';
+  final TextEditingController _substanceDetailsCtrl = TextEditingController();
+  final TextEditingController _exerciseCtrl = TextEditingController();
+  final TextEditingController _sexualHistoryCtrl = TextEditingController();
+  final TextEditingController _occupationalCtrl = TextEditingController();
+  final TextEditingController _travelHistoryCtrl = TextEditingController();
+  final TextEditingController _vaccinationCtrl = TextEditingController();
 
   // Section 8: Gynecological History (if applicable)
   bool _showGynecologicalHistory = false;
@@ -244,19 +244,20 @@ class _PatientHistoryFormScreenState extends State<PatientHistoryFormScreen> {
       // 7. Personal & Social History
       final psh = form.personalSocialHistory;
       if (psh != null) {
-        _diet = psh.diet;
-        _appetite = psh.appetite;
-        _sleep = psh.sleep;
-        _bowelHabits = psh.bowelHabits;
-        _bladderHabits = psh.bladderHabits;
+        _dietCtrl.text = psh.diet;
+        _appetiteCtrl.text = psh.appetite;
+        _sleepCtrl.text = psh.sleep;
+        _bowelHabitsCtrl.text = psh.bowelHabits;
+        _bladderHabitsCtrl.text = psh.bladderHabits;
         _smoking = psh.smoking;
         _alcohol = psh.alcoholUse;
         _substanceAbuse = psh.substanceAbuse;
-        _exercise = psh.exercise;
-        _sexualHistory = psh.sexualHistory ?? '';
-        _occupationalExposure = psh.occupationalExposure ?? '';
-        _travelHistory = psh.travelHistory ?? '';
-        _vaccinationHistory = psh.vaccinationHistory ?? '';
+        _substanceDetailsCtrl.text = psh.substanceDetails ?? '';
+        _exerciseCtrl.text = psh.exercise;
+        _sexualHistoryCtrl.text = psh.sexualHistory ?? '';
+        _occupationalCtrl.text = psh.occupationalExposure ?? '';
+        _travelHistoryCtrl.text = psh.travelHistory ?? '';
+        _vaccinationCtrl.text = psh.vaccinationHistory ?? '';
       }
 
       // 9. Review of Systems
@@ -391,20 +392,20 @@ class _PatientHistoryFormScreenState extends State<PatientHistoryFormScreen> {
           otherRelevantHistory: _otherFamilyCtrl.text.isEmpty ? null : _otherFamilyCtrl.text,
         ),
         personalSocialHistory: PersonalSocialHistory(
-          diet: _diet,
-          appetite: _appetite,
-          sleep: _sleep,
-          bowelHabits: _bowelHabits,
-          bladderHabits: _bladderHabits,
+          diet: _dietCtrl.text,
+          appetite: _appetiteCtrl.text,
+          sleep: _sleepCtrl.text,
+          bowelHabits: _bowelHabitsCtrl.text,
+          bladderHabits: _bladderHabitsCtrl.text,
           smoking: _smoking,
           alcoholUse: _alcohol,
           substanceAbuse: _substanceAbuse,
-          substanceDetails: _substanceDetails,
-          exercise: _exercise,
-          sexualHistory: _sexualHistory.isEmpty ? null : _sexualHistory,
-          occupationalExposure: _occupationalExposure.isEmpty ? null : _occupationalExposure,
-          travelHistory: _travelHistory.isEmpty ? null : _travelHistory,
-          vaccinationHistory: _vaccinationHistory.isEmpty ? null : _vaccinationHistory,
+          substanceDetails: _substanceDetailsCtrl.text.isEmpty ? null : _substanceDetailsCtrl.text,
+          exercise: _exerciseCtrl.text,
+          sexualHistory: _sexualHistoryCtrl.text.isEmpty ? null : _sexualHistoryCtrl.text,
+          occupationalExposure: _occupationalCtrl.text.isEmpty ? null : _occupationalCtrl.text,
+          travelHistory: _travelHistoryCtrl.text.isEmpty ? null : _travelHistoryCtrl.text,
+          vaccinationHistory: _vaccinationCtrl.text.isEmpty ? null : _vaccinationCtrl.text,
         ),
         gynecologicalHistory: _showGynecologicalHistory
             ? GynecologicalHistory(
@@ -1266,12 +1267,12 @@ class _PatientHistoryFormScreenState extends State<PatientHistoryFormScreen> {
         children: [
           _sectionHeader('Personal & Social History'),
           const SizedBox(height: 20),
-          _inlineField('Diet', _diet, (v) => setState(() => _diet = v)),
-          _inlineField('Appetite', _appetite, (v) => setState(() => _appetite = v)),
-          _inlineField('Sleep', _sleep, (v) => setState(() => _sleep = v)),
-          _inlineField('Bowel Habits', _bowelHabits, (v) => setState(() => _bowelHabits = v)),
-          _inlineField('Bladder Habits', _bladderHabits, (v) => setState(() => _bladderHabits = v)),
-          _inlineField('Exercise', _exercise, (v) => setState(() => _exercise = v)),
+          _inlineField('Diet', _dietCtrl),
+          _inlineField('Appetite', _appetiteCtrl),
+          _inlineField('Sleep', _sleepCtrl),
+          _inlineField('Bowel Habits', _bowelHabitsCtrl),
+          _inlineField('Bladder Habits', _bladderHabitsCtrl),
+          _inlineField('Exercise', _exerciseCtrl),
           const SizedBox(height: 4),
           // Smoking
           _card(child: Column(
@@ -1321,29 +1322,27 @@ class _PatientHistoryFormScreenState extends State<PatientHistoryFormScreen> {
                 const SizedBox(height: 8),
                 TextField(
                   decoration: _inputDec('Details'),
-                  controller: TextEditingController(text: _substanceDetails),
-                  onChanged: (v) => _substanceDetails = v.isEmpty ? null : v,
+                  controller: _substanceDetailsCtrl,
                   textDirection: TextDirection.ltr,
                 ),
               ],
             ],
           )),
-          _inlineField('Sexual History', _sexualHistory, (v) => setState(() => _sexualHistory = v)),
-          _inlineField('Occupational Exposure', _occupationalExposure, (v) => setState(() => _occupationalExposure = v)),
-          _inlineField('Travel History', _travelHistory, (v) => setState(() => _travelHistory = v)),
-          _inlineField('Vaccination History', _vaccinationHistory, (v) => setState(() => _vaccinationHistory = v)),
+          _inlineField('Sexual History', _sexualHistoryCtrl),
+          _inlineField('Occupational Exposure', _occupationalCtrl),
+          _inlineField('Travel History', _travelHistoryCtrl),
+          _inlineField('Vaccination History', _vaccinationCtrl),
         ],
       ),
     );
   }
 
-  Widget _inlineField(String label, String value, Function(String) onChanged) {
+  Widget _inlineField(String label, TextEditingController ctrl) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: TextField(
         decoration: _inputDec(label),
-        controller: TextEditingController(text: value),
-        onChanged: onChanged,
+        controller: ctrl,
         textDirection: TextDirection.ltr,
       ),
     );
@@ -1606,6 +1605,17 @@ class _PatientHistoryFormScreenState extends State<PatientHistoryFormScreen> {
     _motherDiseaseCtrl.dispose();
     _motherAgeCtrl.dispose();
     _otherFamilyCtrl.dispose();
+    _dietCtrl.dispose();
+    _appetiteCtrl.dispose();
+    _sleepCtrl.dispose();
+    _bowelHabitsCtrl.dispose();
+    _bladderHabitsCtrl.dispose();
+    _substanceDetailsCtrl.dispose();
+    _exerciseCtrl.dispose();
+    _sexualHistoryCtrl.dispose();
+    _occupationalCtrl.dispose();
+    _travelHistoryCtrl.dispose();
+    _vaccinationCtrl.dispose();
     super.dispose();
   }
 }

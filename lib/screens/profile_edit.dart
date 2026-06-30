@@ -25,7 +25,9 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
   final TextEditingController cnicController = TextEditingController();
   final TextEditingController ageController = TextEditingController();
   final TextEditingController addressController = TextEditingController();
-  final TextEditingController bloodGroupController = TextEditingController();
+
+  // Blood group — state variable so the dropdown refreshes correctly on setState
+  String? _selectedBloodGroup;
 
   // Height state
   String _heightUnit = 'cm';
@@ -165,6 +167,8 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
       phoneController.text = user.phoneNumber;
       ageController.text = user.age ?? '';
       cnicController.text = user.cnic ?? '';
+      addressController.text = user.address ?? '';
+      _selectedBloodGroup = (user.bloodGroup?.isNotEmpty == true) ? user.bloodGroup : null;
       final g = user.gender?.trim() ?? '';
       if (g.toLowerCase() == 'male') {
         _selectedGender = 'Male';
@@ -173,6 +177,19 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
       } else if (g.isNotEmpty) {
         _selectedGender = 'Other';
       }
+      // Restore conditions and goals from stored comma-separated string
+      if (user.existingConditions != null && user.existingConditions!.isNotEmpty) {
+        _selectedConditions.addAll(
+          user.existingConditions!.split(',').map((s) => s.trim()).where((s) => s.isNotEmpty),
+        );
+      }
+      if (user.healthGoals != null && user.healthGoals!.isNotEmpty) {
+        _selectedGoals.addAll(
+          user.healthGoals!.split(',').map((s) => s.trim()).where((s) => s.isNotEmpty),
+        );
+      }
+      // Restore height/weight dropdowns from saved strings (e.g. "175 cm", "5'7\"", "70 kg")
+      _parseHeightWeight(user.height, user.weight);
     }
     final role = ref.read(authProvider).userRole ?? '';
     if (role == 'Doctor') {
@@ -197,6 +214,35 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
     }
   }
 
+  // Parses saved "175 cm" / "5'7\"" / "1.75 m" / "70 kg" / "154 lbs" back into dropdown state
+  void _parseHeightWeight(String? height, String? weight) {
+    if (height != null && height.isNotEmpty) {
+      if (height.contains('cm')) {
+        _heightUnit = 'cm';
+        _heightCm = height.replaceAll(RegExp(r'\s*cm'), '').trim();
+      } else if (height.contains("'") || height.toLowerCase().contains('ft')) {
+        _heightUnit = 'ft';
+        final match = RegExp(r"(\d+)'(\d+)").firstMatch(height);
+        if (match != null) {
+          _heightFt = int.tryParse(match.group(1) ?? '5') ?? 5;
+          _heightIn = int.tryParse(match.group(2) ?? '7') ?? 7;
+        }
+      } else if (height.contains('m')) {
+        _heightUnit = 'm';
+        _heightM = height.replaceAll(RegExp(r'\s*m'), '').trim();
+      }
+    }
+    if (weight != null && weight.isNotEmpty) {
+      if (weight.contains('lbs')) {
+        _weightUnit = 'lbs';
+        _weightLbs = weight.replaceAll(RegExp(r'\s*lbs'), '').trim();
+      } else if (weight.contains('kg')) {
+        _weightUnit = 'kg';
+        _weightKg = weight.replaceAll(RegExp(r'\s*kg'), '').trim();
+      }
+    }
+  }
+
   Future<void> _loadPatientProfile() async {
     final result = await _userService.getUserProfile();
     if (!mounted) return;
@@ -209,11 +255,33 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
             .toList();
         setState(() => _populateEmergencyContacts(contacts));
       }
-      // Also refresh address if stored
-      final addr = result['user']['address']?.toString();
-      if (addr != null && addr.isNotEmpty) {
-        setState(() => addressController.text = addr);
-      }
+      final u = result['user'] as Map<String, dynamic>;
+      setState(() {
+        final addr = u['address']?.toString();
+        if (addr != null && addr.isNotEmpty) addressController.text = addr;
+        final bg = (u['bloodGroup'] ?? u['blood_group'])?.toString();
+        if (bg != null && bg.isNotEmpty) _selectedBloodGroup = bg;
+        final g = u['gender']?.toString()?.trim() ?? '';
+        if (g.toLowerCase() == 'male') _selectedGender = 'Male';
+        else if (g.toLowerCase() == 'female') _selectedGender = 'Female';
+        else if (g.isNotEmpty) _selectedGender = 'Other';
+        final conds = (u['existingConditions'] ?? u['existing_conditions'])?.toString();
+        _selectedConditions.clear();
+        if (conds != null && conds.isNotEmpty) {
+          _selectedConditions.addAll(
+            conds.split(',').map((s) => s.trim()).where((s) => s.isNotEmpty),
+          );
+        }
+        final goals = (u['healthGoals'] ?? u['health_goals'])?.toString();
+        _selectedGoals.clear();
+        if (goals != null && goals.isNotEmpty) {
+          _selectedGoals.addAll(
+            goals.split(',').map((s) => s.trim()).where((s) => s.isNotEmpty),
+          );
+        }
+        // Restore height/weight dropdowns from fresh backend data
+        _parseHeightWeight(u['height']?.toString(), u['weight']?.toString());
+      });
     }
   }
 
@@ -272,7 +340,6 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
     cnicController.dispose();
     ageController.dispose();
     addressController.dispose();
-    bloodGroupController.dispose();
     for (final c in _emergencyContacts) {
       c['name']!.dispose();
       c['relation']!.dispose();
@@ -301,7 +368,8 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
         debugPrint('🟩 [EditProfile] updateDoctorSpecialization result: $specResult');
       }
 
-      // Build height string
+      // Build height string — fall back to stored string if dropdown unchanged
+      final existingHeight = ref.read(authProvider).user?.height;
       String? heightStr;
       if (_heightUnit == 'cm' && _heightCm != null) {
         heightStr = '$_heightCm cm';
@@ -309,14 +377,19 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
         heightStr = '$_heightM m';
       } else if (_heightUnit == 'ft') {
         heightStr = "$_heightFt'$_heightIn\"";
+      } else {
+        heightStr = existingHeight; // preserve stored value if nothing selected
       }
 
-      // Build weight string
+      // Build weight string — fall back to stored string if dropdown unchanged
+      final existingWeight = ref.read(authProvider).user?.weight;
       String? weightStr;
       if (_weightUnit == 'kg' && _weightKg != null) {
         weightStr = '$_weightKg kg';
       } else if (_weightUnit == 'lbs' && _weightLbs != null) {
         weightStr = '$_weightLbs lbs';
+      } else {
+        weightStr = existingWeight; // preserve stored value if nothing selected
       }
 
       final ecList = _emergencyContacts
@@ -340,6 +413,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
         address: isPatient ? (addressController.text.trim().isEmpty ? null : addressController.text.trim()) : null,
         existingConditions: isPatient ? (_selectedConditions.isEmpty ? null : _selectedConditions.join(', ')) : null,
         healthGoals: isPatient ? (_selectedGoals.isEmpty ? null : _selectedGoals.join(', ')) : null,
+        bloodGroup: isPatient ? _selectedBloodGroup : null,
         emergencyContacts: isPatient ? (ecList.isEmpty ? null : ecList) : null,
       );
 
@@ -371,6 +445,19 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
           emergencyContacts: isPatient && ecList.isNotEmpty
               ? ecList.map((e) => Map<String, String>.from(e)).toList()
               : existingUser.emergencyContacts,
+          bloodGroup: isPatient ? (_selectedBloodGroup ?? existingUser.bloodGroup) : existingUser.bloodGroup,
+          existingConditions: isPatient
+              ? (_selectedConditions.isNotEmpty ? _selectedConditions.join(', ') : existingUser.existingConditions)
+              : existingUser.existingConditions,
+          healthGoals: isPatient
+              ? (_selectedGoals.isNotEmpty ? _selectedGoals.join(', ') : existingUser.healthGoals)
+              : existingUser.healthGoals,
+          address: isPatient
+              ? (addressController.text.trim().isNotEmpty ? addressController.text.trim() : existingUser.address)
+              : existingUser.address,
+          // Backend always returns height/weight in PUT response; use that as source of truth
+          height: isPatient ? (userData['height']?.toString() ?? heightStr ?? existingUser.height) : existingUser.height,
+          weight: isPatient ? (userData['weight']?.toString() ?? weightStr ?? existingUser.weight) : existingUser.weight,
         );
         debugPrint('🟩 [EditProfile] updatedUser: name=${updatedUser.name}, spec=${updatedUser.specialization}, conds=${updatedUser.conditionsTreated}');
         await ref.read(authProvider.notifier).setUser(updatedUser);
@@ -620,7 +707,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
                           _buildSectionLabel('Specialization', Icons.medical_services_outlined),
                           const SizedBox(height: 8),
                           DropdownButtonFormField<String>(
-                            value: _selectedSpecialization,
+                            initialValue: _selectedSpecialization,
                             isExpanded: true,
                             decoration: InputDecoration(
                               hintText: 'Select your specialization'.tr(),
@@ -644,8 +731,11 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
                               final sel = _selectedDoctorConditions.contains(c);
                               return GestureDetector(
                                 onTap: () => setState(() {
-                                  if (sel) _selectedDoctorConditions.remove(c);
-                                  else _selectedDoctorConditions.add(c);
+                                  if (sel) {
+                                    _selectedDoctorConditions.remove(c);
+                                  } else {
+                                    _selectedDoctorConditions.add(c);
+                                  }
                                 }),
                                 child: AnimatedContainer(
                                   duration: const Duration(milliseconds: 150),
@@ -861,7 +951,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
                           const SizedBox(height: 16),
                           // Blood Group
                           DropdownButtonFormField<String>(
-                            initialValue: bloodGroupController.text.isEmpty ? null : bloodGroupController.text,
+                            value: _selectedBloodGroup,
                             decoration: InputDecoration(
                               labelText: 'Blood Group',
                               prefixIcon: const Icon(Icons.bloodtype_outlined, color: Color(0xFF94A3B8)),
@@ -879,7 +969,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
                             items: ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-']
                                 .map((g) => DropdownMenuItem(value: g, child: Text(g)))
                                 .toList(),
-                            onChanged: (v) => bloodGroupController.text = v ?? '',
+                            onChanged: (v) => setState(() => _selectedBloodGroup = v),
                           ),
                           const SizedBox(height: 16),
                           // Emergency Contacts

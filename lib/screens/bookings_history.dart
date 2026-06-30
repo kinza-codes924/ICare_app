@@ -11,7 +11,6 @@ import 'package:icare/services/consultation_service.dart';
 import 'package:icare/utils/shared_pref.dart';
 import 'package:icare/utils/theme.dart';
 import 'package:icare/utils/utils.dart';
-import 'package:intl/intl.dart';
 
 class BookingsHistoryScreen extends StatefulWidget {
   const BookingsHistoryScreen({super.key});

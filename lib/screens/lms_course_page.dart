@@ -299,11 +299,13 @@ class _ClassworkTabState extends State<_ClassworkTab> {
       widget.lms.getCourseAssignments(widget.courseId),
       widget.lms.getCourseQuizzes(widget.courseId),
     ]);
-    if (mounted) setState(() {
-      _assignments = results[0] as List;
-      _quizzes = results[1] as List;
+    if (mounted) {
+      setState(() {
+      _assignments = results[0];
+      _quizzes = results[1];
       _loading = false;
     });
+    }
   }
 
   void _showCreateDialog() {
@@ -509,29 +511,54 @@ class _CourseLessons extends StatelessWidget {
                 title: Text(m['title'] ?? 'Module ${me.key + 1}', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
                 subtitle: Text('${lessons.length} lessons · ${quizzes.length} quizzes', style: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8))),
                 children: [
-                  ...lessons.map((l) => ListTile(
-                    leading: const Icon(Icons.play_circle_outline_rounded, color: AppColors.primaryColor, size: 20),
-                    title: Text(l['title'] ?? 'Lesson', style: const TextStyle(fontSize: 13)),
-                    dense: true,
-                    onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => LessonDetailPage(
-                          lesson: l,
-                          courseId: course['_id']?.toString() ?? '',
-                          moduleId: moduleId,
-                          enrollmentId: enrollmentId,
+                  ...lessons.map((l) {
+                    final liveDateTime = l['liveSessionDateTime'] != null
+                        ? DateTime.tryParse(l['liveSessionDateTime'].toString())
+                        : null;
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        ListTile(
+                          leading: Icon(
+                            liveDateTime != null ? Icons.video_call_rounded : Icons.play_circle_outline_rounded,
+                            color: liveDateTime != null ? const Color(0xFF6366F1) : AppColors.primaryColor,
+                            size: 20,
+                          ),
+                          title: Text(l['title'] ?? 'Lesson', style: const TextStyle(fontSize: 13)),
+                          dense: true,
+                          subtitle: liveDateTime != null
+                              ? Text(
+                                  'Live: ${liveDateTime.day}/${liveDateTime.month}/${liveDateTime.year}  ${liveDateTime.hour.toString().padLeft(2,'0')}:${liveDateTime.minute.toString().padLeft(2,'0')}',
+                                  style: const TextStyle(fontSize: 11, color: Color(0xFF6366F1), fontWeight: FontWeight.w600),
+                                )
+                              : null,
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => LessonDetailPage(
+                                lesson: l,
+                                courseId: course['_id']?.toString() ?? '',
+                                moduleId: moduleId,
+                                enrollmentId: enrollmentId,
+                              ),
+                            ),
+                          ),
                         ),
-                      ),
-                    ),
-                  )),
+                        if (liveDateTime != null && l['liveSessionNote'] != null && (l['liveSessionNote'] as String).isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(left: 52, right: 16, bottom: 4),
+                            child: Text(l['liveSessionNote'].toString(), style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+                          ),
+                      ],
+                    );
+                  }),
                   ...quizzes.map((q) => ListTile(
                     leading: const Icon(Icons.quiz_outlined, color: Colors.orange, size: 20),
                     title: Text(q['title'] ?? 'Quiz', style: const TextStyle(fontSize: 13)),
                     trailing: !isInstructor ? const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: Colors.grey) : null,
                     dense: true,
                     onTap: isInstructor ? null : () => Navigator.push(context, MaterialPageRoute(
-                      builder: (_) => QuizTakeScreen(quiz: Map<String, dynamic>.from(q is Map ? q as Map : {}), enrollmentId: enrollmentId ?? ''),
+                      builder: (_) => QuizTakeScreen(quiz: Map<String, dynamic>.from(q is Map ? q : {}), enrollmentId: enrollmentId ?? ''),
                     )),
                   )),
                   if (!isInstructor && moduleId.isNotEmpty)

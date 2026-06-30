@@ -108,7 +108,7 @@ class PatientProfile extends ConsumerWidget {
                         image: imgProvider,
                         width: r, height: r,
                         fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => Text(
+                        errorBuilder: (_, _, _) => Text(
                           (user?.name ?? 'U').substring(0, 1).toUpperCase(),
                           style: TextStyle(fontSize: Utils.windowWidth(context) * 0.12, fontWeight: FontWeight.w900, color: AppColors.primaryColor),
                         ),

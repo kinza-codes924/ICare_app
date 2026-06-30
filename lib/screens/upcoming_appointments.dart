@@ -9,7 +9,6 @@ import 'package:icare/utils/utils.dart';
 import 'package:icare/widgets/appointment_card.dart';
 import 'package:icare/widgets/back_button.dart';
 import 'package:icare/widgets/custom_text.dart';
-import 'package:intl/intl.dart';
 
 class UpcomingAppointments extends StatefulWidget {
   const UpcomingAppointments({super.key});

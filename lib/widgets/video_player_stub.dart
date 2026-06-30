@@ -302,7 +302,7 @@ class _FullscreenPlayerState extends State<_FullscreenPlayer> {
                     // Center play/pause
                     ValueListenableBuilder<VideoPlayerValue>(
                       valueListenable: ctrl,
-                      builder: (_, v, __) => Center(
+                      builder: (_, v, _) => Center(
                         child: IconButton(
                           iconSize: 64,
                           icon: Icon(
@@ -322,7 +322,7 @@ class _FullscreenPlayerState extends State<_FullscreenPlayer> {
                       padding: const EdgeInsets.symmetric(horizontal: 8),
                       child: ValueListenableBuilder<VideoPlayerValue>(
                         valueListenable: ctrl,
-                        builder: (_, v, __) => Column(
+                        builder: (_, v, _) => Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             VideoProgressIndicator(

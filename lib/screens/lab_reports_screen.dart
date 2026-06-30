@@ -799,8 +799,8 @@ class _RecordCardState extends State<_RecordCard>
     final showResults = widget.showResults;
 
     final testName = (b['testName'] ?? b['test_type'] ?? b['testType'] ?? 'Lab Test').toString();
-    final _rawPatientName = (b['patientName'] ?? b['patient_name'] ?? b['contactName'] ?? '').toString().trim();
-    final patientName = (_rawPatientName.isEmpty || _rawPatientName == 'Unknown') ? '' : _rawPatientName;
+    final rawPatientName = (b['patientName'] ?? b['patient_name'] ?? b['contactName'] ?? '').toString().trim();
+    final patientName = (rawPatientName.isEmpty || rawPatientName == 'Unknown') ? '' : rawPatientName;
     final mrNumber = (b['mrNumber'] ?? b['mr_number'] ?? '').toString();
     final referredBy = (b['referredBy'] ?? b['referred_by'] ?? '').toString();
     final contact = (b['contact'] ?? b['patient_phone'] ?? '').toString();

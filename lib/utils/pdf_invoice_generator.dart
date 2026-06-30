@@ -506,7 +506,7 @@ class PdfInvoiceGenerator {
                   ],
                 ),
                 // Data rows
-                ...results!.asMap().entries.map((entry) {
+                ...results.asMap().entries.map((entry) {
                   final i = entry.key;
                   final row = entry.value as Map<String, dynamic>? ?? {};
                   final isAbn = row['isAbnormal'] == true ||
@@ -569,7 +569,7 @@ class PdfInvoiceGenerator {
                 borderRadius: pw.BorderRadius.circular(6),
                 border: pw.Border.all(color: borderGrey),
               ),
-              child: pw.Text(resultNotes!,
+              child: pw.Text(resultNotes,
                   style: pw.TextStyle(fontSize: 11, color: textDark, lineSpacing: 2)),
             ),
             pw.SizedBox(height: 18),

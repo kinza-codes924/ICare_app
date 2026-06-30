@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:icare/utils/theme.dart';
 import 'package:icare/widgets/back_button.dart';
 import 'package:icare/widgets/custom_text.dart';
-import 'package:intl/intl.dart';
 
 class OrderTrackingScreen extends StatelessWidget {
   final Map<String, dynamic>? order;

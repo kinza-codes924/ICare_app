@@ -503,7 +503,7 @@ class _LabBookingsManagementState extends State<LabBookingsManagement>
                         const Text('Select Test', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF475569))),
                         const SizedBox(height: 6),
                         DropdownButtonFormField<String>(
-                          value: selectedTest,
+                          initialValue: selectedTest,
                           hint: const Text('Choose from registered tests'),
                           decoration: InputDecoration(
                             prefixIcon: const Icon(Icons.science_rounded, size: 18, color: primaryColor),
@@ -587,7 +587,7 @@ class _LabBookingsManagementState extends State<LabBookingsManagement>
                         const Text('Assigned Collector', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF475569))),
                         const SizedBox(height: 6),
                         DropdownButtonFormField<String>(
-                          value: selectedCollector,
+                          initialValue: selectedCollector,
                           hint: const Text('Select sample collector'),
                           decoration: InputDecoration(
                             prefixIcon: const Icon(Icons.person_pin_rounded, size: 18, color: primaryColor),
@@ -1046,7 +1046,9 @@ class _LabBookingsManagementState extends State<LabBookingsManagement>
     final patientAddress = booking['patient_address']?.toString() ?? '';
     final bookingNumber = booking['_id']?.toString().substring(0, 8).toUpperCase() ?? '';
     final testName = booking['test_type'] ?? booking['testName'] ?? 'Test';
-    final isDoctorOrdered = booking['medicalRecord'] != null;
+    final isDoctorOrdered = booking['medicalRecord'] != null ||
+        booking['medical_record_id'] != null ||
+        booking['source'] == 'prescription';
     final doctorName = booking['doctor']?['name'];
     final urgency = booking['urgency'] ?? 'Normal';
     final isUrgent = urgency == 'Urgent' || 

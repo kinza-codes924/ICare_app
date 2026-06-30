@@ -192,7 +192,7 @@ class _MyLearningScreenState extends ConsumerState<MyLearningScreen>
                         width: 120,
                         height: 120,
                         fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => Container(
+                        errorBuilder: (_, _, _) => Container(
                           width: 120,
                           height: 120,
                           color: Colors.grey[200],
@@ -329,8 +329,9 @@ class _MyLearningScreenState extends ConsumerState<MyLearningScreen>
     int totalProgress = 0;
     for (final e in _enrolledCourses) {
       final p = e['progress'];
-      if (p is int) totalProgress += p;
-      else if (p is Map) totalProgress += ((p['percent'] ?? 0) as num).toInt();
+      if (p is int) {
+        totalProgress += p;
+      } else if (p is Map) totalProgress += ((p['percent'] ?? 0) as num).toInt();
     }
     final avgProgress = total > 0 ? (totalProgress / total).round() : 0;
 
@@ -389,8 +390,9 @@ class _MyLearningScreenState extends ConsumerState<MyLearningScreen>
             final course = e['course'] ?? {};
             int prog = 0;
             final p = e['progress'];
-            if (p is int) prog = p;
-            else if (p is Map) prog = ((p['percent'] ?? 0) as num).toInt();
+            if (p is int) {
+              prog = p;
+            } else if (p is Map) prog = ((p['percent'] ?? 0) as num).toInt();
             final title = course['title'] ?? course['name'] ?? 'Untitled';
             final isDone = e['status'] == 'completed';
             return Container(

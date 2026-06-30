@@ -30,13 +30,15 @@ function uploadBuffer(buffer, folder) {
 router.post('/', authMiddleware, async (req, res) => {
   try {
     await connectMongoDB();
-    const { courseId, title, description, dueDate, totalMarks, passingMarks } = req.body;
+    const { courseId, title, description, dueDate, totalMarks, passingMarks, attachmentUrl, attachmentName } = req.body;
     if (!courseId || !title) return res.status(400).json({ success: false, message: 'courseId and title required' });
     const a = await Assignment.create({
       courseId, title, description, dueDate,
       totalMarks: totalMarks || 100,
       passingMarks: passingMarks || 50,
       instructorId: req.user.id,
+      ...(attachmentUrl && { attachmentUrl }),
+      ...(attachmentName && { attachmentName }),
     });
 
     // Notify all enrolled students about the new assignment (non-blocking)
@@ -179,6 +181,63 @@ router.post('/:assignmentId/submit', authMiddleware, upload.single('file'), asyn
       });
     }
 
+    // ── Feature 7: Submission notifications ─────────────────────────────────
+    Promise.resolve().then(async () => {
+      try {
+        const Notification = require('../models/Notification');
+        const Course = require('../models/Course');
+        const course = await Course.findById(toId(assignment.courseId.toString())).lean();
+        const student = await User.findById(studentId).lean();
+        const instructor = await User.findById(toId(assignment.instructorId.toString())).lean();
+
+        const dueDateStr = assignment.dueDate
+          ? new Date(assignment.dueDate).toLocaleDateString('en-PK')
+          : 'No deadline';
+        const isLate = status === 'late';
+
+        // In-app + email to student
+        await Notification.create({
+          userId: studentId,
+          type: 'general',
+          title: isLate ? 'Assignment Submitted (Late)' : 'Assignment Submitted',
+          message: `Your submission for "${assignment.title}" in "${course?.title || 'your course'}" has been received.${isLate ? ' Note: This was submitted after the due date.' : ''}`,
+          data: { type: 'assignment_submitted', assignmentId: assignment._id.toString(), courseId: assignment.courseId.toString() },
+        });
+
+        // Email to student
+        try {
+          const nodemailer = require('nodemailer');
+          const transporter = nodemailer.createTransport({
+            service: 'Gmail',
+            auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS },
+          });
+          if (student?.email) {
+            await transporter.sendMail({
+              from: `"iCare LMS" <${process.env.EMAIL_USER}>`,
+              to: student.email,
+              subject: `Assignment Submitted: ${assignment.title}`,
+              html: `<p>Hi ${student.name || 'Student'},</p>
+                     <p>Your assignment <b>"${assignment.title}"</b> in the course <b>"${course?.title || ''}"</b> has been successfully submitted.</p>
+                     ${isLate ? '<p style="color:orange;"><b>Note:</b> This submission was received after the due date (${dueDateStr}).</p>' : ''}
+                     <p>Your instructor will review and grade it soon.</p>
+                     <p>— iCare LMS Team</p>`,
+            });
+          }
+        } catch (_) {}
+
+        // In-app ONLY to instructor (no email)
+        if (instructor) {
+          await Notification.create({
+            userId: toId(assignment.instructorId.toString()),
+            type: 'general',
+            title: 'New Assignment Submission',
+            message: `${student?.name || 'A student'} submitted "${assignment.title}"${isLate ? ' (late)' : ''} in "${course?.title || 'your course'}"`,
+            data: { type: 'assignment_submission_received', assignmentId: assignment._id.toString(), courseId: assignment.courseId.toString(), studentId: studentId.toString() },
+          });
+        }
+      } catch (_) {}
+    });
+
     res.json({ success: true, submission });
   } catch (e) {
     if (e.code === 11000) return res.status(400).json({ success: false, message: 'Already submitted' });
@@ -297,6 +356,99 @@ router.get('/course/:courseId/my-grades', authMiddleware, async (req, res) => {
       submission: subMap[a._id.toString()] || null,
     }));
     res.json({ success: true, grades });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+// ── CRON: Send assignment due-date reminders ─────────────────────────────────
+// Called daily by Vercel cron at 08:00 UTC
+// Sends: (1) reminder 5 days before due date  (2) reminder on due date
+router.post('/send-reminders', async (req, res) => {
+  // Allow cron secret or admin auth
+  const cronSecret = req.headers['x-cron-secret'] || req.query.secret;
+  if (cronSecret !== process.env.CRON_SECRET && process.env.CRON_SECRET) {
+    return res.status(403).json({ success: false, message: 'Forbidden' });
+  }
+  try {
+    await connectMongoDB();
+    const Notification = require('../models/Notification');
+    const Course = require('../models/Course');
+    const nodemailer = require('nodemailer');
+
+    const transporter = nodemailer.createTransport({
+      service: 'Gmail',
+      auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS },
+    });
+
+    const now = new Date();
+    // Day boundaries
+    const todayStart = new Date(now); todayStart.setHours(0, 0, 0, 0);
+    const todayEnd   = new Date(now); todayEnd.setHours(23, 59, 59, 999);
+    const in5Start   = new Date(todayStart); in5Start.setDate(in5Start.getDate() + 5);
+    const in5End     = new Date(todayEnd);   in5End.setDate(in5End.getDate() + 5);
+
+    // Assignments due today (not yet reminded on due date)
+    const dueToday = await Assignment.find({
+      isPublished: true,
+      dueDate: { $gte: todayStart, $lte: todayEnd },
+      reminderSentOnDue: { $ne: true },
+    }).lean();
+
+    // Assignments due in 5 days (not yet sent 5-day reminder)
+    const dueIn5 = await Assignment.find({
+      isPublished: true,
+      dueDate: { $gte: in5Start, $lte: in5End },
+      reminderSent5Days: { $ne: true },
+    }).lean();
+
+    let sent = 0;
+
+    async function sendReminder(assignment, type) {
+      const course = await Course.findById(toId(assignment.courseId.toString())).lean();
+      const enrollments = await Enrollment.find({ courseId: toId(assignment.courseId.toString()) }).lean();
+      if (!enrollments.length) return;
+
+      const dueStr = new Date(assignment.dueDate).toLocaleDateString('en-PK', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+      const label  = type === 'today' ? 'Due TODAY' : 'Due in 5 days';
+
+      const notifs = enrollments.map(e => ({
+        userId: e.userId,
+        type: 'general',
+        title: `⏰ Assignment Reminder: ${label}`,
+        message: `"${assignment.title}" in "${course?.title || 'your course'}" is ${label.toLowerCase()}. Due: ${dueStr}`,
+        data: { type: 'assignment_reminder', assignmentId: assignment._id.toString(), courseId: assignment.courseId.toString() },
+      }));
+      await Notification.insertMany(notifs);
+
+      // Email enrolled students
+      try {
+        const studentIds = enrollments.map(e => e.userId);
+        const students = await User.find({ _id: { $in: studentIds }, email: { $exists: true, $ne: '' } }).select('email name').lean();
+        for (const student of students) {
+          await transporter.sendMail({
+            from: `"iCare LMS" <${process.env.EMAIL_USER}>`,
+            to: student.email,
+            subject: `Reminder: Assignment "${assignment.title}" is ${label}`,
+            html: `<p>Hi ${student.name || 'Student'},</p>
+                   <p>This is a reminder that your assignment <b>"${assignment.title}"</b> in <b>"${course?.title || ''}"</b> is <b>${label}</b>.</p>
+                   <p><b>Due Date:</b> ${dueStr}</p>
+                   <p>Please submit before the deadline.</p>
+                   <p>— iCare LMS Team</p>`,
+          }).catch(() => {});
+        }
+      } catch (_) {}
+
+      // Mark reminder sent
+      const flag = type === 'today' ? { reminderSentOnDue: true } : { reminderSent5Days: true };
+      await Assignment.findByIdAndUpdate(assignment._id, { $set: flag });
+      sent++;
+    }
+
+    for (const a of dueToday)  await sendReminder(a, 'today');
+    for (const a of dueIn5)    await sendReminder(a, '5days');
+
+    res.json({ success: true, message: `Reminders sent for ${sent} assignments`, dueToday: dueToday.length, dueIn5: dueIn5.length });
   } catch (e) {
     res.status(500).json({ success: false, message: e.message });
   }

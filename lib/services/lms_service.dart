@@ -585,6 +585,19 @@ class LmsService {
     } catch (_) {}
   }
 
+  // Feature 4: attendance timestamp recording
+  Future<void> recordLiveSessionJoin(String sessionId) async {
+    try {
+      await _api.post('/live-sessions/$sessionId/record-join', {});
+    } catch (_) {}
+  }
+
+  Future<void> recordLiveSessionLeave(String sessionId) async {
+    try {
+      await _api.post('/live-sessions/$sessionId/record-leave', {});
+    } catch (_) {}
+  }
+
   Future<void> sendHeartbeat(String sessionId) async {
     try {
       await _api.post('/live-sessions/$sessionId/heartbeat', {});
@@ -860,6 +873,23 @@ class LmsService {
       'success': true,
       'courses': response.data['courses'] ?? [],
     };
+  }
+
+  // Feature 1: fetch categories from admin
+  Future<List<Map<String, dynamic>>> getCourseCategories() async {
+    try {
+      final response = await _api.get('/admin/categories');
+      return List<Map<String, dynamic>>.from(response.data['categories'] ?? []);
+    } catch (_) {
+      return [
+        {'name': 'Health Program', 'value': 'HealthProgram'},
+        {'name': 'FCPS Part 1',    'value': 'FCPSPart1'},
+        {'name': 'Medical Training','value': 'Medical Training'},
+        {'name': 'Wellness',        'value': 'Wellness'},
+        {'name': 'Nutrition',       'value': 'Nutrition'},
+        {'name': 'Mental Health',   'value': 'Mental Health'},
+      ];
+    }
   }
 
   Future<Map<String, dynamic>> createCourse(Map<String, dynamic> courseData) async {

@@ -218,6 +218,33 @@ router.get('/nearby', async (req, res) => {
   }
 });
 
+// ─── PHARMACY PROFILE BY USER ID (admin use) ────────────────────────────────
+router.get('/profile/:userId', authMiddleware, async (req, res) => {
+  try {
+    await connectMongoDB();
+    const userId = toId(req.params.userId);
+    const user = await User.findById(userId).lean();
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+    const profile = await PharmacyProfile.findOne({ user_id: userId }).lean() || {};
+    res.json({
+      success: true,
+      pharmacy: {
+        id: user._id.toString(), _id: user._id.toString(), userId: user._id.toString(),
+        username: user.username || user.name, email: user.email, phone: user.phone,
+        profilePicture: user.profilePicture || null,
+        ...profile,
+        pharmacyName: profile?.pharmacy_name || user.name || user.username || '',
+        ownerName: profile?.pharmacy_name || user.name || user.username || '',
+        licenseNumber: profile?.license_number || '',
+        cnic: profile?.cnic || user.cnic || null,
+        openHours: profile?.openHours || null,
+      },
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Failed to fetch pharmacy profile' });
+  }
+});
+
 // ─── PHARMACY PROFILE GET ─────────────────────────────────────────────────────
 router.get('/profile', authMiddleware, async (req, res) => {
   try {
@@ -810,7 +837,8 @@ router.post('/products', authMiddleware, async (req, res) => {
   try {
     await connectMongoDB();
     const userId = toId(req.user.id);
-    const { name, description, category, price, stockQuantity, manufacturer, requiresPrescription, genericName, medicineCategory } = req.body;
+    const { name, description, category, price, stockQuantity, stock_quantity, quantity, stock, manufacturer, requiresPrescription, genericName, medicineCategory } = req.body;
+    const resolvedQty = stockQuantity ?? stock_quantity ?? quantity ?? stock ?? 0;
 
     // Admin-controlled drug list takes precedence — pharmacist cannot override classification
     const adminCategory = await resolveControlledCategory(genericName);
@@ -820,7 +848,7 @@ router.post('/products', authMiddleware, async (req, res) => {
     const product = await Product.create({
       pharmacy_id: userId, name, description, category: category || 'OTC',
       medicine_category: finalCategory,
-      price: price || 0, stock_quantity: stockQuantity || 0,
+      price: price || 0, stock_quantity: Number(resolvedQty),
       manufacturer, requires_prescription: finalRequiresPrescription, generic_name: genericName,
     });
 

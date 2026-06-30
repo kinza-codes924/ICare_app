@@ -2,7 +2,6 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'dart:async';
-import 'package:intl/intl.dart';
 import '../services/chat_service.dart';
 import '../utils/theme.dart';
 import 'chat_screen.dart';

@@ -2,7 +2,6 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'dart:async';
-import 'package:intl/intl.dart';
 import '../services/chat_service.dart';
 import '../services/call_service.dart';
 import '../utils/theme.dart';

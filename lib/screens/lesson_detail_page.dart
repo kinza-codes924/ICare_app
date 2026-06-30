@@ -61,9 +61,11 @@ class _LessonDetailPageState extends State<LessonDetailPage> with SingleTickerPr
           moduleId: widget.moduleId.isNotEmpty ? widget.moduleId : null,
         );
         widget.onLessonCompleted?.call(lessonId);
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Lesson marked as completed!'), backgroundColor: Color(0xFF10B981), duration: Duration(seconds: 2)),
         );
+        }
       }
     } catch (_) {
       if (mounted) setState(() => _isCompleted = !_isCompleted);

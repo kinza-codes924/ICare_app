@@ -1,4 +1,8 @@
-﻿import 'package:flutter/material.dart';
+﻿import 'dart:typed_data';
+import 'package:dio/dio.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:flutter/material.dart';
+import 'package:icare/services/api_service.dart';
 import 'package:icare/services/lms_service.dart';
 import 'package:icare/utils/theme.dart';
 import 'package:intl/intl.dart';
@@ -35,6 +39,11 @@ class _InstructorCreateAssignmentScreenState extends State<InstructorCreateAssig
   bool _isPublished = false;
   String _submissionType = 'file'; // file, text, both
 
+  // Attachment
+  String? _attachmentUrl;
+  String? _attachmentName;
+  bool _uploadingAttachment = false;
+
   List<Map<String, dynamic>> _courses = [];
 
   @override
@@ -53,6 +62,46 @@ class _InstructorCreateAssignmentScreenState extends State<InstructorCreateAssig
     _descriptionController.dispose();
     _instructionsController.dispose();
     super.dispose();
+  }
+
+  Future<String?> _cloudinaryUpload(Uint8List bytes, String filename, String folder, String resourceType) async {
+    final signRes = await ApiService().get('/upload/sign?folder=${Uri.encodeQueryComponent(folder)}&resource_type=$resourceType');
+    if (signRes.data['success'] != true) throw Exception('Sign error');
+    final cloudName = signRes.data['cloud_name']?.toString() ?? 'dzlcnyxgb';
+    final formData = FormData.fromMap({
+      'file': MultipartFile.fromBytes(bytes, filename: filename),
+      'api_key':   signRes.data['api_key']?.toString() ?? '',
+      'timestamp': signRes.data['timestamp']?.toString() ?? '',
+      'signature': signRes.data['signature']?.toString() ?? '',
+      'folder':    signRes.data['folder']?.toString() ?? folder,
+    });
+    final res = await Dio().post(
+      'https://api.cloudinary.com/v1_1/$cloudName/$resourceType/upload',
+      data: formData,
+      options: Options(validateStatus: (s) => s != null && s < 600),
+    );
+    if (res.statusCode == 200 && res.data['secure_url'] != null) return res.data['secure_url'] as String;
+    throw Exception('Upload failed: ${res.data}');
+  }
+
+  Future<void> _pickAttachment() async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['pdf', 'doc', 'docx', 'ppt', 'pptx', 'xls', 'xlsx', 'txt', 'jpg', 'jpeg', 'png', 'mp4', 'mov'],
+        withData: true,
+      );
+      if (result == null || result.files.isEmpty || result.files.first.bytes == null) return;
+      final file = result.files.first;
+      setState(() => _uploadingAttachment = true);
+      final url = await _cloudinaryUpload(file.bytes!, file.name, 'icare/assignments/attachments', 'auto');
+      if (mounted) setState(() { _attachmentUrl = url; _attachmentName = file.name; _uploadingAttachment = false; });
+    } catch (e) {
+      if (mounted) {
+        setState(() => _uploadingAttachment = false);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Upload failed: $e'), backgroundColor: Colors.red));
+      }
+    }
   }
 
   Future<void> _loadCourses() async {
@@ -131,6 +180,8 @@ class _InstructorCreateAssignmentScreenState extends State<InstructorCreateAssig
         'totalMarks': _totalMarks,
         'isPublished': _isPublished,
         'submissionType': _submissionType,
+        if (_attachmentUrl != null) 'attachmentUrl': _attachmentUrl,
+        if (_attachmentName != null) 'attachmentName': _attachmentName,
       };
 
       await _lmsService.createAssignment(assignmentData);
@@ -325,28 +376,66 @@ class _InstructorCreateAssignmentScreenState extends State<InstructorCreateAssig
 
               const SizedBox(height: 24),
 
-              // Resources Card (Future enhancement)
+              // Attachment Card
               _buildCard(
-                title: 'Resources',
+                title: 'Attachment',
                 icon: Icons.attach_file,
                 children: [
-                  OutlinedButton.icon(
-                    onPressed: () {
-                      // TODO: Implement file upload
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('File upload coming soon')),
-                      );
-                    },
-                    icon: const Icon(Icons.upload_file),
-                    label: const Text('Upload Resource Files'),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: AppColors.primaryColor,
-                      side: BorderSide(color: AppColors.primaryColor),
+                  if (_attachmentUrl != null) ...[
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFECFDF5),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.4)),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.check_circle_rounded, color: Color(0xFF10B981), size: 20),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              _attachmentName ?? 'Attachment uploaded',
+                              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF065F46)),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          IconButton(
+                            onPressed: () => setState(() { _attachmentUrl = null; _attachmentName = null; }),
+                            icon: const Icon(Icons.close_rounded, size: 18, color: Color(0xFF64748B)),
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
+                    const SizedBox(height: 10),
+                  ],
+                  _uploadingAttachment
+                      ? const Center(child: Padding(
+                          padding: EdgeInsets.symmetric(vertical: 12),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)),
+                              SizedBox(width: 10),
+                              Text('Uploading...', style: TextStyle(fontSize: 13, color: Color(0xFF64748B))),
+                            ],
+                          ),
+                        ))
+                      : OutlinedButton.icon(
+                          onPressed: _pickAttachment,
+                          icon: const Icon(Icons.upload_file),
+                          label: Text(_attachmentUrl != null ? 'Replace Attachment' : 'Upload Attachment'),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: AppColors.primaryColor,
+                            side: BorderSide(color: AppColors.primaryColor),
+                          ),
+                        ),
                   const SizedBox(height: 8),
                   const Text(
-                    'Upload reference materials, templates, or sample files',
+                    'Attach a PDF, document, image, or video for students to reference.',
                     style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
                   ),
                 ],

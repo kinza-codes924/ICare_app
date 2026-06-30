@@ -127,7 +127,7 @@ class ProfileOrAppointmentViewScreen extends ConsumerWidget {
                               width: 64,
                               height: 64,
                               fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => Center(
+                              errorBuilder: (_, _, _) => Center(
                                 child: Text(
                                   otherPerson.name.isNotEmpty
                                       ? otherPerson.name[0].toUpperCase()

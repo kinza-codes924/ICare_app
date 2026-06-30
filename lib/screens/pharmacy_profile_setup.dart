@@ -6,6 +6,8 @@ import 'package:image_picker/image_picker.dart';
 // ignore: avoid_web_libraries_in_flutter
 import '../utils/html_stub.dart' as html
     if (dart.library.html) 'dart:html';
+import '../utils/geo_locator_stub.dart'
+    if (dart.library.html) '../utils/geo_locator_web.dart';
 import '../services/pharmacy_service.dart';
 import '../services/api_service.dart';
 import '../models/user.dart';
@@ -106,33 +108,212 @@ class _PharmacyProfileSetupState extends ConsumerState<PharmacyProfileSetup> {
   }
 
   Future<void> _getGpsLocation() async {
-    if (!kIsWeb) return;
-    setState(() => _gettingLocation = true);
-    try {
-      final pos = await html.window.navigator.geolocation
-          .getCurrentPosition()
-          .timeout(const Duration(seconds: 15));
-      if (mounted) {
-        setState(() {
-          _latitude = pos.coords?.latitude?.toDouble();
-          _longitude = pos.coords?.longitude?.toDouble();
-          _gettingLocation = false;
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Location captured successfully!'),
-            backgroundColor: Color(0xFF10B981),
-          ),
-        );
-      }
-    } catch (_) {
-      if (mounted) {
-        setState(() => _gettingLocation = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Could not get location. Please allow location access.')),
-        );
-      }
+    if (!kIsWeb) {
+      _showManualCoordinatesDialog(
+          reason: 'Auto-location is only available on web. Enter coordinates manually.');
+      return;
     }
+
+    // HTTPS / secure-context check
+    try {
+      final protocol = html.window.location.protocol;
+      final hostname = html.window.location.hostname;
+      if (protocol != 'https:' && hostname != 'localhost' && hostname != '127.0.0.1') {
+        _showManualCoordinatesDialog(
+            reason: 'Location detection requires a secure HTTPS connection. '
+                'Enter your pharmacy coordinates manually.');
+        return;
+      }
+    } catch (_) {}
+
+    setState(() => _gettingLocation = true);
+
+    int? errorCode;
+    final coords = await getGpsCoords((code) => errorCode = code);
+
+    if (!mounted) return;
+    setState(() => _gettingLocation = false);
+
+    if (coords != null) {
+      setState(() {
+        _latitude = coords[0];
+        _longitude = coords[1];
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Location captured successfully!'),
+          backgroundColor: Color(0xFF10B981),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    // Location failed — show manual dialog with helpful message
+    final String reason;
+    switch (errorCode ?? 0) {
+      case 1:
+        reason = 'Location access is blocked by the browser.\n\n'
+            'To fix: click the 🔒 lock icon in your browser address bar → '
+            'click "Location" → select "Allow" → then tap the location button again.';
+        break;
+      case 2:
+        reason = 'Your device could not determine the location '
+            '(GPS or network unavailable).\n\n'
+            'Please enter your pharmacy coordinates manually below.';
+        break;
+      case 3:
+      default:
+        reason = 'Could not detect location automatically.\n\n'
+            'Tip: Open Google Maps, long-press your pharmacy location, '
+            'and copy the coordinates shown at the top.';
+    }
+    _showManualCoordinatesDialog(reason: reason);
+  }
+
+  void _showManualCoordinatesDialog({String? reason}) {
+    if (!mounted) return;
+    final latCtrl =
+        TextEditingController(text: _latitude?.toStringAsFixed(6) ?? '');
+    final lngCtrl =
+        TextEditingController(text: _longitude?.toStringAsFixed(6) ?? '');
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Row(
+          children: [
+            Icon(Icons.pin_drop_rounded, color: Color(0xFF00897B)),
+            SizedBox(width: 10),
+            Expanded(
+              child: Text('Enter Pharmacy Coordinates',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+            ),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (reason != null) ...[
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFFBEB),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: const Color(0xFFFCD34D)),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Icon(Icons.info_outline_rounded,
+                          size: 16, color: Color(0xFFF59E0B)),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(reason,
+                            style: const TextStyle(
+                                fontSize: 12, color: Color(0xFF92400E))),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ],
+              TextField(
+                controller: latCtrl,
+                keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true, signed: true),
+                decoration: InputDecoration(
+                  labelText: 'Latitude',
+                  hintText: 'e.g. 31.5204',
+                  prefixIcon: const Icon(Icons.swap_vert_rounded),
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: lngCtrl,
+                keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true, signed: true),
+                decoration: InputDecoration(
+                  labelText: 'Longitude',
+                  hintText: 'e.g. 74.3587',
+                  prefixIcon: const Icon(Icons.swap_horiz_rounded),
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                '💡 Tip: Open Google Maps, right-click your pharmacy\'s location, '
+                'and the coordinates appear at the top of the menu.',
+                style: TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel')),
+          ElevatedButton.icon(
+            onPressed: () {
+              final lat = double.tryParse(latCtrl.text.trim());
+              final lng = double.tryParse(lngCtrl.text.trim());
+              if (lat == null || lng == null) {
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                  content: Text('Enter valid decimal numbers.'),
+                  backgroundColor: Colors.red,
+                ));
+                return;
+              }
+              if (lat < -90 || lat > 90) {
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                  content: Text('Latitude must be between -90 and 90.'),
+                  backgroundColor: Colors.red,
+                ));
+                return;
+              }
+              if (lng < -180 || lng > 180) {
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                  content: Text('Longitude must be between -180 and 180.'),
+                  backgroundColor: Colors.red,
+                ));
+                return;
+              }
+              if (mounted) setState(() { _latitude = lat; _longitude = lng; });
+              Navigator.pop(ctx);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Location saved successfully!'),
+                  backgroundColor: Color(0xFF10B981),
+                  behavior: SnackBarBehavior.floating,
+                ),
+              );
+            },
+            icon: const Icon(Icons.check_rounded, size: 16),
+            label: const Text('Save Location'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF00897B),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10)),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _saveProfile() async {

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:icare/services/lms_service.dart';
 import 'package:icare/utils/theme.dart';
+import 'package:icare/widgets/attachment_viewer.dart';
 import 'package:icare/widgets/back_button.dart';
 import 'package:intl/intl.dart';
 
@@ -331,6 +332,28 @@ class _AssignmentSubmitScreenState extends State<AssignmentSubmitScreen> {
                               style: const TextStyle(
                                   fontSize: 13, color: Color(0xFF374151), height: 1.6)),
                         ],
+                        Builder(builder: (_) {
+                          final attachUrl = widget.assignment['attachmentUrl']?.toString() ?? '';
+                          final attachName = widget.assignment['attachmentName']?.toString() ?? '';
+                          if (attachUrl.isEmpty) return const SizedBox.shrink();
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const SizedBox(height: 16),
+                              const Text('Attachment',
+                                  style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w800,
+                                      color: Color(0xFF0F172A))),
+                              const SizedBox(height: 8),
+                              AttachmentViewer(
+                                url: attachUrl,
+                                name: attachName.isNotEmpty ? attachName : 'View Attachment',
+                                label: 'Tap to open in browser',
+                              ),
+                            ],
+                          );
+                        }),
                       ],
                     ),
                   ),

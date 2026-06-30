@@ -314,6 +314,82 @@ router.post('/:id/leave', authMiddleware, async (req, res) => {
   }
 });
 
+// ── Feature 4: Record student join timestamp ─────────────────────────────────
+router.post('/:id/record-join', authMiddleware, async (req, res) => {
+  try {
+    await connectMongoDB();
+    const Attendance = require('../models/Attendance');
+    const session = await LiveSession.findById(toId(req.params.id)).lean();
+    if (!session) return res.status(404).json({ success: false, message: 'Session not found' });
+
+    const studentId = toId(req.user.id);
+    const dayStart = new Date(); dayStart.setHours(0, 0, 0, 0);
+    const dayEnd   = new Date(); dayEnd.setHours(23, 59, 59, 999);
+
+    let att = await Attendance.findOne({
+      liveSessionId: session._id.toString(),
+      sessionDate: { $gte: dayStart, $lte: dayEnd },
+    });
+
+    if (!att) {
+      att = await Attendance.create({
+        courseId: session.courseId,
+        instructorId: session.instructorId,
+        sessionTitle: session.title || 'Live Session',
+        sessionDate: new Date(),
+        liveSessionId: session._id.toString(),
+        records: [],
+      });
+    }
+
+    const existing = att.records.find(r => r.studentId?.toString() === studentId.toString());
+    if (existing) {
+      // Update joinedAt if not set yet
+      if (!existing.joinedAt) existing.joinedAt = new Date();
+    } else {
+      att.records.push({ studentId, status: 'present', joinedAt: new Date() });
+    }
+    await att.save();
+
+    res.json({ success: true, joinedAt: new Date() });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+// ── Feature 4: Record student leave timestamp ────────────────────────────────
+router.post('/:id/record-leave', authMiddleware, async (req, res) => {
+  try {
+    await connectMongoDB();
+    const Attendance = require('../models/Attendance');
+    const studentId = toId(req.user.id);
+    const leftAt = new Date();
+
+    const dayStart = new Date(); dayStart.setHours(0, 0, 0, 0);
+    const dayEnd   = new Date(); dayEnd.setHours(23, 59, 59, 999);
+
+    const att = await Attendance.findOne({
+      liveSessionId: req.params.id,
+      sessionDate: { $gte: dayStart, $lte: dayEnd },
+    });
+
+    if (att) {
+      const record = att.records.find(r => r.studentId?.toString() === studentId.toString());
+      if (record) {
+        record.leftAt = leftAt;
+        if (record.joinedAt) {
+          record.durationMinutes = Math.round((leftAt - new Date(record.joinedAt)) / 60000);
+        }
+        await att.save();
+      }
+    }
+
+    res.json({ success: true, leftAt });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
 // ── INSTRUCTOR: Update session ──────────────────────────────────────────────
 router.put('/:id', authMiddleware, async (req, res) => {
   try {

@@ -1,9 +1,7 @@
 import 'dart:async';
-import 'dart:io';
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
-import 'package:icare/services/face_auth_service.dart';
 
 /// Full-screen camera with live face detection overlay.
 ///

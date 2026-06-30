@@ -15,6 +15,12 @@ class User {
   final List<Map<String, String>>? emergencyContacts;
   final bool isPhoneVerified;
   final bool isEmailVerified;
+  final String? bloodGroup;
+  final String? existingConditions;
+  final String? healthGoals;
+  final String? address;
+  final String? height;
+  final String? weight;
 
   User({
     required this.id,
@@ -33,6 +39,12 @@ class User {
     this.emergencyContacts,
     this.isPhoneVerified = true,
     this.isEmailVerified = true,
+    this.bloodGroup,
+    this.existingConditions,
+    this.healthGoals,
+    this.address,
+    this.height,
+    this.weight,
   });
 
   factory User.fromJson(Map<String, dynamic> json) {
@@ -58,9 +70,14 @@ class User {
           ?.map((e) => Map<String, String>.from(
               (e as Map).map((k, v) => MapEntry(k.toString(), v?.toString() ?? ''))))
           .toList(),
-      // Old accounts without these fields default to true (grandfathered)
       isPhoneVerified: json['isPhoneVerified'] as bool? ?? true,
       isEmailVerified: json['isEmailVerified'] as bool? ?? true,
+      bloodGroup: (json['bloodGroup'] ?? json['blood_group'])?.toString(),
+      existingConditions: (json['existingConditions'] ?? json['existing_conditions'])?.toString(),
+      healthGoals: (json['healthGoals'] ?? json['health_goals'])?.toString(),
+      address: json['address']?.toString(),
+      height: json['height']?.toString(),
+      weight: json['weight']?.toString(),
     );
   }
 
@@ -82,6 +99,12 @@ class User {
       if (emergencyContacts != null) 'emergencyContacts': emergencyContacts,
       'isPhoneVerified': isPhoneVerified,
       'isEmailVerified': isEmailVerified,
+      if (bloodGroup != null) 'bloodGroup': bloodGroup,
+      if (existingConditions != null) 'existingConditions': existingConditions,
+      if (healthGoals != null) 'healthGoals': healthGoals,
+      if (address != null) 'address': address,
+      if (height != null) 'height': height,
+      if (weight != null) 'weight': weight,
     };
   }
 
@@ -102,6 +125,12 @@ class User {
     List<Map<String, String>>? emergencyContacts,
     bool? isPhoneVerified,
     bool? isEmailVerified,
+    String? bloodGroup,
+    String? existingConditions,
+    String? healthGoals,
+    String? address,
+    String? height,
+    String? weight,
   }) {
     return User(
       id: id ?? this.id,
@@ -120,6 +149,12 @@ class User {
       emergencyContacts: emergencyContacts ?? this.emergencyContacts,
       isPhoneVerified: isPhoneVerified ?? this.isPhoneVerified,
       isEmailVerified: isEmailVerified ?? this.isEmailVerified,
+      bloodGroup: bloodGroup ?? this.bloodGroup,
+      existingConditions: existingConditions ?? this.existingConditions,
+      healthGoals: healthGoals ?? this.healthGoals,
+      address: address ?? this.address,
+      height: height ?? this.height,
+      weight: weight ?? this.weight,
     );
   }
 }

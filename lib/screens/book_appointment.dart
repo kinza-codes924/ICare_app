@@ -9,7 +9,6 @@ import 'package:icare/services/doctor_service.dart';
 import 'package:icare/utils/theme.dart';
 import 'package:icare/utils/utils.dart';
 import 'package:icare/widgets/back_button.dart';
-import 'package:intl/intl.dart';
 
 class BookAppointmentScreen extends ConsumerStatefulWidget {
   const BookAppointmentScreen({super.key, required this.doctor});

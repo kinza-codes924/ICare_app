@@ -17,6 +17,7 @@ import 'package:icare/screens/pharmacy_details.dart';
 import 'package:icare/screens/book_lab.dart';
 import 'package:icare/screens/about_us.dart';
 import 'package:icare/screens/privacy_policy.dart';
+import 'package:icare/screens/refund_policy.dart';
 import 'package:icare/screens/terms_and_conditions.dart';
 import 'package:icare/screens/help_and_support.dart';
 import 'package:icare/utils/utils.dart' show buildProfileImageProvider;
@@ -1944,6 +1945,7 @@ class _DoctorsSliderState extends State<_DoctorsSlider> {
   late final PageController _pageController;
   int _currentPage = 0;
   Timer? _autoPlayTimer;
+  Timer? _refreshTimer;
   List<Map<String, dynamic>> _doctors = [];
   bool _loading = true;
   bool _isMobile = false;
@@ -1969,11 +1971,13 @@ class _DoctorsSliderState extends State<_DoctorsSlider> {
     super.initState();
     _pageController = PageController();
     _fetchOnlineDoctors();
+    _refreshTimer = Timer.periodic(const Duration(seconds: 30), (_) => _fetchOnlineDoctors());
   }
 
   @override
   void dispose() {
     _autoPlayTimer?.cancel();
+    _refreshTimer?.cancel();
     _pageController.dispose();
     super.dispose();
   }
@@ -2429,10 +2433,17 @@ class _DoctorCardState extends State<_DoctorCard> {
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
-                onPressed: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(builder: (ctx) => const DoctorsList()),
-                  );
+                onPressed: () async {
+                  if (!await _requireAuth(context)) return;
+                  if (context.mounted) {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => ConsultationDetailsScreen(
+                          targetDoctorId: d['_id']?.toString(),
+                        ),
+                      ),
+                    );
+                  }
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF0036BC),
@@ -3639,6 +3650,7 @@ class _Footer extends StatelessWidget {
                 'Work With Us',
                 'Privacy Policy',
                 'Terms of Service',
+                'Refund Policy',
                 'Contact Us',
               ],
               taps: {
@@ -3646,6 +3658,7 @@ class _Footer extends StatelessWidget {
                 'Work With Us': () => context.go('/work-with-us'),
                 'Privacy Policy': () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PrivacyPolicy())),
                 'Terms of Service': () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TermsAndConditions())),
+                'Refund Policy': () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RefundPolicy())),
                 'Contact Us': () => Navigator.push(context, MaterialPageRoute(builder: (_) => const HelpAndSupport())),
               },
             ),
@@ -3691,6 +3704,7 @@ class _Footer extends StatelessWidget {
           'Work With Us',
           'Privacy Policy',
           'Terms of Service',
+          'Refund Policy',
           'Contact Us',
         ],
         taps: {
@@ -3698,6 +3712,7 @@ class _Footer extends StatelessWidget {
           'Work With Us': () => context.go('/work-with-us'),
           'Privacy Policy': () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PrivacyPolicy())),
           'Terms of Service': () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TermsAndConditions())),
+          'Refund Policy': () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RefundPolicy())),
           'Contact Us': () => Navigator.push(context, MaterialPageRoute(builder: (_) => const HelpAndSupport())),
         },
       ),

@@ -1,0 +1,386 @@
+[{
+  "_id": {
+    "$oid": "69fbe371f0e1af30395666c1"
+  },
+  "courseId": {
+    "$oid": "69ef6149de3b3a7152ef4e38"
+  },
+  "authorId": {
+    "$oid": "69ca75f28abbbbbc1def3629"
+  },
+  "authorName": "Instructor",
+  "authorRole": "instructor",
+  "content": "abc",
+  "comments": [],
+  "createdAt": {
+    "$date": "2026-05-07T00:57:21.837Z"
+  },
+  "updatedAt": {
+    "$date": "2026-05-07T00:57:21.837Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "69fe36a4ba11d2a3ec8c6c92"
+  },
+  "courseId": {
+    "$oid": "69fbe4cb6680dcf0e42b9a52"
+  },
+  "authorId": {
+    "$oid": "69ca75f28abbbbbc1def3629"
+  },
+  "authorName": "Instructor",
+  "authorRole": "instructor",
+  "content": "abc test",
+  "comments": [],
+  "createdAt": {
+    "$date": "2026-05-08T19:16:52.258Z"
+  },
+  "updatedAt": {
+    "$date": "2026-05-08T19:16:52.258Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "6a04dbbef0f1d4215f7b8d7d"
+  },
+  "courseId": {
+    "$oid": "69fbe4cb6680dcf0e42b9a52"
+  },
+  "authorId": {
+    "$oid": "69ca75f28abbbbbc1def3629"
+  },
+  "authorName": "Instructor",
+  "authorRole": "instructor",
+  "content": "abcc",
+  "comments": [],
+  "createdAt": {
+    "$date": "2026-05-13T20:14:54.852Z"
+  },
+  "updatedAt": {
+    "$date": "2026-05-13T20:14:54.852Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "6a04dbc3f0f1d4215f7b8d7e"
+  },
+  "courseId": {
+    "$oid": "69fbe4cb6680dcf0e42b9a52"
+  },
+  "authorId": {
+    "$oid": "69ca75f28abbbbbc1def3629"
+  },
+  "authorName": "Instructor",
+  "authorRole": "instructor",
+  "content": "aaaaa",
+  "comments": [],
+  "createdAt": {
+    "$date": "2026-05-13T20:14:59.964Z"
+  },
+  "updatedAt": {
+    "$date": "2026-05-13T20:14:59.964Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "6a04dbcff0f1d4215f7b8d7f"
+  },
+  "courseId": {
+    "$oid": "69fbe4cb6680dcf0e42b9a52"
+  },
+  "authorId": {
+    "$oid": "69ca75f28abbbbbc1def3629"
+  },
+  "authorName": "Instructor",
+  "authorRole": "instructor",
+  "content": "aabc",
+  "comments": [],
+  "createdAt": {
+    "$date": "2026-05-13T20:15:11.406Z"
+  },
+  "updatedAt": {
+    "$date": "2026-05-13T20:15:11.406Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "6a04fb71f6f3e3f3ea7b8b4a"
+  },
+  "courseId": {
+    "$oid": "69fbe4cb6680dcf0e42b9a52"
+  },
+  "authorId": {
+    "$oid": "69ca75f28abbbbbc1def3629"
+  },
+  "authorName": "Instructor",
+  "authorRole": "instructor",
+  "content": "abc",
+  "comments": [],
+  "createdAt": {
+    "$date": "2026-05-13T22:30:09.385Z"
+  },
+  "updatedAt": {
+    "$date": "2026-05-13T22:30:09.385Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "6a04fce1f6f3e3f3ea7b8b4b"
+  },
+  "courseId": {
+    "$oid": "69fbe4cb6680dcf0e42b9a52"
+  },
+  "authorId": {
+    "$oid": "69ca75f28abbbbbc1def3629"
+  },
+  "authorName": "Instructor",
+  "authorRole": "instructor",
+  "content": "hhhh",
+  "comments": [],
+  "createdAt": {
+    "$date": "2026-05-13T22:36:17.612Z"
+  },
+  "updatedAt": {
+    "$date": "2026-05-13T22:36:17.612Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "6a05042e59bfef1f31cf68ee"
+  },
+  "courseId": {
+    "$oid": "69ff2a41a543710553cb0e0b"
+  },
+  "authorId": {
+    "$oid": "69ca75f28abbbbbc1def3629"
+  },
+  "authorName": "Instructor",
+  "authorRole": "instructor",
+  "content": "abc",
+  "comments": [
+    {
+      "authorId": {
+        "$oid": "69ca76528abbbbbc1def362f"
+      },
+      "authorName": "Production Student",
+      "_id": {
+        "$oid": "6a2720ee07f7b01b532196b6"
+      },
+      "createdAt": {
+        "$date": "2026-06-08T20:07:10.797Z"
+      }
+    }
+  ],
+  "createdAt": {
+    "$date": "2026-05-13T23:07:26.153Z"
+  },
+  "updatedAt": {
+    "$date": "2026-06-08T20:07:10.802Z"
+  },
+  "__v": 1
+},
+{
+  "_id": {
+    "$oid": "6a05048f59bfef1f31cf68ef"
+  },
+  "courseId": {
+    "$oid": "69ff2a41a543710553cb0e0b"
+  },
+  "authorId": {
+    "$oid": "69ca75f28abbbbbc1def3629"
+  },
+  "authorName": "Instructor",
+  "authorRole": "instructor",
+  "content": "abc",
+  "comments": [],
+  "createdAt": {
+    "$date": "2026-05-13T23:09:03.174Z"
+  },
+  "updatedAt": {
+    "$date": "2026-05-13T23:09:03.174Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "6a05060bf5b1a3a6490fd884"
+  },
+  "courseId": {
+    "$oid": "69ff2a41a543710553cb0e0b"
+  },
+  "authorId": {
+    "$oid": "69ca75f28abbbbbc1def3629"
+  },
+  "authorName": "Instructor",
+  "authorRole": "instructor",
+  "content": "abc",
+  "comments": [],
+  "createdAt": {
+    "$date": "2026-05-13T23:15:23.080Z"
+  },
+  "updatedAt": {
+    "$date": "2026-05-13T23:15:23.080Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "6a050d971b71e29a922a342a"
+  },
+  "courseId": {
+    "$oid": "69ff2a41a543710553cb0e0b"
+  },
+  "authorId": {
+    "$oid": "69ca75f28abbbbbc1def3629"
+  },
+  "authorName": "Instructor",
+  "authorRole": "instructor",
+  "content": "hi",
+  "comments": [
+    {
+      "authorId": {
+        "$oid": "69ca76528abbbbbc1def362f"
+      },
+      "authorName": "User",
+      "_id": {
+        "$oid": "6a050e361b71e29a922a3433"
+      },
+      "createdAt": {
+        "$date": "2026-05-13T23:50:14.320Z"
+      }
+    },
+    {
+      "authorId": {
+        "$oid": "69ca75f28abbbbbc1def3629"
+      },
+      "authorName": "User",
+      "_id": {
+        "$oid": "6a0517e6a2b391d87e635d5e"
+      },
+      "createdAt": {
+        "$date": "2026-05-14T00:31:34.695Z"
+      }
+    },
+    {
+      "authorId": {
+        "$oid": "69ca75f28abbbbbc1def3629"
+      },
+      "authorName": "Production instructuctor",
+      "_id": {
+        "$oid": "6a0c602b9dee5a42b2786659"
+      },
+      "createdAt": {
+        "$date": "2026-05-19T13:05:47.986Z"
+      }
+    }
+  ],
+  "createdAt": {
+    "$date": "2026-05-13T23:47:35.604Z"
+  },
+  "updatedAt": {
+    "$date": "2026-05-19T13:05:47.997Z"
+  },
+  "__v": 3
+},
+{
+  "_id": {
+    "$oid": "6a061f001e2c0a76592e0cbe"
+  },
+  "courseId": {
+    "$oid": "6a0613ea4d1c13224d7c866f"
+  },
+  "authorId": {
+    "$oid": "69ca75f28abbbbbc1def3629"
+  },
+  "authorName": "Instructor",
+  "authorRole": "instructor",
+  "content": "abc",
+  "comments": [
+    {
+      "authorId": {
+        "$oid": "69ca75f28abbbbbc1def3629"
+      },
+      "authorName": "User",
+      "_id": {
+        "$oid": "6a0bb932991991eb11caaaeb"
+      },
+      "createdAt": {
+        "$date": "2026-05-19T01:13:22.777Z"
+      }
+    }
+  ],
+  "createdAt": {
+    "$date": "2026-05-14T19:14:08.961Z"
+  },
+  "updatedAt": {
+    "$date": "2026-05-19T01:13:22.781Z"
+  },
+  "__v": 1
+},
+{
+  "_id": {
+    "$oid": "6a0c605cd4a0ddb92f413883"
+  },
+  "courseId": {
+    "$oid": "69ff2a41a543710553cb0e0b"
+  },
+  "authorId": {
+    "$oid": "69ca75f28abbbbbc1def3629"
+  },
+  "authorName": "Instructor",
+  "authorRole": "instructor",
+  "content": "12345",
+  "comments": [
+    {
+      "authorId": {
+        "$oid": "69ca76528abbbbbc1def362f"
+      },
+      "authorName": "Production Student",
+      "_id": {
+        "$oid": "6a0c60c39dee5a42b278665a"
+      },
+      "createdAt": {
+        "$date": "2026-05-19T13:08:19.121Z"
+      }
+    },
+    {
+      "authorId": {
+        "$oid": "69ca76528abbbbbc1def362f"
+      },
+      "authorName": "Production Student",
+      "_id": {
+        "$oid": "6a0c60c39dee5a42b278665c"
+      },
+      "createdAt": {
+        "$date": "2026-05-19T13:08:19.662Z"
+      }
+    },
+    {
+      "authorId": {
+        "$oid": "69ca75f28abbbbbc1def3629"
+      },
+      "authorName": "Production instructuctor",
+      "_id": {
+        "$oid": "6a0c88b4f521496256265072"
+      },
+      "createdAt": {
+        "$date": "2026-05-19T15:58:44.068Z"
+      }
+    }
+  ],
+  "createdAt": {
+    "$date": "2026-05-19T13:06:36.313Z"
+  },
+  "updatedAt": {
+    "$date": "2026-05-19T15:58:44.073Z"
+  },
+  "__v": 3
+}]

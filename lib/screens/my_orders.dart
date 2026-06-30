@@ -136,7 +136,7 @@ class _MyOrdersScreenState extends ConsumerState<MyOrdersScreen> {
                 const Text('Category', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
                 const SizedBox(height: 8),
                 DropdownButtonFormField<String>(
-                  value: category,
+                  initialValue: category,
                   decoration: InputDecoration(
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                     contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),

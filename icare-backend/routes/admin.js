@@ -658,6 +658,87 @@ router.get('/doctor-tools', authMiddleware, adminOnly, async (req, res) => {
   }
 });
 
+// ─── COURSE CATEGORIES (Feature 1) ───────────────────────────────────────────
+const CourseCategory = require('../models/CourseCategory');
+
+// Seed default categories if none exist
+async function seedDefaultCategories() {
+  const count = await CourseCategory.countDocuments();
+  if (count === 0) {
+    await CourseCategory.insertMany([
+      { name: 'Health Program',        value: 'HealthProgram',     order: 1 },
+      { name: 'FCPS Part 1',           value: 'FCPSPart1',         order: 2 },
+      { name: 'Medical Training',      value: 'Medical Training',  order: 3 },
+      { name: 'Wellness',              value: 'Wellness',          order: 4 },
+      { name: 'Nutrition',             value: 'Nutrition',         order: 5 },
+      { name: 'Mental Health',         value: 'Mental Health',     order: 6 },
+    ]);
+  }
+}
+
+// GET /api/admin/categories — list all categories (also used by instructors)
+router.get('/categories', authMiddleware, async (req, res) => {
+  try {
+    await connectMongoDB();
+    await seedDefaultCategories();
+    // admin?all=true returns all (including inactive); default returns only active
+    const filter = (req.query.all === 'true' && req.user?.role === 'admin') ? {} : { isActive: true };
+    const cats = await CourseCategory.find(filter).sort({ order: 1, name: 1 }).lean();
+    res.json({ success: true, categories: cats });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+// POST /api/admin/categories — create new category (admin only)
+router.post('/categories', authMiddleware, adminOnly, async (req, res) => {
+  try {
+    await connectMongoDB();
+    const { name, description, order } = req.body;
+    if (!name?.trim()) return res.status(400).json({ success: false, message: 'name required' });
+    const value = name.trim().replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_]/g, '');
+    const cat = await CourseCategory.create({
+      name: name.trim(),
+      value: value || name.trim(),
+      description: description || '',
+      order: order || 0,
+    });
+    res.status(201).json({ success: true, category: cat });
+  } catch (e) {
+    if (e.code === 11000) return res.status(400).json({ success: false, message: 'Category already exists' });
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+// PUT /api/admin/categories/:id — update category (admin only)
+router.put('/categories/:id', authMiddleware, adminOnly, async (req, res) => {
+  try {
+    await connectMongoDB();
+    const { name, description, isActive, order } = req.body;
+    const update = {};
+    if (name !== undefined) { update.name = name.trim(); update.value = name.trim().replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_]/g, '') || name.trim(); }
+    if (description !== undefined) update.description = description;
+    if (isActive !== undefined) update.isActive = isActive;
+    if (order !== undefined) update.order = order;
+    const cat = await CourseCategory.findByIdAndUpdate(toId(req.params.id), { $set: update }, { new: true });
+    if (!cat) return res.status(404).json({ success: false, message: 'Category not found' });
+    res.json({ success: true, category: cat });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+// DELETE /api/admin/categories/:id — soft delete (admin only)
+router.delete('/categories/:id', authMiddleware, adminOnly, async (req, res) => {
+  try {
+    await connectMongoDB();
+    await CourseCategory.findByIdAndUpdate(toId(req.params.id), { isActive: false });
+    res.json({ success: true });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
 router.all('/{*path}', (req, res) => {
   res.json({ success: true, users: [], data: [], count: 0 });
 });

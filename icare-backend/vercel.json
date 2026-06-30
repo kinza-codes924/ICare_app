@@ -46,6 +46,12 @@
       "dest": "index.js"
     }
   ],
+  "crons": [
+    {
+      "path": "/api/assignments/send-reminders",
+      "schedule": "0 8 * * *"
+    }
+  ],
   "env": {
     "NODE_ENV": "production"
   }

@@ -10,9 +10,7 @@ import 'package:icare/services/call_service.dart';
 import 'package:icare/utils/shared_pref.dart';
 import 'package:icare/utils/theme.dart';
 import 'package:icare/utils/utils.dart';
-import 'package:icare/widgets/back_button.dart';
 import 'package:icare/widgets/custom_text.dart';
-import 'package:intl/intl.dart';
 
 class DoctorAppointmentsScreen extends StatefulWidget {
   final String initialFilter;

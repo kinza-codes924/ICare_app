@@ -122,13 +122,13 @@ class _ReminderBannerState extends State<_ReminderBanner> with SingleTickerProvi
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(16),
                   border: Border(left: BorderSide(color: widget.color, width: 4)),
-                  boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.12), blurRadius: 16, offset: const Offset(0, 4))],
+                  boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.12), blurRadius: 16, offset: const Offset(0, 4))],
                 ),
                 child: Row(
                   children: [
                     Container(
                       padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(color: widget.color.withOpacity(0.12), borderRadius: BorderRadius.circular(10)),
+                      decoration: BoxDecoration(color: widget.color.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(10)),
                       child: Icon(widget.icon, color: widget.color, size: 22),
                     ),
                     const SizedBox(width: 12),

@@ -691,7 +691,7 @@ class _VideoCallWebState extends State<VideoCall> {
         apptJson = match as Map<String, dynamic>;
       }
 
-      final appointment = AppointmentDetail.fromJson(apptJson!);
+      final appointment = AppointmentDetail.fromJson(apptJson);
 
       // Use consultationId only if it is a valid MongoDB ObjectId.
       // The channelName (e.g. "connect_now_...") is NOT a valid ObjectId and
@@ -736,7 +736,7 @@ class _VideoCallWebState extends State<VideoCall> {
 
       // Fetch existing history to pre-fill the form if it was saved before
       final consultService = ConsultationService();
-      final existingHistory = await consultService.getHistoryByConsultation(consultationId!);
+      final existingHistory = await consultService.getHistoryByConsultation(consultationId);
       final existingHistoryId = existingHistory?['_id']?.toString();
 
       if (!mounted) return;

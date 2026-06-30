@@ -4,6 +4,7 @@ const connectNowSchema = new mongoose.Schema({
   patientId: { type: String, required: true },
   patientName: { type: String, required: true },
   channelName: { type: String, required: true },
+  targetDoctorId: { type: String, default: null },
   status: {
     type: String,
     enum: ['pending', 'accepted', 'expired', 'cancelled'],

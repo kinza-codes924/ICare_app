@@ -4,7 +4,6 @@ import 'package:icare/services/community_service.dart';
 import 'package:icare/utils/shared_pref.dart';
 import 'package:icare/utils/theme.dart';
 import 'package:icare/widgets/back_button.dart';
-import 'package:intl/intl.dart';
 
 class CommunityForumScreen extends StatefulWidget {
   const CommunityForumScreen({super.key});

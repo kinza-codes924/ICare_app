@@ -628,7 +628,11 @@ router.post('/:labId/bookings', authMiddleware, async (req, res) => {
 
     const { urgency, is_urgent, collectionType, collection_type, turnaroundTime, source, patientName, patient_name, contact, address,
       patientAge, patient_age, patientGender, patient_gender, patientPhone, patient_phone, patientAddress, patient_address,
-      mrNumber, referredBy, prescriptionDate, specimenIds, sampleCollectedBy } = req.body;
+      mrNumber, referredBy, prescriptionDate, specimenIds, sampleCollectedBy,
+      prescriptionId, medicalRecordId, preferred_time, preferredTime } = req.body;
+    const finalPreferredTime = preferredTime || preferred_time || null;
+
+    const finalPrescriptionId = prescriptionId || medicalRecordId || null;
 
     const booking = await LabTestRequest.create({
       patient_id: patientId,
@@ -641,7 +645,7 @@ router.post('/:labId/bookings', authMiddleware, async (req, res) => {
       is_urgent: is_urgent || urgency === 'Urgent' || false,
       collection_type: collectionType || collection_type || 'in-lab',
       turnaround_time: turnaroundTime || null,
-      source: source || 'online',
+      source: finalPrescriptionId ? 'prescription' : (source || 'online'),
       patient_name_override: patientName || patient_name || null,
       patient_age: patientAge || patient_age || null,
       patient_gender: patientGender || patient_gender || null,
@@ -652,6 +656,8 @@ router.post('/:labId/bookings', authMiddleware, async (req, res) => {
       ...(prescriptionDate ? { prescriptionDate } : {}),
       ...(specimenIds ? { specimenIds } : {}),
       ...(sampleCollectedBy ? { sampleCollectedBy } : {}),
+      ...(finalPrescriptionId ? { medical_record_id: finalPrescriptionId } : {}),
+      ...(finalPreferredTime ? { preferred_time: finalPreferredTime } : {}),
     });
 
     console.log('✅ LAB BOOKING - Created booking:', booking._id.toString());

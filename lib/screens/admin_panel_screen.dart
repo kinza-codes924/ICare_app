@@ -38,7 +38,7 @@ class _AdminPanelScreenState extends ConsumerState<AdminPanelScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 7, vsync: this);
+    _tabController = TabController(length: 8, vsync: this);
     _loadData();
   }
 
@@ -173,6 +173,7 @@ class _AdminPanelScreenState extends ConsumerState<AdminPanelScreen>
                     ],
                   ]),
                 ),
+                const Tab(text: 'COURSE CATEGORIES'),
                 Tab(
                   child: Row(mainAxisSize: MainAxisSize.min, children: [
                     const Text('CERTIFICATES'),
@@ -205,6 +206,7 @@ class _AdminPanelScreenState extends ConsumerState<AdminPanelScreen>
                 _buildInstructorsTab(),
                 _buildStudentsTab(),
                 _buildLeaveRequestsTab(),
+                _buildCourseCategoriesTab(),
                 _buildCredentialsTab(),
               ],
             ),
@@ -334,7 +336,7 @@ class _AdminPanelScreenState extends ConsumerState<AdminPanelScreen>
     final role = d['role']?.toString() ?? 'unknown';
     final details = d['profileDetails'] as Map? ?? {};
 
-    Widget _infoRow(IconData icon, String label, String? value) {
+    Widget infoRow(IconData icon, String label, String? value) {
       if (value == null || value.isEmpty) return const SizedBox.shrink();
       return Padding(
         padding: const EdgeInsets.only(bottom: 6),
@@ -347,7 +349,7 @@ class _AdminPanelScreenState extends ConsumerState<AdminPanelScreen>
       );
     }
 
-    String _roleLabel() {
+    String roleLabel() {
       switch (role) {
         case 'doctor': return 'Doctor';
         case 'pharmacy': return 'Pharmacy';
@@ -398,7 +400,7 @@ class _AdminPanelScreenState extends ConsumerState<AdminPanelScreen>
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(color: roleColor.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(20)),
-              child: Text(_roleLabel(), style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: roleColor)),
+              child: Text(roleLabel(), style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: roleColor)),
             ),
           ]),
         ),
@@ -406,39 +408,39 @@ class _AdminPanelScreenState extends ConsumerState<AdminPanelScreen>
         Padding(
           padding: const EdgeInsets.all(16),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            _infoRow(Icons.phone_outlined, 'Phone', d['phone']?.toString()),
-            _infoRow(Icons.location_city_outlined, 'City', d['city']?.toString()),
-            _infoRow(Icons.location_on_outlined, 'Address', d['address']?.toString()),
+            infoRow(Icons.phone_outlined, 'Phone', d['phone']?.toString()),
+            infoRow(Icons.location_city_outlined, 'City', d['city']?.toString()),
+            infoRow(Icons.location_on_outlined, 'Address', d['address']?.toString()),
             if (role == 'doctor') ...[
-              _infoRow(Icons.school_outlined, 'Qualification', (details['qualification'] ?? d['qualification'])?.toString()),
-              _infoRow(Icons.psychology_outlined, 'Specialization', (details['specialization'] ?? d['specialization'])?.toString()),
-              _infoRow(Icons.numbers_rounded, 'PMDC No.', (details['pmdcNumber'] ?? d['pmdcNumber'])?.toString()),
-              _infoRow(Icons.timeline_outlined, 'Experience', (details['experience'] ?? d['experience'])?.toString()),
-              _infoRow(Icons.local_hospital_outlined, 'Workplace', (details['workplace'] ?? d['workplace'])?.toString()),
-              _infoRow(Icons.schedule_outlined, 'Timings', (details['availableTimings'] ?? d['availableTimings'])?.toString()),
+              infoRow(Icons.school_outlined, 'Qualification', (details['qualification'] ?? d['qualification'])?.toString()),
+              infoRow(Icons.psychology_outlined, 'Specialization', (details['specialization'] ?? d['specialization'])?.toString()),
+              infoRow(Icons.numbers_rounded, 'PMDC No.', (details['pmdcNumber'] ?? d['pmdcNumber'])?.toString()),
+              infoRow(Icons.timeline_outlined, 'Experience', (details['experience'] ?? d['experience'])?.toString()),
+              infoRow(Icons.local_hospital_outlined, 'Workplace', (details['workplace'] ?? d['workplace'])?.toString()),
+              infoRow(Icons.schedule_outlined, 'Timings', (details['availableTimings'] ?? d['availableTimings'])?.toString()),
             ] else if (role == 'pharmacy') ...[
-              _infoRow(Icons.local_pharmacy_outlined, 'Pharmacy Name', (details['pharmacyName'] ?? d['pharmacyName'])?.toString()),
-              _infoRow(Icons.badge_outlined, 'Drug License', (details['drugLicenseNumber'] ?? d['drugLicenseNumber'])?.toString()),
-              _infoRow(Icons.person_outline, 'Pharmacist', (details['pharmacistName'] ?? d['pharmacistName'])?.toString()),
-              _infoRow(Icons.timeline_outlined, 'Years Operating', (details['yearsOfOperation'] ?? d['yearsOfOperation'])?.toString()),
+              infoRow(Icons.local_pharmacy_outlined, 'Pharmacy Name', (details['pharmacyName'] ?? d['pharmacyName'])?.toString()),
+              infoRow(Icons.badge_outlined, 'Drug License', (details['drugLicenseNumber'] ?? d['drugLicenseNumber'])?.toString()),
+              infoRow(Icons.person_outline, 'Pharmacist', (details['pharmacistName'] ?? d['pharmacistName'])?.toString()),
+              infoRow(Icons.timeline_outlined, 'Years Operating', (details['yearsOfOperation'] ?? d['yearsOfOperation'])?.toString()),
             ] else if (role == 'lab') ...[
-              _infoRow(Icons.biotech_outlined, 'Lab Name', (details['labName'] ?? d['labName'])?.toString()),
-              _infoRow(Icons.badge_outlined, 'License No.', (details['labLicenseNumber'] ?? d['labLicenseNumber'])?.toString()),
-              _infoRow(Icons.timeline_outlined, 'Years Operating', (details['yearsOfOperation'] ?? d['yearsOfOperation'])?.toString()),
+              infoRow(Icons.biotech_outlined, 'Lab Name', (details['labName'] ?? d['labName'])?.toString()),
+              infoRow(Icons.badge_outlined, 'License No.', (details['labLicenseNumber'] ?? d['labLicenseNumber'])?.toString()),
+              infoRow(Icons.timeline_outlined, 'Years Operating', (details['yearsOfOperation'] ?? d['yearsOfOperation'])?.toString()),
             ] else if (role == 'student') ...[
-              _infoRow(Icons.account_balance_outlined, 'University', (details['university'] ?? d['university'])?.toString()),
-              _infoRow(Icons.menu_book_outlined, 'Program', (details['program'] ?? d['program'])?.toString()),
-              _infoRow(Icons.timeline_outlined, 'Current Year', (details['currentYear'] ?? d['currentYear'])?.toString()),
-              _infoRow(Icons.badge_outlined, 'Student ID', (details['studentId'] ?? d['studentId'])?.toString()),
+              infoRow(Icons.account_balance_outlined, 'University', (details['university'] ?? d['university'])?.toString()),
+              infoRow(Icons.menu_book_outlined, 'Program', (details['program'] ?? d['program'])?.toString()),
+              infoRow(Icons.timeline_outlined, 'Current Year', (details['currentYear'] ?? d['currentYear'])?.toString()),
+              infoRow(Icons.badge_outlined, 'Student ID', (details['studentId'] ?? d['studentId'])?.toString()),
             ] else if (role == 'instructor') ...[
-              _infoRow(Icons.school_outlined, 'Qualification', (details['qualification'] ?? d['qualification'])?.toString()),
-              _infoRow(Icons.psychology_outlined, 'Specialization', (details['specialization'] ?? d['specialization'])?.toString()),
-              _infoRow(Icons.timeline_outlined, 'Experience', (details['experience'] ?? d['experience'])?.toString()),
-              _infoRow(Icons.account_balance_outlined, 'Institution', (details['institution'] ?? d['institution'])?.toString()),
-              _infoRow(Icons.menu_book_outlined, 'Proposed Courses', (details['proposedCourses'] ?? d['proposedCourses'])?.toString()),
+              infoRow(Icons.school_outlined, 'Qualification', (details['qualification'] ?? d['qualification'])?.toString()),
+              infoRow(Icons.psychology_outlined, 'Specialization', (details['specialization'] ?? d['specialization'])?.toString()),
+              infoRow(Icons.timeline_outlined, 'Experience', (details['experience'] ?? d['experience'])?.toString()),
+              infoRow(Icons.account_balance_outlined, 'Institution', (details['institution'] ?? d['institution'])?.toString()),
+              infoRow(Icons.menu_book_outlined, 'Proposed Courses', (details['proposedCourses'] ?? d['proposedCourses'])?.toString()),
             ],
             if ((details['comments'] ?? d['comments'])?.toString().isNotEmpty == true)
-              _infoRow(Icons.comment_outlined, 'Comments', (details['comments'] ?? d['comments'])?.toString()),
+              infoRow(Icons.comment_outlined, 'Comments', (details['comments'] ?? d['comments'])?.toString()),
             const SizedBox(height: 12),
             Row(children: [
               Expanded(child: OutlinedButton.icon(
@@ -811,6 +813,11 @@ class _AdminPanelScreenState extends ConsumerState<AdminPanelScreen>
       ),
     );
   }
+
+  // ── Feature 1: Course Categories Tab ────────────────────────────────────────
+  Widget _buildCourseCategoriesTab() {
+    return _AdminCategoriesPanel(api: _api);
+  }
 }
 
 // Laboratory Addition Dialog
@@ -1048,6 +1055,162 @@ class _AddStudentDialogState extends State<_AddStudentDialog> {
           }
         }, child: const Text('Add')),
       ],
+    );
+  }
+}
+
+// ── Feature 1: Admin Categories Panel ────────────────────────────────────────
+class _AdminCategoriesPanel extends StatefulWidget {
+  final ApiService api;
+  const _AdminCategoriesPanel({required this.api});
+
+  @override
+  State<_AdminCategoriesPanel> createState() => _AdminCategoriesPanelState();
+}
+
+class _AdminCategoriesPanelState extends State<_AdminCategoriesPanel> {
+  List<Map<String, dynamic>> _categories = [];
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() => _loading = true);
+    try {
+      final res = await widget.api.get('/admin/categories?all=true');
+      if (mounted) setState(() { _categories = List<Map<String, dynamic>>.from(res.data['categories'] ?? []); _loading = false; });
+    } catch (_) {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  void _showAddDialog() {
+    final nameCtrl = TextEditingController();
+    final descCtrl = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Add Course Category'),
+        content: Column(mainAxisSize: MainAxisSize.min, children: [
+          TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Category Name *', border: OutlineInputBorder())),
+          const SizedBox(height: 12),
+          TextField(controller: descCtrl, decoration: const InputDecoration(labelText: 'Description (optional)', border: OutlineInputBorder())),
+        ]),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryColor, foregroundColor: Colors.white),
+            onPressed: () async {
+              if (nameCtrl.text.trim().isEmpty) return;
+              Navigator.pop(ctx);
+              try {
+                await widget.api.post('/admin/categories', {'name': nameCtrl.text.trim(), 'description': descCtrl.text.trim()});
+                if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Category added!'), backgroundColor: Colors.green));
+                _load();
+              } catch (e) {
+                if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+              }
+            },
+            child: const Text('Add'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _toggleActive(Map<String, dynamic> cat) async {
+    try {
+      await widget.api.put('/admin/categories/${cat['_id']}', {'isActive': !(cat['isActive'] as bool? ?? true)});
+      _load();
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+    }
+  }
+
+  Future<void> _delete(Map<String, dynamic> cat) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete Category?'),
+        content: Text('Delete "${cat['name']}"? Existing courses keep their category value.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirm == true) {
+      await widget.api.delete('/admin/categories/${cat['_id']}');
+      _load();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.all(20),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          const Text('Course Categories', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
+          const Spacer(),
+          ElevatedButton.icon(
+            onPressed: _showAddDialog,
+            icon: const Icon(Icons.add, size: 18),
+            label: const Text('Add Category'),
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryColor, foregroundColor: Colors.white),
+          ),
+        ]),
+        const SizedBox(height: 8),
+        const Text('Manage categories available to instructors when creating courses.', style: TextStyle(color: Color(0xFF64748B), fontSize: 13)),
+        const SizedBox(height: 20),
+        if (_loading) const Center(child: CircularProgressIndicator()),
+        if (!_loading && _categories.isEmpty)
+          const Center(child: Text('No categories yet. Add your first one.', style: TextStyle(color: Color(0xFF94A3B8)))),
+        if (!_loading)
+          ...(_categories.map((cat) => Container(
+            margin: const EdgeInsets.only(bottom: 10),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: Row(children: [
+              Container(
+                width: 8, height: 8,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: (cat['isActive'] as bool? ?? true) ? Colors.green : Colors.grey,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(cat['name'] ?? '', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+                Text('Value: ${cat['value'] ?? ''}', style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8))),
+                if ((cat['description'] as String?)?.isNotEmpty == true)
+                  Text(cat['description'].toString(), style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+              ])),
+              Switch(
+                value: cat['isActive'] as bool? ?? true,
+                onChanged: (_) => _toggleActive(cat),
+                activeColor: AppColors.primaryColor,
+              ),
+              IconButton(
+                icon: const Icon(Icons.delete_outline, color: Colors.red, size: 20),
+                onPressed: () => _delete(cat),
+                tooltip: 'Delete',
+              ),
+            ]),
+          ))),
+      ]),
     );
   }
 }

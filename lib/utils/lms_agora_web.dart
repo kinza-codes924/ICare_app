@@ -29,6 +29,18 @@ external JSPromise<JSAny?> _lmsEnableMediaAndPublishJS();
 @JS('lmsStudentEnableAudio')
 external JSPromise<JSString> _lmsStudentEnableAudioJS();
 
+@JS('lmsToggleScreenShare')
+external JSPromise<JSString> _lmsToggleScreenShareJS();
+
+@JS('lmsRequestFullscreen')
+external void _lmsRequestFullscreenJS();
+
+@JS('lmsExitFullscreen')
+external void _lmsExitFullscreenJS();
+
+@JS('lmsRefreshVideoLayout')
+external void _lmsRefreshVideoLayoutJS();
+
 // appId and token fetched by caller from AgoraService
 Future<void> lmsJoinChannel(String roomName, String appId, String token, bool isInstructor) async {
   await _lmsAgoraJoinJS(appId.toJS, roomName.toJS, token.toJS, 0.toJS, isInstructor.toJS).toDart;
@@ -47,6 +59,21 @@ Future<void> lmsEnableMediaAndPublish() async {
 
 Future<void> lmsStudentEnableAudio() async {
   await _lmsStudentEnableAudioJS().toDart;
+}
+
+Future<String> lmsToggleScreenShare() async {
+  final r = await _lmsToggleScreenShareJS().toDart;
+  return r.toDart;
+}
+
+void lmsRequestFullscreen() => _lmsRequestFullscreenJS();
+void lmsExitFullscreen() => _lmsExitFullscreenJS();
+void lmsRefreshVideoLayout() => _lmsRefreshVideoLayoutJS();
+
+void lmsListenForScreenShareEnded(void Function() callback) {
+  web.window.addEventListener('lms-screen-share-ended', ((web.Event _) {
+    callback();
+  }).toJS);
 }
 
 void lmsSetCallbacks({void Function(int, bool)? onRemote, void Function()? onJoined}) {}

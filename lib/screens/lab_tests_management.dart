@@ -547,7 +547,7 @@ class _LabTestsManagementState extends State<LabTestsManagement>
                   const Text('SAMPLE TYPE', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Color(0xFF64748B), letterSpacing: 1.0)),
                   const SizedBox(height: 8),
                   DropdownButtonFormField<String>(
-                    value: sampleType,
+                    initialValue: sampleType,
                     decoration: InputDecoration(
                       prefixIcon: const Icon(Icons.biotech_rounded, color: primaryColor),
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),

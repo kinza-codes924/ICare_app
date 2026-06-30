@@ -17,7 +17,6 @@ import 'package:flutter/services.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
-import 'package:intl/intl.dart';
 import 'dart:async';
 import 'dart:math' as math;
 // ignore: avoid_web_libraries_in_flutter

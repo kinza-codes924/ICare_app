@@ -89,9 +89,11 @@ class _HealthCommunityScreenState extends ConsumerState<HealthCommunityScreen> {
       await _courseService.deleteForumPost(postId);
       if (mounted) _loadPosts();
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Delete failed: $e'), backgroundColor: Colors.red),
       );
+      }
     }
   }
 
@@ -103,9 +105,11 @@ class _HealthCommunityScreenState extends ConsumerState<HealthCommunityScreen> {
         _loadPosts();
       }
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Delete failed: $e'), backgroundColor: Colors.red),
       );
+      }
     }
   }
 
@@ -139,9 +143,11 @@ class _HealthCommunityScreenState extends ConsumerState<HealthCommunityScreen> {
                   _loadCategories();
                 }
               } catch (e) {
-                if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(content: Text('Failed: $e'), backgroundColor: Colors.red),
                 );
+                }
               }
             },
             child: const Text('Add'),

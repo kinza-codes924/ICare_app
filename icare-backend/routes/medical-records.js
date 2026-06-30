@@ -5,7 +5,6 @@ const { connectMongoDB } = require('../config/mongodb');
 const { authMiddleware } = require('../middleware/auth');
 const MedicalRecord = require('../models/MedicalRecord');
 const PharmacyOrder = require('../models/PharmacyOrder');
-const LabTestRequest = require('../models/LabTestRequest');
 const EnhancedPrescription = require('../models/EnhancedPrescription');
 
 // Normalize an EnhancedPrescription into the same shape as MedicalRecord
@@ -162,28 +161,7 @@ router.post('/create', authMiddleware, async (req, res) => {
       }
     }
 
-    // ── AUTO-TRIGGER: Send lab tests to laboratory ───────────────────────────
-    if (
-      referredLaboratory &&
-      mongoose.isValidObjectId(referredLaboratory) &&
-      labTests?.length > 0
-    ) {
-      try {
-        const labBookings = labTests.map((testName) =>
-          LabTestRequest.create({
-            patient_id: patientId,
-            lab_id: referredLaboratory,
-            test_type: testName,
-            status: 'pending',
-            medical_record_id: record._id.toString(),
-          })
-        );
-        await Promise.all(labBookings);
-        console.log(`✅ ${labTests.length} lab test(s) auto-created for record ${record._id}`);
-      } catch (labErr) {
-        console.error('⚠️  Auto lab booking failed:', labErr.message);
-      }
-    }
+    // Lab bookings are created by the patient from "My Prescription" — not auto-created here.
 
     res.status(201).json({ success: true, record: populated });
   } catch (err) {

@@ -3,7 +3,7 @@ const mongoose = require('mongoose');
 const questionSchema = new mongoose.Schema({
   type: {
     type: String,
-    enum: ['mcq', 'true_false', 'short_answer', 'essay', 'clinical_scenario', 'osce', 'clinical_image', 'clinical_video'],
+    enum: ['mcq', 'true_false', 'short_answer', 'essay', 'clinical_scenario', 'osce', 'clinical_image', 'clinical_video', 'osce_station'],
     required: true
   },
   question: { type: String, required: true },
@@ -13,11 +13,17 @@ const questionSchema = new mongoose.Schema({
   explanation: String,
   order: { type: Number, default: 0 },
   // Clinical scenario fields
-  scenarioText: { type: String }, // Patient scenario description
-  imageUrl: { type: String }, // Clinical image (X-ray, CT scan, etc.)
-  videoUrl: { type: String }, // Clinical video (patient acting, procedure, etc.)
+  scenarioText: { type: String },
+  imageUrl: { type: String },
+  videoUrl: { type: String },
+  videoFileUrl: { type: String },   // uploaded video file (Cloudinary)
+  documentUrl: { type: String },    // attached document (any type)
+  documentName: { type: String },   // original filename
+  // OSCE station fields
+  instructions: { type: String },
+  rubric: { type: String },
   // OSCE/TOACS specific fields
-  osceStations: [{ // Multiple stations for OSCE
+  osceStations: [{
     stationName: String,
     description: String,
     imageUrl: String,
@@ -25,7 +31,7 @@ const questionSchema = new mongoose.Schema({
     expectedActions: [String],
     scoringCriteria: [String],
   }],
-});
+}, { strict: false });
 
 const quizSchema = new mongoose.Schema({
   courseId: { type: mongoose.Schema.Types.ObjectId, ref: 'Course', required: true },

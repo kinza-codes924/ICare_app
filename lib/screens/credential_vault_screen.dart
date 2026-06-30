@@ -40,14 +40,17 @@ class _CredentialVaultScreenState extends State<CredentialVaultScreen> {
       // Load verification documents — check multiple sources since different backend
       // endpoints expose different fields.
       final verDocs = <Map<String, String>>[];
-      void _extractVerDocs(Map? vd) {
+      void extractVerDocs(Map? vd) {
         if (vd == null) return;
-        if (vd['cnicDocument'] != null && vd['cnicDocument'].toString().isNotEmpty)
+        if (vd['cnicDocument'] != null && vd['cnicDocument'].toString().isNotEmpty) {
           verDocs.add({'title': 'CNIC / National ID', 'type': 'Identity Document', 'documentUrl': vd['cnicDocument'].toString(), 'name': vd['cnicDocumentName']?.toString() ?? 'cnic'});
-        if (vd['pmdcCertDocument'] != null && vd['pmdcCertDocument'].toString().isNotEmpty)
+        }
+        if (vd['pmdcCertDocument'] != null && vd['pmdcCertDocument'].toString().isNotEmpty) {
           verDocs.add({'title': 'PMDC Certificate', 'type': 'Medical License', 'documentUrl': vd['pmdcCertDocument'].toString(), 'name': vd['pmdcCertDocumentName']?.toString() ?? 'pmdc_cert'});
-        if (vd['experienceCertDocument'] != null && vd['experienceCertDocument'].toString().isNotEmpty)
+        }
+        if (vd['experienceCertDocument'] != null && vd['experienceCertDocument'].toString().isNotEmpty) {
           verDocs.add({'title': 'Experience Certificate', 'type': 'Professional Document', 'documentUrl': vd['experienceCertDocument'].toString(), 'name': vd['experienceCertDocumentName']?.toString() ?? 'experience_cert'});
+        }
       }
 
       // Source 1: /users/profile → user.verificationDetails
@@ -57,9 +60,9 @@ class _CredentialVaultScreenState extends State<CredentialVaultScreen> {
         final user = (data is Map && data['user'] is Map) ? data['user'] as Map
                    : (data is Map ? data : null);
         if (user != null) {
-          _extractVerDocs(user['verificationDetails'] as Map?);
+          extractVerDocs(user['verificationDetails'] as Map?);
           // Some backends also store docs at top-level of user
-          _extractVerDocs(user as Map?);
+          extractVerDocs(user as Map?);
         }
       } catch (_) {}
 
@@ -71,9 +74,9 @@ class _CredentialVaultScreenState extends State<CredentialVaultScreen> {
           final doc = (data is Map && data['doctor'] is Map) ? data['doctor'] as Map
                     : (data is Map ? data : null);
           if (doc != null) {
-            _extractVerDocs(doc['verificationDetails'] as Map?);
+            extractVerDocs(doc['verificationDetails'] as Map?);
             // Also check if documents are stored directly on doctor doc
-            _extractVerDocs(doc as Map?);
+            extractVerDocs(doc as Map?);
           }
         } catch (_) {}
       }

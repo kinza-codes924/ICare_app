@@ -513,7 +513,7 @@ class _AddMedicationSheetState extends State<_AddMedicationSheet> {
                   children: [
                     _label('Frequency'),
                     DropdownButtonFormField<String>(
-                      value: _frequency,
+                      initialValue: _frequency,
                       decoration: _inputDec(),
                       items: _frequencies.map((f) => DropdownMenuItem(value: f, child: Text(f))).toList(),
                       onChanged: (v) => setState(() => _frequency = v!),
@@ -528,7 +528,7 @@ class _AddMedicationSheetState extends State<_AddMedicationSheet> {
             children: [
               Switch(
                 value: _hasDuration,
-                activeColor: AppColors.primaryColor,
+                activeThumbColor: AppColors.primaryColor,
                 onChanged: (v) => setState(() => _hasDuration = v),
               ),
               const SizedBox(width: 8),

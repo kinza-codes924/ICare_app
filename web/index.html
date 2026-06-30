@@ -674,6 +674,84 @@
     // cached builds calling this cannot create duplicate tracks.
     window.lmsStudentEnableAudio = window._lmsEnsureMediaPublished;
 
+    window._lmsScreenTrack = null;
+    window._lmsScreenSharing = false;
+
+    window.lmsToggleScreenShare = async function() {
+      try {
+        if (window._lmsScreenSharing && window._lmsScreenTrack) {
+          // Stop screen sharing — switch back to camera
+          if (window._lmsAgoraClient) {
+            try { await window._lmsAgoraClient.unpublish([window._lmsScreenTrack]); } catch(_) {}
+          }
+          try { window._lmsScreenTrack.stop(); window._lmsScreenTrack.close(); } catch(_) {}
+          window._lmsScreenTrack = null;
+          window._lmsScreenSharing = false;
+          // Re-publish camera
+          if (window._lmsLocalVideo && window._lmsAgoraClient) {
+            try {
+              await window._lmsLocalVideo.setEnabled(true);
+              await window._lmsAgoraClient.publish([window._lmsLocalVideo]);
+              var ld = document.getElementById('lms-agora-local');
+              if (ld) { ld.innerHTML = ''; window._lmsLocalVideo.play('lms-agora-local'); }
+            } catch(_) {}
+          }
+          return 'camera';
+        } else {
+          // Start screen sharing
+          window._lmsScreenTrack = await AgoraRTC.createScreenVideoTrack({
+            encoderConfig: {
+              width: { ideal: 1280, max: 1920 },
+              height: { ideal: 720, max: 1080 },
+              frameRate: 8,
+              bitrateMax: 800,
+              bitrateMin: 200,
+              optimizationMode: 'motion'
+            }
+          }, 'disable');
+          // Unpublish camera
+          if (window._lmsLocalVideo && window._lmsAgoraClient) {
+            try { await window._lmsAgoraClient.unpublish([window._lmsLocalVideo]); } catch(_) {}
+          }
+          if (window._lmsAgoraClient) {
+            await window._lmsAgoraClient.publish([window._lmsScreenTrack]);
+          }
+          // Local preview
+          var ld2 = document.getElementById('lms-agora-local');
+          if (ld2) { ld2.innerHTML = ''; window._lmsScreenTrack.play('lms-agora-local'); }
+          window._lmsScreenSharing = true;
+          // If user stops via browser native UI button
+          window._lmsScreenTrack.on('track-ended', async function() {
+            if (window._lmsScreenSharing) {
+              await window.lmsToggleScreenShare();
+              window.dispatchEvent(new CustomEvent('lms-screen-share-ended'));
+            }
+          });
+          return 'screen';
+        }
+      } catch(e) {
+        console.warn('lmsToggleScreenShare error:', e.message || String(e));
+        window._lmsScreenSharing = false;
+        window._lmsScreenTrack = null;
+        return 'error:' + (e.message || String(e));
+      }
+    };
+
+    window.lmsRequestFullscreen = function() {
+      try {
+        var el = document.documentElement;
+        if (el.requestFullscreen) el.requestFullscreen();
+        else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+      } catch(e) { console.warn('Fullscreen error:', e); }
+    };
+
+    window.lmsExitFullscreen = function() {
+      try {
+        if (document.exitFullscreen) document.exitFullscreen();
+        else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+      } catch(e) {}
+    };
+
     window.lmsAgoraLeave = async function() {
       try {
         if (window._lmsLocalAudio) { window._lmsLocalAudio.stop(); window._lmsLocalAudio.close(); window._lmsLocalAudio = null; }
@@ -693,6 +771,29 @@
     };
 
     window.lmsSetPanelWidth = function(panelOpen) {};
+
+    // Called from Dart when entering/exiting fullscreen so Agora replays
+    // video tracks into the (now resized) container divs.
+    window.lmsRefreshVideoLayout = function() {
+      try {
+        var ld = document.getElementById('lms-agora-local');
+        if (ld) {
+          if (window._lmsScreenSharing && window._lmsScreenTrack) {
+            try { ld.innerHTML = ''; window._lmsScreenTrack.play('lms-agora-local'); } catch(_) {}
+          } else if (window._lmsLocalVideo) {
+            try { ld.innerHTML = ''; window._lmsLocalVideo.play('lms-agora-local'); } catch(_) {}
+          }
+        }
+        var rd = document.getElementById('lms-agora-remote');
+        if (rd && window._lmsAgoraClient) {
+          window._lmsAgoraClient.remoteUsers.forEach(function(u) {
+            if (u.videoTrack) {
+              try { rd.innerHTML = ''; u.videoTrack.play('lms-agora-remote'); } catch(_) {}
+            }
+          });
+        }
+      } catch(e) { console.warn('lmsRefreshVideoLayout error:', e); }
+    };
 
     // Composite recording: instructor (right) + student (left) side-by-side on canvas
     window.lmsStartRecording = async function() {

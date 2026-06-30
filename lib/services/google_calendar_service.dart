@@ -129,7 +129,11 @@ class GoogleCalendarService {
           description: r['instructions'] as String? ?? '',
           scheduledFor: dt,
         );
-        if (ok) success++; else failed++;
+        if (ok) {
+          success++;
+        } else {
+          failed++;
+        }
         // Small delay to avoid Google Calendar API rate limiting
         await Future.delayed(const Duration(milliseconds: 150));
       } catch (_) {

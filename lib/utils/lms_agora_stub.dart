@@ -111,6 +111,12 @@ Future<void> lmsEnableMediaAndPublish() async {}
 
 Future<void> lmsStudentEnableAudio() async {}
 
+Future<String> lmsToggleScreenShare() async => 'unsupported';
+void lmsRequestFullscreen() {}
+void lmsExitFullscreen() {}
+void lmsRefreshVideoLayout() {}
+void lmsListenForScreenShareEnded(void Function() callback) {}
+
 String registerLmsVideoView() => '';
 
 Widget lmsGetLocalVideoWidget(String? viewName) {

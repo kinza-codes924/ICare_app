@@ -52,7 +52,7 @@ class _MobileAboutUs extends StatelessWidget {
                   child: Image.asset(
                     'assets/images/doctor_banner.jpg',
                     fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => Container(color: _primary),
+                    errorBuilder: (_, _, _) => Container(color: _primary),
                   ),
                 ),
                 Container(
@@ -112,7 +112,7 @@ class _MobileAboutUs extends StatelessWidget {
                       width: double.infinity,
                       height: 160,
                       fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => Container(
+                      errorBuilder: (_, _, _) => Container(
                         height: 160,
                         color: _primary.withValues(alpha: 0.08),
                         child: const Center(child: Icon(Icons.biotech_rounded, size: 48, color: _primary)),
@@ -148,7 +148,7 @@ class _MobileAboutUs extends StatelessWidget {
                       width: double.infinity,
                       height: 150,
                       fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => Container(
+                      errorBuilder: (_, _, _) => Container(
                         height: 150,
                         color: _accent.withValues(alpha: 0.08),
                         child: const Center(child: Icon(Icons.people_rounded, size: 48, color: _accent)),
@@ -340,7 +340,7 @@ class _WebAboutUs extends StatelessWidget {
             child: Image.asset(
               'assets/images/doctor_banner.jpg',
               fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) => Container(
+              errorBuilder: (_, _, _) => Container(
                 height: 320,
                 color: _primary,
               ),
@@ -427,7 +427,7 @@ class _WebAboutUs extends StatelessWidget {
       child: Image.asset(
         imagePath,
         fit: BoxFit.cover,
-        errorBuilder: (_, __, ___) => Container(
+        errorBuilder: (_, _, _) => Container(
           decoration: BoxDecoration(
             color: _primary.withValues(alpha: 0.06),
             borderRadius: BorderRadius.circular(20),
@@ -516,7 +516,7 @@ class _WebAboutUs extends StatelessWidget {
                         width: double.infinity,
                         height: 130,
                         fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => Container(
+                        errorBuilder: (_, _, _) => Container(
                           height: 130,
                           decoration: BoxDecoration(
                             color: (b.$4).withValues(alpha: 0.1),
@@ -559,7 +559,7 @@ class _WebAboutUs extends StatelessWidget {
             child: Image.asset(
               'assets/images/lab-tech.png',
               fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) => Container(height: 200, color: _primary),
+              errorBuilder: (_, _, _) => Container(height: 200, color: _primary),
             ),
           ),
           Container(

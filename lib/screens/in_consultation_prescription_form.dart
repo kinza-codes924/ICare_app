@@ -2,7 +2,6 @@
 // Updated: May 11, 2026
 
 import 'package:flutter/material.dart';
-import 'package:icare/utils/shared_pref.dart';
 import 'package:icare/models/appointment_detail.dart';
 import 'package:icare/models/enhanced_prescription.dart';
 import 'package:icare/models/lifestyle_advice.dart';
@@ -705,8 +704,19 @@ class _InConsultationPrescriptionFormState
     );
   }
 
-  void _openHistoryForm() {
-    // Show history form as full-screen overlay — no navigation away from prescription form
+  Future<void> _openHistoryForm() async {
+    Map<String, dynamic>? existingHistory;
+    String? existingHistoryId = _patientHistoryId;
+
+    // When editing, fetch existing history to pre-fill all sections
+    if (_patientHistoryId != null) {
+      try {
+        existingHistory = await _consultationService.getHistoryByConsultation(widget.consultationId);
+        existingHistoryId = existingHistory?['_id']?.toString() ?? _patientHistoryId;
+      } catch (_) {}
+    }
+
+    if (!mounted) return;
     showGeneralDialog(
       context: context,
       barrierDismissible: false,
@@ -714,6 +724,8 @@ class _InConsultationPrescriptionFormState
       pageBuilder: (ctx, _, _) => PatientHistoryFormScreen(
         appointment: widget.appointment,
         consultationId: widget.consultationId,
+        existingHistoryId: existingHistoryId,
+        initialData: existingHistory,
         onHistoryComplete: (historyId) {
           setState(() => _patientHistoryId = historyId);
         },

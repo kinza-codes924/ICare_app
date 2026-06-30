@@ -52,6 +52,8 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
   bool _participantsOpen = false;
   bool _handRaised = false;
   bool _isRecording = false;
+  bool _screenSharing = false;
+  bool _videoFullscreen = false;
   late TabController _panelTab;
 
   // Chat — synced with backend
@@ -87,6 +89,9 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
     // Both instructor and student must tap to unblock Chrome getUserMedia/autoplay
     _permissionsEnabled = false;
     _initSession();
+    lmsListenForScreenShareEnded(() {
+      if (mounted) setState(() => _screenSharing = false);
+    });
   }
 
   @override
@@ -148,6 +153,10 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
       // Step 3: Join the session (registers attendance)
       if (_sessionDocId.isNotEmpty && _sessionDocId != widget.courseId) {
         await _lms.joinLiveSession(_sessionDocId);
+        // Feature 4: record join timestamp for students
+        if (!widget.isInstructor) {
+          _lms.recordLiveSessionJoin(_sessionDocId).catchError((_) {});
+        }
       }
 
       // Step 4: Start web camera (uses _sessionDocId for Agora room name)
@@ -481,6 +490,29 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
     setState(() {});
   }
 
+  Future<void> _toggleScreenShare() async {
+    try {
+      final result = await lmsToggleScreenShare();
+      if (mounted) {
+        setState(() {
+          if (result == 'screen') {
+            _screenSharing = true;
+          } else if (result == 'camera') {
+            _screenSharing = false;
+          } else if (result == 'unsupported') {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Screen sharing is only supported on web'), backgroundColor: Colors.orange),
+            );
+          } else if (result.startsWith('error')) {
+            _screenSharing = false;
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Could not share screen — please allow screen sharing permission'), backgroundColor: Colors.red),
+            );
+          }
+        });
+      }
+    } catch (_) {}
+  }
 
   void _toggleHand() {
     setState(() => _handRaised = !_handRaised);
@@ -563,6 +595,10 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
       // Remove self from session attendees on backend so participant count stays accurate
       if (_sessionDocId.isNotEmpty && _sessionDocId != widget.courseId) {
         await _lms.leaveLiveSession(_sessionDocId);
+        // Feature 4: record leave timestamp for students
+        if (!widget.isInstructor) {
+          _lms.recordLiveSessionLeave(_sessionDocId).catchError((_) {});
+        }
       }
 
       if (widget.isInstructor) {
@@ -645,62 +681,84 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
       body: SafeArea(
         child: Stack(
           children: [
-            // Dark background behind everything
-            Container(color: const Color(0xFF1C2333)),
+            // Dark background
+            Container(color: _videoFullscreen ? const Color(0xFF0A0E1A) : const Color(0xFF1C2333)),
             Column(
               children: [
-                _buildTopBar(),
+                if (!_videoFullscreen) _buildTopBar(),
                 Expanded(
-                  child: LayoutBuilder(
-                    builder: (ctx, constraints) {
-                      final isMobile = constraints.maxWidth < 600;
-                      if (isMobile) {
-                        // Mobile: side panel slides up as overlay (Stack), video stays full-width
-                        return Stack(
-                          children: [
-                            _buildVideoArea(),
-                            if (_chatOpen || _participantsOpen)
-                              Positioned.fill(
-                                child: Container(
-                                  color: Colors.black54,
-                                  child: Align(
-                                    alignment: Alignment.bottomCenter,
-                                    child: Container(
-                                      height: constraints.maxHeight * 0.65,
-                                      decoration: const BoxDecoration(
-                                        color: Color(0xFF252D3D),
-                                        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-                                      ),
-                                      child: Column(children: [
-                                        const SizedBox(height: 6),
-                                        Container(
-                                          width: 40, height: 4,
-                                          decoration: BoxDecoration(
-                                            color: Colors.white38,
-                                            borderRadius: BorderRadius.circular(2),
+                  child: _videoFullscreen
+                      // Fullscreen: video fills the full Expanded area, no panel
+                      ? _buildVideoArea(showFullscreenBtn: false)
+                      : LayoutBuilder(
+                          builder: (ctx, constraints) {
+                            final isMobile = constraints.maxWidth < 600;
+                            if (isMobile) {
+                              return Stack(
+                                children: [
+                                  _buildVideoArea(),
+                                  if (_chatOpen || _participantsOpen)
+                                    Positioned.fill(
+                                      child: Container(
+                                        color: Colors.black54,
+                                        child: Align(
+                                          alignment: Alignment.bottomCenter,
+                                          child: Container(
+                                            height: constraints.maxHeight * 0.65,
+                                            decoration: const BoxDecoration(
+                                              color: Color(0xFF252D3D),
+                                              borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+                                            ),
+                                            child: Column(children: [
+                                              const SizedBox(height: 6),
+                                              Container(
+                                                width: 40, height: 4,
+                                                decoration: BoxDecoration(
+                                                  color: Colors.white38,
+                                                  borderRadius: BorderRadius.circular(2),
+                                                ),
+                                              ),
+                                              Expanded(child: _buildSidePanel()),
+                                            ]),
                                           ),
                                         ),
-                                        Expanded(child: _buildSidePanel()),
-                                      ]),
+                                      ),
                                     ),
-                                  ),
-                                ),
-                              ),
-                          ],
-                        );
-                      }
-                      return Row(
-                        children: [
-                          Expanded(child: _buildVideoArea()),
-                          if (_chatOpen || _participantsOpen) _buildSidePanel(),
-                        ],
-                      );
-                    },
-                  ),
+                                ],
+                              );
+                            }
+                            return Row(
+                              children: [
+                                Expanded(child: _buildVideoArea()),
+                                if (_chatOpen || _participantsOpen) _buildSidePanel(),
+                              ],
+                            );
+                          },
+                        ),
                 ),
-                _buildBottomBar(),
+                if (!_videoFullscreen) _buildBottomBar(),
               ],
             ),
+            // Fullscreen exit button — overlaid on top, no Scaffold swap needed
+            if (_videoFullscreen)
+              Positioned(
+                top: 8,
+                right: 12,
+                child: GestureDetector(
+                  onTap: () {
+                    setState(() => _videoFullscreen = false);
+                    Future.delayed(const Duration(milliseconds: 150), lmsRefreshVideoLayout);
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.6),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(Icons.fullscreen_exit_rounded, color: Colors.white, size: 26),
+                  ),
+                ),
+              ),
           ],
         ),
       ),
@@ -769,7 +827,7 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
     );
   }
 
-  Widget _buildVideoArea() {
+  Widget _buildVideoArea({bool showFullscreenBtn = true}) {
     // On web: use HtmlElementView (same as working doctor-patient call)
     // platformViewRegistry creates divs IN Flutter's layout — buttons work naturally
     if (kIsWeb && _cameraViewName != null) {
@@ -777,6 +835,23 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
         children: [
           // Video platform view — contains lms-local-video + lms-remote-main
           SizedBox.expand(child: HtmlElementView(viewType: _cameraViewName!)),
+
+          // Fullscreen button — top-right corner
+          if (showFullscreenBtn && _permissionsEnabled)
+            Positioned(
+              top: 8, right: 8,
+              child: GestureDetector(
+                onTap: () {
+                  setState(() => _videoFullscreen = true);
+                  Future.delayed(const Duration(milliseconds: 150), lmsRefreshVideoLayout);
+                },
+                child: Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.55), borderRadius: BorderRadius.circular(6)),
+                  child: const Icon(Icons.fullscreen_rounded, color: Colors.white, size: 22),
+                ),
+              ),
+            ),
 
           // "Enable Camera & Mic" overlay — must be tapped to satisfy Chrome's
           // getUserMedia user-gesture requirement. Disappears after first tap.
@@ -1554,6 +1629,14 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
             },
           )
         : null;
+    final screenShareBtn = kIsWeb
+        ? _controlBtn(
+            icon: _screenSharing ? Icons.stop_screen_share_rounded : Icons.screen_share_rounded,
+            label: _screenSharing ? 'Stop Share' : 'Share Screen',
+            color: _screenSharing ? Colors.orange : Colors.white,
+            onTap: _toggleScreenShare,
+          )
+        : null;
     final endBtn = GestureDetector(
       onTap: _endSession,
       child: Container(
@@ -1583,6 +1666,7 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
               children: [
                 micBtn,
                 camBtn,
+                if (screenShareBtn != null) screenShareBtn,
                 if (handBtn != null) handBtn,
                 chatBtn,
                 peopleBtn,
@@ -1624,6 +1708,7 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
           const SizedBox(width: 8),
           camBtn,
           const SizedBox(width: 8),
+          if (screenShareBtn != null) ...[screenShareBtn, const SizedBox(width: 8)],
           if (handBtn != null) ...[handBtn, const SizedBox(width: 8)],
           chatBtn,
           const SizedBox(width: 8),

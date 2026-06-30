@@ -58,6 +58,7 @@ class UserService {
     String? address,
     String? existingConditions,
     String? healthGoals,
+    String? bloodGroup,
     List<Map<String, String>>? emergencyContacts,
   }) async {
     try {
@@ -79,6 +80,7 @@ class UserService {
         if (address != null) 'address': address,
         if (existingConditions != null) 'existingConditions': existingConditions,
         if (healthGoals != null) 'healthGoals': healthGoals,
+        if (bloodGroup != null && bloodGroup.isNotEmpty) 'bloodGroup': bloodGroup,
         if (emergencyContacts != null && emergencyContacts.isNotEmpty) 'emergencyContacts': emergencyContacts,
       });
 

@@ -677,7 +677,7 @@ class _InstructorCourseContentScreenState extends State<InstructorCourseContentS
                   child: Row(mainAxisSize: MainAxisSize.min, children: [
                     const Icon(Icons.lock_clock_rounded, size: 12, color: Color(0xFF6366F1)),
                     const SizedBox(width: 4),
-                    Text(unlockLabel!, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF6366F1))),
+                    Text(unlockLabel, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF6366F1))),
                   ]),
                 ),
             ],
