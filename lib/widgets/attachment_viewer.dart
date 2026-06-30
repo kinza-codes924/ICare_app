@@ -1,17 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../utils/api_constants.dart';
 import 'video_player_widget.dart';
+import 'doc_preview_widget.dart';
 
-/// Reusable widget for displaying quiz/assignment attachments.
-/// Detects file type from the Cloudinary URL extension and renders:
-///  - Images (.png, .jpg, .jpeg, .gif, .webp) inline via Image.network()
-///  - Videos (.mp4, .mov, .webm, .ogg, .m3u8) inline via VideoPlayerWidget
-///  - Documents (.pdf, .docx, .txt, etc.) as a tappable card that opens via url_launcher
-///  - Falls back to url_launcher for unknown types
-///
-/// NOTE: Backend signing APIs (/upload/doc-url) have been completely bypassed.
-/// Cloudinary raw URLs (secure_url) open directly in the browser.
 class AttachmentViewer extends StatelessWidget {
   final String? url;
   final String? name;
@@ -27,12 +21,10 @@ class AttachmentViewer extends StatelessWidget {
   });
 
   bool get _hasUrl => url != null && url!.trim().isNotEmpty;
-
   String get _effectiveUrl => url!.trim();
 
   String get _extension {
     final u = _effectiveUrl.toLowerCase();
-    // Strip query params
     final qIndex = u.indexOf('?');
     final clean = qIndex > 0 ? u.substring(0, qIndex) : u;
     final dot = clean.lastIndexOf('.');
@@ -40,41 +32,23 @@ class AttachmentViewer extends StatelessWidget {
     return clean.substring(dot);
   }
 
-  bool get _isImage {
-    return _extension == '.png' ||
-        _extension == '.jpg' ||
-        _extension == '.jpeg' ||
-        _extension == '.gif' ||
-        _extension == '.webp';
-  }
+  bool get _isImage => ['.png', '.jpg', '.jpeg', '.gif', '.webp'].contains(_extension);
 
-  bool get _isVideo {
-    return _extension == '.mp4' ||
-        _extension == '.webm' ||
-        _extension == '.mov' ||
-        _extension == '.ogg' ||
-        _extension == '.m3u8' ||
-        _effectiveUrl.contains('/video/upload/');
-  }
+  bool get _isVideo =>
+      ['.mp4', '.webm', '.mov', '.ogg', '.m3u8'].contains(_extension) ||
+      _effectiveUrl.contains('/video/upload/');
 
-  bool get _isPdf {
-    return _extension == '.pdf';
-  }
+  bool get _isPdf => _extension == '.pdf';
 
   @override
   Widget build(BuildContext context) {
     if (!_hasUrl) return const SizedBox.shrink();
-
-    if (_isImage) {
-      return _buildImage();
-    } else if (_isVideo) {
-      return _buildVideo();
-    } else {
-      return _buildDocCard();
-    }
+    if (_isImage) return _buildImage();
+    if (_isVideo) return _buildVideo();
+    return _buildDocCard(context);
   }
 
-  // ── Image ────────────────────────────────────────────────────────────
+  // ── Image ──────────────────────────────────────────────────────────────
 
   Widget _buildImage() {
     return Container(
@@ -87,13 +61,9 @@ class AttachmentViewer extends StatelessWidget {
         _effectiveUrl,
         fit: BoxFit.contain,
         width: double.infinity,
-        loadingBuilder: (ctx, child, prog) {
-          if (prog == null) return child;
-          return const SizedBox(
-            height: 200,
-            child: Center(child: CircularProgressIndicator()),
-          );
-        },
+        loadingBuilder: (ctx, child, prog) => prog == null
+            ? child
+            : const SizedBox(height: 200, child: Center(child: CircularProgressIndicator())),
         errorBuilder: (ctx, e, s) => Container(
           height: 120,
           color: const Color(0xFFF8FAFC),
@@ -112,11 +82,10 @@ class AttachmentViewer extends StatelessWidget {
     );
   }
 
-  // ── Video ────────────────────────────────────────────────────────────
+  // ── Video ──────────────────────────────────────────────────────────────
 
   Widget _buildVideo() {
     if (kIsWeb) {
-      // Use the existing inline HTML5 video player on web
       return Container(
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(12),
@@ -129,51 +98,44 @@ class AttachmentViewer extends StatelessWidget {
         ),
       );
     }
-
-    // Mobile fallback: open externally
-    return _buildOpenInBrowserCard(
+    return _buildTapCard(
       icon: Icons.play_circle_fill_rounded,
       color: const Color(0xFF3B82F6),
       title: name ?? 'Video',
       subtitle: label ?? 'Tap to watch video',
+      onTap: () => _launchUrl(_effectiveUrl),
     );
   }
 
-  // ── Documents (PDF, DOCX, etc.) ──────────────────────────────────────
+  // ── Document / PDF ─────────────────────────────────────────────────────
 
-  Widget _buildDocCard() {
-    IconData icon;
-    Color color;
-    String defaultLabel;
+  Widget _buildDocCard(BuildContext context) {
+    final icon = _isPdf ? Icons.picture_as_pdf_rounded : Icons.description_outlined;
+    final color = _isPdf ? const Color(0xFFEF4444) : const Color(0xFF10B981);
+    final defaultTitle = _isPdf ? 'View PDF' : 'View Document';
 
-    if (_isPdf) {
-      icon = Icons.picture_as_pdf_rounded;
-      color = const Color(0xFFEF4444);
-      defaultLabel = 'View PDF';
-    } else {
-      icon = Icons.description_outlined;
-      color = const Color(0xFF10B981);
-      defaultLabel = 'View Document';
-    }
-
-    return _buildOpenInBrowserCard(
+    return _buildTapCard(
       icon: icon,
       color: color,
-      title: name?.isNotEmpty == true ? name! : defaultLabel,
-      subtitle: label ?? 'Tap to open in browser',
+      title: name?.isNotEmpty == true ? name! : defaultTitle,
+      subtitle: label ?? 'Tap to preview',
+      trailingIcon: Icons.preview_rounded,
+      onTap: () => _openDocInApp(context),
     );
   }
 
-  // ── Shared card that opens URL in external browser ───────────────────
+  // ── Shared tap card ────────────────────────────────────────────────────
 
-  Widget _buildOpenInBrowserCard({
+  Widget _buildTapCard({
     required IconData icon,
     required Color color,
     required String title,
     required String subtitle,
+    required VoidCallback onTap,
+    IconData trailingIcon = Icons.open_in_new_rounded,
   }) {
     return GestureDetector(
-      onTap: () => _openInBrowser(_effectiveUrl),
+      onTap: onTap,
       child: Container(
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
@@ -191,37 +153,54 @@ class AttachmentViewer extends StatelessWidget {
                 children: [
                   Text(
                     title,
-                    style: TextStyle(
-                      fontWeight: FontWeight.w700,
-                      color: color,
-                      fontSize: 14,
-                    ),
+                    style: TextStyle(fontWeight: FontWeight.w700, color: color, fontSize: 14),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 2),
-                  Text(
-                    subtitle,
-                    style: const TextStyle(color: Color(0xFF64748B), fontSize: 12),
-                  ),
+                  Text(subtitle,
+                      style: const TextStyle(color: Color(0xFF64748B), fontSize: 12)),
                 ],
               ),
             ),
-            const Icon(Icons.open_in_new_rounded, color: Color(0xFF94A3B8), size: 16),
+            Icon(trailingIcon, color: const Color(0xFF94A3B8), size: 16),
           ],
         ),
       ),
     );
   }
 
-  // ── URL launcher (no backend API call) ───────────────────────────────
+  // ── Open document inline in app ────────────────────────────────────────
 
-  Future<void> _openInBrowser(String url) async {
-    final uri = Uri.parse(url);
+  Future<void> _openDocInApp(BuildContext context) async {
+    final proxyUrl = await _resolveUrl(_effectiveUrl);
+    if (!context.mounted) return;
+
+    final fileName = name?.isNotEmpty == true
+        ? name!
+        : _effectiveUrl.split('/').last.split('?').first;
+
+    await showDocPreview(context, proxyUrl, fileName);
+  }
+
+  // For Cloudinary raw files (res.cloudinary.com with /raw/upload/) route through
+  // the backend proxy so the browser never touches the restricted CDN URL directly.
+  Future<String> _resolveUrl(String original) async {
+    if (!original.contains('res.cloudinary.com')) return original;
     try {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    } catch (e) {
-      debugPrint('❌ Failed to open URL: $url — $e');
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('token') ?? '';
+      if (token.isEmpty) return original;
+      final encoded = Uri.encodeComponent(original);
+      return '${ApiConstants.baseUrl}/upload/doc-stream?url=$encoded&token=${Uri.encodeComponent(token)}';
+    } catch (_) {
+      return original;
     }
+  }
+
+  Future<void> _launchUrl(String url) async {
+    try {
+      await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+    } catch (_) {}
   }
 }
