@@ -174,9 +174,7 @@ router.get('/doc-url', protect, async (req, res) => {
     const expiresAt  = timestamp + 7200; // 2 hours
 
     const paramsToSign = { expires_at: expiresAt, public_id: publicId, timestamp, type: 'upload' };
-    const toSign = Object.keys(paramsToSign).sort()
-      .map(k => `${k}=${paramsToSign[k]}`).join('&') + apiSecret;
-    const signature = crypto.createHash('sha1').update(toSign).digest('hex');
+    const signature = cloudinary.utils.api_sign_request(paramsToSign, apiSecret);
 
     const qs = new URLSearchParams({
       public_id:  publicId,
@@ -236,13 +234,10 @@ router.get('/doc-stream', async (req, res) => {
   const timestamp = Math.floor(Date.now() / 1000);
   const expiresAt = timestamp + 7200;
 
-  // Cloudinary /download signature: sort alphabetically, exclude undefined/falsy values.
-  // The SDK includes `type=upload` and filters out `attachment` when falsy.
-  // NOT including resource_type or format in the signature (those go in the URL path only).
+  // Use the SDK's api_sign_request which correctly filters falsy values and sorts params.
+  // The /download endpoint expects: expires_at, public_id, timestamp, type=upload (no resource_type, no format).
   const paramsToSign = { expires_at: expiresAt, public_id: publicId, timestamp, type: 'upload' };
-  const toSign = Object.keys(paramsToSign).sort()
-    .map(k => `${k}=${paramsToSign[k]}`).join('&') + apiSecret;
-  const signature = crypto.createHash('sha1').update(toSign).digest('hex');
+  const signature = cloudinary.utils.api_sign_request(paramsToSign, apiSecret);
 
   const qs = new URLSearchParams({
     public_id:  publicId,
@@ -254,32 +249,50 @@ router.get('/doc-stream', async (req, res) => {
   }).toString();
 
   const downloadApiUrl = `https://api.cloudinary.com/v1_1/${cldCloud}/${resourceType}/download?${qs}`;
-  console.log(`doc-stream proxy: type=${resourceType} pid=${publicId}`);
+  console.log(`doc-stream: Admin API download type=${resourceType} pid=${publicId}`);
 
-  try {
-    const fileRes = await fetch(downloadApiUrl, { redirect: 'follow' });
-
-    if (!fileRes.ok) {
-      const body = await fileRes.text();
-      console.error(`doc-stream Cloudinary error ${fileRes.status}:`, body);
-      // Fall back: redirect to original URL (user sees 401 but at least something shows)
-      return res.redirect(rawUrl);
-    }
-
-    const ct       = fileRes.headers.get('content-type') || 'application/octet-stream';
+  // Helper to stream a successful fetch response back to client
+  const streamResponse = async (fileRes) => {
+    const ct = fileRes.headers.get('content-type') || 'application/octet-stream';
     const fileName = decodeURIComponent(publicId.split('/').pop() || 'document');
     const disposition = req.query.download === '1' ? 'attachment' : 'inline';
-
     res.setHeader('Content-Type', ct);
     res.setHeader('Content-Disposition', `${disposition}; filename="${fileName}"`);
     res.setHeader('Cache-Control', 'private, max-age=3600');
     res.setHeader('Access-Control-Allow-Origin', '*');
-
     const buf = await fileRes.arrayBuffer();
     return res.send(Buffer.from(buf));
+  };
+
+  try {
+    // Attempt 1: Admin API download (bypasses CDN delivery restrictions entirely)
+    const fileRes = await fetch(downloadApiUrl, { redirect: 'follow' });
+    if (fileRes.ok) {
+      return await streamResponse(fileRes);
+    }
+    const body1 = await fileRes.text();
+    console.error(`doc-stream Admin API ${fileRes.status}:`, body1);
+
+    // Attempt 2: Signed CDN URL (works when delivery requires signed-only, not fully blocked)
+    const signedCdnUrl = cloudinary.url(publicId, {
+      resource_type: resourceType,
+      type: 'upload',
+      sign_url: true,
+      secure: true,
+    });
+    console.log(`doc-stream: Signed CDN fallback: ${signedCdnUrl}`);
+    const cdnRes = await fetch(signedCdnUrl, { redirect: 'follow' });
+    if (cdnRes.ok) {
+      return await streamResponse(cdnRes);
+    }
+    const body2 = await cdnRes.text();
+    console.error(`doc-stream Signed CDN ${cdnRes.status}:`, body2.slice(0, 200));
+
+    // Both failed — fall through to error response
+    return res.status(502).json({ error: 'Unable to fetch file from storage', adminStatus: fileRes.status, cdnStatus: cdnRes.status });
   } catch (e) {
     console.error('doc-stream error:', e);
-    return res.redirect(rawUrl);
+    return res.status(500).json({ error: e.message });
   }
 });
 
