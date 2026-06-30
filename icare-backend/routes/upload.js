@@ -264,32 +264,52 @@ router.get('/doc-stream', async (req, res) => {
     return res.send(Buffer.from(buf));
   };
 
-  try {
-    // Attempt 1: Admin API download (bypasses CDN delivery restrictions entirely)
-    const fileRes = await fetch(downloadApiUrl, { redirect: 'follow' });
-    if (fileRes.ok) {
-      return await streamResponse(fileRes);
-    }
-    const body1 = await fileRes.text();
-    console.error(`doc-stream Admin API ${fileRes.status}:`, body1);
+  // Returns the response only if it's a real file (not an HTML error page Cloudinary sometimes returns as 200)
+  const isRealFile = (r) => {
+    if (!r.ok) return false;
+    const ct = r.headers.get('content-type') || '';
+    return !ct.startsWith('text/html') && !ct.startsWith('text/plain');
+  };
 
-    // Attempt 2: Signed CDN URL (works when delivery requires signed-only, not fully blocked)
+  try {
+    // Attempt 1: Admin API download (bypasses CDN restrictions; may redirect to signed CDN URL)
+    const r1 = await fetch(downloadApiUrl, { redirect: 'follow' });
+    if (isRealFile(r1)) {
+      console.log(`doc-stream: Admin API OK ct=${r1.headers.get('content-type')}`);
+      return await streamResponse(r1);
+    }
+    const b1 = await r1.text();
+    console.error(`doc-stream Admin API fail status=${r1.status} ct=${r1.headers.get('content-type')} body=${b1.slice(0, 200)}`);
+
+    // Attempt 2: Signed CDN URL (works when delivery restriction is "signed URLs only")
     const signedCdnUrl = cloudinary.url(publicId, {
       resource_type: resourceType,
       type: 'upload',
       sign_url: true,
       secure: true,
     });
-    console.log(`doc-stream: Signed CDN fallback: ${signedCdnUrl}`);
-    const cdnRes = await fetch(signedCdnUrl, { redirect: 'follow' });
-    if (cdnRes.ok) {
-      return await streamResponse(cdnRes);
+    console.log(`doc-stream: Signed CDN attempt: ${signedCdnUrl.slice(0, 80)}...`);
+    const r2 = await fetch(signedCdnUrl, { redirect: 'follow' });
+    if (isRealFile(r2)) {
+      console.log(`doc-stream: Signed CDN OK ct=${r2.headers.get('content-type')}`);
+      return await streamResponse(r2);
     }
-    const body2 = await cdnRes.text();
-    console.error(`doc-stream Signed CDN ${cdnRes.status}:`, body2.slice(0, 200));
+    const b2 = await r2.text();
+    console.error(`doc-stream Signed CDN fail status=${r2.status} body=${b2.slice(0, 200)}`);
 
-    // Both failed — fall through to error response
-    return res.status(502).json({ error: 'Unable to fetch file from storage', adminStatus: fileRes.status, cdnStatus: cdnRes.status });
+    // Attempt 3: Admin API without expires_at and type (minimal signature)
+    const ts3 = Math.floor(Date.now() / 1000);
+    const sig3 = cloudinary.utils.api_sign_request({ public_id: publicId, timestamp: ts3 }, apiSecret);
+    const qs3 = new URLSearchParams({ public_id: publicId, timestamp: String(ts3), api_key: apiKey, signature: sig3 }).toString();
+    const r3 = await fetch(`https://api.cloudinary.com/v1_1/${cldCloud}/${resourceType}/download?${qs3}`, { redirect: 'follow' });
+    if (isRealFile(r3)) {
+      console.log(`doc-stream: Minimal sig OK ct=${r3.headers.get('content-type')}`);
+      return await streamResponse(r3);
+    }
+    const b3 = await r3.text();
+    console.error(`doc-stream Minimal sig fail status=${r3.status} body=${b3.slice(0, 200)}`);
+
+    return res.status(502).json({ error: 'Storage unavailable', details: { attempt1: r1.status, attempt2: r2.status, attempt3: r3.status } });
   } catch (e) {
     console.error('doc-stream error:', e);
     return res.status(500).json({ error: e.message });
