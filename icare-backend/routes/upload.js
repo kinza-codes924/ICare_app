@@ -173,16 +173,14 @@ router.get('/doc-url', protect, async (req, res) => {
     const timestamp  = Math.floor(Date.now() / 1000);
     const expiresAt  = timestamp + 7200; // 2 hours
 
-    // Keep extension embedded in public_id — do NOT split it out as a separate 'format' param.
-    // Cloudinary's download API resolves "filename.pdf" to the stored resource correctly.
-    const paramsToSign = { attachment: false, expires_at: expiresAt, public_id: publicId, timestamp };
+    const paramsToSign = { expires_at: expiresAt, public_id: publicId, timestamp, type: 'upload' };
     const toSign = Object.keys(paramsToSign).sort()
       .map(k => `${k}=${paramsToSign[k]}`).join('&') + apiSecret;
     const signature = crypto.createHash('sha1').update(toSign).digest('hex');
 
     const qs = new URLSearchParams({
-      public_id: publicId,
-      attachment: 'false',
+      public_id:  publicId,
+      type:       'upload',
       expires_at: String(expiresAt),
       timestamp:  String(timestamp),
       api_key:    apiKey,
@@ -238,15 +236,17 @@ router.get('/doc-stream', async (req, res) => {
   const timestamp = Math.floor(Date.now() / 1000);
   const expiresAt = timestamp + 7200;
 
-  // Sign only the params Cloudinary's /download endpoint expects (no resource_type, no format)
-  const paramsToSign = { attachment: false, expires_at: expiresAt, public_id: publicId, timestamp };
+  // Cloudinary /download signature: sort alphabetically, exclude undefined/falsy values.
+  // The SDK includes `type=upload` and filters out `attachment` when falsy.
+  // NOT including resource_type or format in the signature (those go in the URL path only).
+  const paramsToSign = { expires_at: expiresAt, public_id: publicId, timestamp, type: 'upload' };
   const toSign = Object.keys(paramsToSign).sort()
     .map(k => `${k}=${paramsToSign[k]}`).join('&') + apiSecret;
   const signature = crypto.createHash('sha1').update(toSign).digest('hex');
 
   const qs = new URLSearchParams({
     public_id:  publicId,
-    attachment: 'false',
+    type:       'upload',
     expires_at: String(expiresAt),
     timestamp:  String(timestamp),
     api_key:    apiKey,
