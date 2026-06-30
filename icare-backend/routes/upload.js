@@ -332,13 +332,11 @@ router.get('/doc-stream', async (req, res) => {
 router.post('/blob-doc', protect, docUpload.single('file'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ success: false, message: 'No file provided' });
-    if (!process.env.BLOB_READ_WRITE_TOKEN) {
-      return res.status(500).json({ success: false, message: 'Vercel Blob not configured (BLOB_READ_WRITE_TOKEN missing)' });
-    }
-
     const safeName = req.file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_');
     const blobPath = `quiz/docs/${Date.now()}-${safeName}`;
 
+    // @vercel/blob uses OIDC auth automatically when running on Vercel (BLOB_STORE_ID is set).
+    // No manual token check needed.
     const blob = await put(blobPath, req.file.buffer, {
       access: 'public',
       contentType: req.file.mimetype,
