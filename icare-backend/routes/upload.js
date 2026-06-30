@@ -199,4 +199,88 @@ router.get('/doc-url', protect, async (req, res) => {
   }
 });
 
+// GET /api/upload/doc-stream?url=<encoded_cloudinary_url>&token=<jwt>
+// Streams the Cloudinary file content directly to the browser.
+// Uses token in query string so url_launcher can open this as a plain browser URL.
+// This completely bypasses Cloudinary CDN delivery restrictions because the backend
+// fetches the file via the authenticated Cloudinary API and proxies the bytes.
+router.get('/doc-stream', async (req, res) => {
+  // Verify JWT from query param (needed because browser navigates directly to this URL)
+  const token = req.query.token;
+  if (!token) return res.status(401).send('Unauthorized');
+  try {
+    const jwt = require('jsonwebtoken');
+    jwt.verify(token, process.env.JWT_SECRET);
+  } catch {
+    return res.status(401).send('Unauthorized');
+  }
+
+  const rawUrl = decodeURIComponent(req.query.url || '');
+  if (!rawUrl) return res.status(400).send('url required');
+
+  // Non-Cloudinary URLs: just redirect
+  if (!rawUrl.includes('res.cloudinary.com')) {
+    return res.redirect(rawUrl);
+  }
+
+  // Parse: https://res.cloudinary.com/{cloud}/{resource_type}/upload/[v123/]{public_id}
+  const match = rawUrl.match(/res\.cloudinary\.com\/([^/]+)\/([^/]+)\/upload\/(?:v\d+\/)?(.+)$/);
+  if (!match) return res.redirect(rawUrl);
+
+  const cldCloud    = match[1];
+  const resourceType = match[2] === 'auto' ? 'raw' : match[2];
+  const publicId    = match[3]; // e.g. icare/quiz/docs/d7mk0u0lnuum1uxodch2.pdf
+
+  const apiKey    = cloudinary.config().api_key;
+  const apiSecret = process.env.CLOUDINARY_API_SECRET || cloudinary.config().api_secret;
+  if (!apiSecret) return res.redirect(rawUrl);
+
+  const timestamp = Math.floor(Date.now() / 1000);
+  const expiresAt = timestamp + 7200;
+
+  // Sign only the params Cloudinary's /download endpoint expects (no resource_type, no format)
+  const paramsToSign = { attachment: false, expires_at: expiresAt, public_id: publicId, timestamp };
+  const toSign = Object.keys(paramsToSign).sort()
+    .map(k => `${k}=${paramsToSign[k]}`).join('&') + apiSecret;
+  const signature = crypto.createHash('sha1').update(toSign).digest('hex');
+
+  const qs = new URLSearchParams({
+    public_id:  publicId,
+    attachment: 'false',
+    expires_at: String(expiresAt),
+    timestamp:  String(timestamp),
+    api_key:    apiKey,
+    signature,
+  }).toString();
+
+  const downloadApiUrl = `https://api.cloudinary.com/v1_1/${cldCloud}/${resourceType}/download?${qs}`;
+  console.log(`doc-stream proxy: type=${resourceType} pid=${publicId}`);
+
+  try {
+    const fileRes = await fetch(downloadApiUrl, { redirect: 'follow' });
+
+    if (!fileRes.ok) {
+      const body = await fileRes.text();
+      console.error(`doc-stream Cloudinary error ${fileRes.status}:`, body);
+      // Fall back: redirect to original URL (user sees 401 but at least something shows)
+      return res.redirect(rawUrl);
+    }
+
+    const ct       = fileRes.headers.get('content-type') || 'application/octet-stream';
+    const fileName = decodeURIComponent(publicId.split('/').pop() || 'document');
+    const disposition = req.query.download === '1' ? 'attachment' : 'inline';
+
+    res.setHeader('Content-Type', ct);
+    res.setHeader('Content-Disposition', `${disposition}; filename="${fileName}"`);
+    res.setHeader('Cache-Control', 'private, max-age=3600');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+
+    const buf = await fileRes.arrayBuffer();
+    return res.send(Buffer.from(buf));
+  } catch (e) {
+    console.error('doc-stream error:', e);
+    return res.redirect(rawUrl);
+  }
+});
+
 module.exports = router;
