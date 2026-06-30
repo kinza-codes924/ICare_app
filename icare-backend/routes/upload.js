@@ -3,6 +3,7 @@ const router = express.Router();
 const crypto = require('crypto');
 const multer = require('multer');
 const { v2: cloudinary } = require('cloudinary');
+const { put } = require('@vercel/blob');
 const { authMiddleware: protect } = require('../middleware/auth');
 
 // Use memory storage — Cloudinary uploads from buffer (Vercel-safe, no disk writes)
@@ -15,6 +16,16 @@ const upload = multer({
     } else {
       cb(new Error('Only images and PDFs are allowed'));
     }
+  },
+});
+
+// Multer for quiz/assignment documents — allows PDF, Office docs, videos, images
+const docUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 50 * 1024 * 1024 }, // 50 MB
+  fileFilter(req, file, cb) {
+    const ok = /pdf|msword|officedocument|text|jpeg|jpg|png|gif|webp|mp4|webm|quicktime|ogg/.test(file.mimetype);
+    cb(ok ? null : new Error('File type not allowed'), ok);
   },
 });
 
@@ -313,6 +324,32 @@ router.get('/doc-stream', async (req, res) => {
   } catch (e) {
     console.error('doc-stream error:', e);
     return res.status(500).json({ error: e.message });
+  }
+});
+
+// POST /api/upload/blob-doc — upload quiz/assignment document to Vercel Blob
+// Returns a public URL with zero delivery restrictions (no CDN signing needed).
+router.post('/blob-doc', protect, docUpload.single('file'), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ success: false, message: 'No file provided' });
+    if (!process.env.BLOB_READ_WRITE_TOKEN) {
+      return res.status(500).json({ success: false, message: 'Vercel Blob not configured (BLOB_READ_WRITE_TOKEN missing)' });
+    }
+
+    const safeName = req.file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_');
+    const blobPath = `quiz/docs/${Date.now()}-${safeName}`;
+
+    const blob = await put(blobPath, req.file.buffer, {
+      access: 'public',
+      contentType: req.file.mimetype,
+      addRandomSuffix: false,
+    });
+
+    console.log(`blob-doc: uploaded ${safeName} → ${blob.url}`);
+    res.json({ success: true, url: blob.url, name: req.file.originalname });
+  } catch (err) {
+    console.error('blob-doc error:', err);
+    res.status(500).json({ success: false, message: err.message });
   }
 });
 
