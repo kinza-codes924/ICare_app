@@ -816,7 +816,8 @@ class _StudentLmsDashboardState extends State<StudentLmsDashboard>
             ),
             const SizedBox(height: 24),
             const Text(
-              'No classes yet',
+              'You have not enrolled in any course yet',
+              textAlign: TextAlign.center,
               style: TextStyle(
                   fontSize: 22,
                   fontWeight: FontWeight.w800,
@@ -863,6 +864,53 @@ class _StudentLmsDashboardState extends State<StudentLmsDashboard>
     }
 
     if (_allTodoItems.isEmpty) {
+      // No enrollments at all — prompt to browse courses
+      if (_enrollments.isEmpty) {
+        return Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(32),
+                decoration: const BoxDecoration(
+                  color: Color(0xFFEFF6FF),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(Icons.checklist_rounded,
+                    size: 64, color: AppColors.primaryColor),
+              ),
+              const SizedBox(height: 24),
+              const Text(
+                'You have not enrolled in any course yet',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF0F172A)),
+              ),
+              const SizedBox(height: 28),
+              ElevatedButton.icon(
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const LmsPublicCatalog()),
+                ),
+                icon: const Icon(Icons.explore_rounded, size: 18),
+                label: const Text('Browse Courses',
+                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primaryColor,
+                  foregroundColor: Colors.white,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8)),
+                  elevation: 0,
+                ),
+              ),
+            ],
+          ),
+        );
+      }
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,

@@ -142,6 +142,45 @@ router.post('/', authMiddleware, async (req, res) => {
   }
 });
 
+// POST /api/certificates/register — register a client-generated certificate code
+// The Flutter app generates the PDF (with QR code) locally; this saves the code
+// so /verify/:code can authenticate it later.
+router.post('/register', authMiddleware, async (req, res) => {
+  try {
+    await connectMongoDB();
+    const {
+      verificationCode, enrollmentId, courseId,
+      studentName, courseName, instructorName, completionDate, template,
+    } = req.body;
+    if (!verificationCode) {
+      return res.status(400).json({ success: false, message: 'verificationCode required' });
+    }
+
+    // Already registered → idempotent success
+    const existing = await Certificate.findOne({ verificationCode }).lean();
+    if (existing) return res.json({ success: true, certificate: existing, message: 'Already registered' });
+
+    const certNumber = `ICARE-${new Date().getFullYear()}-${Math.floor(100000 + Math.random() * 900000)}`;
+    const certificate = await Certificate.create({
+      enrollmentId: toId(enrollmentId) || new mongoose.Types.ObjectId(),
+      studentId: toId(req.user.id),
+      courseId: toId(courseId) || new mongoose.Types.ObjectId(),
+      certificateNumber: certNumber,
+      verificationCode,
+      studentName: studentName || 'Student',
+      courseName: courseName || 'Course',
+      instructorName: instructorName || 'Instructor',
+      completionDate: completionDate ? new Date(completionDate) : new Date(),
+      template: template || 'classic',
+      qrCodeData: `https://www.icare.com.co/verify?code=${verificationCode}`,
+      approvalStatus: 'approved',
+    });
+    res.json({ success: true, certificate });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
 // GET /api/certificates/verify/:code — Verify certificate by QR code
 router.get('/verify/:code', async (req, res) => {
   try {

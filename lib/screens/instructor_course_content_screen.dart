@@ -382,9 +382,18 @@ class _InstructorCourseContentScreenState extends State<InstructorCourseContentS
     final platform = lesson['platform']?.toString() ?? 'zoom';
 
     if (meetingLink.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No meeting link set for this session. Please edit the lesson.'), backgroundColor: Colors.red),
-      );
+      // No external link → launch iCare native live session
+      final sessionId = lesson['_id']?.toString() ?? '';
+      if (!mounted) return;
+      Navigator.push(context, MaterialPageRoute(
+        builder: (_) => LmsLiveSessionScreen(
+          sessionId: sessionId,
+          courseId: widget.courseId,
+          sessionTitle: lesson['title']?.toString() ?? 'Live Session',
+          isInstructor: true,
+          lessonId: lesson['_id']?.toString(),
+        ),
+      ));
       return;
     }
 

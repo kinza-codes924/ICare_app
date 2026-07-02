@@ -41,6 +41,12 @@ external void _lmsExitFullscreenJS();
 @JS('lmsRefreshVideoLayout')
 external void _lmsRefreshVideoLayoutJS();
 
+@JS('lmsSetParticipantNames')
+external void _lmsSetParticipantNamesJS(JSString localName, JSString remoteName);
+
+@JS('lmsSetVideoFit')
+external void _lmsSetVideoFitJS(JSString mode);
+
 // appId and token fetched by caller from AgoraService
 Future<void> lmsJoinChannel(String roomName, String appId, String token, bool isInstructor) async {
   await _lmsAgoraJoinJS(appId.toJS, roomName.toJS, token.toJS, 0.toJS, isInstructor.toJS).toDart;
@@ -69,6 +75,10 @@ Future<String> lmsToggleScreenShare() async {
 void lmsRequestFullscreen() => _lmsRequestFullscreenJS();
 void lmsExitFullscreen() => _lmsExitFullscreenJS();
 void lmsRefreshVideoLayout() => _lmsRefreshVideoLayoutJS();
+void lmsSetParticipantNames(String localName, String remoteName) =>
+    _lmsSetParticipantNamesJS(localName.toJS, remoteName.toJS);
+
+void lmsSetVideoFit(String mode) => _lmsSetVideoFitJS(mode.toJS);
 
 void lmsListenForScreenShareEnded(void Function() callback) {
   web.window.addEventListener('lms-screen-share-ended', ((web.Event _) {
@@ -97,10 +107,28 @@ String registerLmsVideoView() {
       // Remote video — fills entire area
       final remote = web.document.createElement('div') as web.HTMLDivElement;
       remote.id = 'lms-agora-remote';
+      remote.style.position = 'relative';
       remote.style.width = '100%';
       remote.style.height = '100%';
-      remote.style.background = '#1C2333';
+      remote.style.background = '#000';
+      remote.style.overflow = 'hidden';
       container.appendChild(remote);
+
+      // Remote name label
+      final remoteName = web.document.createElement('div') as web.HTMLDivElement;
+      remoteName.id = 'lms-remote-name';
+      remoteName.style.position = 'absolute';
+      remoteName.style.bottom = '8px';
+      remoteName.style.left = '8px';
+      remoteName.style.background = 'rgba(0,0,0,0.6)';
+      remoteName.style.color = '#fff';
+      remoteName.style.fontSize = '12px';
+      remoteName.style.fontWeight = '600';
+      remoteName.style.padding = '3px 8px';
+      remoteName.style.borderRadius = '4px';
+      remoteName.style.zIndex = '10';
+      remoteName.style.display = 'none';
+      remote.appendChild(remoteName);
 
       // Local video — small preview in bottom-right corner
       final local = web.document.createElement('div') as web.HTMLDivElement;
@@ -116,6 +144,22 @@ String registerLmsVideoView() {
       local.style.zIndex = '20';
       local.style.border = '2px solid rgba(255,255,255,0.2)';
       container.appendChild(local);
+
+      // Local name label
+      final localName = web.document.createElement('div') as web.HTMLDivElement;
+      localName.id = 'lms-local-name';
+      localName.style.position = 'absolute';
+      localName.style.bottom = '12px';
+      localName.style.right = '12px';
+      localName.style.background = 'rgba(0,0,0,0.6)';
+      localName.style.color = '#fff';
+      localName.style.fontSize = '9px';
+      localName.style.fontWeight = '600';
+      localName.style.padding = '2px 5px';
+      localName.style.borderRadius = '3px';
+      localName.style.zIndex = '25';
+      localName.style.display = 'none';
+      container.appendChild(localName);
 
       return container;
     });

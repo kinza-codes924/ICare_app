@@ -21,6 +21,7 @@ import 'package:icare/widgets/custom_text.dart';
 import 'package:icare/navigators/drawer.dart';
 import 'package:icare/widgets/svg_wrapper.dart';
 import 'package:icare/screens/courses.dart';
+import 'package:icare/screens/student_lms_dashboard.dart';
 import 'package:icare/screens/doctor_appointments.dart';
 import 'package:icare/screens/doctor_dashboard.dart';
 import 'package:icare/screens/doctor_schedule_calendar.dart';
@@ -70,6 +71,7 @@ import 'package:icare/screens/lms_live_session_screen.dart';
 import 'package:icare/services/lms_service.dart';
 import 'package:icare/services/course_service.dart';
 import 'package:icare/screens/my_learning.dart';
+import 'package:icare/services/notification_service.dart';
 
 class TabsScreen extends ConsumerStatefulWidget {
   final String? initialAdminTab;
@@ -81,6 +83,10 @@ class TabsScreen extends ConsumerStatefulWidget {
 class _TabsScreenState extends ConsumerState<TabsScreen> {
   var currentIndex = 0;
   Timer? _livePoller;
+  Timer? _notifPoller;
+  int _notifUnreadCount = 0;
+  int _lastNotifUnread = -1; // -1 = not yet initialised (suppress banner on first load)
+  OverlayEntry? _bannerEntry;
 
   // Per-course snooze state:
   // Key = courseId
@@ -104,16 +110,61 @@ class _TabsScreenState extends ConsumerState<TabsScreen> {
   @override
   void initState() {
     super.initState();
-    // Try starting poller after first frame (handles case where role is already set)
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (ref.read(authProvider).userRole == 'Student') _ensurePollerRunning();
+      _startNotifPolling();
     });
   }
 
   @override
   void dispose() {
     _livePoller?.cancel();
+    _notifPoller?.cancel();
+    _bannerEntry?.remove();
     super.dispose();
+  }
+
+  // ── Notification polling ─────────────────────────────────────────────────
+  void _startNotifPolling() {
+    _fetchNotifications();
+    _notifPoller ??= Timer.periodic(const Duration(seconds: 30), (_) => _fetchNotifications());
+  }
+
+  Future<void> _fetchNotifications() async {
+    if (!mounted) return;
+    try {
+      final result = await NotificationService().getNotifications();
+      final all = List<Map<String, dynamic>>.from(result['notifications'] ?? []);
+      final unread = all.where((n) => n['isRead'] != true).toList();
+      final count = unread.length;
+      if (mounted) setState(() => _notifUnreadCount = count);
+
+      if (_lastNotifUnread >= 0 && count > _lastNotifUnread && unread.isNotEmpty) {
+        // New notification(s) arrived — show banner for the most recent one
+        _showNotifBanner(unread.first);
+      }
+      _lastNotifUnread = count;
+    } catch (_) {}
+  }
+
+  void _showNotifBanner(Map<String, dynamic> notif) {
+    if (!mounted) return;
+    _bannerEntry?.remove();
+    _bannerEntry = null;
+
+    _bannerEntry = OverlayEntry(
+      builder: (_) => _NotificationBanner(
+        title: notif['title']?.toString() ?? 'New Notification',
+        message: notif['message']?.toString() ?? '',
+        onDismiss: () { _bannerEntry?.remove(); _bannerEntry = null; },
+      ),
+    );
+    Overlay.of(context).insert(_bannerEntry!);
+
+    Future.delayed(const Duration(seconds: 5), () {
+      _bannerEntry?.remove();
+      _bannerEntry = null;
+    });
   }
 
   void _ensurePollerRunning() {
@@ -341,6 +392,14 @@ class _TabsScreenState extends ConsumerState<TabsScreen> {
         activePage = Courses();
       } else if (currentIndex == 2) {
         activePage = const StudentProfileSetup();
+      } else if (currentIndex == 3) {
+        activePage = const Courses(browse: true);
+      } else if (currentIndex == 4) {
+        activePage = const CertificatesScreen();
+      } else if (currentIndex == 5) {
+        activePage = const AssessmentsScreen();
+      } else if (currentIndex == 6) {
+        activePage = const SettingsScreen();
       }
     } else if (role == "Admin") {
       if (currentIndex == 0) {
@@ -495,7 +554,7 @@ class _TabsScreenState extends ConsumerState<TabsScreen> {
                 child: Column(
                   children: [
                     // Premium top navbar
-                    _WebTopBar(role: role),
+                    _WebTopBar(role: role, notifUnreadCount: _notifUnreadCount),
                     // Content fills remaining space.
                     // ClipRect prevents overflow zebra-stripe warnings from
                     // ScallingConfig scaling elements slightly too large on web.
@@ -612,7 +671,7 @@ class _WebSidebarState extends ConsumerState<_WebSidebar> {
               ? 'Orders'
               : (role == 'Laboratory'
                     ? 'New Requests'
-                    : (role == 'Student' ? 'My Programs' : 'Appointments')),
+                    : (role == 'Student' ? 'My Courses' : 'Appointments')),
           index: 1,
         ),
         if (role != 'Student')
@@ -1340,49 +1399,39 @@ class _WebSidebarState extends ConsumerState<_WebSidebar> {
                   ),
                   _buildExtraNavItem(
                     context,
-                    Icons.school_outlined,
-                    role == 'Student' ? 'My Courses' : 'Manage Courses',
+                    Icons.class_outlined,
+                    'Open Classroom',
                     () {
                       Navigator.of(context).push(
                         MaterialPageRoute(
-                          builder: (ctx) => const Courses(myPurchased: true),
+                          builder: (ctx) => const StudentLmsDashboard(),
                         ),
                       );
                     },
                   ),
                   _buildExtraNavItem(
                     context,
+                    Icons.travel_explore_outlined,
+                    'Browse Courses',
+                    () => onSelect(3),
+                  ),
+                  _buildExtraNavItem(
+                    context,
                     Icons.workspace_premium_outlined,
-                    role == 'Student' ? 'My Certificates' : 'Certifications',
-                    () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (ctx) => const CertificatesScreen(),
-                        ),
-                      );
-                    },
+                    'My Certificates',
+                    () => onSelect(4),
                   ),
                   _buildExtraNavItem(
                     context,
                     Icons.task_alt_outlined,
                     'Assessments',
-                    () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(builder: (ctx) => const AssessmentsScreen()),
-                      );
-                    },
+                    () => onSelect(5),
                   ),
                   _buildExtraNavItem(
                     context,
                     Icons.settings_outlined,
                     'Settings',
-                    () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (ctx) => const SettingsScreen(),
-                        ),
-                      );
-                    },
+                    () => onSelect(6),
                   ),
                 ],
 
@@ -1642,8 +1691,9 @@ class _HoverableNavItemState extends State<_HoverableNavItem> {
 // Web Top Navbar
 // ═══════════════════════════════════════════════════════════════════════════
 class _WebTopBar extends ConsumerWidget {
-  const _WebTopBar({required this.role});
+  const _WebTopBar({required this.role, this.notifUnreadCount = 0});
   final String role;
+  final int notifUnreadCount;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -1717,18 +1767,24 @@ class _WebTopBar extends ConsumerWidget {
                     color: Color(0xFF0B2D6E),
                     size: 20,
                   ),
-                  Positioned(
-                    top: 8,
-                    right: 8,
-                    child: Container(
-                      width: 7,
-                      height: 7,
-                      decoration: const BoxDecoration(
-                        color: Colors.redAccent,
-                        shape: BoxShape.circle,
+                  if (notifUnreadCount > 0)
+                    Positioned(
+                      top: 4,
+                      right: 4,
+                      child: Container(
+                        constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                        decoration: BoxDecoration(
+                          color: Colors.redAccent,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          notifUnreadCount > 99 ? '99+' : '$notifUnreadCount',
+                          style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                          textAlign: TextAlign.center,
+                        ),
                       ),
                     ),
-                  ),
                 ],
               ),
             ),
@@ -1874,6 +1930,87 @@ class _SidebarAction {
   final IconData icon;
   final VoidCallback onTap;
   const _SidebarAction(this.label, this.icon, this.onTap);
+}
+
+// ── In-app notification banner ────────────────────────────────────────────────
+class _NotificationBanner extends StatefulWidget {
+  final String title;
+  final String message;
+  final VoidCallback onDismiss;
+  const _NotificationBanner({required this.title, required this.message, required this.onDismiss});
+  @override
+  State<_NotificationBanner> createState() => _NotificationBannerState();
+}
+
+class _NotificationBannerState extends State<_NotificationBanner> with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+  late final Animation<Offset> _slide;
+  late final Animation<double> _fade;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 350));
+    _slide = Tween<Offset>(begin: const Offset(0, -1), end: Offset.zero)
+        .animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeOutCubic));
+    _fade = CurvedAnimation(parent: _ctrl, curve: Curves.easeIn);
+    _ctrl.forward();
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Positioned(
+      top: 16,
+      left: 16,
+      right: 16,
+      child: SlideTransition(
+        position: _slide,
+        child: FadeTransition(
+          opacity: _fade,
+          child: Material(
+            color: Colors.transparent,
+            child: GestureDetector(
+              onTap: widget.onDismiss,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF0B2D6E),
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.25), blurRadius: 16, offset: const Offset(0, 6))],
+                ),
+                child: Row(children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.15), shape: BoxShape.circle),
+                    child: const Icon(Icons.notifications_rounded, color: Colors.white, size: 18),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(widget.title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 13), maxLines: 1, overflow: TextOverflow.ellipsis),
+                    if (widget.message.isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(widget.message, style: TextStyle(color: Colors.white.withValues(alpha: 0.8), fontSize: 12), maxLines: 2, overflow: TextOverflow.ellipsis),
+                    ],
+                  ])),
+                  const SizedBox(width: 8),
+                  GestureDetector(
+                    onTap: widget.onDismiss,
+                    child: Icon(Icons.close_rounded, color: Colors.white.withValues(alpha: 0.7), size: 18),
+                  ),
+                ]),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 

@@ -45,6 +45,7 @@ class _WorkWithUsSignupState extends State<WorkWithUsSignup> {
   final _workplaceCtrl = TextEditingController();
   final Set<String> _docAvailDays = {};
   final _docTimingsCtrl = TextEditingController();
+  TimeOfDay? _docFromTime, _docToTime;
   String? _docCnic;
   Uint8List? _docCnicBytes;
   String? _docPmdcCert;
@@ -63,13 +64,17 @@ class _WorkWithUsSignupState extends State<WorkWithUsSignup> {
   bool? _pharmDelivery;
   final Set<String> _pharmOpDays = {};
   final _pharmHoursCtrl = TextEditingController();
+  TimeOfDay? _pharmFromTime, _pharmToTime;
   bool? _pharmOnlineOrders;
   bool? _pharmHasPOS;
   final _pharmPOSDetailCtrl = TextEditingController();
   bool? _pharmWillingIntegrate;
   String? _pharmCnic;
+  Uint8List? _pharmCnicBytes;
   String? _pharmDrugLicense;
+  Uint8List? _pharmDrugLicenseBytes;
   String? _pharmRegCert;
+  Uint8List? _pharmRegCertBytes;
   final bool _pharmConfirmInfo = false;
   final bool _pharmAgreeOnboarding = false;
   final _pharmCommentsCtrl = TextEditingController();
@@ -79,16 +84,21 @@ class _WorkWithUsSignupState extends State<WorkWithUsSignup> {
   final _labLicenseCtrl = TextEditingController();
   final _labYearsCtrl = TextEditingController();
   String? _labTestsFile;
+  Uint8List? _labTestsFileBytes;
   bool? _labHomeSampling;
   final Set<String> _labOpDays = {};
   final _labHoursCtrl = TextEditingController();
+  TimeOfDay? _labFromTime, _labToTime;
   bool? _labOnlineReports;
   bool? _labHasLIS;
   final _labLISDetailCtrl = TextEditingController();
   bool? _labWillingIntegrate;
   String? _labCnic;
+  Uint8List? _labCnicBytes;
   String? _labLicense;
+  Uint8List? _labLicenseBytes;
   String? _labAccredCert;
+  Uint8List? _labAccredCertBytes;
   final bool _labConfirmInfo = false;
   final bool _labAgreeOnboarding = false;
   final _labCommentsCtrl = TextEditingController();
@@ -99,6 +109,7 @@ class _WorkWithUsSignupState extends State<WorkWithUsSignup> {
   final _studentYearCtrl = TextEditingController();
   final _studentIdCtrl = TextEditingController();
   String? _studentIdFile;
+  Uint8List? _studentIdBytes;
   final bool _studentConfirmInfo = false;
   final _studentCommentsCtrl = TextEditingController();
 
@@ -109,7 +120,9 @@ class _WorkWithUsSignupState extends State<WorkWithUsSignup> {
   final _instrInstitutionCtrl = TextEditingController();
   final _instrCoursesCtrl = TextEditingController();
   String? _instrCnic;
+  Uint8List? _instrCnicBytes;
   String? _instrCvFile;
+  Uint8List? _instrCvBytes;
   final bool _instructorConfirmInfo = false;
   final bool _instructorAgreeOnboarding = false;
   final _instrCommentsCtrl = TextEditingController();
@@ -365,6 +378,18 @@ class _WorkWithUsSignupState extends State<WorkWithUsSignup> {
         vd['posDetails'] = _pharmPOSDetailCtrl.text.trim();
         vd['willingToIntegrate'] = _pharmWillingIntegrate;
         vd['comments'] = _pharmCommentsCtrl.text.trim();
+        if (_pharmCnicBytes != null) {
+          vd['cnicDocument'] = 'data:application/octet-stream;base64,${base64Encode(_pharmCnicBytes!)}';
+          vd['cnicDocumentName'] = _pharmCnic ?? 'cnic';
+        }
+        if (_pharmDrugLicenseBytes != null) {
+          vd['drugLicenseDocument'] = 'data:application/octet-stream;base64,${base64Encode(_pharmDrugLicenseBytes!)}';
+          vd['drugLicenseDocumentName'] = _pharmDrugLicense ?? 'drug_license';
+        }
+        if (_pharmRegCertBytes != null) {
+          vd['regCertDocument'] = 'data:application/octet-stream;base64,${base64Encode(_pharmRegCertBytes!)}';
+          vd['regCertDocumentName'] = _pharmRegCert ?? 'reg_cert';
+        }
       } else if (_selectedRole == 'Laboratory') {
         vd['organizationName'] = _labNameCtrl.text.trim();
         vd['location'] = [city, address].where((s) => s.isNotEmpty).join(', ');
@@ -381,6 +406,22 @@ class _WorkWithUsSignupState extends State<WorkWithUsSignup> {
         vd['lisDetails'] = _labLISDetailCtrl.text.trim();
         vd['willingToIntegrate'] = _labWillingIntegrate;
         vd['comments'] = _labCommentsCtrl.text.trim();
+        if (_labCnicBytes != null) {
+          vd['cnicDocument'] = 'data:application/octet-stream;base64,${base64Encode(_labCnicBytes!)}';
+          vd['cnicDocumentName'] = _labCnic ?? 'cnic';
+        }
+        if (_labLicenseBytes != null) {
+          vd['labLicenseDocument'] = 'data:application/octet-stream;base64,${base64Encode(_labLicenseBytes!)}';
+          vd['labLicenseDocumentName'] = _labLicense ?? 'lab_license';
+        }
+        if (_labAccredCertBytes != null) {
+          vd['accredCertDocument'] = 'data:application/octet-stream;base64,${base64Encode(_labAccredCertBytes!)}';
+          vd['accredCertDocumentName'] = _labAccredCert ?? 'accred_cert';
+        }
+        if (_labTestsFileBytes != null) {
+          vd['testsListDocument'] = 'data:application/octet-stream;base64,${base64Encode(_labTestsFileBytes!)}';
+          vd['testsListDocumentName'] = _labTestsFile ?? 'tests_list';
+        }
       } else if (_selectedRole == 'Student') {
         vd['organizationName'] = _studentUniversityCtrl.text.trim();
         vd['location'] = [city, address].where((s) => s.isNotEmpty).join(', ');
@@ -390,6 +431,10 @@ class _WorkWithUsSignupState extends State<WorkWithUsSignup> {
         vd['currentYear'] = _studentYearCtrl.text.trim();
         vd['studentId'] = _studentIdCtrl.text.trim();
         vd['comments'] = _studentCommentsCtrl.text.trim();
+        if (_studentIdBytes != null) {
+          vd['studentIdDocument'] = 'data:application/octet-stream;base64,${base64Encode(_studentIdBytes!)}';
+          vd['studentIdDocumentName'] = _studentIdFile ?? 'student_id';
+        }
       } else if (_selectedRole == 'Instructor') {
         vd['organizationName'] = _instrInstitutionCtrl.text.trim();
         vd['location'] = [city, address].where((s) => s.isNotEmpty).join(', ');
@@ -401,6 +446,14 @@ class _WorkWithUsSignupState extends State<WorkWithUsSignup> {
         vd['institution'] = _instrInstitutionCtrl.text.trim();
         vd['proposedCourses'] = _instrCoursesCtrl.text.trim();
         vd['comments'] = _instrCommentsCtrl.text.trim();
+        if (_instrCnicBytes != null) {
+          vd['cnicDocument'] = 'data:application/octet-stream;base64,${base64Encode(_instrCnicBytes!)}';
+          vd['cnicDocumentName'] = _instrCnic ?? 'cnic';
+        }
+        if (_instrCvBytes != null) {
+          vd['cvDocument'] = 'data:application/octet-stream;base64,${base64Encode(_instrCvBytes!)}';
+          vd['cvDocumentName'] = _instrCvFile ?? 'cv';
+        }
       }
 
       final response = await api.post('/auth/register', {
@@ -832,8 +885,15 @@ class _WorkWithUsSignupState extends State<WorkWithUsSignup> {
         const SizedBox(height: 8),
         _daySelector(_docAvailDays),
         const SizedBox(height: 12),
-        _inputField(_docTimingsCtrl, 'Available Timings', Icons.access_time_rounded,
-            hint: 'e.g., 9:00 AM – 5:00 PM'),
+        _label('Available Timings'),
+        const SizedBox(height: 8),
+        _timeRangePicker(
+          fromTime: _docFromTime, toTime: _docToTime,
+          onFromChanged: (t) => setState(() => _docFromTime = t),
+          onToChanged: (t) => setState(() => _docToTime = t),
+          ctrl: _docTimingsCtrl,
+          accentColor: const Color(0xFF0036BC),
+        ),
         const SizedBox(height: 24),
 
         // 3. Documents Upload
@@ -897,8 +957,15 @@ class _WorkWithUsSignupState extends State<WorkWithUsSignup> {
         const SizedBox(height: 8),
         _daySelector(_pharmOpDays),
         const SizedBox(height: 12),
-        _inputField(_pharmHoursCtrl, 'Operating Hours', Icons.access_time_rounded,
-            hint: 'e.g., 9:00 AM – 10:00 PM'),
+        _label('Operating Hours'),
+        const SizedBox(height: 8),
+        _timeRangePicker(
+          fromTime: _pharmFromTime, toTime: _pharmToTime,
+          onFromChanged: (t) => setState(() => _pharmFromTime = t),
+          onToChanged: (t) => setState(() => _pharmToTime = t),
+          ctrl: _pharmHoursCtrl,
+          accentColor: const Color(0xFF10B981),
+        ),
         const SizedBox(height: 12),
         _label('Online Orders Available'),
         const SizedBox(height: 8),
@@ -929,13 +996,15 @@ class _WorkWithUsSignupState extends State<WorkWithUsSignup> {
             const Color(0xFF10B981)),
         const SizedBox(height: 12),
         _fileUploadRow('CNIC / ID', _pharmCnic, (v) => setState(() => _pharmCnic = v),
-            required: true),
+            required: true, onBytesChanged: (b) => _pharmCnicBytes = b),
         const SizedBox(height: 10),
         _fileUploadRow('Drug License', _pharmDrugLicense,
-            (v) => setState(() => _pharmDrugLicense = v), required: true),
+            (v) => setState(() => _pharmDrugLicense = v), required: true,
+            onBytesChanged: (b) => _pharmDrugLicenseBytes = b),
         const SizedBox(height: 10),
         _fileUploadRow('Pharmacy Registration Certificate', _pharmRegCert,
-            (v) => setState(() => _pharmRegCert = v), required: true),
+            (v) => setState(() => _pharmRegCert = v), required: true,
+            onBytesChanged: (b) => _pharmRegCertBytes = b),
         const SizedBox(height: 24),
 
         _sectionHeader('5. Additional Comments', Icons.comment_outlined,
@@ -970,7 +1039,8 @@ class _WorkWithUsSignupState extends State<WorkWithUsSignup> {
         const SizedBox(height: 12),
         _fileUploadRow('Available Tests List (Upload)', _labTestsFile,
             (v) => setState(() => _labTestsFile = v), required: false,
-            color: const Color(0xFF8B5CF6)),
+            color: const Color(0xFF8B5CF6),
+            onBytesChanged: (b) => _labTestsFileBytes = b),
         const SizedBox(height: 12),
         _label('Home Sampling Available'),
         const SizedBox(height: 8),
@@ -986,8 +1056,15 @@ class _WorkWithUsSignupState extends State<WorkWithUsSignup> {
         const SizedBox(height: 8),
         _daySelector(_labOpDays),
         const SizedBox(height: 12),
-        _inputField(_labHoursCtrl, 'Operating Hours', Icons.access_time_rounded,
-            hint: 'e.g., 7:00 AM – 9:00 PM'),
+        _label('Operating Hours'),
+        const SizedBox(height: 8),
+        _timeRangePicker(
+          fromTime: _labFromTime, toTime: _labToTime,
+          onFromChanged: (t) => setState(() => _labFromTime = t),
+          onToChanged: (t) => setState(() => _labToTime = t),
+          ctrl: _labHoursCtrl,
+          accentColor: const Color(0xFF8B5CF6),
+        ),
         const SizedBox(height: 12),
         _label('Online Reports Available'),
         const SizedBox(height: 8),
@@ -1021,15 +1098,18 @@ class _WorkWithUsSignupState extends State<WorkWithUsSignup> {
             const Color(0xFF8B5CF6)),
         const SizedBox(height: 12),
         _fileUploadRow('CNIC / ID', _labCnic, (v) => setState(() => _labCnic = v),
-            required: true, color: const Color(0xFF8B5CF6)),
+            required: true, color: const Color(0xFF8B5CF6),
+            onBytesChanged: (b) => _labCnicBytes = b),
         const SizedBox(height: 10),
         _fileUploadRow('Lab License', _labLicense,
             (v) => setState(() => _labLicense = v), required: true,
-            color: const Color(0xFF8B5CF6)),
+            color: const Color(0xFF8B5CF6),
+            onBytesChanged: (b) => _labLicenseBytes = b),
         const SizedBox(height: 10),
         _fileUploadRow('Accreditation Certificates', _labAccredCert,
             (v) => setState(() => _labAccredCert = v), required: false,
-            color: const Color(0xFF8B5CF6)),
+            color: const Color(0xFF8B5CF6),
+            onBytesChanged: (b) => _labAccredCertBytes = b),
         const SizedBox(height: 24),
 
         _sectionHeader('5. Additional Comments', Icons.comment_outlined,
@@ -1070,7 +1150,8 @@ class _WorkWithUsSignupState extends State<WorkWithUsSignup> {
         const SizedBox(height: 12),
         _fileUploadRow('Student ID Card', _studentIdFile,
             (v) => setState(() => _studentIdFile = v),
-            required: true, color: const Color(0xFFF59E0B)),
+            required: true, color: const Color(0xFFF59E0B),
+            onBytesChanged: (b) => _studentIdBytes = b),
         const SizedBox(height: 24),
 
         _sectionHeader('3. Additional Comments', Icons.comment_outlined,
@@ -1116,11 +1197,13 @@ class _WorkWithUsSignupState extends State<WorkWithUsSignup> {
         const SizedBox(height: 12),
         _fileUploadRow('CNIC / ID', _instrCnic,
             (v) => setState(() => _instrCnic = v),
-            required: true, color: const Color(0xFFEF4444)),
+            required: true, color: const Color(0xFFEF4444),
+            onBytesChanged: (b) => _instrCnicBytes = b),
         const SizedBox(height: 10),
         _fileUploadRow('CV / Resume', _instrCvFile,
             (v) => setState(() => _instrCvFile = v),
-            required: true, color: const Color(0xFFEF4444)),
+            required: true, color: const Color(0xFFEF4444),
+            onBytesChanged: (b) => _instrCvBytes = b),
         const SizedBox(height: 24),
 
         _sectionHeader('3. Additional Comments', Icons.comment_outlined,
@@ -1215,6 +1298,94 @@ class _WorkWithUsSignupState extends State<WorkWithUsSignup> {
           ),
         );
       }).toList(),
+    );
+  }
+
+  String _fmtTime(TimeOfDay? t) {
+    if (t == null) return '--:-- --';
+    final hour = t.hourOfPeriod == 0 ? 12 : t.hourOfPeriod;
+    final min = t.minute.toString().padLeft(2, '0');
+    final period = t.period == DayPeriod.am ? 'AM' : 'PM';
+    return '$hour:$min $period';
+  }
+
+  Widget _timeRangePicker({
+    required TimeOfDay? fromTime,
+    required TimeOfDay? toTime,
+    required void Function(TimeOfDay) onFromChanged,
+    required void Function(TimeOfDay) onToChanged,
+    required TextEditingController ctrl,
+    Color accentColor = AppColors.primaryColor,
+  }) {
+    void updateCtrl(TimeOfDay? f, TimeOfDay? t) {
+      ctrl.text = '${_fmtTime(f)} – ${_fmtTime(t)}';
+    }
+
+    Widget timeBtn(String label, TimeOfDay? time, TimeOfDay defaultTime,
+        void Function(TimeOfDay) onChanged) {
+      final picked = time != null;
+      return Expanded(
+        child: GestureDetector(
+          onTap: () async {
+            final t = await showTimePicker(
+              context: context,
+              initialTime: time ?? defaultTime,
+            );
+            if (t != null) {
+              onChanged(t);
+              updateCtrl(
+                label == 'From' ? t : fromTime,
+                label == 'To' ? t : toTime,
+              );
+            }
+          },
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+            decoration: BoxDecoration(
+              color: picked ? accentColor.withValues(alpha: 0.06) : const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: picked ? accentColor.withValues(alpha: 0.4) : const Color(0xFFE2E8F0),
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.access_time_rounded,
+                    color: picked ? accentColor : const Color(0xFF94A3B8), size: 18),
+                const SizedBox(width: 8),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(label,
+                        style: TextStyle(
+                            fontSize: 10,
+                            color: picked ? accentColor : const Color(0xFF94A3B8),
+                            fontWeight: FontWeight.w600)),
+                    Text(_fmtTime(time),
+                        style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: picked ? accentColor : const Color(0xFF94A3B8))),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Row(
+      children: [
+        timeBtn('From', fromTime, const TimeOfDay(hour: 9, minute: 0),
+            (t) { onFromChanged(t); setState(() {}); }),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          child: Text('–', style: TextStyle(fontSize: 18, color: Colors.grey[400])),
+        ),
+        timeBtn('To', toTime, const TimeOfDay(hour: 17, minute: 0),
+            (t) { onToChanged(t); setState(() {}); }),
+      ],
     );
   }
 

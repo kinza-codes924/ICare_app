@@ -690,9 +690,32 @@ class _InstructorLmsCoursesScreenState extends State<InstructorLmsCoursesScreen>
                   Text(isPublished ? 'Unpublish' : 'Publish'),
                 ],
               ),
-              onTap: () {
-                // TODO: Implement publish/unpublish
-              },
+              onTap: () => Future.delayed(
+                const Duration(milliseconds: 100),
+                () async {
+                  final courseId = course['_id']?.toString() ?? '';
+                  if (courseId.isEmpty) return;
+                  try {
+                    if (isPublished) {
+                      await _lmsService.unpublishCourse(courseId);
+                    } else {
+                      await _lmsService.publishCourse(courseId);
+                    }
+                    _loadCourses();
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Course ${isPublished ? 'unpublished' : 'published'} successfully')),
+                      );
+                    }
+                  } catch (e) {
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Error: ${e.toString()}')),
+                      );
+                    }
+                  }
+                },
+              ),
             ),
             const PopupMenuDivider(),
             PopupMenuItem(

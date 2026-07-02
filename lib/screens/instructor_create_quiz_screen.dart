@@ -596,6 +596,7 @@ class _QuestionDialogState extends State<_QuestionDialog> {
   String? _documentName;
   bool _uploadingVideo = false;
   bool _uploadingDoc = false;
+  bool _uploadingImage = false; // for clinical_scenario image upload
 
   List<String> get _options => _optionControllers.map((c) => c.text).toList();
 
@@ -633,6 +634,29 @@ class _QuestionDialogState extends State<_QuestionDialog> {
       if (mounted) setState(() { _videoFileUrl = url; _uploadingVideo = false; });
     } catch (e) {
       if (mounted) { setState(() => _uploadingVideo = false); ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Upload failed: $e'), backgroundColor: Colors.red)); }
+    }
+  }
+
+  Future<void> _pickImage() async {
+    try {
+      final result = await FilePicker.platform.pickFiles(type: FileType.image, withData: true);
+      if (result == null || result.files.isEmpty || result.files.first.bytes == null) return;
+      final file = result.files.first;
+      setState(() => _uploadingImage = true);
+      final url = await _cloudinaryUpload(file.bytes!, file.name, 'icare/quiz/images', 'image');
+      if (mounted && url != null) {
+        setState(() {
+          _uploadingImage = false;
+          _optionControllers[0].text = url;
+        });
+      } else if (mounted) {
+        setState(() => _uploadingImage = false);
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _uploadingImage = false);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Image upload failed: $e'), backgroundColor: Colors.red));
+      }
     }
   }
 
@@ -809,21 +833,60 @@ class _QuestionDialogState extends State<_QuestionDialog> {
                   onChanged: (value) => _correctAnswer = value,
                 ),
               ] else if (_type == 'clinical_scenario') ...[
+                // Image URL field
                 TextField(
-                  controller: TextEditingController(text: _options.isNotEmpty ? _options[0] : ''),
+                  controller: _optionControllers[0],
                   decoration: const InputDecoration(
                     labelText: 'Image URL (Clinical Scenario)',
                     hintText: 'https://example.com/xray.jpg',
                     border: OutlineInputBorder(),
                     prefixIcon: Icon(Icons.image_outlined),
                   ),
-                  onChanged: (value) {
-                    if (_options.isEmpty) {
-                      _options.add(value);
-                    } else {
-                      _options[0] = value;
-                    }
-                  },
+                ),
+                const SizedBox(height: 8),
+                // Upload image button
+                GestureDetector(
+                  onTap: _uploadingImage ? null : _pickImage,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: _optionControllers[0].text.isNotEmpty
+                          ? Colors.green.withValues(alpha: 0.06)
+                          : const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: _optionControllers[0].text.isNotEmpty
+                            ? Colors.green.withValues(alpha: 0.3)
+                            : const Color(0xFFE2E8F0),
+                      ),
+                    ),
+                    child: Row(children: [
+                      Icon(Icons.upload_rounded,
+                          color: _optionControllers[0].text.isNotEmpty ? Colors.green : const Color(0xFF64748B),
+                          size: 20),
+                      const SizedBox(width: 10),
+                      Expanded(child: Text(
+                        _optionControllers[0].text.isNotEmpty
+                            ? 'Image uploaded — tap to replace'
+                            : 'Upload image from device (jpg, png)',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: _optionControllers[0].text.isNotEmpty
+                              ? Colors.green
+                              : const Color(0xFF94A3B8),
+                        ),
+                      )),
+                      if (_uploadingImage)
+                        const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                      else if (_optionControllers[0].text.isNotEmpty)
+                        GestureDetector(
+                          onTap: () => setState(() => _optionControllers[0].clear()),
+                          child: const Icon(Icons.close_rounded, size: 16, color: Colors.red),
+                        )
+                      else
+                        const Icon(Icons.add_circle_outline_rounded, color: Color(0xFF64748B), size: 18),
+                    ]),
+                  ),
                 ),
                 const SizedBox(height: 12),
                 TextField(

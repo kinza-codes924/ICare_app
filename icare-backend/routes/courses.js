@@ -7,6 +7,7 @@ const Course = require('../models/Course');
 const Enrollment = require('../models/Enrollment');
 const Assignment = require('../models/Assignment');
 const AssignmentSubmission = require('../models/AssignmentSubmission');
+const { sendEmail } = require('../utils/email');
 
 function toId(id) {
   try { return new mongoose.Types.ObjectId(id); } catch { return null; }
@@ -488,24 +489,29 @@ router.post('/:id/invite-teacher', authMiddleware, async (req, res) => {
     }).catch(() => {});
 
     // Email the invited teacher
-    try {
-      const nodemailer = require('nodemailer');
-      const transporter = nodemailer.createTransport({
-        service: 'Gmail',
-        auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS },
-      });
-      await transporter.sendMail({
-        from: `"iCare LMS" <${process.env.EMAIL_USER}>`,
-        to: invitedUser.email,
-        subject: `You're invited to teach on iCare: ${course.title}`,
-        html: `<p>Hi ${invitedUser.name || 'there'},</p>
-               <p><b>${inviter?.name || 'An instructor'}</b> has invited you as <b>${teacherRole === 'lead' ? 'Lead' : 'Normal'} Instructor</b> for the course <b>"${course.title}"</b> on iCare LMS.</p>
-               <p>Log in to your iCare account to accept and start teaching.</p>
-               <p>— iCare Team</p>`,
-      });
-    } catch (_) {}
+    sendEmail({
+      to: invitedUser.email,
+      subject: `You're invited to co-teach on iCare: ${course.title}`,
+      html: `<p>Hi ${invitedUser.name || 'there'},</p>
+             <p><b>${inviter?.name || 'An instructor'}</b> has invited you as <b>${teacherRole === 'lead' ? 'Lead' : 'Co'}-Teacher</b> for the course <b>"${course.title}"</b> on iCare LMS.</p>
+             <p>Log in to your iCare instructor account — the course will now appear in your <b>My Courses</b> list.</p>
+             <p>— iCare Team</p>`,
+    }).catch(e => console.error('Co-teacher invite email failed:', e.message));
 
     res.json({ success: true, message: `Invitation sent to ${invitedUser.name || email}` });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+// DELETE /courses/:id/co-teacher/:userId — remove a co-teacher
+router.delete('/:id/co-teacher/:userId', authMiddleware, async (req, res) => {
+  try {
+    await connectMongoDB();
+    await Course.findByIdAndUpdate(toId(req.params.id), {
+      $pull: { coTeachers: { userId: toId(req.params.userId) } },
+    });
+    res.json({ success: true });
   } catch (e) {
     res.status(500).json({ success: false, message: e.message });
   }

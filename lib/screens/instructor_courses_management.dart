@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:icare/models/course.dart';
+import 'package:icare/screens/doctor_notifications.dart';
 import 'package:icare/screens/instructor_create_course.dart';
 import 'package:icare/screens/lms_course_page.dart';
 import 'package:icare/services/instructor_service.dart';
@@ -164,6 +165,13 @@ class _InstructorCoursesManagementScreenState
             fontWeight: FontWeight.w800,
           ),
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.notifications_outlined, color: Color(0xFF0F172A)),
+            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const DoctorNotifications())),
+            tooltip: 'Notifications',
+          ),
+        ],
       ),
       drawer: const InstructorSidebar(currentRoute: 'programs'),
       floatingActionButton: FloatingActionButton.extended(

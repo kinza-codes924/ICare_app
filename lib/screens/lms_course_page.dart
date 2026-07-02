@@ -1,10 +1,16 @@
+import 'dart:typed_data';
+import 'package:dio/dio.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:icare/services/lms_service.dart';
+import 'package:icare/utils/api_constants.dart';
 import 'package:icare/utils/shared_pref.dart';
 import 'package:icare/utils/theme.dart';
+import 'package:icare/widgets/attachment_viewer.dart';
 import 'package:icare/widgets/back_button.dart';
 import 'package:icare/screens/lesson_detail_page.dart';
 import 'package:icare/screens/certificate_templates_screen.dart';
+import 'package:icare/screens/assignment_submit_screen.dart';
 import 'package:icare/screens/quiz_take_screen.dart';
 import 'package:icare/widgets/video_player_widget.dart';
 import 'package:intl/intl.dart';
@@ -30,11 +36,18 @@ class _LmsCoursePageState extends State<LmsCoursePage> with SingleTickerProvider
   final LmsService _lms = LmsService();
   String get _courseId => widget.course['_id']?.toString() ?? '';
   String get _courseName => widget.course['title'] ?? 'Course';
+  int _attendanceRefreshKey = 0;
 
   @override
   void initState() {
     super.initState();
     _tabs = TabController(length: 6, vsync: this);
+    // Refresh attendance tab every time it becomes the active tab
+    _tabs.addListener(() {
+      if (_tabs.index == 4 && !_tabs.indexIsChanging) {
+        setState(() => _attendanceRefreshKey++);
+      }
+    });
   }
 
   @override
@@ -98,7 +111,7 @@ class _LmsCoursePageState extends State<LmsCoursePage> with SingleTickerProvider
             _ClassworkTab(courseId: _courseId, lms: _lms, isInstructor: widget.isInstructor, course: widget.course, enrollmentId: widget.enrollmentId),
             _GradesTab(courseId: _courseId, lms: _lms, isInstructor: widget.isInstructor, course: widget.course, enrollmentId: widget.enrollmentId),
             _PeopleTab(courseId: _courseId, lms: _lms, course: widget.course, isInstructor: widget.isInstructor),
-            _AttendanceTab(courseId: _courseId, lms: _lms, isInstructor: widget.isInstructor),
+            _AttendanceTab(key: ValueKey(_attendanceRefreshKey), courseId: _courseId, lms: _lms, isInstructor: widget.isInstructor),
             _RecordingsTab(courseId: _courseId, lms: _lms),
           ],
         ),
@@ -301,11 +314,24 @@ class _ClassworkTabState extends State<_ClassworkTab> {
     ]);
     if (mounted) {
       setState(() {
-      _assignments = results[0];
-      _quizzes = results[1];
-      _loading = false;
-    });
+        _assignments = results[0];
+        _quizzes = results[1];
+        _loading = false;
+      });
     }
+  }
+
+  Future<String?> _blobUpload(Uint8List bytes, String filename) async {
+    final token = await SharedPref().getToken() ?? '';
+    final res = await Dio().post(
+      '${ApiConstants.baseUrl}/upload/blob-doc',
+      data: FormData.fromMap({'file': MultipartFile.fromBytes(bytes, filename: filename)}),
+      options: Options(headers: {'Authorization': 'Bearer $token'}, validateStatus: (s) => s != null && s < 600),
+    );
+    if (res.statusCode == 200 && res.data['success'] == true && res.data['url'] != null) {
+      return res.data['url'] as String;
+    }
+    return null;
   }
 
   void _showCreateDialog() {
@@ -313,6 +339,9 @@ class _ClassworkTabState extends State<_ClassworkTab> {
     final descCtrl  = TextEditingController();
     final marksCtrl = TextEditingController(text: '100');
     DateTime? dueDate;
+    String? attachmentUrl;
+    String? attachmentName;
+    bool uploading = false;
 
     showDialog(context: context, builder: (ctx) => StatefulBuilder(
       builder: (ctx, setLocal) => AlertDialog(
@@ -333,12 +362,55 @@ class _ClassworkTabState extends State<_ClassworkTab> {
               if (d != null) setLocal(() => dueDate = d);
             },
           ),
+          const SizedBox(height: 8),
+          if (uploading)
+            const Padding(padding: EdgeInsets.symmetric(vertical: 8), child: Row(children: [
+              SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
+              SizedBox(width: 8),
+              Text('Uploading...', style: TextStyle(fontSize: 13, color: Color(0xFF64748B))),
+            ]))
+          else if (attachmentName != null)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              decoration: BoxDecoration(color: Colors.green.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.green.withValues(alpha: 0.3))),
+              child: Row(children: [
+                const Icon(Icons.attach_file_rounded, color: Colors.green, size: 16),
+                const SizedBox(width: 6),
+                Expanded(child: Text(attachmentName!, style: const TextStyle(fontSize: 12, color: Colors.green), maxLines: 1, overflow: TextOverflow.ellipsis)),
+                GestureDetector(
+                  onTap: () => setLocal(() { attachmentUrl = null; attachmentName = null; }),
+                  child: const Icon(Icons.close, size: 16, color: Colors.green),
+                ),
+              ]),
+            )
+          else
+            OutlinedButton.icon(
+              icon: const Icon(Icons.attach_file_rounded, size: 16),
+              label: const Text('Attach Document (optional)'),
+              onPressed: () async {
+                final result = await FilePicker.platform.pickFiles(
+                  type: FileType.custom,
+                  allowedExtensions: ['pdf', 'doc', 'docx', 'ppt', 'pptx', 'xls', 'xlsx', 'png', 'jpg', 'jpeg', 'mp4'],
+                  withData: true,
+                );
+                if (result == null || result.files.isEmpty) return;
+                final file = result.files.first;
+                if (file.bytes == null) return;
+                setLocal(() => uploading = true);
+                final url = await _blobUpload(file.bytes!, file.name);
+                setLocal(() { uploading = false; attachmentUrl = url; attachmentName = url != null ? file.name : null; });
+                if (url == null && ctx.mounted) {
+                  ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(content: Text('Upload failed'), backgroundColor: Colors.red));
+                }
+              },
+            ),
         ])),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryColor, foregroundColor: Colors.white),
-            onPressed: () async {
+            onPressed: uploading ? null : () async {
               if (titleCtrl.text.trim().isEmpty) return;
               Navigator.pop(ctx);
               await widget.lms.createAssignment({
@@ -347,6 +419,8 @@ class _ClassworkTabState extends State<_ClassworkTab> {
                 'description': descCtrl.text.trim(),
                 if (dueDate != null) 'dueDate': dueDate!.toIso8601String(),
                 'totalMarks': int.tryParse(marksCtrl.text) ?? 100,
+                if (attachmentUrl != null) 'attachmentUrl': attachmentUrl,
+                if (attachmentName != null) 'attachmentName': attachmentName,
               });
               _load();
             },
@@ -389,6 +463,8 @@ class _ClassworkTabState extends State<_ClassworkTab> {
               lms: widget.lms,
               isInstructor: widget.isInstructor,
               onRefresh: _load,
+              courseId: widget.courseId,
+              enrollmentId: widget.enrollmentId,
             )),
             const SizedBox(height: 24),
             _SectionHeader(title: 'Quizzes', icon: Icons.quiz_outlined),
@@ -401,6 +477,7 @@ class _ClassworkTabState extends State<_ClassworkTab> {
               lms: widget.lms,
               enrollmentId: widget.enrollmentId,
               isInstructor: widget.isInstructor,
+              onRefresh: _load,
             )),
           ],
         ),
@@ -629,7 +706,8 @@ class _QuizCard extends StatelessWidget {
   final LmsService lms;
   final String? enrollmentId;
   final bool isInstructor;
-  const _QuizCard({required this.quiz, required this.lms, this.enrollmentId, required this.isInstructor});
+  final VoidCallback? onRefresh;
+  const _QuizCard({required this.quiz, required this.lms, this.enrollmentId, required this.isInstructor, this.onRefresh});
 
   @override
   Widget build(BuildContext context) {
@@ -670,7 +748,37 @@ class _QuizCard extends StatelessWidget {
           ]),
         ]),
         trailing: isInstructor
-            ? const Icon(Icons.visibility_outlined, color: Colors.grey, size: 20)
+            ? PopupMenuButton<String>(
+                icon: const Icon(Icons.more_vert, color: Color(0xFF64748B)),
+                onSelected: (val) async {
+                  if (val == 'delete') {
+                    final confirm = await showDialog<bool>(context: context,
+                      builder: (_) => AlertDialog(
+                        title: const Text('Delete Quiz'),
+                        content: Text('Delete "${quiz['title']}"? This cannot be undone.'),
+                        actions: [
+                          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+                          ElevatedButton(
+                            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+                            onPressed: () => Navigator.pop(context, true),
+                            child: const Text('Delete'),
+                          ),
+                        ],
+                      ));
+                    if (confirm == true) {
+                      await lms.deleteQuiz(quiz['_id'].toString());
+                      onRefresh?.call();
+                    }
+                  }
+                },
+                itemBuilder: (_) => [
+                  const PopupMenuItem(value: 'delete', child: Row(children: [
+                    Icon(Icons.delete_outline_rounded, color: Colors.red, size: 18),
+                    SizedBox(width: 8),
+                    Text('Delete Quiz', style: TextStyle(color: Colors.red)),
+                  ])),
+                ],
+              )
             : ElevatedButton(
                 onPressed: () => Navigator.push(context, MaterialPageRoute(
                   builder: (_) => QuizTakeScreen(quiz: _quizMap, enrollmentId: enrollmentId ?? ''),
@@ -696,7 +804,9 @@ class _AssignmentCard extends StatelessWidget {
   final LmsService lms;
   final bool isInstructor;
   final VoidCallback onRefresh;
-  const _AssignmentCard({required this.assignment, required this.lms, required this.isInstructor, required this.onRefresh});
+  final String courseId;
+  final String? enrollmentId;
+  const _AssignmentCard({required this.assignment, required this.lms, required this.isInstructor, required this.onRefresh, required this.courseId, this.enrollmentId});
 
   @override
   Widget build(BuildContext context) {
@@ -733,14 +843,62 @@ class _AssignmentCard extends StatelessWidget {
               ),
             ],
           ]),
+          if (assignment['attachmentUrl'] != null && assignment['attachmentUrl'].toString().isNotEmpty) ...[
+            const SizedBox(height: 8),
+            AttachmentViewer(
+              url: assignment['attachmentUrl'].toString(),
+              name: assignment['attachmentName']?.toString() ?? 'Attachment',
+              label: 'Tap to view',
+            ),
+          ],
         ]),
         trailing: isInstructor
-            ? TextButton(
-                onPressed: () => _showSubmissions(context),
-                child: const Text('Submissions'),
+            ? PopupMenuButton<String>(
+                icon: const Icon(Icons.more_vert, color: Color(0xFF64748B)),
+                onSelected: (val) async {
+                  if (val == 'submissions') {
+                    _showSubmissions(context);
+                  } else if (val == 'delete') {
+                    final confirm = await showDialog<bool>(context: context,
+                      builder: (_) => AlertDialog(
+                        title: const Text('Delete Assignment'),
+                        content: Text('Delete "${assignment['title']}"? All submissions will also be deleted.'),
+                        actions: [
+                          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+                          ElevatedButton(
+                            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+                            onPressed: () => Navigator.pop(context, true),
+                            child: const Text('Delete'),
+                          ),
+                        ],
+                      ));
+                    if (confirm == true) {
+                      await lms.deleteAssignment(assignment['_id'].toString());
+                      onRefresh();
+                    }
+                  }
+                },
+                itemBuilder: (_) => [
+                  const PopupMenuItem(value: 'submissions', child: Row(children: [
+                    Icon(Icons.assignment_turned_in_outlined, color: Color(0xFF334155), size: 18),
+                    SizedBox(width: 8),
+                    Text('View Submissions'),
+                  ])),
+                  const PopupMenuItem(value: 'delete', child: Row(children: [
+                    Icon(Icons.delete_outline_rounded, color: Colors.red, size: 18),
+                    SizedBox(width: 8),
+                    Text('Delete', style: TextStyle(color: Colors.red)),
+                  ])),
+                ],
               )
             : ElevatedButton(
-                onPressed: () => _showSubmitDialog(context),
+                onPressed: () => Navigator.push(context, MaterialPageRoute(
+                  builder: (_) => AssignmentSubmitScreen(
+                    assignment: Map<String, dynamic>.from(assignment as Map),
+                    courseId: courseId,
+                    enrollmentId: enrollmentId,
+                  ),
+                )),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primaryColor, foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -751,32 +909,6 @@ class _AssignmentCard extends StatelessWidget {
               ),
       ),
     );
-  }
-
-  void _showSubmitDialog(BuildContext context) {
-    final ctrl = TextEditingController();
-    showDialog(context: context, builder: (ctx) => AlertDialog(
-      title: Text('Submit: ${assignment['title']}'),
-      content: TextField(controller: ctrl, maxLines: 5,
-        decoration: const InputDecoration(labelText: 'Your answer / notes', border: OutlineInputBorder())),
-      actions: [
-        TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-        ElevatedButton(
-          style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryColor, foregroundColor: Colors.white),
-          onPressed: () async {
-            Navigator.pop(ctx);
-            final result = await lms.submitAssignment(assignmentId: assignment['_id'], content: ctrl.text.trim());
-            if (context.mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                content: Text(result['success'] == true ? 'Submitted successfully!' : (result['message'] ?? 'Failed')),
-                backgroundColor: result['success'] == true ? Colors.green : Colors.red,
-              ));
-            }
-          },
-          child: const Text('Submit'),
-        ),
-      ],
-    ));
   }
 
   void _showSubmissions(BuildContext context) {
@@ -1501,7 +1633,7 @@ class _AttendanceTab extends StatefulWidget {
   final String courseId;
   final LmsService lms;
   final bool isInstructor;
-  const _AttendanceTab({required this.courseId, required this.lms, required this.isInstructor});
+  const _AttendanceTab({super.key, required this.courseId, required this.lms, required this.isInstructor});
 
   @override
   State<_AttendanceTab> createState() => _AttendanceTabState();
@@ -1545,11 +1677,25 @@ class _AttendanceTabState extends State<_AttendanceTab> {
       return const Center(child: CircularProgressIndicator());
     }
 
-    if (widget.isInstructor) {
-      return _buildInstructorView();
-    } else {
-      return _buildStudentView();
-    }
+    return Stack(children: [
+      RefreshIndicator(
+        onRefresh: _loadAttendance,
+        child: widget.isInstructor ? _buildInstructorView() : _buildStudentView(),
+      ),
+      Positioned(
+        top: 8, right: 8,
+        child: IconButton(
+          icon: const Icon(Icons.refresh_rounded),
+          tooltip: 'Refresh attendance',
+          onPressed: _loadAttendance,
+          style: IconButton.styleFrom(
+            backgroundColor: Colors.white,
+            foregroundColor: const Color(0xFF0B2D6E),
+            elevation: 2,
+          ),
+        ),
+      ),
+    ]);
   }
 
   Widget _buildStudentView() {
@@ -1604,48 +1750,52 @@ class _AttendanceTabState extends State<_AttendanceTab> {
                   border: Border.all(color: isPresent ? Colors.green.withValues(alpha: 0.3) : Colors.red.withValues(alpha: 0.3)),
                   boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 6)],
                 ),
-                child: Row(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: isPresent ? Colors.green.withValues(alpha: 0.1) : Colors.red.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(10),
+                    Row(children: [
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: isPresent ? Colors.green.withValues(alpha: 0.1) : Colors.red.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Icon(
+                          isPresent ? Icons.check_circle : Icons.cancel,
+                          color: isPresent ? Colors.green : Colors.red,
+                          size: 24,
+                        ),
                       ),
-                      child: Icon(
-                        isPresent ? Icons.check_circle : Icons.cancel,
-                        color: isPresent ? Colors.green : Colors.red,
-                        size: 24,
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              record['sessionTitle'] ?? 'Class Session',
+                              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              _formatDate(record['sessionDate']),
+                              style: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            record['sessionTitle'] ?? 'Class Session',
-                            style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            _formatDate(record['sessionDate']),
-                            style: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
-                          ),
-                        ],
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: status == 'present' ? Colors.green : status == 'late' ? Colors.orange : Colors.red,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          status == 'present' ? 'Present' : status == 'late' ? 'Late' : 'Absent',
+                          style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700),
+                        ),
                       ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: status == 'present' ? Colors.green : status == 'late' ? Colors.orange : Colors.red,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        status == 'present' ? 'Present' : status == 'late' ? 'Late' : 'Absent',
-                        style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700),
-                      ),
-                    ),
+                    ]),
+                    if (isPresent) _buildTimestampRow(record),
                   ],
                 ),
               );
@@ -1654,6 +1804,61 @@ class _AttendanceTabState extends State<_AttendanceTab> {
         ),
       ],
     );
+  }
+
+  Widget _buildTimestampRow(Map record) {
+    String? fmtTime(dynamic iso) {
+      if (iso == null) return null;
+      try {
+        final dt = DateTime.parse(iso.toString()).toLocal();
+        final h = dt.hour % 12 == 0 ? 12 : dt.hour % 12;
+        final m = dt.minute.toString().padLeft(2, '0');
+        final period = dt.hour < 12 ? 'AM' : 'PM';
+        return '$h:$m $period';
+      } catch (_) { return null; }
+    }
+    final joined = fmtTime(record['joinedAt']);
+    final left   = fmtTime(record['leftAt']);
+    final mins   = record['durationMinutes'];
+    if (joined == null && left == null && mins == null) return const SizedBox.shrink();
+
+    return Container(
+      margin: const EdgeInsets.only(top: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFF10B981).withValues(alpha: 0.07),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.2)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(children: [
+            const Icon(Icons.schedule_rounded, size: 12, color: Color(0xFF10B981)),
+            const SizedBox(width: 4),
+            const Text('Session Activity', style: TextStyle(fontSize: 11, color: Color(0xFF10B981), fontWeight: FontWeight.w700)),
+          ]),
+          const SizedBox(height: 6),
+          Wrap(spacing: 16, runSpacing: 4, children: [
+            if (joined != null)
+              _tsBit(Icons.login_rounded, 'Joined', joined),
+            if (left != null)
+              _tsBit(Icons.logout_rounded, 'Left', left),
+            if (mins != null)
+              _tsBit(Icons.timer_outlined, 'Duration', '$mins min'),
+          ]),
+        ],
+      ),
+    );
+  }
+
+  Widget _tsBit(IconData icon, String label, String value) {
+    return Row(mainAxisSize: MainAxisSize.min, children: [
+      Icon(icon, size: 11, color: const Color(0xFF059669)),
+      const SizedBox(width: 3),
+      Text('$label: ', style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8))),
+      Text(value, style: const TextStyle(fontSize: 11, color: Color(0xFF0F172A), fontWeight: FontWeight.w700)),
+    ]);
   }
 
   Widget _buildStatCard(String label, String value, IconData icon) {
@@ -2198,7 +2403,23 @@ class _RecordingsTabState extends State<_RecordingsTab> {
           foregroundColor: Colors.white,
           title: const Text('Recording', style: TextStyle(color: Colors.white)),
         ),
-        body: Center(child: VideoPlayerWidget(videoUrl: url)),
+        body: Column(children: [
+          Expanded(child: Center(child: VideoPlayerWidget(videoUrl: url))),
+          Container(
+            color: const Color(0xFF111827),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            child: Row(children: [
+              const Icon(Icons.volume_up_rounded, color: Colors.white54, size: 16),
+              const SizedBox(width: 8),
+              const Expanded(
+                child: Text(
+                  'If audio is muted, click the volume icon inside the video player.',
+                  style: TextStyle(color: Colors.white54, fontSize: 12),
+                ),
+              ),
+            ]),
+          ),
+        ]),
       ),
     ));
   }

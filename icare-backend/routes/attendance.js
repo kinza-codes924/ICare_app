@@ -51,10 +51,13 @@ router.get('/course/:courseId/my', authMiddleware, async (req, res) => {
     const result = sessions.map(s => {
       const rec = s.records.find(r => r.studentId?.toString() === studentId);
       return {
-        sessionId:    s._id,
-        sessionTitle: s.sessionTitle,
-        sessionDate:  s.sessionDate,
-        status:       rec?.status || 'absent',
+        sessionId:       s._id,
+        sessionTitle:    s.sessionTitle,
+        sessionDate:     s.sessionDate,
+        status:          rec?.status || 'absent',
+        joinedAt:        rec?.joinedAt  ?? null,
+        leftAt:          rec?.leftAt    ?? null,
+        durationMinutes: rec?.durationMinutes ?? null,
       };
     });
     const total   = result.length;
@@ -87,7 +90,12 @@ router.get('/course/:courseId/report', authMiddleware, async (req, res) => {
         if (status === 'present') present++;
         else if (status === 'late') late++;
         else absent++;
-        return { sessionId: s._id, sessionTitle: s.sessionTitle, sessionDate: s.sessionDate, status };
+        return {
+          sessionId: s._id, sessionTitle: s.sessionTitle, sessionDate: s.sessionDate, status,
+          joinedAt: rec?.joinedAt ?? null,
+          leftAt: rec?.leftAt ?? null,
+          durationMinutes: rec?.durationMinutes ?? null,
+        };
       });
       const total = sessions.length;
       const pct = total ? Math.round(((present + late * 0.5) / total) * 100) : 0;

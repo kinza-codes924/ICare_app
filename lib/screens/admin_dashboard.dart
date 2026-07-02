@@ -5,6 +5,7 @@ import 'package:icare/services/api_service.dart';
 import 'package:icare/services/medical_record_service.dart';
 import 'package:icare/utils/theme.dart';
 import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class AdminDashboard extends ConsumerStatefulWidget {
   final String initialTab;
@@ -624,20 +625,90 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
                           }
                           addRow(Icons.comment_outlined, 'Comments', vd['comments']);
 
-                          if (rows.isEmpty) return const SizedBox.shrink();
-                          return Container(
-                            margin: const EdgeInsets.only(top: 12),
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: Colors.indigo.shade50,
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: Colors.indigo.shade100),
-                            ),
-                            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                              const Text('Registration Details', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Color(0xFF3B4DA8))),
-                              const SizedBox(height: 8),
-                              ...rows,
-                            ]),
+                          // Collect documents
+                          final docEntries = <Map<String, String>>[];
+                          void addDoc(String label, String? dataKey, String? nameKey) {
+                            final data = vd[dataKey]?.toString() ?? '';
+                            if (data.isEmpty) return;
+                            docEntries.add({'label': label, 'data': data, 'name': vd[nameKey]?.toString() ?? label});
+                          }
+                          addDoc('CNIC / ID', 'cnicDocument', 'cnicDocumentName');
+                          addDoc('PMDC Certificate', 'pmdcCertDocument', 'pmdcCertDocumentName');
+                          addDoc('Experience Certificate', 'experienceCertDocument', 'experienceCertDocumentName');
+                          addDoc('Drug License', 'drugLicenseDocument', 'drugLicenseDocumentName');
+                          addDoc('Registration Certificate', 'regCertDocument', 'regCertDocumentName');
+                          addDoc('Lab License', 'labLicenseDocument', 'labLicenseDocumentName');
+                          addDoc('Accreditation Certificate', 'accredCertDocument', 'accredCertDocumentName');
+                          addDoc('Tests List', 'testsListDocument', 'testsListDocumentName');
+                          addDoc('Student ID', 'studentIdDocument', 'studentIdDocumentName');
+                          addDoc('CV / Resume', 'cvDocument', 'cvDocumentName');
+
+                          if (rows.isEmpty && docEntries.isEmpty) return const SizedBox.shrink();
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              if (rows.isNotEmpty)
+                                Container(
+                                  margin: const EdgeInsets.only(top: 12),
+                                  padding: const EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
+                                    color: Colors.indigo.shade50,
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(color: Colors.indigo.shade100),
+                                  ),
+                                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                                    const Text('Registration Details', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Color(0xFF3B4DA8))),
+                                    const SizedBox(height: 8),
+                                    ...rows,
+                                  ]),
+                                ),
+                              if (docEntries.isNotEmpty) ...[
+                                const SizedBox(height: 10),
+                                Container(
+                                  padding: const EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
+                                    color: Colors.orange.shade50,
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(color: Colors.orange.shade100),
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      const Text('Submitted Documents', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Color(0xFFB45309))),
+                                      const SizedBox(height: 8),
+                                      Wrap(
+                                        spacing: 8, runSpacing: 8,
+                                        children: docEntries.map((doc) => GestureDetector(
+                                          onTap: () async {
+                                            try {
+                                              await launchUrl(Uri.parse(doc['data']!), mode: LaunchMode.externalApplication);
+                                            } catch (_) {}
+                                          },
+                                          child: Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                            decoration: BoxDecoration(
+                                              color: Colors.white,
+                                              borderRadius: BorderRadius.circular(8),
+                                              border: Border.all(color: Colors.orange.shade200),
+                                            ),
+                                            child: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                const Icon(Icons.insert_drive_file_outlined, size: 14, color: Color(0xFFB45309)),
+                                                const SizedBox(width: 5),
+                                                Text(doc['label']!, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFFB45309))),
+                                                const SizedBox(width: 4),
+                                                const Icon(Icons.open_in_new_rounded, size: 11, color: Color(0xFFB45309)),
+                                              ],
+                                            ),
+                                          ),
+                                        )).toList(),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ],
                           );
                         }),
                         if (_currentTab == 'Pending') ...[

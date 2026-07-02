@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:icare/services/api_service.dart';
 import 'package:icare/utils/theme.dart';
 import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 /// Admin Panel
 ///
@@ -766,12 +767,21 @@ class _AdminPanelScreenState extends ConsumerState<AdminPanelScreen>
           final status = c['status']?.toString() ?? 'pending';
           final Color statusColor = status == 'verified' ? Colors.green : status == 'rejected' ? Colors.red : const Color(0xFFF59E0B);
 
-          return Container(
+          final docUrl = c['documentUrl']?.toString() ?? '';
+          final hasDoc = docUrl.isNotEmpty;
+          return GestureDetector(
+            onTap: hasDoc ? () async {
+              final uri = Uri.tryParse(docUrl);
+              if (uri != null && await canLaunchUrl(uri)) {
+                await launchUrl(uri, mode: LaunchMode.externalApplication);
+              }
+            } : null,
+            child: Container(
             margin: const EdgeInsets.only(bottom: 14),
             padding: const EdgeInsets.all(18),
             decoration: BoxDecoration(
               color: Colors.white, borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: statusColor.withValues(alpha: 0.2)),
+              border: Border.all(color: hasDoc ? statusColor.withValues(alpha: 0.3) : statusColor.withValues(alpha: 0.2)),
               boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 10, offset: const Offset(0, 3))],
             ),
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -789,6 +799,39 @@ class _AdminPanelScreenState extends ConsumerState<AdminPanelScreen>
                   child: Text(status == 'pending' ? 'UNVERIFIED' : status.toUpperCase(), style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: statusColor)),
                 ),
               ]),
+              const SizedBox(height: 10),
+              GestureDetector(
+                onTap: hasDoc ? () async {
+                  final uri = Uri.tryParse(docUrl);
+                  if (uri != null && await canLaunchUrl(uri)) {
+                    await launchUrl(uri, mode: LaunchMode.externalApplication);
+                  }
+                } : () {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('No document attached to this certificate.'), duration: Duration(seconds: 2)),
+                  );
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: hasDoc ? const Color(0xFF3B82F6).withValues(alpha: 0.07) : Colors.grey.withValues(alpha: 0.07),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: hasDoc ? const Color(0xFF3B82F6).withValues(alpha: 0.25) : Colors.grey.withValues(alpha: 0.25)),
+                  ),
+                  child: Row(mainAxisSize: MainAxisSize.min, children: [
+                    Icon(hasDoc ? Icons.description_outlined : Icons.description_outlined, color: hasDoc ? const Color(0xFF3B82F6) : Colors.grey, size: 16),
+                    const SizedBox(width: 6),
+                    Text('View Certificate', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: hasDoc ? const Color(0xFF3B82F6) : Colors.grey)),
+                    if (hasDoc) ...[
+                      const SizedBox(width: 4),
+                      const Icon(Icons.open_in_new_rounded, color: Color(0xFF3B82F6), size: 13),
+                    ] else ...[
+                      const SizedBox(width: 4),
+                      const Icon(Icons.block_rounded, color: Colors.grey, size: 13),
+                    ],
+                  ]),
+                ),
+              ),
               if (status == 'pending') ...[
                 const SizedBox(height: 14),
                 Row(children: [
@@ -808,6 +851,7 @@ class _AdminPanelScreenState extends ConsumerState<AdminPanelScreen>
                 ]),
               ],
             ]),
+          ),
           );
         },
       ),

@@ -100,8 +100,20 @@ router.get('/my-courses', authMiddleware, async (req, res) => {
     await connectMongoDB();
     const instructorId = toId(req.user.id);
     if (!instructorId) return res.status(400).json({ success: false, message: 'Invalid user id in token' });
-    const courses = await Course.find({ instructor_id: instructorId, is_active: { $ne: false } }).lean();
-    res.json({ success: true, courses, count: courses.length });
+    const courses = await Course.find({
+      is_active: { $ne: false },
+      $or: [
+        { instructor_id: instructorId },
+        { 'coTeachers.userId': instructorId },
+      ],
+    }).lean();
+    // Tag co-taught courses so the frontend can distinguish them
+    const userId = instructorId.toString();
+    const tagged = courses.map(c => ({
+      ...c,
+      isCoTeacher: c.instructor_id?.toString() !== userId,
+    }));
+    res.json({ success: true, courses: tagged, count: tagged.length });
   } catch (e) {
     console.error('GET /my-courses error:', e.message, e.name);
     res.status(500).json({ success: false, message: e.message });

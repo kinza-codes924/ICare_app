@@ -328,10 +328,37 @@ class LmsCertificateScreen extends StatelessWidget {
     );
   }
 
+  /// Stable certificate code — same enrollment always gets the same code,
+  /// so the QR on a re-downloaded PDF still verifies.
+  String get _certId {
+    final base = (enrollmentId != null && enrollmentId!.isNotEmpty)
+        ? enrollmentId!
+        : '${courseId ?? 'ICARE'}-${studentName.hashCode.abs()}';
+    return 'CERT-${base.toUpperCase()}';
+  }
+
+  /// Save the certificate code in the backend so /verify?code=... works.
+  Future<void> _registerCertificate() async {
+    try {
+      await ApiService().post('/certificates/register', {
+        'verificationCode': _certId,
+        'enrollmentId': enrollmentId ?? '',
+        'courseId': courseId ?? '',
+        'studentName': studentName,
+        'courseName': courseTitle,
+        'instructorName': instructorName,
+        'completionDate': (completionDate ?? DateTime.now()).toIso8601String(),
+        'template': template.name,
+      });
+    } catch (_) {}
+  }
+
   Future<void> _downloadPdf(BuildContext context) async {
     try {
       final bytes = await _generatePdf();
       await Printing.sharePdf(bytes: bytes, filename: 'certificate_${courseTitle.replaceAll(' ', '_')}.pdf');
+      // Register verification code so the QR on the PDF verifies
+      await _registerCertificate();
       // Mark enrollment as completed in backend (saves to My Certificates)
       if (enrollmentId != null && enrollmentId!.isNotEmpty) {
         try {
@@ -349,6 +376,7 @@ class LmsCertificateScreen extends StatelessWidget {
     try {
       final bytes = await _generatePdf();
       await Printing.layoutPdf(onLayout: (_) async => bytes, name: 'certificate');
+      await _registerCertificate();
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red));
@@ -360,8 +388,8 @@ class LmsCertificateScreen extends StatelessWidget {
     final pdf = pw.Document();
     final date = DateFormat('MMMM dd, yyyy').format(completionDate ?? DateTime.now());
 
-    // Generate unique certificate ID
-    final certId = 'CERT-${DateTime.now().millisecondsSinceEpoch}-${courseId?.substring(0, 6) ?? 'ICARE'}';
+    // Stable certificate ID (registered with backend for QR verification)
+    final certId = _certId;
 
     // Load logos separately — never share the same pw.MemoryImage across positions
     pw.ImageProvider? icareLogoImg;

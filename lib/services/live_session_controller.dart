@@ -35,6 +35,7 @@ class LiveSessionController {
   String currentUserId = '';
   bool isRecording = false;
   int sessionSeconds = 0;
+  bool _isStudent = false;
 
   // ── Callbacks (set by the View) ───────────────────────────────────────────
   VoidCallback? onStateChanged;
@@ -53,6 +54,9 @@ class LiveSessionController {
     _sessionTimer?.cancel();
     _syncTimer?.cancel();
     lmsLeaveChannel();
+    if (_isStudent && sessionDocId.isNotEmpty) {
+      _lms.recordLiveSessionLeave(sessionDocId);
+    }
   }
 
   // ── PUBLIC: Initiate session join with full null-safety ──────────────────
@@ -108,6 +112,7 @@ class LiveSessionController {
 
     try {
       // ── STEP 1: Load user data ────────────────────────────────────────────
+      _isStudent = !isInstructor;
       final user = await SharedPref().getUserData();
       currentUserName =
           user?.name ?? (isInstructor ? 'Instructor' : 'Student');
@@ -119,6 +124,7 @@ class LiveSessionController {
       // ── STEP 3: Join session on backend (registers attendance) ────────────
       if (sessionDocId.isNotEmpty && sessionDocId != courseId) {
         await _lms.joinLiveSession(sessionDocId);
+        if (_isStudent) await _lms.recordLiveSessionJoin(sessionDocId);
       }
 
       // ── STEP 4: REQUEST BROWSER MICROPHONE PERMISSION (CRITICAL FIX) ──────
@@ -235,6 +241,9 @@ class LiveSessionController {
     String? moduleId,
   }) async {
     lmsLeaveChannel();
+    if (!isInstructor && sessionDocId.isNotEmpty) {
+      await _lms.recordLiveSessionLeave(sessionDocId);
+    }
 
     if (isInstructor) {
       // Stop recording + upload

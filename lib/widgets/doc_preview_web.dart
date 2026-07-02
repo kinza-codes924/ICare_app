@@ -21,14 +21,12 @@ class _DocPreviewDialogState extends State<DocPreviewDialog> {
     super.initState();
     _viewId = 'doc-preview-${DateTime.now().microsecondsSinceEpoch}';
     ui_web.platformViewRegistry.registerViewFactory(_viewId, (int id) {
-      // Vercel Blob URLs are publicly accessible — use direct iframe so Chrome's
-      // built-in PDF viewer renders them without any proxy or external service.
-      // For Cloudinary/proxy URLs fall back to Google Docs Viewer.
-      final isPublicUrl = widget.proxyUrl.contains('blob.vercel-storage.com') ||
-          (!widget.proxyUrl.contains('cloudinary') && !widget.proxyUrl.contains('doc-stream'));
-      final src = isPublicUrl
-          ? widget.proxyUrl
-          : 'https://docs.google.com/viewer?url=${Uri.encodeComponent(widget.proxyUrl)}&embedded=true';
+      // blob-download proxy and direct URLs → Chrome's built-in PDF viewer (direct iframe).
+      // doc-stream proxy (Cloudinary, unreliable) → Google Docs Viewer as fallback.
+      final useGoogleViewer = widget.proxyUrl.contains('doc-stream');
+      final src = useGoogleViewer
+          ? 'https://docs.google.com/viewer?url=${Uri.encodeComponent(widget.proxyUrl)}&embedded=true'
+          : widget.proxyUrl;
       return html.IFrameElement()
         ..src = src
         ..style.cssText = 'width:100%;height:100%;border:none;background:#f8f9fa;';

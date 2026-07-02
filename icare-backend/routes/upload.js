@@ -3,7 +3,7 @@ const router = express.Router();
 const crypto = require('crypto');
 const multer = require('multer');
 const { v2: cloudinary } = require('cloudinary');
-const { put } = require('@vercel/blob');
+const { put, head } = require('@vercel/blob');
 const { authMiddleware: protect } = require('../middleware/auth');
 
 // Use memory storage — Cloudinary uploads from buffer (Vercel-safe, no disk writes)
@@ -338,7 +338,7 @@ router.post('/blob-doc', protect, docUpload.single('file'), async (req, res) => 
     // @vercel/blob uses OIDC auth automatically when running on Vercel (BLOB_STORE_ID is set).
     // No manual token check needed.
     const blob = await put(blobPath, req.file.buffer, {
-      access: 'public',
+      access: 'private',
       contentType: req.file.mimetype,
       addRandomSuffix: false,
     });
@@ -348,6 +348,66 @@ router.post('/blob-doc', protect, docUpload.single('file'), async (req, res) => 
   } catch (err) {
     console.error('blob-doc error:', err);
     res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// GET /api/upload/blob-download?url=<encoded_blob_url>&token=<jwt>&download=1
+// Streams private Vercel Blob files to the browser.
+// Private blob CDN requires the Vercel OIDC bearer token — we obtain it from
+// process.env.VERCEL_OIDC_TOKEN (auto-injected by Vercel runtime) and attach it
+// to the CDN fetch so the backend can proxy the content to the browser.
+router.get('/blob-download', async (req, res) => {
+  const token = req.query.token;
+  if (!token) return res.status(401).send('Unauthorized');
+  try {
+    const jwt = require('jsonwebtoken');
+    jwt.verify(token, process.env.JWT_SECRET);
+  } catch {
+    return res.status(401).send('Unauthorized');
+  }
+
+  const blobUrl = decodeURIComponent(req.query.url || '');
+  if (!blobUrl) return res.status(400).send('url required');
+
+  try {
+    // head() uses OIDC internally to call the Vercel Blob control plane and returns metadata.
+    const blobInfo = await head(blobUrl);
+
+    // Authenticate the CDN fetch. Try in order:
+    //  1. BLOB_READ_WRITE_TOKEN (static token created in Vercel dashboard → most reliable)
+    //  2. VERCEL_OIDC_TOKEN (auto-injected by Vercel runtime for OIDC-connected stores)
+    const blobToken = process.env.BLOB_READ_WRITE_TOKEN || process.env.VERCEL_OIDC_TOKEN;
+    const fetchUrl = blobInfo.downloadUrl || blobUrl;
+    const fetchHeaders = blobToken ? { 'Authorization': `Bearer ${blobToken}` } : {};
+
+    const fileRes = await fetch(fetchUrl, { headers: fetchHeaders, redirect: 'follow' });
+
+    if (!fileRes.ok) {
+      console.error(`blob-download: CDN fetch status=${fileRes.status} hasBlobToken=${!!blobToken} url=${fetchUrl.slice(0, 80)}`);
+      return res.status(502).json({
+        error: 'Failed to fetch blob from CDN',
+        cdnStatus: fileRes.status,
+        hasBlobToken: !!blobToken,
+        hint: !blobToken ? 'Add BLOB_READ_WRITE_TOKEN to env vars in Vercel dashboard' : 'Token present but CDN rejected it',
+      });
+    }
+
+    const ct = fileRes.headers.get('content-type') || blobInfo.contentType || 'application/octet-stream';
+    const rawName = (blobInfo.pathname || blobUrl).split('/').pop()?.split('?')[0] || 'document';
+    const fileName = decodeURIComponent(rawName);
+    const disposition = req.query.download === '1' ? 'attachment' : 'inline';
+
+    res.setHeader('Content-Type', ct);
+    res.setHeader('Content-Disposition', `${disposition}; filename="${fileName}"`);
+    res.setHeader('Cache-Control', 'private, max-age=300');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+
+    const buf = await fileRes.arrayBuffer();
+    return res.send(Buffer.from(buf));
+
+  } catch (e) {
+    console.error('blob-download error:', e.message);
+    return res.status(500).json({ error: e.message });
   }
 });
 

@@ -47,6 +47,9 @@ const liveSessionSchema = new mongoose.Schema({
   // Instructor heartbeat — updated every 30s while instructor is in session.
   // If older than 90s, session is treated as stale (instructor left without ending).
   instructorHeartbeat: { type: Date, default: null },
+  // Whiteboard
+  whiteboardStrokes: [{ type: mongoose.Schema.Types.Mixed }],
+  whiteboardPermissions: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
 }, { timestamps: true });
 
 module.exports = mongoose.models.LiveSession || mongoose.model('LiveSession', liveSessionSchema);

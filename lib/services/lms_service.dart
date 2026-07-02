@@ -124,6 +124,10 @@ class LmsService {
     await _api.delete('/quizzes/$quizId');
   }
 
+  Future<void> deleteAssignment(String assignmentId) async {
+    await _api.delete('/lms/assignments/$assignmentId');
+  }
+
   // ═══════════════════════════════════════════════════════════════════════
   // ANNOUNCEMENTS (Stream)
   // ═══════════════════════════════════════════════════════════════════════
@@ -557,6 +561,44 @@ class LmsService {
     }
   }
 
+  // ── Whiteboard ──────────────────────────────────────────────────────────────
+
+  Future<Map<String, dynamic>> getWhiteboard(String sessionId) async {
+    try {
+      final response = await _api.get('/live-sessions/$sessionId/whiteboard');
+      return Map<String, dynamic>.from(response.data ?? {});
+    } catch (_) {
+      return {'strokes': [], 'permissions': []};
+    }
+  }
+
+  Future<void> addWhiteboardStroke(String sessionId, Map<String, dynamic> stroke) async {
+    try {
+      await _api.post('/live-sessions/$sessionId/whiteboard/stroke', stroke);
+    } catch (_) {}
+  }
+
+  Future<void> undoWhiteboardStroke(String sessionId) async {
+    try {
+      await _api.delete('/live-sessions/$sessionId/whiteboard/stroke/last');
+    } catch (_) {}
+  }
+
+  Future<void> clearWhiteboard(String sessionId) async {
+    try {
+      await _api.post('/live-sessions/$sessionId/whiteboard/clear', {});
+    } catch (_) {}
+  }
+
+  Future<void> setWhiteboardPermission(String sessionId, String studentId, {required bool grant}) async {
+    try {
+      await _api.put('/live-sessions/$sessionId/whiteboard/permission', {
+        'studentId': studentId,
+        'grant': grant,
+      });
+    } catch (_) {}
+  }
+
   // ═══════════════════════════════════════════════════════════════════════
   // INVITE TEACHER
   // ═══════════════════════════════════════════════════════════════════════
@@ -813,6 +855,15 @@ class LmsService {
     } catch (_) { return []; }
   }
 
+  Future<Map<String, dynamic>> removeCoTeacher({required String courseId, required String userId}) async {
+    try {
+      final response = await _api.delete('/courses/$courseId/co-teacher/$userId');
+      return response.data ?? {'success': true};
+    } catch (e) {
+      return {'success': false, 'message': e.toString()};
+    }
+  }
+
   // ═══════════════════════════════════════════════════════════════════════
   // LIVE SESSION — RESCHEDULE / CANCEL
   // ═══════════════════════════════════════════════════════════════════════
@@ -868,7 +919,7 @@ class LmsService {
   }
 
   Future<Map<String, dynamic>> getInstructorCourses() async {
-    final response = await _api.get('/courses');
+    final response = await _api.get('/instructors/my-courses');
     return {
       'success': true,
       'courses': response.data['courses'] ?? [],
@@ -922,7 +973,8 @@ class LmsService {
   }
 
   Future<List<dynamic>> getMyAssessmentAssignments() async {
-    final response = await _api.get('/assignments/my');
+    // Assignments router is mounted at /api/lms/assignments
+    final response = await _api.get('/lms/assignments/my');
     return response.data['assignments'] ?? [];
   }
 

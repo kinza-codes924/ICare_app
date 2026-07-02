@@ -619,31 +619,6 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
               ],
             ),
           ),
-          // Settings icon bottom-right (like GC)
-          Positioned(
-            right: 16,
-            bottom: 16,
-            child: GestureDetector(
-              onTap: () {
-                if (_courseId.isNotEmpty) {
-                  Clipboard.setData(ClipboardData(text: _courseId));
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                        content: Text('Class code copied!')),
-                  );
-                }
-              },
-              child: Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.15),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Icons.vpn_key_outlined,
-                    color: Colors.white, size: 20),
-              ),
-            ),
-          ),
         ],
       ),
     );
@@ -945,85 +920,135 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header row
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 14, 8, 10),
-            child: Row(
-              children: [
-                // Icon/avatar
-                Container(
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    color: isAnnouncement
-                        ? const Color(0xFF1A73E8)
-                        : const Color(0xFF1E7E34),
-                    shape: BoxShape.circle,
+          // Header row — clickable: opens the related classwork item
+          InkWell(
+            borderRadius: BorderRadius.circular(8),
+            onTap: () => _openFeedItem(item, content),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 14, 8, 10),
+              child: Row(
+                children: [
+                  // Icon/avatar
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: isAnnouncement
+                          ? const Color(0xFF1A73E8)
+                          : const Color(0xFF1E7E34),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      isAnnouncement
+                          ? Icons.campaign_rounded
+                          : Icons.assignment_outlined,
+                      color: Colors.white,
+                      size: 18,
+                    ),
                   ),
-                  child: Icon(
-                    isAnnouncement
-                        ? Icons.campaign_rounded
-                        : Icons.assignment_outlined,
-                    color: Colors.white,
-                    size: 18,
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          content,
+                          style: const TextStyle(
+                              fontSize: 14, color: Color(0xFF202124)),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          dateLabel,
+                          style: const TextStyle(
+                              fontSize: 12, color: Color(0xFF70757A)),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        content,
-                        style: const TextStyle(
-                            fontSize: 14, color: Color(0xFF202124)),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        dateLabel,
-                        style: const TextStyle(
-                            fontSize: 12, color: Color(0xFF70757A)),
-                      ),
-                    ],
-                  ),
-                ),
-                // Three-dot menu
-                PopupMenuButton<String>(
-                  icon: const Icon(Icons.more_vert_rounded,
-                      size: 18, color: Color(0xFF70757A)),
-                  padding: EdgeInsets.zero,
-                  itemBuilder: (_) => [
-                    const PopupMenuItem(
-                        value: 'edit',
-                        child: Text('Edit', style: TextStyle(fontSize: 14))),
-                    const PopupMenuItem(
-                        value: 'delete',
-                        child: Text('Delete', style: TextStyle(fontSize: 14))),
-                    const PopupMenuItem(
-                        value: 'copy',
-                        child: Text('Copy link', style: TextStyle(fontSize: 14))),
-                  ],
-                  onSelected: (val) {
-                    if (!isAnnouncement) return;
-                    final postId = item.data['_id']?.toString() ?? '';
-                    if (val == 'edit') _editAnnouncement(postId, content);
-                    if (val == 'delete') _deleteAnnouncement(postId);
-                  },
-                ),
-              ],
+                  // Three-dot menu — instructor only, announcements only
+                  if (widget.isInstructor && isAnnouncement)
+                    PopupMenuButton<String>(
+                      icon: const Icon(Icons.more_vert_rounded,
+                          size: 18, color: Color(0xFF70757A)),
+                      padding: EdgeInsets.zero,
+                      itemBuilder: (_) => [
+                        const PopupMenuItem(
+                            value: 'edit',
+                            child: Text('Edit', style: TextStyle(fontSize: 14))),
+                        const PopupMenuItem(
+                            value: 'delete',
+                            child: Text('Delete', style: TextStyle(fontSize: 14))),
+                      ],
+                      onSelected: (val) {
+                        final postId = item.data['_id']?.toString() ?? '';
+                        if (val == 'edit') _editAnnouncement(postId, content);
+                        if (val == 'delete') _deleteAnnouncement(postId);
+                      },
+                    ),
+                ],
+              ),
             ),
           ),
-          // Content text
-          if (content.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-              child: Text(content, style: const TextStyle(fontSize: 14, color: Color(0xFF202124))),
-            ),
           // Comments section
           if (isAnnouncement) _buildCommentSection(item),
         ],
       ),
     );
+  }
+
+  /// Open the classwork item a feed card refers to.
+  /// Assignment feed cards open directly; announcement cards that mention a
+  /// posted assignment/quiz are matched by title and opened.
+  void _openFeedItem(_FeedItem item, String content) {
+    if (item.type == _FeedItemType.assignment) {
+      _openItem('assignment', item.data);
+      return;
+    }
+    // Announcement: try to match "posted a new assignment/quiz: <title>"
+    final lower = content.toLowerCase();
+    final match = RegExp(r'(assignment|quiz|session)\s*:\s*(.+)$', caseSensitive: false)
+        .firstMatch(content);
+    if (match != null) {
+      final kind = match.group(1)!.toLowerCase();
+      final title = match.group(2)!.trim().toLowerCase();
+      if (kind == 'assignment') {
+        final found = _assignments.where((a) =>
+            (a['title']?.toString().trim().toLowerCase() ?? '') == title).toList();
+        if (found.isNotEmpty) {
+          _openItem('assignment', found.first);
+          return;
+        }
+      } else if (kind == 'quiz') {
+        final found = _quizzes.where((q) =>
+            (q['title']?.toString().trim().toLowerCase() ?? '') == title).toList();
+        if (found.isNotEmpty) {
+          _openItem('quiz', found.first);
+          return;
+        }
+      } else if (kind == 'session') {
+        final found = _sessions.where((s) =>
+            (s['title']?.toString().trim().toLowerCase() ?? '') == title).toList();
+        if (found.isNotEmpty) {
+          _openItem('session', found.first);
+          return;
+        }
+      }
+    }
+    // Fallback: partial title match against all classwork
+    for (final a in _assignments) {
+      final t = a['title']?.toString().trim().toLowerCase() ?? '';
+      if (t.isNotEmpty && lower.contains(t)) {
+        _openItem('assignment', a);
+        return;
+      }
+    }
+    for (final q in _quizzes) {
+      final t = q['title']?.toString().trim().toLowerCase() ?? '';
+      if (t.isNotEmpty && lower.contains(t)) {
+        _openItem('quiz', q);
+        return;
+      }
+    }
   }
 
   void _editAnnouncement(String postId, String currentContent) {
@@ -1478,6 +1503,10 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
 
   void _openItem(String type, Map data) {
     if (type == 'assignment') {
+      if (widget.isInstructor) {
+        _showClassworkMenu(type, data);
+        return;
+      }
       Navigator.push(
         context,
         MaterialPageRoute(
@@ -1489,6 +1518,10 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
         ),
       );
     } else if (type == 'quiz') {
+      if (widget.isInstructor) {
+        _showClassworkMenu(type, data);
+        return;
+      }
       Navigator.push(
         context,
         MaterialPageRoute(
@@ -1606,6 +1639,20 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
                 subtitle: const Text('Recording was not saved for this session', style: TextStyle(fontSize: 12)),
                 enabled: false,
               ),
+            if (widget.isInstructor && recordingUrl.isNotEmpty)
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(color: const Color(0xFFFFEBEE), shape: BoxShape.circle),
+                  child: const Icon(Icons.delete_outline_rounded, color: Color(0xFFB3261E), size: 22),
+                ),
+                title: const Text('Delete Recording', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: Color(0xFFB3261E))),
+                subtitle: const Text('Permanently remove this recording', style: TextStyle(fontSize: 12)),
+                onTap: () {
+                  Navigator.pop(context);
+                  _deleteRecording(sessionId, title);
+                },
+              ),
             ListTile(
               leading: Container(
                 padding: const EdgeInsets.all(8),
@@ -1624,6 +1671,40 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
         ),
       ),
     );
+  }
+
+  Future<void> _deleteRecording(String sessionId, String title) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Delete Recording?'),
+        content: Text('The recording for "$title" will be permanently removed.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirm != true) return;
+    try {
+      await _lms.updateSession(sessionId, {'recordingUrl': '', 'recordingBlobUrl': ''});
+      _loadClasswork();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Recording deleted'), backgroundColor: Colors.green),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
   }
 
   Future<void> _viewSessionTranscript(String sessionId, String title) async {
@@ -1799,6 +1880,19 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
                   _openVideoPlayer(data['recordingUrl']?.toString() ?? '');
                 },
               ),
+            // Session — Delete Recording (instructor only)
+            if (type == 'session' && widget.isInstructor &&
+                (data['status'] == 'completed' || data['status'] == 'ended') &&
+                (data['recordingUrl']?.toString() ?? '').isNotEmpty)
+              ListTile(
+                leading: const Icon(Icons.delete_outline_rounded, color: Color(0xFFB3261E)),
+                title: const Text('Delete Recording', style: TextStyle(fontWeight: FontWeight.w700, color: Color(0xFFB3261E))),
+                subtitle: const Text('Permanently remove this recording'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _deleteRecording(id, data['title']?.toString() ?? 'Session');
+                },
+              ),
             // Session — View Transcript (completed sessions)
             if (type == 'session' &&
                 (data['status'] == 'completed' || data['status'] == 'ended') &&
@@ -1851,11 +1945,53 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
                   await _cancelSession(id, data['title']?.toString() ?? 'Session');
                 },
               ),
-            ListTile(
-              leading: const Icon(Icons.delete_outline_rounded, color: Color(0xFFB3261E)),
-              title: const Text('Delete', style: TextStyle(color: Color(0xFFB3261E))),
-              onTap: () => Navigator.pop(context),
-            ),
+            if (type == 'assignment' || type == 'quiz')
+              ListTile(
+                leading: const Icon(Icons.delete_outline_rounded, color: Color(0xFFB3261E)),
+                title: Text('Delete $type'.replaceFirst('a', 'A').replaceFirst('q', 'Q'),
+                    style: const TextStyle(color: Color(0xFFB3261E))),
+                onTap: () async {
+                  Navigator.pop(context);
+                  final confirm = await showDialog<bool>(
+                    context: context,
+                    builder: (_) => AlertDialog(
+                      title: Text('Delete ${type == 'quiz' ? 'Quiz' : 'Assignment'}?'),
+                      content: Text('"$title" will be permanently deleted.${type == 'assignment' ? ' All submissions will also be removed.' : ''}'),
+                      actions: [
+                        TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+                        ElevatedButton(
+                          style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+                          onPressed: () => Navigator.pop(context, true),
+                          child: const Text('Delete'),
+                        ),
+                      ],
+                    ),
+                  );
+                  if (confirm == true && id.isNotEmpty) {
+                    try {
+                      if (type == 'quiz') {
+                        await _lms.deleteQuiz(id);
+                      } else {
+                        await _lms.deleteAssignment(id);
+                      }
+                      _loadClasswork();
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                          content: Text('${type == 'quiz' ? 'Quiz' : 'Assignment'} deleted'),
+                          backgroundColor: Colors.green,
+                        ));
+                      }
+                    } catch (e) {
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                          content: Text('Delete failed: $e'),
+                          backgroundColor: Colors.red,
+                        ));
+                      }
+                    }
+                  }
+                },
+              ),
           ],
         ),
       ),
@@ -2173,8 +2309,39 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
           ...coTeachers.map((ct) {
             final ctName = ct['name']?.toString() ?? ct['email']?.toString() ?? 'Co-Teacher';
             final ctRole = ct['role']?.toString() ?? 'normal';
+            final ctId = ct['userId']?.toString() ?? '';
             final roleLabel = ctRole == 'lead' ? 'Lead Instructor' : 'Co-Instructor';
-            return _personRow(ctName, isTeacher: true, roleLabel: roleLabel, isLead: ctRole == 'lead');
+            return _personRow(ctName, isTeacher: true, roleLabel: roleLabel, isLead: ctRole == 'lead',
+              onRemove: widget.isInstructor && ctId.isNotEmpty ? () async {
+                final confirm = await showDialog<bool>(
+                  context: context,
+                  builder: (_) => AlertDialog(
+                    title: const Text('Remove Co-Teacher'),
+                    content: Text('Remove $ctName from this course?'),
+                    actions: [
+                      TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+                      ElevatedButton(
+                        style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+                        onPressed: () => Navigator.pop(context, true),
+                        child: const Text('Remove'),
+                      ),
+                    ],
+                  ),
+                );
+                if (confirm == true && mounted) {
+                  final lms = LmsService();
+                  final courseId = widget.course['_id']?.toString() ?? '';
+                  final result = await lms.removeCoTeacher(courseId: courseId, userId: ctId);
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                      content: Text(result['success'] == true ? '$ctName removed' : (result['message'] ?? 'Failed')),
+                      backgroundColor: result['success'] == true ? Colors.green : Colors.red,
+                    ));
+                    if (result['success'] == true) _loadPeople();
+                  }
+                }
+              } : null,
+            );
           }),
           const SizedBox(height: 24),
 
@@ -2224,7 +2391,7 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
     );
   }
 
-  Widget _personRow(String name, {required bool isTeacher, String? roleLabel, bool isLead = false}) {
+  Widget _personRow(String name, {required bool isTeacher, String? roleLabel, bool isLead = false, VoidCallback? onRemove}) {
     final avatarColor = isTeacher
         ? (isLead ? const Color(0xFF9334E6) : const Color(0xFF1A73E8))
         : Colors.grey.shade300;
@@ -2255,7 +2422,7 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
               ],
             ),
           ),
-          if (isTeacher && roleLabel != null)
+          if (isTeacher && roleLabel != null) ...[
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
               decoration: BoxDecoration(
@@ -2270,8 +2437,16 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
                   color: isLead ? const Color(0xFF7C3AED) : const Color(0xFF1A73E8),
                 ),
               ),
-            )
-          else if (!isTeacher)
+            ),
+            if (onRemove != null)
+              IconButton(
+                icon: const Icon(Icons.person_remove_outlined, size: 16, color: Colors.red),
+                onPressed: onRemove,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                tooltip: 'Remove co-teacher',
+              ),
+          ] else if (!isTeacher)
             IconButton(
               icon: const Icon(Icons.more_vert_rounded,
                   size: 18, color: Color(0xFF70757A)),

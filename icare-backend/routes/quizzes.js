@@ -48,7 +48,7 @@ router.get('/my', authMiddleware, async (req, res) => {
 
     const quizzes = await Quiz.find({
       courseId: { $in: courseIds }, isPublished: true,
-    }).select('_id title courseId totalMarks passingMarks').lean();
+    }).select('_id title courseId totalMarks passingMarks questions').lean();
 
     const quizIds = quizzes.map(q => q._id);
     const attempts = await QuizAttempt.find({
@@ -73,12 +73,14 @@ router.get('/my', authMiddleware, async (req, res) => {
 
     const result = quizzes.map(q => {
       const best = bestAttemptMap[q._id.toString()];
+      // Older quizzes have no totalMarks — fall back to question count
+      const totalMarks = q.totalMarks || (q.questions?.length || null);
       return {
         quizId: q._id,
         quizTitle: q.title,
         courseId: q.courseId,
         courseName: courseMap[q.courseId?.toString()] || '',
-        totalMarks: q.totalMarks,
+        totalMarks,
         passingMarks: q.passingMarks,
         attempted: !!best,
         score: best?.score ?? null,

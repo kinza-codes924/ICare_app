@@ -4,6 +4,7 @@ import 'package:icare/services/lms_service.dart';
 import 'package:icare/models/course.dart';
 import 'package:icare/screens/lesson_player.dart';
 import 'package:icare/screens/lms_course_page.dart';
+import 'package:icare/screens/lms_purchase_flow.dart';
 import 'package:icare/screens/quiz_screen.dart';
 import 'package:icare/services/course_service.dart';
 import 'package:icare/services/course_question_service.dart';
@@ -109,41 +110,57 @@ class _ViewCourseState extends ConsumerState<ViewCourse> {
 
   Future<void> _enrollInCourse(String courseId) async {
     if (_isPurchasing) return;
+    final course = widget.courseData ?? {};
+    final price = course['discountedPrice'] ?? course['price'] ?? course['cost'] ?? 0;
+    final amount = (price is num) ? price.toDouble() : double.tryParse(price.toString()) ?? 0.0;
 
-    setState(() => _isPurchasing = true);
-    try {
-      final result = await _courseService.buyCourse(courseId);
-      if (mounted) {
-        setState(() {
-          _isPurchased = true;
-          _currentEnrollmentId = result['enrollment']?['_id'];
-          _isPurchasing = false;
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Program started successfully!")),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        final errorStr = e.toString();
-        if (errorStr.contains('Already purchased')) {
+    // Free courses → enroll directly without payment
+    if (amount <= 0) {
+      setState(() => _isPurchasing = true);
+      try {
+        final result = await _courseService.buyCourse(courseId);
+        if (mounted) {
           setState(() {
             _isPurchased = true;
+            _currentEnrollmentId = result['enrollment']?['_id'];
             _isPurchasing = false;
           });
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text("You are already enrolled in this program."),
-            ),
+            const SnackBar(content: Text("Enrolled successfully!")),
           );
-        } else {
-          setState(() => _isPurchasing = false);
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(content: Text("Enrollment failed: $e")));
+        }
+      } catch (e) {
+        if (mounted) {
+          final errorStr = e.toString();
+          if (errorStr.contains('Already purchased')) {
+            setState(() { _isPurchased = true; _isPurchasing = false; });
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text("You are already enrolled.")),
+            );
+          } else {
+            setState(() => _isPurchasing = false);
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Enrollment failed: $e")));
+          }
         }
       }
+      return;
     }
+
+    // Paid courses → go through full purchase/payment flow
+    if (!mounted) return;
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => LmsPurchaseFlow(course: course),
+      ),
+    ).then((_) {
+      // On return, re-check enrollment status
+      if (mounted) {
+        setState(() {
+          _isPurchased = widget.courseData?['isPurchased'] == true || _currentEnrollmentId != null;
+        });
+      }
+    });
   }
 
   @override

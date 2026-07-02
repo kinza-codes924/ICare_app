@@ -20,7 +20,8 @@ import 'package:icare/screens/certificate_templates_screen.dart';
 
 class Courses extends ConsumerStatefulWidget {
   final bool myPurchased;
-  const Courses({super.key, this.myPurchased = false});
+  final bool browse; // Student: browse-all-courses mode (All/Paid/Free tabs)
+  const Courses({super.key, this.myPurchased = false, this.browse = false});
 
   @override
   ConsumerState<Courses> createState() => _CoursesState();
@@ -31,29 +32,25 @@ class _CoursesState extends ConsumerState<Courses>
   late TabController controller;
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = "";
-  int? _currentTabLength;
 
-  // @override
-  // void didChangeDependencies() {
-  //   super.didChangeDependencies();
-
-  //   final role = ref.read(authProvider).userRole;
-  //   final newLength = role == "instructor" ? 1 : 3;
-
-  //   if (_currentTabLength != newLength) {
-  //     controller?.dispose();
-  //     controller = TabController(length: newLength, vsync: this);
-  //     _currentTabLength = newLength;
-  //   }
-  // }
   @override
   void initState() {
     super.initState();
     final role = ref.read(authProvider).userRole;
+    final isStudent = role == 'Student';
+    final int len;
+    if (role == "Instructor") {
+      len = 1;
+    } else if (isStudent) {
+      // Browse mode: All / Paid / Free — My Courses mode: My Courses / My Progress
+      len = widget.browse ? 3 : 2;
+    } else {
+      len = 3;
+    }
     controller = TabController(
-      length: role == "Instructor" ? 1 : 3,
+      length: len,
       vsync: this,
-      initialIndex: widget.myPurchased ? 1 : 0,
+      initialIndex: (!isStudent && widget.myPurchased) ? 1 : 0,
     );
   }
 
@@ -68,6 +65,7 @@ class _CoursesState extends ConsumerState<Courses>
       return _WebCoursesScreen(
         controller: controller,
         role: role,
+        browse: widget.browse,
         searchController: _searchController,
         onSearchChanged: (val) => setState(() => _searchQuery = val),
         searchQuery: _searchQuery,
@@ -81,7 +79,9 @@ class _CoursesState extends ConsumerState<Courses>
         title: CustomText(
           text: isPatient
               ? "Health Programs"
-              : (isStudent ? "Professional Courses" : "Courses"),
+              : (isStudent
+                    ? (widget.browse ? "Browse Courses" : "My Courses")
+                    : "Courses"),
           fontFamily: "Gilroy-Bold",
           fontSize: 16.78,
           color: AppColors.primary500,
@@ -119,35 +119,63 @@ class _CoursesState extends ConsumerState<Courses>
                 indicatorWeight: 6,
                 indicatorColor: AppColors.themeBlack,
                 tabs: [
-                  CustomText(
-                    text: isPatient
-                        ? "All Programs"
-                        : (isStudent ? "Course Catalog" : "All Courses"),
-                    padding: const EdgeInsets.only(bottom: 5),
-                    width: Utils.windowWidth(context) * 0.33,
-                    textAlign: TextAlign.center,
-                  ),
-                  if (role == "Instructor") ...[
-                    SizedBox(width: Utils.windowWidth(context) * 0.33),
-                    SizedBox(width: Utils.windowWidth(context) * 0.33),
-                  ],
-                  if (role != "Instructor") ...[
+                  if (isStudent && widget.browse) ...[
                     CustomText(
-                      text: isPatient
-                          ? "My Health Journey"
-                          : (isStudent ? "My Learning" : "My Purchase"),
+                      text: "All Courses",
                       padding: const EdgeInsets.only(bottom: 5),
                       width: Utils.windowWidth(context) * 0.33,
                       textAlign: TextAlign.center,
                     ),
                     CustomText(
+                      text: "Paid",
                       padding: const EdgeInsets.only(bottom: 5),
                       width: Utils.windowWidth(context) * 0.33,
                       textAlign: TextAlign.center,
-                      text: isPatient
-                          ? "Progress"
-                          : (isStudent ? "Certificates" : "Purchased"),
                     ),
+                    CustomText(
+                      text: "Free",
+                      padding: const EdgeInsets.only(bottom: 5),
+                      width: Utils.windowWidth(context) * 0.33,
+                      textAlign: TextAlign.center,
+                    ),
+                  ] else if (isStudent) ...[
+                    CustomText(
+                      text: "My Courses",
+                      padding: const EdgeInsets.only(bottom: 5),
+                      width: Utils.windowWidth(context) * 0.45,
+                      textAlign: TextAlign.center,
+                    ),
+                    CustomText(
+                      text: "My Progress",
+                      padding: const EdgeInsets.only(bottom: 5),
+                      width: Utils.windowWidth(context) * 0.45,
+                      textAlign: TextAlign.center,
+                    ),
+                  ] else ...[
+                    CustomText(
+                      text: isPatient ? "All Programs" : "All Courses",
+                      padding: const EdgeInsets.only(bottom: 5),
+                      width: Utils.windowWidth(context) * 0.33,
+                      textAlign: TextAlign.center,
+                    ),
+                    if (role == "Instructor") ...[
+                      SizedBox(width: Utils.windowWidth(context) * 0.33),
+                      SizedBox(width: Utils.windowWidth(context) * 0.33),
+                    ],
+                    if (role != "Instructor") ...[
+                      CustomText(
+                        text: isPatient ? "My Health Journey" : "My Purchase",
+                        padding: const EdgeInsets.only(bottom: 5),
+                        width: Utils.windowWidth(context) * 0.33,
+                        textAlign: TextAlign.center,
+                      ),
+                      CustomText(
+                        padding: const EdgeInsets.only(bottom: 5),
+                        width: Utils.windowWidth(context) * 0.33,
+                        textAlign: TextAlign.center,
+                        text: isPatient ? "Progress" : "Purchased",
+                      ),
+                    ],
                   ],
                 ],
               ),
@@ -156,10 +184,19 @@ class _CoursesState extends ConsumerState<Courses>
               child: TabBarView(
                 controller: controller,
                 children: [
-                  CoursesList(searchQuery: _searchQuery),
-                  if (role != "Instructor") ...[
+                  if (isStudent && widget.browse) ...[
+                    CoursesList(searchQuery: _searchQuery),
+                    CoursesList(searchQuery: _searchQuery, priceFilter: 'paid'),
+                    CoursesList(searchQuery: _searchQuery, priceFilter: 'free'),
+                  ] else if (isStudent) ...[
                     CoursesList(mypurchased: true, searchQuery: _searchQuery),
-                    CertificatesList(),
+                    _WebProgressList(searchQuery: _searchQuery),
+                  ] else ...[
+                    CoursesList(searchQuery: _searchQuery),
+                    if (role != "Instructor") ...[
+                      CoursesList(mypurchased: true, searchQuery: _searchQuery),
+                      CertificatesList(),
+                    ],
                   ],
                 ],
               ),
@@ -178,6 +215,7 @@ class _CoursesState extends ConsumerState<Courses>
 class _WebCoursesScreen extends StatelessWidget {
   final TabController controller;
   final String role;
+  final bool browse;
   final TextEditingController searchController;
   final Function(String) onSearchChanged;
   final String searchQuery;
@@ -185,6 +223,7 @@ class _WebCoursesScreen extends StatelessWidget {
   const _WebCoursesScreen({
     required this.controller,
     required this.role,
+    this.browse = false,
     required this.searchController,
     required this.onSearchChanged,
     required this.searchQuery,
@@ -193,6 +232,7 @@ class _WebCoursesScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isPatient = role.toLowerCase() == 'patient';
+    final isStudent = role == 'Student';
     return Scaffold(
       backgroundColor: const Color(0xFFF4F6FB),
       appBar: AppBar(
@@ -202,7 +242,11 @@ class _WebCoursesScreen extends StatelessWidget {
         automaticallyImplyLeading: false,
         leading: CustomBackButton(),
         title: CustomText(
-          text: (isPatient || role == 'Student') ? "All Programs" : "Courses",
+          text: isPatient
+              ? "All Programs"
+              : (isStudent
+                    ? (browse ? "Browse Courses" : "My Courses")
+                    : "Courses"),
           fontFamily: "Gilroy-Bold",
           fontSize: 20,
           color: AppColors.primaryColor,
@@ -230,7 +274,9 @@ class _WebCoursesScreen extends StatelessWidget {
                         Text(
                           isPatient
                               ? "Your Health Programs"
-                              : "Find Your Next Course",
+                              : (isStudent && !browse
+                                    ? "Your Courses"
+                                    : "Find Your Next Course"),
                           style: const TextStyle(
                             fontSize: 24,
                             fontWeight: FontWeight.w700,
@@ -242,7 +288,9 @@ class _WebCoursesScreen extends StatelessWidget {
                         Text(
                           isPatient
                               ? "Discover programs assigned by your doctor to enhance your well-being."
-                              : "Discover amazing topics to enhance your skills and career.",
+                              : (isStudent && !browse
+                                    ? "You can see and track your course progress here."
+                                    : "Discover amazing topics to enhance your skills and career."),
                           style: const TextStyle(
                             fontSize: 15,
                             color: Color(0xFF64748B),
@@ -330,25 +378,28 @@ class _WebCoursesScreen extends StatelessWidget {
                       fontFamily: "Gilroy-Medium",
                     ),
                     tabs: [
-                      Tab(
-                        text: (isPatient || role == 'Student')
-                            ? "All Programs"
-                            : "All Courses",
-                      ),
-                      if (role != "Instructor")
+                      if (isStudent && browse) ...[
+                        const Tab(text: "All Courses"),
+                        const Tab(text: "Paid Courses"),
+                        const Tab(text: "Free Courses"),
+                      ] else if (isStudent) ...[
+                        const Tab(text: "My Courses"),
+                        const Tab(text: "My Progress"),
+                      ] else ...[
                         Tab(
-                          text: isPatient
-                              ? "My Health Journey"
-                              : (role == 'Student'
-                                    ? "My Learning"
-                                    : "My Purchase"),
+                          text: isPatient ? "All Programs" : "All Courses",
                         ),
-                      if (role != "Instructor")
-                        Tab(
-                          text: (isPatient || role == 'Student')
-                              ? "Progress"
-                              : "Certificates",
-                        ),
+                        if (role != "Instructor")
+                          Tab(
+                            text: isPatient
+                                ? "My Health Journey"
+                                : "My Purchase",
+                          ),
+                        if (role != "Instructor")
+                          Tab(
+                            text: isPatient ? "Progress" : "Certificates",
+                          ),
+                      ],
                     ],
                   ),
                 ),
@@ -361,13 +412,31 @@ class _WebCoursesScreen extends StatelessWidget {
                 child: TabBarView(
                   controller: controller,
                   children: [
-                    _WebCoursesList(searchQuery: searchQuery),
-                    if (role != "Instructor") ...[
+                    if (isStudent && browse) ...[
+                      _WebCoursesList(searchQuery: searchQuery),
+                      _WebCoursesList(
+                        searchQuery: searchQuery,
+                        priceFilter: 'paid',
+                      ),
+                      _WebCoursesList(
+                        searchQuery: searchQuery,
+                        priceFilter: 'free',
+                      ),
+                    ] else if (isStudent) ...[
                       _WebCoursesList(
                         myPurchased: true,
                         searchQuery: searchQuery,
                       ),
-                      const _WebCertificatesList(),
+                      _WebProgressList(searchQuery: searchQuery),
+                    ] else ...[
+                      _WebCoursesList(searchQuery: searchQuery),
+                      if (role != "Instructor") ...[
+                        _WebCoursesList(
+                          myPurchased: true,
+                          searchQuery: searchQuery,
+                        ),
+                        const _WebCertificatesList(),
+                      ],
                     ],
                   ],
                 ),
@@ -383,7 +452,12 @@ class _WebCoursesScreen extends StatelessWidget {
 class _WebCoursesList extends StatefulWidget {
   final bool myPurchased;
   final String searchQuery;
-  const _WebCoursesList({this.myPurchased = false, this.searchQuery = ""});
+  final String priceFilter; // 'all' | 'paid' | 'free'
+  const _WebCoursesList({
+    this.myPurchased = false,
+    this.searchQuery = "",
+    this.priceFilter = 'all',
+  });
 
   @override
   State<_WebCoursesList> createState() => _WebCoursesListState();
@@ -447,8 +521,15 @@ class _WebCoursesListState extends State<_WebCoursesList> {
     }
 
     final filteredCourses = _courses.where((item) {
-      if (widget.searchQuery.isEmpty) return true;
       final course = widget.myPurchased ? item['course'] : item;
+      if (course == null) return false;
+      // Price filter (Browse Courses: Paid / Free tabs)
+      if (widget.priceFilter != 'all') {
+        final price = (course['price'] is num) ? (course['price'] as num) : 0;
+        if (widget.priceFilter == 'paid' && price <= 0) return false;
+        if (widget.priceFilter == 'free' && price > 0) return false;
+      }
+      if (widget.searchQuery.isEmpty) return true;
       final title = (course["title"] ?? course["name"] ?? "")
           .toString()
           .toLowerCase();
@@ -670,6 +751,225 @@ class _WebCoursesListState extends State<_WebCoursesList> {
       height: height,
       width: double.infinity,
       fit: BoxFit.cover,
+    );
+  }
+}
+
+// ── My Progress — enrolled courses with progress bar + Open Course button ──
+class _WebProgressList extends StatefulWidget {
+  final String searchQuery;
+  const _WebProgressList({this.searchQuery = ""});
+
+  @override
+  State<_WebProgressList> createState() => _WebProgressListState();
+}
+
+class _WebProgressListState extends State<_WebProgressList> {
+  final CourseService _courseService = CourseService();
+  List<dynamic> _enrollments = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetch();
+  }
+
+  Future<void> _fetch() async {
+    try {
+      final data = await _courseService.myPurchases();
+      if (mounted) {
+        setState(() {
+          _enrollments = data;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error fetching progress list: $e');
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  double _progressOf(dynamic item) {
+    final p = item['progress'];
+    if (p is num) return (p.toDouble()).clamp(0, 100);
+    return 0;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    final items = _enrollments.where((item) {
+      final course = item['course'];
+      if (course == null) return false;
+      if (widget.searchQuery.isEmpty) return true;
+      final title = (course["title"] ?? course["name"] ?? "")
+          .toString()
+          .toLowerCase();
+      return title.contains(widget.searchQuery.toLowerCase());
+    }).toList();
+
+    if (items.isEmpty) {
+      return const Center(child: Text("You have not enrolled in any course yet"));
+    }
+
+    return GridView.builder(
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+      itemCount: items.length,
+      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+        maxCrossAxisExtent: 500,
+        crossAxisSpacing: 24,
+        mainAxisSpacing: 24,
+        childAspectRatio: 2.4,
+      ),
+      itemBuilder: (ctx, i) {
+        final item = items[i];
+        final course = item['course'] ?? {};
+        final progress = _progressOf(item);
+        final done = progress >= 100;
+
+        return Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: const Color(0xFFF1F4F9), width: 1.5),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x05000000),
+                offset: Offset(0, 4),
+                blurRadius: 16,
+              ),
+            ],
+          ),
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: done
+                          ? const Color(0xFFECFDF5)
+                          : const Color(0xFFEFF6FF),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(
+                      done
+                          ? Icons.check_circle_rounded
+                          : Icons.play_lesson_outlined,
+                      color: done
+                          ? const Color(0xFF10B981)
+                          : AppColors.primaryColor,
+                      size: 22,
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Text(
+                      course['title'] ?? course['name'] ?? 'Course',
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF1E293B),
+                        fontFamily: "Gilroy-Bold",
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+              const Spacer(),
+              Row(
+                children: [
+                  Expanded(
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(6),
+                      child: LinearProgressIndicator(
+                        value: progress / 100,
+                        minHeight: 8,
+                        backgroundColor: const Color(0xFFF1F5F9),
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          done ? const Color(0xFF10B981) : AppColors.primaryColor,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Text(
+                    '${progress.toStringAsFixed(0)}%',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: done ? const Color(0xFF10B981) : AppColors.primaryColor,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  if (done)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 5,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFECFDF5),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Text(
+                        'Completed',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF10B981),
+                        ),
+                      ),
+                    ),
+                  const Spacer(),
+                  ElevatedButton.icon(
+                    onPressed: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (ctx) => ViewCourse(
+                            courseData: course,
+                            enrollmentId: item['_id'],
+                          ),
+                        ),
+                      ).then((_) => _fetch());
+                    },
+                    icon: Icon(
+                      done ? Icons.visibility_rounded : Icons.play_arrow_rounded,
+                      size: 16,
+                    ),
+                    label: Text(done ? 'View Course' : 'Open Course'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primaryColor,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 10,
+                      ),
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }

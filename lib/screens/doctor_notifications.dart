@@ -1,7 +1,12 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:icare/screens/chat_screen.dart';
+import 'package:icare/screens/classroom_course_view.dart';
+import 'package:icare/screens/instructor_grading_screen.dart';
+import 'package:icare/screens/doctor_appointments.dart';
 import 'package:icare/services/notification_service.dart';
+import 'package:icare/services/lms_service.dart';
+import 'package:icare/utils/shared_pref.dart';
 import 'package:icare/widgets/back_button.dart';
 import 'package:intl/intl.dart';
 
@@ -92,6 +97,80 @@ class _DoctorNotificationsState extends State<DoctorNotifications> {
         return const Color(0xFF10B981);
       default:
         return const Color(0xFF64748B);
+    }
+  }
+
+  /// Navigate to the item a notification refers to (assignments, courses,
+  /// appointments) so the user can act on it directly.
+  Future<void> _openNotificationTarget(Map<String, dynamic> notification) async {
+    final rawData = notification['data'];
+    final type = notification['type']?.toString() ?? '';
+
+    // Appointment-type notifications → appointments screen
+    if (type == 'appointment' || type == 'cancellation') {
+      final user = await SharedPref().getUserData();
+      if (!mounted) return;
+      if ((user?.role ?? '').toLowerCase() == 'doctor') {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const DoctorAppointmentsScreen()),
+        );
+        return;
+      }
+    }
+
+    if (rawData is! Map) return;
+    final data = Map<String, dynamic>.from(rawData);
+    final dType = data['type']?.toString() ?? '';
+    final courseId = data['courseId']?.toString() ?? '';
+
+    try {
+      // Instructor: student submitted an assignment → open grading screen
+      if (dType == 'assignment_submission_received') {
+        final assignmentId = data['assignmentId']?.toString() ?? '';
+        if (assignmentId.isNotEmpty && mounted) {
+          // Extract assignment title from message: ... submitted "title" ...
+          final msg = notification['message']?.toString() ?? '';
+          final m = RegExp(r'"([^"]+)"').firstMatch(msg);
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => InstructorGradingScreen(
+                assignmentId: assignmentId,
+                assignmentTitle: m?.group(1) ?? 'Assignment',
+              ),
+            ),
+          );
+          return;
+        }
+      }
+
+      // Other LMS notifications with a courseId → open course classroom
+      if (courseId.isNotEmpty) {
+        final res = await LmsService().getCourseDetails(courseId);
+        final course = (res['course'] is Map)
+            ? Map<String, dynamic>.from(res['course'] as Map)
+            : (res['data'] is Map
+                  ? Map<String, dynamic>.from(res['data'] as Map)
+                  : <String, dynamic>{});
+        if (course.isEmpty || !mounted) return;
+        final user = await SharedPref().getUserData();
+        final isInstructor = (user?.role ?? '').toLowerCase() == 'instructor';
+        if (!mounted) return;
+        final isClasswork = dType.contains('assignment') || dType.contains('quiz');
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ClassroomCourseView(
+              course: course,
+              isInstructor: isInstructor,
+              initialTab: isClasswork ? 1 : 0,
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('Notification navigation error: $e');
     }
   }
 
@@ -271,7 +350,9 @@ class _DoctorNotificationsState extends State<DoctorNotifications> {
               ),
             );
           }
+          return;
         }
+        await _openNotificationTarget(notification);
       },
       child: Container(
         margin: const EdgeInsets.only(bottom: 12),

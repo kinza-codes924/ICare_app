@@ -1,5 +1,10 @@
+import 'package:dio/dio.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:icare/services/lms_service.dart';
+import 'package:icare/utils/api_constants.dart';
+import 'package:icare/utils/shared_pref.dart';
 import 'package:icare/utils/theme.dart';
 import 'package:icare/widgets/attachment_viewer.dart';
 import 'package:icare/widgets/back_button.dart';
@@ -30,6 +35,63 @@ class _AssignmentSubmitScreenState extends State<AssignmentSubmitScreen> {
   bool _isSubmitting = false;
   Map<String, dynamic>? _existingSubmission;
   String? _error;
+
+  // Direct file upload (Vercel Blob)
+  bool _uploadingFile = false;
+  String? _uploadedFileName;
+
+  Future<void> _pickAndUploadFile() async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: [
+          'pdf', 'doc', 'docx', 'ppt', 'pptx', 'xls', 'xlsx',
+          'txt', 'jpg', 'jpeg', 'png', 'zip',
+        ],
+        withData: true,
+      );
+      if (result == null || result.files.isEmpty || result.files.first.bytes == null) {
+        return;
+      }
+      final file = result.files.first;
+      setState(() => _uploadingFile = true);
+      final token = await SharedPref().getToken() ?? '';
+      final res = await Dio().post(
+        '${ApiConstants.baseUrl}/upload/blob-doc',
+        data: FormData.fromMap({
+          'file': MultipartFile.fromBytes(file.bytes!, filename: file.name),
+        }),
+        options: Options(
+          headers: {'Authorization': 'Bearer $token'},
+          validateStatus: (s) => s != null && s < 600,
+        ),
+      );
+      if (res.statusCode == 200 &&
+          res.data['success'] == true &&
+          res.data['url'] != null) {
+        if (mounted) {
+          setState(() {
+            _fileUrlController.text = res.data['url'] as String;
+            _uploadedFileName = file.name;
+            _uploadingFile = false;
+          });
+        }
+      } else {
+        throw Exception(res.data['message'] ?? 'Upload failed');
+      }
+    } catch (e) {
+      debugPrint('Assignment file upload error: $e');
+      if (mounted) {
+        setState(() => _uploadingFile = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Upload failed: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
 
   @override
   void initState() {
@@ -160,6 +222,9 @@ class _AssignmentSubmitScreenState extends State<AssignmentSubmitScreen> {
 
   bool get _isSubmitted => _existingSubmission != null;
 
+  /// Editable until graded — students can update fields when resubmitting
+  bool get _canEdit => !_isSubmitted || _getGradeInfo().isEmpty;
+
   String _getGradeInfo() {
     if (_existingSubmission == null) return '';
     final marks = _existingSubmission!['marksObtained'] ??
@@ -194,16 +259,18 @@ class _AssignmentSubmitScreenState extends State<AssignmentSubmitScreen> {
             overflow: TextOverflow.ellipsis),
         actions: [
           if (_isSubmitted && !_isLate)
-            Container(
-              margin: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-              decoration: BoxDecoration(
-                color: const Color(0xFF10B981),
-                borderRadius: BorderRadius.circular(20),
+            Center(
+              child: Container(
+                margin: const EdgeInsets.symmetric(horizontal: 12),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF10B981),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: const Text('Submitted',
+                    style: TextStyle(
+                        color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700)),
               ),
-              child: const Text('Submitted',
-                  style: TextStyle(
-                      color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700)),
             ),
           if (_isLate && !_isSubmitted)
             Container(
@@ -496,10 +563,10 @@ class _AssignmentSubmitScreenState extends State<AssignmentSubmitScreen> {
                         TextField(
                           controller: _contentController,
                           maxLines: 8,
-                          readOnly: _isSubmitted,
+                          readOnly: !_canEdit,
                           style: const TextStyle(fontSize: 14, color: Color(0xFF0F172A)),
                           decoration: InputDecoration(
-                            hintText: _isSubmitted
+                            hintText: !_canEdit
                                 ? 'No written submission'
                                 : 'Type your answer, essay, or notes here...',
                             hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
@@ -531,48 +598,77 @@ class _AssignmentSubmitScreenState extends State<AssignmentSubmitScreen> {
 
                         const SizedBox(height: 16),
 
-                        // File URL
-                        const Text('File / Link (Optional)',
+                        // File upload
+                        const Text('File Upload',
                             style: TextStyle(
                                 fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF374151))),
                         const SizedBox(height: 8),
-                        TextField(
-                          controller: _fileUrlController,
-                          readOnly: _isSubmitted,
-                          style: const TextStyle(fontSize: 14, color: Color(0xFF0F172A)),
-                          decoration: InputDecoration(
-                            hintText: _isSubmitted
-                                ? 'No file submitted'
-                                : 'Paste Google Drive / Dropbox / OneDrive link...',
-                            hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
-                            prefixIcon: const Icon(Icons.link_rounded,
-                                color: Color(0xFF64748B), size: 20),
-                            filled: true,
-                            fillColor: _isSubmitted
-                                ? const Color(0xFFF8FAFC)
-                                : const Color(0xFFFAFAFF),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+
+                        // Submitted / uploaded file preview
+                        Builder(builder: (_) {
+                          final fileUrl = _fileUrlController.text.trim();
+                          if (fileUrl.isEmpty) {
+                            if (_canEdit) return const SizedBox.shrink();
+                            return Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.all(14),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF8FAFC),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: const Color(0xFFE2E8F0)),
+                              ),
+                              child: const Text('No file submitted',
+                                  style: TextStyle(fontSize: 13, color: Color(0xFF94A3B8))),
+                            );
+                          }
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 10),
+                            child: AttachmentViewer(
+                              url: fileUrl,
+                              name: _uploadedFileName ?? 'Submitted file',
+                              label: 'Tap to open in browser',
                             ),
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: BorderSide(
-                                color: AppColors.primaryColor.withValues(alpha: 0.6),
-                                width: 1.5,
+                          );
+                        }),
+
+                        if (_canEdit) ...[
+                          // Direct file upload button
+                          SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton.icon(
+                              onPressed: _uploadingFile ? null : _pickAndUploadFile,
+                              icon: _uploadingFile
+                                  ? const SizedBox(
+                                      width: 16, height: 16,
+                                      child: CircularProgressIndicator(
+                                          strokeWidth: 2, color: Colors.white),
+                                    )
+                                  : const Icon(Icons.upload_file_rounded, size: 18),
+                              label: Text(
+                                _uploadingFile
+                                    ? 'Uploading...'
+                                    : (_uploadedFileName != null
+                                        ? 'Uploaded: $_uploadedFileName — tap to change'
+                                        : 'Upload File'),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+                              ),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: _uploadedFileName != null
+                                    ? const Color(0xFF10B981)
+                                    : AppColors.primaryColor,
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(vertical: 14),
+                                elevation: 0,
+                                shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12)),
                               ),
                             ),
                           ),
-                        ),
-
-                        if (!_isSubmitted) ...[
                           const SizedBox(height: 6),
                           const Text(
-                            'Tip: Upload your file to Google Drive, make it publicly accessible, and paste the link here.',
+                            'PDF, Word, PowerPoint, Excel, images or ZIP — max 1 file.',
                             style: TextStyle(fontSize: 11, color: Color(0xFF94A3B8), height: 1.5),
                           ),
                         ],

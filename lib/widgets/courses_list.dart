@@ -11,12 +11,14 @@ class CoursesList extends StatefulWidget {
     this.constraintHeight,
     this.mypurchased = false,
     this.searchQuery = "",
+    this.priceFilter = 'all',
   });
 
   final String searchQuery;
   final bool mypurchased;
   final double? constraintHeight;
   final int? numOfCourses;
+  final String priceFilter; // 'all' | 'paid' | 'free'
 
   @override
   State<CoursesList> createState() => _CoursesListState();
@@ -84,10 +86,20 @@ class _CoursesListState extends State<CoursesList> {
     }
 
     final List<dynamic> filteredCourses = _courses.where((item) {
-      if (widget.searchQuery.isEmpty) return true;
       final Map<String, dynamic> courseData = widget.mypurchased
           ? (item['course'] as Map<String, dynamic>? ?? {})
           : (item as Map<String, dynamic>? ?? {});
+
+      // Price filter (Browse Courses: Paid / Free tabs)
+      if (widget.priceFilter != 'all') {
+        final price = (courseData['price'] is num)
+            ? (courseData['price'] as num)
+            : 0;
+        if (widget.priceFilter == 'paid' && price <= 0) return false;
+        if (widget.priceFilter == 'free' && price > 0) return false;
+      }
+
+      if (widget.searchQuery.isEmpty) return true;
 
       final title = (courseData["title"] ?? courseData["name"] ?? "")
           .toString()

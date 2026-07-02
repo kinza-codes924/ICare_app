@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:icare/screens/assignment_submit_screen.dart';
+import 'package:icare/screens/quiz_take_screen.dart';
+import 'package:icare/services/course_service.dart';
 import 'package:icare/services/lms_service.dart';
 import 'package:icare/utils/theme.dart';
 import 'package:icare/widgets/back_button.dart';
@@ -17,6 +20,7 @@ class _AssessmentsScreenState extends State<AssessmentsScreen>
   final LmsService _lms = LmsService();
   List<dynamic> _assignments = [];
   List<dynamic> _quizzes = [];
+  List<dynamic> _enrollments = [];
   bool _loadingAssignments = true;
   bool _loadingQuizzes = true;
 
@@ -36,6 +40,63 @@ class _AssessmentsScreenState extends State<AssessmentsScreen>
   Future<void> _loadAll() async {
     _loadAssignments();
     _loadQuizzes();
+    _loadEnrollments();
+  }
+
+  Future<void> _loadEnrollments() async {
+    try {
+      final data = await CourseService().myPurchases();
+      if (mounted) setState(() => _enrollments = data);
+    } catch (_) {}
+  }
+
+  String _enrollmentIdFor(String courseId) {
+    for (final e in _enrollments) {
+      final c = e['course'];
+      final cid = (c is Map ? c['_id'] : e['courseId'])?.toString() ?? '';
+      if (cid == courseId) return e['_id']?.toString() ?? '';
+    }
+    return '';
+  }
+
+  void _openAssignment(Map<String, dynamic> a) {
+    final courseId = a['courseId']?.toString() ?? '';
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => AssignmentSubmitScreen(
+          assignment: a,
+          courseId: courseId,
+          enrollmentId: _enrollmentIdFor(courseId),
+        ),
+      ),
+    ).then((_) => _loadAssignments());
+  }
+
+  Future<void> _openQuiz(Map<String, dynamic> q) async {
+    final courseId = q['courseId']?.toString() ?? '';
+    final quizId = q['quizId']?.toString() ?? '';
+    try {
+      // /quizzes/my returns a summary — fetch the full quiz (with questions)
+      final quizzes = await _lms.getCourseQuizzes(courseId);
+      final full = quizzes.where((x) => x['_id']?.toString() == quizId).toList();
+      if (full.isEmpty || !mounted) return;
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => QuizTakeScreen(
+            quiz: Map<String, dynamic>.from(full.first as Map),
+            enrollmentId: _enrollmentIdFor(courseId),
+          ),
+        ),
+      ).then((_) => _loadQuizzes());
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not open quiz: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
   }
 
   Future<void> _loadAssignments() async {
@@ -139,7 +200,10 @@ class _AssessmentsScreenState extends State<AssessmentsScreen>
       statusIcon = isOverdue ? Icons.warning_rounded : Icons.pending_outlined;
     }
 
-    return Container(
+    return InkWell(
+      onTap: () => _openAssignment(Map<String, dynamic>.from(a)),
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
         color: Colors.white,
@@ -229,6 +293,7 @@ class _AssessmentsScreenState extends State<AssessmentsScreen>
             ]),
           ),
       ]),
+      ),
     );
   }
 
@@ -273,7 +338,10 @@ class _AssessmentsScreenState extends State<AssessmentsScreen>
       statusIcon = Icons.cancel_rounded;
     }
 
-    return Container(
+    return InkWell(
+      onTap: () => _openQuiz(Map<String, dynamic>.from(q)),
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
         color: Colors.white,
@@ -317,11 +385,15 @@ class _AssessmentsScreenState extends State<AssessmentsScreen>
           ),
           if (score != null) ...[
             const SizedBox(height: 4),
-            Text('${(score as num).toStringAsFixed(0)} / $total',
+            Text(
+                total != null
+                    ? '${(score as num).toStringAsFixed(0)} / $total'
+                    : 'Score: ${(score as num).toStringAsFixed(0)}',
                 style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: Color(0xFF0F172A))),
           ],
         ]),
       ]),
+      ),
     );
   }
 

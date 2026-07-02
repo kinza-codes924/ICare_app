@@ -2,8 +2,9 @@
 import 'package:dio/dio.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
-import 'package:icare/services/api_service.dart';
 import 'package:icare/services/lms_service.dart';
+import 'package:icare/utils/api_constants.dart';
+import 'package:icare/utils/shared_pref.dart';
 import 'package:icare/utils/theme.dart';
 import 'package:intl/intl.dart';
 
@@ -64,23 +65,16 @@ class _InstructorCreateAssignmentScreenState extends State<InstructorCreateAssig
     super.dispose();
   }
 
-  Future<String?> _cloudinaryUpload(Uint8List bytes, String filename, String folder, String resourceType) async {
-    final signRes = await ApiService().get('/upload/sign?folder=${Uri.encodeQueryComponent(folder)}&resource_type=$resourceType');
-    if (signRes.data['success'] != true) throw Exception('Sign error');
-    final cloudName = signRes.data['cloud_name']?.toString() ?? 'dzlcnyxgb';
-    final formData = FormData.fromMap({
-      'file': MultipartFile.fromBytes(bytes, filename: filename),
-      'api_key':   signRes.data['api_key']?.toString() ?? '',
-      'timestamp': signRes.data['timestamp']?.toString() ?? '',
-      'signature': signRes.data['signature']?.toString() ?? '',
-      'folder':    signRes.data['folder']?.toString() ?? folder,
-    });
+  Future<String?> _blobUpload(Uint8List bytes, String filename) async {
+    final token = await SharedPref().getToken() ?? '';
     final res = await Dio().post(
-      'https://api.cloudinary.com/v1_1/$cloudName/$resourceType/upload',
-      data: formData,
-      options: Options(validateStatus: (s) => s != null && s < 600),
+      '${ApiConstants.baseUrl}/upload/blob-doc',
+      data: FormData.fromMap({'file': MultipartFile.fromBytes(bytes, filename: filename)}),
+      options: Options(headers: {'Authorization': 'Bearer $token'}, validateStatus: (s) => s != null && s < 600),
     );
-    if (res.statusCode == 200 && res.data['secure_url'] != null) return res.data['secure_url'] as String;
+    if (res.statusCode == 200 && res.data['success'] == true && res.data['url'] != null) {
+      return res.data['url'] as String;
+    }
     throw Exception('Upload failed: ${res.data}');
   }
 
@@ -94,7 +88,7 @@ class _InstructorCreateAssignmentScreenState extends State<InstructorCreateAssig
       if (result == null || result.files.isEmpty || result.files.first.bytes == null) return;
       final file = result.files.first;
       setState(() => _uploadingAttachment = true);
-      final url = await _cloudinaryUpload(file.bytes!, file.name, 'icare/assignments/attachments', 'auto');
+      final url = await _blobUpload(file.bytes!, file.name);
       if (mounted) setState(() { _attachmentUrl = url; _attachmentName = file.name; _uploadingAttachment = false; });
     } catch (e) {
       if (mounted) {

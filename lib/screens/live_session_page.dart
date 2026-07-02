@@ -5,6 +5,7 @@ import 'package:icare/services/lms_service.dart';
 import 'package:icare/utils/theme.dart';
 import 'package:icare/widgets/back_button.dart';
 import 'package:icare/utils/shared_pref.dart';
+import 'package:icare/widgets/whiteboard_widget.dart';
 
 /// Live Session Page with Chat, Raise Hand, Polls, Waiting Room
 class LiveSessionPage extends StatefulWidget {
@@ -35,16 +36,25 @@ class _LiveSessionPageState extends State<LiveSessionPage> with SingleTickerProv
   final List<dynamic> _polls = [];
   User? _currentUser;
   Timer? _pollTimer;
+  Timer? _wbTimer;
   bool _handRaised = false;
   bool _loading = true;
+
+  // Whiteboard state
+  List<WbStroke> _wbStrokes = [];
+  List<String> _wbPermissions = [];
+  final List<WbStroke> _wbLocalQueue = []; // strokes sent but not yet confirmed
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: widget.isInstructor ? 4 : 3, vsync: this);
+    // instructor: Video, Chat, Polls, Whiteboard, Waiting Room = 5
+    // student:    Video, Chat, Polls, Whiteboard = 4
+    _tabController = TabController(length: widget.isInstructor ? 5 : 4, vsync: this);
     _loadUser();
     _loadSessionData();
     _startPolling();
+    _startWbPolling();
   }
 
   @override
@@ -53,6 +63,7 @@ class _LiveSessionPageState extends State<LiveSessionPage> with SingleTickerProv
     _chatController.dispose();
     _chatScrollController.dispose();
     _pollTimer?.cancel();
+    _wbTimer?.cancel();
     super.dispose();
   }
 
@@ -78,12 +89,52 @@ class _LiveSessionPageState extends State<LiveSessionPage> with SingleTickerProv
   }
 
   void _startPolling() {
-    // Poll for updates every 3 seconds
     _pollTimer = Timer.periodic(const Duration(seconds: 3), (_) {
-      if (mounted) {
-        _loadSessionData();
-      }
+      if (mounted) _loadSessionData();
     });
+  }
+
+  void _startWbPolling() {
+    _fetchWhiteboard();
+    _wbTimer = Timer.periodic(const Duration(seconds: 2), (_) {
+      if (mounted) _fetchWhiteboard();
+    });
+  }
+
+  Future<void> _fetchWhiteboard() async {
+    if (!mounted) return;
+    try {
+      final data = await _lms.getWhiteboard(widget.sessionId);
+      final rawStrokes = data['strokes'] as List? ?? [];
+      final rawPerms   = data['permissions'] as List? ?? [];
+      if (!mounted) return;
+      setState(() {
+        _wbStrokes = rawStrokes
+            .map((s) => WbStroke.fromJson(Map<String, dynamic>.from(s as Map)))
+            .toList();
+        _wbPermissions = rawPerms.map((e) => e.toString()).toList();
+      });
+    } catch (_) {}
+  }
+
+  Future<void> _onWbStrokeAdded(WbStroke stroke) async {
+    // Optimistically add locally
+    setState(() => _wbStrokes = [..._wbStrokes, stroke]);
+    await _lms.addWhiteboardStroke(widget.sessionId, stroke.toJson());
+  }
+
+  Future<void> _onWbUndo() async {
+    await _lms.undoWhiteboardStroke(widget.sessionId);
+    _fetchWhiteboard();
+  }
+
+  Future<void> _onWbClear() async {
+    await _lms.clearWhiteboard(widget.sessionId);
+    setState(() => _wbStrokes = []);
+  }
+
+  Future<void> _onPermissionChanged(String userId, bool grant) async {
+    await _lms.setWhiteboardPermission(widget.sessionId, userId, grant: grant);
   }
 
   Future<void> _sendMessage() async {
@@ -203,6 +254,7 @@ class _LiveSessionPageState extends State<LiveSessionPage> with SingleTickerProv
             const Tab(icon: Icon(Icons.videocam_rounded), text: 'Video'),
             const Tab(icon: Icon(Icons.chat_bubble_outline), text: 'Chat'),
             const Tab(icon: Icon(Icons.poll_outlined), text: 'Polls'),
+            const Tab(icon: Icon(Icons.draw_rounded), text: 'Whiteboard'),
             if (widget.isInstructor)
               const Tab(icon: Icon(Icons.meeting_room_outlined), text: 'Waiting Room'),
           ],
@@ -216,6 +268,7 @@ class _LiveSessionPageState extends State<LiveSessionPage> with SingleTickerProv
                 _buildVideoTab(),
                 _buildChatTab(),
                 _buildPollsTab(),
+                _buildWhiteboardTab(),
                 if (widget.isInstructor) _buildWaitingRoomTab(),
               ],
             ),
@@ -243,6 +296,31 @@ class _LiveSessionPageState extends State<LiveSessionPage> with SingleTickerProv
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildWhiteboardTab() {
+    final userId = _currentUser?.id ?? '';
+    final canDraw = widget.isInstructor || _wbPermissions.contains(userId);
+
+    // Build attendee list for instructor permission sheet
+    final attendees = widget.isInstructor
+        ? _raisedHands.map((h) => {
+            'userId': h['userId']?.toString() ?? '',
+            'name': h['userName']?.toString() ?? 'Student',
+          }).toList()
+        : <Map<String, dynamic>>[];
+
+    return WhiteboardWidget(
+      isEditable: canDraw,
+      strokes: _wbStrokes,
+      currentUserId: userId,
+      onStrokeAdded: canDraw ? _onWbStrokeAdded : null,
+      onUndo: canDraw ? _onWbUndo : null,
+      onClear: widget.isInstructor ? _onWbClear : null,
+      attendees: attendees,
+      permissionedUserIds: _wbPermissions,
+      onPermissionChanged: widget.isInstructor ? _onPermissionChanged : null,
     );
   }
 

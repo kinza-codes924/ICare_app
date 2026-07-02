@@ -115,6 +115,8 @@ Future<String> lmsToggleScreenShare() async => 'unsupported';
 void lmsRequestFullscreen() {}
 void lmsExitFullscreen() {}
 void lmsRefreshVideoLayout() {}
+void lmsSetParticipantNames(String localName, String remoteName) {}
+void lmsSetVideoFit(String mode) {}
 void lmsListenForScreenShareEnded(void Function() callback) {}
 
 String registerLmsVideoView() => '';

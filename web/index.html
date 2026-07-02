@@ -32,9 +32,16 @@
     }
     @keyframes spin { to { transform: rotate(360deg); } }
     /* Agora video elements must fill their containers */
+    #lms-agora-remote, #agora-remote {
+      position: relative !important; overflow: hidden !important;
+    }
     #lms-agora-remote > div, #lms-agora-remote video,
-    #lms-agora-local  > div, #lms-agora-local  video,
     #agora-remote     > div, #agora-remote     video {
+      position: absolute !important; top: 0 !important; left: 0 !important;
+      width: 100% !important; height: 100% !important;
+      object-fit: cover; display: block; background: #000;
+    }
+    #lms-agora-local  > div, #lms-agora-local  video {
       width: 100% !important; height: 100% !important;
       object-fit: cover; display: block;
     }
@@ -431,7 +438,7 @@
         if (!window._lmsLocalVideo) {
           try {
             window._lmsLocalVideo = await AgoraRTC.createCameraVideoTrack({
-              encoderConfig: '480p_1',
+              encoderConfig: '720p_3',
               optimizationMode: 'motion'
             });
             console.log('LMS media: camera track created');
@@ -701,12 +708,12 @@
           // Start screen sharing
           window._lmsScreenTrack = await AgoraRTC.createScreenVideoTrack({
             encoderConfig: {
-              width: { ideal: 1280, max: 1920 },
-              height: { ideal: 720, max: 1080 },
-              frameRate: 8,
-              bitrateMax: 800,
-              bitrateMin: 200,
-              optimizationMode: 'motion'
+              width: { ideal: 1920, max: 1920 },
+              height: { ideal: 1080, max: 1080 },
+              frameRate: 30,
+              bitrateMax: 4000,
+              bitrateMin: 800,
+              optimizationMode: 'detail'
             }
           }, 'disable');
           // Unpublish camera
@@ -735,6 +742,28 @@
         window._lmsScreenTrack = null;
         return 'error:' + (e.message || String(e));
       }
+    };
+
+    window.lmsSetParticipantNames = function(localName, remoteName) {
+      var ln = document.getElementById('lms-local-name');
+      if (ln) { ln.textContent = localName; ln.style.display = localName ? 'block' : 'none'; }
+      var rn = document.getElementById('lms-remote-name');
+      if (rn) { rn.textContent = remoteName; rn.style.display = remoteName ? 'block' : 'none'; }
+    };
+
+    // Toggle video fit: 'cover' fills rectangle (no black bars), 'contain' shows full content
+    window._lmsVideoFit = 'cover';
+    window.lmsSetVideoFit = function(mode) {
+      window._lmsVideoFit = mode;
+      var st = document.getElementById('lms-agora-fit-override');
+      if (!st) {
+        st = document.createElement('style');
+        st.id = 'lms-agora-fit-override';
+        document.head.appendChild(st);
+      }
+      st.textContent =
+        '#lms-agora-remote > div, #lms-agora-remote video {' +
+        'object-fit: ' + mode + ' !important; }';
     };
 
     window.lmsRequestFullscreen = function() {
@@ -867,6 +896,8 @@
         // Mix local mic + all remote audio tracks via Web Audio API
         try {
           var audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+          // Resume in case browser suspended the context (autoplay policy)
+          if (audioCtx.state === 'suspended') { audioCtx.resume(); }
           var dest = audioCtx.createMediaStreamDestination();
           var audioSourceCount = 0;
           if (window._lmsLocalAudio) {
@@ -908,10 +939,17 @@
         }
 
         window._lmsChunks = [];
-        var mimeType = ['video/webm;codecs=vp9','video/webm;codecs=vp8','video/webm']
-          .find(function(t) { return MediaRecorder.isTypeSupported(t); }) || 'video/webm';
+        // Include opus audio codec so MediaRecorder captures audio alongside video
+        var mimeType = [
+          'video/webm;codecs=vp9,opus',
+          'video/webm;codecs=vp8,opus',
+          'video/webm;codecs=h264,opus',
+          'video/webm;codecs=vp9',
+          'video/webm;codecs=vp8',
+          'video/webm'
+        ].find(function(t) { return MediaRecorder.isTypeSupported(t); }) || 'video/webm';
 
-        window._lmsRecorder = new MediaRecorder(canvasStream, { mimeType: mimeType, videoBitsPerSecond: 800000 });
+        window._lmsRecorder = new MediaRecorder(canvasStream, { mimeType: mimeType, videoBitsPerSecond: 1200000, audioBitsPerSecond: 128000 });
         window._lmsRecorder.ondataavailable = function(e) {
           if (e.data && e.data.size > 0) window._lmsChunks.push(e.data);
         };

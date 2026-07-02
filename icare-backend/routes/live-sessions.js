@@ -181,37 +181,29 @@ router.post('/course/:courseId/set-live', authMiddleware, async (req, res) => {
       { status: 'ended' }
     );
 
-    let resultSession = null;
-
-    // Try to mark a pre-scheduled session live (only if sessionId is a valid session, not courseId)
+    // Resolve title: use provided title, or inherit from the scheduled session template
+    let sessionTitle = title || 'Live Session';
     if (sessionId && sessionId !== req.params.courseId) {
-      resultSession = await LiveSession.findByIdAndUpdate(
-        toId(sessionId),
-        // Clear stale attendees/waiting/hands/chat from any previous run of this session
-        // Reset instructorHeartbeat to NOW so auto-expire check passes immediately
-        // Refresh scheduledAt/startedAt so a reused session shows TODAY's date, not its original one
-        { status: 'live', instructorHeartbeat: new Date(), scheduledAt: new Date(), startedAt: new Date(), attendees: [], waitingStudents: [], raisedHands: [], chatMessages: [], polls: [] },
-        { new: true }
-      );
+      const template = await LiveSession.findById(toId(sessionId)).select('title').lean();
+      if (template?.title) sessionTitle = template.title;
     }
 
-    // If no valid session found/provided, create a fresh one (always gets a new _id)
-    if (!resultSession) {
-      resultSession = await LiveSession.create({
-        courseId: toId(req.params.courseId),
-        instructorId: toId(req.user.id),
-        status: 'live',
-        instructorHeartbeat: new Date(),
-        title: title || 'Live Session',
-        scheduledAt: new Date(),
-        startedAt: new Date(),
-        attendees: [],
-        waitingStudents: [],
-        raisedHands: [],
-        chatMessages: [],
-        polls: [],
-      });
-    }
+    // ALWAYS create a fresh LiveSession document — each go-live gets a new _id,
+    // which ensures record-join creates a separate Attendance row per session run.
+    const resultSession = await LiveSession.create({
+      courseId: toId(req.params.courseId),
+      instructorId: toId(req.user.id),
+      status: 'live',
+      instructorHeartbeat: new Date(),
+      title: sessionTitle,
+      scheduledAt: new Date(),
+      startedAt: new Date(),
+      attendees: [],
+      waitingStudents: [],
+      raisedHands: [],
+      chatMessages: [],
+      polls: [],
+    });
 
     console.log(`set-live: course=${req.params.courseId} session=${resultSession._id}`);
     res.json({ success: true, sessionId: resultSession._id.toString() });
@@ -1118,6 +1110,128 @@ router.get('/:id/transcript', authMiddleware, async (req, res) => {
     ];
 
     res.json({ success: true, transcript: lines.join('\n') });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+// ── WHITEBOARD ───────────────────────────────────────────────────────────────
+
+// GET /:id/whiteboard — fetch all strokes + permission list
+router.get('/:id/whiteboard', authMiddleware, async (req, res) => {
+  try {
+    await connectMongoDB();
+    const session = await LiveSession.findById(req.params.id)
+      .select('whiteboardStrokes whiteboardPermissions instructorId')
+      .lean();
+    if (!session) return res.status(404).json({ success: false, message: 'Session not found' });
+    res.json({
+      success: true,
+      strokes: session.whiteboardStrokes || [],
+      permissions: (session.whiteboardPermissions || []).map(id => id.toString()),
+    });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+// POST /:id/whiteboard/stroke — add a stroke
+router.post('/:id/whiteboard/stroke', authMiddleware, async (req, res) => {
+  try {
+    await connectMongoDB();
+    const userId = (req.user.id || req.user._id || req.user.userId || '').toString();
+    if (!userId) return res.status(401).json({ success: false, message: 'Unauthorized' });
+    const session = await LiveSession.findById(req.params.id)
+      .select('instructorId whiteboardPermissions')
+      .lean();
+    if (!session) return res.status(404).json({ success: false, message: 'Session not found' });
+
+    const instructorId = session.instructorId?.toString() || '';
+    const isInstructor = instructorId && instructorId === userId;
+    const hasPermission = (session.whiteboardPermissions || []).some(id => id.toString() === userId);
+    if (!isInstructor && !hasPermission) {
+      return res.status(403).json({ success: false, message: 'No drawing permission' });
+    }
+
+    const stroke = { ...req.body, userId, addedAt: new Date() };
+    await LiveSession.findByIdAndUpdate(req.params.id, {
+      $push: { whiteboardStrokes: stroke }
+    });
+    res.json({ success: true });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+// DELETE /:id/whiteboard/stroke/last — undo last stroke by current user
+router.delete('/:id/whiteboard/stroke/last', authMiddleware, async (req, res) => {
+  try {
+    await connectMongoDB();
+    const userId = (req.user.id || req.user._id || req.user.userId || '').toString();
+    if (!userId) return res.status(401).json({ success: false, message: 'Unauthorized' });
+    const session = await LiveSession.findById(req.params.id).select('whiteboardStrokes instructorId').lean();
+    if (!session) return res.status(404).json({ success: false, message: 'Session not found' });
+
+    const strokes = session.whiteboardStrokes || [];
+    for (let i = strokes.length - 1; i >= 0; i--) {
+      if (strokes[i].userId?.toString() === userId) {
+        await LiveSession.findByIdAndUpdate(req.params.id, {
+          $pull: { whiteboardStrokes: { id: strokes[i].id } }
+        });
+        return res.json({ success: true });
+      }
+    }
+    res.json({ success: true, message: 'Nothing to undo' });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+// POST /:id/whiteboard/clear — clear all strokes (instructor only)
+router.post('/:id/whiteboard/clear', authMiddleware, async (req, res) => {
+  try {
+    await connectMongoDB();
+    const userId = (req.user.id || req.user._id || req.user.userId || '').toString();
+    if (!userId) return res.status(401).json({ success: false, message: 'Unauthorized' });
+    const session = await LiveSession.findById(req.params.id).select('instructorId').lean();
+    // If session not found or no instructorId, still allow clear (session may be new)
+    if (session && session.instructorId) {
+      const instructorId = session.instructorId.toString();
+      if (instructorId !== userId) {
+        return res.status(403).json({ success: false, message: 'Only instructor can clear' });
+      }
+    }
+    await LiveSession.findByIdAndUpdate(req.params.id, { $set: { whiteboardStrokes: [] } });
+    res.json({ success: true });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+// PUT /:id/whiteboard/permission — grant or revoke a student's drawing permission
+router.put('/:id/whiteboard/permission', authMiddleware, async (req, res) => {
+  try {
+    await connectMongoDB();
+    const userId = (req.user.id || req.user._id || req.user.userId || '').toString();
+    if (!userId) return res.status(401).json({ success: false, message: 'Unauthorized' });
+    const session = await LiveSession.findById(req.params.id).select('instructorId').lean();
+    if (!session) return res.status(404).json({ success: false, message: 'Session not found' });
+    if (session.instructorId && session.instructorId.toString() !== userId) {
+      return res.status(403).json({ success: false, message: 'Only instructor can manage permissions' });
+    }
+    const { studentId, grant } = req.body;
+    const studentObjId = toId(studentId);
+    if (!studentObjId) return res.status(400).json({ success: false, message: 'Invalid studentId' });
+    if (grant) {
+      await LiveSession.findByIdAndUpdate(req.params.id, {
+        $addToSet: { whiteboardPermissions: studentObjId }
+      });
+    } else {
+      await LiveSession.findByIdAndUpdate(req.params.id, {
+        $pull: { whiteboardPermissions: studentObjId }
+      });
+    }
+    res.json({ success: true });
   } catch (e) {
     res.status(500).json({ success: false, message: e.message });
   }

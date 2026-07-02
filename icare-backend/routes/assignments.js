@@ -204,26 +204,19 @@ router.post('/:assignmentId/submit', authMiddleware, upload.single('file'), asyn
           data: { type: 'assignment_submitted', assignmentId: assignment._id.toString(), courseId: assignment.courseId.toString() },
         });
 
-        // Email to student
-        try {
-          const nodemailer = require('nodemailer');
-          const transporter = nodemailer.createTransport({
-            service: 'Gmail',
-            auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS },
-          });
-          if (student?.email) {
-            await transporter.sendMail({
-              from: `"iCare LMS" <${process.env.EMAIL_USER}>`,
-              to: student.email,
-              subject: `Assignment Submitted: ${assignment.title}`,
-              html: `<p>Hi ${student.name || 'Student'},</p>
-                     <p>Your assignment <b>"${assignment.title}"</b> in the course <b>"${course?.title || ''}"</b> has been successfully submitted.</p>
-                     ${isLate ? '<p style="color:orange;"><b>Note:</b> This submission was received after the due date (${dueDateStr}).</p>' : ''}
-                     <p>Your instructor will review and grade it soon.</p>
-                     <p>— iCare LMS Team</p>`,
-            });
-          }
-        } catch (_) {}
+        // Email to student (uses Resend HTTP API — works on Vercel serverless)
+        if (student?.email) {
+          const { sendEmail } = require('../utils/email');
+          sendEmail({
+            to: student.email,
+            subject: `Assignment Submitted: ${assignment.title}`,
+            html: `<p>Hi ${student.name || 'Student'},</p>
+                   <p>Your assignment <b>"${assignment.title}"</b> in the course <b>"${course?.title || ''}"</b> has been successfully submitted.</p>
+                   ${isLate ? `<p style="color:orange;"><b>Note:</b> This submission was received after the due date (${dueDateStr}).</p>` : ''}
+                   <p>Your instructor will review and grade it soon.</p>
+                   <p>— iCare LMS Team</p>`,
+          }).catch(() => {});
+        }
 
         // In-app ONLY to instructor (no email)
         if (instructor) {
@@ -361,10 +354,27 @@ router.get('/course/:courseId/my-grades', authMiddleware, async (req, res) => {
   }
 });
 
+// ── INSTRUCTOR: delete assignment ────────────────────────────────────────────
+router.delete('/:id', authMiddleware, async (req, res) => {
+  try {
+    await connectMongoDB();
+    const assignment = await Assignment.findById(toId(req.params.id));
+    if (!assignment) return res.status(404).json({ success: false, message: 'Assignment not found' });
+    if (assignment.instructorId.toString() !== req.user.id.toString() && req.user.role !== 'admin') {
+      return res.status(403).json({ success: false, message: 'Not authorized' });
+    }
+    await Assignment.findByIdAndDelete(toId(req.params.id));
+    await AssignmentSubmission.deleteMany({ assignmentId: toId(req.params.id) });
+    res.json({ success: true });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
 // ── CRON: Send assignment due-date reminders ─────────────────────────────────
-// Called daily by Vercel cron at 08:00 UTC
+// Called daily by Vercel cron at 08:00 UTC (GET) or manually (POST)
 // Sends: (1) reminder 5 days before due date  (2) reminder on due date
-router.post('/send-reminders', async (req, res) => {
+async function handleSendReminders(req, res) {
   // Allow cron secret or admin auth
   const cronSecret = req.headers['x-cron-secret'] || req.query.secret;
   if (cronSecret !== process.env.CRON_SECRET && process.env.CRON_SECRET) {
@@ -374,12 +384,7 @@ router.post('/send-reminders', async (req, res) => {
     await connectMongoDB();
     const Notification = require('../models/Notification');
     const Course = require('../models/Course');
-    const nodemailer = require('nodemailer');
-
-    const transporter = nodemailer.createTransport({
-      service: 'Gmail',
-      auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS },
-    });
+    const { sendEmail } = require('../utils/email');
 
     const now = new Date();
     // Day boundaries
@@ -421,13 +426,12 @@ router.post('/send-reminders', async (req, res) => {
       }));
       await Notification.insertMany(notifs);
 
-      // Email enrolled students
+      // Email enrolled students (Resend HTTP API — works on Vercel serverless)
       try {
         const studentIds = enrollments.map(e => e.userId);
         const students = await User.find({ _id: { $in: studentIds }, email: { $exists: true, $ne: '' } }).select('email name').lean();
         for (const student of students) {
-          await transporter.sendMail({
-            from: `"iCare LMS" <${process.env.EMAIL_USER}>`,
+          sendEmail({
             to: student.email,
             subject: `Reminder: Assignment "${assignment.title}" is ${label}`,
             html: `<p>Hi ${student.name || 'Student'},</p>
@@ -452,6 +456,8 @@ router.post('/send-reminders', async (req, res) => {
   } catch (e) {
     res.status(500).json({ success: false, message: e.message });
   }
-});
+}
+router.get('/send-reminders', handleSendReminders);
+router.post('/send-reminders', handleSendReminders);
 
 module.exports = router;

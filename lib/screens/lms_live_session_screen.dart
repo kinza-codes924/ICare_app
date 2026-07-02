@@ -5,6 +5,7 @@ import 'package:icare/services/agora_service.dart';
 import 'package:icare/services/lms_service.dart';
 import 'package:icare/utils/shared_pref.dart';
 import 'package:icare/utils/theme.dart';
+import 'package:icare/widgets/whiteboard_widget.dart';
 import '../utils/lms_agora_stub.dart'
     if (dart.library.js_interop) '../utils/lms_agora_web.dart';
 
@@ -54,6 +55,7 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
   bool _isRecording = false;
   bool _screenSharing = false;
   bool _videoFullscreen = false;
+  bool _videoFitCover = true; // true=cover(fill), false=contain(fit)
   late TabController _panelTab;
 
   // Chat — synced with backend
@@ -68,6 +70,14 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
   // Participants + raised hands — synced with backend
   final List<Map<String, dynamic>> _participants = [];
   final List<String> _raisedHands = [];
+
+  // Whiteboard
+  bool _whiteboardOpen = false;
+  List<WbStroke> _wbStrokes = [];
+  List<String> _wbPermissions = [];
+  Timer? _wbTimer;
+  final Set<String> _localStrokeIds = {}; // optimistic strokes not yet confirmed by backend
+  bool _wbFullscreen = false;
 
   // Session info
   String _currentUserName = 'You';
@@ -99,12 +109,76 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
     _sessionTimer?.cancel();
     _syncTimer?.cancel();
     _heartbeatTimer?.cancel();
+    _wbTimer?.cancel();
     _chatCtrl.dispose();
     _chatScroll.dispose();
     _panelTab.dispose();
     LmsLiveSessionScreen.activeCourseId = null; // allow popup again after leaving
     lmsLeaveChannel();
     super.dispose();
+  }
+
+  // ── Whiteboard helpers ───────────────────────────────────────────────────────
+  void _startWbPolling() {
+    _fetchWb();
+    _wbTimer = Timer.periodic(const Duration(seconds: 2), (_) {
+      if (mounted) _fetchWb();
+    });
+  }
+
+  Future<void> _fetchWb() async {
+    if (_sessionDocId.isEmpty || !mounted) return;
+    try {
+      final data = await _lms.getWhiteboard(_sessionDocId);
+      final backendStrokes = (data['strokes'] as List? ?? [])
+          .map((s) => WbStroke.fromJson(Map<String, dynamic>.from(s as Map)))
+          .toList();
+      final perms = (data['permissions'] as List? ?? []).map((e) => e.toString()).toList();
+      if (!mounted) return;
+      setState(() {
+        // Remove confirmed strokes from local pending set
+        final backendIds = backendStrokes.map((s) => s.id).toSet();
+        _localStrokeIds.removeWhere((id) => backendIds.contains(id));
+        // Merge: backend strokes + any still-pending local strokes
+        if (_localStrokeIds.isNotEmpty) {
+          final localOnly = _wbStrokes.where((s) => _localStrokeIds.contains(s.id)).toList();
+          _wbStrokes = [...backendStrokes, ...localOnly];
+        } else {
+          _wbStrokes = backendStrokes;
+        }
+        _wbPermissions = perms;
+      });
+    } catch (_) {}
+  }
+
+  Future<void> _wbStrokeAdded(WbStroke stroke) async {
+    // Optimistic: show immediately, mark as pending
+    setState(() {
+      _wbStrokes = [..._wbStrokes, stroke];
+      _localStrokeIds.add(stroke.id);
+    });
+    await _lms.addWhiteboardStroke(_sessionDocId, stroke.toJson());
+  }
+
+  Future<void> _wbUndo() async {
+    // Remove last local stroke instantly
+    if (_wbStrokes.isNotEmpty) {
+      final last = _wbStrokes.last;
+      setState(() {
+        _wbStrokes = _wbStrokes.sublist(0, _wbStrokes.length - 1);
+        _localStrokeIds.remove(last.id);
+      });
+    }
+    await _lms.undoWhiteboardStroke(_sessionDocId);
+  }
+
+  Future<void> _wbClear() async {
+    setState(() { _wbStrokes = []; _localStrokeIds.clear(); });
+    await _lms.clearWhiteboard(_sessionDocId);
+  }
+
+  Future<void> _wbPermissionChanged(String userId, bool grant) async {
+    await _lms.setWhiteboardPermission(_sessionDocId, userId, grant: grant);
   }
 
   Future<void> _initSession() async {
@@ -164,6 +238,13 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
 
       // Step 5: Start polling for real-time sync
       _startSyncPolling();
+      _startWbPolling();
+
+      // Instructor always starts with a clean whiteboard (no leftovers from prior sessions)
+      if (widget.isInstructor && _sessionDocId.isNotEmpty) {
+        _lms.clearWhiteboard(_sessionDocId).catchError((_) {});
+        if (mounted) setState(() { _wbStrokes = []; _localStrokeIds.clear(); });
+      }
 
       await _initVideoSession();
     } catch (e) {
@@ -296,6 +377,14 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
             _waitingStudents = [];
           }
         });
+
+        // Update name labels on the web video tiles
+        if (kIsWeb) {
+          final remoteName = widget.isInstructor
+              ? (_participants.firstWhere((p) => p['id'] != _currentUserId, orElse: () => {'name': ''})['name']?.toString() ?? 'Student')
+              : (_instructorName.isNotEmpty ? '$_instructorName (Host)' : 'Instructor');
+          lmsSetParticipantNames('$_currentUserName (You)', remoteName);
+        }
 
         // Notify instructor of new join request — compare against PRE-setState count
         if (mounted && widget.isInstructor && waitingNames.length > prevWaitingCount) {
@@ -578,9 +667,7 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
       ),
     );
     if (confirm == true && mounted) {
-      // Stop recording + upload FIRST — must run while the Agora tracks are still
-      // alive, because lmsLeaveChannel() closes the very tracks MediaRecorder is
-      // capturing. JS guards itself if no recorder is active, so no _isRecording check.
+      // Stop recording while Agora tracks are still alive
       if (widget.isInstructor && kIsWeb && _sessionDocId.isNotEmpty) {
         final token = await SharedPref().getToken();
         lmsStopRecordingAndUpload(
@@ -592,45 +679,36 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
 
       lmsLeaveChannel();
 
-      // Remove self from session attendees on backend so participant count stays accurate
-      if (_sessionDocId.isNotEmpty && _sessionDocId != widget.courseId) {
-        await _lms.leaveLiveSession(_sessionDocId);
-        // Feature 4: record leave timestamp for students
-        if (!widget.isInstructor) {
-          _lms.recordLiveSessionLeave(_sessionDocId).catchError((_) {});
-        }
-      }
+      // Navigate immediately — never block on backend calls
+      final sessionId = _sessionDocId;
+      final lessonId = widget.lessonId;
+      final moduleId = widget.moduleId;
+      final courseId = widget.courseId;
+      final isInstructor = widget.isInstructor;
+      final chatSnapshot = List<Map<String, dynamic>>.from(_chatMessages);
 
-      if (widget.isInstructor) {
+      if (mounted) Navigator.pop(context);
 
-        // Auto-save: end session + save chat transcript to lesson
-        if (_sessionDocId.isNotEmpty && _sessionDocId != widget.courseId) {
-          final result = await _lms.endAndSaveSession(
-            sessionId: _sessionDocId,
-            lessonId: widget.lessonId,
-            moduleId: widget.moduleId,
-            chatMessages: List<Map<String, dynamic>>.from(_chatMessages),
-          );
-          if (mounted && result['success'] == true) {
-            final msg = widget.lessonId != null
-                ? 'Session saved and linked to lesson.'
-                : 'Session ended. Chat transcript saved.';
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Row(children: [
-                  const Icon(Icons.save_rounded, color: Colors.white),
-                  const SizedBox(width: 8),
-                  Expanded(child: Text(msg)),
-                ]),
-                backgroundColor: Colors.green,
-                duration: const Duration(seconds: 3),
-              ),
-            );
+      // Background cleanup — fire and forget
+      Future(() async {
+        if (sessionId.isNotEmpty && sessionId != courseId) {
+          _lms.leaveLiveSession(sessionId).catchError((_) {});
+          if (!isInstructor) {
+            _lms.recordLiveSessionLeave(sessionId).catchError((_) {});
           }
         }
-        await _lms.setSessionLive(courseId: widget.courseId, isLive: false);
-      }
-      Navigator.pop(context);
+        if (isInstructor) {
+          if (sessionId.isNotEmpty && sessionId != courseId) {
+            _lms.endAndSaveSession(
+              sessionId: sessionId,
+              lessonId: lessonId,
+              moduleId: moduleId,
+              chatMessages: chatSnapshot,
+            ).catchError((_) => <String, dynamic>{});
+          }
+          _lms.setSessionLive(courseId: courseId, isLive: false).catchError((_) => null);
+        }
+      });
     }
   }
 
@@ -759,8 +837,81 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
                   ),
                 ),
               ),
+            // Whiteboard overlay — covers video area, bottom bar stays visible
+            if (_whiteboardOpen) _buildWhiteboardOverlay(),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildWhiteboardOverlay() {
+    final canDraw = widget.isInstructor || _wbPermissions.contains(_currentUserId);
+    final bottomBarH = _wbFullscreen ? 0.0 : (MediaQuery.of(context).size.width < 600 ? 100.0 : 70.0);
+    final topBarH = _wbFullscreen ? 0.0 : (_videoFullscreen ? 0.0 : 52.0);
+    return Positioned(
+      top: topBarH,
+      left: 0, right: 0,
+      bottom: bottomBarH,
+      child: Material(
+        color: Colors.white,
+        child: Column(children: [
+          // Whiteboard title bar
+          Container(
+            height: 40,
+            color: const Color(0xFF0B2D6E),
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: Row(children: [
+              const Icon(Icons.draw_rounded, color: Colors.white, size: 16),
+              const SizedBox(width: 8),
+              const Expanded(
+                child: Text('Whiteboard', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 14)),
+              ),
+              if (!canDraw)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(10)),
+                  child: const Text('View Only', style: TextStyle(color: Colors.white70, fontSize: 11)),
+                ),
+              const SizedBox(width: 8),
+              // Fullscreen toggle
+              GestureDetector(
+                onTap: () => setState(() => _wbFullscreen = !_wbFullscreen),
+                child: Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(6)),
+                  child: Icon(
+                    _wbFullscreen ? Icons.fullscreen_exit_rounded : Icons.fullscreen_rounded,
+                    color: Colors.white, size: 18,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 6),
+              GestureDetector(
+                onTap: () => setState(() { _whiteboardOpen = false; _wbFullscreen = false; }),
+                child: Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(6)),
+                  child: const Icon(Icons.close_rounded, color: Colors.white, size: 18),
+                ),
+              ),
+            ]),
+          ),
+          // Whiteboard canvas
+          Expanded(
+            child: WhiteboardWidget(
+              isEditable: canDraw,
+              strokes: _wbStrokes,
+              currentUserId: _currentUserId,
+              onStrokeAdded: canDraw ? _wbStrokeAdded : null,
+              onUndo: canDraw ? _wbUndo : null,
+              onClear: widget.isInstructor ? _wbClear : null,
+              attendees: _participants,
+              permissionedUserIds: _wbPermissions,
+              onPermissionChanged: widget.isInstructor ? _wbPermissionChanged : null,
+            ),
+          ),
+        ]),
       ),
     );
   }
@@ -849,6 +1000,37 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
                   padding: const EdgeInsets.all(6),
                   decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.55), borderRadius: BorderRadius.circular(6)),
                   child: const Icon(Icons.fullscreen_rounded, color: Colors.white, size: 22),
+                ),
+              ),
+            ),
+
+          // Fit/Fill toggle — top-left corner (visible when permissions enabled)
+          if (showFullscreenBtn && _permissionsEnabled)
+            Positioned(
+              top: 8, left: 8,
+              child: GestureDetector(
+                onTap: () {
+                  final next = !_videoFitCover;
+                  setState(() => _videoFitCover = next);
+                  if (kIsWeb) lmsSetVideoFit(next ? 'cover' : 'contain');
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                  decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.55), borderRadius: BorderRadius.circular(6)),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        _videoFitCover ? Icons.fit_screen_rounded : Icons.crop_free_rounded,
+                        color: Colors.white, size: 16,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        _videoFitCover ? 'Fill' : 'Fit',
+                        style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -1629,6 +1811,12 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
             },
           )
         : null;
+    final wbBtn = _controlBtn(
+      icon: Icons.draw_rounded,
+      label: 'Whiteboard',
+      color: _whiteboardOpen ? const Color(0xFF10B981) : Colors.white,
+      onTap: () => setState(() => _whiteboardOpen = !_whiteboardOpen),
+    );
     final screenShareBtn = kIsWeb
         ? _controlBtn(
             icon: _screenSharing ? Icons.stop_screen_share_rounded : Icons.screen_share_rounded,
@@ -1671,6 +1859,7 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
                 chatBtn,
                 peopleBtn,
                 if (pollsBtn != null) pollsBtn,
+                wbBtn,
               ],
             ),
             const SizedBox(height: 6),
@@ -1715,6 +1904,8 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
           peopleBtn,
           const SizedBox(width: 8),
           if (pollsBtn != null) ...[pollsBtn, const SizedBox(width: 8)],
+          wbBtn,
+          const SizedBox(width: 8),
           const Spacer(),
           endBtn,
         ],

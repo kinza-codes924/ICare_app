@@ -6,6 +6,8 @@ import 'package:icare/screens/lab_reports_screen.dart';
 import 'package:icare/screens/patient_prescriptions.dart';
 import 'package:icare/screens/reminder_list.dart';
 import 'package:icare/services/notification_service.dart';
+import 'package:icare/services/course_service.dart';
+import 'package:icare/screens/classroom_course_view.dart';
 import 'package:icare/utils/theme.dart';
 import 'package:icare/utils/utils.dart';
 import 'package:icare/widgets/back_button.dart';
@@ -140,7 +142,44 @@ class _NotificationScreenState extends State<NotificationScreen> {
         Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ReminderList()));
         break;
       default:
+        _openLmsTarget(notif);
         break;
+    }
+  }
+
+  /// LMS notifications carry data.type + courseId — open the course classroom
+  Future<void> _openLmsTarget(Map notif) async {
+    final data = notif['data'];
+    if (data is! Map) return;
+    final courseId = data['courseId']?.toString() ?? '';
+    if (courseId.isEmpty) return;
+    try {
+      // Find the enrollment for this course so classwork/submissions work
+      final enrollments = await CourseService().myPurchases();
+      Map<String, dynamic>? enrollment;
+      for (final e in enrollments) {
+        final c = e['course'];
+        final cid = (c is Map ? c['_id'] : e['courseId'])?.toString() ?? '';
+        if (cid == courseId) {
+          enrollment = Map<String, dynamic>.from(e);
+          break;
+        }
+      }
+      if (enrollment == null || !mounted) return;
+      final course = Map<String, dynamic>.from(enrollment['course'] as Map);
+      final dType = data['type']?.toString() ?? '';
+      // Assignment-related → open Classwork tab directly
+      final isClasswork = dType.contains('assignment') || dType.contains('quiz');
+      Navigator.of(context).push(MaterialPageRoute(
+        builder: (_) => ClassroomCourseView(
+          course: course,
+          enrollmentId: enrollment!['_id']?.toString(),
+          isInstructor: false,
+          initialTab: isClasswork ? 1 : 0,
+        ),
+      ));
+    } catch (e) {
+      debugPrint('Notification navigation error: $e');
     }
   }
 

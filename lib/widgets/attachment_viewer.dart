@@ -183,15 +183,23 @@ class AttachmentViewer extends StatelessWidget {
     await showDocPreview(context, proxyUrl, fileName);
   }
 
-  // For Cloudinary raw files (res.cloudinary.com with /raw/upload/) route through
-  // the backend proxy so the browser never touches the restricted CDN URL directly.
+  // Route files through backend proxies so the browser never touches restricted URLs.
+  // Cloudinary raw files → doc-stream proxy
+  // Vercel Blob private files → blob-download proxy
   Future<String> _resolveUrl(String original) async {
-    if (!original.contains('res.cloudinary.com')) return original;
     try {
       final token = await SharedPref().getToken() ?? '';
       if (token.isEmpty) return original;
       final encoded = Uri.encodeComponent(original);
-      return '${ApiConstants.baseUrl}/upload/doc-stream?url=$encoded&token=${Uri.encodeComponent(token)}';
+      final t = Uri.encodeComponent(token);
+
+      if (original.contains('res.cloudinary.com')) {
+        return '${ApiConstants.baseUrl}/upload/doc-stream?url=$encoded&token=$t';
+      }
+      if (original.contains('blob.vercel-storage.com')) {
+        return '${ApiConstants.baseUrl}/upload/blob-download?url=$encoded&token=$t';
+      }
+      return original;
     } catch (_) {
       return original;
     }

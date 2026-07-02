@@ -2,6 +2,7 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:icare/screens/classroom_course_view.dart';
+import 'package:icare/screens/doctor_notifications.dart';
 import 'package:icare/screens/instructor_lms_create_course.dart';
 import 'package:icare/screens/instructor_lms_courses.dart';
 import 'package:icare/screens/instructor_profile_setup.dart';
@@ -173,6 +174,11 @@ class _InstructorLmsDashboardState extends ConsumerState<InstructorLmsDashboard>
             icon: const Icon(Icons.search_rounded, color: Color(0xFF444746), size: 22),
             onPressed: () {},
             tooltip: 'Search',
+          ),
+          IconButton(
+            icon: const Icon(Icons.notifications_outlined, color: Color(0xFF444746), size: 22),
+            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const DoctorNotifications())),
+            tooltip: 'Notifications',
           ),
           // Create class button
           Padding(
@@ -367,7 +373,7 @@ class _InstructorLmsDashboardState extends ConsumerState<InstructorLmsDashboard>
                   _createClass();
                 },
                 icon: const Icon(Icons.add_rounded, size: 16),
-                label: const Text('Create class'),
+                label: const Text('Create course'),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: const Color(0xFF1A73E8),
                   side: const BorderSide(color: Color(0xFF1A73E8)),
@@ -685,7 +691,7 @@ class _InstructorLmsDashboardState extends ConsumerState<InstructorLmsDashboard>
           ElevatedButton.icon(
             onPressed: _createClass,
             icon: const Icon(Icons.add_rounded, size: 18),
-            label: const Text('Create class'),
+            label: const Text('Create course'),
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF1A73E8), foregroundColor: Colors.white,
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
