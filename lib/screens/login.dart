@@ -2100,6 +2100,116 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     );
   }
 
+  static const _roleDisplayNames = {
+    'doctor': 'Doctor',
+    'student': 'Student',
+    'instructor': 'Instructor',
+    'patient': 'Patient',
+    'lab': 'Laboratory',
+    'pharmacy': 'Pharmacy',
+  };
+
+  static const _roleIcons = {
+    'doctor': Icons.medical_services_rounded,
+    'student': Icons.school_rounded,
+    'instructor': Icons.cast_for_education_rounded,
+    'patient': Icons.person_rounded,
+    'lab': Icons.biotech_rounded,
+    'pharmacy': Icons.local_pharmacy_rounded,
+  };
+
+  /// Multi-role accounts: pick which role to log in as.
+  Future<String?> _showLoginAsSheet(List<String> roles, String activeRole) {
+    return showModalBottomSheet<String>(
+      context: context,
+      isDismissible: false,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40, height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Text('Login As',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: Color(0xFF0F172A))),
+              const SizedBox(height: 4),
+              const Text('Your account has multiple roles. Choose how you want to continue.',
+                  style: TextStyle(fontSize: 13, color: Color(0xFF64748B))),
+              const SizedBox(height: 16),
+              ...roles.map((r) {
+                final key = r.toLowerCase();
+                final isActive = key == activeRole.toLowerCase();
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: InkWell(
+                    onTap: () => Navigator.pop(ctx, key),
+                    borderRadius: BorderRadius.circular(14),
+                    child: Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: isActive
+                            ? const Color(0xFF0036BC).withValues(alpha: 0.06)
+                            : Colors.white,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                          color: isActive
+                              ? const Color(0xFF0036BC)
+                              : const Color(0xFFE2E8F0),
+                          width: isActive ? 1.5 : 1,
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 42, height: 42,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF0036BC).withValues(alpha: 0.08),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Icon(
+                              _roleIcons[key] ?? Icons.person_rounded,
+                              color: const Color(0xFF0036BC), size: 22,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              'Login as ${_roleDisplayNames[key] ?? r}',
+                              style: const TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xFF0F172A)),
+                            ),
+                          ),
+                          if (isActive)
+                            const Icon(Icons.check_circle_rounded,
+                                color: Color(0xFF0036BC), size: 20),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              }),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   void _handleSubmit() async {
     if (!_formKey.currentState!.validate()) return;
     // Terms & Conditions check for signup
@@ -2135,8 +2245,31 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
           debugPrint("🔍 Fetching user profile...");
 
           // Get the token from the login result
-          final token = result['data']['token'];
+          var token = result['data']['token'];
           debugPrint("🔑 Token from login: ${token.substring(0, 20)}...");
+
+          // Multi-role account: ask which role to log in as
+          final loginUser = result['data']['user'];
+          final rolesRaw = (loginUser is Map) ? loginUser['roles'] : null;
+          if (rolesRaw is List && rolesRaw.length > 1 && mounted) {
+            final roles = rolesRaw.map((e) => e.toString()).toList();
+            final activeRole = loginUser['role']?.toString() ?? '';
+            final picked = await _showLoginAsSheet(roles, activeRole);
+            if (picked == null) {
+              setState(() => isLoading = false);
+              return;
+            }
+            if (picked.toLowerCase() != activeRole.toLowerCase()) {
+              final sw = await _authService.switchRole(picked, token: token);
+              if (sw['success'] == true) {
+                token = sw['data']['token'];
+              } else {
+                _showError(sw['message']?.toString() ?? 'Role switch failed');
+                setState(() => isLoading = false);
+                return;
+              }
+            }
+          }
 
           // Fetch user profile with the token directly (don't rely on storage yet)
           final profileResult = await _userService.getUserProfile(token: token);

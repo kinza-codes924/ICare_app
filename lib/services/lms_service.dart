@@ -978,6 +978,17 @@ class LmsService {
     return response.data['assignments'] ?? [];
   }
 
+  // ── Attendance (instructor) ────────────────────────────────────────────────
+  Future<List<dynamic>> getCourseAttendanceSessions(String courseId) async {
+    final response = await _api.get('/lms/attendance/course/$courseId');
+    return response.data['sessions'] ?? [];
+  }
+
+  Future<Map<String, dynamic>> getAttendanceSessionDetail(String sessionId) async {
+    final response = await _api.get('/lms/attendance/session/$sessionId');
+    return Map<String, dynamic>.from(response.data ?? {});
+  }
+
   Future<List<dynamic>> getMyAssessmentQuizzes() async {
     final response = await _api.get('/quizzes/my');
     return response.data['quizAttempts'] ?? [];

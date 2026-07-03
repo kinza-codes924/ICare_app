@@ -115,7 +115,11 @@ class _CustomDrawerState extends ConsumerState<CustomDrawer> {
     if (result['success'] == true) {
       final inner = result['data'];
       await ref.read(authProvider.notifier).setUserToken(inner['token'].toString());
-      final user = User.fromJson(Map<String, dynamic>.from(inner['user'] as Map));
+      final currentUser = ref.read(authProvider).user;
+      final user = User.fromJson(Map<String, dynamic>.from(inner['user'] as Map)).copyWith(
+        isEmailVerified: currentUser?.isEmailVerified ?? true,
+        isPhoneVerified: currentUser?.isPhoneVerified ?? true,
+      );
       await ref.read(authProvider.notifier).setUser(user);
       if (!mounted) return;
       // ignore: use_build_context_synchronously

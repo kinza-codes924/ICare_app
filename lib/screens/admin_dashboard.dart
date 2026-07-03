@@ -325,6 +325,115 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
     }
   }
 
+  static const _allRoles = ['doctor', 'student', 'instructor', 'patient', 'lab', 'pharmacy'];
+  static const _roleLabels = {
+    'doctor': 'Doctor',
+    'student': 'Student',
+    'instructor': 'Instructor',
+    'patient': 'Patient',
+    'lab': 'Laboratory',
+    'pharmacy': 'Pharmacy',
+  };
+
+  Future<void> _showManageRolesDialog(Map user) async {
+    final userId = user['_id']?.toString() ?? '';
+    final primaryRole = (user['role']?.toString() ?? '').toLowerCase();
+    final existingRoles = ((user['roles'] as List?) ?? [])
+        .map((e) => e.toString().toLowerCase())
+        .toSet();
+    final selected = <String>{primaryRole, ...existingRoles};
+
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (dialogCtx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Row(children: [
+            const Icon(Icons.swap_horiz_rounded, color: Color(0xFF0036BC)),
+            const SizedBox(width: 10),
+            Expanded(child: Text('Manage Roles — ${user['name'] ?? user['username'] ?? 'User'}',
+                style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16))),
+          ]),
+          content: SizedBox(
+            width: 380,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Select every role this account can switch between. The primary role (below) stays locked.',
+                  style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                ),
+                const SizedBox(height: 14),
+                ..._allRoles.map((r) {
+                  final isPrimary = r == primaryRole;
+                  final isChecked = selected.contains(r);
+                  return CheckboxListTile(
+                    value: isChecked,
+                    onChanged: isPrimary
+                        ? null
+                        : (v) => setDialogState(() {
+                              if (v == true) {
+                                selected.add(r);
+                              } else {
+                                selected.remove(r);
+                              }
+                            }),
+                    controlAffinity: ListTileControlAffinity.leading,
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                    title: Row(children: [
+                      Text(_roleLabels[r] ?? r, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                      if (isPrimary) ...[
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF0036BC).withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: const Text('Primary', style: TextStyle(fontSize: 10, color: Color(0xFF0036BC), fontWeight: FontWeight.w700)),
+                        ),
+                      ],
+                    ]),
+                  );
+                }),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(dialogCtx, false), child: const Text('Cancel')),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(dialogCtx, true),
+              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF0036BC), foregroundColor: Colors.white),
+              child: const Text('Save'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (result != true || !mounted) return;
+    try {
+      final response = await _apiService.put(
+        '/admin/users/$userId/roles',
+        {'roles': selected.toList()},
+      );
+      if (mounted && response.statusCode == 200) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Roles updated successfully'), backgroundColor: Colors.green),
+        );
+        _fetchUsers();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to update roles: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -711,6 +820,21 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
                             ],
                           );
                         }),
+                        const SizedBox(height: 12),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            OutlinedButton.icon(
+                              onPressed: () => _showManageRolesDialog(user),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: const Color(0xFF0036BC),
+                                side: const BorderSide(color: Color(0xFF0036BC)),
+                              ),
+                              icon: const Icon(Icons.swap_horiz_rounded, size: 18),
+                              label: const Text('Manage Roles'),
+                            ),
+                          ],
+                        ),
                         if (_currentTab == 'Pending') ...[
                           const SizedBox(height: 16),
                           const Divider(),
@@ -1065,6 +1189,7 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
               child: Row(
                 children: [
                   _buildTabItem('Pending',        Icons.pending_actions_rounded),
+                  _buildTabItem('Doctor',         Icons.medical_services_rounded),
                   _buildTabItem('Student',        Icons.school_rounded),
                   _buildTabItem('Pharmacy',       Icons.local_pharmacy_rounded),
                   _buildTabItem('Laboratory',     Icons.biotech_rounded),

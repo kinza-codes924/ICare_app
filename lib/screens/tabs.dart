@@ -72,6 +72,9 @@ import 'package:icare/services/lms_service.dart';
 import 'package:icare/services/course_service.dart';
 import 'package:icare/screens/my_learning.dart';
 import 'package:icare/services/notification_service.dart';
+import 'package:icare/services/api_service.dart';
+import 'package:icare/services/auth_service.dart';
+import 'package:icare/models/user.dart' as app_user;
 
 class TabsScreen extends ConsumerStatefulWidget {
   final String? initialAdminTab;
@@ -362,6 +365,16 @@ class _TabsScreenState extends ConsumerState<TabsScreen> {
         activePage = const PharmacyInventory();
       } else if (currentIndex == 3) {
         activePage = const PharmacyProfileSetup();
+      } else if (currentIndex == 20) {
+        activePage = const PharmacyOrders();
+      } else if (currentIndex == 21) {
+        activePage = const PaymentInvoices(isPharmacy: true);
+      } else if (currentIndex == 22) {
+        activePage = const PharmacyAnalytics();
+      } else if (currentIndex == 23) {
+        activePage = const SettingsScreen();
+      } else if (currentIndex == 24) {
+        activePage = const HelpAndSupport();
       }
     } else if (role == "Laboratory") {
       if (currentIndex == 0) {
@@ -372,18 +385,54 @@ class _TabsScreenState extends ConsumerState<TabsScreen> {
         activePage = const LabReportsScreen();
       } else if (currentIndex == 3) {
         activePage = const LabProfileSetup();
+      } else if (currentIndex == 20) {
+        activePage = const LabBookingsManagement();
+      } else if (currentIndex == 21) {
+        activePage = const LabTestsManagement();
+      } else if (currentIndex == 22) {
+        activePage = const PaymentInvoices();
+      } else if (currentIndex == 23) {
+        activePage = const LabAnalytics();
+      } else if (currentIndex == 24) {
+        activePage = const SettingsScreen();
+      } else if (currentIndex == 25) {
+        activePage = const HelpAndSupport();
       }
     } else if (role == "Doctor") {
       if (currentIndex == 0) {
         activePage = const DoctorDashboard();
       } else if (currentIndex == 1) {
         activePage = const DoctorAppointmentsScreen();
+      } else if (currentIndex == 20) {
+        activePage = const DoctorScheduleCalendar();
+      } else if (currentIndex == 21) {
+        activePage = const DoctorAnalytics();
+      } else if (currentIndex == 22) {
+        activePage = const HealthCommunityScreen();
+      } else if (currentIndex == 23) {
+        activePage = const DoctorAvailability();
+      } else if (currentIndex == 24) {
+        activePage = const DoctorNotifications();
+      } else if (currentIndex == 25) {
+        activePage = const HelpAndSupport();
+      } else if (currentIndex == 26) {
+        activePage = const SettingsScreen();
       }
     } else if (role == "Instructor") {
       if (currentIndex == 0) {
         activePage = const InstructorDashboardScreen();
       } else if (currentIndex == 1) {
         activePage = InstructorCoursesManagementScreen();
+      } else if (currentIndex == 20) {
+        activePage = InstructorCoursesManagementScreen();
+      } else if (currentIndex == 21) {
+        activePage = InstructorLearnersScreen();
+      } else if (currentIndex == 22) {
+        activePage = InstructorPrecautionsManagementScreen();
+      } else if (currentIndex == 23) {
+        activePage = InstructorAnalytics();
+      } else if (currentIndex == 24) {
+        activePage = const SettingsScreen();
       }
     } else if (role == "Student") {
       if (currentIndex == 0) {
@@ -400,6 +449,8 @@ class _TabsScreenState extends ConsumerState<TabsScreen> {
         activePage = const AssessmentsScreen();
       } else if (currentIndex == 6) {
         activePage = const SettingsScreen();
+      } else if (currentIndex == 20) {
+        activePage = const StudentLmsDashboard();
       }
     } else if (role == "Admin") {
       if (currentIndex == 0) {
@@ -422,10 +473,35 @@ class _TabsScreenState extends ConsumerState<TabsScreen> {
       } else if (currentIndex == 1) {
         activePage = const MyLearningScreen();
       } else if (currentIndex == 2) {
-        // On web show the web profile overview; on mobile show the edit profile form
         activePage = isWeb ? ProfileScreen() : const ProfileEditScreen();
       } else if (currentIndex == 4) {
         activePage = const MyLearningScreen();
+      } else if (currentIndex == 20) {
+        activePage = const BookingsHistoryScreen();
+      } else if (currentIndex == 21) {
+        activePage = const PatientPrescriptions();
+      } else if (currentIndex == 22) {
+        activePage = const PharmaciesScreen();
+      } else if (currentIndex == 23) {
+        activePage = const PatientBookLabFlow();
+      } else if (currentIndex == 24) {
+        activePage = const HealthJourneyScreen();
+      } else if (currentIndex == 25) {
+        activePage = const LifestyleTrackerScreen();
+      } else if (currentIndex == 26) {
+        activePage = const MyLearningScreen();
+      } else if (currentIndex == 27) {
+        activePage = const EmergencyContactsScreen();
+      } else if (currentIndex == 28) {
+        activePage = LabReportsScreen();
+      } else if (currentIndex == 29) {
+        activePage = const ReminderList();
+      } else if (currentIndex == 30) {
+        activePage = const HealthCommunityScreen();
+      } else if (currentIndex == 31) {
+        activePage = const GamificationScreen();
+      } else if (currentIndex == 32) {
+        activePage = const SettingsScreen();
       }
     }
 
@@ -914,475 +990,78 @@ class _WebSidebarState extends ConsumerState<_WebSidebar> {
                 // ── Role-specific extra nav items ──────────────────────────
                 if (role == 'Patient') ...[
                   const SizedBox(height: 8),
-                  _buildExtraNavItem(
-                    context,
-                    Icons.calendar_month_outlined,
-                    'My Appointments',
-                    () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const BookingsHistoryScreen())),
-                  ),
-                  _buildExtraNavItem(
-                    context,
-                    Icons.medication_liquid_outlined,
-                    'My Prescriptions',
-                    () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const PatientPrescriptions())),
-                  ),
-                  _buildExtraNavItem(
-                    context,
-                    Icons.medication_outlined,
-                    'Order Medicines',
-                    () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const PharmaciesScreen())),
-                  ),
-                  _buildExtraNavItem(
-                    context,
-                    Icons.science_outlined,
-                    'Book a Lab Test',
-                    () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const PatientBookLabFlow())),
-                  ),
+                  _buildExtraNavItem(context, Icons.calendar_month_outlined, 'My Appointments', () => onSelect(20)),
+                  _buildExtraNavItem(context, Icons.medication_liquid_outlined, 'My Prescriptions', () => onSelect(21)),
+                  _buildExtraNavItem(context, Icons.medication_outlined, 'Order Medicines', () => onSelect(22)),
+                  _buildExtraNavItem(context, Icons.science_outlined, 'Book a Lab Test', () => onSelect(23)),
                   Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 4,
-                      vertical: 8,
-                    ),
-                    child: Divider(
-                      color: const Color(0xFFE8ECF5),
-                      height: 1,
-                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+                    child: Divider(color: const Color(0xFFE8ECF5), height: 1),
                   ),
-                  _buildExtraNavItem(
-                    context,
-                    Icons.history_outlined,
-                    'Health Journey',
-                    () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (ctx) => const HealthJourneyScreen(),
-                        ),
-                      );
-                    },
-                  ),
-                  _buildExtraNavItem(
-                    context,
-                    Icons.monitor_heart_outlined,
-                    'Health Tracker',
-                    () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (ctx) => const LifestyleTrackerScreen(),
-                        ),
-                      );
-                    },
-                  ),
-                  _buildExtraNavItem(
-                    context,
-                    Icons.school_outlined,
-                    'My Learning',
-                    () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (ctx) => const MyLearningScreen(),
-                        ),
-                      );
-                    },
-                  ),
-                  _buildExtraNavItem(
-                    context,
-                    Icons.contact_emergency_outlined,
-                    'Emergency Contacts',
-                    () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (ctx) => const EmergencyContactsScreen(),
-                        ),
-                      );
-                    },
-                  ),
-                  _buildExtraNavItem(
-                    context,
-                    Icons.biotech_outlined,
-                    'Lab Results/Reports',
-                    () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => LabReportsScreen())),
-                  ),
-                  _buildExtraNavItem(
-                    context,
-                    Icons.alarm_outlined,
-                    'Reminders',
-                    () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (ctx) => const ReminderList(),
-                        ),
-                      );
-                    },
-                  ),
-                  _buildExtraNavItem(
-                    context,
-                    Icons.people_outline_rounded,
-                    'Health Community',
-                    () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (ctx) => const HealthCommunityScreen(),
-                        ),
-                      );
-                    },
-                  ),
-                  _buildExtraNavItem(
-                    context,
-                    Icons.emoji_events_outlined,
-                    'Achievements & Rewards',
-                    () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (ctx) => const GamificationScreen(),
-                        ),
-                      );
-                    },
-                  ),
-                  _buildExtraNavItem(
-                    context,
-                    Icons.settings_outlined,
-                    'Settings',
-                    () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (ctx) => const SettingsScreen(),
-                        ),
-                      );
-                    },
-                  ),
+                  _buildExtraNavItem(context, Icons.history_outlined, 'Health Journey', () => onSelect(24)),
+                  _buildExtraNavItem(context, Icons.monitor_heart_outlined, 'Health Tracker', () => onSelect(25)),
+                  _buildExtraNavItem(context, Icons.school_outlined, 'My Learning', () => onSelect(26)),
+                  _buildExtraNavItem(context, Icons.contact_emergency_outlined, 'Emergency Contacts', () => onSelect(27)),
+                  _buildExtraNavItem(context, Icons.biotech_outlined, 'Lab Results/Reports', () => onSelect(28)),
+                  _buildExtraNavItem(context, Icons.alarm_outlined, 'Reminders', () => onSelect(29)),
+                  _buildExtraNavItem(context, Icons.people_outline_rounded, 'Health Community', () => onSelect(30)),
+                  _buildExtraNavItem(context, Icons.emoji_events_outlined, 'Achievements & Rewards', () => onSelect(31)),
+                  _buildExtraNavItem(context, Icons.settings_outlined, 'Settings', () => onSelect(32)),
                 ],
 
                 if (role == 'Doctor') ...[
                   const SizedBox(height: 8),
                   Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 4,
-                      vertical: 8,
-                    ),
-                    child: Divider(
-                      color: const Color(0xFFE8ECF5),
-                      height: 1,
-                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+                    child: Divider(color: const Color(0xFFE8ECF5), height: 1),
                   ),
-                  _buildExtraNavItem(
-                    context,
-                    Icons.schedule_outlined,
-                    'My Schedule',
-                    () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (ctx) => const DoctorScheduleCalendar(),
-                        ),
-                      );
-                    },
-                  ),
-                  _buildExtraNavItem(
-                    context,
-                    Icons.analytics_outlined,
-                    'Analytics',
-                    () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (ctx) => const DoctorAnalytics(),
-                        ),
-                      );
-                    },
-                  ),
-                  _buildExtraNavItem(
-                    context,
-                    Icons.people_outline_rounded,
-                    'Health Community',
-                    () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (ctx) => const HealthCommunityScreen(),
-                        ),
-                      );
-                    },
-                  ),
-                  _buildExtraNavItem(
-                    context,
-                    Icons.event_available_outlined,
-                    'Availability',
-                    () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (ctx) => const DoctorAvailability(),
-                        ),
-                      );
-                    },
-                  ),
-                  _buildExtraNavItem(
-                    context,
-                    Icons.notifications_outlined,
-                    'Notifications',
-                    () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (ctx) => const DoctorNotifications(),
-                        ),
-                      );
-                    },
-                  ),
-                  _buildExtraNavItem(
-                    context,
-                    Icons.help_outline_rounded,
-                    'Help & Support',
-                    () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (ctx) => const HelpAndSupport(),
-                        ),
-                      );
-                    },
-                  ),
-                  _buildExtraNavItem(
-                    context,
-                    Icons.settings_outlined,
-                    'Settings',
-                    () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (ctx) => const SettingsScreen(),
-                        ),
-                      );
-                    },
-                  ),
+                  _buildExtraNavItem(context, Icons.schedule_outlined, 'My Schedule', () => onSelect(20)),
+                  _buildExtraNavItem(context, Icons.analytics_outlined, 'Analytics', () => onSelect(21)),
+                  _buildExtraNavItem(context, Icons.people_outline_rounded, 'Health Community', () => onSelect(22)),
+                  _buildExtraNavItem(context, Icons.event_available_outlined, 'Availability', () => onSelect(23)),
+                  _buildExtraNavItem(context, Icons.notifications_outlined, 'Notifications', () => onSelect(24)),
+                  _buildExtraNavItem(context, Icons.help_outline_rounded, 'Help & Support', () => onSelect(25)),
+                  _buildExtraNavItem(context, Icons.settings_outlined, 'Settings', () => onSelect(26)),
                 ],
 
                 if (role == 'Instructor') ...[
                   const SizedBox(height: 8),
                   Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 4,
-                      vertical: 8,
-                    ),
-                    child: Divider(
-                      color: const Color(0xFFE8ECF5),
-                      height: 1,
-                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+                    child: Divider(color: const Color(0xFFE8ECF5), height: 1),
                   ),
-                  _buildExtraNavItem(
-                    context,
-                    Icons.library_books_outlined,
-                    'Manage Courses',
-                    () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (ctx) => InstructorCoursesManagementScreen(),
-                        ),
-                      );
-                    },
-                  ),
-                  _buildExtraNavItem(
-                    context,
-                    Icons.group_outlined,
-                    'Assigned Learners',
-                    () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (ctx) => InstructorLearnersScreen(),
-                        ),
-                      );
-                    },
-                  ),
-                  _buildExtraNavItem(
-                    context,
-                    Icons.health_and_safety_outlined,
-                    'Health Precautions',
-                    () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (ctx) =>
-                              InstructorPrecautionsManagementScreen(),
-                        ),
-                      );
-                    },
-                  ),
-                  _buildExtraNavItem(
-                    context,
-                    Icons.analytics_outlined,
-                    'Educational Analytics',
-                    () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (ctx) => InstructorAnalytics(),
-                        ),
-                      );
-                    },
-                  ),
-                  _buildExtraNavItem(
-                    context,
-                    Icons.settings_outlined,
-                    'Settings',
-                    () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (ctx) => const SettingsScreen(),
-                        ),
-                      );
-                    },
-                  ),
+                  _buildExtraNavItem(context, Icons.library_books_outlined, 'Manage Courses', () => onSelect(20)),
+                  _buildExtraNavItem(context, Icons.group_outlined, 'Assigned Learners', () => onSelect(21)),
+                  _buildExtraNavItem(context, Icons.health_and_safety_outlined, 'Health Precautions', () => onSelect(22)),
+                  _buildExtraNavItem(context, Icons.analytics_outlined, 'Educational Analytics', () => onSelect(23)),
+                  _buildExtraNavItem(context, Icons.settings_outlined, 'Settings', () => onSelect(24)),
                 ],
 
                 if (role == 'Laboratory') ...[
                   const SizedBox(height: 8),
                   Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 4,
-                      vertical: 8,
-                    ),
-                    child: Divider(
-                      color: const Color(0xFFE8ECF5),
-                      height: 1,
-                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+                    child: Divider(color: const Color(0xFFE8ECF5), height: 1),
                   ),
-                  _buildExtraNavItem(
-                    context,
-                    Icons.list_alt_outlined,
-                    'Orders',
-                    () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (ctx) => const LabBookingsManagement(),
-                        ),
-                      );
-                    },
-                  ),
-                  _buildExtraNavItem(
-                    context,
-                    Icons.science_outlined,
-                    'Test Catalog',
-                    () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (ctx) => const LabTestsManagement(),
-                        ),
-                      );
-                    },
-                  ),
-                  _buildExtraNavItem(
-                    context,
-                    Icons.receipt_long_outlined,
-                    'Invoices',
-                    () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (ctx) => const PaymentInvoices(),
-                        ),
-                      );
-                    },
-                  ),
-                  _buildExtraNavItem(
-                    context,
-                    Icons.analytics_outlined,
-                    'Analytics',
-                    () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (ctx) => const LabAnalytics(),
-                        ),
-                      );
-                    },
-                  ),
-                  _buildExtraNavItem(
-                    context,
-                    Icons.settings_outlined,
-                    'Settings',
-                    () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (ctx) => const SettingsScreen(),
-                        ),
-                      );
-                    },
-                  ),
-                  _buildExtraNavItem(
-                    context,
-                    Icons.support_agent_outlined,
-                    'iCare Lab Support',
-                    () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (ctx) => const HelpAndSupport(),
-                        ),
-                      );
-                    },
-                  ),
+                  _buildExtraNavItem(context, Icons.list_alt_outlined, 'Orders', () => onSelect(20)),
+                  _buildExtraNavItem(context, Icons.science_outlined, 'Test Catalog', () => onSelect(21)),
+                  _buildExtraNavItem(context, Icons.receipt_long_outlined, 'Invoices', () => onSelect(22)),
+                  _buildExtraNavItem(context, Icons.analytics_outlined, 'Analytics', () => onSelect(23)),
+                  _buildExtraNavItem(context, Icons.settings_outlined, 'Settings', () => onSelect(24)),
+                  _buildExtraNavItem(context, Icons.support_agent_outlined, 'iCare Lab Support', () => onSelect(25)),
                 ],
 
                 if (role == 'Pharmacy') ...[
                   const SizedBox(height: 8),
                   Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 4,
-                      vertical: 8,
-                    ),
-                    child: Divider(
-                      color: const Color(0xFFE8ECF5),
-                      height: 1,
-                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+                    child: Divider(color: const Color(0xFFE8ECF5), height: 1),
                   ),
-                  _buildExtraNavItem(
-                    context,
-                    Icons.hourglass_empty_outlined,
-                    'Awaiting Fulfillment',
-                    () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (ctx) => const PharmacyOrders(),
-                        ),
-                      );
-                    },
-                  ),
-                  _buildExtraNavItem(
-                    context,
-                    Icons.receipt_long_outlined,
-                    'Invoices',
-                    () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (ctx) => const PaymentInvoices(isPharmacy: true),
-                        ),
-                      );
-                    },
-                  ),
-                  _buildExtraNavItem(
-                    context,
-                    Icons.analytics_outlined,
-                    'Analytics',
-                    () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (ctx) => const PharmacyAnalytics(),
-                        ),
-                      );
-                    },
-                  ),
-                  _buildExtraNavItem(
-                    context,
-                    Icons.settings_outlined,
-                    'Settings',
-                    () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (ctx) => const SettingsScreen(),
-                        ),
-                      );
-                    },
-                  ),
-                  _buildExtraNavItem(
-                    context,
-                    Icons.support_agent_outlined,
-                    'iCare Pharmacist Support',
-                    () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (ctx) => const HelpAndSupport(),
-                        ),
-                      );
-                    },
-                  ),
+                  _buildExtraNavItem(context, Icons.hourglass_empty_outlined, 'Awaiting Fulfillment', () => onSelect(20)),
+                  _buildExtraNavItem(context, Icons.receipt_long_outlined, 'Invoices', () => onSelect(21)),
+                  _buildExtraNavItem(context, Icons.analytics_outlined, 'Analytics', () => onSelect(22)),
+                  _buildExtraNavItem(context, Icons.settings_outlined, 'Settings', () => onSelect(23)),
+                  _buildExtraNavItem(context, Icons.support_agent_outlined, 'iCare Pharmacist Support', () => onSelect(24)),
                 ],
 
                 if (role == 'Student') ...[
@@ -1397,18 +1076,7 @@ class _WebSidebarState extends ConsumerState<_WebSidebar> {
                       height: 1,
                     ),
                   ),
-                  _buildExtraNavItem(
-                    context,
-                    Icons.class_outlined,
-                    'Open Classroom',
-                    () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (ctx) => const StudentLmsDashboard(),
-                        ),
-                      );
-                    },
-                  ),
+                  _buildExtraNavItem(context, Icons.class_outlined, 'Open Classroom', () => onSelect(20)),
                   _buildExtraNavItem(
                     context,
                     Icons.travel_explore_outlined,
@@ -1690,13 +1358,187 @@ class _HoverableNavItemState extends State<_HoverableNavItem> {
 // ═══════════════════════════════════════════════════════════════════════════
 // Web Top Navbar
 // ═══════════════════════════════════════════════════════════════════════════
-class _WebTopBar extends ConsumerWidget {
+class _WebTopBar extends ConsumerStatefulWidget {
   const _WebTopBar({required this.role, this.notifUnreadCount = 0});
   final String role;
   final int notifUnreadCount;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_WebTopBar> createState() => _WebTopBarState();
+}
+
+class _WebTopBarState extends ConsumerState<_WebTopBar> {
+  List<String> _availableRoles = [];
+
+  static const _roleDisplayNames = {
+    'doctor': 'Doctor',
+    'student': 'Student',
+    'instructor': 'Instructor',
+    'patient': 'Patient',
+    'lab': 'Laboratory',
+    'pharmacy': 'Pharmacy',
+  };
+
+  static const _roleIcons = {
+    'doctor': Icons.medical_services_rounded,
+    'student': Icons.school_rounded,
+    'instructor': Icons.cast_for_education_rounded,
+    'patient': Icons.person_rounded,
+    'lab': Icons.biotech_rounded,
+    'pharmacy': Icons.local_pharmacy_rounded,
+  };
+
+  @override
+  void initState() {
+    super.initState();
+    _loadAvailableRoles();
+  }
+
+  Future<void> _loadAvailableRoles() async {
+    try {
+      final res = await ApiService().get('/auth/profile');
+      final roles = (res.data['user']?['roles'] as List?)
+              ?.map((e) => e.toString())
+              .toList() ??
+          [];
+      if (mounted) setState(() => _availableRoles = roles);
+    } catch (_) {}
+  }
+
+  Future<void> _switchRole(String role) async {
+    final result = await AuthService().switchRole(role);
+    if (!mounted) return;
+    if (result['success'] == true) {
+      final inner = result['data'];
+      await ref.read(authProvider.notifier).setUserToken(inner['token'].toString());
+      // Preserve current user's verification flags — user is already authenticated,
+      // so re-triggering OTP by setting isEmailVerified=false would be wrong.
+      final currentUser = ref.read(authProvider).user;
+      final user = app_user.User.fromJson(Map<String, dynamic>.from(inner['user'] as Map)).copyWith(
+        isEmailVerified: currentUser?.isEmailVerified ?? true,
+        isPhoneVerified: currentUser?.isPhoneVerified ?? true,
+      );
+      await ref.read(authProvider.notifier).setUser(user);
+      if (!mounted) return;
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const TabsScreen()),
+        (route) => false,
+      );
+    } else {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(result['message']?.toString() ?? 'Role switch failed'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  void _showSwitchRoleDialog() {
+    final currentRole = widget.role.toLowerCase();
+    final activeKey = currentRole == 'laboratory' ? 'lab' : currentRole;
+    showDialog(
+      context: context,
+      builder: (dc) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        contentPadding: const EdgeInsets.fromLTRB(24, 20, 24, 16),
+        titlePadding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
+        title: Row(children: [
+          const Icon(Icons.swap_horiz_rounded, color: Color(0xFF0036BC), size: 22),
+          const SizedBox(width: 8),
+          const Text('Switch Role', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+        ]),
+        content: SizedBox(
+          width: 340,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Select a role to switch to its dashboard.',
+                  style: TextStyle(fontSize: 13, color: Color(0xFF94A3B8))),
+              const SizedBox(height: 16),
+              ..._availableRoles.map((r) {
+                final key = r.toLowerCase();
+                final isActive = key == activeKey;
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: InkWell(
+                    onTap: isActive ? null : () {
+                      Navigator.pop(dc);
+                      _switchRole(key);
+                    },
+                    borderRadius: BorderRadius.circular(12),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                      decoration: BoxDecoration(
+                        color: isActive ? const Color(0xFF0036BC).withValues(alpha: 0.06) : Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: isActive ? const Color(0xFF0036BC) : const Color(0xFFE2E8F0),
+                          width: isActive ? 1.5 : 1,
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF0036BC).withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Icon(_roleIcons[key] ?? Icons.person_rounded,
+                                color: const Color(0xFF0036BC), size: 18),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              _roleDisplayNames[key] ?? r,
+                              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
+                            ),
+                          ),
+                          if (isActive)
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF0036BC),
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: const Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.check_rounded, color: Colors.white, size: 12),
+                                  SizedBox(width: 3),
+                                  Text('Current', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w800)),
+                                ],
+                              ),
+                            )
+                          else
+                            const Icon(Icons.chevron_right_rounded, color: Color(0xFF94A3B8)),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              }),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dc),
+            child: const Text('Cancel'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String get role => widget.role;
+  int get notifUnreadCount => widget.notifUnreadCount;
+
+  @override
+  Widget build(BuildContext context) {
     return Container(
       height: 72,
       decoration: const BoxDecoration(
@@ -1825,6 +1667,8 @@ class _WebTopBar extends ConsumerWidget {
                       MaterialPageRoute(builder: (ctx) => const ProfileEditScreen()),
                     );
                   }
+                } else if (value == 'switch_role') {
+                  _showSwitchRoleDialog();
                 } else if (value == 'logout') {
                   ref.read(authProvider.notifier).setUserLogout();
                   context.go('/login');
@@ -1841,6 +1685,17 @@ class _WebTopBar extends ConsumerWidget {
                     ],
                   ),
                 ),
+                if (_availableRoles.length > 1)
+                  PopupMenuItem(
+                    value: 'switch_role',
+                    child: Row(
+                      children: const [
+                        Icon(Icons.swap_horiz_rounded, size: 18, color: Color(0xFF0036BC)),
+                        SizedBox(width: 10),
+                        Text('Switch Role', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF0036BC))),
+                      ],
+                    ),
+                  ),
                 PopupMenuItem(
                   value: 'logout',
                   child: Row(

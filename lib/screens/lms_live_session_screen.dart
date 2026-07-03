@@ -78,6 +78,7 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
   Timer? _wbTimer;
   final Set<String> _localStrokeIds = {}; // optimistic strokes not yet confirmed by backend
   bool _wbFullscreen = false;
+  bool _lastWbOpenFlag = false; // last backend whiteboardOpen — edge-trigger for students
 
   // Session info
   String _currentUserName = 'You';
@@ -134,6 +135,7 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
           .map((s) => WbStroke.fromJson(Map<String, dynamic>.from(s as Map)))
           .toList();
       final perms = (data['permissions'] as List? ?? []).map((e) => e.toString()).toList();
+      final wbOpenFlag = data['whiteboardOpen'] == true;
       if (!mounted) return;
       setState(() {
         // Remove confirmed strokes from local pending set
@@ -147,6 +149,13 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
           _wbStrokes = backendStrokes;
         }
         _wbPermissions = perms;
+        // Students follow the instructor's whiteboard state (edge-triggered so
+        // a student can still close/reopen manually between changes)
+        if (!widget.isInstructor && wbOpenFlag != _lastWbOpenFlag) {
+          _whiteboardOpen = wbOpenFlag;
+          if (!wbOpenFlag) _wbFullscreen = false;
+        }
+        _lastWbOpenFlag = wbOpenFlag;
       });
     } catch (_) {}
   }
@@ -243,6 +252,7 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
       // Instructor always starts with a clean whiteboard (no leftovers from prior sessions)
       if (widget.isInstructor && _sessionDocId.isNotEmpty) {
         _lms.clearWhiteboard(_sessionDocId).catchError((_) {});
+        _lms.updateSession(_sessionDocId, {'whiteboardOpen': false}).catchError((_) => <String, dynamic>{});
         if (mounted) setState(() { _wbStrokes = []; _localStrokeIds.clear(); });
       }
 
@@ -1815,7 +1825,17 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
       icon: Icons.draw_rounded,
       label: 'Whiteboard',
       color: _whiteboardOpen ? const Color(0xFF10B981) : Colors.white,
-      onTap: () => setState(() => _whiteboardOpen = !_whiteboardOpen),
+      onTap: () {
+        final next = !_whiteboardOpen;
+        setState(() {
+          _whiteboardOpen = next;
+          if (!next) _wbFullscreen = false;
+        });
+        // Instructor's toggle is synced so students auto-open/close
+        if (widget.isInstructor && _sessionDocId.isNotEmpty) {
+          _lms.updateSession(_sessionDocId, {'whiteboardOpen': next});
+        }
+      },
     );
     final screenShareBtn = kIsWeb
         ? _controlBtn(

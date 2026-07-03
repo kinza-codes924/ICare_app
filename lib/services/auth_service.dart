@@ -126,6 +126,32 @@ class AuthService {
     }
   }
 
+  /// Switch the active role on a multi-role account.
+  /// Returns the same shape as login: {'success', 'data': {token, user}}.
+  Future<Map<String, dynamic>> switchRole(String role, {String? token}) async {
+    try {
+      final res = await _apiService.post(
+        '/auth/switch-role',
+        {'role': role},
+        token: token,
+      );
+      if (res.statusCode == 200 && res.data['success'] == true) {
+        final inner = res.data['data'] ?? res.data;
+        final newToken = inner['token']?.toString() ?? '';
+        if (newToken.isNotEmpty) await _saveToken(newToken);
+        return {'success': true, 'data': inner};
+      }
+      return {
+        'success': false,
+        'message': res.data['message']?.toString() ?? 'Role switch failed',
+      };
+    } on DioException catch (e) {
+      return {'success': false, 'message': _friendlyError(e)};
+    } catch (e) {
+      return {'success': false, 'message': 'Error: ${e.toString()}'};
+    }
+  }
+
   String _friendlyError(DioException e, {bool isSocialAuth = false}) {
     switch (e.type) {
       case DioExceptionType.connectionTimeout:
