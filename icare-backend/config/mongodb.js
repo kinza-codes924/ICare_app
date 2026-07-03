@@ -1,38 +1,42 @@
 const mongoose = require('mongoose');
-require('dotenv').config(); // Load .env file
+require('dotenv').config();
 
-// In serverless environments, reuse existing connection across warm invocations
+// Single in-flight promise — prevents multiple concurrent cold-start connections
+let _connectionPromise = null;
+
 const connectMongoDB = async () => {
-  if (mongoose.connection.readyState === 1) return; // already connected
-  if (mongoose.connection.readyState === 2) {
-    // connecting — wait for it
-    await new Promise((resolve, reject) => {
-      mongoose.connection.once('connected', resolve);
-      mongoose.connection.once('error', reject);
-    });
-    return;
-  }
+  // Already connected — reuse existing connection
+  if (mongoose.connection.readyState === 1) return;
+
+  // A connection attempt is already in-flight — wait for it
+  if (_connectionPromise) return _connectionPromise;
+
   const uri = (process.env.MONGO_URI || process.env.MONGODB_URI || '').trim();
   if (!uri) {
     const err = new Error('MONGO_URI or MONGODB_URI environment variable is not set');
     console.error('❌ MongoDB connection error:', err.message);
     throw err;
   }
-  try {
-    await mongoose.connect(uri, {
-      serverSelectionTimeoutMS: 4000,
-      connectTimeoutMS: 4000,
-      socketTimeoutMS: 8000,
-      maxPoolSize: 10,
-      minPoolSize: 1,
-      maxIdleTimeMS: 10000,
-      waitQueueTimeoutMS: 4000, // fail fast if pool is full
+
+  _connectionPromise = mongoose
+    .connect(uri, {
+      serverSelectionTimeoutMS: 10000, // 10s — covers Vercel cold starts
+      connectTimeoutMS: 10000,
+      socketTimeoutMS: 15000,
+      maxPoolSize: 5,
+      minPoolSize: 0,
+      maxIdleTimeMS: 60000, // keep warm for 60s between requests
+    })
+    .then(() => {
+      console.log('✅ MongoDB connected');
+    })
+    .catch((err) => {
+      _connectionPromise = null; // reset so next request retries
+      console.error('❌ MongoDB connection error:', err.message);
+      throw err;
     });
-    console.log('✅ MongoDB connected');
-  } catch (err) {
-    console.error('❌ MongoDB connection error:', err.message);
-    throw err;
-  }
+
+  return _connectionPromise;
 };
 
 module.exports = { connectMongoDB };
