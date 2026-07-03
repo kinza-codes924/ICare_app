@@ -63,21 +63,46 @@ const ensureAdminMiddleware = async (req, res, next) => {
 };
 router.use(ensureAdminMiddleware);
 
+// Retry a Mongo query up to 3 times on transient network timeouts —
+// Atlas cold-start blips on Vercel can take a couple of attempts.
+async function withRetry(fn, maxAttempts = 3) {
+  let lastErr;
+  for (let i = 0; i < maxAttempts; i++) {
+    try {
+      return await fn();
+    } catch (err) {
+      lastErr = err;
+      const isTransient = err?.name === 'MongoNetworkTimeoutError'
+        || err?.name === 'MongoServerSelectionError'
+        || err?.name === 'MongoTimeoutError'
+        || (err?.code === 50) // MaxTimeMSExpired
+        || (err?.message || '').includes('timed out');
+      if (!isTransient || i === maxAttempts - 1) throw err;
+      await new Promise(r => setTimeout(r, 500 * (i + 1)));
+    }
+  }
+  throw lastErr;
+}
+
 // ─── PENDING USERS ────────────────────────────────────────────────────────────
 // GET /api/admin/pending-users
 router.get('/pending-users', authMiddleware, adminOnly, async (req, res) => {
   try {
     await connectMongoDB();
-    const users = await User.find({
-      is_approved: false,
-      role: { $nin: ['admin', 'patient'] },
-    }).select('-password').lean();
+    const users = await withRetry(() =>
+      User.find({ is_approved: false, role: { $nin: ['admin', 'patient'] } })
+        .select('name username email role roles phone createdAt')
+        .maxTimeMS(8000)
+        .lean(),
+    2
+    );
 
     const result = users.map(u => ({
       _id: u._id.toString(),
       name: u.name || u.username || '',
       email: u.email || '',
       role: u.role || '',
+      roles: u.roles || [],
       phone: u.phone || '',
       createdAt: u.createdAt,
     }));
@@ -85,7 +110,7 @@ router.get('/pending-users', authMiddleware, adminOnly, async (req, res) => {
     res.json({ success: true, users: result, count: result.length, pendingUsers: result });
   } catch (err) {
     console.error('pending-users error:', err);
-    res.json({ success: true, users: [], count: 0, pendingUsers: [] });
+    res.status(503).json({ success: false, message: 'Could not load users — please retry.', users: [], count: 0, pendingUsers: [] });
   }
 });
 
@@ -95,19 +120,35 @@ router.get('/approved-users', authMiddleware, adminOnly, async (req, res) => {
   try {
     await connectMongoDB();
     const { role } = req.query;
+    // Use exact lowercase match so MongoDB can use the index on `role` —
+    // regex on an unindexed field causes a full collection scan.
+    const roleLower = (role || '').toLowerCase();
 
-    const query = { is_approved: { $ne: false }, is_active: { $ne: false } };
-    if (role) {
-      // Case-insensitive role match
-      query.role = { $regex: new RegExp(`^${role}$`, 'i') };
+    const query = {};
+    if (roleLower) {
+      query.$or = [
+        { role: roleLower },
+        { roles: roleLower },
+      ];
     }
 
-    const users = await User.find(query).select('-password').lean();
-    const result = users.map(u => ({
+    // select only the fields we need + limit 500 to bound query time
+    const users = await withRetry(() =>
+      User.find(query)
+        .select('name username email role roles phone createdAt is_approved is_active')
+        .limit(500)
+        .maxTimeMS(8000)
+        .lean(),
+    2 // max 2 attempts so total stays under 30s
+    );
+    // Filter out inactive/unapproved in JS to avoid slow $ne index miss
+    const approved = users.filter(u => u.is_approved !== false && u.is_active !== false);
+    const result = approved.map(u => ({
       _id: u._id.toString(),
       name: u.name || u.username || '',
       email: u.email || '',
       role: u.role || '',
+      roles: u.roles || [],
       phone: u.phone || '',
       createdAt: u.createdAt,
       isApproved: true,
@@ -116,7 +157,7 @@ router.get('/approved-users', authMiddleware, adminOnly, async (req, res) => {
     res.json({ success: true, users: result, count: result.length });
   } catch (err) {
     console.error('approved-users error:', err);
-    res.json({ success: true, users: [], count: 0 });
+    res.status(503).json({ success: false, message: 'Could not load users — please retry.', users: [], count: 0 });
   }
 });
 
@@ -182,6 +223,28 @@ router.post('/approve-user/:userId', authMiddleware, adminOnly, async (req, res)
   } catch (err) {
     console.error('approve-user error:', err);
     res.status(500).json({ success: false, message: 'Failed to approve user' });
+  }
+});
+
+// ─── SET USER ROLES (multi-role accounts) ─────────────────────────────────────
+// Body: { roles: ['doctor','student',...] } — the full set of roles this
+// account may switch between. Active role stays unchanged.
+router.put('/users/:userId/roles', authMiddleware, adminOnly, async (req, res) => {
+  try {
+    await connectMongoDB();
+    const allowed = ['patient', 'doctor', 'lab', 'pharmacy', 'instructor', 'student'];
+    const roles = [...new Set((req.body.roles || [])
+      .map(r => r.toString().toLowerCase())
+      .filter(r => allowed.includes(r)))];
+    const user = await User.findByIdAndUpdate(
+      toId(req.params.userId),
+      { $set: { roles } },
+      { new: true }
+    ).select('-password').lean();
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+    res.json({ success: true, message: 'Roles updated', roles: [...new Set([user.role, ...roles])] });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
   }
 });
 

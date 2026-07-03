@@ -159,18 +159,28 @@ router.get('/my-profile', authMiddleware, async (req, res) => {
 
 // ─── GET ALL DOCTORS ──────────────────────────────────────────────────────────
 router.get('/get_all_doctors', async (req, res) => {
+  // Hard deadline 25s — always send JSON before Vercel kills the function at 30s
+  const deadline = setTimeout(() => {
+    if (!res.headersSent) res.status(503).json({ success: false, doctors: [], message: 'Slow start — please retry' });
+  }, 25000);
+
   try {
     await connectMongoDB();
-    // Case-insensitive match — old accounts may have 'Doctor' (capital D)
-    const doctors = await User.find({ role: /^doctor$/i, is_active: { $ne: false } }).lean();
-    const ids = doctors.map(d => d._id);
-    const profiles = await DoctorProfile.find({ user_id: { $in: ids } }).lean();
+    // Query DoctorProfile first (small collection) then join by _id (indexed).
+    const profiles = await DoctorProfile.find({}).lean();
     const profileMap = {};
-    profiles.forEach(p => { profileMap[p.user_id.toString()] = p; });
+    const profileUserIds = [];
+    profiles.forEach(p => {
+      const uid = p.user_id?.toString();
+      if (uid) { profileMap[uid] = p; profileUserIds.push(p.user_id); }
+    });
+    const doctors = await User.find({
+      _id: { $in: profileUserIds },
+      is_active: { $ne: false },
+    }).select('_id username name email phone profilePicture role is_active').lean();
 
     const result = doctors.map(d => {
       const p = profileMap[d._id.toString()] || {};
-      // Consider online if last_seen within 5 minutes
       const lastSeen = p.last_seen ? new Date(p.last_seen) : null;
       const isOnline = p.is_online === true &&
         lastSeen &&
@@ -203,10 +213,12 @@ router.get('/get_all_doctors', async (req, res) => {
       };
     });
 
-    res.json({ success: true, doctors: result });
+    clearTimeout(deadline);
+    if (!res.headersSent) res.json({ success: true, doctors: result });
   } catch (error) {
+    clearTimeout(deadline);
     console.error('Get doctors error:', error);
-    res.status(500).json({ success: false, message: 'Failed to fetch doctors' });
+    if (!res.headersSent) res.status(500).json({ success: false, message: 'Failed to fetch doctors' });
   }
 });
 

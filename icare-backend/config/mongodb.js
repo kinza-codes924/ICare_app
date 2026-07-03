@@ -20,12 +20,18 @@ const connectMongoDB = async () => {
 
   _connectionPromise = mongoose
     .connect(uri, {
-      serverSelectionTimeoutMS: 10000, // 10s — covers Vercel cold starts
-      connectTimeoutMS: 10000,
-      socketTimeoutMS: 15000,
+      // vercel.json uses the legacy builds/routes format, which cannot set a
+      // per-function maxDuration — Vercel's default (10s on Hobby) applies.
+      // Keep all timeouts well under that so Express always gets to send a
+      // JSON error before Vercel kills the lambda and returns HTML instead.
+      serverSelectionTimeoutMS: 6000,
+      connectTimeoutMS: 6000,
+      socketTimeoutMS: 8000,
       maxPoolSize: 5,
       minPoolSize: 0,
       maxIdleTimeMS: 60000, // keep warm for 60s between requests
+      retryWrites: true,
+      retryReads: true,
     })
     .then(() => {
       console.log('✅ MongoDB connected');

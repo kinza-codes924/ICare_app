@@ -1122,13 +1122,14 @@ router.get('/:id/whiteboard', authMiddleware, async (req, res) => {
   try {
     await connectMongoDB();
     const session = await LiveSession.findById(req.params.id)
-      .select('whiteboardStrokes whiteboardPermissions instructorId')
+      .select('whiteboardStrokes whiteboardPermissions instructorId whiteboardOpen')
       .lean();
     if (!session) return res.status(404).json({ success: false, message: 'Session not found' });
     res.json({
       success: true,
       strokes: session.whiteboardStrokes || [],
       permissions: (session.whiteboardPermissions || []).map(id => id.toString()),
+      whiteboardOpen: session.whiteboardOpen === true,
     });
   } catch (e) {
     res.status(500).json({ success: false, message: e.message });

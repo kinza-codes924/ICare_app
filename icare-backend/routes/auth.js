@@ -16,6 +16,66 @@ router.post('/reset_password', resetPassword);
 // Protected routes
 router.get('/profile', authMiddleware, getUserProfile);
 
+// ── Switch role (multi-role accounts) ─────────────────────────────────────────
+// Body: { role } — must be one of the account's approved roles.
+// Updates the active role and returns a fresh token + user (same shape as login).
+router.post('/switch-role', authMiddleware, async (req, res) => {
+  try {
+    const { connectMongoDB } = require('../config/mongodb');
+    await connectMongoDB();
+    const User = require('../models/User');
+    const jwt = require('jsonwebtoken');
+
+    const requested = (req.body.role || '').toString().toLowerCase();
+    if (!requested) return res.status(400).json({ success: false, message: 'role is required' });
+
+    const user = await User.findById(req.user.id);
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+
+    const availableRoles = [...new Set([user.role, ...(user.roles || [])].filter(Boolean))]
+      .map(r => r.toLowerCase());
+    if (!availableRoles.includes(requested)) {
+      return res.status(403).json({ success: false, message: 'This role is not enabled for your account' });
+    }
+
+    // Keep the full roles list intact; only the active role changes
+    if (!(user.roles || []).map(r => r.toLowerCase()).includes(user.role?.toLowerCase())) {
+      user.roles = [...(user.roles || []), user.role];
+    }
+    user.role = requested;
+    await user.save();
+
+    const token = jwt.sign(
+      { id: user._id.toString(), email: user.email, role: user.role },
+      process.env.JWT_SECRET,
+      { expiresIn: '30d' }
+    );
+
+    res.json({
+      success: true,
+      message: 'Role switched',
+      data: {
+        token,
+        user: {
+          id: user._id.toString(),
+          username: user.username || user.name,
+          email: user.email,
+          phone: user.phone,
+          role: user.role,
+          roles: [...new Set([user.role, ...(user.roles || [])].filter(Boolean))],
+          isApproved: user.is_approved !== false && user.isApproved !== false,
+          profilePicture: user.profilePicture || null,
+          mrNumber: user.mrNumber || null,
+          isPhoneVerified: user.isPhoneVerified !== false,
+          isEmailVerified: user.isEmailVerified !== false,
+        },
+      },
+    });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
 // ── Login sessions ────────────────────────────────────────────────────────────
 router.get('/sessions', authMiddleware, async (req, res) => {
   try {

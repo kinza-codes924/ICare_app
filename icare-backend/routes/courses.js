@@ -8,6 +8,7 @@ const Enrollment = require('../models/Enrollment');
 const Assignment = require('../models/Assignment');
 const AssignmentSubmission = require('../models/AssignmentSubmission');
 const { sendEmail } = require('../utils/email');
+const LiveSession = require('../models/LiveSession');
 
 function toId(id) {
   try { return new mongoose.Types.ObjectId(id); } catch { return null; }
@@ -291,10 +292,40 @@ router.get('/:id', authMiddleware, async (req, res) => {
 });
 
 // POST /api/courses — create course (instructor)
+// Create LiveSession docs for any lessons that have a liveSessionDateTime
+async function syncLiveSessions(courseId, instructorId, modules) {
+  if (!Array.isArray(modules)) return;
+  for (const mod of modules) {
+    for (const lesson of (mod.lessons || [])) {
+      if (!lesson.liveSessionDateTime) continue;
+      const scheduledAt = new Date(lesson.liveSessionDateTime);
+      if (isNaN(scheduledAt)) continue;
+      const lessonId = lesson._id?.toString() || lesson.id?.toString() || null;
+      const modId = mod._id?.toString() || mod.id?.toString() || null;
+      // Upsert by courseId + linkedLessonId so we don't create duplicates on edit
+      const filter = { courseId: toId(courseId), linkedLessonId: lessonId || lesson.title };
+      const update = {
+        $set: {
+          courseId: toId(courseId),
+          instructorId: toId(instructorId),
+          title: lesson.liveSessionNote?.trim() || `Live: ${lesson.title || 'Session'}`,
+          scheduledAt,
+          linkedLessonId: lessonId || lesson.title,
+          linkedModuleId: modId || mod.title,
+          status: 'scheduled',
+        },
+        $setOnInsert: { duration: 60, maxParticipants: 100, isRecorded: true },
+      };
+      await LiveSession.findOneAndUpdate(filter, update, { upsert: true, new: true });
+    }
+  }
+}
+
 router.post('/', authMiddleware, async (req, res) => {
   try {
     await connectMongoDB();
     const course = await Course.create({ ...req.body, instructor_id: toId(req.user.id) });
+    await syncLiveSessions(course._id, req.user.id, req.body.modules);
     res.status(201).json({ success: true, course });
   } catch (e) {
     res.status(500).json({ success: false, message: e.message });
@@ -307,6 +338,7 @@ router.put('/:id', authMiddleware, async (req, res) => {
     await connectMongoDB();
     const course = await Course.findByIdAndUpdate(toId(req.params.id), { $set: req.body }, { new: true });
     if (!course) return res.status(404).json({ success: false, message: 'Not found' });
+    await syncLiveSessions(course._id, req.user.id, req.body.modules);
     res.json({ success: true, course });
   } catch (e) {
     res.status(500).json({ success: false, message: e.message });

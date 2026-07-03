@@ -108,6 +108,44 @@ router.get('/course/:courseId/report', authMiddleware, async (req, res) => {
   }
 });
 
+// ── INSTRUCTOR: single session attendance — all enrolled students ─────────────
+router.get('/session/:sessionId', authMiddleware, async (req, res) => {
+  try {
+    await connectMongoDB();
+    const session = await Attendance.findById(toId(req.params.sessionId)).lean();
+    if (!session) return res.status(404).json({ success: false, message: 'Session not found' });
+
+    const enrollments = await Enrollment.find({ courseId: session.courseId })
+      .populate('userId', 'name email username').lean();
+
+    const rows = enrollments.map(e => {
+      const user = e.userId;
+      const studentId = user?._id?.toString() ?? e.userId?.toString();
+      const rec = (session.records || []).find(r => r.studentId?.toString() === studentId);
+      return {
+        studentId,
+        name: user?.name || user?.username || 'Student',
+        email: user?.email || '',
+        status: rec?.status || 'absent',
+        joinedAt: rec?.joinedAt ?? null,
+        leftAt: rec?.leftAt ?? null,
+        durationMinutes: rec?.durationMinutes ?? null,
+      };
+    });
+
+    const present = rows.filter(r => r.status === 'present').length;
+    res.json({
+      success: true,
+      session: { _id: session._id, sessionTitle: session.sessionTitle, sessionDate: session.sessionDate },
+      students: rows,
+      total: rows.length,
+      present,
+    });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
 // ── INSTRUCTOR: mark single student attendance in a session ───────────────────
 router.put('/:sessionId/mark', authMiddleware, async (req, res) => {
   try {

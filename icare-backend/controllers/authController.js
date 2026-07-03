@@ -261,6 +261,9 @@ const login = async (req, res) => {
       { expiresIn: '30d' }
     );
 
+    // All roles this account can use (always includes the primary role)
+    const availableRoles = [...new Set([user.role, ...(user.roles || [])].filter(Boolean))];
+
     res.status(200).json({
       success: true,
       message: 'Login successful',
@@ -272,6 +275,7 @@ const login = async (req, res) => {
           email: user.email,
           phone: user.phone,
           role: user.role,
+          roles: availableRoles,
           isApproved: user.is_approved !== false && user.isApproved !== false,
           profilePicture: user.profilePicture || null,
           mrNumber: user.mrNumber || null,
@@ -303,6 +307,7 @@ const getUserProfile = async (req, res) => {
         email: user.email,
         phone: user.phone,
         role: user.role,
+        roles: [...new Set([user.role, ...(user.roles || [])].filter(Boolean))],
         isApproved: user.is_approved !== false,
         mrNumber: user.mrNumber || null,
         prescriptionEmailEnabled: user.prescriptionEmailEnabled !== false,
