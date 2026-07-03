@@ -6,6 +6,8 @@ import 'package:icare/models/user.dart' as app_user;
 import 'package:icare/services/doctor_service.dart';
 import 'package:go_router/go_router.dart';
 import 'package:icare/providers/auth_provider.dart';
+import 'package:icare/screens/payment_history.dart';
+import 'package:icare/services/auth_service.dart';
 import 'package:icare/screens/about_us.dart' show AboutUs;
 import 'package:icare/screens/change_password.dart' show ChangePassword;
 import 'package:icare/screens/certificates_screen.dart';
@@ -120,6 +122,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   bool _billingLoading = false;
   final List<Map<String, String>> _savedCards = [];
 
+  // Multi-role accounts
+  List<String> _availableRoles = [];
+
   @override
   void initState() {
     super.initState();
@@ -131,6 +136,45 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     _loadPointsData();
     _loadReminderAndDiagnosticsPrefs();
     _loadNotifPrefs();
+    _loadAvailableRoles();
+  }
+
+  Future<void> _loadAvailableRoles() async {
+    try {
+      final res = await ApiService().get('/auth/profile');
+      final roles = (res.data['user']?['roles'] as List?)
+              ?.map((e) => e.toString())
+              .toList() ??
+          [];
+      if (mounted) setState(() => _availableRoles = roles);
+    } catch (_) {}
+  }
+
+  Future<void> _switchRole(BuildContext context, String role) async {
+    final result = await AuthService().switchRole(role);
+    if (!mounted) return;
+    if (result['success'] == true) {
+      final inner = result['data'];
+      await ref.read(authProvider.notifier).setUserToken(inner['token'].toString());
+      final user = app_user.User.fromJson(Map<String, dynamic>.from(inner['user'] as Map));
+      await ref.read(authProvider.notifier).setUser(user);
+      if (mounted) {
+        ScaffoldMessenger.of(this.context).showSnackBar(
+          SnackBar(
+            content: Text('Switched to ${user.role[0].toUpperCase()}${user.role.substring(1)} account'),
+            backgroundColor: const Color(0xFF10B981),
+          ),
+        );
+        this.context.go('/dashboard');
+      }
+    } else {
+      ScaffoldMessenger.of(this.context).showSnackBar(
+        SnackBar(
+          content: Text(result['message']?.toString() ?? 'Role switch failed'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   Future<void> _loadPointsData() async {
@@ -1647,6 +1691,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       onToggleCourseNotifications: _toggleCourseNotifications,
       notifPrefs: _notifPrefs,
       onSaveNotifPref: _saveNotifPref,
+      availableRoles: _availableRoles,
+      onSwitchRole: _switchRole,
     );
 
     if (isWide) return _WebSettingsLayout(p: params);
@@ -1685,6 +1731,9 @@ class _SettingsLayoutParams {
   // Notification preferences
   final Map<String, bool> notifPrefs;
   final void Function(String, bool) onSaveNotifPref;
+  // Multi-role accounts
+  final List<String> availableRoles;
+  final void Function(BuildContext, String) onSwitchRole;
   final void Function(bool) onToggle2FA, onToggleBiometrics, onToggleFaceId, onTogglePrescriptionEmail;
   final void Function(String, bool) onTrackerToggle, onHealthModeToggle;
   final VoidCallback onLogout;
@@ -1739,6 +1788,7 @@ class _SettingsLayoutParams {
     required this.onTogglePreferHomeSample, required this.onSetReportDelivery,
     required this.courseNotificationsEnabled, required this.onToggleCourseNotifications,
     required this.notifPrefs, required this.onSaveNotifPref,
+    this.availableRoles = const [], required this.onSwitchRole,
   });
 }
 
@@ -1757,6 +1807,7 @@ class _WebSettingsLayout extends StatelessWidget {
       body: SingleChildScrollView(padding: const EdgeInsets.all(24), child: Center(child: Container(constraints: const BoxConstraints(maxWidth: 800), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         // Remove any blue background header - using clean white layout
         _ProfileEditCard(p: p), const SizedBox(height: 24),
+        if (p.availableRoles.length > 1) ...[_SwitchRoleCard(p: p), const SizedBox(height: 24)],
         if (p.isDoctor) ...[_doctorProfessionalCard(context), const SizedBox(height: 24)],
         if (p.isLaboratory) ...[_labManagementCard(context), const SizedBox(height: 24)],
         if (p.isPatient) ...[_healthProfile(context), const SizedBox(height: 24)],
@@ -1766,6 +1817,7 @@ class _WebSettingsLayout extends StatelessWidget {
         if (p.isPatient) ...[_diagnosticsCard(context), const SizedBox(height: 24)],
         if (p.isPatient) ...[_privacyCard(context), const SizedBox(height: 24)],
         if (p.isPatient) ...[_paymentCard(context), const SizedBox(height: 24)],
+        if (p.isStudent) ...[_studentPaymentCard(context), const SizedBox(height: 24)],
         _contactCard(context), const SizedBox(height: 24),
         if (p.isPatient) ...[_pharmacyCard(context), const SizedBox(height: 24)],
         if (p.isPatient || p.isStudent || p.isInstructor) ...[_learningCard(context), const SizedBox(height: 24)],
@@ -2137,6 +2189,15 @@ class _WebSettingsLayout extends StatelessWidget {
       ])));
   }
 
+  // ── STUDENT PAYMENTS ──
+  Widget _studentPaymentCard(BuildContext context) {
+    return Card(elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Padding(padding: const EdgeInsets.all(20), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        _sectionLabel('Payments'), const SizedBox(height: 16),
+        _settingsTile(icon: Icons.receipt_long_outlined, iconColor: const Color(0xFF10B981), title: 'Payment History', subtitle: 'View your course purchases', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PaymentHistoryScreen(role: 'Student')))),
+      ])));
+  }
+
   // ── CONTACT ──
   Widget _contactCard(BuildContext context) {
     return Card(elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -2406,6 +2467,7 @@ class _MobileSettingsLayout extends StatelessWidget {
       appBar: AppBar(title: Text('settings_title'.tr(), style: const TextStyle(color: AppColors.primaryColor, fontWeight: FontWeight.w700)), centerTitle: true, backgroundColor: Colors.white, foregroundColor: AppColors.primaryColor, elevation: 0, surfaceTintColor: Colors.white),
       body: SingleChildScrollView(padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         _ProfileEditCard(p: p), const SizedBox(height: 16),
+        if (p.availableRoles.length > 1) ...[_SwitchRoleCard(p: p), const SizedBox(height: 16)],
         if (p.isDoctor) ...[_doctorProfessionalCard(context), const SizedBox(height: 16)],
         if (p.isLaboratory) ...[_labManagementCard(context), const SizedBox(height: 16)],
         if (p.isPatient) ...[_healthProfile(context), const SizedBox(height: 16)],
@@ -2414,7 +2476,7 @@ class _MobileSettingsLayout extends StatelessWidget {
         if (p.isPatient) ...[_rewardsCard(context), const SizedBox(height: 16)],
         if (p.isPatient) ...[_diagnosticsCard(context), const SizedBox(height: 16)],
         if (p.isPatient) ...[_privacyCard(context), const SizedBox(height: 16)],
-        if (p.isPatient) ...[_paymentCard(context), const SizedBox(height: 16)],
+        if (p.isStudent) ...[_studentPaymentCard(context), const SizedBox(height: 16)],
         _contactCard(context), const SizedBox(height: 16),
         if (p.isPatient) ...[_pharmacyCard(context), const SizedBox(height: 16)],
         if (p.isPatient || p.isStudent || p.isInstructor) ...[_learningCard(context), const SizedBox(height: 16)],
@@ -2619,6 +2681,14 @@ class _MobileSettingsLayout extends StatelessWidget {
         _sectionLabel('Payment & Subscription'), const SizedBox(height: 12),
         _settingsTile(icon: Icons.credit_card_outlined, iconColor: const Color(0xFF10B981), title: 'Saved Payment Methods', subtitle: p.savedPaymentMethods.isEmpty ? 'No methods saved' : '${p.savedPaymentMethods.length} method(s)', onTap: () => p.onShowPaymentMethods(context)),
         const Divider(height: 1), _settingsTile(icon: Icons.receipt_long_outlined, iconColor: const Color(0xFF10B981), title: 'Billing History', subtitle: p.billingHistory.isEmpty ? 'View transactions' : '${p.billingHistory.length} transaction(s)', onTap: () => p.onShowBillingHistory(context)),
+      ])));
+  }
+
+  Widget _studentPaymentCard(BuildContext context) {
+    return Card(elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Padding(padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        _sectionLabel('Payments'), const SizedBox(height: 12),
+        _settingsTile(icon: Icons.receipt_long_outlined, iconColor: const Color(0xFF10B981), title: 'Payment History', subtitle: 'View your course purchases', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PaymentHistoryScreen(role: 'Student')))),
       ])));
   }
 
@@ -2989,6 +3059,157 @@ class _MobileSettingsLayout extends StatelessWidget {
 // ═══════════════════════════════════════════════════════════════════════════
 // PROFILE EDIT CARD — Approach 2: Global Toggle (View ↔ Edit)
 // ═══════════════════════════════════════════════════════════════════════════
+
+// ═══════════════════════════════════════════════════════════════════════════
+// SWITCH ROLE CARD — multi-role accounts (doctor + student + instructor etc.)
+// ═══════════════════════════════════════════════════════════════════════════
+
+class _SwitchRoleCard extends StatelessWidget {
+  final _SettingsLayoutParams p;
+  const _SwitchRoleCard({required this.p});
+
+  static const _displayNames = {
+    'doctor': 'Doctor',
+    'student': 'Student',
+    'instructor': 'Instructor',
+    'patient': 'Patient',
+    'lab': 'Laboratory',
+    'pharmacy': 'Pharmacy',
+  };
+
+  static const _icons = {
+    'doctor': Icons.medical_services_rounded,
+    'student': Icons.school_rounded,
+    'instructor': Icons.cast_for_education_rounded,
+    'patient': Icons.person_rounded,
+    'lab': Icons.biotech_rounded,
+    'pharmacy': Icons.local_pharmacy_rounded,
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    final activeRole = p.role.toLowerCase() == 'laboratory' ? 'lab' : p.role.toLowerCase();
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.swap_horiz_rounded, color: AppColors.primaryColor, size: 20),
+                const SizedBox(width: 8),
+                Text('Switch Role'.toUpperCase(),
+                    style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 1,
+                        color: Color(0xFF64748B))),
+              ],
+            ),
+            const SizedBox(height: 4),
+            const Text('Your account has multiple roles. Tap a role to switch to its dashboard.',
+                style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8))),
+            const SizedBox(height: 14),
+            ...p.availableRoles.map((r) {
+              final key = r.toLowerCase();
+              final isActive = key == activeRole;
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: InkWell(
+                  onTap: isActive
+                      ? null
+                      : () async {
+                          final confirm = await showDialog<bool>(
+                            context: context,
+                            builder: (dc) => AlertDialog(
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                              title: const Text('Switch Role?', style: TextStyle(fontWeight: FontWeight.w800)),
+                              content: Text('You will be switched to your ${_displayNames[key] ?? r} dashboard.'),
+                              actions: [
+                                TextButton(onPressed: () => Navigator.pop(dc, false), child: const Text('Cancel')),
+                                ElevatedButton(
+                                  onPressed: () => Navigator.pop(dc, true),
+                                  child: const Text('Switch'),
+                                ),
+                              ],
+                            ),
+                          );
+                          if (confirm == true && context.mounted) {
+                            p.onSwitchRole(context, key);
+                          }
+                        },
+                  borderRadius: BorderRadius.circular(12),
+                  child: Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: isActive
+                          ? AppColors.primaryColor.withValues(alpha: 0.06)
+                          : Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: isActive ? AppColors.primaryColor : const Color(0xFFE2E8F0),
+                        width: isActive ? 1.5 : 1,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 38,
+                          height: 38,
+                          decoration: BoxDecoration(
+                            color: AppColors.primaryColor.withValues(alpha: 0.08),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Icon(_icons[key] ?? Icons.person_rounded,
+                              color: AppColors.primaryColor, size: 20),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            _displayNames[key] ?? r,
+                            style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFF0F172A)),
+                          ),
+                        ),
+                        if (isActive)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: AppColors.primaryColor,
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.check_rounded, color: Colors.white, size: 12),
+                                SizedBox(width: 3),
+                                Text('Current',
+                                    style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w800)),
+                              ],
+                            ),
+                          )
+                        else
+                          const Icon(Icons.chevron_right_rounded, color: Color(0xFF94A3B8)),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            }),
+          ],
+        ),
+      ),
+    );
+  }
+}
 
 class _ProfileEditCard extends ConsumerStatefulWidget {
   final _SettingsLayoutParams p;
