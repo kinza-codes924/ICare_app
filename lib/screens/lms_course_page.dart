@@ -1458,13 +1458,21 @@ class _PeopleTabState extends State<_PeopleTab> {
   void initState() { super.initState(); _load(); }
 
   Future<void> _load() async {
-    final futures = <Future>[];
     if (widget.isInstructor) {
-      futures.add(widget.lms.getEnrolledStudents(widget.courseId).then((s) => _students = s));
-      futures.add(widget.lms.getCourseInstructors(widget.courseId).then((i) => _coInstructors = i));
+      final results = await Future.wait([
+        widget.lms.getEnrolledStudents(widget.courseId),
+        widget.lms.getCourseInstructors(widget.courseId),
+      ]);
+      if (mounted) {
+        setState(() {
+          _students = results[0];
+          _coInstructors = results[1];
+          _loading = false;
+        });
+      }
+    } else {
+      if (mounted) { setState(() => _loading = false); }
     }
-    await Future.wait(futures);
-    if (mounted) setState(() => _loading = false);
   }
 
   Future<void> _showInviteTeacherDialog() async {

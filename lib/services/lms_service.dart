@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:icare/services/api_service.dart';
 
@@ -347,7 +348,11 @@ class LmsService {
     try {
       // Backend returns { success: true, students: [{ _id, name, email, progress }] }
       final response = await _api.get('/courses/enrolled-students/$courseId');
-      final data = response.data;
+      dynamic data = response.data;
+      // ApiService uses ResponseType.plain — 2xx responses arrive as raw JSON strings
+      if (data is String && data.isNotEmpty) {
+        try { data = jsonDecode(data); } catch (_) {}
+      }
       if (data is Map && data['success'] == true) {
         return (data['students'] ?? []) as List;
       }
