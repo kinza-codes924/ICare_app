@@ -103,6 +103,17 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
     lmsListenForScreenShareEnded(() {
       if (mounted) setState(() => _screenSharing = false);
     });
+    // Web: JS fires CustomEvents when remote participants join/leave per-UID tiles
+    if (kIsWeb) {
+      lmsListenForRemoteJoined((uid) {
+        if (mounted) setState(() {
+          if (!_remoteUids.contains(uid)) _remoteUids.add(uid);
+        });
+      });
+      lmsListenForRemoteLeft((uid) {
+        if (mounted) setState(() => _remoteUids.remove(uid));
+      });
+    }
   }
 
   @override
@@ -390,10 +401,21 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
 
         // Update name labels on the web video tiles
         if (kIsWeb) {
-          final remoteName = widget.isInstructor
-              ? (_participants.firstWhere((p) => p['id'] != _currentUserId, orElse: () => {'name': ''})['name']?.toString() ?? 'Student')
-              : (_instructorName.isNotEmpty ? '$_instructorName (Host)' : 'Instructor');
-          lmsSetParticipantNames('$_currentUserName (You)', remoteName);
+          lmsSetParticipantNames('$_currentUserName (You)', '');
+          final remoteParticipants = _participants
+              .where((p) => p['id'] != _currentUserId)
+              .toList();
+          for (var i = 0; i < _remoteUids.length; i++) {
+            final String name;
+            if (i < remoteParticipants.length) {
+              name = remoteParticipants[i]['name']?.toString() ?? 'Student';
+            } else if (!widget.isInstructor && _instructorName.isNotEmpty) {
+              name = '$_instructorName (Host)';
+            } else {
+              name = widget.isInstructor ? 'Student' : 'Instructor';
+            }
+            lmsSetTileName(_remoteUids[i], name);
+          }
         }
 
         // Notify instructor of new join request — compare against PRE-setState count
@@ -1207,18 +1229,17 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
   }
 
   Widget _buildVideoGrid() {
+    final cols = _remoteUids.length <= 4 ? 2 : 3;
     return GridView.builder(
       padding: const EdgeInsets.all(8),
       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: _remoteUids.length <= 1 ? 2 : _remoteUids.length <= 3 ? 2 : 3,
+        crossAxisCount: cols,
         crossAxisSpacing: 8,
         mainAxisSpacing: 8,
         childAspectRatio: 16 / 9,
       ),
       itemCount: _remoteUids.length,
-      itemBuilder: (context, i) {
-        return _buildRemoteVideoTile(_remoteUids[i]);
-      },
+      itemBuilder: (context, i) => _buildRemoteVideoTile(_remoteUids[i]),
     );
   }
 
@@ -1292,6 +1313,17 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
   }
 
   Widget _buildRemoteVideoTile(int uid) {
+    // Resolve participant name by position in remote-UID list
+    final remoteParticipants = _participants
+        .where((p) => p['id'] != _currentUserId)
+        .toList();
+    final uidIndex = _remoteUids.indexOf(uid);
+    final participantName = uidIndex >= 0 && uidIndex < remoteParticipants.length
+        ? remoteParticipants[uidIndex]['name']?.toString() ?? 'Student'
+        : (widget.isInstructor
+            ? 'Student'
+            : (_instructorName.isNotEmpty ? _instructorName : 'Instructor'));
+
     return Container(
       decoration: BoxDecoration(
         color: const Color(0xFF2D3748),
@@ -1303,20 +1335,17 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
           if (!kIsWeb)
             lmsGetRemoteVideoWidget(uid, 'lms_${widget.courseId}')
           else
+            // Web video is rendered inside lms-grid-container by JS —
+            // this tile is only shown on mobile; web uses HtmlElementView grid.
             Center(
-              child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-                CircleAvatar(
-                  radius: 30,
-                  backgroundColor: Colors.blueGrey,
-                  child: Text('${uid % 100}',
-                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+              child: CircleAvatar(
+                radius: 30,
+                backgroundColor: Colors.blueGrey,
+                child: Text(
+                  participantName.isNotEmpty ? participantName[0].toUpperCase() : '?',
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
                 ),
-                const SizedBox(height: 8),
-                Text(
-                  widget.isInstructor ? 'Student' : (_instructorName.isNotEmpty ? _instructorName : 'Instructor'),
-                  style: const TextStyle(color: Colors.white70, fontSize: 12),
-                ),
-              ]),
+              ),
             ),
           Positioned(
             bottom: 6,
@@ -1327,15 +1356,7 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
               child: Row(mainAxisSize: MainAxisSize.min, children: [
                 const Icon(Icons.mic_rounded, size: 12, color: Colors.white),
                 const SizedBox(width: 4),
-                Text(
-                  widget.isInstructor
-                    ? (_participants.firstWhere(
-                        (p) => p['id']?.toString() != _currentUserId,
-                        orElse: () => {'name': 'Student'},
-                      )['name']?.toString() ?? 'Student')
-                    : (_instructorName.isNotEmpty ? _instructorName : 'Instructor'),
-                  style: const TextStyle(color: Colors.white, fontSize: 11),
-                ),
+                Text(participantName, style: const TextStyle(color: Colors.white, fontSize: 11)),
               ]),
             ),
           ),

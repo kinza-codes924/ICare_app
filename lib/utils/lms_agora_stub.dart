@@ -118,6 +118,9 @@ void lmsRefreshVideoLayout() {}
 void lmsSetParticipantNames(String localName, String remoteName) {}
 void lmsSetVideoFit(String mode) {}
 void lmsListenForScreenShareEnded(void Function() callback) {}
+void lmsListenForRemoteJoined(void Function(int uid) callback) {}
+void lmsListenForRemoteLeft(void Function(int uid) callback) {}
+void lmsSetTileName(int uid, String name) {}
 
 String registerLmsVideoView() => '';
 

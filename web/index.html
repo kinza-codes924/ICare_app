@@ -32,11 +32,10 @@
     }
     @keyframes spin { to { transform: rotate(360deg); } }
     /* Agora video elements must fill their containers */
-    #lms-agora-remote, #agora-remote {
+    #agora-remote {
       position: relative !important; overflow: hidden !important;
     }
-    #lms-agora-remote > div, #lms-agora-remote video,
-    #agora-remote     > div, #agora-remote     video {
+    #agora-remote > div, #agora-remote video {
       position: absolute !important; top: 0 !important; left: 0 !important;
       width: 100% !important; height: 100% !important;
       object-fit: cover; display: block; background: #000;
@@ -44,6 +43,20 @@
     #lms-agora-local  > div, #lms-agora-local  video {
       width: 100% !important; height: 100% !important;
       object-fit: cover; display: block;
+    }
+    /* LMS multi-participant grid tiles */
+    #lms-grid-container { display: grid; grid-template-columns: 1fr; gap: 4px; padding: 4px; box-sizing: border-box; width: 100%; height: 100%; }
+    .lms-remote-tile { position: relative; background: #1a2234; border-radius: 8px; overflow: hidden; min-height: 80px; }
+    .lms-remote-tile > div { position: absolute !important; inset: 0; }
+    .lms-remote-tile video {
+      position: absolute !important; inset: 0;
+      width: 100% !important; height: 100% !important;
+      object-fit: cover; display: block; background: #000;
+    }
+    .lms-tile-name {
+      position: absolute; bottom: 6px; left: 6px;
+      background: rgba(0,0,0,0.6); color: #fff; font-size: 12px; font-weight: 600;
+      padding: 2px 8px; border-radius: 4px; z-index: 10; pointer-events: none;
     }
   </style>
 </head>
@@ -479,8 +492,9 @@
           }
           if (u.videoTrack) {
             try {
-              var rd = document.getElementById('lms-agora-remote');
-              if (rd) { rd.innerHTML = ''; u.videoTrack.play('lms-agora-remote'); }
+              var vd = document.getElementById('lms-tile-' + u.uid + '-video');
+              if (!vd) { window._lmsGetOrCreateTile(u.uid); vd = document.getElementById('lms-tile-' + u.uid + '-video'); }
+              if (vd) { vd.innerHTML = ''; u.videoTrack.play(vd.id); }
             } catch(_) {}
           }
         });
@@ -536,6 +550,55 @@
     // stale cached main.dart.js cannot double-publish or create duplicate tracks.
     window.lmsEnableMediaAndPublish = window._lmsEnsureMediaPublished;
 
+    // ── LMS multi-participant tile management ────────────────────────────────────
+    // Creates one DOM tile per remote UID inside lms-grid-container.
+    // Fires lms-remote-joined / lms-remote-left CustomEvents that Dart listens to.
+    window._lmsGetOrCreateTile = function(uid) {
+      var grid = document.getElementById('lms-grid-container');
+      if (!grid) return null;
+      var tileId = 'lms-tile-' + uid;
+      var existing = document.getElementById(tileId);
+      if (existing) return existing;
+      var tile = document.createElement('div');
+      tile.id = tileId;
+      tile.className = 'lms-remote-tile';
+      var videoDiv = document.createElement('div');
+      videoDiv.id = tileId + '-video';
+      tile.appendChild(videoDiv);
+      var nameEl = document.createElement('div');
+      nameEl.id = tileId + '-name';
+      nameEl.className = 'lms-tile-name';
+      tile.appendChild(nameEl);
+      grid.appendChild(tile);
+      window._lmsUpdateGridLayout();
+      window.dispatchEvent(new CustomEvent('lms-remote-joined', { detail: String(uid) }));
+      return tile;
+    };
+
+    window._lmsRemoveTile = function(uid) {
+      var tile = document.getElementById('lms-tile-' + uid);
+      if (tile) { tile.remove(); window._lmsUpdateGridLayout(); }
+      window.dispatchEvent(new CustomEvent('lms-remote-left', { detail: String(uid) }));
+    };
+
+    window._lmsUpdateGridLayout = function() {
+      var grid = document.getElementById('lms-grid-container');
+      if (!grid) return;
+      var count = grid.children.length;
+      var cols = count <= 1 ? 1 : count <= 4 ? 2 : 3;
+      grid.style.gridTemplateColumns = 'repeat(' + cols + ', 1fr)';
+    };
+
+    window.lmsSetTileName = function(uid, name) {
+      var el = document.getElementById('lms-tile-' + uid + '-name');
+      if (el) el.textContent = name || '';
+    };
+
+    window.lmsGetRemoteUids = function() {
+      if (!window._lmsAgoraClient) return '';
+      return window._lmsAgoraClient.remoteUsers.map(function(u) { return String(u.uid); }).join(',');
+    };
+
     window.lmsAgoraJoin = async function(appId, channel, token, uid, isInstructor) {
       try {
         // Clean up previous session
@@ -558,35 +621,35 @@
 
         window._lmsAgoraClient = AgoraRTC.createClient({ mode: 'rtc', codec: 'vp8' });
 
-        // ── Helper: play remote video with retry until div is in DOM ──────
-        async function lmsPlayRemoteVideo(videoTrack, retries) {
+        // ── Helper: play remote video into per-UID tile with retry ──────────
+        async function lmsPlayIntoTile(uid, videoTrack, retries) {
           retries = retries || 0;
-          var remoteDiv = document.getElementById('lms-agora-remote');
-          if (remoteDiv) {
+          var tile = window._lmsGetOrCreateTile(uid);
+          var videoDiv = tile ? document.getElementById('lms-tile-' + uid + '-video') : null;
+          if (videoDiv) {
             try {
-              remoteDiv.innerHTML = '';
-              videoTrack.play('lms-agora-remote');
-              console.log('LMS: remote video playing (attempt ' + retries + ')');
+              videoDiv.innerHTML = '';
+              videoTrack.play(videoDiv.id);
+              console.log('LMS: remote video playing uid=' + uid + ' (attempt ' + retries + ')');
             } catch(e) {
-              console.warn('LMS remote video play error:', e.message);
-              if (retries < 5) setTimeout(function() { lmsPlayRemoteVideo(videoTrack, retries + 1); }, 500);
+              console.warn('LMS remote video play error uid=' + uid + ':', e.message);
+              if (retries < 5) setTimeout(function() { lmsPlayIntoTile(uid, videoTrack, retries + 1); }, 500);
             }
           } else {
             if (retries < 20) {
-              console.warn('lms-agora-remote div not found, retry ' + retries);
-              setTimeout(function() { lmsPlayRemoteVideo(videoTrack, retries + 1); }, 300);
+              console.warn('lms-grid-container not ready for uid=' + uid + ', retry ' + retries);
+              setTimeout(function() { lmsPlayIntoTile(uid, videoTrack, retries + 1); }, 300);
             } else {
-              console.error('lms-agora-remote div never appeared');
+              console.error('lms-grid-container never appeared for uid=' + uid);
             }
           }
         }
 
-        // Subscribe to remote users
-        // (lms-agora-remote and lms-agora-local divs are created by Dart registerViewFactory)
+        // Subscribe to remote users — each UID gets its own tile, never clobbers existing feeds
         window._lmsAgoraClient.on('user-published', async function(user, mediaType) {
           await window._lmsAgoraClient.subscribe(user, mediaType);
           if (mediaType === 'video') {
-            lmsPlayRemoteVideo(user.videoTrack, 0);
+            lmsPlayIntoTile(user.uid, user.videoTrack, 0);
           }
           if (mediaType === 'audio') {
             try {
@@ -601,9 +664,14 @@
 
         window._lmsAgoraClient.on('user-unpublished', function(user, mediaType) {
           if (mediaType === 'video') {
-            var remoteDiv = document.getElementById('lms-agora-remote');
-            if (remoteDiv) remoteDiv.innerHTML = '';
+            var videoDiv = document.getElementById('lms-tile-' + user.uid + '-video');
+            if (videoDiv) videoDiv.innerHTML = '';
           }
+        });
+
+        window._lmsAgoraClient.on('user-left', function(user) {
+          window._lmsRemoveTile(user.uid);
+          console.log('LMS: user left uid=' + user.uid);
         });
 
         await window._lmsAgoraClient.join(appId, channel, token || null, uid || null);
@@ -612,7 +680,7 @@
         // Subscribe to anyone already in channel when joining late
         for (var j = 0; j < window._lmsAgoraClient.remoteUsers.length; j++) {
           var ru = window._lmsAgoraClient.remoteUsers[j];
-          if (ru.hasVideo) { try { await window._lmsAgoraClient.subscribe(ru,'video'); lmsPlayRemoteVideo(ru.videoTrack, 0); } catch(_){} }
+          if (ru.hasVideo) { try { await window._lmsAgoraClient.subscribe(ru,'video'); lmsPlayIntoTile(ru.uid, ru.videoTrack, 0); } catch(_){} }
           if (ru.hasAudio) {
             try { await window._lmsAgoraClient.subscribe(ru,'audio'); ru.audioTrack.play(); }
             catch(_) { /* autoplay blocked — lmsEnableMediaAndPublish() will resume */ }
@@ -747,8 +815,7 @@
     window.lmsSetParticipantNames = function(localName, remoteName) {
       var ln = document.getElementById('lms-local-name');
       if (ln) { ln.textContent = localName; ln.style.display = localName ? 'block' : 'none'; }
-      var rn = document.getElementById('lms-remote-name');
-      if (rn) { rn.textContent = remoteName; rn.style.display = remoteName ? 'block' : 'none'; }
+      // Per-tile remote names are set via lmsSetTileName(uid, name)
     };
 
     // Toggle video fit: 'cover' fills rectangle (no black bars), 'contain' shows full content
@@ -762,7 +829,7 @@
         document.head.appendChild(st);
       }
       st.textContent =
-        '#lms-agora-remote > div, #lms-agora-remote video {' +
+        '.lms-remote-tile > div, .lms-remote-tile video {' +
         'object-fit: ' + mode + ' !important; }';
     };
 
@@ -813,11 +880,12 @@
             try { ld.innerHTML = ''; window._lmsLocalVideo.play('lms-agora-local'); } catch(_) {}
           }
         }
-        var rd = document.getElementById('lms-agora-remote');
-        if (rd && window._lmsAgoraClient) {
+        if (window._lmsAgoraClient) {
           window._lmsAgoraClient.remoteUsers.forEach(function(u) {
             if (u.videoTrack) {
-              try { rd.innerHTML = ''; u.videoTrack.play('lms-agora-remote'); } catch(_) {}
+              var vd = document.getElementById('lms-tile-' + u.uid + '-video');
+              if (!vd) { window._lmsGetOrCreateTile(u.uid); vd = document.getElementById('lms-tile-' + u.uid + '-video'); }
+              if (vd) { try { vd.innerHTML = ''; u.videoTrack.play(vd.id); } catch(_) {} }
             }
           });
         }

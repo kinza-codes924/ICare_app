@@ -47,6 +47,9 @@ external void _lmsSetParticipantNamesJS(JSString localName, JSString remoteName)
 @JS('lmsSetVideoFit')
 external void _lmsSetVideoFitJS(JSString mode);
 
+@JS('lmsSetTileName')
+external void _lmsSetTileNameJS(JSNumber uid, JSString name);
+
 // appId and token fetched by caller from AgoraService
 Future<void> lmsJoinChannel(String roomName, String appId, String token, bool isInstructor) async {
   await _lmsAgoraJoinJS(appId.toJS, roomName.toJS, token.toJS, 0.toJS, isInstructor.toJS).toDart;
@@ -77,12 +80,34 @@ void lmsExitFullscreen() => _lmsExitFullscreenJS();
 void lmsRefreshVideoLayout() => _lmsRefreshVideoLayoutJS();
 void lmsSetParticipantNames(String localName, String remoteName) =>
     _lmsSetParticipantNamesJS(localName.toJS, remoteName.toJS);
-
 void lmsSetVideoFit(String mode) => _lmsSetVideoFitJS(mode.toJS);
+void lmsSetTileName(int uid, String name) => _lmsSetTileNameJS(uid.toJS, name.toJS);
 
 void lmsListenForScreenShareEnded(void Function() callback) {
   web.window.addEventListener('lms-screen-share-ended', ((web.Event _) {
     callback();
+  }).toJS);
+}
+
+/// Listen for a remote participant joining — fires when JS creates a new tile.
+void lmsListenForRemoteJoined(void Function(int uid) callback) {
+  web.window.addEventListener('lms-remote-joined', ((web.Event e) {
+    try {
+      final detail = (e as dynamic).detail;
+      final uid = int.tryParse(detail?.toString() ?? '') ?? 0;
+      if (uid > 0) callback(uid);
+    } catch (_) {}
+  }).toJS);
+}
+
+/// Listen for a remote participant leaving — fires when JS removes the tile.
+void lmsListenForRemoteLeft(void Function(int uid) callback) {
+  web.window.addEventListener('lms-remote-left', ((web.Event e) {
+    try {
+      final detail = (e as dynamic).detail;
+      final uid = int.tryParse(detail?.toString() ?? '') ?? 0;
+      if (uid > 0) callback(uid);
+    } catch (_) {}
   }).toJS);
 }
 
@@ -91,8 +116,8 @@ Widget lmsGetLocalVideoWidget(String? viewName) => const SizedBox.shrink();
 Widget lmsGetRemoteVideoWidget(int uid, String channelId) => const SizedBox.shrink();
 
 /// Register the LMS host container as a Flutter platform view.
-/// Creates agora-remote and lms-agora-local divs INSIDE the platform view
-/// (same pattern as the working doctor-patient call in video_call_web.dart).
+/// Creates a CSS Grid container (lms-grid-container) for remote tiles + a
+/// small local preview pinned to the bottom-right corner.
 String registerLmsVideoView() {
   const viewId = 'lms-jitsi-view';
   try {
@@ -103,34 +128,21 @@ String registerLmsVideoView() {
       container.style.height = '100%';
       container.style.background = '#1C2333';
       container.style.position = 'relative';
+      container.style.overflow = 'hidden';
 
-      // Remote video — fills entire area
-      final remote = web.document.createElement('div') as web.HTMLDivElement;
-      remote.id = 'lms-agora-remote';
-      remote.style.position = 'relative';
-      remote.style.width = '100%';
-      remote.style.height = '100%';
-      remote.style.background = '#000';
-      remote.style.overflow = 'hidden';
-      container.appendChild(remote);
+      // Remote grid — fills entire area; JS creates per-UID tile divs inside
+      final grid = web.document.createElement('div') as web.HTMLDivElement;
+      grid.id = 'lms-grid-container';
+      grid.style.width = '100%';
+      grid.style.height = '100%';
+      grid.style.display = 'grid';
+      grid.style.gridTemplateColumns = '1fr';
+      grid.style.gap = '4px';
+      grid.style.padding = '4px';
+      grid.style.boxSizing = 'border-box';
+      container.appendChild(grid);
 
-      // Remote name label
-      final remoteName = web.document.createElement('div') as web.HTMLDivElement;
-      remoteName.id = 'lms-remote-name';
-      remoteName.style.position = 'absolute';
-      remoteName.style.bottom = '8px';
-      remoteName.style.left = '8px';
-      remoteName.style.background = 'rgba(0,0,0,0.6)';
-      remoteName.style.color = '#fff';
-      remoteName.style.fontSize = '12px';
-      remoteName.style.fontWeight = '600';
-      remoteName.style.padding = '3px 8px';
-      remoteName.style.borderRadius = '4px';
-      remoteName.style.zIndex = '10';
-      remoteName.style.display = 'none';
-      remote.appendChild(remoteName);
-
-      // Local video — small preview in bottom-right corner
+      // Local video — small preview pinned to bottom-right corner
       final local = web.document.createElement('div') as web.HTMLDivElement;
       local.id = 'lms-agora-local';
       local.style.position = 'absolute';
