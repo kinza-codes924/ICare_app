@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:icare/screens/resource_library_screen.dart';
 import 'package:icare/screens/student_lms_dashboard.dart';
 import 'package:icare/screens/lms_public_catalog.dart';
 import 'package:icare/screens/tabs.dart';
@@ -278,9 +277,6 @@ class _StudentDashboardState extends ConsumerState<StudentDashboard> {
 
                     const SizedBox(height: 32),
 
-                    // ── Resource Library Quick Access ──────────────────────
-                    _buildResourceLibraryBanner(),
-
                     // ── Continue Learning ──────────────────────────────────
                     if (_recentCourses.isNotEmpty) ...[
                       const SizedBox(height: 28),
@@ -497,66 +493,6 @@ class _StudentDashboardState extends ConsumerState<StudentDashboard> {
           ),
         ),
       ],
-    );
-  }
-
-  Widget _buildResourceLibraryBanner() {
-    return GestureDetector(
-      onTap: () {
-        Navigator.of(context).push(
-          MaterialPageRoute(builder: (ctx) => const ResourceLibraryScreen()),
-        );
-      },
-      child: Container(
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: const Color(0xFFF1F5F9),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: const Color(0xFFE2E8F0)),
-        ),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: const Icon(
-                Icons.library_books_rounded,
-                color: AppColors.primaryColor,
-                size: 24,
-              ),
-            ),
-            const SizedBox(width: 16),
-            const Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Resource Library',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w800,
-                      color: Color(0xFF0F172A),
-                    ),
-                  ),
-                  SizedBox(height: 2),
-                  Text(
-                    'Access clinical PDFs & research papers',
-                    style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
-                  ),
-                ],
-              ),
-            ),
-            const Icon(
-              Icons.arrow_forward_ios_rounded,
-              size: 14,
-              color: Color(0xFF94A3B8),
-            ),
-          ],
-        ),
-      ),
     );
   }
 
