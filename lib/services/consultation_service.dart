@@ -10,8 +10,39 @@ class ConsultationService {
     baseUrl: ApiConstants.baseUrl,
     connectTimeout: const Duration(seconds: 30),
     receiveTimeout: const Duration(seconds: 30),
+    // plain text prevents Dio transformer from calling jsonDecode on HTML error pages
+    responseType: ResponseType.plain,
   ));
   final SharedPref _sharedPref = SharedPref();
+
+  ConsultationService() {
+    _dio.interceptors.add(InterceptorsWrapper(
+      onResponse: (response, handler) {
+        final ct = response.headers.value('content-type') ?? '';
+        if (ct.contains('text/html')) {
+          return handler.reject(DioException(
+            requestOptions: response.requestOptions,
+            response: response,
+            type: DioExceptionType.badResponse,
+            message: 'Backend unavailable (HTML ${response.statusCode})',
+          ), true);
+        }
+        if (response.data is String && (response.data as String).isNotEmpty) {
+          try {
+            response.data = jsonDecode(response.data as String);
+          } on FormatException {
+            return handler.reject(DioException(
+              requestOptions: response.requestOptions,
+              response: response,
+              type: DioExceptionType.badResponse,
+              message: 'Invalid JSON from server',
+            ), true);
+          }
+        }
+        handler.next(response);
+      },
+    ));
+  }
 
   // ==================== V2 CONSULTATION ENDPOINTS ====================
   
