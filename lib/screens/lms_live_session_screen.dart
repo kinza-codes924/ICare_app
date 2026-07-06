@@ -336,6 +336,7 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
       final newParticipants = attendees.map<Map<String, dynamic>>((a) => {
         'name': a['name'] ?? a['username'] ?? 'Participant',
         'id': a['_id']?.toString() ?? '',
+        'userId': a['_id']?.toString() ?? '', // needed by whiteboard permission sheet
         'isInstructor': false,
       }).toList();
 
