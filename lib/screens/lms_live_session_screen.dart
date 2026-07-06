@@ -1176,8 +1176,16 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
                 child: Row(children: [
                   const Text('✋', style: TextStyle(fontSize: 16)),
                   const SizedBox(width: 8),
-                  Text('${_raisedHands.length} hand(s) raised',
-                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text('${_raisedHands.length} hand(s) raised',
+                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 13)),
+                      Text(_raisedHands.join(', '),
+                          style: const TextStyle(color: Colors.white, fontSize: 12)),
+                    ],
+                  ),
                 ]),
               ),
             ),
@@ -1229,8 +1237,16 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
               child: Row(children: [
                 const Text('✋', style: TextStyle(fontSize: 16)),
                 const SizedBox(width: 8),
-                Text('${_raisedHands.length} hand(s) raised',
-                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text('${_raisedHands.length} hand(s) raised',
+                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 13)),
+                    Text(_raisedHands.join(', '),
+                        style: const TextStyle(color: Colors.white, fontSize: 12)),
+                  ],
+                ),
               ]),
             ),
           ),
