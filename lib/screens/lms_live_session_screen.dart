@@ -198,6 +198,15 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
   }
 
   Future<void> _wbPermissionChanged(String userId, bool grant) async {
+    // Optimistic update: reflect the change immediately so the 2-second
+    // whiteboard poll doesn't flip the toggle back before the PUT completes.
+    setState(() {
+      if (grant) {
+        if (!_wbPermissions.contains(userId)) _wbPermissions = [..._wbPermissions, userId];
+      } else {
+        _wbPermissions = _wbPermissions.where((id) => id != userId).toList();
+      }
+    });
     await _lms.setWhiteboardPermission(_sessionDocId, userId, grant: grant);
   }
 
