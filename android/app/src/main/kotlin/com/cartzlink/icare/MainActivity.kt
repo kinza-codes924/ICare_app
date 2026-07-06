@@ -1,4 +1,4 @@
-package com.example.icare
+package com.cartzlink.icare
 
 import io.flutter.embedding.android.FlutterFragmentActivity
 

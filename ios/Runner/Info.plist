@@ -51,5 +51,15 @@
 	<string>This app needs microphone access for audio during calls</string>
 	<key>NSFaceIDUsageDescription</key>
 	<string>iCare uses Face ID to securely sign you in without entering your password each time.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>iCare needs access to your photo library so you can share medical reports, prescriptions, and images with your doctor during consultations.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>iCare uses speech recognition to let you dictate messages and symptoms instead of typing.</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>audio</string>
+		<string>voip</string>
+		<string>remote-notification</string>
+	</array>
 </dict>
 </plist>
