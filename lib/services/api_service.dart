@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:dio/dio.dart';
 import '../utils/shared_pref.dart';
@@ -21,9 +22,12 @@ class ApiService {
       baseUrl: ApiConfig.baseUrl,
       connectTimeout: const Duration(seconds: 60),
       receiveTimeout: const Duration(seconds: 60),
+      // Plain text — we decode JSON manually in the interceptor so that a
+      // Vercel 502/504 HTML error page never reaches json.decode() and never
+      // throws an uncaught FormatException in the browser.
+      responseType: ResponseType.plain,
       headers: {
         'Content-Type': 'application/json',
-        // Only send x-platform on native mobile — web doesn't need it and it triggers CORS preflight
         if (!kIsWeb) 'x-platform': _detectPlatform(),
       },
     ),
@@ -31,23 +35,41 @@ class ApiService {
   final SharedPref _sharedPref = SharedPref();
 
   ApiService._internal() {
-    // Intercept responses that carry an HTML body (Vercel 502/504 error pages)
-    // and convert them to a DioException so callers get a clean error message
-    // instead of an unhandled FormatException from JSON.parse('<DOCTYPE...').
     _dio.interceptors.add(InterceptorsWrapper(
       onResponse: (response, handler) {
         final ct = response.headers.value('content-type') ?? '';
+
+        // Vercel 502/504 pages arrive as text/html — reject before json.decode
         if (ct.contains('text/html')) {
           return handler.reject(
             DioException(
               requestOptions: response.requestOptions,
               response: response,
               type: DioExceptionType.badResponse,
-              message: 'Server returned HTML instead of JSON (${response.statusCode}). Backend may be down.',
+              message: 'Backend unavailable (HTML response ${response.statusCode})',
             ),
             true,
           );
         }
+
+        // Decode the raw string body into a Dart object so every caller
+        // sees response.data as Map/List exactly as before.
+        if (response.data is String && (response.data as String).isNotEmpty) {
+          try {
+            response.data = jsonDecode(response.data as String);
+          } on FormatException {
+            return handler.reject(
+              DioException(
+                requestOptions: response.requestOptions,
+                response: response,
+                type: DioExceptionType.badResponse,
+                message: 'Invalid JSON from server',
+              ),
+              true,
+            );
+          }
+        }
+
         handler.next(response);
       },
     ));
@@ -92,15 +114,11 @@ class ApiService {
     return await _dio.delete(endpoint);
   }
 
-  /// Force-set the Authorization header immediately (without reading SharedPref).
-  /// Call this right after a successful login/signup to ensure the next
-  /// API requests are authenticated without a SharedPref read delay.
   void forceSetToken(String token) {
     final trimmed = token.trim();
     _dio.options.headers['Authorization'] = 'Bearer $trimmed';
   }
 
-  // Support for file uploads
   Future<Response> postMultipart(
     String endpoint,
     FormData formData, {
@@ -110,7 +128,10 @@ class ApiService {
     return await _dio.post(
       endpoint,
       data: formData,
-      options: Options(headers: {'Content-Type': 'multipart/form-data'}),
+      options: Options(
+        headers: {'Content-Type': 'multipart/form-data'},
+        responseType: ResponseType.plain,
+      ),
     );
   }
 }
