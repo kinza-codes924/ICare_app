@@ -45,4 +45,16 @@ const connectMongoDB = async () => {
   return _connectionPromise;
 };
 
+// Reset the in-flight promise when Atlas drops an idle connection so the
+// next request triggers a fresh connect() instead of returning the old
+// resolved promise (which would bypass reconnection).
+mongoose.connection.on('disconnected', () => {
+  _connectionPromise = null;
+  console.log('⚠️ MongoDB disconnected — will reconnect on next request');
+});
+
+mongoose.connection.on('error', () => {
+  _connectionPromise = null;
+});
+
 module.exports = { connectMongoDB };

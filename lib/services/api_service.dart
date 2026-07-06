@@ -15,7 +15,6 @@ String _detectPlatform() {
 class ApiService {
   static final ApiService _instance = ApiService._internal();
   factory ApiService() => _instance;
-  ApiService._internal();
 
   final Dio _dio = Dio(
     BaseOptions(
@@ -30,6 +29,29 @@ class ApiService {
     ),
   );
   final SharedPref _sharedPref = SharedPref();
+
+  ApiService._internal() {
+    // Intercept responses that carry an HTML body (Vercel 502/504 error pages)
+    // and convert them to a DioException so callers get a clean error message
+    // instead of an unhandled FormatException from JSON.parse('<DOCTYPE...').
+    _dio.interceptors.add(InterceptorsWrapper(
+      onResponse: (response, handler) {
+        final ct = response.headers.value('content-type') ?? '';
+        if (ct.contains('text/html')) {
+          return handler.reject(
+            DioException(
+              requestOptions: response.requestOptions,
+              response: response,
+              type: DioExceptionType.badResponse,
+              message: 'Server returned HTML instead of JSON (${response.statusCode}). Backend may be down.',
+            ),
+            true,
+          );
+        }
+        handler.next(response);
+      },
+    ));
+  }
 
   Future<void> _setAuthToken({String? providedToken}) async {
     String? token = providedToken ?? await _sharedPref.getToken();
