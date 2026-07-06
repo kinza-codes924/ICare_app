@@ -89,7 +89,7 @@ const register = async (req, res) => {
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    const rolesRequiringApproval = ['doctor', 'lab', 'pharmacy', 'instructor'];
+    const rolesRequiringApproval = ['doctor', 'lab', 'pharmacy', 'instructor', 'student'];
     const isApproved = !rolesRequiringApproval.includes(role);
 
     // Auto-generate MR number for patients and students
@@ -216,8 +216,8 @@ const login = async (req, res) => {
       return res.status(403).json({ success: false, message: 'Your account has been deactivated' });
     }
 
-    // Check approval for professional roles (only block if explicitly false)
-    const rolesRequiringApproval = ['doctor', 'lab', 'pharmacy', 'instructor'];
+    // Check approval — block login until admin approves
+    const rolesRequiringApproval = ['doctor', 'lab', 'pharmacy', 'instructor', 'student'];
     if (rolesRequiringApproval.includes(user.role?.toLowerCase()) && user.is_approved === false) {
       return res.status(403).json({ success: false, message: 'Your account is pending admin approval. Please wait for verification.' });
     }
