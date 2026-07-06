@@ -64,7 +64,6 @@ class _VerifyCodeState extends State<VerifyCode> {
       final result = await _authService.forgotPassword(email: widget.email);
 
       if (result['success']) {
-        debugPrint('New OTP for testing: ${result['otp']}');
         _showSuccess('OTP resent successfully');
       } else {
         _showError(result['message']);

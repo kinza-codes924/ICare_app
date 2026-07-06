@@ -8,7 +8,6 @@ import 'package:icare/services/notification_service.dart';
 import 'package:icare/utils/theme.dart';
 import 'package:icare/utils/utils.dart';
 import 'package:icare/widgets/back_button.dart';
-import 'package:icare/widgets/custom_button.dart';
 import 'package:icare/widgets/custom_text.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -209,12 +208,6 @@ class _NotificationSettingsState extends ConsumerState<NotificationSettings> {
               ),
             ),
             SizedBox(height: Utils.windowHeight(context) * 0.5),
-            if (!isPatient)
-              CustomButton(
-                borderRadius: 30,
-                onPressed: () {},
-                label: "Delete Account".tr(),
-              ),
           ],
         ),
       ),

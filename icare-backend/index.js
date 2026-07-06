@@ -14,7 +14,6 @@ const pharmacyRoutes = require('./routes/pharmacy');
 const coursesRoutes = require('./routes/courses');
 const productsRoutes = require('./routes/products');
 const cartRoutes = require('./routes/cart');
-const seedRoutes = require('./routes/seed');
 const ratingsRoutes = require('./routes/ratings');
 const inventoryRoutes = require('./routes/inventory');
 const invoicesRoutes = require('./routes/invoices');
@@ -28,7 +27,6 @@ const courseQuestionsRoutes = require('./routes/course-questions');
 const callChatRoutes = require('./routes/call-chat');
 const clinicalRoutes = require('./routes/clinical');
 const adminRoutes = require('./routes/admin');
-const seedLocationsRoute = require('./routes/seed-locations');
 
 const healthRoutes = require('./routes/healthRoutes');
 const consultationRoutes = require('./routes/consultationRoutes');
@@ -58,8 +56,23 @@ const faqsRoutes = require('./routes/faqs');
 const app = express();
 
 // Middleware — CORS must be first, before any routes
+const ALLOWED_ORIGINS = [
+  'https://www.icare.com.co',
+  'https://icare.com.co',
+  'https://icare-app.vercel.app',
+  // Vercel preview URLs
+  /^https:\/\/icare-[a-z0-9-]+-wajahatfrontdev-8765s-projects\.vercel\.app$/,
+];
+
 app.use((req, res, next) => {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  const origin = req.headers.origin;
+  const allowed = ALLOWED_ORIGINS.some(o =>
+    typeof o === 'string' ? o === origin : o.test?.(origin)
+  );
+  if (allowed) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Vary', 'Origin');
+  }
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, x-platform');
   res.setHeader('Access-Control-Max-Age', '86400');
@@ -70,7 +83,13 @@ app.use((req, res, next) => {
 });
 
 app.use(cors({
-  origin: '*',
+  origin: (origin, callback) => {
+    if (!origin) return callback(null, true); // mobile apps have no origin
+    const allowed = ALLOWED_ORIGINS.some(o =>
+      typeof o === 'string' ? o === origin : o.test?.(origin)
+    );
+    callback(allowed ? null : new Error('Not allowed by CORS'), allowed);
+  },
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'x-platform'],
   credentials: false,
@@ -120,7 +139,6 @@ app.use('/api/courses', coursesRoutes);
 app.use('/api/students/courses', coursesRoutes);
 app.use('/api/products', productsRoutes);
 app.use('/api/cart', cartRoutes);
-app.use('/api/seed', seedRoutes);
 app.use('/api/ratings', ratingsRoutes);
 app.use('/api/inventory', inventoryRoutes);
 app.use('/api/invoices', invoicesRoutes);
@@ -143,7 +161,6 @@ app.use('/api/chat', callChatRoutes); // alias
 app.use('/api/users', usersRoutes);
 app.use('/api/clinical', clinicalRoutes);
 app.use('/api/admin', adminRoutes);
-app.use('/api/seed-locations', seedLocationsRoute);
 
 app.use('/api/health', healthRoutes);
 app.use('/api/consultations', consultationRoutes);

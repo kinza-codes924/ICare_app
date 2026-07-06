@@ -54,9 +54,7 @@ class FcmService {
       _handleNotificationTap(initialMessage);
     }
 
-    // Get and print FCM token
-    final token = await getToken();
-    debugPrint('🔑 FCM Token: $token');
+    await getAndSaveToken();
   }
 
   Future<void> _setupLocalNotifications() async {
