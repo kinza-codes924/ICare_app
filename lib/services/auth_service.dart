@@ -406,4 +406,29 @@ class AuthService {
       return {'success': false, 'message': 'Error: ${e.toString()}'};
     }
   }
+
+  // NOTE: backend endpoint '/auth/switch-role' is not implemented yet.
+  // This method exists so the multi-role UI (drawer/settings) compiles and
+  // runs; it will surface a friendly error until the backend route is added.
+  Future<Map<String, dynamic>> switchRole(String role) async {
+    try {
+      final response = await _apiService.post('/auth/switch-role', {'role': _capitalizeRole(role)});
+      if (response.statusCode == 200) {
+        final data = response.data as Map<String, dynamic>;
+        if (data['success'] == true) {
+          final inner = data['data'] as Map<String, dynamic>? ?? {};
+          final token = inner['token']?.toString() ?? '';
+          if (token.isNotEmpty) {
+            await _saveToken(token);
+          }
+        }
+        return data;
+      }
+      return {'success': false, 'message': (response.data as Map?)?['message'] ?? 'Role switch failed'};
+    } on DioException catch (e) {
+      return {'success': false, 'message': _friendlyError(e)};
+    } catch (e) {
+      return {'success': false, 'message': 'Error: ${e.toString()}'};
+    }
+  }
 }
