@@ -91,7 +91,7 @@ router.get('/pending-users', authMiddleware, adminOnly, async (req, res) => {
     await connectMongoDB();
     const users = await withRetry(() =>
       User.find({ is_approved: false, role: { $nin: ['admin', 'patient'] } })
-        .select('name username email role roles phone createdAt')
+        .select('name username email role roles phone createdAt verificationDetails')
         .maxTimeMS(8000)
         .lean(),
     2
@@ -105,6 +105,7 @@ router.get('/pending-users', authMiddleware, adminOnly, async (req, res) => {
       roles: u.roles || [],
       phone: u.phone || '',
       createdAt: u.createdAt,
+      verificationDetails: u.verificationDetails || {},
     }));
 
     res.json({ success: true, users: result, count: result.length, pendingUsers: result });

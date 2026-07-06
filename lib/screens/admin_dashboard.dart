@@ -156,6 +156,12 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
               }
             } catch (_) {}
           }
+        } else if (role == 'instructor' || role == 'student') {
+          // verificationDetails already included in pending-users response — just copy it
+          final vd = u['verificationDetails'];
+          if (vd is Map && vd.isNotEmpty && mounted) {
+            setState(() => _extraDetails[id] = Map<String, dynamic>.from(vd));
+          }
         }
       } catch (_) {}
     }
