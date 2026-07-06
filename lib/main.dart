@@ -1,3 +1,4 @@
+import 'dart:ui' show PlatformDispatcher;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_size_matters/flutter_size_matters.dart';
@@ -20,6 +21,13 @@ import 'package:flutter_web_plugins/url_strategy.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await EasyLocalization.ensureInitialized();
+
+  // Catch every unhandled async error (FormatException from bad JSON, etc.)
+  // so it never surfaces as "Uncaught (in promise)" in the browser console.
+  PlatformDispatcher.instance.onError = (error, stack) {
+    debugPrint('🚨 Unhandled error: $error');
+    return true; // mark as handled — suppresses browser-level uncaught promise
+  };
 
   // Use path-based URLs (no # hash) so /home, /login etc. work directly.
   usePathUrlStrategy();
