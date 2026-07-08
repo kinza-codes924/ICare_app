@@ -72,6 +72,9 @@ import 'package:icare/services/lms_service.dart';
 import 'package:icare/services/course_service.dart';
 import 'package:icare/screens/my_learning.dart';
 import 'package:icare/services/notification_service.dart';
+import 'package:icare/services/api_service.dart';
+import 'package:icare/services/auth_service.dart';
+import 'package:icare/models/user.dart' as app_user;
 
 class TabsScreen extends ConsumerStatefulWidget {
   final String? initialAdminTab;
@@ -695,6 +698,160 @@ class _WebSidebar extends ConsumerStatefulWidget {
 }
 
 class _WebSidebarState extends ConsumerState<_WebSidebar> {
+  List<String> _availableRoles = [];
+
+  static const _roleDisplayNames = {
+    'doctor': 'Doctor',
+    'student': 'Student',
+    'instructor': 'Instructor',
+    'patient': 'Patient',
+    'lab': 'Laboratory',
+    'laboratory': 'Laboratory',
+    'pharmacy': 'Pharmacy',
+  };
+
+  static const _roleIcons = {
+    'doctor': Icons.medical_services_rounded,
+    'student': Icons.school_rounded,
+    'instructor': Icons.cast_for_education_rounded,
+    'patient': Icons.person_rounded,
+    'lab': Icons.biotech_rounded,
+    'laboratory': Icons.biotech_rounded,
+    'pharmacy': Icons.local_pharmacy_rounded,
+  };
+
+  @override
+  void initState() {
+    super.initState();
+    _loadAvailableRoles();
+  }
+
+  Future<void> _loadAvailableRoles() async {
+    try {
+      final res = await ApiService().get('/auth/profile');
+      final roles = (res.data['user']?['roles'] as List?)
+              ?.map((e) => e.toString())
+              .toList() ??
+          [];
+      if (mounted) setState(() => _availableRoles = roles);
+    } catch (_) {}
+  }
+
+  Future<void> _switchRole(String role) async {
+    final result = await AuthService().switchRole(role);
+    if (!mounted) return;
+    if (result['success'] == true) {
+      final inner = result['data'];
+      await ref.read(authProvider.notifier).setUserToken(inner['token'].toString());
+      final currentUser = ref.read(authProvider).user;
+      final user = app_user.User.fromJson(Map<String, dynamic>.from(inner['user'] as Map)).copyWith(
+        isEmailVerified: currentUser?.isEmailVerified ?? true,
+        isPhoneVerified: currentUser?.isPhoneVerified ?? true,
+      );
+      await ref.read(authProvider.notifier).setUser(user);
+      if (!mounted) return;
+      context.go('/dashboard');
+    } else {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(result['message']?.toString() ?? 'Role switch failed'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  void _showSwitchRoleSheet(BuildContext context) {
+    final currentRole = widget.role.toLowerCase();
+    final activeKey = currentRole == 'laboratory' ? 'lab' : currentRole;
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (sheetCtx) => Padding(
+        padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(children: [
+              const Icon(Icons.swap_horiz_rounded, color: AppColors.primaryColor, size: 22),
+              const SizedBox(width: 8),
+              const Text('Switch Role', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+            ]),
+            const SizedBox(height: 6),
+            const Text('Select a role to switch to its dashboard.', style: TextStyle(fontSize: 13, color: Color(0xFF94A3B8))),
+            const SizedBox(height: 16),
+            ..._availableRoles.map((r) {
+              final key = r.toLowerCase();
+              final isActive = key == activeKey;
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: InkWell(
+                  onTap: isActive ? null : () async {
+                    Navigator.pop(sheetCtx);
+                    await _switchRole(key);
+                  },
+                  borderRadius: BorderRadius.circular(12),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                    decoration: BoxDecoration(
+                      color: isActive ? AppColors.primaryColor.withValues(alpha: 0.06) : Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: isActive ? AppColors.primaryColor : const Color(0xFFE2E8F0),
+                        width: isActive ? 1.5 : 1,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: AppColors.primaryColor.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Icon(_roleIcons[key] ?? Icons.person_rounded, color: AppColors.primaryColor, size: 18),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            _roleDisplayNames[key] ?? r,
+                            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
+                          ),
+                        ),
+                        if (isActive)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: AppColors.primaryColor,
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.check_rounded, color: Colors.white, size: 12),
+                                SizedBox(width: 3),
+                                Text('Current', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w800)),
+                              ],
+                            ),
+                          )
+                        else
+                          const Icon(Icons.chevron_right_rounded, color: Color(0xFF94A3B8)),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            }),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final role = widget.role;
@@ -1215,6 +1372,23 @@ class _WebSidebarState extends ConsumerState<_WebSidebar> {
                         ),
                       );
                     },
+                  ),
+                ],
+
+                // Shown only when this account has more than one role
+                // (e.g. Doctor + Instructor) to switch to — matches the
+                // gating already used by the mobile drawer's equivalent item.
+                if (_availableRoles.length > 1) ...[
+                  const SizedBox(height: 8),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+                    child: Divider(color: const Color(0xFFE8ECF5), height: 1),
+                  ),
+                  _buildExtraNavItem(
+                    context,
+                    Icons.swap_horiz_rounded,
+                    'Switch Role',
+                    () => _showSwitchRoleSheet(context),
                   ),
                 ],
                 ],
