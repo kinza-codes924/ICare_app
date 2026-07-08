@@ -655,7 +655,7 @@ class _CourseLessons extends StatelessWidget {
         ? DateTime.tryParse(course['startDate'].toString())
         : null;
     final completedModuleIds = <String>{};
-    final rawCompleted = course['_completedModules'];
+    final rawCompleted = course['completedModuleIds'];
     if (rawCompleted is List) {
       for (final id in rawCompleted) { completedModuleIds.add(id.toString()); }
     }
@@ -688,8 +688,14 @@ class _CourseLessons extends StatelessWidget {
       final moduleId = m['_id']?.toString() ?? '';
       final lessons = (m['lessons'] as List?) ?? [];
       final quizzes = (m['quizzes'] as List?) ?? [];
-      final locked = isModuleLocked(me.key);
-      final unlockDate = isPragmatic ? pragmaticUnlockDate(me.key) : null;
+      // Prefer the backend's authoritative per-module isLocked (kept in sync
+      // with classroom_course_view.dart) over the client-side recomputation,
+      // which falls back to isModuleLocked() only if the field is absent.
+      final locked = m['isLocked'] is bool ? m['isLocked'] as bool : isModuleLocked(me.key);
+      final unlockDateRaw = m['unlockDate']?.toString();
+      final unlockDate = unlockDateRaw != null
+          ? DateTime.tryParse(unlockDateRaw)
+          : (isPragmatic ? pragmaticUnlockDate(me.key) : null);
 
       return Container(
         margin: const EdgeInsets.only(bottom: 8),

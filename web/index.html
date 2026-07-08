@@ -45,8 +45,13 @@
       object-fit: cover; display: block;
     }
     /* LMS multi-participant grid tiles */
-    #lms-grid-container { display: grid; grid-template-columns: 1fr; gap: 4px; padding: 4px; box-sizing: border-box; width: 100%; height: 100%; }
+    #lms-grid-container { display: grid; grid-template-columns: 1fr; grid-auto-rows: 1fr; align-content: start; gap: 4px; padding: 4px; box-sizing: border-box; width: 100%; height: 100%; overflow-y: auto; }
     .lms-remote-tile { position: relative; background: #1a2234; border-radius: 8px; overflow: hidden; min-height: 80px; }
+    /* Only force a 4:3 box once there's more than one tile in the grid —
+       with a single remote participant the tile should fill the whole
+       video area (matches the Dart side's SizedBox.expand for that case),
+       not get boxed into a small letterboxed rectangle. */
+    #lms-grid-container:has(.lms-remote-tile:nth-child(2)) .lms-remote-tile { aspect-ratio: 4 / 3; }
     .lms-remote-tile > div { position: absolute !important; inset: 0; }
     .lms-remote-tile video {
       position: absolute !important; inset: 0;
@@ -57,6 +62,29 @@
       position: absolute; bottom: 6px; left: 6px;
       background: rgba(0,0,0,0.6); color: #fff; font-size: 12px; font-weight: 600;
       padding: 2px 8px; border-radius: 4px; z-index: 10; pointer-events: none;
+    }
+    /* Screen-share mode: a large main view for the shared screen, with
+       participant camera tiles demoted to a thin scrollable sidebar strip. */
+    #lms-jitsi-host.lms-screenshare-mode #lms-grid-container {
+      position: absolute; top: 0; right: 0; bottom: 0;
+      width: 130px; height: auto;
+      grid-template-columns: 1fr !important;
+      grid-auto-rows: 98px;
+      overflow-y: auto; overflow-x: hidden;
+      background: rgba(0,0,0,0.35);
+      z-index: 15;
+    }
+    #lms-jitsi-host.lms-screenshare-mode #lms-grid-container .lms-remote-tile {
+      aspect-ratio: auto; min-height: 98px;
+    }
+    #lms-screen-share-main {
+      position: absolute; inset: 0; background: #000;
+      display: none;
+    }
+    #lms-jitsi-host.lms-screenshare-mode #lms-screen-share-main { display: block; }
+    #lms-screen-share-main > div, #lms-screen-share-main video {
+      width: 100% !important; height: 100% !important;
+      object-fit: contain !important; display: block; background: #000;
     }
   </style>
 </head>
@@ -585,8 +613,25 @@
       var grid = document.getElementById('lms-grid-container');
       if (!grid) return;
       var count = grid.children.length;
-      var cols = count <= 1 ? 1 : count <= 4 ? 2 : 3;
+      // Scale columns with participant count instead of capping at a fixed
+      // number, so grids with 20+ students still lay out sensibly.
+      var cols = count <= 1 ? 1 : count <= 4 ? 2 : count <= 9 ? 3 : count <= 16 ? 4 : 5;
       grid.style.gridTemplateColumns = 'repeat(' + cols + ', 1fr)';
+      // Every grid resize reflows every tile's box size. Agora's internal
+      // <video>/<canvas> element doesn't always pick up on that reflow (it
+      // can be left sized against the pre-reflow box), which is what makes
+      // tiles go blank once enough participants join to change the column
+      // count. Re-playing each already-subscribed remote track a beat later
+      // forces Agora to re-measure the (now correctly sized) container.
+      if (window._lmsAgoraClient) {
+        setTimeout(function() {
+          window._lmsAgoraClient.remoteUsers.forEach(function(u) {
+            if (!u.videoTrack) return;
+            var vd = document.getElementById('lms-tile-' + u.uid + '-video');
+            if (vd) { try { u.videoTrack.play(vd.id); } catch(_) {} }
+          });
+        }, 120);
+      }
     };
 
     window.lmsSetTileName = function(uid, name) {
@@ -622,7 +667,7 @@
         window._lmsAgoraClient = AgoraRTC.createClient({ mode: 'rtc', codec: 'vp8' });
 
         // ── Helper: play remote video into per-UID tile with retry ──────────
-        async function lmsPlayIntoTile(uid, videoTrack, retries) {
+        function lmsPlayIntoTile(uid, videoTrack, retries) {
           retries = retries || 0;
           var tile = window._lmsGetOrCreateTile(uid);
           var videoDiv = tile ? document.getElementById('lms-tile-' + uid + '-video') : null;
@@ -631,14 +676,22 @@
               videoDiv.innerHTML = '';
               videoTrack.play(videoDiv.id);
               console.log('LMS: remote video playing uid=' + uid + ' (attempt ' + retries + ')');
+              // Verify Agora actually attached a rendering element (canvas/video)
+              // into the tile — under rapid concurrent joins this can silently
+              // no-op. If nothing landed, retry once the DOM has settled.
+              setTimeout(function() {
+                if (videoDiv.childElementCount === 0 && retries < 8) {
+                  lmsPlayIntoTile(uid, videoTrack, retries + 1);
+                }
+              }, 400);
             } catch(e) {
               console.warn('LMS remote video play error uid=' + uid + ':', e.message);
-              if (retries < 5) setTimeout(function() { lmsPlayIntoTile(uid, videoTrack, retries + 1); }, 500);
+              if (retries < 8) setTimeout(function() { lmsPlayIntoTile(uid, videoTrack, retries + 1); }, 400);
             }
           } else {
-            if (retries < 20) {
+            if (retries < 30) {
               console.warn('lms-grid-container not ready for uid=' + uid + ', retry ' + retries);
-              setTimeout(function() { lmsPlayIntoTile(uid, videoTrack, retries + 1); }, 300);
+              setTimeout(function() { lmsPlayIntoTile(uid, videoTrack, retries + 1); }, 250);
             } else {
               console.error('lms-grid-container never appeared for uid=' + uid);
             }
@@ -752,6 +805,14 @@
     window._lmsScreenTrack = null;
     window._lmsScreenSharing = false;
 
+    // Toggles the big-main-view/sidebar layout. Applied on the sharer's own
+    // screen (self screen-share) and on every viewer's screen when a remote
+    // user is publishing their screen (see handleRemoteScreenShare below).
+    window._lmsSetScreenShareMode = function(active) {
+      var host = document.getElementById('lms-jitsi-host');
+      if (host) host.classList.toggle('lms-screenshare-mode', !!active);
+    };
+
     window.lmsToggleScreenShare = async function() {
       try {
         if (window._lmsScreenSharing && window._lmsScreenTrack) {
@@ -762,6 +823,9 @@
           try { window._lmsScreenTrack.stop(); window._lmsScreenTrack.close(); } catch(_) {}
           window._lmsScreenTrack = null;
           window._lmsScreenSharing = false;
+          window._lmsSetScreenShareMode(false);
+          var mainEl = document.getElementById('lms-screen-share-main');
+          if (mainEl) mainEl.innerHTML = '';
           // Re-publish camera
           if (window._lmsLocalVideo && window._lmsAgoraClient) {
             try {
@@ -793,9 +857,12 @@
           if (window._lmsAgoraClient) {
             await window._lmsAgoraClient.publish([window._lmsScreenTrack]);
           }
-          // Local preview
-          var ld2 = document.getElementById('lms-agora-local');
-          if (ld2) { ld2.innerHTML = ''; window._lmsScreenTrack.play('lms-agora-local'); }
+          // Big main view for the sharer's own screen; camera self-preview
+          // stays in the small corner box (still shows the last camera
+          // frame, harmless since it's not being published).
+          window._lmsSetScreenShareMode(true);
+          var mainEl2 = document.getElementById('lms-screen-share-main');
+          if (mainEl2) { mainEl2.innerHTML = ''; window._lmsScreenTrack.play('lms-screen-share-main'); }
           window._lmsScreenSharing = true;
           // Point the recording at the live screen track so it captures the
           // real screen (not a frozen camera frame).
@@ -815,6 +882,51 @@
         window._lmsScreenTrack = null;
         return 'error:' + (e.message || String(e));
       }
+    };
+
+    window.lmsGetLocalUid = function() {
+      return window._lmsAgoraClient ? String(window._lmsAgoraClient.uid || '') : '';
+    };
+
+    // Called on the 5s poll cycle (Dart side) with the session's current
+    // screenSharingUid (or '' if nobody is sharing). If that uid belongs to
+    // a REMOTE user we have a video track for, move their video into the
+    // big main view and demote the grid to the sidebar strip. If it's our
+    // own uid, or empty, this is a no-op — self-share is already handled
+    // directly by lmsToggleScreenShare, and clearing is handled below.
+    window.lmsApplyRemoteScreenShare = function(sharingUid) {
+      try {
+        var myUid = window.lmsGetLocalUid();
+        var mainEl = document.getElementById('lms-screen-share-main');
+        if (!sharingUid || sharingUid === myUid) {
+          // Nobody remote is sharing (or it's us, already handled locally).
+          // Only clear the remote-driven view if we're not the active sharer.
+          if (!window._lmsScreenSharing) {
+            window._lmsSetScreenShareMode(false);
+            if (mainEl) mainEl.innerHTML = '';
+          }
+          // Restore any grid tile we'd hidden for a previous remote sharer.
+          if (window._lmsAgoraClient) {
+            window._lmsAgoraClient.remoteUsers.forEach(function(u) {
+              var t = document.getElementById('lms-tile-' + u.uid);
+              if (t) t.style.display = '';
+            });
+          }
+          return;
+        }
+        if (!window._lmsAgoraClient) return;
+        var remoteUser = window._lmsAgoraClient.remoteUsers.find(function(u) {
+          return String(u.uid) === String(sharingUid);
+        });
+        if (remoteUser && remoteUser.videoTrack && mainEl) {
+          window._lmsSetScreenShareMode(true);
+          try { remoteUser.videoTrack.play('lms-screen-share-main'); } catch(_) {}
+          // Hide their small grid tile while they're the main view so the
+          // same feed isn't shown twice.
+          var smallTile = document.getElementById('lms-tile-' + sharingUid);
+          if (smallTile) smallTile.style.display = 'none';
+        }
+      } catch(e) { console.warn('lmsApplyRemoteScreenShare error:', e); }
     };
 
     window.lmsSetParticipantNames = function(localName, remoteName) {
@@ -991,10 +1103,17 @@
           } else if (hasRemote) {
             drawFit(remoteVid, 0, 0, W, H);
           }
-          requestAnimationFrame(drawFrame);
         };
-        // Start drawing after delay — DOM-attached video needs time to decode first frame
-        setTimeout(drawFrame, 1500);
+        // Start drawing after delay — DOM-attached video needs time to decode first frame.
+        // Uses setInterval (not requestAnimationFrame) because browsers throttle/
+        // pause rAF entirely when the tab is backgrounded or minimized — which is
+        // exactly when instructors tend to switch away during a live session —
+        // causing the recording to drop frames and look choppy. setInterval is
+        // only clamped to a minimum delay in background tabs, so it keeps drawing
+        // at a steady (if occasionally slightly slower) rate instead of stalling.
+        setTimeout(function() {
+          window._lmsRecordDrawTimer = setInterval(drawFrame, 1000 / 30);
+        }, 1500);
 
         // ── MediaRecorder from canvas stream + mixed audio ───────────────
         // 30fps for smooth motion; matches Agora screen-share frameRate.
@@ -1094,6 +1213,7 @@
 
       var doSave = async function() {
         // Clean up canvas recording helpers
+        if (window._lmsRecordDrawTimer) { clearInterval(window._lmsRecordDrawTimer); window._lmsRecordDrawTimer = null; }
         if (window._lmsRecordLocalVid) { try { window._lmsRecordLocalVid.pause(); window._lmsRecordLocalVid.srcObject = null; if (window._lmsRecordLocalVid.parentNode) window._lmsRecordLocalVid.parentNode.removeChild(window._lmsRecordLocalVid); } catch(_){} window._lmsRecordLocalVid = null; }
         if (window._lmsRecordRemoteVid) { try { window._lmsRecordRemoteVid.pause(); window._lmsRecordRemoteVid.srcObject = null; if (window._lmsRecordRemoteVid.parentNode) window._lmsRecordRemoteVid.parentNode.removeChild(window._lmsRecordRemoteVid); } catch(_){} window._lmsRecordRemoteVid = null; }
         window._lmsRecordCanvas = null;

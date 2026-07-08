@@ -52,6 +52,10 @@ const liveSessionSchema = new mongoose.Schema({
   whiteboardPermissions: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
   // Instructor's whiteboard visibility — students follow this to auto-open
   whiteboardOpen: { type: Boolean, default: false },
+  // Whoever is currently screen-sharing (Agora numeric uid, as a string) —
+  // other participants poll this to switch to the big-main-view layout.
+  // null/empty means nobody is sharing.
+  screenSharingUid: { type: String, default: null },
 }, { timestamps: true });
 
 module.exports = mongoose.models.LiveSession || mongoose.model('LiveSession', liveSessionSchema);

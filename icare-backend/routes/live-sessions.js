@@ -550,6 +550,20 @@ router.post('/:id/raise-hand', authMiddleware, async (req, res) => {
   }
 });
 
+// ── Screen share: broadcast who is currently sharing (or clear it) ─────────
+router.post('/:id/screen-share', authMiddleware, async (req, res) => {
+  try {
+    await connectMongoDB();
+    const { uid } = req.body; // Agora numeric uid as string, or null to clear
+    await LiveSession.findByIdAndUpdate(toId(req.params.id), {
+      screenSharingUid: uid || null,
+    });
+    res.json({ success: true });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
 // ── STUDENT: Lower hand ──────────────────────────────────────────────────────
 router.post('/:id/lower-hand', authMiddleware, async (req, res) => {
   try {

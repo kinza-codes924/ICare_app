@@ -1,7 +1,6 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:icare/screens/lms_limited_dashboard.dart';
 import 'package:icare/screens/view_course.dart';
 import 'package:icare/services/course_service.dart';
 import 'package:icare/providers/auth_provider.dart';
@@ -40,31 +39,9 @@ class _MyLearningScreenState extends ConsumerState<MyLearningScreen>
     try {
       final courses = await _courseService.myPurchases();
 
-      // Gate: only students actively going through the LMS purchase
-      // verification flow (status 'pending' or 'rejected') get routed to the
-      // limited single-course dashboard. Students with no verification
-      // record at all ('not_submitted' — pre-existing/admin-enrolled
-      // students who never went through this flow) keep full access.
-      final role = ref.read(authProvider).userRole.toLowerCase();
-      if (role == 'student' && courses.isNotEmpty) {
-        final verification = await _courseService.getVerificationStatus();
-        final status = verification['status'];
-        final gated = (status == 'pending' || status == 'rejected') && verification['level'] != 'full';
-        if (gated && mounted) {
-          final first = courses.first;
-          final rawCourse = first['course'];
-          final course = (rawCourse is Map) ? Map<String, dynamic>.from(rawCourse) : {};
-          final courseId = course['_id']?.toString() ?? first['courseId']?.toString() ?? '';
-          if (courseId.isNotEmpty) {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(builder: (_) => LmsLimitedDashboard(courseId: courseId)),
-            );
-            return;
-          }
-        }
-      }
-
+      // Enrollment/payment already grants full course access — document
+      // verification (StudentVerification) is tracked separately in the
+      // background and no longer gates access to purchased courses here.
       if (mounted) {
         setState(() {
           _enrolledCourses = courses;

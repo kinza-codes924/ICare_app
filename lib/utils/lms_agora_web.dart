@@ -32,6 +32,12 @@ external JSPromise<JSString> _lmsStudentEnableAudioJS();
 @JS('lmsToggleScreenShare')
 external JSPromise<JSString> _lmsToggleScreenShareJS();
 
+@JS('lmsGetLocalUid')
+external JSString _lmsGetLocalUidJS();
+
+@JS('lmsApplyRemoteScreenShare')
+external void _lmsApplyRemoteScreenShareJS(JSString sharingUid);
+
 @JS('lmsRequestFullscreen')
 external void _lmsRequestFullscreenJS();
 
@@ -74,6 +80,10 @@ Future<String> lmsToggleScreenShare() async {
   final r = await _lmsToggleScreenShareJS().toDart;
   return r.toDart;
 }
+
+String lmsGetLocalUid() => _lmsGetLocalUidJS().toDart;
+void lmsApplyRemoteScreenShare(String sharingUid) =>
+    _lmsApplyRemoteScreenShareJS(sharingUid.toJS);
 
 void lmsRequestFullscreen() => _lmsRequestFullscreenJS();
 void lmsExitFullscreen() => _lmsExitFullscreenJS();
@@ -129,6 +139,14 @@ String registerLmsVideoView() {
       container.style.background = '#1C2333';
       container.style.position = 'relative';
       container.style.overflow = 'hidden';
+
+      // Large screen-share view — hidden unless lms-screenshare-mode is
+      // active on the host container (see lmsSetScreenShareMode in
+      // web/index.html), in which case it becomes the main view and the
+      // remote grid is demoted to a sidebar strip via CSS.
+      final screenMain = web.document.createElement('div') as web.HTMLDivElement;
+      screenMain.id = 'lms-screen-share-main';
+      container.appendChild(screenMain);
 
       // Remote grid — fills entire area; JS creates per-UID tile divs inside
       final grid = web.document.createElement('div') as web.HTMLDivElement;

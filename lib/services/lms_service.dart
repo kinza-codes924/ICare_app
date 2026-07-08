@@ -564,6 +564,15 @@ class LmsService {
     }
   }
 
+  Future<void> setScreenSharingUid({
+    required String sessionId,
+    String? uid,
+  }) async {
+    try {
+      await _api.post('/live-sessions/$sessionId/screen-share', {'uid': uid});
+    } catch (_) {}
+  }
+
   Future<Map<String, dynamic>> admitStudent({
     required String sessionId,
     required String studentId,

@@ -136,7 +136,7 @@ router.post('/', authMiddleware, async (req, res) => {
     // Generate certificate
     const certNumber = `ICARE-${new Date().getFullYear()}-${Math.floor(100000 + Math.random() * 900000)}`;
     const verificationCode = Math.random().toString(36).substring(2, 15).toUpperCase();
-    const qrCodeData = `https://icare-app-ten.vercel.app/verify?code=${verificationCode}`;
+    const qrCodeData = `https://www.icare.com.co/verify?code=${verificationCode}`;
 
     // Courses that require manual approval start in 'pending' status
     const requiresApproval = course.requiresCertificateApproval === true;

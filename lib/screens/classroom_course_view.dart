@@ -56,6 +56,7 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
   // Course modules (for Course Content tab)
   List<dynamic> _modules = [];
   bool _loadingModules = true;
+  String _courseType = 'self-paced';
 
   // Key to reach embedded course content screen's add-module action
   final _embeddedContentKey = GlobalKey<_EmbeddedCourseContentState>();
@@ -221,6 +222,7 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
       final mods = (course is Map ? course['modules'] : null) ?? [];
       if (mounted) setState(() {
         _modules = List<dynamic>.from(mods);
+        _courseType = (course is Map ? course['courseType']?.toString() : null) ?? 'self-paced';
         // Also update assignments/quizzes/sessions for Course Content tab
         if (results[1] is List) _assignments = results[1] as List;
         if (results[2] is List) _quizzes = results[2] as List;
@@ -1213,7 +1215,11 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
     // Student: read-only modules view
     if (_loadingModules) return const Center(child: CircularProgressIndicator(strokeWidth: 2));
 
-    // Check if any session is currently live
+    // Check if any session is currently live — only used here for the
+    // banner's displayed title; whether the banner shows at all, and what
+    // happens on tap, is driven solely by _isSessionLive (kept in sync by
+    // the 5s poller in _checkLiveSession) so this tab can never show a
+    // stale "JOIN" affordance after the instructor has ended the session.
     final liveSession = _sessions.where((s) => s['status']?.toString() == 'live').firstOrNull;
 
     final standaloneAssignments = _assignments;
@@ -1225,17 +1231,12 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
       child: ListView(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
         children: [
-          // Live session banner — always visible when instructor goes live
-          if (liveSession != null) ...[
+          // Live session banner — gated on _isSessionLive (polled every 5s),
+          // not on the unpolled _sessions list, so it appears/disappears in
+          // sync with the Stream tab's banner and the FAB.
+          if (_isSessionLive) ...[
             GestureDetector(
-              onTap: () => Navigator.push(context, MaterialPageRoute(
-                builder: (_) => LmsLiveSessionScreen(
-                  sessionId: liveSession['_id']?.toString() ?? '',
-                  courseId: _courseId,
-                  sessionTitle: liveSession['title']?.toString() ?? 'Live Session',
-                  isInstructor: false,
-                ),
-              )),
+              onTap: _joinLiveClass,
               child: Container(
                 margin: const EdgeInsets.only(bottom: 16),
                 padding: const EdgeInsets.all(16),
@@ -1249,7 +1250,7 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
                   const SizedBox(width: 12),
                   Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     const Text('● LIVE NOW', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 1)),
-                    Text(liveSession['title']?.toString() ?? 'Live Session',
+                    Text(liveSession?['title']?.toString() ?? 'Live Session',
                       style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w700)),
                   ])),
                   Container(
@@ -1264,6 +1265,23 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
 
           // Modules
           if (_modules.isNotEmpty) ...[
+            Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: _courseType == 'pragmatic' ? const Color(0xFFEEF2FF) : const Color(0xFFF0FDF4),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  _courseType == 'pragmatic' ? 'Pragmatic — modules unlock on schedule' : 'Self-paced — complete a module to unlock the next',
+                  style: TextStyle(
+                    fontSize: 11.5, fontWeight: FontWeight.w700,
+                    color: _courseType == 'pragmatic' ? const Color(0xFF4F46E5) : const Color(0xFF15803D),
+                  ),
+                ),
+              ),
+            ),
             ..._modules.asMap().entries.map((e) => _buildModuleCard(e.value, e.key)),
           ] else ...[
             Center(child: Padding(
@@ -1332,12 +1350,20 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
     // of whether earlier modules were completed early.
     final isLocked = module['isLocked'] == true;
     final unlockDateRaw = module['unlockDate']?.toString();
+    final isPragmatic = _courseType == 'pragmatic';
     String? unlockLabel;
-    if (isLocked && unlockDateRaw != null) {
-      try {
-        final d = DateTime.parse(unlockDateRaw).toLocal();
-        unlockLabel = 'Unlocks ${d.day}/${d.month}/${d.year}';
-      } catch (_) {}
+    if (isLocked) {
+      if (isPragmatic && unlockDateRaw != null) {
+        try {
+          final d = DateTime.parse(unlockDateRaw).toLocal();
+          unlockLabel = 'Unlocks ${d.day}/${d.month}/${d.year}';
+        } catch (_) {}
+      } else if (!isPragmatic && idx > 0) {
+        final prevTitle = (_modules[idx - 1] is Map ? _modules[idx - 1]['title']?.toString() : null)
+            ?? 'Module $idx';
+        unlockLabel = 'Complete "$prevTitle" to unlock';
+      }
+      unlockLabel ??= 'Locked';
     }
 
     return Container(

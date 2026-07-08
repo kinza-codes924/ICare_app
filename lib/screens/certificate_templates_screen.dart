@@ -289,6 +289,15 @@ class LmsCertificateScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Register the verification code as soon as the certificate (and its QR)
+    // is shown, not just on download/print — otherwise a student who scans
+    // the on-screen QR without ever tapping Download/Print hits "Certificate
+    // not found" because the backend never learned the code exists.
+    // _registerCertificate() is idempotent (backend no-ops if already
+    // registered), so firing it on every build via a post-frame callback is
+    // safe and only produces meaningful writes once.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _registerCertificate());
+
     return Scaffold(
       backgroundColor: const Color(0xFF0F172A),
       appBar: AppBar(
