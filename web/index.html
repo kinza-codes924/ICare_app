@@ -71,32 +71,44 @@
       padding: 2px 8px; border-radius: 4px; z-index: 10; pointer-events: none;
     }
     /* Screen-share mode: a large main view for the shared screen, with
-       participant camera tiles demoted to a thin scrollable sidebar strip.
+       participant camera tiles overlaid as a thin scrollable strip along
+       the bottom edge — sitting inside whatever letterbox space
+       object-fit:contain already leaves empty there, rather than eating
+       into the shared-screen area with a separate sidebar (a portrait
+       phone showing a landscape screen-share leaves big empty bars above
+       and below the content; that space is otherwise wasted).
        Every property here needs !important — #lms-grid-container carries
        inline width/height:100% (set once from Dart when the platform view
        is created) and inline styles beat class selectors regardless of
        selector specificity, so without !important this rule was a no-op:
        the grid stayed full-screen on top of the screen-share view instead
-       of shrinking into the sidebar, which is why the shared screen looked
+       of shrinking into the strip, which is why the shared screen looked
        small (grid was covering it) and participants looked like they
        vanished (full-size transparent-ish grid clipping over them). */
     #lms-jitsi-host.lms-screenshare-mode #lms-grid-container {
-      position: absolute !important; top: 0 !important; right: 0 !important; bottom: 0 !important; left: auto !important;
-      width: 130px !important; height: auto !important;
-      grid-template-columns: 1fr !important;
-      grid-auto-rows: 98px !important;
-      overflow-y: auto !important; overflow-x: hidden !important;
-      background: rgba(0,0,0,0.35) !important;
+      position: absolute !important; left: 0 !important; right: 0 !important; bottom: 0 !important; top: auto !important;
+      width: auto !important; height: 100px !important;
+      display: flex !important;
+      flex-direction: row !important;
+      overflow-x: auto !important; overflow-y: hidden !important;
+      background: rgba(0,0,0,0.55) !important;
       z-index: 15 !important;
+      padding: 6px !important; gap: 6px !important;
     }
     #lms-jitsi-host.lms-screenshare-mode #lms-grid-container .lms-remote-tile {
-      aspect-ratio: auto; min-height: 98px;
+      aspect-ratio: auto !important; flex: 0 0 auto !important;
+      width: 130px !important; height: 100% !important;
     }
     #lms-screen-share-main {
       position: absolute; inset: 0; background: #000;
       display: none;
     }
     #lms-jitsi-host.lms-screenshare-mode #lms-screen-share-main { display: block; }
+    /* Shift the self-preview up so it doesn't sit on top of the bottom
+       participant strip while screen-sharing. */
+    #lms-jitsi-host.lms-screenshare-mode #lms-agora-local {
+      bottom: 112px !important;
+    }
     #lms-screen-share-main > div, #lms-screen-share-main video {
       width: 100% !important; height: 100% !important;
       object-fit: contain !important; display: block; background: #000;
@@ -832,6 +844,22 @@
     window._lmsSetScreenShareMode = function(active) {
       var host = document.getElementById('lms-jitsi-host');
       if (host) host.classList.toggle('lms-screenshare-mode', !!active);
+      // Entering/leaving screenshare mode resizes #lms-grid-container from
+      // full-screen down to a 130px sidebar (or back) — the same reflow
+      // that made tiles go blank on join (see _lmsUpdateGridLayout). Agora's
+      // player doesn't automatically re-measure when its container's size
+      // changes, so a tile that was already playing fine can render blank
+      // in the sidebar. Re-play every remote track a beat after the CSS
+      // transition applies so Agora picks up the new box size.
+      if (window._lmsAgoraClient) {
+        setTimeout(function() {
+          window._lmsAgoraClient.remoteUsers.forEach(function(u) {
+            if (!u.videoTrack) return;
+            var vd = document.getElementById('lms-tile-' + u.uid + '-video');
+            if (vd) { try { vd.innerHTML = ''; u.videoTrack.play(vd.id, { fit: window._lmsVideoFit || 'cover' }); } catch(_) {} }
+          });
+        }, 150);
+      }
     };
 
     window.lmsToggleScreenShare = async function() {

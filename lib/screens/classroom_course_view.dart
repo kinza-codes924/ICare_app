@@ -433,6 +433,11 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
 
   Future<void> _joinLiveClass() async {
     if (!mounted) return;
+    // ScaffoldMessenger is shared app-wide by default (MaterialApp provides
+    // one), so a "just went LIVE" SnackBar queued here would otherwise
+    // still be showing — overlapping its own text — once we've navigated
+    // into LmsLiveSessionScreen a moment later.
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
     final courseId = widget.course['_id']?.toString() ?? '';
     if (courseId.isEmpty) return;
 
