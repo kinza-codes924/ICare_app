@@ -45,12 +45,19 @@
       object-fit: cover; display: block;
     }
     /* LMS multi-participant grid tiles */
-    #lms-grid-container { display: grid; grid-template-columns: 1fr; grid-auto-rows: 1fr; align-content: start; gap: 4px; padding: 4px; box-sizing: border-box; width: 100%; height: 100%; overflow-y: auto; }
+    #lms-grid-container { display: grid; grid-template-columns: 1fr; grid-auto-rows: 1fr; gap: 4px; padding: 4px; box-sizing: border-box; width: 100%; height: 100%; overflow-y: auto; }
     .lms-remote-tile { position: relative; background: #1a2234; border-radius: 8px; overflow: hidden; min-height: 80px; }
-    /* Only force a 4:3 box once there's more than one tile in the grid —
-       with a single remote participant the tile should fill the whole
-       video area (matches the Dart side's SizedBox.expand for that case),
-       not get boxed into a small letterboxed rectangle. */
+    /* Only force a 4:3 box (and top-aligned, scrollable rows instead of
+       stretched-to-fill) once there's more than one tile — with a single
+       remote participant the tile must fill the entire video area (matches
+       the Dart side's SizedBox.expand for that case). align-content:start
+       was previously applied unconditionally, which let a lone 1fr row
+       size itself to its content instead of stretching to the container's
+       full height — that's what left the large empty black bars above and
+       below a single participant's tile in the screenshot report. */
+    #lms-grid-container:has(.lms-remote-tile:nth-child(2)) {
+      align-content: start;
+    }
     #lms-grid-container:has(.lms-remote-tile:nth-child(2)) .lms-remote-tile { aspect-ratio: 4 / 3; }
     .lms-remote-tile > div { position: absolute !important; inset: 0; }
     .lms-remote-tile video {
