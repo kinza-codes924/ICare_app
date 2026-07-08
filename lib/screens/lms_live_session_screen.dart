@@ -443,13 +443,6 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
             }
             lmsSetTileName(_remoteUids[i], name);
           }
-
-          // Whoever is screen-sharing (per the backend flag) becomes the
-          // big main view for every OTHER participant; a no-op if nobody
-          // is sharing or if it's our own uid (already handled locally by
-          // _toggleScreenShare).
-          final sharingUid = session['screenSharingUid']?.toString() ?? '';
-          lmsApplyRemoteScreenShare(sharingUid);
         }
 
         // Notify instructor of new join request — compare against PRE-setState count
@@ -666,12 +659,6 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
           }
         });
       }
-      // Broadcast who's sharing (or clear it) so other participants' 5s
-      // poll picks it up and switches to the big-main-view layout.
-      if (kIsWeb && _sessionDocId.isNotEmpty && (result == 'screen' || result == 'camera')) {
-        final uid = result == 'screen' ? lmsGetLocalUid() : null;
-        await _lms.setScreenSharingUid(sessionId: _sessionDocId, uid: uid);
-      }
     } catch (_) {}
   }
 
@@ -739,11 +726,6 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
       ),
     );
     if (confirm == true && mounted) {
-      // Clear the screen-share flag if we were the active sharer, so other
-      // participants' next poll drops the stale big-main-view layout.
-      if (kIsWeb && _screenSharing && _sessionDocId.isNotEmpty) {
-        _lms.setScreenSharingUid(sessionId: _sessionDocId, uid: null).catchError((_) {});
-      }
       // Stop recording while Agora tracks are still alive
       if (widget.isInstructor && kIsWeb && _sessionDocId.isNotEmpty) {
         final token = await SharedPref().getToken();

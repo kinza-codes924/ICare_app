@@ -70,49 +70,6 @@
       background: rgba(0,0,0,0.6); color: #fff; font-size: 12px; font-weight: 600;
       padding: 2px 8px; border-radius: 4px; z-index: 10; pointer-events: none;
     }
-    /* Screen-share mode: a large main view for the shared screen, with
-       participant camera tiles overlaid as a thin scrollable strip along
-       the bottom edge — sitting inside whatever letterbox space
-       object-fit:contain already leaves empty there, rather than eating
-       into the shared-screen area with a separate sidebar (a portrait
-       phone showing a landscape screen-share leaves big empty bars above
-       and below the content; that space is otherwise wasted).
-       Every property here needs !important — #lms-grid-container carries
-       inline width/height:100% (set once from Dart when the platform view
-       is created) and inline styles beat class selectors regardless of
-       selector specificity, so without !important this rule was a no-op:
-       the grid stayed full-screen on top of the screen-share view instead
-       of shrinking into the strip, which is why the shared screen looked
-       small (grid was covering it) and participants looked like they
-       vanished (full-size transparent-ish grid clipping over them). */
-    #lms-jitsi-host.lms-screenshare-mode #lms-grid-container {
-      position: absolute !important; left: 0 !important; right: 0 !important; bottom: 0 !important; top: auto !important;
-      width: auto !important; height: 100px !important;
-      display: flex !important;
-      flex-direction: row !important;
-      overflow-x: auto !important; overflow-y: hidden !important;
-      background: rgba(0,0,0,0.55) !important;
-      z-index: 15 !important;
-      padding: 6px !important; gap: 6px !important;
-    }
-    #lms-jitsi-host.lms-screenshare-mode #lms-grid-container .lms-remote-tile {
-      aspect-ratio: auto !important; flex: 0 0 auto !important;
-      width: 130px !important; height: 100% !important;
-    }
-    #lms-screen-share-main {
-      position: absolute; inset: 0; background: #000;
-      display: none;
-    }
-    #lms-jitsi-host.lms-screenshare-mode #lms-screen-share-main { display: block; }
-    /* Shift the self-preview up so it doesn't sit on top of the bottom
-       participant strip while screen-sharing. */
-    #lms-jitsi-host.lms-screenshare-mode #lms-agora-local {
-      bottom: 112px !important;
-    }
-    #lms-screen-share-main > div, #lms-screen-share-main video {
-      width: 100% !important; height: 100% !important;
-      object-fit: contain !important; display: block; background: #000;
-    }
   </style>
 </head>
 <body>
@@ -843,30 +800,17 @@
     window._lmsScreenTrack = null;
     window._lmsScreenSharing = false;
 
-    // Toggles the big-main-view/sidebar layout. Applied on the sharer's own
-    // screen (self screen-share) and on every viewer's screen when a remote
-    // user is publishing their screen (see handleRemoteScreenShare below).
-    window._lmsSetScreenShareMode = function(active) {
-      var host = document.getElementById('lms-jitsi-host');
-      if (host) host.classList.toggle('lms-screenshare-mode', !!active);
-      // Entering/leaving screenshare mode resizes #lms-grid-container from
-      // full-screen down to a 130px sidebar (or back) — the same reflow
-      // that made tiles go blank on join (see _lmsUpdateGridLayout). Agora's
-      // player doesn't automatically re-measure when its container's size
-      // changes, so a tile that was already playing fine can render blank
-      // in the sidebar. Re-play every remote track a beat after the CSS
-      // transition applies so Agora picks up the new box size.
-      if (window._lmsAgoraClient) {
-        setTimeout(function() {
-          window._lmsAgoraClient.remoteUsers.forEach(function(u) {
-            if (!u.videoTrack) return;
-            var vd = document.getElementById('lms-tile-' + u.uid + '-video');
-            if (vd) { try { vd.innerHTML = ''; u.videoTrack.play(vd.id, { fit: window._lmsVideoFit || 'cover' }); } catch(_) {} }
-          });
-        }, 150);
-      }
-    };
-
+    // Screen-share plays into the same small self-preview corner box used
+    // for the camera (#lms-agora-local) — it's treated as just another
+    // video source for that slot, not a separate big-view layout. Other
+    // participants see it the same way they see any camera: as a normal
+    // tile in #lms-grid-container via the regular user-published/
+    // lmsPlayIntoTile path, no special-casing needed. This is deliberately
+    // the simple, proven-stable behavior — an earlier "big main view +
+    // sidebar" layout (and, before that, a dual-Agora-client attempt to
+    // keep the camera tile alive during a share) both made screen-sharing
+    // itself unreliable in practice (blank/stuck sharing), so this was
+    // reverted back to what was known to work.
     window.lmsToggleScreenShare = async function() {
       try {
         if (window._lmsScreenSharing && window._lmsScreenTrack) {
@@ -877,9 +821,6 @@
           try { window._lmsScreenTrack.stop(); window._lmsScreenTrack.close(); } catch(_) {}
           window._lmsScreenTrack = null;
           window._lmsScreenSharing = false;
-          window._lmsSetScreenShareMode(false);
-          var mainEl = document.getElementById('lms-screen-share-main');
-          if (mainEl) mainEl.innerHTML = '';
           // Mobile Chrome sometimes force-rotates to landscape while
           // getDisplayMedia() is capturing and doesn't revert it on its
           // own — release any orientation lock we took and let the OS
@@ -920,31 +861,16 @@
               await screen.orientation.lock('portrait').catch(function(){});
             }
           } catch(_) {}
-          // Unpublish camera. NOTE: an earlier version tried publishing the
-          // screen track on a SECOND Agora client/UID so the camera could
-          // stay live at the same time — that added a second signed-token
-          // fetch, a second join/publish sequence, and a second failure
-          // surface, and in practice made screen-share itself unreliable
-          // (blank screen, stuck state after stopping) without reliably
-          // delivering the camera tile either. Reverted to this simpler,
-          // proven-stable single-client swap: screen-share works reliably,
-          // at the cost of the presenter's own camera tile not being shown
-          // to others while they're sharing (matches how it behaved before
-          // that experiment).
+          // Unpublish camera
           if (window._lmsLocalVideo && window._lmsAgoraClient) {
             try { await window._lmsAgoraClient.unpublish([window._lmsLocalVideo]); } catch(_) {}
           }
           if (window._lmsAgoraClient) {
             await window._lmsAgoraClient.publish([window._lmsScreenTrack]);
           }
-          // Big main view for the sharer's own screen; camera self-preview
-          // stays in the small corner box (still shows the last camera
-          // frame, harmless since it's not being published).
-          window._lmsSetScreenShareMode(true);
-          var mainEl2 = document.getElementById('lms-screen-share-main');
-          // Always 'contain' — a shared screen (slides/text) must never be
-          // cropped regardless of the camera-tile Fit/Fill toggle.
-          if (mainEl2) { mainEl2.innerHTML = ''; window._lmsScreenTrack.play('lms-screen-share-main', { fit: 'contain' }); }
+          // Local preview
+          var ld2 = document.getElementById('lms-agora-local');
+          if (ld2) { ld2.innerHTML = ''; window._lmsScreenTrack.play('lms-agora-local'); }
           window._lmsScreenSharing = true;
           // Point the recording at the live screen track so it captures the
           // real screen (not a frozen camera frame).
@@ -970,46 +896,10 @@
       return window._lmsAgoraClient ? String(window._lmsAgoraClient.uid || '') : '';
     };
 
-    // Called on the 5s poll cycle (Dart side) with the session's current
-    // screenSharingUid (or '' if nobody is sharing). If that uid belongs to
-    // a REMOTE user we have a video track for, move their video into the
-    // big main view and demote the grid to the sidebar strip. If it's our
-    // own uid, or empty, this is a no-op — self-share is already handled
-    // directly by lmsToggleScreenShare, and clearing is handled below.
-    window.lmsApplyRemoteScreenShare = function(sharingUid) {
-      try {
-        var myUid = window.lmsGetLocalUid();
-        var mainEl = document.getElementById('lms-screen-share-main');
-        if (!sharingUid || sharingUid === myUid) {
-          // Nobody remote is sharing (or it's us, already handled locally).
-          // Only clear the remote-driven view if we're not the active sharer.
-          if (!window._lmsScreenSharing) {
-            window._lmsSetScreenShareMode(false);
-            if (mainEl) mainEl.innerHTML = '';
-          }
-          // Restore any grid tile we'd hidden for a previous remote sharer.
-          if (window._lmsAgoraClient) {
-            window._lmsAgoraClient.remoteUsers.forEach(function(u) {
-              var t = document.getElementById('lms-tile-' + u.uid);
-              if (t) t.style.display = '';
-            });
-          }
-          return;
-        }
-        if (!window._lmsAgoraClient) return;
-        var remoteUser = window._lmsAgoraClient.remoteUsers.find(function(u) {
-          return String(u.uid) === String(sharingUid);
-        });
-        if (remoteUser && remoteUser.videoTrack && mainEl) {
-          window._lmsSetScreenShareMode(true);
-          try { mainEl.innerHTML = ''; remoteUser.videoTrack.play('lms-screen-share-main', { fit: 'contain' }); } catch(_) {}
-          // Hide their small grid tile while they're the main view so the
-          // same feed isn't shown twice.
-          var smallTile = document.getElementById('lms-tile-' + sharingUid);
-          if (smallTile) smallTile.style.display = 'none';
-        }
-      } catch(e) { console.warn('lmsApplyRemoteScreenShare error:', e); }
-    };
+    // No-op kept only so Dart's existing call site (guarded, harmless if
+    // undefined anyway) doesn't need touching — screen-share no longer
+    // drives any special big-view layout to switch into.
+    window.lmsApplyRemoteScreenShare = function(sharingUid) {};
 
     window.lmsSetParticipantNames = function(localName, remoteName) {
       var ln = document.getElementById('lms-local-name');

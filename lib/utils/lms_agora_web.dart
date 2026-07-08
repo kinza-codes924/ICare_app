@@ -140,14 +140,6 @@ String registerLmsVideoView() {
       container.style.position = 'relative';
       container.style.overflow = 'hidden';
 
-      // Large screen-share view — hidden unless lms-screenshare-mode is
-      // active on the host container (see lmsSetScreenShareMode in
-      // web/index.html), in which case it becomes the main view and the
-      // remote grid is demoted to a sidebar strip via CSS.
-      final screenMain = web.document.createElement('div') as web.HTMLDivElement;
-      screenMain.id = 'lms-screen-share-main';
-      container.appendChild(screenMain);
-
       // Remote grid — fills entire area; JS creates per-UID tile divs inside
       final grid = web.document.createElement('div') as web.HTMLDivElement;
       grid.id = 'lms-grid-container';
