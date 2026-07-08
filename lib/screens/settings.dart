@@ -7,13 +7,11 @@ import 'package:icare/services/doctor_service.dart';
 import 'package:go_router/go_router.dart';
 import 'package:icare/providers/auth_provider.dart';
 import 'package:icare/screens/payment_history.dart';
-import 'package:icare/screens/about_us.dart' show AboutUs;
 import 'package:icare/screens/change_password.dart' show ChangePassword;
 import 'package:icare/screens/certificates_screen.dart';
 import 'package:icare/screens/courses.dart' show Courses;
 import 'package:icare/screens/doctor_availability.dart' show DoctorAvailability;
 import 'package:icare/screens/doctor_profile_setup.dart' show DoctorProfileSetup;
-import 'package:icare/screens/help_and_support.dart' show HelpAndSupport;
 import 'package:icare/screens/current_medications_page.dart';
 import 'package:icare/screens/notification_settings.dart' show NotificationSettings;
 import 'package:icare/utils/theme.dart';
@@ -2150,9 +2148,9 @@ class _WebSettingsLayout extends StatelessWidget {
     return Card(elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Padding(padding: const EdgeInsets.all(20), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         _sectionLabel('Contact & Legal'), const SizedBox(height: 16),
-        _settingsTile(icon: Icons.headset_mic_outlined, iconColor: const Color(0xFF6366F1), title: 'Contact Support', subtitle: 'Get help from our team', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const HelpAndSupport()))),
+        _settingsTile(icon: Icons.headset_mic_outlined, iconColor: const Color(0xFF6366F1), title: 'Contact Support', subtitle: 'Get help from our team', onTap: () => context.push('/help')),
         const Divider(height: 1),
-        _settingsTile(icon: Icons.help_outline, iconColor: const Color(0xFF6366F1), title: 'FAQ', subtitle: 'Frequently asked questions', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const HelpAndSupport()))),
+        _settingsTile(icon: Icons.help_outline, iconColor: const Color(0xFF6366F1), title: 'FAQ', subtitle: 'Frequently asked questions', onTap: () => context.push('/help')),
         const Divider(height: 1),
         _settingsTile(icon: Icons.bug_report_outlined, iconColor: const Color(0xFFEF4444), title: 'Report an Issue', subtitle: 'Report bugs & problems', onTap: () => p.onReportIssue(context)),
         const Divider(height: 1),
@@ -2337,7 +2335,7 @@ class _WebSettingsLayout extends StatelessWidget {
     return Card(elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Padding(padding: const EdgeInsets.all(20), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         _sectionLabel('About & Legal'), const SizedBox(height: 16),
-        _settingsTile(icon: Icons.info_outline, iconColor: const Color(0xFF64748B), title: 'About Us', subtitle: 'Learn more about iCare', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AboutUs()))),
+        _settingsTile(icon: Icons.info_outline, iconColor: const Color(0xFF64748B), title: 'About Us', subtitle: 'Learn more about iCare', onTap: () => context.push('/about-us')),
         const Divider(height: 1),
         _settingsTile(icon: Icons.verified_outlined, iconColor: const Color(0xFF10B981), title: 'DRAP Guidelines', subtitle: 'Drug Regulatory Authority of Pakistan', onTap: () async { try { await launchUrl(Uri.parse('https://www.dra.gov.pk'), mode: LaunchMode.externalApplication); } catch (_) {} }),
         const Divider(height: 1),
@@ -2642,8 +2640,8 @@ class _MobileSettingsLayout extends StatelessWidget {
     return Card(elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Padding(padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         _sectionLabel('Contact & Legal'), const SizedBox(height: 12),
-        _settingsTile(icon: Icons.headset_mic_outlined, iconColor: const Color(0xFF6366F1), title: 'Contact Support', subtitle: 'Get help', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const HelpAndSupport()))),
-        const Divider(height: 1), _settingsTile(icon: Icons.help_outline, iconColor: const Color(0xFF6366F1), title: 'FAQ', subtitle: 'Frequently asked questions', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const HelpAndSupport()))),
+        _settingsTile(icon: Icons.headset_mic_outlined, iconColor: const Color(0xFF6366F1), title: 'Contact Support', subtitle: 'Get help', onTap: () => context.push('/help')),
+        const Divider(height: 1), _settingsTile(icon: Icons.help_outline, iconColor: const Color(0xFF6366F1), title: 'FAQ', subtitle: 'Frequently asked questions', onTap: () => context.push('/help')),
         const Divider(height: 1), _settingsTile(icon: Icons.bug_report_outlined, iconColor: const Color(0xFFEF4444), title: 'Report an Issue', subtitle: 'Report bugs', onTap: () => p.onReportIssue(context)),
         const Divider(height: 1), _settingsTile(icon: Icons.description_outlined, iconColor: const Color(0xFF64748B), title: 'Terms & Conditions', subtitle: 'Review terms', onTap: () => context.go('/terms')),
         const Divider(height: 1), _settingsTile(icon: Icons.privacy_tip_outlined, iconColor: const Color(0xFF64748B), title: 'Privacy Policy', subtitle: 'Data handling', onTap: () => context.go('/privacypolicy')),
@@ -2768,7 +2766,7 @@ class _MobileSettingsLayout extends StatelessWidget {
     return Card(elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Padding(padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         _sectionLabel('About & Legal'), const SizedBox(height: 12),
-        _settingsTile(icon: Icons.info_outline, iconColor: const Color(0xFF64748B), title: 'About Us', subtitle: 'Learn about iCare', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AboutUs()))),
+        _settingsTile(icon: Icons.info_outline, iconColor: const Color(0xFF64748B), title: 'About Us', subtitle: 'Learn about iCare', onTap: () => context.push('/about-us')),
         const Divider(height: 1),
         _settingsTile(icon: Icons.verified_outlined, iconColor: const Color(0xFF10B981), title: 'DRAP Guidelines', subtitle: 'Drug Regulatory Authority of Pakistan', onTap: () async { try { await launchUrl(Uri.parse('https://www.dra.gov.pk'), mode: LaunchMode.externalApplication); } catch (_) {} }),
         const Divider(height: 1),
