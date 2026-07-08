@@ -867,29 +867,13 @@
       }
     };
 
-    // Agora only lets ONE client instance publish a video track per UID at
-    // a time, so screen-share can't just be "another track on the same
-    // connection" without kicking the camera off. To keep the camera live
-    // while sharing, we open a SECOND client on a fresh Agora-assigned UID
-    // (uid 0 = dynamic) that publishes only the screen track — from every
-    // other participant's point of view this just looks like one more
-    // remote user, whose video happens to be the presenter's screen,
-    // sitting alongside the presenter's own (still-live) camera tile. That
-    // second client needs its own signed token (Dart fetches it from the
-    // backend right before calling here, same as the main join token).
-    window._lmsScreenClient = null;
-    window._lmsScreenUid = null;
-
-    window.lmsToggleScreenShare = async function(screenToken) {
+    window.lmsToggleScreenShare = async function() {
       try {
         if (window._lmsScreenSharing && window._lmsScreenTrack) {
-          // Stop screen sharing — leave the second client, camera never left
-          if (window._lmsScreenClient) {
-            try { await window._lmsScreenClient.unpublish([window._lmsScreenTrack]); } catch(_) {}
-            try { await window._lmsScreenClient.leave(); } catch(_) {}
+          // Stop screen sharing — switch back to camera
+          if (window._lmsAgoraClient) {
+            try { await window._lmsAgoraClient.unpublish([window._lmsScreenTrack]); } catch(_) {}
           }
-          window._lmsScreenClient = null;
-          window._lmsScreenUid = null;
           try { window._lmsScreenTrack.stop(); window._lmsScreenTrack.close(); } catch(_) {}
           window._lmsScreenTrack = null;
           window._lmsScreenSharing = false;
@@ -903,6 +887,15 @@
           try {
             if (screen.orientation && screen.orientation.unlock) screen.orientation.unlock();
           } catch(_) {}
+          // Re-publish camera
+          if (window._lmsLocalVideo && window._lmsAgoraClient) {
+            try {
+              await window._lmsLocalVideo.setEnabled(true);
+              await window._lmsAgoraClient.publish([window._lmsLocalVideo]);
+              var ld = document.getElementById('lms-agora-local');
+              if (ld) { ld.innerHTML = ''; window._lmsLocalVideo.play('lms-agora-local'); }
+            } catch(_) {}
+          }
           // Point the recording back at the live camera track
           if (window._lmsRebindRecordLocal) { try { window._lmsRebindRecordLocal(); } catch(_) {} }
           return 'camera';
@@ -927,20 +920,26 @@
               await screen.orientation.lock('portrait').catch(function(){});
             }
           } catch(_) {}
-          // Camera is intentionally left publishing on the main client —
-          // publish the screen track on a second client/UID instead of
-          // unpublishing the camera, so both stay visible to everyone else.
-          // uid 0 = let Agora assign a fresh unique numeric UID (matches
-          // how the main client joins); it needs its own signed token
-          // since the app enforces certificate-based token auth, which
-          // Dart fetched from the backend right before calling in here.
-          window._lmsScreenClient = AgoraRTC.createClient({ mode: 'rtc', codec: 'vp8' });
-          window._lmsScreenUid = await window._lmsScreenClient.join(
-            window._lmsJoinAppId, window._lmsJoinChannel, screenToken || null, 0
-          );
-          await window._lmsScreenClient.publish([window._lmsScreenTrack]);
+          // Unpublish camera. NOTE: an earlier version tried publishing the
+          // screen track on a SECOND Agora client/UID so the camera could
+          // stay live at the same time — that added a second signed-token
+          // fetch, a second join/publish sequence, and a second failure
+          // surface, and in practice made screen-share itself unreliable
+          // (blank screen, stuck state after stopping) without reliably
+          // delivering the camera tile either. Reverted to this simpler,
+          // proven-stable single-client swap: screen-share works reliably,
+          // at the cost of the presenter's own camera tile not being shown
+          // to others while they're sharing (matches how it behaved before
+          // that experiment).
+          if (window._lmsLocalVideo && window._lmsAgoraClient) {
+            try { await window._lmsAgoraClient.unpublish([window._lmsLocalVideo]); } catch(_) {}
+          }
+          if (window._lmsAgoraClient) {
+            await window._lmsAgoraClient.publish([window._lmsScreenTrack]);
+          }
           // Big main view for the sharer's own screen; camera self-preview
-          // stays in the small corner box, still live and publishing.
+          // stays in the small corner box (still shows the last camera
+          // frame, harmless since it's not being published).
           window._lmsSetScreenShareMode(true);
           var mainEl2 = document.getElementById('lms-screen-share-main');
           // Always 'contain' — a shared screen (slides/text) must never be
@@ -971,14 +970,6 @@
       return window._lmsAgoraClient ? String(window._lmsAgoraClient.uid || '') : '';
     };
 
-    // The UID of OUR OWN screen-share publish (the second client), if
-    // currently sharing — this is what gets broadcast as the session's
-    // screenSharingUid so every other participant's poll can find the
-    // matching remote user via their own _lmsAgoraClient.remoteUsers.
-    window.lmsGetScreenUid = function() {
-      return window._lmsScreenUid ? String(window._lmsScreenUid) : '';
-    };
-
     // Called on the 5s poll cycle (Dart side) with the session's current
     // screenSharingUid (or '' if nobody is sharing). If that uid belongs to
     // a REMOTE user we have a video track for, move their video into the
@@ -987,9 +978,9 @@
     // directly by lmsToggleScreenShare, and clearing is handled below.
     window.lmsApplyRemoteScreenShare = function(sharingUid) {
       try {
-        var myScreenUid = window.lmsGetScreenUid();
+        var myUid = window.lmsGetLocalUid();
         var mainEl = document.getElementById('lms-screen-share-main');
-        if (!sharingUid || (myScreenUid && sharingUid === myScreenUid)) {
+        if (!sharingUid || sharingUid === myUid) {
           // Nobody remote is sharing (or it's us, already handled locally).
           // Only clear the remote-driven view if we're not the active sharer.
           if (!window._lmsScreenSharing) {
