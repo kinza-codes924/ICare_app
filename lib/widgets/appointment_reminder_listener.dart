@@ -23,8 +23,8 @@ class _AppointmentReminderListenerState
   final AppointmentService _service = AppointmentService();
   final SharedPref _sharedPref = SharedPref();
 
-  // Reminder windows in minutes
-  static const List<int> _reminderWindows = [10, 5];
+  // Reminder windows in minutes — 1 hour and 10 minutes before the appointment
+  static const List<int> _reminderWindows = [60, 10];
 
   @override
   void initState() {

@@ -11,6 +11,8 @@ const lessonSchema = new mongoose.Schema({
   resources: { type: Array, default: [] },
   documentUrl: String,       // attached document
   documentName: String,
+  // Timeline for pragmatic courses — days this lesson takes within its module
+  unlockAfterDays: { type: Number, default: 0 },
   // Feature 2: live session scheduled for this lesson (reminder only, not auto-start)
   liveSessionDateTime: { type: Date, default: null },
   liveSessionNote: { type: String, default: '' },
@@ -83,6 +85,9 @@ const courseSchema = new mongoose.Schema({
   certificateReleased: { type: Boolean, default: false },
   certificateTemplate: { type: String, default: 'classic' },
   price: { type: Number, default: 0 },
+  isFree: { type: Boolean, default: false },
+  discountPercent: { type: Number, default: 0 },
+  discountedPrice: { type: Number, default: 0 },
 }, { timestamps: true });
 
 // No pre-save hooks — sync logic is handled in route handlers

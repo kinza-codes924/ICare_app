@@ -55,10 +55,45 @@ class _QuizTakeScreenState extends State<QuizTakeScreen> {
     final rawQuestions = widget.quiz['questions'];
     if (rawQuestions is List && rawQuestions.isNotEmpty) {
       _questions = rawQuestions;
-      _isLoading = false;
-      _startTimerAndStopwatch();
+    }
+    _checkExistingAttempt();
+  }
+
+  // If the student already has an attempt (submitted earlier, possibly since
+  // reviewed by the instructor with rubric/stars/feedback), show the result
+  // screen immediately instead of starting a fresh attempt. Questions are
+  // still loaded in the background so "Retake" works without a reload.
+  Future<void> _checkExistingAttempt() async {
+    Map<String, dynamic>? latestAttempt;
+    try {
+      final attempts = await _lmsService.getMyQuizAttempts(_quizId);
+      if (attempts.isNotEmpty) {
+        // Most recent attempt first (backend sorts by attemptNumber desc)
+        latestAttempt = Map<String, dynamic>.from(attempts.first as Map);
+      }
+    } catch (_) {}
+
+    if (_questions.isEmpty) {
+      try {
+        final data = await _lmsService.getQuiz(_quizId);
+        final q = data['quiz'] ?? data;
+        _questions = (q['questions'] as List?) ?? [];
+        final tl = (q['timeLimit'] as num?)?.toInt() ?? 0;
+        if (tl > 0) _timeLimitSeconds = tl * 60;
+      } catch (_) {}
+    }
+
+    if (!mounted) return;
+
+    if (latestAttempt != null) {
+      setState(() {
+        _result = latestAttempt;
+        _quizCompleted = true;
+        _isLoading = false;
+      });
     } else {
-      _fetchQuizDetails();
+      setState(() => _isLoading = false);
+      _startTimerAndStopwatch();
     }
   }
 
@@ -67,30 +102,6 @@ class _QuizTakeScreenState extends State<QuizTakeScreen> {
     _timer?.cancel();
     _stopwatch.stop();
     super.dispose();
-  }
-
-  Future<void> _fetchQuizDetails() async {
-    try {
-      final data = await _lmsService.getQuiz(_quizId);
-      final q = data['quiz'] ?? data;
-      if (mounted) {
-        setState(() {
-          _questions = (q['questions'] as List?) ?? [];
-          final tl = (q['timeLimit'] as num?)?.toInt() ?? 0;
-          if (tl > 0) _timeLimitSeconds = tl * 60;
-          _isLoading = false;
-        });
-        _startTimerAndStopwatch();
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _questions = [];
-          _isLoading = false;
-        });
-        _startTimerAndStopwatch();
-      }
-    }
   }
 
   void _startTimerAndStopwatch() {
@@ -897,7 +908,8 @@ class _QuizTakeScreenState extends State<QuizTakeScreen> {
                   ),
 
                   // Instructor feedback (if graded)
-                  if ((attempt['feedback'] ?? attempt['instructorFeedback'])?.toString().isNotEmpty == true) ...[
+                  if (attempt['gradedAt'] != null ||
+                      (attempt['feedback'] ?? attempt['instructorFeedback'])?.toString().isNotEmpty == true) ...[
                     const SizedBox(height: 16),
                     Container(
                       padding: const EdgeInsets.all(14),
@@ -913,14 +925,29 @@ class _QuizTakeScreenState extends State<QuizTakeScreen> {
                           Text('Instructor Feedback', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
                         ]),
                         const SizedBox(height: 8),
+                        if (attempt['rubricGrade'] != null) ...[
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: Colors.amber.shade100,
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Text(
+                              _rubricLabel(attempt['rubricGrade'].toString()),
+                              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF92400E)),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                        ],
                         if ((attempt['stars'] ?? 0) > 0)
                           Row(children: List.generate(5, (i) => Icon(
                             i < (attempt['stars'] ?? 0) ? Icons.star_rounded : Icons.star_outline_rounded,
                             color: Colors.amber, size: 20,
                           ))),
                         if ((attempt['stars'] ?? 0) > 0) const SizedBox(height: 6),
-                        Text(attempt['feedback'] ?? attempt['instructorFeedback'] ?? '',
-                          style: const TextStyle(fontSize: 13, color: Color(0xFF1E293B))),
+                        if ((attempt['feedback'] ?? attempt['instructorFeedback'])?.toString().isNotEmpty == true)
+                          Text(attempt['feedback'] ?? attempt['instructorFeedback'] ?? '',
+                            style: const TextStyle(fontSize: 13, color: Color(0xFF1E293B))),
                       ]),
                     ),
                   ],
@@ -1058,6 +1085,16 @@ class _QuizTakeScreenState extends State<QuizTakeScreen> {
       const Spacer(),
       Text(value, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: valueColor)),
     ]);
+  }
+
+  String _rubricLabel(String value) {
+    switch (value) {
+      case 'excellent': return 'Excellent';
+      case 'satisfactory': return 'Satisfactory';
+      case 'average': return 'Average';
+      case 'needs_improvement': return 'Needs Improvement';
+      default: return value;
+    }
   }
 
   Widget _buildBreakdownItem(int index, dynamic item) {

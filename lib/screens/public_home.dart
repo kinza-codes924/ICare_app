@@ -16,9 +16,6 @@ import 'package:icare/services/laboratory_service.dart';
 import 'package:icare/screens/pharmacy_details.dart';
 import 'package:icare/screens/book_lab.dart';
 import 'package:icare/screens/about_us.dart';
-import 'package:icare/screens/privacy_policy.dart';
-import 'package:icare/screens/refund_policy.dart';
-import 'package:icare/screens/terms_and_conditions.dart';
 import 'package:icare/screens/help_and_support.dart';
 import 'package:icare/utils/utils.dart' show buildProfileImageProvider;
 
@@ -3656,9 +3653,9 @@ class _Footer extends StatelessWidget {
               taps: {
                 'About Us': () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AboutUs())),
                 'Work With Us': () => context.go('/work-with-us'),
-                'Privacy Policy': () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PrivacyPolicy())),
-                'Terms of Service': () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TermsAndConditions())),
-                'Refund Policy': () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RefundPolicy())),
+                'Privacy Policy': () => context.go('/privacypolicy'),
+                'Terms of Service': () => context.go('/terms'),
+                'Refund Policy': () => context.go('/refund-policy'),
                 'Contact Us': () => Navigator.push(context, MaterialPageRoute(builder: (_) => const HelpAndSupport())),
               },
             ),
@@ -3710,9 +3707,9 @@ class _Footer extends StatelessWidget {
         taps: {
           'About Us': () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AboutUs())),
           'Work With Us': () => context.go('/work-with-us'),
-          'Privacy Policy': () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PrivacyPolicy())),
-          'Terms of Service': () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TermsAndConditions())),
-          'Refund Policy': () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RefundPolicy())),
+          'Privacy Policy': () => context.go('/privacypolicy'),
+          'Terms of Service': () => context.go('/terms'),
+          'Refund Policy': () => context.go('/refund-policy'),
           'Contact Us': () => Navigator.push(context, MaterialPageRoute(builder: (_) => const HelpAndSupport())),
         },
       ),

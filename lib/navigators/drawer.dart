@@ -44,11 +44,13 @@ import 'package:icare/screens/settings.dart';
 import 'package:icare/screens/tabs.dart';
 import 'package:icare/screens/tasks.dart';
 import 'package:icare/screens/wallet.dart';
+import 'package:icare/screens/assessments_screen.dart';
 import 'package:icare/screens/certificates_screen.dart';
 import 'package:icare/screens/student_dashboard.dart';
 import 'package:icare/screens/instructor_dashboard.dart';
 import 'package:icare/screens/instructor_courses_management.dart';
 import 'package:icare/screens/instructor_learners_screen.dart';
+import 'package:icare/screens/instructor_feedback_screen.dart';
 import 'package:icare/screens/instructor_precautions_management.dart';
 import 'package:icare/screens/instructor_analytics.dart';
 import 'package:icare/screens/instructor_profile_setup.dart';
@@ -504,6 +506,11 @@ class _CustomDrawerState extends ConsumerState<CustomDrawer> {
             MaterialPageRoute(builder: (ctx) => InstructorLearnersScreen()),
           );
         }),
+        _drawerItem('Student Feedback', Icons.rate_review_outlined, () {
+          Navigator.of(context).push(
+            MaterialPageRoute(builder: (ctx) => const InstructorFeedbackScreen()),
+          );
+        }),
         _drawerItem('Health Precautions', Icons.health_and_safety_outlined, () {
           Navigator.of(context).push(
             MaterialPageRoute(
@@ -534,42 +541,45 @@ class _CustomDrawerState extends ConsumerState<CustomDrawer> {
       ];
     } else if (selectedRole == "Student") {
       drawerItems = [
-        _drawerItem('Dashboard', Icons.dashboard_outlined, () {
-          Navigator.of(
-            context,
-          ).push(MaterialPageRoute(builder: (ctx) => const StudentDashboard()));
-        }),
-        _drawerItem('iCare Academy', Icons.school_rounded, () {
+        _drawerItem('Learning Dashboard', Icons.dashboard_outlined, () {
           Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (ctx) => const StudentLmsDashboard(),
-            ),
+            MaterialPageRoute(builder: (ctx) => const StudentDashboard()),
           );
         }),
-        _drawerItem('Course Catalog', Icons.explore_outlined, () {
-          Navigator.of(
-            context,
-          ).push(MaterialPageRoute(builder: (ctx) => const LmsPublicCatalog()));
+        _drawerItem('My Courses', Icons.school_outlined, () {
+          Navigator.of(context).push(
+            MaterialPageRoute(builder: (ctx) => const Courses()),
+          );
+        }),
+        _drawerItem('Open Classroom', Icons.class_outlined, () {
+          Navigator.of(context).push(
+            MaterialPageRoute(builder: (ctx) => const StudentLmsDashboard()),
+          );
+        }),
+        _drawerItem('Browse Courses', Icons.travel_explore_outlined, () {
+          Navigator.of(context).push(
+            MaterialPageRoute(builder: (ctx) => const LmsPublicCatalog()),
+          );
         }),
         _drawerItem('My Certificates', Icons.workspace_premium_outlined, () {
           Navigator.of(context).push(
             MaterialPageRoute(builder: (ctx) => const CertificatesScreen()),
           );
         }),
-        _drawerItem('Tasks & Quizzes', Icons.task_alt_outlined, () {
-          Navigator.of(
-            context,
-          ).push(MaterialPageRoute(builder: (ctx) => const TaskScreen()));
+        _drawerItem('Assessments', Icons.task_alt_outlined, () {
+          Navigator.of(context).push(
+            MaterialPageRoute(builder: (ctx) => const AssessmentsScreen()),
+          );
         }),
         _drawerItem('Help & Support', Icons.help_outline_rounded, () {
-          Navigator.of(
-            context,
-          ).push(MaterialPageRoute(builder: (ctx) => const HelpAndSupport()));
+          Navigator.of(context).push(
+            MaterialPageRoute(builder: (ctx) => const HelpAndSupport()),
+          );
         }),
         _drawerItem('Settings', Icons.settings_outlined, () {
-          Navigator.of(
-            context,
-          ).push(MaterialPageRoute(builder: (ctx) => const SettingsScreen()));
+          Navigator.of(context).push(
+            MaterialPageRoute(builder: (ctx) => const SettingsScreen()),
+          );
         }),
       ];
     } else if (selectedRole == 'Admin') {

@@ -246,8 +246,8 @@ class _BookAppointmentScreenState extends ConsumerState<BookAppointmentScreen> {
             builder: (_) => SelectPaymentMethod(
               appointmentId: appointmentId,
               amount: fee.toDouble(),
-              onPaymentSuccess: () {
-                Navigator.of(context).popUntil((route) => route.isFirst);
+              onPaymentSuccess: (successContext) {
+                Navigator.of(successContext).popUntil((route) => route.isFirst);
               },
             ),
           ),

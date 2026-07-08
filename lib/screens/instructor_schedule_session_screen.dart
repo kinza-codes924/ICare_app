@@ -136,7 +136,7 @@ class _InstructorScheduleSessionScreenState extends State<InstructorScheduleSess
         'courseId': _selectedCourseId,
         'title': _titleController.text,
         'description': _descriptionController.text,
-        'scheduledAt': _scheduledAt!.toIso8601String(),
+        'scheduledAt': _scheduledAt!.toUtc().toIso8601String(),
         'duration': _duration,
         'maxParticipants': _maxParticipants,
         'platform': _platform,

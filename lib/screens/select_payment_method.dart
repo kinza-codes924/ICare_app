@@ -21,7 +21,7 @@ class SelectPaymentMethod extends StatefulWidget {
   final String? labBookingId;
   final String? appointmentId;
   final double? amount;
-  final VoidCallback? onPaymentSuccess;
+  final void Function(BuildContext context)? onPaymentSuccess;
 
   const SelectPaymentMethod({
     super.key,
@@ -102,12 +102,22 @@ class _SelectPaymentMethodState extends State<SelectPaymentMethod> {
           throw Exception("Invalid course ID");
         }
 
-        await _courseService.buyCourse(widget.courseId!);
-        if (mounted) {
-          _showSuccessDialog(
-            "Course Purchased!",
-            "You have successfully enrolled in the course. You can now start learning.",
-          );
+        if (widget.onPaymentSuccess != null) {
+          // LMS purchase flow (lms_purchase_flow.dart) owns enrollment itself
+          // and routes to document verification next — don't double-enroll
+          // or short-circuit that flow with the generic "Go to Home" dialog.
+          // Pass this screen's own context: it's the one actually mounted
+          // when the user clicks Confirm & Pay (lms_purchase_flow's screen
+          // was already replaced by this one via pushReplacement).
+          if (mounted) widget.onPaymentSuccess!(context);
+        } else {
+          await _courseService.buyCourse(widget.courseId!);
+          if (mounted) {
+            _showSuccessDialog(
+              "Course Purchased!",
+              "You have successfully enrolled in the course. You can now start learning.",
+            );
+          }
         }
       } else if (widget.labBookingId != null) {
         // Update booking status to 'confirmed' or similar if needed

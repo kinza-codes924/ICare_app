@@ -72,6 +72,21 @@ class ApiService {
 
         handler.next(response);
       },
+      onError: (error, handler) {
+        // Error responses (4xx/5xx) bypass onResponse entirely in Dio, so the
+        // body is still the raw JSON string from ResponseType.plain. Decode
+        // it here too, otherwise every `data is Map` check on error messages
+        // across the app silently fails and falls back to a generic message.
+        final response = error.response;
+        if (response != null && response.data is String && (response.data as String).isNotEmpty) {
+          try {
+            response.data = jsonDecode(response.data as String);
+          } catch (_) {
+            // Leave as-is (e.g. HTML error page) — callers already guard with `is Map`
+          }
+        }
+        handler.next(error);
+      },
     ));
   }
 

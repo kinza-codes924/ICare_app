@@ -140,15 +140,20 @@ class _InstructorCreateQuizScreenState extends State<InstructorCreateQuizScreen>
 
       if (widget.quizId != null) {
         await _lmsService.updateQuiz(widget.quizId!, quizData);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Quiz updated successfully!')),
+          );
+          Navigator.pop(context);
+        }
       } else {
-        await _lmsService.createQuiz(quizData);
-      }
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Quiz ${widget.quizId != null ? 'updated' : 'created'} successfully!')),
-        );
-        Navigator.pop(context);
+        final created = await _lmsService.createQuiz(quizData);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Quiz created successfully!')),
+          );
+          Navigator.pop(context, created['quiz'] ?? created);
+        }
       }
     } catch (e) {
       if (mounted) {

@@ -90,6 +90,12 @@ class _CoursesListState extends State<CoursesList> {
           ? (item['course'] as Map<String, dynamic>? ?? {})
           : (item as Map<String, dynamic>? ?? {});
 
+      // Only show CRP course in browse mode
+      if (!widget.mypurchased) {
+        final title = (courseData['title'] ?? courseData['name'] ?? '').toString().toLowerCase();
+        if (!title.contains('certificate in research') && !title.contains('crp')) return false;
+      }
+
       // Price filter (Browse Courses: Paid / Free tabs)
       if (widget.priceFilter != 'all') {
         final price = (courseData['price'] is num)

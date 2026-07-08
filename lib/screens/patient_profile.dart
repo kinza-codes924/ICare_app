@@ -153,7 +153,7 @@ class PatientProfile extends ConsumerWidget {
                   SizedBox(width: ScallingConfig.scale(10)),
                   Expanded(
                     child: CustomText(
-                      text: "House 12, Street 4, Gulberg III, Lahore",
+                      text: (user?.address?.isNotEmpty == true) ? user!.address! : "No address set",
                       fontSize: 13,
                     ),
                   ),

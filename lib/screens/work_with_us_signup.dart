@@ -4,10 +4,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:go_router/go_router.dart';
-import 'package:icare/screens/terms_and_conditions.dart';
-import 'package:icare/screens/privacy_policy.dart';
-import 'package:icare/screens/refund_policy.dart';
 import 'package:icare/services/api_service.dart';
+import 'package:icare/utils/api_constants.dart';
 import 'package:icare/utils/theme.dart';
 import 'package:icare/utils/utils.dart';
 import 'package:icare/widgets/auth_left_panel.dart';
@@ -25,6 +23,7 @@ class _WorkWithUsSignupState extends State<WorkWithUsSignup> {
 
   // ── Step 1: Basic Info ───────────────────────────────────────────────────
   final _step1Key = GlobalKey<FormState>();
+  final _step2Key = GlobalKey<FormState>();
   final _nameCtrl = TextEditingController();
   final _contactPersonCtrl = TextEditingController();
   final _phoneCtrl = TextEditingController();
@@ -313,8 +312,51 @@ class _WorkWithUsSignupState extends State<WorkWithUsSignup> {
     if (_step > 0) setState(() => _step--);
   }
 
+  // Uploads a document to Vercel Blob (via the backend) and returns its URL.
+  // Used instead of embedding files as base64 — base64 inflates payload size
+  // ~33% and previously caused documents to silently fail to save once the
+  // combined verificationDetails payload exceeded Vercel's 4.5MB body limit.
+  Future<String?> _uploadDoc(Uint8List bytes, String filename, String token) async {
+    try {
+      final res = await Dio().post(
+        '${ApiConstants.baseUrl}/upload/blob-doc',
+        data: FormData.fromMap({
+          'file': MultipartFile.fromBytes(bytes, filename: filename),
+        }),
+        options: Options(
+          headers: {'Authorization': 'Bearer $token'},
+          validateStatus: (s) => s != null && s < 600,
+        ),
+      );
+      if (res.statusCode == 200 && res.data is Map && res.data['success'] == true) {
+        return res.data['url'] as String?;
+      }
+    } catch (_) {}
+    return null;
+  }
+
   Future<void> _submit() async {
-    // Agreement is implicit by submitting — no checkbox validation needed
+    // Validate step 2 detail form fields
+    if (_step2Key.currentState != null && !_step2Key.currentState!.validate()) return;
+
+    // Document mandatory checks per role
+    String? docError;
+    if (_selectedRole == 'Student' && _studentIdBytes == null) {
+      docError = 'Please upload your Student ID Card';
+    } else if (_selectedRole == 'Doctor' && _docCnicBytes == null) {
+      docError = 'Please upload your CNIC document';
+    } else if (_selectedRole == 'Instructor' && _instrCnicBytes == null) {
+      docError = 'Please upload your CNIC document';
+    }
+    if (docError != null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(docError), backgroundColor: Colors.red, duration: const Duration(seconds: 4)),
+        );
+      }
+      return;
+    }
+
     setState(() => _submitting = true);
 
     try {
@@ -328,6 +370,9 @@ class _WorkWithUsSignupState extends State<WorkWithUsSignup> {
       };
       final backendRole = roleMap[_selectedRole] ?? _selectedRole!.toLowerCase();
       final capturedName = _nameCtrl.text.trim();
+      // Make username unique: use email prefix so two people with the same name don't collide.
+      final emailPrefix = _emailCtrl.text.trim().toLowerCase().split('@').first;
+      final uniqueUsername = emailPrefix.isNotEmpty ? emailPrefix : capturedName;
 
       final api = ApiService();
 
@@ -348,19 +393,9 @@ class _WorkWithUsSignupState extends State<WorkWithUsSignup> {
         vd['availableDays'] = _docAvailDays.toList();
         vd['availableTimings'] = _docTimingsCtrl.text.trim();
         vd['comments'] = _docCommentsCtrl.text.trim();
-        // Encode uploaded documents as base64 data URIs so admin can view them
-        if (_docCnicBytes != null) {
-          vd['cnicDocument'] = 'data:application/octet-stream;base64,${base64Encode(_docCnicBytes!)}';
-          vd['cnicDocumentName'] = _docCnic ?? 'cnic';
-        }
-        if (_docPmdcCertBytes != null) {
-          vd['pmdcCertDocument'] = 'data:application/octet-stream;base64,${base64Encode(_docPmdcCertBytes!)}';
-          vd['pmdcCertDocumentName'] = _docPmdcCert ?? 'pmdc_cert';
-        }
-        if (_docExpCertBytes != null) {
-          vd['experienceCertDocument'] = 'data:application/octet-stream;base64,${base64Encode(_docExpCertBytes!)}';
-          vd['experienceCertDocumentName'] = _docExpCert ?? 'experience_cert';
-        }
+        if (_docCnicBytes != null) vd['cnicDocumentName'] = _docCnic ?? 'cnic';
+        if (_docPmdcCertBytes != null) vd['pmdcCertDocumentName'] = _docPmdcCert ?? 'pmdc_cert';
+        if (_docExpCertBytes != null) vd['experienceCertDocumentName'] = _docExpCert ?? 'experience_cert';
       } else if (_selectedRole == 'Pharmacy') {
         vd['organizationName'] = _pharmNameCtrl.text.trim();
         vd['location'] = [city, address].where((s) => s.isNotEmpty).join(', ');
@@ -378,18 +413,9 @@ class _WorkWithUsSignupState extends State<WorkWithUsSignup> {
         vd['posDetails'] = _pharmPOSDetailCtrl.text.trim();
         vd['willingToIntegrate'] = _pharmWillingIntegrate;
         vd['comments'] = _pharmCommentsCtrl.text.trim();
-        if (_pharmCnicBytes != null) {
-          vd['cnicDocument'] = 'data:application/octet-stream;base64,${base64Encode(_pharmCnicBytes!)}';
-          vd['cnicDocumentName'] = _pharmCnic ?? 'cnic';
-        }
-        if (_pharmDrugLicenseBytes != null) {
-          vd['drugLicenseDocument'] = 'data:application/octet-stream;base64,${base64Encode(_pharmDrugLicenseBytes!)}';
-          vd['drugLicenseDocumentName'] = _pharmDrugLicense ?? 'drug_license';
-        }
-        if (_pharmRegCertBytes != null) {
-          vd['regCertDocument'] = 'data:application/octet-stream;base64,${base64Encode(_pharmRegCertBytes!)}';
-          vd['regCertDocumentName'] = _pharmRegCert ?? 'reg_cert';
-        }
+        if (_pharmCnicBytes != null) vd['cnicDocumentName'] = _pharmCnic ?? 'cnic';
+        if (_pharmDrugLicenseBytes != null) vd['drugLicenseDocumentName'] = _pharmDrugLicense ?? 'drug_license';
+        if (_pharmRegCertBytes != null) vd['regCertDocumentName'] = _pharmRegCert ?? 'reg_cert';
       } else if (_selectedRole == 'Laboratory') {
         vd['organizationName'] = _labNameCtrl.text.trim();
         vd['location'] = [city, address].where((s) => s.isNotEmpty).join(', ');
@@ -406,22 +432,10 @@ class _WorkWithUsSignupState extends State<WorkWithUsSignup> {
         vd['lisDetails'] = _labLISDetailCtrl.text.trim();
         vd['willingToIntegrate'] = _labWillingIntegrate;
         vd['comments'] = _labCommentsCtrl.text.trim();
-        if (_labCnicBytes != null) {
-          vd['cnicDocument'] = 'data:application/octet-stream;base64,${base64Encode(_labCnicBytes!)}';
-          vd['cnicDocumentName'] = _labCnic ?? 'cnic';
-        }
-        if (_labLicenseBytes != null) {
-          vd['labLicenseDocument'] = 'data:application/octet-stream;base64,${base64Encode(_labLicenseBytes!)}';
-          vd['labLicenseDocumentName'] = _labLicense ?? 'lab_license';
-        }
-        if (_labAccredCertBytes != null) {
-          vd['accredCertDocument'] = 'data:application/octet-stream;base64,${base64Encode(_labAccredCertBytes!)}';
-          vd['accredCertDocumentName'] = _labAccredCert ?? 'accred_cert';
-        }
-        if (_labTestsFileBytes != null) {
-          vd['testsListDocument'] = 'data:application/octet-stream;base64,${base64Encode(_labTestsFileBytes!)}';
-          vd['testsListDocumentName'] = _labTestsFile ?? 'tests_list';
-        }
+        if (_labCnicBytes != null) vd['cnicDocumentName'] = _labCnic ?? 'cnic';
+        if (_labLicenseBytes != null) vd['labLicenseDocumentName'] = _labLicense ?? 'lab_license';
+        if (_labAccredCertBytes != null) vd['accredCertDocumentName'] = _labAccredCert ?? 'accred_cert';
+        if (_labTestsFileBytes != null) vd['testsListDocumentName'] = _labTestsFile ?? 'tests_list';
       } else if (_selectedRole == 'Student') {
         vd['organizationName'] = _studentUniversityCtrl.text.trim();
         vd['location'] = [city, address].where((s) => s.isNotEmpty).join(', ');
@@ -431,10 +445,7 @@ class _WorkWithUsSignupState extends State<WorkWithUsSignup> {
         vd['currentYear'] = _studentYearCtrl.text.trim();
         vd['studentId'] = _studentIdCtrl.text.trim();
         vd['comments'] = _studentCommentsCtrl.text.trim();
-        if (_studentIdBytes != null) {
-          vd['studentIdDocument'] = 'data:application/octet-stream;base64,${base64Encode(_studentIdBytes!)}';
-          vd['studentIdDocumentName'] = _studentIdFile ?? 'student_id';
-        }
+        if (_studentIdBytes != null) vd['studentIdDocumentName'] = _studentIdFile ?? 'student_id';
       } else if (_selectedRole == 'Instructor') {
         vd['organizationName'] = _instrInstitutionCtrl.text.trim();
         vd['location'] = [city, address].where((s) => s.isNotEmpty).join(', ');
@@ -446,18 +457,15 @@ class _WorkWithUsSignupState extends State<WorkWithUsSignup> {
         vd['institution'] = _instrInstitutionCtrl.text.trim();
         vd['proposedCourses'] = _instrCoursesCtrl.text.trim();
         vd['comments'] = _instrCommentsCtrl.text.trim();
-        if (_instrCnicBytes != null) {
-          vd['cnicDocument'] = 'data:application/octet-stream;base64,${base64Encode(_instrCnicBytes!)}';
-          vd['cnicDocumentName'] = _instrCnic ?? 'cnic';
-        }
-        if (_instrCvBytes != null) {
-          vd['cvDocument'] = 'data:application/octet-stream;base64,${base64Encode(_instrCvBytes!)}';
-          vd['cvDocumentName'] = _instrCvFile ?? 'cv';
-        }
+        if (_instrCnicBytes != null) vd['cnicDocumentName'] = _instrCnic ?? 'cnic';
+        if (_instrCvBytes != null) vd['cvDocumentName'] = _instrCvFile ?? 'cv';
       }
 
+      // Register without documents first (small payload) — files are uploaded
+      // to Vercel Blob right after, once we have an auth token, then attached
+      // to the profile via /users/profile.
       final response = await api.post('/auth/register', {
-        'username': capturedName,
+        'username': uniqueUsername,
         'name': capturedName,
         'email': _emailCtrl.text.trim().toLowerCase(),
         'password': _passwordCtrl.text,
@@ -478,6 +486,30 @@ class _WorkWithUsSignupState extends State<WorkWithUsSignup> {
             ? (resData['token'] ?? resData['accessToken'] ?? resData['data']?['token'])?.toString()
             : null;
         if (regToken != null && regToken.isNotEmpty && vd.isNotEmpty) {
+          // Upload each selected document to Vercel Blob now that we have a
+          // token, and attach the resulting URLs to verificationDetails.
+          final uploads = <String, Uint8List>{
+            if (_docCnicBytes != null) 'cnicDocument': _docCnicBytes!,
+            if (_docPmdcCertBytes != null) 'pmdcCertDocument': _docPmdcCertBytes!,
+            if (_docExpCertBytes != null) 'experienceCertDocument': _docExpCertBytes!,
+            if (_pharmCnicBytes != null) 'cnicDocument': _pharmCnicBytes!,
+            if (_pharmDrugLicenseBytes != null) 'drugLicenseDocument': _pharmDrugLicenseBytes!,
+            if (_pharmRegCertBytes != null) 'regCertDocument': _pharmRegCertBytes!,
+            if (_labCnicBytes != null) 'cnicDocument': _labCnicBytes!,
+            if (_labLicenseBytes != null) 'labLicenseDocument': _labLicenseBytes!,
+            if (_labAccredCertBytes != null) 'accredCertDocument': _labAccredCertBytes!,
+            if (_labTestsFileBytes != null) 'testsListDocument': _labTestsFileBytes!,
+            if (_studentIdBytes != null) 'studentIdDocument': _studentIdBytes!,
+            if (_instrCnicBytes != null) 'cnicDocument': _instrCnicBytes!,
+            if (_instrCvBytes != null) 'cvDocument': _instrCvBytes!,
+          };
+          for (final entry in uploads.entries) {
+            final nameKey = '${entry.key}Name';
+            final filename = (vd[nameKey] as String?) ?? entry.key;
+            final url = await _uploadDoc(entry.value, filename, regToken);
+            if (url != null) vd[entry.key] = url;
+          }
+
           try {
             await api.put('/users/profile', {'verificationDetails': vd}, token: regToken);
           } catch (_) {}
@@ -517,24 +549,24 @@ class _WorkWithUsSignupState extends State<WorkWithUsSignup> {
       }
     } catch (e) {
       if (mounted) {
-        String errMsg;
+        String errMsg = 'Registration failed. Please try again.';
         if (e is DioException && e.response != null) {
-          final data = e.response!.data;
-          if (data is Map) {
-            errMsg = data['message']?.toString() ?? data['error']?.toString() ?? 'Registration failed (${e.response!.statusCode}).';
-          } else {
-            errMsg = 'Registration failed. Status: ${e.response!.statusCode}';
+          // Dio with ResponseType.plain keeps error bodies as raw strings —
+          // the onResponse interceptor doesn't run for 4xx/5xx, so we decode manually.
+          dynamic data = e.response!.data;
+          if (data is String && data.isNotEmpty) {
+            try { data = jsonDecode(data); } catch (_) {}
           }
-        } else if (e.toString().contains('already exists') || e.toString().contains('duplicate')) {
-          errMsg = 'An account with this email already exists.';
+          if (data is Map) {
+            errMsg = data['message']?.toString() ?? data['error']?.toString() ?? errMsg;
+          } else {
+            errMsg = 'Registration failed (${e.response!.statusCode}). Please try again.';
+          }
         } else if (e.toString().contains('SocketException') || e.toString().contains('connection')) {
           errMsg = 'Network error. Please check your internet connection.';
-        } else {
-          errMsg = 'Registration failed. Please try again.';
-          debugPrint('WorkWithUs submit error: $e');
         }
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(errMsg), backgroundColor: Colors.red, duration: const Duration(seconds: 4)),
+          SnackBar(content: Text(errMsg), backgroundColor: Colors.red, duration: const Duration(seconds: 5)),
         );
       }
     } finally {
@@ -730,7 +762,14 @@ class _WorkWithUsSignupState extends State<WorkWithUsSignup> {
           const SizedBox(height: 14),
           _inputField(_phoneCtrl, 'Phone Number', Icons.phone_outlined,
               keyboardType: TextInputType.phone,
-              validator: (v) => v == null || v.isEmpty ? 'Phone is required' : null),
+              validator: (v) {
+                if (v == null || v.trim().isEmpty) return 'Phone number is required';
+                final digits = v.replaceAll(RegExp(r'[\s\-\+]'), '');
+                if (!RegExp(r'^(92\d{10}|0\d{10})$').hasMatch(digits)) {
+                  return 'Enter a valid Pakistani number (e.g. 03001234567)';
+                }
+                return null;
+              }),
           const SizedBox(height: 14),
           _inputField(_emailCtrl, 'Email Address', Icons.email_outlined,
               keyboardType: TextInputType.emailAddress,
@@ -843,12 +882,14 @@ class _WorkWithUsSignupState extends State<WorkWithUsSignup> {
   // STEP 3 — Role-specific Detailed Form
   // ════════════════════════════════════════════════════════════════════════════
   Widget _buildStep3() {
-    if (_selectedRole == 'Doctor') return _buildDoctorForm();
-    if (_selectedRole == 'Pharmacy') return _buildPharmacyForm();
-    if (_selectedRole == 'Laboratory') return _buildLabForm();
-    if (_selectedRole == 'Student') return _buildStudentForm();
-    if (_selectedRole == 'Instructor') return _buildInstructorForm();
-    return const SizedBox.shrink();
+    Widget inner;
+    if (_selectedRole == 'Doctor') inner = _buildDoctorForm();
+    else if (_selectedRole == 'Pharmacy') inner = _buildPharmacyForm();
+    else if (_selectedRole == 'Laboratory') inner = _buildLabForm();
+    else if (_selectedRole == 'Student') inner = _buildStudentForm();
+    else if (_selectedRole == 'Instructor') inner = _buildInstructorForm();
+    else return const SizedBox.shrink();
+    return Form(key: _step2Key, child: inner);
   }
 
   // ── Doctor Form ─────────────────────────────────────────────────────────────
@@ -1134,16 +1175,20 @@ class _WorkWithUsSignupState extends State<WorkWithUsSignup> {
         _sectionHeader('1. Academic Details', Icons.school_rounded, const Color(0xFFF59E0B)),
         const SizedBox(height: 12),
         _inputField(_studentUniversityCtrl, 'University / Institution Name',
-            Icons.account_balance_outlined),
+            Icons.account_balance_outlined,
+            validator: (v) => (v == null || v.trim().isEmpty) ? 'University name is required' : null),
         const SizedBox(height: 12),
         _inputField(_studentProgramCtrl, 'Program / Degree',
-            Icons.menu_book_outlined, hint: 'e.g., MBBS, BDS, Pharm-D'),
+            Icons.menu_book_outlined, hint: 'e.g., MBBS, BDS, Pharm-D',
+            validator: (v) => (v == null || v.trim().isEmpty) ? 'Program / Degree is required' : null),
         const SizedBox(height: 12),
         _inputField(_studentYearCtrl, 'Current Year / Semester',
-            Icons.timeline_rounded, hint: 'e.g., 3rd Year, Semester 5'),
+            Icons.timeline_rounded, hint: 'e.g., 3rd Year, Semester 5',
+            validator: (v) => (v == null || v.trim().isEmpty) ? 'Current year is required' : null),
         const SizedBox(height: 12),
         _inputField(_studentIdCtrl, 'Student ID / Roll Number',
-            Icons.badge_outlined),
+            Icons.badge_outlined,
+            validator: (v) => (v == null || v.trim().isEmpty) ? 'Student ID is required' : null),
         const SizedBox(height: 24),
 
         _sectionHeader('2. Documents', Icons.upload_file_rounded, const Color(0xFFF59E0B)),
@@ -1651,10 +1696,7 @@ class _WorkWithUsSignupState extends State<WorkWithUsSignup> {
                 style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
               ),
               GestureDetector(
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const TermsAndConditions()),
-                ),
+                onTap: () => context.go('/terms'),
                 child: Text(
                   'Terms and Conditions',
                   style: TextStyle(
@@ -1671,10 +1713,7 @@ class _WorkWithUsSignupState extends State<WorkWithUsSignup> {
                 style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
               ),
               GestureDetector(
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const PrivacyPolicy()),
-                ),
+                onTap: () => context.go('/privacypolicy'),
                 child: Text(
                   'Privacy Policy',
                   style: TextStyle(
@@ -1691,10 +1730,7 @@ class _WorkWithUsSignupState extends State<WorkWithUsSignup> {
                 style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
               ),
               GestureDetector(
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const RefundPolicy()),
-                ),
+                onTap: () => context.go('/refund-policy'),
                 child: Text(
                   'Refund Policy',
                   style: TextStyle(
@@ -1717,7 +1753,7 @@ class _WorkWithUsSignupState extends State<WorkWithUsSignup> {
           width: double.infinity,
           height: 52,
           child: ElevatedButton(
-            onPressed: _submitting ? null : _submit,
+            onPressed: _submitting ? null : () async { await _submit(); },
             style: ElevatedButton.styleFrom(
               backgroundColor: color,
               foregroundColor: Colors.white,

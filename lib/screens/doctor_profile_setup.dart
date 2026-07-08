@@ -32,6 +32,12 @@ class _DoctorProfileSetupState extends ConsumerState<DoctorProfileSetup> {
   final TextEditingController startTimeController = TextEditingController();
   final TextEditingController endTimeController = TextEditingController();
 
+  // Basic account info (shared with Settings profile — saved via /users/profile)
+  final TextEditingController _phoneController = TextEditingController();
+  final TextEditingController _ageController = TextEditingController();
+  final TextEditingController _addressController = TextEditingController();
+  String? _gender;
+
   // License expiry date
   DateTime? _licenseValidTill;
 
@@ -81,6 +87,11 @@ class _DoctorProfileSetupState extends ConsumerState<DoctorProfileSetup> {
   @override
   void initState() {
     super.initState();
+    final u = ref.read(authProvider).user;
+    _phoneController.text = u?.phoneNumber ?? '';
+    _ageController.text = u?.age ?? '';
+    _addressController.text = u?.address ?? '';
+    _gender = (u?.gender?.isNotEmpty == true) ? u!.gender : null;
     _loadProfile();
   }
 
@@ -224,6 +235,9 @@ class _DoctorProfileSetupState extends ConsumerState<DoctorProfileSetup> {
     _specialtySearchCtrl.dispose();
     _specialtyCustomCtrl.dispose();
     _conditionInputCtrl.dispose();
+    _phoneController.dispose();
+    _ageController.dispose();
+    _addressController.dispose();
     super.dispose();
   }
 
@@ -328,6 +342,17 @@ class _DoctorProfileSetupState extends ConsumerState<DoctorProfileSetup> {
         startTime: startTimeController.text,
         endTime: endTimeController.text,
       );
+    } catch (_) {}
+
+    // Save basic account info (Phone/Age/Gender/Address) — same endpoint the
+    // generic Settings profile edit uses.
+    try {
+      await ApiService().put('/users/profile', {
+        'phoneNumber': _phoneController.text.trim(),
+        'age': _ageController.text.trim(),
+        'address': _addressController.text.trim(),
+        if (_gender != null) 'gender': _gender,
+      });
     } catch (_) {}
 
     // Save specialties separately
@@ -551,7 +576,52 @@ class _DoctorProfileSetupState extends ConsumerState<DoctorProfileSetup> {
                   child: Text('Tap to upload profile photo', style: TextStyle(fontSize: 12, color: AppColors.primaryColor)),
                 ),
                 const SizedBox(height: 24),
-                _buildSectionTitle("Basic Information"),
+                _buildSectionTitle("Personal Information"),
+                const SizedBox(height: 16),
+                _buildTextField(
+                  controller: _phoneController,
+                  label: "Phone Number",
+                  icon: Icons.phone_outlined,
+                  hint: "+92 300 0000000",
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: _buildTextField(
+                        controller: _ageController,
+                        label: "Age",
+                        icon: Icons.cake_outlined,
+                        hint: "e.g., 30",
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: DropdownButtonFormField<String>(
+                        initialValue: _gender,
+                        decoration: InputDecoration(
+                          labelText: 'Gender',
+                          prefixIcon: const Icon(Icons.wc_rounded),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        items: ['Male', 'Female', 'Other']
+                            .map((g) => DropdownMenuItem(value: g, child: Text(g)))
+                            .toList(),
+                        onChanged: (v) => setState(() => _gender = v),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                _buildTextField(
+                  controller: _addressController,
+                  label: "Address",
+                  icon: Icons.location_on_outlined,
+                  hint: "Street, city, area",
+                ),
+                const SizedBox(height: 24),
+                _buildSectionTitle("Professional Details"),
                 const SizedBox(height: 16),
                 _buildTextField(
                   controller: specializationController,
@@ -797,6 +867,74 @@ class _DoctorProfileSetupState extends ConsumerState<DoctorProfileSetup> {
                           child: Text('Tap to upload profile photo', style: TextStyle(fontSize: 13, color: AppColors.primaryColor)),
                         ),
                         const SizedBox(height: 32),
+                        const Text(
+                          "Personal Information",
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF1E293B),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _buildTextField(
+                                controller: _phoneController,
+                                label: "Phone Number",
+                                icon: Icons.phone_outlined,
+                                hint: "+92 300 0000000",
+                              ),
+                            ),
+                            const SizedBox(width: 24),
+                            Expanded(
+                              child: _buildTextField(
+                                controller: _ageController,
+                                label: "Age",
+                                icon: Icons.cake_outlined,
+                                hint: "e.g., 30",
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 24),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: DropdownButtonFormField<String>(
+                                initialValue: _gender,
+                                decoration: InputDecoration(
+                                  labelText: 'Gender',
+                                  prefixIcon: const Icon(Icons.wc_rounded),
+                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                                ),
+                                items: ['Male', 'Female', 'Other']
+                                    .map((g) => DropdownMenuItem(value: g, child: Text(g)))
+                                    .toList(),
+                                onChanged: (v) => setState(() => _gender = v),
+                              ),
+                            ),
+                            const SizedBox(width: 24),
+                            Expanded(
+                              child: _buildTextField(
+                                controller: _addressController,
+                                label: "Address",
+                                icon: Icons.location_on_outlined,
+                                hint: "Street, city, area",
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 40),
+                        const Text(
+                          "Professional Details",
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF1E293B),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
                         Row(
                           children: [
                             Expanded(

@@ -87,7 +87,7 @@ class _InstructorLmsCreateCourseScreenState extends State<InstructorLmsCreateCou
   final _durationMonthsController = TextEditingController();
   DateTime? _startDate;
   String _courseType = 'self-paced'; // 'self-paced' or 'pragmatic'
-  bool _isPublished = false;
+  bool _isPublished = true;
   bool _uploadingThumbnail = false;
   String? _thumbnailUrl;
 
@@ -258,10 +258,29 @@ class _InstructorLmsCreateCourseScreenState extends State<InstructorLmsCreateCou
     }
   }
 
+  Widget _categoryLabel(String name) {
+    final isMedicalTraining = name.trim().toLowerCase() == 'medical training';
+    if (!isMedicalTraining) return Text(name);
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(name),
+        const SizedBox(width: 6),
+        Flexible(
+          child: Text(
+            '(for healthcare professionals only)',
+            style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDesktop = MediaQuery.of(context).size.width > 900;
-    
+
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
@@ -518,14 +537,17 @@ class _InstructorLmsCreateCourseScreenState extends State<InstructorLmsCreateCou
                   border: OutlineInputBorder(),
                 ),
                 items: _categories.isNotEmpty
-                    ? _categories.map((c) => DropdownMenuItem(value: c['value']?.toString() ?? '', child: Text(c['name']?.toString() ?? ''))).toList()
-                    : const [
-                        DropdownMenuItem(value: 'HealthProgram', child: Text('Health Program')),
-                        DropdownMenuItem(value: 'FCPSPart1', child: Text('FCPS Part 1')),
-                        DropdownMenuItem(value: 'Medical Training', child: Text('Medical Training')),
-                        DropdownMenuItem(value: 'Wellness', child: Text('Wellness')),
-                        DropdownMenuItem(value: 'Nutrition', child: Text('Nutrition')),
-                        DropdownMenuItem(value: 'Mental Health', child: Text('Mental Health')),
+                    ? _categories.map((c) => DropdownMenuItem(
+                        value: c['value']?.toString() ?? '',
+                        child: _categoryLabel(c['name']?.toString() ?? ''),
+                      )).toList()
+                    : [
+                        const DropdownMenuItem(value: 'HealthProgram', child: Text('Health Program')),
+                        const DropdownMenuItem(value: 'FCPSPart1', child: Text('FCPS Part 1')),
+                        DropdownMenuItem(value: 'Medical Training', child: _categoryLabel('Medical Training')),
+                        const DropdownMenuItem(value: 'Wellness', child: Text('Wellness')),
+                        const DropdownMenuItem(value: 'Nutrition', child: Text('Nutrition')),
+                        const DropdownMenuItem(value: 'Mental Health', child: Text('Mental Health')),
                       ],
                 onChanged: (value) => setState(() => _category = value!),
               ),

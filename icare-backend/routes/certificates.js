@@ -12,6 +12,18 @@ function toId(id) {
   try { return new mongoose.Types.ObjectId(id); } catch { return null; }
 }
 
+// Only the course owner (instructor_id) or a co-teacher explicitly marked
+// role: 'lead' may issue/approve certificates. Normal instructors are blocked.
+async function assertLeadInstructor(courseId, userId) {
+  const course = await Course.findById(courseId).select('instructor_id coTeachers').lean();
+  if (!course) return { ok: false, status: 404, message: 'Course not found' };
+  const uid = userId.toString();
+  if (course.instructor_id?.toString() === uid) return { ok: true, course };
+  const coTeacher = (course.coTeachers || []).find(t => t.userId?.toString() === uid);
+  if (coTeacher?.role === 'lead') return { ok: true, course };
+  return { ok: false, status: 403, message: 'Only the Lead Instructor can issue or approve certificates' };
+}
+
 // GET /api/certificates/pending/:courseId — instructor sees pending approvals
 router.get('/pending/:courseId', authMiddleware, async (req, res) => {
   try {
@@ -30,6 +42,11 @@ router.put('/:id/approve', authMiddleware, async (req, res) => {
     await connectMongoDB();
     const { action, note } = req.body; // action: 'approve' | 'reject'
     if (!['approve', 'reject'].includes(action)) return res.status(400).json({ success: false, message: 'action must be approve or reject' });
+
+    const existingCert = await Certificate.findById(toId(req.params.id)).select('courseId').lean();
+    if (!existingCert) return res.status(404).json({ success: false, message: 'Not found' });
+    const perm = await assertLeadInstructor(existingCert.courseId, req.user.id);
+    if (!perm.ok) return res.status(perm.status).json({ success: false, message: perm.message });
 
     const cert = await Certificate.findByIdAndUpdate(
       toId(req.params.id),
@@ -97,6 +114,9 @@ router.post('/', authMiddleware, async (req, res) => {
       return res.status(422).json({ success: false, message: 'Course or student data missing in enrollment' });
     }
 
+    const perm = await assertLeadInstructor(course._id, req.user.id);
+    if (!perm.ok) return res.status(perm.status).json({ success: false, message: perm.message });
+
     // Get instructor name
     const instructor = await User.findById(course.instructor_id).lean();
     const instructorName = instructor?.name || instructor?.username || 'Instructor';
@@ -159,6 +179,11 @@ router.post('/register', authMiddleware, async (req, res) => {
     // Already registered → idempotent success
     const existing = await Certificate.findOne({ verificationCode }).lean();
     if (existing) return res.json({ success: true, certificate: existing, message: 'Already registered' });
+
+    if (courseId) {
+      const perm = await assertLeadInstructor(toId(courseId), req.user.id);
+      if (!perm.ok) return res.status(perm.status).json({ success: false, message: perm.message });
+    }
 
     const certNumber = `ICARE-${new Date().getFullYear()}-${Math.floor(100000 + Math.random() * 900000)}`;
     const certificate = await Certificate.create({

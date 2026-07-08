@@ -10,6 +10,7 @@ import 'package:icare/screens/instructor_course_content_screen.dart';
 import 'package:icare/screens/instructor_student_progress_screen.dart';
 import 'package:icare/screens/instructor_course_analytics_screen.dart';
 import 'package:icare/screens/instructor_grading_screen.dart';
+import 'package:icare/screens/instructor_feedback_screen.dart';
 import 'package:icare/services/lms_service.dart';
 import 'package:icare/services/api_service.dart';
 import 'package:icare/services/auth_service.dart';
@@ -239,11 +240,14 @@ class _InstructorLmsDashboardState extends ConsumerState<InstructorLmsDashboard>
 
   Color _cardColor(int i) => _cardColors[i % _cardColors.length];
 
-  void _openCourse(dynamic course) {
+  void _openCourse(dynamic course) => _openCourseAtTab(course, 0);
+
+  void _openCourseAtTab(dynamic course, int tab) {
     Navigator.push(context, MaterialPageRoute(
       builder: (_) => ClassroomCourseView(
         course: Map<String, dynamic>.from(course is Map ? course : {}),
         isInstructor: true,
+        initialTab: tab,
       ),
     )).then((_) => _loadCourses());
   }
@@ -475,6 +479,10 @@ class _InstructorLmsDashboardState extends ConsumerState<InstructorLmsDashboard>
                       if (isDrawer) Navigator.pop(context);
                       Navigator.push(context, MaterialPageRoute(builder: (_) => const InstructorLmsCoursesScreen()))
                           .then((_) => _loadCourses());
+                    }),
+                    _navItemExternal(Icons.rate_review_outlined, 'Student Feedback', () {
+                      if (isDrawer) Navigator.pop(context);
+                      Navigator.push(context, MaterialPageRoute(builder: (_) => const InstructorFeedbackScreen()));
                     }),
                     const SizedBox(height: 4),
                     Padding(
@@ -760,9 +768,9 @@ class _InstructorLmsDashboardState extends ConsumerState<InstructorLmsDashboard>
                       ),
                     ),
                     const Spacer(),
-                    // Students count
+                    // Students count — opens directly to Course Content tab
                     _cardIconButton(Icons.people_outlined, enrolledCount > 0 ? '$enrolledCount' : null,
-                        () => _openCourse(course)),
+                        () => _openCourseAtTab(course, 1)),
                     // More menu (settings) — only button kept
                     _cardMoreButton(course),
                   ],

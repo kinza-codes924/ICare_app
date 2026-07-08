@@ -190,6 +190,8 @@ router.post('/:id/submit', authMiddleware, async (req, res) => {
 
     const percentage = totalPoints > 0 ? (earnedPoints / totalPoints * 100) : 0;
     const passed = percentage >= quiz.passingScore;
+    // Passing Marks as a raw point value (quiz.passingScore is a %, convert to points out of totalPoints)
+    const passingMarks = Math.round((quiz.passingScore / 100) * totalPoints);
 
     const attempt = await QuizAttempt.create({
       quizId,
@@ -197,6 +199,7 @@ router.post('/:id/submit', authMiddleware, async (req, res) => {
       answers: gradedAnswers,
       score: earnedPoints,
       totalPoints,
+      passingMarks,
       percentage: Math.round(percentage),
       passed,
       submittedAt: new Date(),
@@ -206,6 +209,11 @@ router.post('/:id/submit', authMiddleware, async (req, res) => {
 
     // Return with correct answers if allowed
     let result = attempt.toObject();
+    // Aliases the Flutter results screen reads directly (avoids relying on
+    // client-side fallbacks that used percentage/question-count instead of
+    // real point values).
+    result.marksObtained = result.score;
+    result.maxMarks = result.totalPoints;
     if (quiz.showCorrectAnswers) {
       result.correctAnswers = quiz.questions.map(q => ({
         questionId: q._id,
@@ -220,6 +228,13 @@ router.post('/:id/submit', authMiddleware, async (req, res) => {
   }
 });
 
+// Attach marksObtained/maxMarks aliases (see /submit) to a lean attempt doc/array.
+function withMarksAliases(attempts) {
+  const list = Array.isArray(attempts) ? attempts : [attempts];
+  list.forEach(a => { a.marksObtained = a.score; a.maxMarks = a.totalPoints; });
+  return attempts;
+}
+
 // ── STUDENT: Get my attempts for a quiz ─────────────────────────────────────
 router.get('/:id/my-attempts', authMiddleware, async (req, res) => {
   try {
@@ -229,7 +244,7 @@ router.get('/:id/my-attempts', authMiddleware, async (req, res) => {
       studentId: toId(req.user.id)
     }).sort({ attemptNumber: -1 }).lean();
 
-    res.json({ success: true, attempts });
+    res.json({ success: true, attempts: withMarksAliases(attempts) });
   } catch (e) {
     res.status(500).json({ success: false, message: e.message });
   }
@@ -244,7 +259,43 @@ router.get('/:id/attempts', authMiddleware, async (req, res) => {
       .sort({ submittedAt: -1 })
       .lean();
 
-    res.json({ success: true, attempts });
+    res.json({ success: true, attempts: withMarksAliases(attempts) });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+// ── INSTRUCTOR: Grade a quiz attempt — rubric level, star rating, feedback ──
+router.put('/attempts/:attemptId/grade', authMiddleware, async (req, res) => {
+  try {
+    await connectMongoDB();
+    const { rubricGrade, stars, feedback } = req.body;
+
+    const validRubrics = ['excellent', 'satisfactory', 'average', 'needs_improvement'];
+    if (rubricGrade && !validRubrics.includes(rubricGrade)) {
+      return res.status(400).json({ success: false, message: 'Invalid rubric grade' });
+    }
+    if (stars !== undefined && stars !== null && (stars < 1 || stars > 5)) {
+      return res.status(400).json({ success: false, message: 'Stars must be 1-5' });
+    }
+
+    const attempt = await QuizAttempt.findByIdAndUpdate(
+      toId(req.params.attemptId),
+      {
+        $set: {
+          ...(rubricGrade !== undefined && { rubricGrade }),
+          ...(stars !== undefined && { stars }),
+          ...(feedback !== undefined && { feedback }),
+          gradedBy: toId(req.user.id),
+          gradedAt: new Date(),
+        },
+      },
+      { new: true }
+    ).lean();
+
+    if (!attempt) return res.status(404).json({ success: false, message: 'Attempt not found' });
+
+    res.json({ success: true, attempt });
   } catch (e) {
     res.status(500).json({ success: false, message: e.message });
   }

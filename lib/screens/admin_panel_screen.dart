@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:icare/screens/admin_verification_panel.dart';
 import 'package:icare/services/api_service.dart';
 import 'package:icare/utils/theme.dart';
 import 'package:intl/intl.dart';
@@ -39,7 +40,7 @@ class _AdminPanelScreenState extends ConsumerState<AdminPanelScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 8, vsync: this);
+    _tabController = TabController(length: 9, vsync: this);
     _loadData();
   }
 
@@ -191,6 +192,7 @@ class _AdminPanelScreenState extends ConsumerState<AdminPanelScreen>
                     ],
                   ]),
                 ),
+                const Tab(text: 'STUDENT VERIFICATIONS'),
               ],
             ),
           ),
@@ -209,6 +211,7 @@ class _AdminPanelScreenState extends ConsumerState<AdminPanelScreen>
                 _buildLeaveRequestsTab(),
                 _buildCourseCategoriesTab(),
                 _buildCredentialsTab(),
+                const AdminVerificationPanel(embedded: true),
               ],
             ),
     );

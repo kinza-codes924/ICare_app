@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:icare/screens/courses.dart';
 import 'package:icare/screens/lms_course_page.dart';
+import 'package:icare/screens/lms_document_upload.dart';
 import 'package:icare/services/api_service.dart';
 import 'package:icare/utils/theme.dart';
 
@@ -21,8 +23,11 @@ class _LmsLimitedDashboardState extends State<LmsLimitedDashboard> {
   
   Map<String, dynamic>? _course;
   Map<String, dynamic>? _enrollment;
-  final String _verificationStatus = 'pending'; // pending, approved, rejected
+  String _verificationStatus = 'not_submitted'; // not_submitted, pending, approved, rejected
+  String _verificationLevel = 'limited'; // limited, full
   bool _isLoading = true;
+
+  bool get _hasFullAccess => _verificationLevel == 'full';
 
   @override
   void initState() {
@@ -50,9 +55,16 @@ class _LmsLimitedDashboardState extends State<LmsLimitedDashboard> {
         );
       }
       
-      // TODO: Load verification status from backend
-      // For now, keep as pending
-      
+      // Load real verification status
+      try {
+        final verificationResponse = await _api.get('/verification/my-status');
+        if (verificationResponse.data['success'] == true) {
+          final v = verificationResponse.data['verification'];
+          _verificationStatus = v['status'] ?? 'not_submitted';
+          _verificationLevel = v['verificationLevel'] ?? 'limited';
+        }
+      } catch (_) {}
+
       setState(() => _isLoading = false);
     } catch (e) {
       setState(() => _isLoading = false);
@@ -71,20 +83,31 @@ class _LmsLimitedDashboardState extends State<LmsLimitedDashboard> {
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
-        title: const Text(
-          'My Learning',
-          style: TextStyle(
+        title: Text(
+          _hasFullAccess ? 'My Learning' : 'Course Verification',
+          style: const TextStyle(
             color: Color(0xFF0F172A),
             fontWeight: FontWeight.w800,
           ),
         ),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.notifications_outlined, color: Color(0xFF0F172A)),
-            onPressed: () {
-              // TODO: Show notifications
-            },
-          ),
+          if (_hasFullAccess)
+            IconButton(
+              icon: const Icon(Icons.notifications_outlined, color: Color(0xFF0F172A)),
+              onPressed: () {
+                // TODO: Show notifications
+              },
+            )
+          else
+            TextButton.icon(
+              onPressed: () => Navigator.pushNamed(context, '/login'),
+              icon: const Icon(Icons.login_rounded, size: 18, color: AppColors.primaryColor),
+              label: const Text(
+                'Login',
+                style: TextStyle(color: AppColors.primaryColor, fontWeight: FontWeight.w700),
+              ),
+            ),
+          const SizedBox(width: 8),
         ],
       ),
       body: _isLoading
@@ -97,19 +120,22 @@ class _LmsLimitedDashboardState extends State<LmsLimitedDashboard> {
                   // Verification Status Banner
                   _buildVerificationBanner(),
                   const SizedBox(height: 24),
-                  
-                  // Welcome Message
-                  _buildWelcomeMessage(),
-                  const SizedBox(height: 24),
-                  
-                  // Course Card
+
+                  if (_hasFullAccess) ...[
+                    // Welcome Message
+                    _buildWelcomeMessage(),
+                    const SizedBox(height: 24),
+                  ],
+
+                  // Course preview — always visible (title/description/curriculum),
+                  // but content stays locked until _hasFullAccess is true.
                   if (_course != null) _buildCourseCard(),
                   const SizedBox(height: 24),
-                  
+
                   // Quick Actions
                   _buildQuickActions(),
                   const SizedBox(height: 24),
-                  
+
                   // What's Next
                   _buildWhatsNext(),
                 ],
@@ -137,11 +163,17 @@ class _LmsLimitedDashboardState extends State<LmsLimitedDashboard> {
         bannerTitle = 'Verification Rejected';
         bannerMessage = 'Please upload valid documents to continue';
         break;
-      default:
+      case 'pending':
         bannerColor = const Color(0xFFF59E0B);
         bannerIcon = Icons.pending;
         bannerTitle = 'Verification Pending';
-        bannerMessage = 'Your documents are being reviewed. You can start learning now!';
+        bannerMessage = 'Your documents are under review. Course access will unlock once an admin approves your verification.';
+        break;
+      default:
+        bannerColor = const Color(0xFFF59E0B);
+        bannerIcon = Icons.upload_file;
+        bannerTitle = 'Verification Required';
+        bannerMessage = 'Upload your documents to request full LMS access';
     }
     
     return Container(
@@ -185,6 +217,19 @@ class _LmsLimitedDashboardState extends State<LmsLimitedDashboard> {
               ],
             ),
           ),
+          if (_hasFullAccess)
+            TextButton(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const Courses(browse: true)),
+                );
+              },
+              child: Text(
+                'Browse Courses',
+                style: TextStyle(color: bannerColor, fontWeight: FontWeight.w700),
+              ),
+            ),
         ],
       ),
     );
@@ -271,20 +316,24 @@ class _LmsLimitedDashboardState extends State<LmsLimitedDashboard> {
     );
     final progress = _enrollment?['progress']?['completedVideos'] ?? 0;
     final progressPercent = lessonCount > 0 ? (progress / lessonCount * 100).toInt() : 0;
-    
-    return GestureDetector(
-      onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => LmsCoursePage(
-              course: _course!,
-              enrollmentId: _enrollment?['_id'],
-              isInstructor: false,
-            ),
+    final locked = !_hasFullAccess;
+
+    void openCourse() {
+      if (locked) return;
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => LmsCoursePage(
+            course: _course!,
+            enrollmentId: _enrollment?['_id'],
+            isInstructor: false,
           ),
-        );
-      },
+        ),
+      );
+    }
+
+    return GestureDetector(
+      onTap: openCourse,
       child: Container(
         decoration: BoxDecoration(
           color: Colors.white,
@@ -302,7 +351,6 @@ class _LmsLimitedDashboardState extends State<LmsLimitedDashboard> {
           children: [
             // Header
             Container(
-              height: 120,
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   colors: [
@@ -316,13 +364,21 @@ class _LmsLimitedDashboardState extends State<LmsLimitedDashboard> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    _course!['category'] ?? 'Course',
-                    style: const TextStyle(
-                      color: Colors.white70,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                    ),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          _course!['category'] ?? 'Course',
+                          style: const TextStyle(
+                            color: Colors.white70,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                      if (locked)
+                        const Icon(Icons.lock, color: Colors.white70, size: 18),
+                    ],
                   ),
                   const SizedBox(height: 8),
                   Text(
@@ -335,90 +391,146 @@ class _LmsLimitedDashboardState extends State<LmsLimitedDashboard> {
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
+                  if ((_course!['description'] ?? '').toString().isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      _course!['description'].toString(),
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 13,
+                        height: 1.4,
+                      ),
+                      maxLines: 3,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
                 ],
               ),
             ),
-            
+
             // Content
             Padding(
               padding: const EdgeInsets.all(20),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Progress Bar
-                  Row(
-                    children: [
-                      Expanded(
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(10),
-                          child: LinearProgressIndicator(
-                            value: progressPercent / 100,
-                            minHeight: 8,
-                            backgroundColor: const Color(0xFFE2E8F0),
-                            valueColor: AlwaysStoppedAnimation<Color>(
-                              AppColors.primaryColor,
+                  if (locked) ...[
+                    // Locked notice + curriculum outline only (titles, no content access)
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF59E0B).withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Row(
+                        children: [
+                          Icon(Icons.lock_outline, color: Color(0xFFB45309), size: 18),
+                          SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Content locked until admin approves your verification',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFFB45309),
+                              ),
                             ),
                           ),
-                        ),
+                        ],
                       ),
-                      const SizedBox(width: 12),
-                      Text(
-                        '$progressPercent%',
-                        style: const TextStyle(
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        _StatChip(
+                          icon: Icons.library_books,
+                          label: '${modules.length} modules',
+                        ),
+                        const SizedBox(width: 12),
+                        _StatChip(
+                          icon: Icons.play_circle_outline,
+                          label: '$lessonCount lessons',
+                        ),
+                      ],
+                    ),
+                    if (modules.isNotEmpty) ...[
+                      const SizedBox(height: 16),
+                      const Text(
+                        'Curriculum',
+                        style: TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w700,
                           color: Color(0xFF0F172A),
                         ),
                       ),
+                      const SizedBox(height: 8),
+                      ...modules.map((m) => _LockedModuleOutline(module: m as Map)),
                     ],
-                  ),
-                  const SizedBox(height: 16),
-                  
-                  // Stats
-                  Row(
-                    children: [
-                      _StatChip(
-                        icon: Icons.library_books,
-                        label: '${modules.length} modules',
-                      ),
-                      const SizedBox(width: 12),
-                      _StatChip(
-                        icon: Icons.play_circle_outline,
-                        label: '$lessonCount lessons',
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  
-                  // Continue Button
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton.icon(
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => LmsCoursePage(
-                              course: _course!,
-                              enrollmentId: _enrollment?['_id'],
-                              isInstructor: false,
+                  ] else ...[
+                    // Progress Bar
+                    Row(
+                      children: [
+                        Expanded(
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(10),
+                            child: LinearProgressIndicator(
+                              value: progressPercent / 100,
+                              minHeight: 8,
+                              backgroundColor: const Color(0xFFE2E8F0),
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                AppColors.primaryColor,
+                              ),
                             ),
                           ),
-                        );
-                      },
-                      icon: const Icon(Icons.play_arrow, size: 20),
-                      label: const Text('Continue Learning'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primaryColor,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
                         ),
-                        elevation: 0,
+                        const SizedBox(width: 12),
+                        Text(
+                          '$progressPercent%',
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF0F172A),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Stats
+                    Row(
+                      children: [
+                        _StatChip(
+                          icon: Icons.library_books,
+                          label: '${modules.length} modules',
+                        ),
+                        const SizedBox(width: 12),
+                        _StatChip(
+                          icon: Icons.play_circle_outline,
+                          label: '$lessonCount lessons',
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Continue Button
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: openCourse,
+                        icon: const Icon(Icons.play_arrow, size: 20),
+                        label: const Text('Continue Learning'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primaryColor,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          elevation: 0,
+                        ),
                       ),
                     ),
-                  ),
+                  ],
                 ],
               ),
             ),
@@ -443,24 +555,34 @@ class _LmsLimitedDashboardState extends State<LmsLimitedDashboard> {
         const SizedBox(height: 12),
         Row(
           children: [
-            Expanded(
-              child: _ActionCard(
-                icon: Icons.upload_file,
-                label: 'Upload Documents',
-                color: const Color(0xFF6366F1),
-                onTap: () {
-                  // TODO: Navigate to document upload
-                },
+            if (_verificationStatus == 'not_submitted' || _verificationStatus == 'rejected') ...[
+              Expanded(
+                child: _ActionCard(
+                  icon: Icons.upload_file,
+                  label: 'Upload Documents',
+                  color: const Color(0xFF6366F1),
+                  onTap: () async {
+                    await Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => LmsDocumentUpload(courseId: widget.courseId),
+                      ),
+                    );
+                    _loadData();
+                  },
+                ),
               ),
-            ),
-            const SizedBox(width: 12),
+              const SizedBox(width: 12),
+            ],
             Expanded(
               child: _ActionCard(
                 icon: Icons.help_outline,
                 label: 'Get Help',
                 color: const Color(0xFF10B981),
                 onTap: () {
-                  // TODO: Navigate to help
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Contact support at support@icare.com.co')),
+                  );
                 },
               ),
             ),
@@ -498,8 +620,12 @@ class _LmsLimitedDashboardState extends State<LmsLimitedDashboard> {
           _NextStepItem(
             number: '2',
             title: 'Get verified',
-            description: 'Upload documents for full LMS access',
-            isDone: false,
+            description: _verificationStatus == 'approved'
+                ? 'Your documents were approved'
+                : _verificationStatus == 'pending'
+                    ? 'Documents submitted — awaiting admin review'
+                    : 'Upload documents for full LMS access',
+            isDone: _verificationStatus == 'approved',
           ),
           _NextStepItem(
             number: '3',
@@ -507,6 +633,62 @@ class _LmsLimitedDashboardState extends State<LmsLimitedDashboard> {
             description: 'Complete the course to get certified',
             isDone: false,
           ),
+        ],
+      ),
+    );
+  }
+}
+
+class _LockedModuleOutline extends StatelessWidget {
+  final Map module;
+
+  const _LockedModuleOutline({required this.module});
+
+  @override
+  Widget build(BuildContext context) {
+    final lessons = (module['lessons'] as List?) ?? [];
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            module['title']?.toString() ?? 'Module',
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF0F172A),
+            ),
+          ),
+          if (lessons.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            ...lessons.map((l) => Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 3),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.lock, size: 13, color: Color(0xFF94A3B8)),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          (l as Map)['title']?.toString() ?? 'Lesson',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Color(0xFF64748B),
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                )),
+          ],
         ],
       ),
     );

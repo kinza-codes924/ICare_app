@@ -178,13 +178,13 @@ class _InstructorCreateAssignmentScreenState extends State<InstructorCreateAssig
         if (_attachmentName != null) 'attachmentName': _attachmentName,
       };
 
-      await _lmsService.createAssignment(assignmentData);
+      final created = await _lmsService.createAssignment(assignmentData);
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Assignment created successfully!')),
         );
-        Navigator.pop(context);
+        Navigator.pop(context, created['assignment'] ?? created);
       }
     } catch (e) {
       if (mounted) {

@@ -5,31 +5,43 @@ import 'package:dio/dio.dart';
 import 'package:icare/screens/certificate_templates_screen.dart';
 import 'package:icare/services/lms_service.dart';
 import 'package:icare/services/api_service.dart';
+import 'package:icare/utils/api_constants.dart';
+import 'package:icare/utils/shared_pref.dart';
 import 'package:icare/utils/theme.dart';
 import 'package:icare/screens/lms_live_session_screen.dart';
+import 'package:icare/screens/instructor_create_assignment_screen.dart';
+import 'package:icare/screens/instructor_create_quiz_screen.dart';
+import 'package:icare/screens/instructor_quiz_attempts_screen.dart';
+import 'package:icare/widgets/video_player_widget.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 /// Course Content Management - Moodle/Udemy style
 class InstructorCourseContentScreen extends StatefulWidget {
   final String courseId;
+  final bool embedded; // when true, hides AppBar (rendered inside a tab)
 
   const InstructorCourseContentScreen({
     super.key,
     required this.courseId,
+    this.embedded = false,
   });
 
   @override
-  State<InstructorCourseContentScreen> createState() => _InstructorCourseContentScreenState();
+  State<InstructorCourseContentScreen> createState() => InstructorCourseContentScreenState();
 }
 
-class _InstructorCourseContentScreenState extends State<InstructorCourseContentScreen> {
+class InstructorCourseContentScreenState extends State<InstructorCourseContentScreen> {
   final LmsService _lmsService = LmsService();
 
   Map<String, dynamic>? _course;
   bool _isLoading = true;
   CertificateTemplate _certificateTemplate = CertificateTemplate.classic;
-  // 'self-paced' or 'pragmatic'
   String _courseType = 'self-paced';
+
+  // Standalone assignments, quizzes, sessions (created outside modules)
+  List<dynamic> _assignments = [];
+  List<dynamic> _quizzes = [];
+  List<dynamic> _liveSessions = [];
 
   @override
   void initState() {
@@ -40,11 +52,19 @@ class _InstructorCourseContentScreenState extends State<InstructorCourseContentS
   Future<void> _loadCourse() async {
     setState(() => _isLoading = true);
     try {
-      final response = await _lmsService.getCourseDetails(widget.courseId);
+      final results = await Future.wait([
+        _lmsService.getCourseDetails(widget.courseId),
+        _lmsService.getCourseAssignments(widget.courseId).catchError((_) => <dynamic>[]),
+        _lmsService.getCourseQuizzes(widget.courseId).catchError((_) => <dynamic>[]),
+        _lmsService.getCourseSessions(widget.courseId).catchError((_) => <dynamic>[]),
+      ]);
       if (mounted) {
         setState(() {
-          _course = response['course'];
+          _course = (results[0] as Map)['course'];
           _courseType = _course?['courseType']?.toString() ?? 'self-paced';
+          _assignments = results[1] as List;
+          _quizzes = results[2] as List;
+          _liveSessions = results[3] as List;
           _isLoading = false;
         });
       }
@@ -75,10 +95,12 @@ class _InstructorCourseContentScreenState extends State<InstructorCourseContentS
     );
   }
 
+  void addModule() => _addModule();
+
   Future<void> _addModule() async {
     final result = await showDialog<Map<String, dynamic>>(
       context: context,
-      builder: (context) => _ModuleDialog(),
+      builder: (context) => _ModuleDialog(courseId: widget.courseId),
     );
 
     if (result != null) {
@@ -108,7 +130,7 @@ class _InstructorCourseContentScreenState extends State<InstructorCourseContentS
     final modules = List<Map<String, dynamic>>.from(_course?['modules'] ?? []);
     final result = await showDialog<Map<String, dynamic>>(
       context: context,
-      builder: (context) => _ModuleDialog(module: modules[index]),
+      builder: (context) => _ModuleDialog(module: modules[index], courseId: widget.courseId),
     );
 
     if (result != null) {
@@ -447,59 +469,6 @@ class _InstructorCourseContentScreenState extends State<InstructorCourseContentS
     );
   }
 
-  void _copyMeetingLink(Map<String, dynamic> lesson) {
-    final link = lesson['meetingLink']?.toString() ?? '';
-    if (link.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No meeting link available'), backgroundColor: Colors.red),
-      );
-      return;
-    }
-    Clipboard.setData(ClipboardData(text: link));
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Meeting link copied to clipboard!'), backgroundColor: Colors.green),
-    );
-  }
-
-  void _postAnnouncement(String moduleTitle, String lessonTitle) {
-    final ctrl = TextEditingController(text: 'The live session for "$lessonTitle" in "$moduleTitle" has been rescheduled. We will announce the new date shortly.');
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Row(children: [
-          Icon(Icons.campaign_rounded, color: Color(0xFFF59E0B), size: 22),
-          SizedBox(width: 10),
-          Text('Post Announcement', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
-        ]),
-        content: SizedBox(
-          width: 420,
-          child: Column(mainAxisSize: MainAxisSize.min, children: [
-            const Text('This announcement will be visible to all enrolled students.', style: TextStyle(fontSize: 13, color: Color(0xFF64748B))),
-            const SizedBox(height: 14),
-            TextField(controller: ctrl, maxLines: 4, decoration: const InputDecoration(border: OutlineInputBorder(), labelText: 'Announcement message')),
-          ]),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-          ElevatedButton.icon(
-            onPressed: () async {
-              Navigator.pop(ctx);
-              try {
-                await ApiService().post('/courses/${widget.courseId}/announcements', {'message': ctrl.text.trim(), 'type': 'live_reschedule'});
-                if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✅ Announcement posted to all students'), backgroundColor: Colors.green));
-              } catch (_) {
-                if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Announcement posted (offline mode)'), backgroundColor: Colors.orange));
-              }
-            },
-            icon: const Icon(Icons.send_rounded, size: 16),
-            label: const Text('Post'),
-            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFF59E0B), foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
-          ),
-        ],
-      ),
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -510,6 +479,10 @@ class _InstructorCourseContentScreenState extends State<InstructorCourseContentS
     }
 
     final modules = List<Map<String, dynamic>>.from(_course?['modules'] ?? []);
+
+    if (widget.embedded) {
+      return _buildEmbeddedBody(modules);
+    }
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
@@ -619,6 +592,308 @@ class _InstructorCourseContentScreenState extends State<InstructorCourseContentS
                 },
               ),
             ),
+    );
+  }
+
+  Widget _buildEmbeddedBody(List<Map<String, dynamic>> modules) {
+    final hasContent = modules.isNotEmpty || _assignments.isNotEmpty ||
+        _quizzes.isNotEmpty || _liveSessions.isNotEmpty;
+    if (!hasContent) return _buildEmptyState();
+
+    final items = <Widget>[];
+
+    // Modules
+    for (int i = 0; i < modules.length; i++) {
+      items.add(_buildModuleCard(modules[i], i));
+    }
+
+    // Live Sessions section
+    if (_liveSessions.isNotEmpty) {
+      items.add(_buildSectionHeader(Icons.live_tv_rounded, 'Live Sessions', Colors.red));
+      for (final s in _liveSessions) {
+        items.add(_buildStandaloneSessionTile(s));
+      }
+    }
+
+    // Assignments section
+    if (_assignments.isNotEmpty) {
+      items.add(_buildSectionHeader(Icons.assignment_rounded, 'Assignments', const Color(0xFF6366F1)));
+      for (final a in _assignments) {
+        items.add(_buildStandaloneAssignmentTile(a));
+      }
+    }
+
+    // Quizzes section
+    if (_quizzes.isNotEmpty) {
+      items.add(_buildSectionHeader(Icons.quiz_rounded, 'Quizzes', const Color(0xFFF59E0B)));
+      for (final q in _quizzes) {
+        items.add(_buildStandaloneQuizTile(q));
+      }
+    }
+
+    return RefreshIndicator(
+      onRefresh: _loadCourse,
+      child: ListView(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
+        children: items,
+      ),
+    );
+  }
+
+  Widget _buildSectionHeader(IconData icon, String title, Color color) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(0, 8, 0, 8),
+      child: Row(children: [
+        Icon(icon, size: 18, color: color),
+        const SizedBox(width: 8),
+        Text(title, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: color)),
+        const SizedBox(width: 8),
+        Expanded(child: Divider(color: color.withValues(alpha: 0.3))),
+      ]),
+    );
+  }
+
+  String _fmtDate(String raw) {
+    try {
+      // Parse as UTC if it ends with Z, otherwise treat as local
+      DateTime dt;
+      if (raw.endsWith('Z') || raw.contains('+')) {
+        dt = DateTime.parse(raw).toLocal();
+      } else {
+        dt = DateTime.parse(raw);
+      }
+      final months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+      final h = dt.hour % 12 == 0 ? 12 : dt.hour % 12;
+      final m = dt.minute.toString().padLeft(2, '0');
+      final ampm = dt.hour < 12 ? 'AM' : 'PM';
+      return '${dt.day} ${months[dt.month - 1]} ${dt.year}  $h:$m $ampm';
+    } catch (_) { return raw; }
+  }
+
+  Widget _buildStandaloneSessionTile(dynamic session) {
+    final title = session['title']?.toString() ?? 'Live Session';
+    final status = session['status']?.toString() ?? 'scheduled';
+    final scheduledAt = session['scheduledAt']?.toString() ?? session['liveSessionDateTime']?.toString() ?? '';
+    final recordingUrl = session['recordingUrl']?.toString() ?? '';
+    final hasRecording = recordingUrl.isNotEmpty;
+    final isLive = status == 'live';
+    final isEnded = status == 'ended' || status == 'completed';
+    final id = session['_id']?.toString() ?? '';
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: hasRecording ? const Color(0xFFECFDF5) : const Color(0xFFFFF7ED),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: hasRecording ? const Color(0xFF10B981).withValues(alpha: 0.4) : const Color(0xFFFB923C).withValues(alpha: 0.4)),
+      ),
+      child: Row(children: [
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: (hasRecording ? const Color(0xFF10B981) : Colors.red).withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: Icon(
+            hasRecording ? Icons.play_circle_rounded : Icons.live_tv_rounded,
+            size: 20, color: hasRecording ? const Color(0xFF10B981) : Colors.red,
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF0F172A))),
+          if (scheduledAt.isNotEmpty)
+            Text(_fmtDate(scheduledAt), style: TextStyle(fontSize: 12, color: hasRecording ? const Color(0xFF10B981) : const Color(0xFFF59E0B))),
+        ])),
+        if (hasRecording)
+          GestureDetector(
+            onTap: () => _openRecording(session),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(color: const Color(0xFF10B981), borderRadius: BorderRadius.circular(8)),
+              child: const Row(mainAxisSize: MainAxisSize.min, children: [
+                Icon(Icons.play_arrow_rounded, color: Colors.white, size: 16),
+                SizedBox(width: 4),
+                Text('Play', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700)),
+              ]),
+            ),
+          )
+        else if (isEnded)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(color: Colors.grey[200], borderRadius: BorderRadius.circular(8)),
+            child: const Text('Ended', style: TextStyle(color: Colors.black45, fontSize: 12, fontWeight: FontWeight.w600)),
+          )
+        else
+          GestureDetector(
+            onTap: () => _startLiveSession(session),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(color: isLive ? Colors.red : AppColors.primaryColor, borderRadius: BorderRadius.circular(8)),
+              child: Text(isLive ? 'Join Live' : 'Start', style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700)),
+            ),
+          ),
+        const SizedBox(width: 8),
+        GestureDetector(
+          onTap: () async {
+            final confirm = await showDialog<bool>(context: context, builder: (ctx) => AlertDialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              title: const Text('Delete Session'),
+              content: Text('Delete "$title"? This cannot be undone.'),
+              actions: [
+                TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+                ElevatedButton(onPressed: () => Navigator.pop(ctx, true),
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                  child: const Text('Delete', style: TextStyle(color: Colors.white))),
+              ],
+            ));
+            if (confirm == true && id.isNotEmpty) {
+              try {
+                await _lmsService.deleteSession(id);
+                _loadCourse();
+              } catch (_) {}
+            }
+          },
+          child: const Icon(Icons.delete_outline_rounded, color: Colors.red, size: 20),
+        ),
+      ]),
+    );
+  }
+
+  Widget _buildStandaloneAssignmentTile(dynamic assignment) {
+    final title = assignment['title']?.toString() ?? 'Assignment';
+    final dueDate = assignment['dueDate']?.toString() ?? '';
+    final marks = assignment['totalMarks']?.toString() ?? '100';
+    final isPublished = assignment['isPublished'] == true;
+    final id = assignment['_id']?.toString() ?? '';
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF5F3FF),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: const Color(0xFF6366F1).withValues(alpha: 0.3)),
+      ),
+      child: Row(children: [
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(color: const Color(0xFF6366F1).withValues(alpha: 0.1), borderRadius: BorderRadius.circular(6)),
+          child: const Icon(Icons.assignment_rounded, size: 20, color: Color(0xFF6366F1)),
+        ),
+        const SizedBox(width: 12),
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF0F172A))),
+          Text('$marks marks${dueDate.isNotEmpty ? ' · Due: ${_fmtDate(dueDate)}' : ''}',
+            style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+        ])),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+          margin: const EdgeInsets.only(right: 8),
+          decoration: BoxDecoration(
+            color: isPublished ? const Color(0xFF10B981).withValues(alpha: 0.1) : Colors.grey.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(4),
+          ),
+          child: Text(isPublished ? 'Published' : 'Draft',
+            style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: isPublished ? const Color(0xFF10B981) : Colors.grey)),
+        ),
+        GestureDetector(
+          onTap: () async {
+            final confirm = await showDialog<bool>(context: context, builder: (ctx) => AlertDialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              title: const Text('Delete Assignment'),
+              content: Text('Delete "$title"?'),
+              actions: [
+                TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+                ElevatedButton(onPressed: () => Navigator.pop(ctx, true),
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                  child: const Text('Delete', style: TextStyle(color: Colors.white))),
+              ],
+            ));
+            if (confirm == true && id.isNotEmpty) {
+              try {
+                await _lmsService.deleteAssignment(id);
+                _loadCourse();
+              } catch (_) {}
+            }
+          },
+          child: const Icon(Icons.delete_outline_rounded, color: Colors.red, size: 20),
+        ),
+      ]),
+    );
+  }
+
+  Widget _buildStandaloneQuizTile(dynamic quiz) {
+    final title = quiz['title']?.toString() ?? 'Quiz';
+    final timeLimit = quiz['timeLimit']?.toString() ?? '';
+    final passingScore = quiz['passingScore']?.toString() ?? '';
+    final isPublished = quiz['isPublished'] == true;
+    final id = quiz['_id']?.toString() ?? '';
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFFBEB),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: const Color(0xFFF59E0B).withValues(alpha: 0.3)),
+      ),
+      child: Row(children: [
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(color: const Color(0xFFF59E0B).withValues(alpha: 0.1), borderRadius: BorderRadius.circular(6)),
+          child: const Icon(Icons.quiz_rounded, size: 20, color: Color(0xFFF59E0B)),
+        ),
+        const SizedBox(width: 12),
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF0F172A))),
+          Text('${timeLimit.isNotEmpty ? '$timeLimit min' : ''}${passingScore.isNotEmpty ? ' · Pass: $passingScore%' : ''}',
+            style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+        ])),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+          margin: const EdgeInsets.only(right: 8),
+          decoration: BoxDecoration(
+            color: isPublished ? const Color(0xFF10B981).withValues(alpha: 0.1) : Colors.grey.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(4),
+          ),
+          child: Text(isPublished ? 'Published' : 'Draft',
+            style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: isPublished ? const Color(0xFF10B981) : Colors.grey)),
+        ),
+        if (id.isNotEmpty)
+          IconButton(
+            tooltip: 'View Attempts / Review',
+            icon: const Icon(Icons.fact_check_outlined, color: Color(0xFF6366F1), size: 20),
+            onPressed: () {
+              Navigator.push(context, MaterialPageRoute(
+                builder: (_) => InstructorQuizAttemptsScreen(quizId: id, quizTitle: title),
+              ));
+            },
+          ),
+        GestureDetector(
+          onTap: () async {
+            final confirm = await showDialog<bool>(context: context, builder: (ctx) => AlertDialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              title: const Text('Delete Quiz'),
+              content: Text('Delete "$title"?'),
+              actions: [
+                TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+                ElevatedButton(onPressed: () => Navigator.pop(ctx, true),
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                  child: const Text('Delete', style: TextStyle(color: Colors.white))),
+              ],
+            ));
+            if (confirm == true && id.isNotEmpty) {
+              try {
+                await _lmsService.deleteQuiz(id);
+                _loadCourse();
+              } catch (_) {}
+            }
+          },
+          child: const Icon(Icons.delete_outline_rounded, color: Colors.red, size: 20),
+        ),
+      ]),
     );
   }
 
@@ -762,9 +1037,9 @@ class _InstructorCourseContentScreenState extends State<InstructorCourseContentS
           children: [
             if (lessons.isEmpty)
               const Padding(
-                padding: EdgeInsets.all(16),
+                padding: EdgeInsets.fromLTRB(16, 0, 16, 8),
                 child: Text(
-                  'No lessons yet. Edit module to add lessons.',
+                  'No lessons yet.',
                   style: TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
                 ),
               )
@@ -774,6 +1049,20 @@ class _InstructorCourseContentScreenState extends State<InstructorCourseContentS
                 final lesson = entry.value;
                 return _buildLessonItem(lesson, lessonIndex);
               }),
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: OutlinedButton.icon(
+                onPressed: () => _editModule(index),
+                icon: const Icon(Icons.add, size: 18),
+                label: Text('Add Lesson ${lessons.length + 1}'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.primaryColor,
+                  side: BorderSide(color: AppColors.primaryColor.withValues(alpha: 0.4)),
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  minimumSize: const Size(double.infinity, 0),
+                ),
+              ),
+            ),
           ],
         ),
       ),
@@ -784,35 +1073,59 @@ class _InstructorCourseContentScreenState extends State<InstructorCourseContentS
     final title = lesson['title'] ?? 'Lesson ${index + 1}';
     final duration = lesson['duration'] ?? 0;
     final hasVideo = lesson['videoUrl'] != null && lesson['videoUrl'].toString().isNotEmpty;
-    final isLiveSession = lesson['type']?.toString() == 'live';
+    final lessonType = lesson['type']?.toString() ?? 'content';
+    final isLiveSession = lessonType == 'live';
+    final isAssignment = lessonType == 'assignment';
+    final isQuiz = lessonType == 'quiz';
     final hasRecording = lesson['recordingUrl'] != null && lesson['recordingUrl'].toString().isNotEmpty;
-    final moduleTitle = ''; // passed via closure if needed
+    final sessionStatus = lesson['status']?.toString() ?? 'scheduled';
 
-    return Container(
+    // Determine icon/color by type
+    IconData typeIcon;
+    Color typeColor;
+    Color tileBg;
+    Color tileBorder;
+    if (isLiveSession) {
+      typeIcon = hasRecording ? Icons.play_circle_rounded : Icons.live_tv_rounded;
+      typeColor = hasRecording ? const Color(0xFF10B981) : Colors.red;
+      tileBg = const Color(0xFFFFF7ED);
+      tileBorder = const Color(0xFFFB923C).withValues(alpha: 0.4);
+    } else if (isAssignment) {
+      typeIcon = Icons.assignment_rounded;
+      typeColor = const Color(0xFF6366F1);
+      tileBg = const Color(0xFFF5F3FF);
+      tileBorder = const Color(0xFF6366F1).withValues(alpha: 0.3);
+    } else if (isQuiz) {
+      typeIcon = Icons.quiz_rounded;
+      typeColor = const Color(0xFFF59E0B);
+      tileBg = const Color(0xFFFFFBEB);
+      tileBorder = const Color(0xFFF59E0B).withValues(alpha: 0.3);
+    } else {
+      typeIcon = hasVideo ? Icons.play_circle_outline : Icons.article_outlined;
+      typeColor = hasVideo ? const Color(0xFF10B981) : const Color(0xFF94A3B8);
+      tileBg = const Color(0xFFF8FAFC);
+      tileBorder = const Color(0xFFE2E8F0);
+    }
+
+    return GestureDetector(
+      onTap: isLiveSession ? null : () => _showLessonDetail(lesson),
+      child: Container(
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: isLiveSession ? const Color(0xFFFFF7ED) : const Color(0xFFF8FAFC),
+        color: tileBg,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: isLiveSession ? const Color(0xFFFB923C).withValues(alpha: 0.4) : const Color(0xFFE2E8F0)),
+        border: Border.all(color: tileBorder),
       ),
       child: Row(
         children: [
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: isLiveSession
-                  ? Colors.red.withValues(alpha: 0.1)
-                  : hasVideo
-                      ? const Color(0xFF10B981).withValues(alpha: 0.1)
-                      : const Color(0xFF94A3B8).withValues(alpha: 0.1),
+              color: typeColor.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(6),
             ),
-            child: Icon(
-              isLiveSession ? Icons.live_tv_rounded : (hasVideo ? Icons.play_circle_outline : Icons.article_outlined),
-              size: 20,
-              color: isLiveSession ? Colors.red : (hasVideo ? const Color(0xFF10B981) : const Color(0xFF94A3B8)),
-            ),
+            child: Icon(typeIcon, size: 20, color: typeColor),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -821,10 +1134,20 @@ class _InstructorCourseContentScreenState extends State<InstructorCourseContentS
               children: [
                 Row(children: [
                   Expanded(child: Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF0F172A)))),
-                  if (isLiveSession) Container(
+                  if (isLiveSession && !hasRecording) Container(
                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                     decoration: BoxDecoration(color: Colors.red.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(4)),
                     child: const Text('LIVE', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: Colors.red)),
+                  ),
+                  if (isAssignment) Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(color: const Color(0xFF6366F1).withValues(alpha: 0.1), borderRadius: BorderRadius.circular(4)),
+                    child: const Text('ASSIGNMENT', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: Color(0xFF6366F1))),
+                  ),
+                  if (isQuiz) Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(color: const Color(0xFFF59E0B).withValues(alpha: 0.1), borderRadius: BorderRadius.circular(4)),
+                    child: const Text('QUIZ', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: Color(0xFFF59E0B))),
                   ),
                   if (hasRecording) Container(
                     margin: const EdgeInsets.only(left: 4),
@@ -837,7 +1160,7 @@ class _InstructorCourseContentScreenState extends State<InstructorCourseContentS
                   if (duration > 0) Text('$duration min', style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
                   if (isLiveSession && lesson['scheduledAt'] != null) ...[
                     if (duration > 0) const Text(' · ', style: TextStyle(color: Color(0xFF94A3B8))),
-                    Text(lesson['scheduledAt'].toString(), style: const TextStyle(fontSize: 12, color: Color(0xFFF59E0B))),
+                    Text(_fmtDate(lesson['scheduledAt'].toString()), style: const TextStyle(fontSize: 12, color: Color(0xFFF59E0B))),
                   ],
                 ]),
               ],
@@ -845,44 +1168,216 @@ class _InstructorCourseContentScreenState extends State<InstructorCourseContentS
           ),
           // Live session actions
           if (isLiveSession) Row(mainAxisSize: MainAxisSize.min, children: [
-            // Start / Open session button
-            GestureDetector(
-              onTap: () => _startLiveSession(lesson),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                decoration: BoxDecoration(
-                  color: Colors.red,
-                  borderRadius: BorderRadius.circular(8),
+            if (hasRecording)
+              // Recording available — play it
+              GestureDetector(
+                onTap: () => _openRecording(lesson),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(color: const Color(0xFF10B981), borderRadius: BorderRadius.circular(8)),
+                  child: const Row(mainAxisSize: MainAxisSize.min, children: [
+                    Icon(Icons.play_arrow_rounded, color: Colors.white, size: 16),
+                    SizedBox(width: 4),
+                    Text('Recording', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700)),
+                  ]),
                 ),
-                child: const Row(mainAxisSize: MainAxisSize.min, children: [
-                  Icon(Icons.play_arrow_rounded, color: Colors.white, size: 16),
-                  SizedBox(width: 4),
-                  Text('Start', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700)),
-                ]),
+              )
+            else if (sessionStatus == 'ended' || sessionStatus == 'completed')
+              // Ended but no recording
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(8)),
+                child: const Text('No Recording', style: TextStyle(color: Colors.black54, fontSize: 12, fontWeight: FontWeight.w600)),
+              )
+            else
+              // Scheduled / upcoming — Start button
+              GestureDetector(
+                onTap: () => _startLiveSession(lesson),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(color: Colors.red, borderRadius: BorderRadius.circular(8)),
+                  child: const Row(mainAxisSize: MainAxisSize.min, children: [
+                    Icon(Icons.play_arrow_rounded, color: Colors.white, size: 16),
+                    SizedBox(width: 4),
+                    Text('Start', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700)),
+                  ]),
+                ),
               ),
-            ),
             const SizedBox(width: 6),
             PopupMenuButton<String>(
               icon: const Icon(Icons.more_vert, size: 18, color: Color(0xFF94A3B8)),
-              onSelected: (val) {
-                if (val == 'announce') _postAnnouncement(moduleTitle, title);
-                if (val == 'copy') _copyMeetingLink(lesson);
+              onSelected: (val) async {
+                if (val == 'cancel') {
+                  final sessionId = lesson['sessionId']?.toString() ?? lesson['_id']?.toString() ?? '';
+                  if (sessionId.isEmpty) return;
+                  final confirm = await showDialog<bool>(context: context, builder: (ctx) => AlertDialog(
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    title: const Text('Cancel Session'),
+                    content: Text('Cancel "$title"?'),
+                    actions: [
+                      TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('No')),
+                      ElevatedButton(onPressed: () => Navigator.pop(ctx, true),
+                        style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                        child: const Text('Cancel Session', style: TextStyle(color: Colors.white))),
+                    ],
+                  ));
+                  if (!mounted) return;
+                  if (confirm == true) {
+                    try { await _lmsService.deleteSession(sessionId); _loadCourse(); } catch (_) {}
+                  }
+                }
+                if (val == 'delete_rec') {
+                  final sessionId = lesson['sessionId']?.toString() ?? '';
+                  if (sessionId.isEmpty) return;
+                  final confirm = await showDialog<bool>(context: context, builder: (ctx) => AlertDialog(
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    title: const Text('Delete Recording'),
+                    content: const Text('Remove this recording? This cannot be undone.'),
+                    actions: [
+                      TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+                      ElevatedButton(onPressed: () => Navigator.pop(ctx, true),
+                        style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                        child: const Text('Delete', style: TextStyle(color: Colors.white))),
+                    ],
+                  ));
+                  if (!mounted) return;
+                  if (confirm == true) {
+                    try {
+                      await _lmsService.updateSession(sessionId, {'recordingUrl': ''});
+                      _loadCourse();
+                    } catch (_) {}
+                  }
+                }
               },
               itemBuilder: (_) => [
-                const PopupMenuItem(value: 'copy', child: Row(children: [
-                  Icon(Icons.copy_rounded, size: 18, color: AppColors.primaryColor),
+                if (hasRecording) const PopupMenuItem(value: 'delete_rec', child: Row(children: [
+                  Icon(Icons.delete_outline_rounded, size: 18, color: Colors.red),
                   SizedBox(width: 10),
-                  Text('Copy Meeting Link'),
+                  Text('Delete Recording', style: TextStyle(color: Colors.red)),
                 ])),
-                const PopupMenuItem(value: 'announce', child: Row(children: [
-                  Icon(Icons.campaign_rounded, size: 18, color: Color(0xFFF59E0B)),
+                const PopupMenuItem(value: 'cancel', child: Row(children: [
+                  Icon(Icons.cancel_outlined, size: 18, color: Color(0xFFF59E0B)),
                   SizedBox(width: 10),
-                  Text('Cancel & Announce'),
+                  Text('Cancel Session'),
                 ])),
               ],
             ),
           ]),
         ],
+      ),
+    ));
+  }
+
+  void _showLessonDetail(Map<String, dynamic> lesson) {
+    final title = lesson['title']?.toString() ?? 'Lesson';
+    final lessonType = lesson['type']?.toString() ?? 'content';
+    final content = lesson['content']?.toString() ?? '';
+    final videoUrl = lesson['videoUrl']?.toString() ?? '';
+    final duration = lesson['duration']?.toString() ?? '';
+    final isAssignment = lessonType == 'assignment';
+    final isQuiz = lessonType == 'quiz';
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (ctx) => DraggableScrollableSheet(
+        expand: false,
+        initialChildSize: 0.55,
+        maxChildSize: 0.9,
+        minChildSize: 0.3,
+        builder: (_, ctrl) => SingleChildScrollView(
+          controller: ctrl,
+          padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Center(child: Container(width: 40, height: 4, margin: const EdgeInsets.only(bottom: 16),
+              decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2)))),
+            Row(children: [
+              Icon(isAssignment ? Icons.assignment_rounded : isQuiz ? Icons.quiz_rounded : Icons.article_outlined,
+                color: isAssignment ? const Color(0xFF6366F1) : isQuiz ? const Color(0xFFF59E0B) : const Color(0xFF10B981), size: 22),
+              const SizedBox(width: 10),
+              Expanded(child: Text(title, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)))),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: (isAssignment ? const Color(0xFF6366F1) : isQuiz ? const Color(0xFFF59E0B) : const Color(0xFF10B981)).withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(isAssignment ? 'Assignment' : isQuiz ? 'Quiz' : 'Content',
+                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700,
+                    color: isAssignment ? const Color(0xFF6366F1) : isQuiz ? const Color(0xFFF59E0B) : const Color(0xFF10B981))),
+              ),
+            ]),
+            const SizedBox(height: 16),
+            const Divider(),
+            const SizedBox(height: 12),
+            if (duration.isNotEmpty && duration != '0') ...[
+              _detailRow(Icons.timer_outlined, 'Duration', '$duration min'),
+              const SizedBox(height: 10),
+            ],
+            if (videoUrl.isNotEmpty) ...[
+              _detailRow(Icons.play_circle_outline, 'Video', videoUrl),
+              const SizedBox(height: 10),
+            ],
+            if (content.isNotEmpty) ...[
+              const Text('Content', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF64748B))),
+              const SizedBox(height: 6),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(color: const Color(0xFFF8FAFC), borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: const Color(0xFFE2E8F0))),
+                child: Text(content, style: const TextStyle(fontSize: 14, color: Color(0xFF0F172A), height: 1.5)),
+              ),
+              const SizedBox(height: 10),
+            ],
+            if (content.isEmpty && videoUrl.isEmpty)
+              Center(child: Padding(
+                padding: const EdgeInsets.only(top: 20),
+                child: Text('No content added yet.', style: TextStyle(color: Colors.grey[500], fontSize: 14)),
+              )),
+          ]),
+        ),
+      ),
+    );
+  }
+
+  Widget _detailRow(IconData icon, String label, String value) => Row(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Icon(icon, size: 16, color: const Color(0xFF64748B)),
+      const SizedBox(width: 8),
+      Text('$label: ', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF64748B))),
+      Expanded(child: Text(value, style: const TextStyle(fontSize: 13, color: Color(0xFF0F172A)))),
+    ],
+  );
+
+  void _openRecording(dynamic lesson) {
+    final url = lesson['recordingUrl']?.toString() ?? '';
+    if (url.isEmpty) return;
+    final title = lesson['title']?.toString() ?? 'Recording';
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (ctx) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        insetPadding: const EdgeInsets.all(16),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 8, 8),
+            child: Row(children: [
+              const Icon(Icons.play_circle_rounded, color: Color(0xFF10B981), size: 22),
+              const SizedBox(width: 10),
+              Expanded(child: Text(title, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16))),
+              IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(ctx)),
+            ]),
+          ),
+          Container(
+            constraints: const BoxConstraints(maxHeight: 400),
+            child: VideoPlayerWidget(videoUrl: url),
+          ),
+          const SizedBox(height: 12),
+        ]),
       ),
     );
   }
@@ -930,8 +1425,9 @@ class _InstructorCourseContentScreenState extends State<InstructorCourseContentS
 // Module Dialog
 class _ModuleDialog extends StatefulWidget {
   final Map<String, dynamic>? module;
+  final String courseId;
 
-  const _ModuleDialog({this.module});
+  const _ModuleDialog({this.module, required this.courseId});
 
   @override
   State<_ModuleDialog> createState() => _ModuleDialogState();
@@ -965,10 +1461,31 @@ class _ModuleDialogState extends State<_ModuleDialog> {
     super.dispose();
   }
 
-  void _addLesson() {
+  void _addLesson({String defaultType = 'content'}) {
+    if (defaultType == 'assignment') {
+      Navigator.push(context, MaterialPageRoute(
+        builder: (_) => InstructorCreateAssignmentScreen(courseId: widget.courseId),
+      )).then((result) {
+        if (result is Map<String, dynamic>) {
+          setState(() => _lessons.add({...result, 'type': 'assignment'}));
+        }
+      });
+      return;
+    }
+    if (defaultType == 'quiz') {
+      Navigator.push(context, MaterialPageRoute(
+        builder: (_) => InstructorCreateQuizScreen(courseId: widget.courseId),
+      )).then((result) {
+        if (result is Map<String, dynamic>) {
+          setState(() => _lessons.add({...result, 'type': 'quiz'}));
+        }
+      });
+      return;
+    }
     showDialog(
       context: context,
       builder: (context) => _LessonDialog(
+        defaultType: defaultType,
         onSave: (lesson) {
           setState(() => _lessons.add(lesson));
         },
@@ -977,10 +1494,26 @@ class _ModuleDialogState extends State<_ModuleDialog> {
   }
 
   void _editLesson(int index) {
+    final lesson = _lessons[index];
+    final ltype = lesson['type']?.toString() ?? 'content';
+    if (ltype == 'assignment') {
+      final assignmentId = lesson['_id']?.toString();
+      Navigator.push(context, MaterialPageRoute(
+        builder: (_) => InstructorCreateAssignmentScreen(courseId: '', assignmentId: assignmentId),
+      ));
+      return;
+    }
+    if (ltype == 'quiz') {
+      final quizId = lesson['_id']?.toString();
+      Navigator.push(context, MaterialPageRoute(
+        builder: (_) => InstructorCreateQuizScreen(courseId: '', quizId: quizId),
+      ));
+      return;
+    }
     showDialog(
       context: context,
       builder: (context) => _LessonDialog(
-        lesson: _lessons[index],
+        lesson: lesson,
         onSave: (lesson) {
           setState(() => _lessons[index] = lesson);
         },
@@ -1032,14 +1565,35 @@ class _ModuleDialogState extends State<_ModuleDialog> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    'Lessons (${_lessons.length})',
+                    'Content (${_lessons.length})',
                     style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                   ),
-                  TextButton.icon(
-                    onPressed: _addLesson,
-                    icon: const Icon(Icons.add, size: 18),
-                    label: const Text('Add Lesson'),
-                  ),
+                  Wrap(spacing: 6, children: [
+                    TextButton.icon(
+                      onPressed: () => _addLesson(defaultType: 'content'),
+                      icon: const Icon(Icons.article_outlined, size: 16),
+                      label: const Text('Lesson', style: TextStyle(fontSize: 12)),
+                      style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
+                    ),
+                    TextButton.icon(
+                      onPressed: () => _addLesson(defaultType: 'live'),
+                      icon: const Icon(Icons.live_tv_rounded, size: 16, color: Colors.red),
+                      label: const Text('Live', style: TextStyle(fontSize: 12, color: Colors.red)),
+                      style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
+                    ),
+                    TextButton.icon(
+                      onPressed: () => _addLesson(defaultType: 'assignment'),
+                      icon: const Icon(Icons.assignment_rounded, size: 16, color: Color(0xFF6366F1)),
+                      label: const Text('Assignment', style: TextStyle(fontSize: 12, color: Color(0xFF6366F1))),
+                      style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
+                    ),
+                    TextButton.icon(
+                      onPressed: () => _addLesson(defaultType: 'quiz'),
+                      icon: const Icon(Icons.quiz_rounded, size: 16, color: Color(0xFFF59E0B)),
+                      label: const Text('Quiz', style: TextStyle(fontSize: 12, color: Color(0xFFF59E0B))),
+                      style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
+                    ),
+                  ]),
                 ],
               ),
               const SizedBox(height: 8),
@@ -1047,7 +1601,7 @@ class _ModuleDialogState extends State<_ModuleDialog> {
                 const Center(
                   child: Padding(
                     padding: EdgeInsets.all(16),
-                    child: Text('No lessons yet', style: TextStyle(color: Color(0xFF94A3B8))),
+                    child: Text('No content yet', style: TextStyle(color: Color(0xFF94A3B8))),
                   ),
                 )
               else
@@ -1057,11 +1611,26 @@ class _ModuleDialogState extends State<_ModuleDialog> {
                   itemCount: _lessons.length,
                   itemBuilder: (context, index) {
                     final lesson = _lessons[index];
+                    final ltype = lesson['type']?.toString() ?? 'content';
+                    final typeIcon = ltype == 'live'
+                        ? Icons.live_tv_rounded
+                        : ltype == 'assignment'
+                            ? Icons.assignment_rounded
+                            : ltype == 'quiz'
+                                ? Icons.quiz_rounded
+                                : Icons.play_circle_outline;
+                    final typeColor = ltype == 'live'
+                        ? Colors.red
+                        : ltype == 'assignment'
+                            ? const Color(0xFF6366F1)
+                            : ltype == 'quiz'
+                                ? const Color(0xFFF59E0B)
+                                : const Color(0xFF10B981);
                     return ListTile(
                       dense: true,
-                      leading: const Icon(Icons.play_circle_outline, size: 20),
-                      title: Text(lesson['title'] ?? 'Lesson ${index + 1}'),
-                      subtitle: Text('${lesson['duration'] ?? 0} min'),
+                      leading: Icon(typeIcon, size: 20, color: typeColor),
+                      title: Text(lesson['title'] ?? 'Item ${index + 1}'),
+                      subtitle: Text(ltype == 'live' ? 'Live Session' : ltype == 'assignment' ? 'Assignment' : ltype == 'quiz' ? 'Quiz' : '${lesson['duration'] ?? 0} min'),
                       trailing: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
@@ -1116,8 +1685,9 @@ class _ModuleDialogState extends State<_ModuleDialog> {
 class _LessonDialog extends StatefulWidget {
   final Map<String, dynamic>? lesson;
   final Function(Map<String, dynamic>) onSave;
+  final String defaultType;
 
-  const _LessonDialog({this.lesson, required this.onSave});
+  const _LessonDialog({this.lesson, required this.onSave, this.defaultType = 'content'});
 
   @override
   State<_LessonDialog> createState() => _LessonDialogState();
@@ -1128,8 +1698,12 @@ class _LessonDialogState extends State<_LessonDialog> {
   final _contentController = TextEditingController();
   final _videoUrlController = TextEditingController();
   final _durationController = TextEditingController();
+  final _unlockDaysController = TextEditingController();
   bool _uploadingVideo = false;
   String? _uploadedVideoUrl;
+  bool _uploadingDocument = false;
+  String? _documentUrl;
+  String? _documentName;
   String _lessonType = 'content'; // 'content' or 'live'
   DateTime? _scheduledDate;
   TimeOfDay? _scheduledTime;
@@ -1156,9 +1730,14 @@ class _LessonDialogState extends State<_LessonDialog> {
       _videoUrlController.text = widget.lesson!['videoUrl'] ?? '';
       _durationController.text = (widget.lesson!['duration'] ?? 15).toString();
       _uploadedVideoUrl = widget.lesson!['videoUrl'];
-      _lessonType = widget.lesson!['type']?.toString() == 'live' ? 'live' : 'content';
+      _lessonType = widget.lesson!['type']?.toString() ?? 'content';
+      _documentUrl = widget.lesson!['documentUrl']?.toString();
+      _documentName = widget.lesson!['documentName']?.toString();
+      _unlockDaysController.text = (widget.lesson!['unlockAfterDays'] ?? 0).toString();
     } else {
+      _lessonType = widget.defaultType;
       _durationController.text = '15';
+      _unlockDaysController.text = '0';
     }
   }
 
@@ -1168,7 +1747,28 @@ class _LessonDialogState extends State<_LessonDialog> {
     _contentController.dispose();
     _videoUrlController.dispose();
     _durationController.dispose();
+    _unlockDaysController.dispose();
     super.dispose();
+  }
+
+  Widget _typeChip(String type, IconData icon, String label, Color color) {
+    final selected = _lessonType == type;
+    return GestureDetector(
+      onTap: () => setState(() => _lessonType = type),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: selected ? color : const Color(0xFFF8FAFC),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: selected ? color : const Color(0xFFE2E8F0)),
+        ),
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          Icon(icon, size: 15, color: selected ? Colors.white : const Color(0xFF64748B)),
+          const SizedBox(width: 5),
+          Text(label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: selected ? Colors.white : const Color(0xFF64748B))),
+        ]),
+      ),
+    );
   }
 
   Future<void> _uploadVideo() async {
@@ -1235,6 +1835,54 @@ class _LessonDialogState extends State<_LessonDialog> {
     }
   }
 
+  Future<void> _uploadDocument() async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['pdf', 'doc', 'docx', 'ppt', 'pptx', 'xls', 'xlsx', 'txt'],
+        allowMultiple: false,
+        withData: true,
+      );
+      if (result == null || result.files.isEmpty) return;
+      final file = result.files.first;
+      if (file.bytes == null) return;
+
+      setState(() => _uploadingDocument = true);
+      final token = await SharedPref().getToken() ?? '';
+      final res = await Dio().post(
+        '${ApiConstants.baseUrl}/upload/blob-doc',
+        data: FormData.fromMap({
+          'file': MultipartFile.fromBytes(file.bytes!, filename: file.name),
+        }),
+        options: Options(
+          headers: {'Authorization': 'Bearer $token'},
+          validateStatus: (s) => s != null && s < 600,
+        ),
+      );
+      if (res.statusCode == 200 && res.data['success'] == true && res.data['url'] != null) {
+        setState(() {
+          _documentUrl = res.data['url'] as String;
+          _documentName = file.name;
+        });
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('✅ Document uploaded successfully!'), backgroundColor: Colors.green),
+          );
+        }
+      } else {
+        throw Exception(res.data?['message'] ?? 'Upload failed (${res.statusCode})');
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Document upload failed: $e'), backgroundColor: Colors.red, duration: const Duration(seconds: 5)),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _uploadingDocument = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final currentUrl = _videoUrlController.text.trim();
@@ -1255,39 +1903,9 @@ class _LessonDialogState extends State<_LessonDialog> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Lesson Type Toggle
-              Row(children: [
-                Expanded(child: GestureDetector(
-                  onTap: () => setState(() => _lessonType = 'content'),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(vertical: 10),
-                    decoration: BoxDecoration(
-                      color: _lessonType == 'content' ? AppColors.primaryColor : const Color(0xFFF8FAFC),
-                      borderRadius: const BorderRadius.horizontal(left: Radius.circular(8)),
-                      border: Border.all(color: _lessonType == 'content' ? AppColors.primaryColor : const Color(0xFFE2E8F0)),
-                    ),
-                    child: Center(child: Row(mainAxisSize: MainAxisSize.min, children: [
-                      Icon(Icons.article_outlined, size: 16, color: _lessonType == 'content' ? Colors.white : const Color(0xFF64748B)),
-                      const SizedBox(width: 6),
-                      Text('Content', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: _lessonType == 'content' ? Colors.white : const Color(0xFF64748B))),
-                    ])),
-                  ),
-                )),
-                Expanded(child: GestureDetector(
-                  onTap: () => setState(() => _lessonType = 'live'),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(vertical: 10),
-                    decoration: BoxDecoration(
-                      color: _lessonType == 'live' ? Colors.red : const Color(0xFFF8FAFC),
-                      borderRadius: const BorderRadius.horizontal(right: Radius.circular(8)),
-                      border: Border.all(color: _lessonType == 'live' ? Colors.red : const Color(0xFFE2E8F0)),
-                    ),
-                    child: Center(child: Row(mainAxisSize: MainAxisSize.min, children: [
-                      Icon(Icons.live_tv_rounded, size: 16, color: _lessonType == 'live' ? Colors.white : const Color(0xFF64748B)),
-                      const SizedBox(width: 6),
-                      Text('Live Session', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: _lessonType == 'live' ? Colors.white : const Color(0xFF64748B))),
-                    ])),
-                  ),
-                )),
+              Wrap(spacing: 8, runSpacing: 8, children: [
+                _typeChip('content', Icons.article_outlined, 'Content', AppColors.primaryColor),
+                _typeChip('live', Icons.live_tv_rounded, 'Live Session', Colors.red),
               ]),
               const SizedBox(height: 14),
               // Title
@@ -1350,8 +1968,6 @@ class _LessonDialogState extends State<_LessonDialog> {
                   ]),
                 ),
                 const SizedBox(height: 14),
-              ] else ...[
-                const SizedBox(height: 0),
               ],
               // ── Video Section (Content only) ────────────────────
               if (_lessonType == 'content') ...[
@@ -1483,6 +2099,85 @@ class _LessonDialogState extends State<_LessonDialog> {
                 ),
               ),
               const SizedBox(height: 14),
+              // ── Document Section (Content only) ────────────────────
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Row(
+                      children: [
+                        Icon(Icons.description_outlined, color: Color(0xFF6366F1), size: 18),
+                        SizedBox(width: 8),
+                        Text('Document (optional)',
+                            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: Color(0xFF0F172A))),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      width: double.infinity,
+                      child: _uploadingDocument
+                          ? const Center(child: Padding(
+                              padding: EdgeInsets.all(12),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)),
+                                  SizedBox(width: 10),
+                                  Text('Uploading document...', style: TextStyle(fontSize: 13, color: Color(0xFF64748B))),
+                                ],
+                              ),
+                            ))
+                          : OutlinedButton.icon(
+                              onPressed: _uploadDocument,
+                              icon: const Icon(Icons.upload_file_rounded, size: 16),
+                              label: Text(_documentUrl != null ? 'Replace Document' : 'Upload Document / PDF',
+                                  style: const TextStyle(fontSize: 13)),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: const Color(0xFF6366F1),
+                                side: const BorderSide(color: Color(0xFF6366F1)),
+                                padding: const EdgeInsets.symmetric(vertical: 10),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                              ),
+                            ),
+                    ),
+                    if (_documentUrl != null && _documentName != null) ...[
+                      const SizedBox(height: 8),
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFECFDF5),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.3)),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.check_circle_rounded, color: Color(0xFF10B981), size: 18),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(_documentName!,
+                                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF10B981)),
+                                  maxLines: 1, overflow: TextOverflow.ellipsis),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.close_rounded, size: 18, color: Color(0xFF64748B)),
+                              onPressed: () => setState(() { _documentUrl = null; _documentName = null; }),
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(height: 14),
               ] else const SizedBox.shrink(),
               // Duration
               TextField(
@@ -1492,6 +2187,19 @@ class _LessonDialogState extends State<_LessonDialog> {
                   border: OutlineInputBorder(),
                   isDense: true,
                   prefixIcon: Icon(Icons.timer_outlined, size: 18),
+                ),
+                keyboardType: TextInputType.number,
+              ),
+              const SizedBox(height: 14),
+              // Days to complete (Pragmatic timeline)
+              TextField(
+                controller: _unlockDaysController,
+                decoration: const InputDecoration(
+                  labelText: 'Days to Complete (Pragmatic mode)',
+                  hintText: 'e.g. 2',
+                  border: OutlineInputBorder(),
+                  isDense: true,
+                  prefixIcon: Icon(Icons.event_available_outlined, size: 18),
                 ),
                 keyboardType: TextInputType.number,
               ),
@@ -1520,7 +2228,10 @@ class _LessonDialogState extends State<_LessonDialog> {
               'title': _titleController.text.trim(),
               'content': _contentController.text.trim(),
               'videoUrl': _lessonType == 'content' ? _videoUrlController.text.trim() : '',
+              'documentUrl': _lessonType == 'content' ? (_documentUrl ?? '') : '',
+              'documentName': _lessonType == 'content' ? (_documentName ?? '') : '',
               'duration': int.tryParse(_durationController.text) ?? 15,
+              'unlockAfterDays': int.tryParse(_unlockDaysController.text) ?? 0,
               'order': widget.lesson?['order'] ?? 0,
               'type': _lessonType,
               if (scheduledAt != null) 'scheduledAt': scheduledAt,

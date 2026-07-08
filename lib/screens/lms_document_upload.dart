@@ -1,6 +1,7 @@
-import 'dart:io';
+import 'dart:convert';
+import 'package:dio/dio.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:icare/screens/lms_limited_dashboard.dart';
 import 'package:icare/services/api_service.dart';
 import 'package:icare/utils/theme.dart';
@@ -21,8 +22,7 @@ class LmsDocumentUpload extends StatefulWidget {
 
 class _LmsDocumentUploadState extends State<LmsDocumentUpload> {
   final ApiService _api = ApiService();
-  final ImagePicker _picker = ImagePicker();
-  
+
   final List<Map<String, dynamic>> _documents = [];
   bool _isUploading = false;
   final bool _canSkip = true; // Allow skip for now, can be made mandatory later
@@ -37,25 +37,29 @@ class _LmsDocumentUploadState extends State<LmsDocumentUpload> {
 
   Future<void> _pickDocument(String type) async {
     try {
-      final XFile? image = await _picker.pickImage(
-        source: ImageSource.gallery,
-        imageQuality: 80,
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx'],
+        withData: true,
       );
-      
-      if (image != null) {
-        setState(() {
-          _documents.add({
-            'type': type,
-            'file': File(image.path),
-            'name': image.name,
-            'uploaded': false,
-          });
-        });
+
+      if (result == null || result.files.isEmpty || result.files.first.bytes == null) {
+        return;
       }
+
+      final file = result.files.first;
+      setState(() {
+        _documents.add({
+          'type': type,
+          'bytes': file.bytes!,
+          'name': file.name,
+          'uploaded': false,
+        });
+      });
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to pick image: $e')),
+          SnackBar(content: Text('Failed to pick document: $e')),
         );
       }
     }
@@ -68,21 +72,34 @@ class _LmsDocumentUploadState extends State<LmsDocumentUpload> {
       );
       return;
     }
-    
+
     setState(() => _isUploading = true);
-    
+
     try {
-      // TODO: Implement actual document upload to backend
-      // For now, simulate upload
-      await Future.delayed(const Duration(seconds: 2));
-      
-      // Mark all as uploaded
+      final types = _documents.map((d) => d['type'] as String).toList();
+      final formData = FormData.fromMap({
+        'documentTypes': jsonEncode(types),
+        'documents': _documents.map((doc) {
+          return MultipartFile.fromBytes(
+            doc['bytes'] as List<int>,
+            filename: doc['name'] as String,
+          );
+        }).toList(),
+      });
+
+      final response = await _api.postMultipart('/verification/upload', formData);
+      final body = response.data is String ? jsonDecode(response.data) : response.data;
+
+      if (body['success'] != true) {
+        throw Exception(body['message'] ?? 'Upload failed');
+      }
+
       setState(() {
         for (var doc in _documents) {
           doc['uploaded'] = true;
         }
       });
-      
+
       if (mounted) {
         _navigateToLimitedDashboard();
       }
@@ -236,19 +253,19 @@ class _LmsDocumentUploadState extends State<LmsDocumentUpload> {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: const Color(0xFF10B981).withValues(alpha: 0.1),
+              color: const Color(0xFFF59E0B).withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(8),
             ),
             child: const Row(
               children: [
-                Icon(Icons.check_circle, color: Color(0xFF10B981), size: 18),
+                Icon(Icons.info_outline, color: Color(0xFFF59E0B), size: 18),
                 SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    'You\'ll get immediate access to your course while we review',
+                    'Course access unlocks once an admin reviews and approves your documents',
                     style: TextStyle(
                       fontSize: 13,
-                      color: Color(0xFF059669),
+                      color: Color(0xFFB45309),
                       fontWeight: FontWeight.w600,
                     ),
                   ),

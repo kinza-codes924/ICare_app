@@ -24,9 +24,13 @@ import 'package:icare/screens/instructor_student_progress_screen.dart';
 import 'package:icare/screens/instructor_course_content_screen.dart';
 import 'package:icare/screens/instructor_course_analytics_screen.dart';
 import 'package:icare/screens/instructor_course_stream_screen.dart';
+import 'package:icare/screens/instructor_feedback_screen.dart';
 import 'package:icare/screens/certificate_verification_page.dart';
 import 'package:icare/screens/otp_verification_screen.dart';
 import 'package:icare/screens/lms_public_course_detail.dart';
+import 'package:icare/screens/privacy_policy.dart';
+import 'package:icare/screens/terms_and_conditions.dart';
+import 'package:icare/screens/refund_policy.dart';
 import 'package:icare/utils/shared_pref.dart';
 import 'package:icare/utils/app_keys.dart';
 
@@ -61,7 +65,7 @@ final _routerNotifierProvider = Provider<_RouterNotifier>((ref) {
 });
 
 /// Public paths that don't require authentication.
-const _publicPaths = ['/home', '/login', '/signup', '/work-with-us', '/splash', '/lms/catalog', '/verify', '/lms/course'];
+const _publicPaths = ['/home', '/login', '/signup', '/work-with-us', '/splash', '/lms/catalog', '/verify', '/lms/course', '/privacypolicy', '/terms', '/refund-policy'];
 
 final routerProvider = Provider<GoRouter>((ref) {
   // Trigger auth init as soon as router is created.
@@ -101,8 +105,11 @@ final routerProvider = Provider<GoRouter>((ref) {
         if (!needsVerification && path == '/verify-otp') return '/dashboard';
 
         // Logged in visiting any other public route → dashboard.
-        // /lms/catalog and /verify remain accessible to everyone.
-        if (isPublic && path != '/splash' && path != '/lms/catalog' && path != '/verify') {
+        // /lms/catalog, /lms/course/*, /verify, and the legal pages remain
+        // accessible to everyone regardless of login state.
+        const alwaysAccessible = ['/lms/catalog', '/verify', '/privacypolicy', '/terms', '/refund-policy'];
+        if (isPublic && path != '/splash' && !alwaysAccessible.contains(path) &&
+            !path.startsWith('/lms/course')) {
           return '/dashboard';
         }
       }
@@ -121,6 +128,9 @@ final routerProvider = Provider<GoRouter>((ref) {
         },
       ),
       GoRoute(path: '/work-with-us', builder: (_, _) => const WorkWithUsSignup()),
+      GoRoute(path: '/privacypolicy', builder: (_, _) => const PrivacyPolicy()),
+      GoRoute(path: '/terms', builder: (_, _) => const TermsAndConditions()),
+      GoRoute(path: '/refund-policy', builder: (_, _) => const RefundPolicy()),
       GoRoute(path: '/dashboard', builder: (_, _) => const TabsScreen()),
       GoRoute(path: '/verify-otp', builder: (_, _) => const OtpVerificationScreen()),
       GoRoute(path: '/doctor/appointments', builder: (_, state) {
@@ -152,6 +162,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       
       // Instructor LMS Routes
       GoRoute(path: '/instructor/lms', builder: (_, _) => const InstructorLmsDashboard()),
+      GoRoute(path: '/instructor/lms/feedback', builder: (_, _) => const InstructorFeedbackScreen()),
       GoRoute(path: '/instructor/lms/courses', builder: (_, _) => const InstructorLmsCoursesScreen()),
       GoRoute(path: '/instructor/lms/create-course', builder: (_, _) => const InstructorLmsCreateCourseScreen()),
       

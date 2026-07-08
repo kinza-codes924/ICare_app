@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:icare/screens/assignment_submit_screen.dart';
@@ -8,6 +9,7 @@ import 'package:icare/screens/instructor_create_quiz_screen.dart';
 import 'package:icare/screens/instructor_schedule_session_screen.dart';
 import 'package:icare/screens/instructor_grading_screen.dart';
 import 'package:icare/screens/instructor_course_content_screen.dart';
+import 'package:icare/screens/lesson_detail_page.dart';
 import 'package:icare/services/lms_service.dart';
 import 'package:icare/screens/lms_live_session_screen.dart';
 import 'package:icare/widgets/video_player_widget.dart';
@@ -50,6 +52,13 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
   List<dynamic> _quizzes = [];
   List<dynamic> _sessions = [];
   bool _loadingClasswork = true;
+
+  // Course modules (for Course Content tab)
+  List<dynamic> _modules = [];
+  bool _loadingModules = true;
+
+  // Key to reach embedded course content screen's add-module action
+  final _embeddedContentKey = GlobalKey<_EmbeddedCourseContentState>();
 
   List<dynamic> _students = [];
   bool _loadingPeople = true;
@@ -104,6 +113,7 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
     _loadStream();
     _loadClasswork();
     _loadPeople();
+    _loadModules();
     // Poll for live session every 10s (students only)
     if (!widget.isInstructor) {
       _startLivePolling();
@@ -193,6 +203,35 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
     }
   }
 
+  Future<void> _loadModules() async {
+    if (_courseId.isEmpty) { setState(() => _loadingModules = false); return; }
+    setState(() => _loadingModules = true);
+    try {
+      final results = await Future.wait([
+        _lms.getCourseDetails(_courseId),
+        _lms.getCourseAssignments(_courseId).catchError((_) => <dynamic>[]),
+        _lms.getCourseQuizzes(_courseId).catchError((_) => <dynamic>[]),
+        _lms.getCourseSessions(_courseId).catchError((_) => <dynamic>[]),
+      ]);
+      dynamic parsed = results[0];
+      if (parsed is String && parsed.isNotEmpty) {
+        try { parsed = jsonDecode(parsed); } catch (_) {}
+      }
+      final course = parsed is Map ? (parsed['course'] ?? parsed) : {};
+      final mods = (course is Map ? course['modules'] : null) ?? [];
+      if (mounted) setState(() {
+        _modules = List<dynamic>.from(mods);
+        // Also update assignments/quizzes/sessions for Course Content tab
+        if (results[1] is List) _assignments = results[1] as List;
+        if (results[2] is List) _quizzes = results[2] as List;
+        if (results[3] is List) _sessions = results[3] as List;
+        _loadingModules = false;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _loadingModules = false);
+    }
+  }
+
   Future<void> _loadStudentGrades() async {
     if (_courseId.isEmpty) { setState(() => _loadingGrades = false); return; }
     setState(() => _loadingGrades = true);
@@ -272,21 +311,20 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
                 style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800),
               ),
             )
-          : widget.isInstructor && _tabs.index == 1
+          : widget.isInstructor
               ? FloatingActionButton.extended(
                   onPressed: _showCreateMenu,
                   backgroundColor: const Color(0xFF1A73E8),
                   icon: const Icon(Icons.add_rounded, color: Colors.white),
                   label: const Text('Create',
-                      style: TextStyle(
-                          color: Colors.white, fontWeight: FontWeight.w500)),
+                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.w500)),
                 )
               : null,
       body: TabBarView(
         controller: _tabs,
         children: [
           _buildStreamTab(isWide),
-          _buildClassworkTab(isWide),
+          _buildCourseContentTab(isWide),
           widget.isInstructor ? _buildPeopleTab(isWide) : _buildStudentGradesTab(),
           widget.isInstructor ? _buildGradesTab() : _buildPeopleTab(isWide),
         ],
@@ -367,7 +405,7 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
             const TextStyle(fontSize: 14, fontWeight: FontWeight.w400),
         tabs: [
           const Tab(text: 'Announcement'),
-          const Tab(text: 'Classwork'),
+          const Tab(text: 'Course Content'),
           Tab(text: widget.isInstructor ? 'People' : 'Grades'),
           Tab(text: widget.isInstructor ? 'Grades' : 'People'),
         ],
@@ -1163,7 +1201,458 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
   }
 
   // ════════════════════════════════════════════════
-  // CLASSWORK TAB
+  // COURSE CONTENT TAB — modules + lessons + sessions
+  // ════════════════════════════════════════════════
+
+  Widget _buildCourseContentTab(bool isWide) {
+    // Instructor: embed the full course content management screen inline
+    if (widget.isInstructor) {
+      return _EmbeddedCourseContent(key: _embeddedContentKey, courseId: _courseId);
+    }
+
+    // Student: read-only modules view
+    if (_loadingModules) return const Center(child: CircularProgressIndicator(strokeWidth: 2));
+
+    // Check if any session is currently live
+    final liveSession = _sessions.where((s) => s['status']?.toString() == 'live').firstOrNull;
+
+    final standaloneAssignments = _assignments;
+    final standaloneQuizzes = _quizzes;
+    final standaloneSessions = _sessions.where((s) => s['status']?.toString() != 'live').toList();
+
+    return RefreshIndicator(
+      onRefresh: _loadModules,
+      child: ListView(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
+        children: [
+          // Live session banner — always visible when instructor goes live
+          if (liveSession != null) ...[
+            GestureDetector(
+              onTap: () => Navigator.push(context, MaterialPageRoute(
+                builder: (_) => LmsLiveSessionScreen(
+                  sessionId: liveSession['_id']?.toString() ?? '',
+                  courseId: _courseId,
+                  sessionTitle: liveSession['title']?.toString() ?? 'Live Session',
+                  isInstructor: false,
+                ),
+              )),
+              child: Container(
+                margin: const EdgeInsets.only(bottom: 16),
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.red,
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [BoxShadow(color: Colors.red.withValues(alpha: 0.3), blurRadius: 12, offset: const Offset(0, 4))],
+                ),
+                child: Row(children: [
+                  const Icon(Icons.live_tv_rounded, color: Colors.white, size: 24),
+                  const SizedBox(width: 12),
+                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    const Text('● LIVE NOW', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 1)),
+                    Text(liveSession['title']?.toString() ?? 'Live Session',
+                      style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w700)),
+                  ])),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(8)),
+                    child: const Text('JOIN', style: TextStyle(color: Colors.red, fontSize: 13, fontWeight: FontWeight.w900)),
+                  ),
+                ]),
+              ),
+            ),
+          ],
+
+          // Modules
+          if (_modules.isNotEmpty) ...[
+            ..._modules.asMap().entries.map((e) => _buildModuleCard(e.value, e.key)),
+          ] else ...[
+            Center(child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 32),
+              child: Column(children: [
+                Icon(Icons.library_books_outlined, size: 56, color: Colors.grey.shade300),
+                const SizedBox(height: 16),
+                const Text('No modules yet', style: TextStyle(fontSize: 16, color: Color(0xFF94A3B8))),
+              ]),
+            )),
+          ],
+
+          // Standalone Live Sessions (scheduled / ended)
+          if (standaloneSessions.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            const Padding(
+              padding: EdgeInsets.only(bottom: 8),
+              child: Row(children: [
+                Icon(Icons.live_tv_rounded, color: Colors.red, size: 18),
+                SizedBox(width: 8),
+                Text('Live Sessions', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Color(0xFF0F172A))),
+              ]),
+            ),
+            ...standaloneSessions.map((s) => _buildStudentSessionTile(s)),
+          ],
+
+          // Standalone Assignments
+          if (standaloneAssignments.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            const Padding(
+              padding: EdgeInsets.only(bottom: 8),
+              child: Row(children: [
+                Icon(Icons.assignment_rounded, color: Color(0xFF6366F1), size: 18),
+                SizedBox(width: 8),
+                Text('Assignments', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Color(0xFF0F172A))),
+              ]),
+            ),
+            ...standaloneAssignments.map((a) => _buildStudentAssignmentTile(a)),
+          ],
+
+          // Standalone Quizzes
+          if (standaloneQuizzes.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            const Padding(
+              padding: EdgeInsets.only(bottom: 8),
+              child: Row(children: [
+                Icon(Icons.quiz_rounded, color: Color(0xFFF59E0B), size: 18),
+                SizedBox(width: 8),
+                Text('Quizzes', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Color(0xFF0F172A))),
+              ]),
+            ),
+            ...standaloneQuizzes.map((q) => _buildStudentQuizTile(q)),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildModuleCard(dynamic mod, int idx) {
+    final module = mod is Map ? mod : <String, dynamic>{};
+    final title = module['title']?.toString() ?? 'Module ${idx + 1}';
+    final description = module['description']?.toString() ?? '';
+    final lessons = List<dynamic>.from(module['lessons'] ?? []);
+    // Set server-side by GET /courses/:id (courses.js computeProgress/lock logic) —
+    // pragmatic courses lock a module until its scheduled unlock date regardless
+    // of whether earlier modules were completed early.
+    final isLocked = module['isLocked'] == true;
+    final unlockDateRaw = module['unlockDate']?.toString();
+    String? unlockLabel;
+    if (isLocked && unlockDateRaw != null) {
+      try {
+        final d = DateTime.parse(unlockDateRaw).toLocal();
+        unlockLabel = 'Unlocks ${d.day}/${d.month}/${d.year}';
+      } catch (_) {}
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8, offset: const Offset(0, 2))],
+      ),
+      child: Theme(
+        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+        child: ExpansionTile(
+          tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+          childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+          initiallyExpanded: !isLocked,
+          enabled: !isLocked,
+          leading: CircleAvatar(
+            backgroundColor: isLocked ? const Color(0xFF94A3B8) : const Color(0xFF1A73E8),
+            child: isLocked
+                ? const Icon(Icons.lock_rounded, color: Colors.white, size: 18)
+                : Text('${idx + 1}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          ),
+          title: Text(title, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: isLocked ? const Color(0xFF94A3B8) : const Color(0xFF0F172A))),
+          subtitle: isLocked && unlockLabel != null
+              ? Text(unlockLabel, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF6366F1)))
+              : (description.isNotEmpty
+                  ? Text(description, style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)), maxLines: 1, overflow: TextOverflow.ellipsis)
+                  : Text('${lessons.length} lesson${lessons.length == 1 ? '' : 's'}', style: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)))),
+          children: isLocked
+              ? []
+              : lessons.isEmpty
+                  ? [const Padding(
+                      padding: EdgeInsets.all(12),
+                      child: Text('No lessons in this module', style: TextStyle(fontSize: 13, color: Color(0xFF94A3B8))),
+                    )]
+                  : lessons.map<Widget>((lesson) => _buildLessonTile(lesson)).toList(),
+        ),
+      ),
+    );
+  }
+
+  String _fmtSessionDate(String raw) {
+    try {
+      final dt = DateTime.parse(raw).toLocal();
+      final months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+      final h = dt.hour % 12 == 0 ? 12 : dt.hour % 12;
+      final m = dt.minute.toString().padLeft(2, '0');
+      final ampm = dt.hour < 12 ? 'AM' : 'PM';
+      return '${dt.day} ${months[dt.month - 1]} ${dt.year}  $h:$m $ampm';
+    } catch (_) { return raw; }
+  }
+
+  Widget _buildStudentSessionTile(dynamic session) {
+    final title = session['title']?.toString() ?? 'Live Session';
+    final status = session['status']?.toString() ?? 'scheduled';
+    final scheduledAt = session['scheduledAt']?.toString() ?? '';
+    final recordingUrl = session['recordingUrl']?.toString() ?? '';
+    final hasRecording = recordingUrl.isNotEmpty;
+    final isEnded = status == 'ended' || status == 'completed';
+    final id = session['_id']?.toString() ?? '';
+
+    return GestureDetector(
+      onTap: hasRecording ? () => _showCompletedSessionOptions(id, title, recordingUrl) : null,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: hasRecording ? const Color(0xFFECFDF5) : const Color(0xFFFFF7ED),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: hasRecording ? const Color(0xFF10B981).withValues(alpha: 0.4) : const Color(0xFFFB923C).withValues(alpha: 0.4)),
+        ),
+        child: Row(children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: (hasRecording ? const Color(0xFF10B981) : Colors.red).withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Icon(hasRecording ? Icons.play_circle_rounded : Icons.live_tv_rounded,
+              size: 20, color: hasRecording ? const Color(0xFF10B981) : Colors.red),
+          ),
+          const SizedBox(width: 12),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF0F172A))),
+            if (scheduledAt.isNotEmpty)
+              Text(_fmtSessionDate(scheduledAt),
+                style: TextStyle(fontSize: 12, color: hasRecording ? const Color(0xFF10B981) : const Color(0xFFF59E0B))),
+          ])),
+          if (hasRecording)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(color: const Color(0xFF10B981), borderRadius: BorderRadius.circular(8)),
+              child: const Row(mainAxisSize: MainAxisSize.min, children: [
+                Icon(Icons.play_arrow_rounded, color: Colors.white, size: 16),
+                SizedBox(width: 4),
+                Text('Watch', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700)),
+              ]),
+            )
+          else if (isEnded)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(color: Colors.grey[200], borderRadius: BorderRadius.circular(8)),
+              child: const Text('Ended', style: TextStyle(color: Colors.black45, fontSize: 12, fontWeight: FontWeight.w600)),
+            )
+          else
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(color: Colors.blue[50], borderRadius: BorderRadius.circular(8)),
+              child: const Text('Upcoming', style: TextStyle(color: Color(0xFF1A73E8), fontSize: 12, fontWeight: FontWeight.w600)),
+            ),
+        ]),
+      ),
+    );
+  }
+
+  Widget _buildStudentAssignmentTile(dynamic assignment) {
+    final title = assignment['title']?.toString() ?? 'Assignment';
+    final dueDate = assignment['dueDate']?.toString() ?? '';
+    final marks = assignment['totalMarks']?.toString() ?? '';
+    final id = assignment['_id']?.toString() ?? '';
+
+    return GestureDetector(
+      onTap: () => Navigator.push(context, MaterialPageRoute(
+        builder: (_) => AssignmentSubmitScreen(
+          assignment: Map<String, dynamic>.from(assignment is Map ? assignment : {}),
+          courseId: _courseId,
+        ),
+      )),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF5F3FF),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: const Color(0xFF6366F1).withValues(alpha: 0.3)),
+        ),
+        child: Row(children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(color: const Color(0xFF6366F1).withValues(alpha: 0.1), borderRadius: BorderRadius.circular(6)),
+            child: const Icon(Icons.assignment_rounded, size: 20, color: Color(0xFF6366F1)),
+          ),
+          const SizedBox(width: 12),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF0F172A))),
+            Text('${marks.isNotEmpty ? '$marks marks' : ''}${dueDate.isNotEmpty ? '  ·  Due: ${_fmtSessionDate(dueDate)}' : ''}',
+              style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+          ])),
+          const Icon(Icons.chevron_right_rounded, color: Color(0xFF94A3B8)),
+        ]),
+      ),
+    );
+  }
+
+  Widget _buildStudentQuizTile(dynamic quiz) {
+    final title = quiz['title']?.toString() ?? 'Quiz';
+    final timeLimit = quiz['timeLimit']?.toString() ?? '';
+    final passingScore = quiz['passingScore']?.toString() ?? '';
+    final id = quiz['_id']?.toString() ?? '';
+
+    return GestureDetector(
+      onTap: () => Navigator.push(context, MaterialPageRoute(
+        builder: (_) => QuizTakeScreen(
+          quiz: Map<String, dynamic>.from(quiz is Map ? quiz : {}),
+          enrollmentId: '',
+        ),
+      )),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: const Color(0xFFFFFBEB),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: const Color(0xFFF59E0B).withValues(alpha: 0.3)),
+        ),
+        child: Row(children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(color: const Color(0xFFF59E0B).withValues(alpha: 0.1), borderRadius: BorderRadius.circular(6)),
+            child: const Icon(Icons.quiz_rounded, size: 20, color: Color(0xFFF59E0B)),
+          ),
+          const SizedBox(width: 12),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF0F172A))),
+            Text('${timeLimit.isNotEmpty ? '$timeLimit min' : ''}${passingScore.isNotEmpty ? '  ·  Pass: $passingScore%' : ''}',
+              style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+          ])),
+          const Icon(Icons.chevron_right_rounded, color: Color(0xFF94A3B8)),
+        ]),
+      ),
+    );
+  }
+
+  Widget _buildLessonTile(dynamic l) {
+    final lesson = l is Map ? l : <String, dynamic>{};
+    final title = lesson['title']?.toString() ?? 'Lesson';
+    final type = lesson['type']?.toString() ?? 'lesson';
+    final isLive = type == 'live';
+    final status = lesson['status']?.toString() ?? '';
+    final scheduledAt = lesson['scheduledAt']?.toString() ?? lesson['scheduledDate']?.toString() ?? '';
+
+    String dateLabel = '';
+    if (scheduledAt.isNotEmpty) {
+      try { dateLabel = DateFormat('MMM d, yyyy – h:mm a').format(DateTime.parse(scheduledAt).toLocal()); } catch (_) {}
+    }
+
+    Color iconColor = isLive ? Colors.red : const Color(0xFF1A73E8);
+    IconData icon = isLive ? Icons.live_tv_rounded : Icons.play_circle_outline_rounded;
+    if (type == 'video') icon = Icons.videocam_outlined;
+    if (type == 'document') { icon = Icons.description_outlined; iconColor = const Color(0xFF188038); }
+    if (type == 'quiz') { icon = Icons.quiz_outlined; iconColor = const Color(0xFF9334E6); }
+
+    String statusLabel = '';
+    Color statusColor = const Color(0xFF94A3B8);
+    if (isLive) {
+      if (status == 'live') { statusLabel = '● LIVE NOW'; statusColor = Colors.red; }
+      else if (status == 'ended' || status == 'completed') { statusLabel = 'Ended'; statusColor = const Color(0xFF94A3B8); }
+      else if (dateLabel.isNotEmpty) { statusLabel = 'Scheduled · $dateLabel'; statusColor = const Color(0xFF1A73E8); }
+      else { statusLabel = 'Scheduled'; statusColor = const Color(0xFF1A73E8); }
+    }
+
+    return InkWell(
+      onTap: () => _openLessonItem(lesson),
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+        decoration: BoxDecoration(
+          border: Border(bottom: BorderSide(color: Colors.grey.shade100)),
+        ),
+        child: Row(children: [
+          Container(
+            width: 34, height: 34,
+            decoration: BoxDecoration(color: iconColor.withValues(alpha: 0.1), shape: BoxShape.circle),
+            child: Icon(icon, color: iconColor, size: 18),
+          ),
+          const SizedBox(width: 12),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: Color(0xFF202124))),
+            if (statusLabel.isNotEmpty)
+              Text(statusLabel, style: TextStyle(fontSize: 11, color: statusColor, fontWeight: FontWeight.w600)),
+          ])),
+          if (status == 'live')
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(color: Colors.red, borderRadius: BorderRadius.circular(6)),
+              child: const Text('JOIN', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w900)),
+            )
+          else
+            Icon(Icons.chevron_right_rounded, size: 18, color: Colors.grey.shade400),
+        ]),
+      ),
+    );
+  }
+
+  void _openLessonItem(Map lesson) {
+    final type = lesson['type']?.toString() ?? 'lesson';
+    final status = lesson['status']?.toString() ?? '';
+    final sessionId = lesson['_id']?.toString() ?? '';
+    final title = lesson['title']?.toString() ?? 'Session';
+    final recordingUrl = lesson['recordingUrl']?.toString() ?? '';
+
+    if (type == 'live') {
+      if (status == 'live') {
+        Navigator.push(context, MaterialPageRoute(
+          builder: (_) => LmsLiveSessionScreen(
+            sessionId: sessionId,
+            courseId: _courseId,
+            sessionTitle: title,
+            isInstructor: widget.isInstructor,
+          ),
+        ));
+      } else if (status == 'ended' || status == 'completed') {
+        _showCompletedSessionOptions(sessionId, title, recordingUrl);
+      } else {
+        final scheduledAt = lesson['scheduledAt']?.toString() ?? '';
+        String dateLabel = scheduledAt;
+        if (scheduledAt.isNotEmpty) {
+          try { dateLabel = DateFormat('EEEE, MMM d, yyyy – h:mm a').format(DateTime.parse(scheduledAt).toLocal()); } catch (_) {}
+        }
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Session scheduled for $dateLabel'),
+          backgroundColor: const Color(0xFF1A73E8),
+          duration: const Duration(seconds: 3),
+        ));
+      }
+    } else if (type == 'assignment') {
+      Navigator.push(context, MaterialPageRoute(
+        builder: (_) => AssignmentSubmitScreen(
+          assignment: Map<String, dynamic>.from(lesson),
+          courseId: _courseId,
+        ),
+      ));
+    } else if (type == 'quiz') {
+      Navigator.push(context, MaterialPageRoute(
+        builder: (_) => QuizTakeScreen(
+          quiz: Map<String, dynamic>.from(lesson),
+          enrollmentId: '',
+        ),
+      ));
+    } else {
+      // Content lesson — open detail page
+      Navigator.push(context, MaterialPageRoute(
+        builder: (_) => LessonDetailPage(
+          lesson: Map<String, dynamic>.from(lesson),
+          courseId: _courseId,
+          moduleId: lesson['moduleId']?.toString() ?? '',
+          enrollmentId: '',
+        ),
+      ));
+    }
+  }
+
+  // ════════════════════════════════════════════════
+  // CLASSWORK TAB (kept for reference, unused)
   // ════════════════════════════════════════════════
 
   Widget _buildClassworkTab(bool isWide) {
@@ -1537,9 +2026,19 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
       final status = data['status']?.toString() ?? '';
       final recordingUrl = data['recordingUrl']?.toString() ?? '';
 
-      // Completed sessions → show recording + transcript options
-      if (!widget.isInstructor && (status == 'completed' || status == 'ended')) {
+      // Completed/ended sessions → show recording options (for all users)
+      if (status == 'completed' || status == 'ended') {
         _showCompletedSessionOptions(sessionId, sessionTitle, recordingUrl);
+        return;
+      }
+
+      // Scheduled sessions that haven't started → don't open live screen
+      if (status == 'scheduled') {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('This session has not started yet.'),
+          backgroundColor: Color(0xFF64748B),
+          duration: Duration(seconds: 2),
+        ));
         return;
       }
 
@@ -2133,13 +2632,38 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
   void _showCreateMenu() {
     showModalBottomSheet(
       context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
       builder: (_) => SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            Container(
+              width: 40, height: 4,
+              margin: const EdgeInsets.symmetric(vertical: 10),
+              decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2)),
+            ),
             ListTile(
-              leading: const Icon(Icons.assignment_outlined, color: Color(0xFF1A73E8)),
-              title: const Text('Assignment'),
+              leading: const CircleAvatar(
+                backgroundColor: Color(0xFFE8F0FE),
+                child: Icon(Icons.view_module_rounded, color: Color(0xFF1A73E8), size: 20),
+              ),
+              title: const Text('Add Module', style: TextStyle(fontWeight: FontWeight.w600)),
+              subtitle: const Text('Add a new module to Course Content'),
+              onTap: () {
+                Navigator.pop(context);
+                _embeddedContentKey.currentState?.triggerAddModule();
+              },
+            ),
+            const Divider(height: 1, indent: 16, endIndent: 16),
+            ListTile(
+              leading: const CircleAvatar(
+                backgroundColor: Color(0xFFE8F0FE),
+                child: Icon(Icons.assignment_outlined, color: Color(0xFF1A73E8), size: 20),
+              ),
+              title: const Text('Assignment', style: TextStyle(fontWeight: FontWeight.w600)),
+              subtitle: const Text('Create an assignment for students'),
               onTap: () {
                 Navigator.pop(context);
                 if (_courseId.isNotEmpty) {
@@ -2150,8 +2674,12 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
               },
             ),
             ListTile(
-              leading: const Icon(Icons.quiz_outlined, color: Color(0xFF9334E6)),
-              title: const Text('Quiz'),
+              leading: const CircleAvatar(
+                backgroundColor: Color(0xFFF3E8FF),
+                child: Icon(Icons.quiz_outlined, color: Color(0xFF9334E6), size: 20),
+              ),
+              title: const Text('Quiz', style: TextStyle(fontWeight: FontWeight.w600)),
+              subtitle: const Text('Create a quiz for students'),
               onTap: () {
                 Navigator.pop(context);
                 if (_courseId.isNotEmpty) {
@@ -2162,8 +2690,12 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
               },
             ),
             ListTile(
-              leading: const Icon(Icons.videocam_outlined, color: Color(0xFF188038)),
-              title: const Text('Live session'),
+              leading: const CircleAvatar(
+                backgroundColor: Color(0xFFE6F4EA),
+                child: Icon(Icons.videocam_outlined, color: Color(0xFF188038), size: 20),
+              ),
+              title: const Text('Live Session', style: TextStyle(fontWeight: FontWeight.w600)),
+              subtitle: const Text('Schedule a live class session'),
               onTap: () {
                 Navigator.pop(context);
                 if (_courseId.isNotEmpty) {
@@ -2173,6 +2705,7 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
                 }
               },
             ),
+            const SizedBox(height: 8),
           ],
         ),
       ),
@@ -2185,9 +2718,10 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
 
   Future<void> _showInviteTeacherDialog() async {
     final emailCtrl = TextEditingController();
+    String selectedRole = 'normal';
     await showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
+      builder: (ctx) => StatefulBuilder(builder: (ctx, setDlg) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Row(children: [
           Icon(Icons.person_add_outlined, color: Color(0xFF1A73E8)),
@@ -2210,6 +2744,14 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
               prefixIcon: Icon(Icons.email_outlined),
             ),
           ),
+          const SizedBox(height: 16),
+          const Align(alignment: Alignment.centerLeft, child: Text('Role', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13))),
+          const SizedBox(height: 8),
+          Row(children: [
+            Expanded(child: _inviteRoleChip('Lead Instructor', 'lead', selectedRole, (v) => setDlg(() => selectedRole = v))),
+            const SizedBox(width: 8),
+            Expanded(child: _inviteRoleChip('Normal Instructor', 'normal', selectedRole, (v) => setDlg(() => selectedRole = v))),
+          ]),
           const SizedBox(height: 12),
           Container(
             padding: const EdgeInsets.all(10),
@@ -2242,7 +2784,7 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
               }
               Navigator.pop(ctx);
               try {
-                await _lms.inviteTeacher(courseId: _courseId, email: email);
+                await _lms.inviteTeacher(courseId: _courseId, email: email, role: selectedRole);
                 if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
@@ -2263,6 +2805,31 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
             label: const Text('Send Invite'),
           ),
         ],
+      )),
+    );
+  }
+
+  Widget _inviteRoleChip(String label, String value, String selected, void Function(String) onTap) {
+    final isSelected = selected == value;
+    return GestureDetector(
+      onTap: () => onTap(value),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        decoration: BoxDecoration(
+          color: isSelected ? const Color(0xFF1A73E8).withValues(alpha: 0.1) : const Color(0xFFF8FAFC),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: isSelected ? const Color(0xFF1A73E8) : const Color(0xFFE2E8F0)),
+        ),
+        child: Center(
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: isSelected ? const Color(0xFF1A73E8) : const Color(0xFF64748B),
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -2955,4 +3522,27 @@ class _FeedItem {
   final dynamic data;
   final DateTime? date;
   _FeedItem({required this.type, required this.data, this.date});
+}
+
+// ─────────────────────────────────────────────────────────────
+// Embedded Course Content — full InstructorCourseContentScreen
+// body rendered inline inside the Course Content tab
+// ─────────────────────────────────────────────────────────────
+class _EmbeddedCourseContent extends StatefulWidget {
+  final String courseId;
+  const _EmbeddedCourseContent({super.key, required this.courseId});
+
+  @override
+  State<_EmbeddedCourseContent> createState() => _EmbeddedCourseContentState();
+}
+
+class _EmbeddedCourseContentState extends State<_EmbeddedCourseContent> {
+  final _screenKey = GlobalKey<InstructorCourseContentScreenState>();
+
+  void triggerAddModule() => _screenKey.currentState?.addModule();
+
+  @override
+  Widget build(BuildContext context) {
+    return InstructorCourseContentScreen(key: _screenKey, courseId: widget.courseId, embedded: true);
+  }
 }

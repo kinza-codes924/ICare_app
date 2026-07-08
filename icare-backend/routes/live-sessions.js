@@ -175,12 +175,19 @@ router.post('/course/:courseId/set-live', authMiddleware, async (req, res) => {
       return res.json({ success: true });
     }
 
-    // Going live: always end ALL existing live sessions for this course first
-    await LiveSession.updateMany(
-      { courseId: toId(req.params.courseId), status: 'live' },
-      { status: 'ended' }
-    );
+    // Check if a session is already live for this course (started by another instructor/co-teacher)
+    const existingLive = await LiveSession.findOne({
+      courseId: toId(req.params.courseId),
+      status: 'live',
+    }).lean();
 
+    if (existingLive) {
+      // Another instructor already started — co-teacher joins the same session room
+      console.log(`set-live: co-teacher joining existing session=${existingLive._id}`);
+      return res.json({ success: true, sessionId: existingLive._id.toString() });
+    }
+
+    // No active session — this instructor is starting fresh
     // Resolve title: use provided title, or inherit from the scheduled session template
     let sessionTitle = title || 'Live Session';
     if (sessionId && sessionId !== req.params.courseId) {
@@ -188,8 +195,8 @@ router.post('/course/:courseId/set-live', authMiddleware, async (req, res) => {
       if (template?.title) sessionTitle = template.title;
     }
 
-    // ALWAYS create a fresh LiveSession document — each go-live gets a new _id,
-    // which ensures record-join creates a separate Attendance row per session run.
+    // Create a fresh LiveSession document — each go-live gets a new _id,
+    // which ensures attendance is tracked separately per session run.
     const resultSession = await LiveSession.create({
       courseId: toId(req.params.courseId),
       instructorId: toId(req.user.id),
@@ -205,7 +212,7 @@ router.post('/course/:courseId/set-live', authMiddleware, async (req, res) => {
       polls: [],
     });
 
-    console.log(`set-live: course=${req.params.courseId} session=${resultSession._id}`);
+    console.log(`set-live: course=${req.params.courseId} new session=${resultSession._id}`);
     res.json({ success: true, sessionId: resultSession._id.toString() });
   } catch (e) {
     res.status(500).json({ success: false, message: e.message });
@@ -841,7 +848,7 @@ router.post('/:id/recording/stop', authMiddleware, async (req, res) => {
 router.post('/:id/end-and-save', authMiddleware, async (req, res) => {
   try {
     await connectMongoDB();
-    const { lessonId, moduleId } = req.body;
+    const { lessonId, moduleId, chatTranscript } = req.body;
 
     const session = await LiveSession.findById(toId(req.params.id)).lean();
     if (!session) return res.status(404).json({ success: false, message: 'Session not found' });
@@ -855,11 +862,20 @@ router.post('/:id/end-and-save', authMiddleware, async (req, res) => {
       duration: durationMinutes,
     });
 
-    // Build chat transcript
+    // Build chat transcript — prefer server-recorded chatMessages (has
+    // resolved user names + exact timestamps). If the server-side array is
+    // empty (e.g. a message's POST /chat call hadn't committed yet when this
+    // request landed) but the client sent its own local chat log, fall back
+    // to that instead of silently saving "no messages".
     const chatMessages = session.chatMessages || [];
-    const transcript = chatMessages.map(m =>
+    let transcript = chatMessages.map(m =>
       `[${new Date(m.timestamp).toLocaleTimeString()}] ${m.userName}: ${m.message}`
     ).join('\n');
+    if (!transcript && Array.isArray(chatTranscript) && chatTranscript.length > 0) {
+      transcript = chatTranscript.map(m =>
+        `[${m.time || ''}] ${m.sender || 'User'}: ${m.text || ''}`
+      ).join('\n');
+    }
 
     const sessionSummary = {
       title: session.title,
@@ -875,37 +891,32 @@ router.post('/:id/end-and-save', authMiddleware, async (req, res) => {
     const resolvedLessonId = lessonId || session.linkedLessonId;
     const resolvedModuleId = moduleId || session.linkedModuleId;
 
-    // Update the lesson in the course document (if linked)
+    // Update the lesson in the course document (if linked) — atomic
+    // positional update so a concurrent /set-recording-url write (from the
+    // recording upload, which runs in parallel with this call) can't clobber
+    // this write or vice versa. Both previously did a read→modify→save on
+    // the whole Course doc, which is a classic lost-update race: whichever
+    // finished last would silently discard the other's field (this is why
+    // chatTranscript sometimes went missing even though it was computed here).
     if (resolvedLessonId) {
       try {
         const Course = require('../models/Course');
-        const course = await Course.findById(courseId);
-        if (course) {
-          let lessonUpdated = false;
-          course.modules = (course.modules || []).map(mod => ({
-            ...mod.toObject(),
-            lessons: mod.lessons.map(lesson => {
-              if (lesson._id?.toString() === resolvedLessonId) {
-                lessonUpdated = true;
-                return {
-                  ...lesson.toObject(),
-                  type: 'live',
-                  liveSessionId: session._id,
-                  liveSessionDate: new Date(),
-                  chatTranscript: transcript,
-                  sessionSummary: JSON.stringify(sessionSummary),
-                  // If recording was done, save URL; otherwise keep existing
-                  ...(session.recordingUrl ? {
-                    videoUrl: session.recordingUrl,
-                    recordingAvailable: true,
-                  } : {}),
-                };
-              }
-              return lesson;
-            }),
-          }));
-          if (lessonUpdated) await course.save();
+        const setFields = {
+          'modules.$[].lessons.$[lesson].type': 'live',
+          'modules.$[].lessons.$[lesson].liveSessionId': session._id,
+          'modules.$[].lessons.$[lesson].liveSessionDate': new Date(),
+          'modules.$[].lessons.$[lesson].chatTranscript': transcript,
+          'modules.$[].lessons.$[lesson].sessionSummary': JSON.stringify(sessionSummary),
+        };
+        if (session.recordingUrl) {
+          setFields['modules.$[].lessons.$[lesson].videoUrl'] = session.recordingUrl;
+          setFields['modules.$[].lessons.$[lesson].recordingAvailable'] = true;
         }
+        await Course.updateOne(
+          { _id: courseId },
+          { $set: setFields },
+          { arrayFilters: [{ 'lesson._id': toId(resolvedLessonId) }] }
+        );
       } catch (_) {}
     }
 
@@ -957,24 +968,23 @@ router.patch('/:id/set-recording-url', authMiddleware, async (req, res) => {
     );
     if (!session) return res.status(404).json({ success: false, message: 'Session not found' });
 
-    // Also update linked lesson if any
+    // Also update linked lesson if any — atomic positional update (see note
+    // in /end-and-save above) so this can't race with that route's write to
+    // the same Course document.
     if (session.linkedLessonId || session.lessonId) {
       const lId = session.linkedLessonId || session.lessonId;
       try {
         const Course = require('../models/Course');
-        const course = await Course.findById(session.courseId);
-        if (course) {
-          course.modules = course.modules.map(mod => ({
-            ...mod.toObject(),
-            lessons: mod.lessons.map(lesson => {
-              if (lesson._id?.toString() === lId) {
-                return { ...lesson.toObject(), videoUrl: recordingUrl, recordingAvailable: true };
-              }
-              return lesson;
-            }),
-          }));
-          await course.save();
-        }
+        await Course.updateOne(
+          { _id: session.courseId },
+          {
+            $set: {
+              'modules.$[].lessons.$[lesson].videoUrl': recordingUrl,
+              'modules.$[].lessons.$[lesson].recordingAvailable': true,
+            },
+          },
+          { arrayFilters: [{ 'lesson._id': toId(lId) }] }
+        );
       } catch (_) {}
     }
 

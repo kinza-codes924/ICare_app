@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const mongoose = require('mongoose');
 const multer = require('multer');
-const { v2: cloudinary } = require('cloudinary');
+const { put } = require('@vercel/blob');
 const { connectMongoDB } = require('../config/mongodb');
 const { authMiddleware } = require('../middleware/auth');
 const StudentVerification = require('../models/StudentVerification');
@@ -14,13 +14,16 @@ function toId(id) {
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
-function uploadBuffer(buffer, folder) {
-  return new Promise((resolve, reject) => {
-    const stream = cloudinary.uploader.upload_stream(
-      { folder, resource_type: 'auto' },
-      (err, result) => err ? reject(err) : resolve(result)
-    );
-    stream.end(buffer);
+// Vercel Blob — same private-storage + backend-proxy pattern as
+// upload.js's /blob-doc route, avoiding Cloudinary's delivery-restriction
+// failures seen on the doc-stream proxy (401/404 across all fallback attempts).
+function uploadToBlob(buffer, originalname, mimetype) {
+  const safeName = originalname.replace(/[^a-zA-Z0-9._-]/g, '_');
+  const blobPath = `verification/${Date.now()}-${safeName}`;
+  return put(blobPath, buffer, {
+    access: 'private',
+    contentType: mimetype,
+    addRandomSuffix: false,
   });
 }
 
@@ -41,11 +44,11 @@ router.post('/upload', authMiddleware, upload.array('documents', 5), async (req,
     for (let i = 0; i < req.files.length; i++) {
       const file = req.files[i];
       const type = types[i] || 'other';
-      
-      const result = await uploadBuffer(file.buffer, 'icare/lms/verification');
+
+      const blob = await uploadToBlob(file.buffer, file.originalname, file.mimetype);
       documents.push({
         type,
-        url: result.secure_url,
+        url: blob.url,
         fileName: file.originalname,
         uploadedAt: new Date()
       });
@@ -102,7 +105,7 @@ router.get('/pending', authMiddleware, async (req, res) => {
     
     // Check if user is admin
     const user = await User.findById(toId(req.user.id)).lean();
-    if (user.role !== 'Admin') {
+    if ((user.role || '').toLowerCase() !== 'admin') {
       return res.status(403).json({ success: false, message: 'Admin access required' });
     }
 
@@ -123,7 +126,7 @@ router.post('/:id/approve', authMiddleware, async (req, res) => {
     await connectMongoDB();
     
     const user = await User.findById(toId(req.user.id)).lean();
-    if (user.role !== 'Admin') {
+    if ((user.role || '').toLowerCase() !== 'admin') {
       return res.status(403).json({ success: false, message: 'Admin access required' });
     }
 
@@ -152,7 +155,7 @@ router.post('/:id/reject', authMiddleware, async (req, res) => {
     await connectMongoDB();
     
     const user = await User.findById(toId(req.user.id)).lean();
-    if (user.role !== 'Admin') {
+    if ((user.role || '').toLowerCase() !== 'admin') {
       return res.status(403).json({ success: false, message: 'Admin access required' });
     }
 
@@ -183,7 +186,7 @@ router.get('/all', authMiddleware, async (req, res) => {
     await connectMongoDB();
     
     const user = await User.findById(toId(req.user.id)).lean();
-    if (user.role !== 'Admin') {
+    if ((user.role || '').toLowerCase() !== 'admin') {
       return res.status(403).json({ success: false, message: 'Admin access required' });
     }
 

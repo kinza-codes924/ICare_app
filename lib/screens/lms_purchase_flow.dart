@@ -179,17 +179,21 @@ class _LmsPurchaseFlowState extends ConsumerState<LmsPurchaseFlow> {
     );
   }
 
-  Future<void> _handlePaymentSuccess() async {
+  // Called from SelectPaymentMethod, which is the screen actually visible
+  // (and mounted) at this point — LmsPurchaseFlow was already replaced by
+  // it via pushReplacement, so navigation must happen using the caller's
+  // context, not this widget's own (already-disposed) context.
+  Future<void> _handlePaymentSuccess(BuildContext callerContext) async {
     try {
       // Enroll user in course
       await _api.post('/courses/enrollments', {
         'courseId': widget.course['_id'],
       });
-      
+
       // Navigate to document upload
-      if (mounted) {
+      if (callerContext.mounted) {
         Navigator.pushReplacement(
-          context,
+          callerContext,
           MaterialPageRoute(
             builder: (_) => LmsDocumentUpload(
               courseId: widget.course['_id'],
@@ -198,8 +202,8 @@ class _LmsPurchaseFlowState extends ConsumerState<LmsPurchaseFlow> {
         );
       }
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+      if (callerContext.mounted) {
+        ScaffoldMessenger.of(callerContext).showSnackBar(
           SnackBar(
             content: Text('Enrollment failed: ${e.toString()}'),
             backgroundColor: Colors.red,

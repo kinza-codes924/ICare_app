@@ -3,7 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:icare/models/consultation_timer.dart';
 import 'package:icare/services/api_service.dart';
 import 'package:icare/services/medical_record_service.dart';
+import 'package:icare/utils/api_constants.dart';
+import 'package:icare/utils/shared_pref.dart';
 import 'package:icare/utils/theme.dart';
+import 'package:icare/widgets/doc_preview_widget.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -21,6 +24,10 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
   List<dynamic> _users = [];
   // Extra profile details fetched per-user (keyed by userId)
   final Map<String, Map<String, dynamic>> _extraDetails = {};
+  // LMS course-verification records (documents uploaded via the LMS purchase
+  // flow, stored separately from the signup-time verificationDetails field),
+  // keyed by userId.
+  final Map<String, Map<String, dynamic>> _lmsVerifications = {};
   String _currentTab =
       'Pending'; // 'Pending', 'Student', 'Pharmacy', 'Laboratory', 'Instructor', 'PatientRecords'
 
@@ -60,6 +67,41 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
   void dispose() {
     _tabScrollController.dispose();
     super.dispose();
+  }
+
+  // Route Cloudinary/Vercel Blob URLs through the backend's authenticated
+  // proxy endpoints instead of opening the raw storage URL directly — same
+  // pattern as AttachmentViewer._resolveUrl.
+  Future<String> _resolveDocUrl(String original) async {
+    try {
+      final token = await SharedPref().getToken() ?? '';
+      if (token.isEmpty) return original;
+      final encoded = Uri.encodeComponent(original);
+      final t = Uri.encodeComponent(token);
+      if (original.contains('res.cloudinary.com')) {
+        return '${ApiConstants.baseUrl}/upload/doc-stream?url=$encoded&token=$t';
+      }
+      if (original.contains('blob.vercel-storage.com')) {
+        return '${ApiConstants.baseUrl}/upload/blob-download?url=$encoded&token=$t';
+      }
+      return original;
+    } catch (_) {
+      return original;
+    }
+  }
+
+  Future<void> _openDocument(BuildContext context, String url, String label) async {
+    // Base64 data URIs (legacy Work-With-Us uploads) have no remote host to
+    // proxy through — open directly.
+    if (url.startsWith('data:')) {
+      try {
+        await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+      } catch (_) {}
+      return;
+    }
+    final proxyUrl = await _resolveDocUrl(url);
+    if (!context.mounted) return;
+    await showDocPreview(context, proxyUrl, label);
   }
 
   @override
@@ -112,12 +154,34 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
         if (_currentTab == 'Pending') {
           _fetchExtraDetailsForPendingUsers(users);
         }
+        if (_currentTab == 'Pending' || _currentTab == 'Student') {
+          _fetchLmsVerifications();
+        }
       }
     } catch (e) {
       debugPrint('Error fetching users: $e');
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  Future<void> _fetchLmsVerifications() async {
+    try {
+      final r = await _apiService.get('/verification/all');
+      if (r.statusCode == 200 && r.data is Map && r.data['success'] == true) {
+        final list = List<dynamic>.from(r.data['verifications'] ?? []);
+        final map = <String, Map<String, dynamic>>{};
+        for (final v in list) {
+          final rawUserId = v['userId'];
+          final userId = (rawUserId is Map ? rawUserId['_id'] : rawUserId)?.toString() ?? '';
+          if (userId.isEmpty) continue;
+          map[userId] = Map<String, dynamic>.from(v as Map);
+        }
+        if (mounted) setState(() => _lmsVerifications
+          ..clear()
+          ..addAll(map));
+      }
+    } catch (_) {}
   }
 
   Future<void> _fetchExtraDetailsForPendingUsers(List<dynamic> users) async {
@@ -758,6 +822,22 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
                           addDoc('Student ID', 'studentIdDocument', 'studentIdDocumentName');
                           addDoc('CV / Resume', 'cvDocument', 'cvDocumentName');
 
+                          // LMS course-purchase verification documents (uploaded via
+                          // POST /verification/upload, a separate flow from signup).
+                          final lmsVerification = _lmsVerifications[userId];
+                          if (lmsVerification != null) {
+                            final lmsDocs = List<dynamic>.from(lmsVerification['documents'] ?? []);
+                            for (final d in lmsDocs) {
+                              final url = d['url']?.toString() ?? '';
+                              if (url.isEmpty) continue;
+                              docEntries.add({
+                                'label': 'LMS: ${d['type']?.toString() ?? 'Document'}',
+                                'data': url,
+                                'name': d['fileName']?.toString() ?? 'Document',
+                              });
+                            }
+                          }
+
                           if (rows.isEmpty && docEntries.isEmpty) return const SizedBox.shrink();
                           return Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -794,11 +874,7 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
                                       Wrap(
                                         spacing: 8, runSpacing: 8,
                                         children: docEntries.map((doc) => GestureDetector(
-                                          onTap: () async {
-                                            try {
-                                              await launchUrl(Uri.parse(doc['data']!), mode: LaunchMode.externalApplication);
-                                            } catch (_) {}
-                                          },
+                                          onTap: () => _openDocument(ctx, doc['data']!, doc['label']!),
                                           child: Container(
                                             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                                             decoration: BoxDecoration(

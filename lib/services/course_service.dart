@@ -197,6 +197,22 @@ class CourseService {
     }
   }
 
+  // Get my document verification status ('not_submitted' | 'pending' | 'approved' | 'rejected')
+  // and access level ('limited' | 'full')
+  Future<Map<String, String>> getVerificationStatus() async {
+    try {
+      final response = await _apiService.get('/verification/my-status');
+      final v = response.data['verification'] ?? {};
+      return {
+        'status': (v['status'] ?? 'not_submitted').toString(),
+        'level': (v['verificationLevel'] ?? 'limited').toString(),
+      };
+    } catch (e) {
+      debugPrint('Error getting verification status: $e');
+      return {'status': 'not_submitted', 'level': 'limited'};
+    }
+  }
+
   // Update course progress
   Future<Map<String, dynamic>> updateProgress(
     String enrollmentId,

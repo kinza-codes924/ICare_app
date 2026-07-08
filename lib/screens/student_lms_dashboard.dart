@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:icare/screens/classroom_course_view.dart';
+import 'package:icare/screens/lms_limited_dashboard.dart';
 import 'package:icare/screens/lms_live_session_screen.dart';
 import 'package:icare/screens/lms_public_catalog.dart';
 import 'package:icare/screens/quiz_take_screen.dart';
@@ -176,6 +177,31 @@ class _StudentLmsDashboardState extends State<StudentLmsDashboard>
     });
     try {
       final enrollments = await _courseService.myPurchases();
+
+      // Gate: only students actively going through the LMS purchase
+      // verification flow (status 'pending' or 'rejected') get routed to the
+      // limited single-course dashboard. Students with no verification
+      // record at all ('not_submitted' — pre-existing/admin-enrolled
+      // students who never went through this flow) keep full access.
+      if (enrollments.isNotEmpty) {
+        final verification = await _courseService.getVerificationStatus();
+        final status = verification['status'];
+        final gated = (status == 'pending' || status == 'rejected') && verification['level'] != 'full';
+        if (gated && mounted) {
+          final first = enrollments.first;
+          final rawCourse = first['course'];
+          final course = (rawCourse is Map) ? Map<String, dynamic>.from(rawCourse) : {};
+          final courseId = course['_id']?.toString() ?? first['courseId']?.toString() ?? '';
+          if (courseId.isNotEmpty) {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (_) => LmsLimitedDashboard(courseId: courseId)),
+            );
+            return;
+          }
+        }
+      }
+
       if (mounted) {
         setState(() {
           _enrollments = enrollments;

@@ -16,9 +16,6 @@ import 'package:icare/screens/doctor_profile_setup.dart' show DoctorProfileSetup
 import 'package:icare/screens/help_and_support.dart' show HelpAndSupport;
 import 'package:icare/screens/current_medications_page.dart';
 import 'package:icare/screens/notification_settings.dart' show NotificationSettings;
-import 'package:icare/screens/privacy_policy.dart' show PrivacyPolicy;
-import 'package:icare/screens/refund_policy.dart' show RefundPolicy;
-import 'package:icare/screens/terms_and_conditions.dart' show TermsAndConditions;
 import 'package:icare/utils/theme.dart';
 import 'package:icare/services/security_service.dart';
 import 'package:icare/services/biometric_service.dart';
@@ -2159,11 +2156,11 @@ class _WebSettingsLayout extends StatelessWidget {
         const Divider(height: 1),
         _settingsTile(icon: Icons.bug_report_outlined, iconColor: const Color(0xFFEF4444), title: 'Report an Issue', subtitle: 'Report bugs & problems', onTap: () => p.onReportIssue(context)),
         const Divider(height: 1),
-        _settingsTile(icon: Icons.description_outlined, iconColor: const Color(0xFF64748B), title: 'Terms & Conditions', subtitle: 'Review terms of service', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TermsAndConditions()))),
+        _settingsTile(icon: Icons.description_outlined, iconColor: const Color(0xFF64748B), title: 'Terms & Conditions', subtitle: 'Review terms of service', onTap: () => context.go('/terms')),
         const Divider(height: 1),
-        _settingsTile(icon: Icons.privacy_tip_outlined, iconColor: const Color(0xFF64748B), title: 'Privacy Policy', subtitle: 'How we handle your data', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PrivacyPolicy()))),
+        _settingsTile(icon: Icons.privacy_tip_outlined, iconColor: const Color(0xFF64748B), title: 'Privacy Policy', subtitle: 'How we handle your data', onTap: () => context.go('/privacypolicy')),
         const Divider(height: 1),
-        _settingsTile(icon: Icons.receipt_long_outlined, iconColor: const Color(0xFF64748B), title: 'Refund Policy', subtitle: 'Refunds & cancellations', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RefundPolicy()))),
+        _settingsTile(icon: Icons.receipt_long_outlined, iconColor: const Color(0xFF64748B), title: 'Refund Policy', subtitle: 'Refunds & cancellations', onTap: () => context.go('/refund-policy')),
       ])));
   }
 
@@ -2648,9 +2645,9 @@ class _MobileSettingsLayout extends StatelessWidget {
         _settingsTile(icon: Icons.headset_mic_outlined, iconColor: const Color(0xFF6366F1), title: 'Contact Support', subtitle: 'Get help', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const HelpAndSupport()))),
         const Divider(height: 1), _settingsTile(icon: Icons.help_outline, iconColor: const Color(0xFF6366F1), title: 'FAQ', subtitle: 'Frequently asked questions', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const HelpAndSupport()))),
         const Divider(height: 1), _settingsTile(icon: Icons.bug_report_outlined, iconColor: const Color(0xFFEF4444), title: 'Report an Issue', subtitle: 'Report bugs', onTap: () => p.onReportIssue(context)),
-        const Divider(height: 1), _settingsTile(icon: Icons.description_outlined, iconColor: const Color(0xFF64748B), title: 'Terms & Conditions', subtitle: 'Review terms', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TermsAndConditions()))),
-        const Divider(height: 1), _settingsTile(icon: Icons.privacy_tip_outlined, iconColor: const Color(0xFF64748B), title: 'Privacy Policy', subtitle: 'Data handling', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PrivacyPolicy()))),
-        const Divider(height: 1), _settingsTile(icon: Icons.receipt_long_outlined, iconColor: const Color(0xFF64748B), title: 'Refund Policy', subtitle: 'Refunds & cancellations', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RefundPolicy()))),
+        const Divider(height: 1), _settingsTile(icon: Icons.description_outlined, iconColor: const Color(0xFF64748B), title: 'Terms & Conditions', subtitle: 'Review terms', onTap: () => context.go('/terms')),
+        const Divider(height: 1), _settingsTile(icon: Icons.privacy_tip_outlined, iconColor: const Color(0xFF64748B), title: 'Privacy Policy', subtitle: 'Data handling', onTap: () => context.go('/privacypolicy')),
+        const Divider(height: 1), _settingsTile(icon: Icons.receipt_long_outlined, iconColor: const Color(0xFF64748B), title: 'Refund Policy', subtitle: 'Refunds & cancellations', onTap: () => context.go('/refund-policy')),
       ])));
   }
 
@@ -3024,16 +3021,18 @@ class _ProfileEditCardState extends ConsumerState<_ProfileEditCard> {
   late final TextEditingController _nameCtrl;
   late final TextEditingController _phoneCtrl;
   late final TextEditingController _ageCtrl;
+  late final TextEditingController _addressCtrl;
   String? _gender;
 
   @override
   void initState() {
     super.initState();
     final u = widget.p.user;
-    _nameCtrl  = TextEditingController(text: u?.name ?? '');
-    _phoneCtrl = TextEditingController(text: u?.phoneNumber ?? '');
-    _ageCtrl   = TextEditingController(text: u?.age ?? '');
-    _gender    = (u?.gender?.isNotEmpty == true) ? u!.gender : null;
+    _nameCtrl    = TextEditingController(text: u?.name ?? '');
+    _phoneCtrl   = TextEditingController(text: u?.phoneNumber ?? '');
+    _ageCtrl     = TextEditingController(text: u?.age ?? '');
+    _addressCtrl = TextEditingController(text: u?.address ?? '');
+    _gender      = (u?.gender?.isNotEmpty == true) ? u!.gender : null;
   }
 
   @override
@@ -3041,17 +3040,19 @@ class _ProfileEditCardState extends ConsumerState<_ProfileEditCard> {
     _nameCtrl.dispose();
     _phoneCtrl.dispose();
     _ageCtrl.dispose();
+    _addressCtrl.dispose();
     super.dispose();
   }
 
   void _cancelEdit() {
     final u = widget.p.user;
     setState(() {
-      _editMode      = false;
-      _nameCtrl.text  = u?.name ?? '';
-      _phoneCtrl.text = u?.phoneNumber ?? '';
-      _ageCtrl.text   = u?.age ?? '';
-      _gender         = (u?.gender?.isNotEmpty == true) ? u!.gender : null;
+      _editMode        = false;
+      _nameCtrl.text    = u?.name ?? '';
+      _phoneCtrl.text   = u?.phoneNumber ?? '';
+      _ageCtrl.text     = u?.age ?? '';
+      _addressCtrl.text = u?.address ?? '';
+      _gender           = (u?.gender?.isNotEmpty == true) ? u!.gender : null;
     });
   }
 
@@ -3063,6 +3064,7 @@ class _ProfileEditCardState extends ConsumerState<_ProfileEditCard> {
         'name': _nameCtrl.text.trim(),
         'phoneNumber': _phoneCtrl.text.trim(),
         'age': _ageCtrl.text.trim(),
+        'address': _addressCtrl.text.trim(),
         if (_gender != null) 'gender': _gender,
       });
       if (response.statusCode == 200 && response.data != null) {
@@ -3105,10 +3107,11 @@ class _ProfileEditCardState extends ConsumerState<_ProfileEditCard> {
   @override
   Widget build(BuildContext context) {
     final u = widget.p.user;
-    final name   = _nameCtrl.text.isNotEmpty  ? _nameCtrl.text  : (u?.name ?? 'Not set');
-    final phone  = _phoneCtrl.text.isNotEmpty ? _phoneCtrl.text : (u?.phoneNumber ?? 'Not set');
-    final age    = _ageCtrl.text.isNotEmpty   ? _ageCtrl.text   : (u?.age ?? 'Not set');
-    final gender = _gender ?? u?.gender ?? 'Not set';
+    final name    = _nameCtrl.text.isNotEmpty    ? _nameCtrl.text    : (u?.name ?? 'Not set');
+    final phone   = _phoneCtrl.text.isNotEmpty   ? _phoneCtrl.text   : (u?.phoneNumber ?? 'Not set');
+    final age     = _ageCtrl.text.isNotEmpty     ? _ageCtrl.text     : (u?.age ?? 'Not set');
+    final address = _addressCtrl.text.isNotEmpty ? _addressCtrl.text : (u?.address ?? 'Not set');
+    final gender  = _gender ?? u?.gender ?? 'Not set';
 
     return Card(
       elevation: 0,
@@ -3176,10 +3179,11 @@ class _ProfileEditCardState extends ConsumerState<_ProfileEditCard> {
               // ── VIEW MODE ────────────────────────────────────────────────
               if (!_editMode) ...[
                 _viewRow(Icons.person_outline_rounded,       'Full Name',    name),
-                _viewRow(Icons.phone_outlined,               'Phone',        phone),
+                _viewRow(Icons.phone_outlined,               'Phone',        phone,             verified: u?.isPhoneVerified),
                 _viewRow(Icons.cake_rounded,                 'Age',          age),
                 _viewRow(Icons.wc_rounded,                   'Gender',       gender),
-                _viewRow(Icons.email_outlined,               'Email',        u?.email ?? 'Not set'),
+                _viewRow(Icons.email_outlined,               'Email',        u?.email ?? 'Not set', verified: u?.isEmailVerified),
+                _viewRow(Icons.location_on_outlined,         'Address',      address),
               ],
 
               // ── EDIT MODE ────────────────────────────────────────────────
@@ -3203,6 +3207,8 @@ class _ProfileEditCardState extends ConsumerState<_ProfileEditCard> {
                       .toList(),
                   onChanged: (v) => setState(() => _gender = v),
                 ),
+                const SizedBox(height: 14),
+                _editField('Address', _addressCtrl, Icons.location_on_outlined, hint: 'Street, city, area'),
 
                 const SizedBox(height: 24),
 
@@ -3248,7 +3254,7 @@ class _ProfileEditCardState extends ConsumerState<_ProfileEditCard> {
 
   // ── Helpers ───────────────────────────────────────────────────────────────
 
-  Widget _viewRow(IconData icon, String label, String value) {
+  Widget _viewRow(IconData icon, String label, String value, {bool? verified}) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 14),
       child: Row(
@@ -3268,6 +3274,29 @@ class _ProfileEditCardState extends ConsumerState<_ProfileEditCard> {
                 Text(value, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF0F172A))),
               ],
             ),
+          ),
+          if (verified != null) _verifiedBadge(verified),
+        ],
+      ),
+    );
+  }
+
+  Widget _verifiedBadge(bool verified) {
+    final color = verified ? const Color(0xFF10B981) : const Color(0xFFF59E0B);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(verified ? Icons.verified_rounded : Icons.error_outline_rounded, size: 13, color: color),
+          const SizedBox(width: 4),
+          Text(
+            (verified ? 'Verified' : 'Unverified').tr(),
+            style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: color),
           ),
         ],
       ),

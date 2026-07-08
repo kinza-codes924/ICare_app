@@ -2,8 +2,8 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:icare/utils/theme.dart';
 import 'package:icare/utils/utils.dart';
-import 'package:icare/widgets/back_button.dart';
 import 'package:icare/widgets/custom_text.dart';
+import 'package:icare/widgets/legal_page_back_button.dart';
 
 class TermsAndConditions extends StatelessWidget {
   const TermsAndConditions({super.key});
@@ -16,7 +16,7 @@ class TermsAndConditions extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         automaticallyImplyLeading: false,
-        leading: CustomBackButton(),
+        leading: LegalPageBackButton(),
         title: CustomText(
           text: "Terms & Conditions".tr(),
           fontWeight: FontWeight.bold,
@@ -143,7 +143,7 @@ class _WebTermsAndConditions extends StatelessWidget {
         elevation: 0,
         surfaceTintColor: Colors.transparent,
         automaticallyImplyLeading: false,
-        leading: CustomBackButton(),
+        leading: LegalPageBackButton(),
         title: CustomText(
           text: "Terms & Conditions".tr(),
           fontFamily: "Gilroy-Bold",

@@ -321,6 +321,23 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
       final session = data['session'];
       if (session == null || !mounted) return;
 
+      // If session ended by instructor, kick student out automatically
+      if (!widget.isInstructor) {
+        final status = session['status']?.toString() ?? '';
+        if (status == 'ended' || status == 'completed') {
+          lmsLeaveChannel();
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+              content: Text('The instructor has ended the session.'),
+              backgroundColor: Colors.red,
+              duration: Duration(seconds: 4),
+            ));
+            Navigator.pop(context);
+          }
+          return;
+        }
+      }
+
       // Extract instructor name from session document (for student label)
       final instrMap = session['instructor'] as Map? ??
           session['createdBy'] as Map? ??

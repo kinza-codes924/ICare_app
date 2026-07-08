@@ -457,6 +457,21 @@ class _AssignmentSubmitScreenState extends State<AssignmentSubmitScreen> {
                                   fontSize: 24,
                                   fontWeight: FontWeight.w900,
                                   color: Color(0xFF0F172A))),
+                          if (_existingSubmission!['rubricGrade'] != null &&
+                              _existingSubmission!['rubricGrade'].toString().isNotEmpty) ...[
+                            const SizedBox(height: 10),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF10B981).withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Text(
+                                _existingSubmission!['rubricGrade'].toString(),
+                                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF047857)),
+                              ),
+                            ),
+                          ],
                           if (_existingSubmission!['stars'] != null) ...[
                             const SizedBox(height: 12),
                             Builder(builder: (_) {

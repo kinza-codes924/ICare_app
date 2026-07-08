@@ -9,6 +9,7 @@ const Assignment = require('../models/Assignment');
 const AssignmentSubmission = require('../models/AssignmentSubmission');
 const { sendEmail } = require('../utils/email');
 const LiveSession = require('../models/LiveSession');
+const CourseReview = require('../models/CourseReview');
 
 function toId(id) {
   try { return new mongoose.Types.ObjectId(id); } catch { return null; }
@@ -562,6 +563,110 @@ router.get('/:id/instructors', authMiddleware, async (req, res) => {
       role: t.role || 'normal',
     }));
     res.json({ success: true, instructors });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+// ── COURSE FEEDBACK / REVIEWS ────────────────────────────────────────────────
+// POST /courses/:id/reviews — enrolled student submits (or updates) a
+// rating + written review for the course/instructor.
+router.post('/:id/reviews', authMiddleware, async (req, res) => {
+  try {
+    await connectMongoDB();
+    const courseId = toId(req.params.id);
+    if (!courseId) return res.status(400).json({ success: false, message: 'Invalid courseId' });
+
+    const { rating, comment } = req.body;
+    const stars = Math.round(Number(rating));
+    if (!stars || stars < 1 || stars > 5) {
+      return res.status(400).json({ success: false, message: 'Rating must be 1–5' });
+    }
+
+    const studentId = toId(req.user.id);
+    const enrollment = await Enrollment.findOne({ userId: studentId, courseId }).lean();
+    if (!enrollment) {
+      return res.status(403).json({ success: false, message: 'You must be enrolled in this course to leave feedback' });
+    }
+
+    const course = await Course.findById(courseId).lean();
+    if (!course) return res.status(404).json({ success: false, message: 'Course not found' });
+
+    await CourseReview.findOneAndUpdate(
+      { courseId, studentId },
+      { courseId, studentId, instructorId: course.instructor_id, rating: stars, comment: comment || '' },
+      { upsert: true, new: true }
+    );
+
+    // Recompute the course's aggregate rating/count for display on course cards.
+    const agg = await CourseReview.aggregate([
+      { $match: { courseId } },
+      { $group: { _id: null, avg: { $avg: '$rating' }, count: { $sum: 1 } } },
+    ]);
+    const avg = agg[0]?.avg || 0;
+    const count = agg[0]?.count || 0;
+    await Course.findByIdAndUpdate(courseId, { rating: Math.round(avg * 10) / 10, total_reviews: count });
+
+    res.json({ success: true, message: 'Feedback submitted', rating: avg, totalReviews: count });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+// GET /courses/:id/reviews — public: list reviews for a course
+router.get('/:id/reviews', async (req, res) => {
+  try {
+    await connectMongoDB();
+    const courseId = toId(req.params.id);
+    if (!courseId) return res.json({ success: true, reviews: [] });
+
+    const reviews = await CourseReview.find({ courseId })
+      .populate('studentId', 'name username')
+      .sort({ createdAt: -1 })
+      .limit(100)
+      .lean();
+
+    res.json({
+      success: true,
+      reviews: reviews.map(r => ({
+        _id: r._id,
+        studentName: r.studentId?.name || r.studentId?.username || 'Student',
+        rating: r.rating,
+        comment: r.comment,
+        createdAt: r.createdAt,
+      })),
+      count: reviews.length,
+    });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+// GET /courses/reviews/my-courses — instructor: all feedback across their own courses
+router.get('/reviews/my-courses', authMiddleware, async (req, res) => {
+  try {
+    await connectMongoDB();
+    const instructorId = toId(req.user.id);
+
+    const reviews = await CourseReview.find({ instructorId })
+      .populate('studentId', 'name username')
+      .populate('courseId', 'title')
+      .sort({ createdAt: -1 })
+      .lean();
+
+    res.json({
+      success: true,
+      reviews: reviews.map(r => ({
+        _id: r._id,
+        courseId: r.courseId?._id,
+        courseTitle: r.courseId?.title || 'Course',
+        studentName: r.studentId?.name || r.studentId?.username || 'Student',
+        rating: r.rating,
+        comment: r.comment,
+        createdAt: r.createdAt,
+      })),
+      count: reviews.length,
+    });
   } catch (e) {
     res.status(500).json({ success: false, message: e.message });
   }

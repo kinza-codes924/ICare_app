@@ -162,12 +162,141 @@ class _StreamTabState extends State<_StreamTab> {
           if (widget.isInstructor) ...[
             _PostBox(ctrl: _ctrl, onPost: _post),
             const SizedBox(height: 16),
+          ] else ...[
+            _LeaveReviewCard(courseId: widget.courseId, lms: widget.lms),
+            const SizedBox(height: 16),
           ],
           if (_loading)
             const Center(child: Padding(padding: EdgeInsets.all(32), child: CircularProgressIndicator())),
           if (!_loading && _posts.isEmpty)
             _EmptyState(icon: Icons.campaign_outlined, text: 'No announcements yet'),
           ..._posts.map((p) => _PostCard(post: p, lms: widget.lms, onRefresh: _load)),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── LEAVE A REVIEW (student → instructor/course feedback) ───────────────────
+class _LeaveReviewCard extends StatefulWidget {
+  final String courseId;
+  final LmsService lms;
+  const _LeaveReviewCard({required this.courseId, required this.lms});
+
+  @override
+  State<_LeaveReviewCard> createState() => _LeaveReviewCardState();
+}
+
+class _LeaveReviewCardState extends State<_LeaveReviewCard> {
+  int _rating = 0;
+  final _commentCtrl = TextEditingController();
+  bool _submitting = false;
+  bool _expanded = false;
+
+  @override
+  void dispose() {
+    _commentCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    if (_rating == 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select a star rating')),
+      );
+      return;
+    }
+    setState(() => _submitting = true);
+    try {
+      await widget.lms.submitCourseReview(widget.courseId, _rating, comment: _commentCtrl.text.trim());
+      if (mounted) {
+        setState(() => _expanded = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Thanks for your feedback!'), backgroundColor: Color(0xFF10B981)),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to submit: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8)],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          InkWell(
+            onTap: () => setState(() => _expanded = !_expanded),
+            child: Row(
+              children: [
+                const Icon(Icons.rate_review_outlined, color: AppColors.primaryColor, size: 20),
+                const SizedBox(width: 10),
+                const Expanded(
+                  child: Text('Leave a review for this course',
+                      style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+                ),
+                Icon(_expanded ? Icons.expand_less : Icons.expand_more, color: const Color(0xFF64748B)),
+              ],
+            ),
+          ),
+          if (_expanded) ...[
+            const SizedBox(height: 12),
+            Row(
+              children: List.generate(5, (i) {
+                final filled = i < _rating;
+                return GestureDetector(
+                  onTap: () => setState(() => _rating = i + 1),
+                  child: Padding(
+                    padding: const EdgeInsets.only(right: 4),
+                    child: Icon(
+                      filled ? Icons.star_rounded : Icons.star_outline_rounded,
+                      size: 32,
+                      color: filled ? const Color(0xFFF59E0B) : const Color(0xFFCBD5E1),
+                    ),
+                  ),
+                );
+              }),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _commentCtrl,
+              maxLines: 3,
+              decoration: const InputDecoration(
+                hintText: 'Share your experience with this course (optional)',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Align(
+              alignment: Alignment.centerRight,
+              child: ElevatedButton(
+                onPressed: _submitting ? null : _submit,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primaryColor,
+                  foregroundColor: Colors.white,
+                ),
+                child: _submitting
+                    ? const SizedBox(
+                        width: 18, height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      )
+                    : const Text('Submit Review'),
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -1458,20 +1587,16 @@ class _PeopleTabState extends State<_PeopleTab> {
   void initState() { super.initState(); _load(); }
 
   Future<void> _load() async {
-    if (widget.isInstructor) {
-      final results = await Future.wait([
-        widget.lms.getEnrolledStudents(widget.courseId),
-        widget.lms.getCourseInstructors(widget.courseId),
-      ]);
-      if (mounted) {
-        setState(() {
-          _students = results[0];
-          _coInstructors = results[1];
-          _loading = false;
-        });
-      }
-    } else {
-      if (mounted) { setState(() => _loading = false); }
+    final results = await Future.wait([
+      widget.lms.getEnrolledStudents(widget.courseId),
+      widget.lms.getCourseInstructors(widget.courseId),
+    ]);
+    if (mounted) {
+      setState(() {
+        _students = results[0];
+        _coInstructors = results[1];
+        _loading = false;
+      });
     }
   }
 
@@ -1574,13 +1699,11 @@ class _PeopleTabState extends State<_PeopleTab> {
         // ── Students section
         _SectionHeader(title: 'Students (${_students.length})', icon: Icons.group_rounded),
         const SizedBox(height: 8),
-        if (!widget.isInstructor)
-          _EmptyState(icon: Icons.group_outlined, text: 'Enroll to see classmates'),
-        if (widget.isInstructor && _students.isEmpty)
+        if (_students.isEmpty)
           _EmptyState(icon: Icons.group_outlined, text: 'No students enrolled yet'),
         ..._students.map((s) => _PersonTile(
           name: s['name'] ?? 'Student',
-          role: s['email'] ?? '',
+          role: widget.isInstructor ? (s['email'] ?? '') : '',
           isInstructor: false,
           progress: s['progress'],
         )),

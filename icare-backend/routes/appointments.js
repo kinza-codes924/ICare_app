@@ -350,4 +350,89 @@ router.post('/:id/rate', authMiddleware, async (req, res) => {
   }
 });
 
+// ── CRON: Send appointment reminders (1 hour and 10 minutes before) ─────────
+// Vercel cron only guarantees daily execution on the Hobby plan; on Pro this
+// endpoint can be scheduled every few minutes for real minute-level accuracy.
+// Either way the reminderSent1hr/10min flags make repeated calls idempotent.
+function parseApptDateTime(dateStr, timeStr) {
+  try {
+    if (!dateStr) return null;
+    const base = new Date(`${dateStr}T00:00:00`);
+    if (isNaN(base.getTime())) return null;
+    if (!timeStr) return base;
+
+    const match = timeStr.trim().toUpperCase().match(/^(\d{1,2}):(\d{2})\s*(AM|PM)?$/);
+    if (!match) return base;
+    let hour = parseInt(match[1], 10);
+    const minute = parseInt(match[2], 10);
+    const meridiem = match[3];
+    if (meridiem === 'PM' && hour !== 12) hour += 12;
+    if (meridiem === 'AM' && hour === 12) hour = 0;
+
+    base.setHours(hour, minute, 0, 0);
+    return base;
+  } catch {
+    return null;
+  }
+}
+
+async function handleAppointmentReminders(req, res) {
+  const cronSecret = req.headers['x-cron-secret'] || req.query.secret;
+  if (cronSecret !== process.env.CRON_SECRET && process.env.CRON_SECRET) {
+    return res.status(403).json({ success: false, message: 'Forbidden' });
+  }
+  try {
+    await connectMongoDB();
+    const { sendToUser } = require('../services/notificationService');
+
+    const now = new Date();
+    const todayStr = now.toISOString().split('T')[0];
+
+    // Only confirmed appointments happening today are candidates —
+    // avoids scanning the whole collection on every run.
+    const candidates = await Appointment.find({
+      status: 'confirmed',
+      appointment_date: todayStr,
+      $or: [{ reminderSent1hr: { $ne: true } }, { reminderSent10min: { $ne: true } }],
+    }).lean();
+
+    let sent1hr = 0, sent10min = 0;
+
+    for (const appt of candidates) {
+      const apptTime = parseApptDateTime(appt.appointment_date, appt.appointment_time);
+      if (!apptTime) continue;
+      const minsUntil = (apptTime.getTime() - now.getTime()) / 60000;
+
+      const notify = async (label) => {
+        const body = `Your appointment is ${label}. Please be ready.`;
+        await Promise.all([
+          sendToUser(appt.patient_id, { title: 'Appointment Reminder', body, type: 'booking_update' }),
+          sendToUser(appt.doctor_id, { title: 'Appointment Reminder', body, type: 'booking_update' }),
+        ]);
+      };
+
+      // 1-hour window: fire once between 50 and 70 minutes before
+      if (!appt.reminderSent1hr && minsUntil > 0 && minsUntil <= 70 && minsUntil >= 50) {
+        await notify('in about 1 hour');
+        await Appointment.updateOne({ _id: appt._id }, { $set: { reminderSent1hr: true } });
+        sent1hr++;
+      }
+
+      // 10-minute window: fire once between 5 and 15 minutes before
+      if (!appt.reminderSent10min && minsUntil > 0 && minsUntil <= 15 && minsUntil >= 5) {
+        await notify('in about 10 minutes');
+        await Appointment.updateOne({ _id: appt._id }, { $set: { reminderSent10min: true } });
+        sent10min++;
+      }
+    }
+
+    res.json({ success: true, checked: candidates.length, sent1hr, sent10min });
+  } catch (e) {
+    console.error('Appointment reminders cron error:', e);
+    res.status(500).json({ success: false, message: e.message });
+  }
+}
+router.get('/send-reminders', handleAppointmentReminders);
+router.post('/send-reminders', handleAppointmentReminders);
+
 module.exports = router;

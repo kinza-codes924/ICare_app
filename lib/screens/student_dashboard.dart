@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:icare/screens/doctors_list.dart';
 import 'package:icare/screens/student_lms_dashboard.dart';
 import 'package:icare/screens/lms_public_catalog.dart';
-import 'package:icare/screens/tabs.dart';
 import 'package:icare/screens/view_course.dart';
 import 'package:icare/services/course_service.dart';
 import 'package:icare/services/analytics_service.dart';
@@ -368,9 +368,9 @@ class _StudentDashboardState extends ConsumerState<StudentDashboard> {
                             Icons.video_call_rounded,
                             const Color(0xFF0EA5E9),
                             () {
-                              Navigator.of(context).pushReplacement(
+                              Navigator.of(context).push(
                                 MaterialPageRoute(
-                                  builder: (ctx) => const TabsScreen(),
+                                  builder: (ctx) => const DoctorsList(),
                                 ),
                               );
                             },

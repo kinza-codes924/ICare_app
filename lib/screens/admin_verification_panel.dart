@@ -5,7 +5,11 @@ import 'package:icare/widgets/back_button.dart';
 
 /// Admin Verification Panel - Review and approve/reject student documents
 class AdminVerificationPanel extends StatefulWidget {
-  const AdminVerificationPanel({super.key});
+  /// When true, renders without its own Scaffold/AppBar — for embedding
+  /// inside another screen's TabBarView (e.g. AdminPanelScreen).
+  final bool embedded;
+
+  const AdminVerificationPanel({super.key, this.embedded = false});
 
   @override
   State<AdminVerificationPanel> createState() => _AdminVerificationPanelState();
@@ -148,8 +152,79 @@ class _AdminVerificationPanelState extends State<AdminVerificationPanel>
     }
   }
 
+  Widget _buildTabBar() {
+    return TabBar(
+      controller: _tabController,
+      indicatorColor: AppColors.primaryColor,
+      labelColor: AppColors.primaryColor,
+      unselectedLabelColor: const Color(0xFF64748B),
+      isScrollable: widget.embedded,
+      tabs: [
+        Tab(
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('Pending'),
+              if (_pendingVerifications.isNotEmpty) ...[
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: Colors.red,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    '${_pendingVerifications.length}',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+        const Tab(text: 'Approved'),
+        const Tab(text: 'Rejected'),
+        const Tab(text: 'All'),
+      ],
+    );
+  }
+
+  Widget _buildBody() {
+    return _isLoading
+        ? const Center(child: CircularProgressIndicator())
+        : TabBarView(
+            controller: _tabController,
+            children: [
+              _buildVerificationList(_pendingVerifications),
+              _buildVerificationList(
+                _allVerifications.where((v) => v['status'] == 'approved').toList(),
+              ),
+              _buildVerificationList(
+                _allVerifications.where((v) => v['status'] == 'rejected').toList(),
+              ),
+              _buildVerificationList(_allVerifications),
+            ],
+          );
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (widget.embedded) {
+      return Column(
+        children: [
+          Container(
+            color: Colors.white,
+            child: _buildTabBar(),
+          ),
+          Expanded(child: _buildBody()),
+        ],
+      );
+    }
+
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
@@ -163,59 +238,12 @@ class _AdminVerificationPanelState extends State<AdminVerificationPanel>
             fontWeight: FontWeight.w800,
           ),
         ),
-        bottom: TabBar(
-          controller: _tabController,
-          indicatorColor: AppColors.primaryColor,
-          labelColor: AppColors.primaryColor,
-          unselectedLabelColor: const Color(0xFF64748B),
-          tabs: [
-            Tab(
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Text('Pending'),
-                  if (_pendingVerifications.isNotEmpty) ...[
-                    const SizedBox(width: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: Colors.red,
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Text(
-                        '${_pendingVerifications.length}',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-            const Tab(text: 'Approved'),
-            const Tab(text: 'Rejected'),
-            const Tab(text: 'All'),
-          ],
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(48),
+          child: _buildTabBar(),
         ),
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : TabBarView(
-              controller: _tabController,
-              children: [
-                _buildVerificationList(_pendingVerifications),
-                _buildVerificationList(
-                  _allVerifications.where((v) => v['status'] == 'approved').toList(),
-                ),
-                _buildVerificationList(
-                  _allVerifications.where((v) => v['status'] == 'rejected').toList(),
-                ),
-                _buildVerificationList(_allVerifications),
-              ],
-            ),
+      body: _buildBody(),
     );
   }
 

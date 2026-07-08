@@ -1,6 +1,7 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:icare/services/lms_service.dart';
 import 'package:icare/utils/theme.dart';
+import 'package:icare/widgets/attachment_viewer.dart';
 import 'package:intl/intl.dart';
 
 /// Assignment Grading Screen - Google Classroom style
@@ -173,7 +174,7 @@ class _InstructorGradingScreenState extends State<InstructorGradingScreen> {
     String submittedLabel = '';
     if (submittedAt != null) {
       try {
-        final date = DateTime.parse(submittedAt.toString());
+        final date = DateTime.parse(submittedAt.toString()).toLocal();
         submittedLabel = DateFormat('MMM dd, yyyy - hh:mm a').format(date);
       } catch (_) {}
     }
@@ -405,6 +406,14 @@ class _GradingDialogState extends State<_GradingDialog> {
   final _feedbackController = TextEditingController();
   bool _isSubmitting = false;
   int _starRating = 0;
+  String? _rubricGrade;
+
+  static const _rubricOptions = [
+    {'value': 'Excellent', 'label': 'Excellent'},
+    {'value': 'Satisfactory', 'label': 'Satisfactory'},
+    {'value': 'Average', 'label': 'Average'},
+    {'value': 'Needs Improvement', 'label': 'Needs Improvement'},
+  ];
 
   @override
   void initState() {
@@ -417,6 +426,10 @@ class _GradingDialogState extends State<_GradingDialog> {
     }
     if (widget.submission['stars'] != null) {
       _starRating = (widget.submission['stars'] as num).toInt();
+    }
+    final existingRubric = widget.submission['rubricGrade']?.toString();
+    if (existingRubric != null && existingRubric.isNotEmpty) {
+      _rubricGrade = existingRubric;
     }
   }
 
@@ -444,6 +457,7 @@ class _GradingDialogState extends State<_GradingDialog> {
         marks,
         feedback: _feedbackController.text,
         stars: _starRating > 0 ? _starRating : null,
+        rubricGrade: _rubricGrade,
       );
 
       if (mounted) {
@@ -510,31 +524,9 @@ class _GradingDialogState extends State<_GradingDialog> {
                   style: TextStyle(fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 8),
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF8FAFC),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: const Color(0xFFE2E8F0)),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.attach_file, size: 20),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          widget.submission['fileName'] ?? 'Attached file',
-                          style: const TextStyle(fontSize: 14),
-                        ),
-                      ),
-                      TextButton(
-                        onPressed: () {
-                          // TODO: Open file
-                        },
-                        child: const Text('View'),
-                      ),
-                    ],
-                  ),
+                AttachmentViewer(
+                  url: widget.submission['fileUrl'].toString(),
+                  name: widget.submission['fileName']?.toString(),
                 ),
                 const SizedBox(height: 16),
               ],
@@ -548,6 +540,38 @@ class _GradingDialogState extends State<_GradingDialog> {
                   hintText: 'Enter marks',
                 ),
                 keyboardType: TextInputType.number,
+              ),
+              const SizedBox(height: 16),
+
+              // Rubric level
+              const Text('Rubric Level (optional)',
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF374151))),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: _rubricOptions.map((opt) {
+                  final selected = _rubricGrade == opt['value'];
+                  return GestureDetector(
+                    onTap: () => setState(() => _rubricGrade = selected ? null : opt['value']),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: selected ? AppColors.primaryColor.withValues(alpha: 0.1) : const Color(0xFFF8FAFC),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: selected ? AppColors.primaryColor : const Color(0xFFE2E8F0)),
+                      ),
+                      child: Text(
+                        opt['label']!,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: selected ? AppColors.primaryColor : const Color(0xFF64748B),
+                        ),
+                      ),
+                    ),
+                  );
+                }).toList(),
               ),
               const SizedBox(height: 16),
 

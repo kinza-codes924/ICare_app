@@ -107,6 +107,29 @@ class LmsService {
     } catch (_) { return []; }
   }
 
+  // Instructor: all student attempts for a quiz
+  Future<List<dynamic>> getQuizAttempts(String quizId) async {
+    try {
+      final response = await _api.get('/quizzes/$quizId/attempts');
+      return response.data['attempts'] ?? [];
+    } catch (_) { return []; }
+  }
+
+  // Instructor: grade a quiz attempt — rubric level, star rating, feedback
+  Future<Map<String, dynamic>> gradeQuizAttempt(
+    String attemptId, {
+    String? rubricGrade,
+    int? stars,
+    String? feedback,
+  }) async {
+    final response = await _api.put('/quizzes/attempts/$attemptId/grade', {
+      if (rubricGrade != null) 'rubricGrade': rubricGrade,
+      if (stars != null) 'stars': stars,
+      if (feedback != null) 'feedback': feedback,
+    });
+    return response.data ?? {};
+  }
+
   Future<Map<String, dynamic>> createQuiz(Map<String, dynamic> quizData) async {
     try {
       final response = await _api.post('/quizzes', quizData);
@@ -242,6 +265,34 @@ class LmsService {
 
   Future<List<dynamic>> getCourseGrades(String courseId) async {
     return getMyGrades(courseId);
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // COURSE FEEDBACK / REVIEWS
+  // ═══════════════════════════════════════════════════════════════════════
+
+  // Enrolled student submits (or updates) a rating + written review.
+  Future<Map<String, dynamic>> submitCourseReview(
+    String courseId,
+    int rating, {
+    String? comment,
+  }) async {
+    final response = await _api.post('/courses/$courseId/reviews', {
+      'rating': rating,
+      if (comment != null) 'comment': comment,
+    });
+    return response.data;
+  }
+
+  Future<List<dynamic>> getCourseReviews(String courseId) async {
+    final response = await _api.get('/courses/$courseId/reviews');
+    return response.data['reviews'] ?? [];
+  }
+
+  // Instructor: all feedback across their own courses.
+  Future<List<dynamic>> getMyCourseReviews() async {
+    final response = await _api.get('/courses/reviews/my-courses');
+    return response.data['reviews'] ?? [];
   }
 
   // ═══════════════════════════════════════════════════════════════════════
@@ -894,6 +945,10 @@ class LmsService {
     } catch (e) {
       return {'success': false, 'message': e.toString().replaceAll('Exception: ', '')};
     }
+  }
+
+  Future<void> deleteSession(String sessionId) async {
+    await _api.delete('/live-sessions/$sessionId');
   }
 
   // ═══════════════════════════════════════════════════════════════════════

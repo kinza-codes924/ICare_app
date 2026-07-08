@@ -771,6 +771,8 @@
               if (ld) { ld.innerHTML = ''; window._lmsLocalVideo.play('lms-agora-local'); }
             } catch(_) {}
           }
+          // Point the recording back at the live camera track
+          if (window._lmsRebindRecordLocal) { try { window._lmsRebindRecordLocal(); } catch(_) {} }
           return 'camera';
         } else {
           // Start screen sharing
@@ -795,6 +797,9 @@
           var ld2 = document.getElementById('lms-agora-local');
           if (ld2) { ld2.innerHTML = ''; window._lmsScreenTrack.play('lms-agora-local'); }
           window._lmsScreenSharing = true;
+          // Point the recording at the live screen track so it captures the
+          // real screen (not a frozen camera frame).
+          if (window._lmsRebindRecordLocal) { try { window._lmsRebindRecordLocal(); } catch(_) {} }
           // If user stops via browser native UI button
           window._lmsScreenTrack.on('track-ended', async function() {
             if (window._lmsScreenSharing) {
@@ -909,12 +914,24 @@
         var localVid = document.createElement('video');
         localVid.autoplay = true; localVid.muted = true; localVid.playsInline = true;
         _hiddenStyle(localVid);
-        if (window._lmsLocalVideo) {
-          var ls = new MediaStream();
-          try { ls.addTrack(window._lmsLocalVideo.getMediaStreamTrack()); } catch(_) {}
-          localVid.srcObject = ls;
-        }
         document.body.appendChild(localVid);
+
+        // Bind the recording's local video element to whichever track is the
+        // instructor's active local video — screen track while sharing, camera
+        // otherwise. Exposed so lmsToggleScreenShare can re-bind on switch.
+        window._lmsRebindRecordLocal = function() {
+          var srcTrack = (window._lmsScreenSharing && window._lmsScreenTrack)
+            ? window._lmsScreenTrack
+            : window._lmsLocalVideo;
+          if (!srcTrack || !localVid) return;
+          try {
+            var s = new MediaStream();
+            s.addTrack(srcTrack.getMediaStreamTrack());
+            localVid.srcObject = s;
+            localVid.play().catch(function(){});
+          } catch(_) {}
+        };
+        window._lmsRebindRecordLocal();
 
         var remoteVid = null;
         var remoteUsers = window._lmsAgoraClient ? window._lmsAgoraClient.remoteUsers : [];
@@ -931,7 +948,8 @@
         localVid.play().catch(function(){});
 
         // ── Canvas composite ─────────────────────────────────────────────
-        var W = 1280, H = 720;
+        // 1080p so shared screen content (text/slides) stays legible.
+        var W = 1920, H = 1080;
         var canvas = document.createElement('canvas');
         canvas.width = W; canvas.height = H;
         var ctx = canvas.getContext('2d');
@@ -939,19 +957,39 @@
         window._lmsRecordLocalVid = localVid;
         window._lmsRecordRemoteVid = remoteVid;
 
+        // Draw a source video into a target rect preserving aspect ratio
+        // (letterboxed) so screen content is never stretched/squeezed.
+        var drawFit = function(vid, dx, dy, dw, dh) {
+          var vw = vid.videoWidth, vh = vid.videoHeight;
+          if (!vw || !vh) return;
+          var scale = Math.min(dw / vw, dh / vh);
+          var w = vw * scale, h = vh * scale;
+          ctx.drawImage(vid, dx + (dw - w) / 2, dy + (dh - h) / 2, w, h);
+        };
+
         var drawFrame = function() {
           if (!window._lmsRecorder || window._lmsRecorder.state !== 'recording') return;
           ctx.fillStyle = '#111';
           ctx.fillRect(0, 0, W, H);
           var hasRemote = remoteVid && remoteVid.readyState >= 2 && remoteVid.videoWidth > 0;
           var hasLocal  = localVid  && localVid.readyState  >= 2 && localVid.videoWidth  > 0;
-          if (hasRemote && hasLocal) {
-            ctx.drawImage(remoteVid, 0,   0, W/2, H);   // student  — left
-            ctx.drawImage(localVid,  W/2, 0, W/2, H);   // instructor — right
+          if (window._lmsScreenSharing && hasLocal) {
+            // Screen share: fill the whole frame with the shared screen
+            // (aspect-preserved), camera goes to a small PiP corner.
+            drawFit(localVid, 0, 0, W, H);
+            if (hasRemote) {
+              var pipW = W * 0.22, pipH = pipW * 9 / 16;
+              ctx.fillStyle = '#000';
+              ctx.fillRect(W - pipW - 12, H - pipH - 12, pipW, pipH);
+              drawFit(remoteVid, W - pipW - 12, H - pipH - 12, pipW, pipH);
+            }
+          } else if (hasRemote && hasLocal) {
+            drawFit(remoteVid, 0,   0, W/2, H);   // student  — left
+            drawFit(localVid,  W/2, 0, W/2, H);   // instructor — right
           } else if (hasLocal) {
-            ctx.drawImage(localVid, 0, 0, W, H);
+            drawFit(localVid, 0, 0, W, H);
           } else if (hasRemote) {
-            ctx.drawImage(remoteVid, 0, 0, W, H);
+            drawFit(remoteVid, 0, 0, W, H);
           }
           requestAnimationFrame(drawFrame);
         };
@@ -959,13 +997,27 @@
         setTimeout(drawFrame, 1500);
 
         // ── MediaRecorder from canvas stream + mixed audio ───────────────
-        var canvasStream = canvas.captureStream(24);
+        // 30fps for smooth motion; matches Agora screen-share frameRate.
+        var canvasStream = canvas.captureStream(30);
 
         // Mix local mic + all remote audio tracks via Web Audio API
         try {
           var audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-          // Resume in case browser suspended the context (autoplay policy)
-          if (audioCtx.state === 'suspended') { audioCtx.resume(); }
+          // Resume in case browser suspended the context (autoplay policy) —
+          // MUST be awaited: connecting sources before the context is truly
+          // 'running' produces a silent destination track (recording plays
+          // back with no sound even though a track exists).
+          if (audioCtx.state === 'suspended') {
+            try { await audioCtx.resume(); } catch(_) {}
+          }
+          // If the mic track isn't ready yet (race with Agora publish flow,
+          // e.g. recording auto-starts 3s after join), wait briefly and retry
+          // instead of silently recording with no local audio at all.
+          if (!window._lmsLocalAudio) {
+            for (var waitTry = 0; waitTry < 10 && !window._lmsLocalAudio; waitTry++) {
+              await new Promise(function(r) { setTimeout(r, 300); });
+            }
+          }
           var dest = audioCtx.createMediaStreamDestination();
           var audioSourceCount = 0;
           if (window._lmsLocalAudio) {
@@ -974,6 +1026,8 @@
               audioCtx.createMediaStreamSource(localStream).connect(dest);
               audioSourceCount++;
             } catch(ae) { console.warn('LMS rec: local audio mix error:', ae.message); }
+          } else {
+            console.warn('LMS rec: local mic track still unavailable after wait — recording will have no local audio');
           }
           if (window._lmsAgoraClient) {
             window._lmsAgoraClient.remoteUsers.forEach(function(u) {
@@ -989,8 +1043,13 @@
           var mixedTrack = dest.stream.getAudioTracks()[0];
           if (mixedTrack) {
             canvasStream.addTrack(mixedTrack);
-            console.log('LMS: mixed ' + audioSourceCount + ' audio source(s) into recording');
+            console.log('LMS: mixed ' + audioSourceCount + ' audio source(s) into recording, audioCtx.state=' + audioCtx.state);
+          } else {
+            console.warn('LMS rec: no mixed audio track produced — recording will be silent');
           }
+          // Keep a handle so we can verify/resume if the context gets
+          // suspended again mid-recording (some browsers do this on tab blur).
+          window._lmsRecordAudioCtx = audioCtx;
         } catch(audioErr) {
           // Fallback: local only
           if (window._lmsLocalAudio) {
@@ -1017,7 +1076,8 @@
           'video/webm'
         ].find(function(t) { return MediaRecorder.isTypeSupported(t); }) || 'video/webm';
 
-        window._lmsRecorder = new MediaRecorder(canvasStream, { mimeType: mimeType, videoBitsPerSecond: 1200000, audioBitsPerSecond: 128000 });
+        // 4 Mbps @ 1080p keeps shared-screen text crisp without huge files.
+        window._lmsRecorder = new MediaRecorder(canvasStream, { mimeType: mimeType, videoBitsPerSecond: 4000000, audioBitsPerSecond: 128000 });
         window._lmsRecorder.ondataavailable = function(e) {
           if (e.data && e.data.size > 0) window._lmsChunks.push(e.data);
         };
@@ -1037,6 +1097,11 @@
         if (window._lmsRecordLocalVid) { try { window._lmsRecordLocalVid.pause(); window._lmsRecordLocalVid.srcObject = null; if (window._lmsRecordLocalVid.parentNode) window._lmsRecordLocalVid.parentNode.removeChild(window._lmsRecordLocalVid); } catch(_){} window._lmsRecordLocalVid = null; }
         if (window._lmsRecordRemoteVid) { try { window._lmsRecordRemoteVid.pause(); window._lmsRecordRemoteVid.srcObject = null; if (window._lmsRecordRemoteVid.parentNode) window._lmsRecordRemoteVid.parentNode.removeChild(window._lmsRecordRemoteVid); } catch(_){} window._lmsRecordRemoteVid = null; }
         window._lmsRecordCanvas = null;
+        window._lmsRebindRecordLocal = null;
+        if (window._lmsRecordAudioCtx) {
+          try { window._lmsRecordAudioCtx.close(); } catch(_) {}
+          window._lmsRecordAudioCtx = null;
+        }
         if (window._lmsStream) {
           window._lmsStream.getTracks().forEach(function(t) { t.stop(); });
           window._lmsStream = null;

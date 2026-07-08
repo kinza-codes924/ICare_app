@@ -8,7 +8,6 @@ import 'package:flutter_size_matters/flutter_size_matters.dart';
 import 'package:go_router/go_router.dart';
 import 'package:icare/providers/auth_provider.dart';
 import 'package:icare/screens/forget_password.dart';
-import 'package:icare/screens/privacy_policy.dart';
 import 'package:icare/screens/lab_profile_setup.dart';
 import 'package:icare/screens/pharmacy_profile_setup.dart';
 import 'package:icare/screens/student_profile_setup.dart';
@@ -1089,11 +1088,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                                               ),
                                               recognizer: TapGestureRecognizer()
                                                 ..onTap = () {
-                                                  Navigator.of(context).push(
-                                                    MaterialPageRoute(
-                                                      builder: (ctx) => const PrivacyPolicy(),
-                                                    ),
-                                                  );
+                                                  context.go('/terms');
                                                 },
                                             ),
                                             const TextSpan(text: " and "),
@@ -1106,11 +1101,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                                               ),
                                               recognizer: TapGestureRecognizer()
                                                 ..onTap = () {
-                                                  Navigator.of(context).push(
-                                                    MaterialPageRoute(
-                                                      builder: (ctx) => const PrivacyPolicy(),
-                                                    ),
-                                                  );
+                                                  context.go('/privacypolicy');
                                                 },
                                             ),
                                           ],
@@ -1625,11 +1616,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                                           ),
                                           recognizer: TapGestureRecognizer()
                                             ..onTap = () {
-                                              Navigator.of(context).push(
-                                                MaterialPageRoute(
-                                                  builder: (ctx) => const PrivacyPolicy(),
-                                                ),
-                                              );
+                                              context.go('/terms');
                                             },
                                         ),
                                         const TextSpan(text: " and "),
@@ -1642,11 +1629,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                                           ),
                                           recognizer: TapGestureRecognizer()
                                             ..onTap = () {
-                                              Navigator.of(context).push(
-                                                MaterialPageRoute(
-                                                  builder: (ctx) => const PrivacyPolicy(),
-                                                ),
-                                              );
+                                              context.go('/privacypolicy');
                                             },
                                         ),
                                       ],
