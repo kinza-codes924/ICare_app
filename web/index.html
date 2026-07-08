@@ -64,15 +64,23 @@
       padding: 2px 8px; border-radius: 4px; z-index: 10; pointer-events: none;
     }
     /* Screen-share mode: a large main view for the shared screen, with
-       participant camera tiles demoted to a thin scrollable sidebar strip. */
+       participant camera tiles demoted to a thin scrollable sidebar strip.
+       Every property here needs !important — #lms-grid-container carries
+       inline width/height:100% (set once from Dart when the platform view
+       is created) and inline styles beat class selectors regardless of
+       selector specificity, so without !important this rule was a no-op:
+       the grid stayed full-screen on top of the screen-share view instead
+       of shrinking into the sidebar, which is why the shared screen looked
+       small (grid was covering it) and participants looked like they
+       vanished (full-size transparent-ish grid clipping over them). */
     #lms-jitsi-host.lms-screenshare-mode #lms-grid-container {
-      position: absolute; top: 0; right: 0; bottom: 0;
-      width: 130px; height: auto;
+      position: absolute !important; top: 0 !important; right: 0 !important; bottom: 0 !important; left: auto !important;
+      width: 130px !important; height: auto !important;
       grid-template-columns: 1fr !important;
-      grid-auto-rows: 98px;
-      overflow-y: auto; overflow-x: hidden;
-      background: rgba(0,0,0,0.35);
-      z-index: 15;
+      grid-auto-rows: 98px !important;
+      overflow-y: auto !important; overflow-x: hidden !important;
+      background: rgba(0,0,0,0.35) !important;
+      z-index: 15 !important;
     }
     #lms-jitsi-host.lms-screenshare-mode #lms-grid-container .lms-remote-tile {
       aspect-ratio: auto; min-height: 98px;
@@ -522,7 +530,7 @@
             try {
               var vd = document.getElementById('lms-tile-' + u.uid + '-video');
               if (!vd) { window._lmsGetOrCreateTile(u.uid); vd = document.getElementById('lms-tile-' + u.uid + '-video'); }
-              if (vd) { vd.innerHTML = ''; u.videoTrack.play(vd.id); }
+              if (vd) { vd.innerHTML = ''; u.videoTrack.play(vd.id, { fit: window._lmsVideoFit || 'cover' }); }
             } catch(_) {}
           }
         });
@@ -628,7 +636,7 @@
           window._lmsAgoraClient.remoteUsers.forEach(function(u) {
             if (!u.videoTrack) return;
             var vd = document.getElementById('lms-tile-' + u.uid + '-video');
-            if (vd) { try { u.videoTrack.play(vd.id); } catch(_) {} }
+            if (vd) { try { u.videoTrack.play(vd.id, { fit: window._lmsVideoFit || 'cover' }); } catch(_) {} }
           });
         }, 120);
       }
@@ -674,7 +682,13 @@
           if (videoDiv) {
             try {
               videoDiv.innerHTML = '';
-              videoTrack.play(videoDiv.id);
+              // Agora's player crops to its OWN internal canvas using this
+              // fit mode — our CSS object-fit override on the outer <video>
+              // element only resizes that already-cropped canvas, it can't
+              // undo the crop. Without passing `fit` here Agora defaults to
+              // 'cover' regardless of the CSS, which is why "Fit" mode still
+              // looked zoomed/cropped instead of showing the full frame.
+              videoTrack.play(videoDiv.id, { fit: window._lmsVideoFit || 'cover' });
               console.log('LMS: remote video playing uid=' + uid + ' (attempt ' + retries + ')');
               // Verify Agora actually attached a rendering element (canvas/video)
               // into the tile — under rapid concurrent joins this can silently
@@ -826,6 +840,13 @@
           window._lmsSetScreenShareMode(false);
           var mainEl = document.getElementById('lms-screen-share-main');
           if (mainEl) mainEl.innerHTML = '';
+          // Mobile Chrome sometimes force-rotates to landscape while
+          // getDisplayMedia() is capturing and doesn't revert it on its
+          // own — release any orientation lock we took and let the OS
+          // sensor take back over so the page returns to portrait.
+          try {
+            if (screen.orientation && screen.orientation.unlock) screen.orientation.unlock();
+          } catch(_) {}
           // Re-publish camera
           if (window._lmsLocalVideo && window._lmsAgoraClient) {
             try {
@@ -850,6 +871,15 @@
               optimizationMode: 'detail'
             }
           }, 'disable');
+          // Best-effort: ask to stay in portrait. Only actually works while
+          // fullscreen on most mobile browsers, so this is allowed to fail
+          // silently — the real fix is the unlock() call on stop, above,
+          // which recovers from whatever rotation the capture itself forced.
+          try {
+            if (screen.orientation && screen.orientation.lock) {
+              await screen.orientation.lock('portrait').catch(function(){});
+            }
+          } catch(_) {}
           // Unpublish camera
           if (window._lmsLocalVideo && window._lmsAgoraClient) {
             try { await window._lmsAgoraClient.unpublish([window._lmsLocalVideo]); } catch(_) {}
@@ -862,7 +892,9 @@
           // frame, harmless since it's not being published).
           window._lmsSetScreenShareMode(true);
           var mainEl2 = document.getElementById('lms-screen-share-main');
-          if (mainEl2) { mainEl2.innerHTML = ''; window._lmsScreenTrack.play('lms-screen-share-main'); }
+          // Always 'contain' — a shared screen (slides/text) must never be
+          // cropped regardless of the camera-tile Fit/Fill toggle.
+          if (mainEl2) { mainEl2.innerHTML = ''; window._lmsScreenTrack.play('lms-screen-share-main', { fit: 'contain' }); }
           window._lmsScreenSharing = true;
           // Point the recording at the live screen track so it captures the
           // real screen (not a frozen camera frame).
@@ -920,7 +952,7 @@
         });
         if (remoteUser && remoteUser.videoTrack && mainEl) {
           window._lmsSetScreenShareMode(true);
-          try { remoteUser.videoTrack.play('lms-screen-share-main'); } catch(_) {}
+          try { mainEl.innerHTML = ''; remoteUser.videoTrack.play('lms-screen-share-main', { fit: 'contain' }); } catch(_) {}
           // Hide their small grid tile while they're the main view so the
           // same feed isn't shown twice.
           var smallTile = document.getElementById('lms-tile-' + sharingUid);
@@ -935,7 +967,12 @@
       // Per-tile remote names are set via lmsSetTileName(uid, name)
     };
 
-    // Toggle video fit: 'cover' fills rectangle (no black bars), 'contain' shows full content
+    // Toggle video fit: 'cover' fills rectangle (no black bars), 'contain' shows full content.
+    // The CSS override alone only resizes Agora's own internal canvas — it
+    // doesn't change what Agora cropped when it first rendered the frame —
+    // so every currently-playing remote tile has to be re-played with the
+    // new `fit` value passed directly to Agora for the toggle to actually
+    // change what's visible (see lmsPlayIntoTile for the same fix on join).
     window._lmsVideoFit = 'cover';
     window.lmsSetVideoFit = function(mode) {
       window._lmsVideoFit = mode;
@@ -948,6 +985,13 @@
       st.textContent =
         '.lms-remote-tile > div, .lms-remote-tile video {' +
         'object-fit: ' + mode + ' !important; }';
+      if (window._lmsAgoraClient) {
+        window._lmsAgoraClient.remoteUsers.forEach(function(u) {
+          if (!u.videoTrack) return;
+          var vd = document.getElementById('lms-tile-' + u.uid + '-video');
+          if (vd) { try { vd.innerHTML = ''; u.videoTrack.play(vd.id, { fit: mode }); } catch(_) {} }
+        });
+      }
     };
 
     window.lmsRequestFullscreen = function() {

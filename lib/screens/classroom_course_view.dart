@@ -77,6 +77,12 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
   // Live session detection
   bool _isSessionLive = false;
   Timer? _livePoller;
+  // Suppresses the "instructor just went LIVE" SnackBar on the very first
+  // poll — that check just reflects whatever the session's state already
+  // was when this screen opened, not a fresh "just went live" event. The
+  // FAB + Stream-tab banner already make an already-live session visible
+  // without an extra transient alert stacked on top of them.
+  bool _firstLiveCheck = true;
 
   String get _courseId => widget.course['_id']?.toString() ?? '';
   String get _courseTitle =>
@@ -133,10 +139,16 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
     if (_courseId.isEmpty || !mounted) return;
     try {
       final result = await _lms.checkActiveLiveSession(_courseId);
+      final wasFirstCheck = _firstLiveCheck;
+      _firstLiveCheck = false;
       if (mounted && result['isLive'] != _isSessionLive) {
         setState(() => _isSessionLive = result['isLive'] == true);
-        // Show alert when session goes live
-        if (_isSessionLive) {
+        // Show the "just went live" alert only when this is a real
+        // transition witnessed while the screen was already open — not on
+        // the first poll, which just reports whatever state the session
+        // was already in (avoids stacking a SnackBar on top of the FAB and
+        // Stream-tab banner that already show an already-live session).
+        if (_isSessionLive && !wasFirstCheck) {
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(
             content: const Row(children: [
               Icon(Icons.live_tv_rounded, color: Colors.white),
