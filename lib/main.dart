@@ -1,3 +1,4 @@
+import 'dart:async' show unawaited;
 import 'dart:ui' show PlatformDispatcher;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -40,7 +41,12 @@ void main() async {
           options: DefaultFirebaseOptions.currentPlatform);
     } else {
       await Firebase.initializeApp();
-      await FcmService().init();
+      // Do NOT await FCM init: on iOS it waits for an APNS token, which never
+      // arrives until the Push Notifications capability is added — awaiting it
+      // here blocks runApp() and leaves the app on a blank screen.
+      unawaited(FcmService().init().catchError((Object e) {
+        debugPrint('FCM init failed (non-fatal): $e');
+      }));
     }
   } catch (e) {
     // Graceful fallback if firebase_options.dart still has placeholder appId.
