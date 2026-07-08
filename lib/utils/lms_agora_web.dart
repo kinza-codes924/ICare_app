@@ -30,10 +30,13 @@ external JSPromise<JSAny?> _lmsEnableMediaAndPublishJS();
 external JSPromise<JSString> _lmsStudentEnableAudioJS();
 
 @JS('lmsToggleScreenShare')
-external JSPromise<JSString> _lmsToggleScreenShareJS();
+external JSPromise<JSString> _lmsToggleScreenShareJS(JSString screenToken);
 
 @JS('lmsGetLocalUid')
 external JSString _lmsGetLocalUidJS();
+
+@JS('lmsGetScreenUid')
+external JSString _lmsGetScreenUidJS();
 
 @JS('lmsApplyRemoteScreenShare')
 external void _lmsApplyRemoteScreenShareJS(JSString sharingUid);
@@ -76,12 +79,13 @@ Future<void> lmsStudentEnableAudio() async {
   await _lmsStudentEnableAudioJS().toDart;
 }
 
-Future<String> lmsToggleScreenShare() async {
-  final r = await _lmsToggleScreenShareJS().toDart;
+Future<String> lmsToggleScreenShare(String screenToken) async {
+  final r = await _lmsToggleScreenShareJS(screenToken.toJS).toDart;
   return r.toDart;
 }
 
 String lmsGetLocalUid() => _lmsGetLocalUidJS().toDart;
+String lmsGetScreenUid() => _lmsGetScreenUidJS().toDart;
 void lmsApplyRemoteScreenShare(String sharingUid) =>
     _lmsApplyRemoteScreenShareJS(sharingUid.toJS);
 

@@ -111,8 +111,9 @@ Future<void> lmsEnableMediaAndPublish() async {}
 
 Future<void> lmsStudentEnableAudio() async {}
 
-Future<String> lmsToggleScreenShare() async => 'unsupported';
+Future<String> lmsToggleScreenShare(String screenToken) async => 'unsupported';
 String lmsGetLocalUid() => '';
+String lmsGetScreenUid() => '';
 void lmsApplyRemoteScreenShare(String sharingUid) {}
 void lmsRequestFullscreen() {}
 void lmsExitFullscreen() {}

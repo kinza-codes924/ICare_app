@@ -647,7 +647,19 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
 
   Future<void> _toggleScreenShare() async {
     try {
-      final result = await lmsToggleScreenShare();
+      String screenToken = '';
+      // Screen-share publishes on a SECOND Agora client/UID so the
+      // presenter's camera can keep publishing at the same time (Agora only
+      // allows one video track per UID per client) — that second client
+      // needs its own signed token for this channel, fetched the same way
+      // the main join token was (uid 0 = Agora assigns a fresh unique UID).
+      if (kIsWeb && !_screenSharing && _agoraRoomName != null) {
+        try {
+          final tokenData = await AgoraService().getToken(channelName: _agoraRoomName!, uid: 0);
+          screenToken = tokenData['data']?['token']?.toString() ?? '';
+        } catch (_) {}
+      }
+      final result = await lmsToggleScreenShare(screenToken);
       if (mounted) {
         setState(() {
           if (result == 'screen') {
@@ -667,9 +679,12 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
         });
       }
       // Broadcast who's sharing (or clear it) so other participants' 5s
-      // poll picks it up and switches to the big-main-view layout.
+      // poll picks it up and switches to the big-main-view layout. Uses the
+      // dedicated screen-share client's UID (not the camera client's) —
+      // that's the UID everyone else's own client sees the screen track
+      // published under, since it's a second, separate Agora connection.
       if (kIsWeb && _sessionDocId.isNotEmpty && (result == 'screen' || result == 'camera')) {
-        final uid = result == 'screen' ? lmsGetLocalUid() : null;
+        final uid = result == 'screen' ? lmsGetScreenUid() : null;
         await _lms.setScreenSharingUid(sessionId: _sessionDocId, uid: uid);
       }
     } catch (_) {}
