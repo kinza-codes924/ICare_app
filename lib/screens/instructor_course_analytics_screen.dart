@@ -1,5 +1,4 @@
 ﻿import 'package:flutter/material.dart';
-import 'package:icare/screens/instructor_attendance_screen.dart';
 import 'package:icare/services/lms_service.dart';
 import 'package:icare/utils/theme.dart';
 
@@ -434,29 +433,11 @@ class _InstructorCourseAnalyticsScreenState extends State<InstructorCourseAnalyt
             const Color(0xFF10B981),
           ),
           const Divider(height: 24),
-          InkWell(
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => InstructorAttendanceScreen(
-                  courseId: widget.courseId,
-                  courseTitle: widget.courseTitle,
-                ),
-              ),
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: _buildEngagementRow(
-                    Icons.video_call_rounded,
-                    'Live Session Attendance',
-                    'View attendance by session',
-                    const Color(0xFFEC4899),
-                  ),
-                ),
-                const Icon(Icons.chevron_right_rounded, color: Color(0xFF94A3B8)),
-              ],
-            ),
+          _buildEngagementRow(
+            Icons.video_call_rounded,
+            'Live Session Attendance',
+            'Coming soon',
+            const Color(0xFFEC4899),
           ),
         ],
       ),
