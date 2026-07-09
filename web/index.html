@@ -70,8 +70,12 @@
       background: rgba(0,0,0,0.6); color: #fff; font-size: 12px; font-weight: 600;
       padding: 2px 8px; border-radius: 4px; z-index: 10; pointer-events: none;
     }
-    /* Screen-share spotlight: the sharing participant's EXISTING tile grows
-       to fill most of the space, other tiles shrink into a strip below it.
+    /* Screen-share spotlight (Zoom-style): the sharing participant's
+       EXISTING tile grows to fill nearly the whole area; every other
+       participant keeps a fixed-size tile in a horizontally SCROLLABLE
+       strip below it — never shrunk to the point of disappearing, and
+       never clipped by the container height regardless of headcount
+       (5, 15, 20+ students all stay reachable via horizontal scroll).
        Deliberately reuses the same tile <div> that's already playing video
        the whole time (just resized via CSS/class toggle) instead of moving
        video into a new container — an earlier "big main view" attempt did
@@ -82,6 +86,7 @@
     #lms-grid-container.lms-spotlight-active {
       display: flex !important;
       flex-direction: column !important;
+      overflow-y: hidden !important;
     }
     #lms-grid-container.lms-spotlight-active .lms-remote-tile {
       aspect-ratio: auto !important;
@@ -90,11 +95,26 @@
       flex: 1 1 auto !important;
       order: -1 !important;
       min-height: 0 !important;
+      width: 100% !important;
+    }
+    /* Thumbnail strip: fixed height, horizontally scrollable so every
+       participant tile stays fully visible (and clickable) no matter how
+       many students are in the call — this is the piece that was missing
+       before, which let tiles overflow off-screen and "disappear". */
+    #lms-grid-container.lms-spotlight-active .lms-thumbnail-strip {
+      order: 1 !important;
+      flex: 0 0 96px !important;
+      display: flex !important;
+      flex-direction: row !important;
+      gap: 4px !important;
+      overflow-x: auto !important;
+      overflow-y: hidden !important;
+      padding-top: 4px !important;
     }
     #lms-grid-container.lms-spotlight-active .lms-remote-tile:not(.lms-spotlight-tile) {
-      flex: 0 0 84px !important;
-      height: 84px !important;
-      order: 1 !important;
+      flex: 0 0 128px !important;
+      width: 128px !important;
+      height: 96px !important;
     }
   </style>
 </head>
@@ -607,7 +627,14 @@
       nameEl.id = tileId + '-name';
       nameEl.className = 'lms-tile-name';
       tile.appendChild(nameEl);
-      grid.appendChild(tile);
+      // If a spotlight is already active when a new participant joins, put
+      // their tile straight into the thumbnail strip so it doesn't briefly
+      // render full-size in the spotlight area before the next poll tick.
+      if (grid.classList.contains('lms-spotlight-active')) {
+        window._lmsGetOrCreateThumbStrip(grid).appendChild(tile);
+      } else {
+        grid.appendChild(tile);
+      }
       window._lmsUpdateGridLayout();
       window.dispatchEvent(new CustomEvent('lms-remote-joined', { detail: String(uid) }));
       return tile;
@@ -640,6 +667,13 @@
     window._lmsUpdateGridLayout = function() {
       var grid = document.getElementById('lms-grid-container');
       if (!grid) return;
+      // While a spotlight is active the container is in flex/column mode
+      // (see .lms-spotlight-active CSS) — grid-template-columns has no
+      // effect there and setting it is a no-op we can skip.
+      if (grid.classList.contains('lms-spotlight-active')) {
+        window._lmsReplayGridTiles();
+        return;
+      }
       var count = grid.children.length;
       // Scale columns with participant count instead of capping at a fixed
       // number, so grids with 20+ students still lay out sensibly.
@@ -932,6 +966,30 @@
     // — the tile keeps playing the same video it already was, nothing is
     // moved or replayed into a new container, which is what made the
     // earlier big-view layout unreliable (see .lms-spotlight-active above).
+    // Moves every non-spotlight .lms-remote-tile into a single scrollable
+    // strip <div> so they lay out as a horizontal row (see .lms-thumbnail-strip
+    // CSS) instead of overflowing the container vertically and running off
+    // screen once there are more than a couple of participants.
+    window._lmsGetOrCreateThumbStrip = function(grid) {
+      var strip = grid.querySelector('.lms-thumbnail-strip');
+      if (!strip) {
+        strip = document.createElement('div');
+        strip.className = 'lms-thumbnail-strip';
+        grid.appendChild(strip);
+      }
+      return strip;
+    };
+
+    // Reverses _lmsGetOrCreateThumbStrip: moves every tile back out of the
+    // strip as direct children of the grid, then removes the (now-empty)
+    // strip, restoring the plain grid layout.
+    window._lmsDissolveThumbStrip = function(grid) {
+      var strip = grid.querySelector('.lms-thumbnail-strip');
+      if (!strip) return;
+      while (strip.firstChild) { grid.appendChild(strip.firstChild); }
+      strip.remove();
+    };
+
     window.lmsApplyRemoteScreenShare = function(sharingUid) {
       try {
         var grid = document.getElementById('lms-grid-container');
@@ -945,7 +1003,8 @@
             grid.classList.remove('lms-spotlight-active');
             var prevTile = grid.querySelector('.lms-spotlight-tile');
             if (prevTile) prevTile.classList.remove('lms-spotlight-tile');
-            window._lmsReplayGridTiles();
+            window._lmsDissolveThumbStrip(grid);
+            window._lmsUpdateGridLayout();
           }
           return;
         }
@@ -956,6 +1015,12 @@
         if (other && other !== tile) other.classList.remove('lms-spotlight-tile');
         tile.classList.add('lms-spotlight-tile');
         grid.classList.add('lms-spotlight-active');
+        // Move every OTHER tile into the scrollable thumbnail strip so none
+        // of them get clipped/hidden regardless of participant count.
+        var strip = window._lmsGetOrCreateThumbStrip(grid);
+        Array.prototype.forEach.call(grid.querySelectorAll('.lms-remote-tile'), function(t) {
+          if (t !== tile && t.parentElement !== strip) strip.appendChild(t);
+        });
         window._lmsReplayGridTiles();
       } catch(e) { console.warn('lmsApplyRemoteScreenShare error:', e); }
     };
