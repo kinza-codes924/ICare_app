@@ -602,11 +602,20 @@ class _InstructorLmsCoursesScreenState extends State<InstructorLmsCoursesScreen>
         const SizedBox(height: 12),
         Row(
           children: [
-            _buildInfoChip(Icons.people_outline, '$enrolledCount students'),
+            GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () => Navigator.push(context, MaterialPageRoute(
+                builder: (_) => InstructorStudentProgressScreen(
+                  courseId: course['_id']?.toString() ?? '',
+                  courseTitle: course['title']?.toString() ?? 'Course',
+                ),
+              )),
+              child: _buildInfoChip(Icons.people_outline, '$enrolledCount students'),
+            ),
             const SizedBox(width: 16),
             _buildInfoChip(Icons.folder_outlined, '$modulesCount modules'),
             const SizedBox(width: 16),
-            _buildInfoChip(Icons.access_time, '${course['duration'] ?? 0} weeks'),
+            _buildInfoChip(Icons.access_time, '${(((course['duration'] ?? 0) as num) / 7).ceil()} weeks'),
           ],
         ),
       ],

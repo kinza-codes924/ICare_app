@@ -10,6 +10,8 @@ import 'package:icare/screens/instructor_schedule_session_screen.dart';
 import 'package:icare/screens/instructor_grading_screen.dart';
 import 'package:icare/screens/instructor_course_content_screen.dart';
 import 'package:icare/screens/lesson_detail_page.dart';
+import 'package:icare/screens/doctor_notifications.dart';
+import 'package:icare/screens/instructor_assignments_list_screen.dart';
 import 'package:icare/services/lms_service.dart';
 import 'package:icare/screens/lms_live_session_screen.dart';
 import 'package:icare/widgets/video_player_widget.dart';
@@ -392,6 +394,15 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
         ],
       ),
       actions: [
+        if (widget.isInstructor)
+          IconButton(
+            icon: const Icon(Icons.notifications_outlined,
+                color: Color(0xFF444746), size: 20),
+            tooltip: 'Notifications',
+            onPressed: () => Navigator.push(context, MaterialPageRoute(
+              builder: (_) => const DoctorNotifications(),
+            )),
+          ),
         // Settings only (Edit Course content)
         if (widget.isInstructor)
           IconButton(
@@ -757,7 +768,18 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
             }),
           const SizedBox(height: 4),
           GestureDetector(
-            onTap: () => _tabs.animateTo(1),
+            onTap: () {
+              if (widget.isInstructor) {
+                Navigator.push(context, MaterialPageRoute(
+                  builder: (_) => InstructorAssignmentsListScreen(
+                    courseId: _courseId,
+                    courseTitle: _courseTitle,
+                  ),
+                ));
+              } else {
+                _tabs.animateTo(1);
+              }
+            },
             child: const Text(
               'View all',
               style: TextStyle(
@@ -2036,7 +2058,19 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
   void _openItem(String type, Map data) {
     if (type == 'assignment') {
       if (widget.isInstructor) {
-        _showClassworkMenu(type, data);
+        // Straight into that assignment's submissions/grading — the old
+        // behavior (a menu with only "Grade Submissions"/"Delete
+        // Assignment") made it look like the feed card wasn't really
+        // clickable to anything useful.
+        final assignmentId = data['_id']?.toString() ?? '';
+        if (assignmentId.isNotEmpty) {
+          Navigator.push(context, MaterialPageRoute(
+            builder: (_) => InstructorGradingScreen(
+              assignmentId: assignmentId,
+              assignmentTitle: data['title']?.toString() ?? 'Assignment',
+            ),
+          ));
+        }
         return;
       }
       Navigator.push(

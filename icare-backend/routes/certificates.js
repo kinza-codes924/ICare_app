@@ -181,8 +181,28 @@ router.post('/register', authMiddleware, async (req, res) => {
     if (existing) return res.json({ success: true, certificate: existing, message: 'Already registered' });
 
     if (courseId) {
-      const perm = await assertLeadInstructor(toId(courseId), req.user.id);
-      if (!perm.ok) return res.status(perm.status).json({ success: false, message: perm.message });
+      const isLead = (await assertLeadInstructor(toId(courseId), req.user.id)).ok;
+      if (!isLead) {
+        // Not the lead instructor — this must be the enrolled student
+        // registering their own completed-course certificate. Require the
+        // instructor to have actually released it (and, if there's an
+        // enrollment on record, that it's marked complete) so a stray call
+        // to this endpoint can't manufacture a certificate for an
+        // in-progress course.
+        const course = await Course.findById(toId(courseId)).select('certificateReleased').lean();
+        if (!course || course.certificateReleased !== true) {
+          return res.status(403).json({ success: false, message: 'Certificate has not been released for this course yet' });
+        }
+        if (enrollmentId) {
+          const enrollment = await Enrollment.findById(toId(enrollmentId)).select('progress.completed userId').lean();
+          if (enrollment && enrollment.userId?.toString() !== req.user.id?.toString()) {
+            return res.status(403).json({ success: false, message: 'Not your enrollment' });
+          }
+          if (enrollment && enrollment.progress?.completed !== true) {
+            return res.status(403).json({ success: false, message: 'Course not yet completed' });
+          }
+        }
+      }
     }
 
     const certNumber = `ICARE-${new Date().getFullYear()}-${Math.floor(100000 + Math.random() * 900000)}`;
@@ -252,12 +272,15 @@ router.get('/verify/:code', async (req, res) => {
   }
 });
 
-// GET /api/certificates/my — Get my certificates
+// GET /api/certificates/my — Get my certificates (approved only — a student
+// shouldn't see a certificate count/tile before their course is actually
+// complete and the certificate has cleared approval)
 router.get('/my', authMiddleware, async (req, res) => {
   try {
     await connectMongoDB();
     const certificates = await Certificate.find({
       studentId: toId(req.user.id),
+      approvalStatus: 'approved',
     }).sort({ issuedAt: -1 }).lean();
 
     res.json({ success: true, certificates, count: certificates.length });

@@ -418,6 +418,54 @@ class LmsService {
     return getCourseStudents(courseId);
   }
 
+  Future<Map<String, dynamic>> getCourseEngagement(String courseId) async {
+    try {
+      final response = await _api.get('/courses/$courseId/engagement');
+      dynamic data = response.data;
+      if (data is String && data.isNotEmpty) {
+        try { data = jsonDecode(data); } catch (_) {}
+      }
+      if (data is Map && data['success'] == true) {
+        return Map<String, dynamic>.from(data);
+      }
+      return {};
+    } catch (e) {
+      return {};
+    }
+  }
+
+  Future<List<dynamic>> getStudentAssignments(String courseId, String studentId) async {
+    try {
+      final response = await _api.get('/courses/$courseId/students/$studentId/assignments');
+      dynamic data = response.data;
+      if (data is String && data.isNotEmpty) {
+        try { data = jsonDecode(data); } catch (_) {}
+      }
+      if (data is Map && data['success'] == true) {
+        return (data['assignments'] ?? []) as List;
+      }
+      return [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  Future<List<dynamic>> getStudentQuizzes(String courseId, String studentId) async {
+    try {
+      final response = await _api.get('/courses/$courseId/students/$studentId/quizzes');
+      dynamic data = response.data;
+      if (data is String && data.isNotEmpty) {
+        try { data = jsonDecode(data); } catch (_) {}
+      }
+      if (data is Map && data['success'] == true) {
+        return (data['quizzes'] ?? []) as List;
+      }
+      return [];
+    } catch (e) {
+      return [];
+    }
+  }
+
   // ═══════════════════════════════════════════════════════════════════════
   // MODULE COMPLETION
   // ═══════════════════════════════════════════════════════════════════════

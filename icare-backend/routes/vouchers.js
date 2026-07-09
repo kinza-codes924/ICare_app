@@ -20,7 +20,7 @@ const Voucher = mongoose.models.Voucher || mongoose.model('Voucher', voucherSche
 // ─── GET /api/vouchers — instructor: list own vouchers ────────────────────────
 router.get('/', auth, async (req, res) => {
   try {
-    const vouchers = await Voucher.find({ instructorId: req.user._id })
+    const vouchers = await Voucher.find({ instructorId: req.user.id })
       .sort({ createdAt: -1 })
       .lean();
     res.json({ success: true, vouchers });
@@ -37,7 +37,7 @@ router.post('/', auth, async (req, res) => {
 
     const voucher = await Voucher.create({
       code: code.trim().toUpperCase(),
-      instructorId: req.user._id,
+      instructorId: req.user.id,
       discount: Number(discount),
       courseId: courseId || null,
       expiresAt: expiresAt ? new Date(expiresAt) : null,
@@ -52,7 +52,7 @@ router.post('/', auth, async (req, res) => {
 // ─── DELETE /api/vouchers/:id — instructor deletes own unused voucher ─────────
 router.delete('/:id', auth, async (req, res) => {
   try {
-    const v = await Voucher.findOne({ _id: req.params.id, instructorId: req.user._id });
+    const v = await Voucher.findOne({ _id: req.params.id, instructorId: req.user.id });
     if (!v) return res.status(404).json({ success: false, message: 'Not found' });
     if (v.usedBy) return res.status(400).json({ success: false, message: 'Cannot delete a used voucher' });
     await v.deleteOne();
@@ -96,7 +96,7 @@ router.post('/redeem', auth, async (req, res) => {
       return res.status(400).json({ success: false, message: 'Voucher not valid for this course' });
     }
 
-    voucher.usedBy = req.user._id;
+    voucher.usedBy = req.user.id;
     voucher.usedAt = new Date();
     await voucher.save();
 

@@ -76,17 +76,25 @@ router.get('/course/:courseId', authMiddleware, async (req, res) => {
       courseId: toId(req.params.courseId), isPublished: true,
     }).sort({ createdAt: -1 }).lean();
 
-    // Attach submission count to each assignment
+    // Attach submission + graded counts to each assignment (so the
+    // instructor "To Review" list can compute pending = submitted - graded)
     const assignmentIds = assignments.map(a => a._id);
     const counts = await AssignmentSubmission.aggregate([
       { $match: { assignmentId: { $in: assignmentIds } } },
       { $group: { _id: '$assignmentId', count: { $sum: 1 } } },
     ]);
+    const gradedCounts = await AssignmentSubmission.aggregate([
+      { $match: { assignmentId: { $in: assignmentIds }, status: 'graded' } },
+      { $group: { _id: '$assignmentId', count: { $sum: 1 } } },
+    ]);
     const countMap = {};
     counts.forEach(c => { countMap[c._id.toString()] = c.count; });
+    const gradedMap = {};
+    gradedCounts.forEach(c => { gradedMap[c._id.toString()] = c.count; });
     const result = assignments.map(a => ({
       ...a,
       submissionCount: countMap[a._id.toString()] || 0,
+      gradedCount: gradedMap[a._id.toString()] || 0,
     }));
 
     res.json({ success: true, assignments: result });

@@ -7,6 +7,8 @@ const Course = require('../models/Course');
 const Enrollment = require('../models/Enrollment');
 const Assignment = require('../models/Assignment');
 const AssignmentSubmission = require('../models/AssignmentSubmission');
+const Quiz = require('../models/Quiz');
+const QuizAttempt = require('../models/QuizAttempt');
 const { sendEmail } = require('../utils/email');
 const LiveSession = require('../models/LiveSession');
 const CourseReview = require('../models/CourseReview');
@@ -59,13 +61,128 @@ router.get('/public', async (req, res) => {
 router.get('/enrolled-students/:courseId', authMiddleware, async (req, res) => {
   try {
     await connectMongoDB();
-    const enrollments = await Enrollment.find({ courseId: toId(req.params.courseId) })
+    const courseId = toId(req.params.courseId);
+    const enrollments = await Enrollment.find({ courseId })
       .populate('userId', 'name email username').lean();
-    const students = enrollments.map(e => ({
-      _id: e.userId?._id, name: e.userId?.name || e.userId?.username,
-      email: e.userId?.email, progress: e.progress, enrolledAt: e.createdAt,
+
+    const quizzes = await Quiz.find({ courseId, isPublished: true }).select('_id').lean();
+    const quizIds = quizzes.map(q => q._id);
+
+    const students = await Promise.all(enrollments.map(async (e) => {
+      const { progressPct, totalAssignments, submittedAssignments } = await computeProgress(e);
+      let quizzesAttempted = 0;
+      if (quizIds.length > 0) {
+        const distinctQuizzes = await QuizAttempt.distinct('quizId', {
+          quizId: { $in: quizIds }, studentId: e.userId?._id,
+        });
+        quizzesAttempted = distinctQuizzes.length;
+      }
+      return {
+        _id: e.userId?._id, name: e.userId?.name || e.userId?.username,
+        email: e.userId?.email, enrolledAt: e.createdAt,
+        progress: { ...e.progress, percent: progressPct },
+        totalAssignments, submittedAssignments,
+        totalQuizzes: quizIds.length, quizzesAttempted,
+      };
     }));
+
     res.json({ success: true, students });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+// GET /api/courses/:courseId/students/:studentId/assignments — instructor view of
+// one student's assignment submissions across the course (Student Progress screen)
+router.get('/:courseId/students/:studentId/assignments', authMiddleware, async (req, res) => {
+  try {
+    await connectMongoDB();
+    const courseId = toId(req.params.courseId);
+    const studentId = toId(req.params.studentId);
+    const assignments = await Assignment.find({ courseId, isPublished: true }).sort({ createdAt: -1 }).lean();
+    const subs = await AssignmentSubmission.find({
+      assignmentId: { $in: assignments.map(a => a._id) }, studentId,
+    }).lean();
+    const subMap = {};
+    subs.forEach(s => { subMap[s.assignmentId.toString()] = s; });
+    const result = assignments.map(a => ({
+      _id: a._id, title: a.title, dueDate: a.dueDate, totalMarks: a.totalMarks,
+      submission: subMap[a._id.toString()] || null,
+    }));
+    res.json({ success: true, assignments: result });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+// GET /api/courses/:courseId/students/:studentId/quizzes — instructor view of one
+// student's quiz attempts across the course (Student Progress screen)
+router.get('/:courseId/students/:studentId/quizzes', authMiddleware, async (req, res) => {
+  try {
+    await connectMongoDB();
+    const courseId = toId(req.params.courseId);
+    const studentId = toId(req.params.studentId);
+    const quizzes = await Quiz.find({ courseId, isPublished: true }).sort({ createdAt: -1 }).lean();
+    const attempts = await QuizAttempt.find({
+      quizId: { $in: quizzes.map(q => q._id) }, studentId,
+    }).sort({ createdAt: -1 }).lean();
+    const attemptsByQuiz = {};
+    attempts.forEach(a => {
+      const k = a.quizId.toString();
+      (attemptsByQuiz[k] = attemptsByQuiz[k] || []).push(a);
+    });
+    const result = quizzes.map(q => ({
+      _id: q._id, title: q.title, passingScore: q.passingScore,
+      attempts: attemptsByQuiz[q._id.toString()] || [],
+    }));
+    res.json({ success: true, quizzes: result });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+// GET /api/courses/:courseId/engagement — instructor Course Analytics
+// "Engagement Metrics" panel: total assignment submissions, total quiz
+// attempts, and average live-session attendance % across the course.
+router.get('/:courseId/engagement', authMiddleware, async (req, res) => {
+  try {
+    await connectMongoDB();
+    const courseId = toId(req.params.courseId);
+
+    const assignments = await Assignment.find({ courseId, isPublished: true }).select('_id').lean();
+    const totalSubmissions = await AssignmentSubmission.countDocuments({
+      assignmentId: { $in: assignments.map(a => a._id) },
+    });
+
+    const quizzes = await Quiz.find({ courseId, isPublished: true }).select('_id').lean();
+    const totalQuizAttempts = await QuizAttempt.countDocuments({
+      quizId: { $in: quizzes.map(q => q._id) },
+    });
+
+    const Attendance = require('../models/Attendance');
+    const sessions = await Attendance.find({ courseId }).lean();
+    const enrollmentCount = await Enrollment.countDocuments({ courseId });
+    let avgAttendancePct = 0;
+    if (sessions.length > 0 && enrollmentCount > 0) {
+      let presentTally = 0;
+      sessions.forEach(s => {
+        (s.records || []).forEach(r => {
+          if (r.status === 'present') presentTally += 1;
+          else if (r.status === 'late') presentTally += 0.5;
+        });
+      });
+      avgAttendancePct = Math.round((presentTally / (sessions.length * enrollmentCount)) * 100);
+    }
+
+    res.json({
+      success: true,
+      totalAssignments: assignments.length,
+      totalSubmissions,
+      totalQuizzes: quizzes.length,
+      totalQuizAttempts,
+      totalSessions: sessions.length,
+      avgAttendancePct,
+    });
   } catch (e) {
     res.status(500).json({ success: false, message: e.message });
   }
@@ -177,7 +294,7 @@ router.get('/certificates/my', authMiddleware, async (req, res) => {
     const uId = toId(req.user.id);
     const enrollments = await Enrollment.find({ userId: uId, 'progress.completed': true }).lean();
     const Certificate = require('../models/Certificate');
-    const issued = await Certificate.find({ studentId: uId }).lean();
+    const issued = await Certificate.find({ studentId: uId, approvalStatus: 'approved' }).lean();
 
     const courseIds = [
       ...enrollments.map(e => e.courseId),
@@ -262,6 +379,18 @@ router.get('/:id', authMiddleware, async (req, res) => {
     const now = new Date();
     const enrollment = await Enrollment.findOne({ userId: toId(req.user.id), courseId: course._id }).lean();
     const completedModuleIds = new Set((enrollment?.moduleCompletions || []).map(m => m.moduleId));
+
+    // Gate full module/lesson content behind enrollment (or ownership) —
+    // browsing the catalog / course-detail preview only needs title,
+    // description, pricing, etc.; the actual modules array (videos,
+    // documents, live-session links) should only go to the instructor who
+    // owns the course or a student who has actually enrolled.
+    const uid = req.user.id?.toString();
+    const isOwner = course.instructor_id?.toString() === uid
+      || (course.coTeachers || []).some(t => t.userId?.toString() === uid);
+    if (!enrollment && !isOwner) {
+      return res.json({ success: true, course: { ...course, modules: [], enrollmentId: null, locked: true } });
+    }
 
     course.modules = (course.modules || []).map((mod, idx) => {
       let isLocked = false;

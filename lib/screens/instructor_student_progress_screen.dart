@@ -1,4 +1,5 @@
 ﻿import 'package:flutter/material.dart';
+import 'package:icare/screens/instructor_student_submissions_screen.dart';
 import 'package:icare/services/lms_service.dart';
 import 'package:icare/utils/theme.dart';
 
@@ -217,6 +218,19 @@ class _InstructorStudentProgressScreenState extends State<InstructorStudentProgr
     return (total / _students.length).round();
   }
 
+  void _openStudentSubmissions(Map<String, dynamic> student, {required bool showQuizzes}) {
+    final studentId = student['_id']?.toString() ?? '';
+    if (studentId.isEmpty) return;
+    Navigator.push(context, MaterialPageRoute(
+      builder: (_) => InstructorStudentSubmissionsScreen(
+        courseId: widget.courseId,
+        studentId: studentId,
+        studentName: (student['name'] ?? 'Student').toString(),
+        showQuizzes: showQuizzes,
+      ),
+    ));
+  }
+
   Widget _buildStudentCard(Map<String, dynamic> student) {
     final name = student['name'] ?? 'Unknown Student';
     final email = student['email'] ?? '';
@@ -324,17 +338,20 @@ class _InstructorStudentProgressScreenState extends State<InstructorStudentProgr
             const SizedBox(height: 12),
             Row(
               children: [
-                _buildInfoChip(Icons.assignment_outlined, 'Assignments', const Color(0xFF6366F1)),
+                GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () => _openStudentSubmissions(student, showQuizzes: false),
+                  child: _buildInfoChip(Icons.assignment_outlined, 'Assignments', const Color(0xFF6366F1)),
+                ),
                 const SizedBox(width: 12),
-                _buildInfoChip(Icons.quiz_outlined, 'Quizzes', const Color(0xFF10B981)),
+                GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () => _openStudentSubmissions(student, showQuizzes: true),
+                  child: _buildInfoChip(Icons.quiz_outlined, 'Quizzes', const Color(0xFF10B981)),
+                ),
                 const Spacer(),
                 TextButton(
-                  onPressed: () {
-                    // TODO: View detailed student report
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Detailed report coming soon')),
-                    );
-                  },
+                  onPressed: () => _openStudentSubmissions(student, showQuizzes: false),
                   child: const Text('View Details'),
                 ),
               ],

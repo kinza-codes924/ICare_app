@@ -36,6 +36,7 @@ class _InstructorCourseAnalyticsScreenState extends State<InstructorCourseAnalyt
       final students = await _lmsService.getCourseStudents(widget.courseId);
       final assignments = await _lmsService.getCourseAssignments(widget.courseId);
       final quizzes = await _lmsService.getCourseQuizzes(widget.courseId);
+      final engagement = await _lmsService.getCourseEngagement(widget.courseId);
 
       // Calculate statistics
       int totalStudents = students.length;
@@ -83,6 +84,10 @@ class _InstructorCourseAnalyticsScreenState extends State<InstructorCourseAnalyt
             'totalAssignments': totalAssignments,
             'totalQuizzes': totalQuizzes,
             'students': students,
+            'totalSubmissions': engagement['totalSubmissions'] ?? 0,
+            'totalQuizAttempts': engagement['totalQuizAttempts'] ?? 0,
+            'totalSessions': engagement['totalSessions'] ?? 0,
+            'avgAttendancePct': engagement['avgAttendancePct'] ?? 0,
           };
           _isLoading = false;
         });
@@ -201,13 +206,18 @@ class _InstructorCourseAnalyticsScreenState extends State<InstructorCourseAnalyt
   }
 
   Widget _buildStatsGrid() {
+    // Fixed 2-column grid stretched full-width on wide/web viewports, which
+    // is what made these tiles balloon to huge sizes — scale columns with
+    // screen width instead (same pattern used on the LMS home dashboard).
+    final width = MediaQuery.of(context).size.width;
+    final crossCount = width > 1000 ? 4 : (width > 600 ? 3 : 2);
     return GridView.count(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      crossAxisCount: 2,
+      crossAxisCount: crossCount,
       mainAxisSpacing: 16,
       crossAxisSpacing: 16,
-      childAspectRatio: 0.9,
+      childAspectRatio: 1.3,
       children: [
         _buildStatCard(
           'Total Students',
@@ -422,21 +432,23 @@ class _InstructorCourseAnalyticsScreenState extends State<InstructorCourseAnalyt
           _buildEngagementRow(
             Icons.assignment_turned_in_rounded,
             'Assignment Submissions',
-            'Coming soon',
+            '${_analytics['totalSubmissions'] ?? 0} across ${_analytics['totalAssignments'] ?? 0} assignments',
             const Color(0xFF6366F1),
           ),
           const Divider(height: 24),
           _buildEngagementRow(
             Icons.quiz_rounded,
             'Quiz Attempts',
-            'Coming soon',
+            '${_analytics['totalQuizAttempts'] ?? 0} across ${_analytics['totalQuizzes'] ?? 0} quizzes',
             const Color(0xFF10B981),
           ),
           const Divider(height: 24),
           _buildEngagementRow(
             Icons.video_call_rounded,
             'Live Session Attendance',
-            'Coming soon',
+            (_analytics['totalSessions'] ?? 0) > 0
+                ? '${_analytics['avgAttendancePct'] ?? 0}% average across ${_analytics['totalSessions']} sessions'
+                : 'No live sessions held yet',
             const Color(0xFFEC4899),
           ),
         ],

@@ -337,8 +337,8 @@ class _InstructorLmsDashboardState extends ConsumerState<InstructorLmsDashboard>
           const Spacer(),
           IconButton(
             icon: const Icon(Icons.search_rounded, color: Color(0xFF444746), size: 22),
-            onPressed: () {},
-            tooltip: 'Search',
+            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const InstructorLmsCoursesScreen())),
+            tooltip: 'Search courses',
           ),
           IconButton(
             icon: const Icon(Icons.notifications_outlined, color: Color(0xFF444746), size: 22),
