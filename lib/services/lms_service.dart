@@ -623,6 +623,18 @@ class LmsService {
     } catch (_) {}
   }
 
+  // Reports the Agora uid this device was assigned for this call, so other
+  // participants can map "which video tile" to "which person" reliably
+  // instead of guessing by list order.
+  Future<void> setMyAgoraUid({
+    required String sessionId,
+    required String agoraUid,
+  }) async {
+    try {
+      await _api.post('/live-sessions/$sessionId/set-my-uid', {'agoraUid': agoraUid});
+    } catch (_) {}
+  }
+
   Future<Map<String, dynamic>> admitStudent({
     required String sessionId,
     required String studentId,

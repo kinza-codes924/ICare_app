@@ -357,6 +357,37 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
         'isInstructor': false,
       }).toList();
 
+      // The instructor is deliberately excluded from `attendees` on the
+      // backend (attendees is students-only), so without adding them here
+      // explicitly a student would have no participant entry at all for
+      // the instructor's uid to resolve against below.
+      final instructorId = instrMap['_id']?.toString() ?? '';
+      if (instructorId.isNotEmpty && instructorId != _currentUserId) {
+        newParticipants.add({
+          'name': instrName.isNotEmpty ? instrName : 'Instructor',
+          'id': instructorId,
+          'userId': instructorId,
+          'isInstructor': true,
+        });
+      }
+
+      // backend userId -> Agora uid, reported by each participant right
+      // after they join (see set-my-uid). This is the ONLY reliable way to
+      // know which video tile belongs to which person — Agora assigns uids
+      // randomly (uid:0 join), so there is no formula linking them to a
+      // userId, and matching by list-order position (what this used to do)
+      // silently mislabels tiles whenever the two lists' orders differ.
+      final uidEntries = (session['participantUids'] as List?) ?? [];
+      final Map<String, String> userIdToAgoraUid = {};
+      for (final e in uidEntries) {
+        if (e is! Map) continue;
+        final uid = e['userId']?.toString();
+        final agoraUid = e['agoraUid']?.toString();
+        if (uid != null && agoraUid != null && agoraUid.isNotEmpty) {
+          userIdToAgoraUid[uid] = agoraUid;
+        }
+      }
+
       // Waiting room students (instructor sees these)
       final waiting = (session['waitingStudents'] as List?) ?? [];
       final waitingNames = waiting.map((w) => w['name'] ?? w['username'] ?? 'Student').toList();
@@ -426,22 +457,34 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
           }
         });
 
-        // Update name labels on the web video tiles
+        // Update name labels on the web video tiles — matched by the actual
+        // Agora uid each participant reported (userIdToAgoraUid), never by
+        // list position. A tile whose uid hasn't been reported yet (report
+        // call still in flight, or an older cached build that never calls
+        // set-my-uid) keeps its last-known/placeholder name rather than
+        // being mislabeled with whichever participant happens to share the
+        // same index this poll tick.
         if (kIsWeb) {
           lmsSetParticipantNames('$_currentUserName (You)', '');
           final remoteParticipants = _participants
               .where((p) => p['id'] != _currentUserId)
               .toList();
-          for (var i = 0; i < _remoteUids.length; i++) {
-            final String name;
-            if (i < remoteParticipants.length) {
-              name = remoteParticipants[i]['name']?.toString() ?? 'Student';
-            } else if (!widget.isInstructor && _instructorName.isNotEmpty) {
-              name = '$_instructorName (Host)';
-            } else {
-              name = widget.isInstructor ? 'Student' : 'Instructor';
+          // Reverse lookup: agoraUid -> participant, built once per sync.
+          final Map<String, Map<String, dynamic>> agoraUidToParticipant = {};
+          for (final p in remoteParticipants) {
+            final uid = userIdToAgoraUid[p['id']?.toString() ?? ''];
+            if (uid != null) agoraUidToParticipant[uid] = p;
+          }
+          for (final remoteUid in _remoteUids) {
+            final participant = agoraUidToParticipant[remoteUid.toString()];
+            if (participant != null) {
+              final isInstr = participant['isInstructor'] == true;
+              final baseName = participant['name']?.toString() ?? 'Participant';
+              lmsSetTileName(remoteUid, isInstr ? '$baseName (Host)' : baseName);
             }
-            lmsSetTileName(_remoteUids[i], name);
+            // No match yet for this uid — leave the tile's existing label
+            // alone instead of guessing; the next poll (2s later) will
+            // usually have the mapping by then.
           }
 
           // Whoever is screen-sharing (per the backend flag) gets their
@@ -1186,6 +1229,18 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
                                 widget.isInstructor,
                               );
                               debugPrint('LMS joined+published room=$_agoraRoomName');
+                              // Report the Agora uid we were just assigned so
+                              // other participants' next poll can label our
+                              // tile with the correct name instead of
+                              // guessing by list order (which produced wrong
+                              // names on tiles and tiles vanishing when a new
+                              // participant joined).
+                              if (_sessionDocId.isNotEmpty) {
+                                final myUid = lmsGetLocalUid();
+                                if (myUid.isNotEmpty) {
+                                  _lms.setMyAgoraUid(sessionId: _sessionDocId, agoraUid: myUid);
+                                }
+                              }
                               // Recording auto-starts in JS 3s after instructor joins
                               if (widget.isInstructor) {
                                 Future.delayed(const Duration(seconds: 4), () {

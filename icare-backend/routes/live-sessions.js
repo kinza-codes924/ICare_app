@@ -564,6 +564,35 @@ router.post('/:id/screen-share', authMiddleware, async (req, res) => {
   }
 });
 
+// ── Report which Agora uid this participant was assigned for this call ─────
+// Called once right after a participant joins Agora (uid:0 join means Agora
+// picks a random numeric uid server-side — there's no way to derive it from
+// the backend userId). Every OTHER participant's poll then uses this
+// mapping to label the correct video tile with the correct name, instead of
+// guessing by list order (which caused wrong names on tiles / tiles
+// disappearing when a new participant joined).
+router.post('/:id/set-my-uid', authMiddleware, async (req, res) => {
+  try {
+    await connectMongoDB();
+    const { agoraUid } = req.body;
+    if (!agoraUid) return res.status(400).json({ success: false, message: 'agoraUid required' });
+    const userId = toId(req.user.id);
+    const sessionId = toId(req.params.id);
+
+    // Replace this user's existing entry (if any) rather than appending —
+    // a participant may leave and rejoin the same session and get a new uid.
+    await LiveSession.findByIdAndUpdate(sessionId, {
+      $pull: { participantUids: { userId } },
+    });
+    await LiveSession.findByIdAndUpdate(sessionId, {
+      $push: { participantUids: { userId, agoraUid: String(agoraUid) } },
+    });
+    res.json({ success: true });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
 // ── STUDENT: Lower hand ──────────────────────────────────────────────────────
 router.post('/:id/lower-hand', authMiddleware, async (req, res) => {
   try {
