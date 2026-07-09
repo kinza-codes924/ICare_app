@@ -32,12 +32,22 @@ class _InstructorScheduleSessionScreenState extends State<InstructorScheduleSess
   final _meetingIdController = TextEditingController();
   final _meetingPasswordController = TextEditingController();
   String? _selectedCourseId;
+  String? _selectedModuleId; // null = not linked to a specific module
   DateTime? _scheduledAt;
   int _duration = 60; // minutes
   int _maxParticipants = 100;
   final String _platform = 'zoom'; // zoom, meet, teams, custom
 
   List<Map<String, dynamic>> _courses = [];
+
+  List<Map<String, dynamic>> get _modulesForSelectedCourse {
+    if (_selectedCourseId == null) return [];
+    final course = _courses.firstWhere(
+      (c) => c['_id']?.toString() == _selectedCourseId,
+      orElse: () => <String, dynamic>{},
+    );
+    return List<Map<String, dynamic>>.from(course['modules'] ?? []);
+  }
 
   @override
   void initState() {
@@ -144,6 +154,7 @@ class _InstructorScheduleSessionScreenState extends State<InstructorScheduleSess
         'meetingId': _meetingIdController.text,
         'meetingPassword': _meetingPasswordController.text,
         'status': 'scheduled',
+        if (_selectedModuleId != null) 'linkedModuleId': _selectedModuleId,
       };
 
       if (widget.sessionId != null) {
@@ -238,10 +249,33 @@ class _InstructorScheduleSessionScreenState extends State<InstructorScheduleSess
                           child: Text(course['title'] ?? 'Untitled'),
                         );
                       }).toList(),
-                      onChanged: (value) => setState(() => _selectedCourseId = value),
+                      onChanged: (value) => setState(() {
+                        _selectedCourseId = value;
+                        _selectedModuleId = null; // course changed — reset module pick
+                      }),
                       validator: (value) => value == null ? 'Please select a course' : null,
                     ),
                   if (widget.courseId == null) const SizedBox(height: 16),
+
+                  if (_modulesForSelectedCourse.isNotEmpty) ...[
+                    DropdownButtonFormField<String>(
+                      initialValue: _selectedModuleId,
+                      decoration: const InputDecoration(
+                        labelText: 'Module (optional)',
+                        helperText: 'Link this session to a module so it shows up nested under it',
+                        border: OutlineInputBorder(),
+                      ),
+                      items: [
+                        const DropdownMenuItem(value: null, child: Text('Not linked to a module')),
+                        ..._modulesForSelectedCourse.map((m) => DropdownMenuItem(
+                              value: m['_id']?.toString(),
+                              child: Text(m['title']?.toString() ?? 'Untitled Module', overflow: TextOverflow.ellipsis),
+                            )),
+                      ],
+                      onChanged: (value) => setState(() => _selectedModuleId = value),
+                    ),
+                    const SizedBox(height: 16),
+                  ],
 
                   TextFormField(
                     controller: _titleController,

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:icare/services/api_service.dart';
+import 'package:icare/services/lms_service.dart';
 import 'package:icare/utils/theme.dart';
 
 class InstructorVoucherScreen extends StatefulWidget {
@@ -35,7 +36,16 @@ class _InstructorVoucherScreenState extends State<InstructorVoucherScreen> {
     final codeCtrl = TextEditingController();
     final discountCtrl = TextEditingController();
     DateTime? expiresAt;
+    String discountType = 'percent'; // 'percent' | 'flat'
+    String? selectedCourseId; // null = valid on any course
 
+    List<dynamic> courses = [];
+    try {
+      final res = await LmsService().getInstructorCourses();
+      courses = res['courses'] ?? [];
+    } catch (_) {}
+
+    if (!mounted) return;
     await showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
@@ -43,58 +53,123 @@ class _InstructorVoucherScreenState extends State<InstructorVoucherScreen> {
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           title: const Text('Create Discount Voucher', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 17)),
           content: SizedBox(
-            width: 400,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: codeCtrl,
-                  textCapitalization: TextCapitalization.characters,
-                  decoration: const InputDecoration(
-                    labelText: 'Voucher Code *',
-                    hintText: 'e.g. SAVE50',
-                    border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.confirmation_number_rounded),
-                  ),
-                ),
-                const SizedBox(height: 14),
-                TextField(
-                  controller: discountCtrl,
-                  keyboardType: TextInputType.number,
-                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                  decoration: const InputDecoration(
-                    labelText: 'Discount % (1–100) *',
-                    border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.percent_rounded),
-                  ),
-                ),
-                const SizedBox(height: 14),
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        expiresAt == null
-                            ? 'No expiry date'
-                            : 'Expires: ${expiresAt!.day}/${expiresAt!.month}/${expiresAt!.year}',
-                        style: const TextStyle(fontSize: 13, color: Color(0xFF64748B)),
+            width: 420,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Service type — only Courses is wired up today
+                  const Text('Service Type', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF64748B))),
+                  const SizedBox(height: 6),
+                  Wrap(
+                    spacing: 8,
+                    children: [
+                      ChoiceChip(
+                        label: const Text('Courses'),
+                        selected: true,
+                        onSelected: (_) {},
+                        selectedColor: AppColors.primaryColor.withValues(alpha: 0.15),
                       ),
+                      ChoiceChip(
+                        label: const Text('Consultation (coming soon)'),
+                        selected: false,
+                        onSelected: null,
+                      ),
+                      ChoiceChip(
+                        label: const Text('Lab Test (coming soon)'),
+                        selected: false,
+                        onSelected: null,
+                      ),
+                      ChoiceChip(
+                        label: const Text('Pharmacy (coming soon)'),
+                        selected: false,
+                        onSelected: null,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  TextField(
+                    controller: codeCtrl,
+                    textCapitalization: TextCapitalization.characters,
+                    decoration: const InputDecoration(
+                      labelText: 'Voucher Code *',
+                      hintText: 'e.g. SAVE50',
+                      border: OutlineInputBorder(),
+                      prefixIcon: Icon(Icons.confirmation_number_rounded),
                     ),
-                    TextButton.icon(
-                      onPressed: () async {
-                        final d = await showDatePicker(
-                          context: ctx,
-                          initialDate: DateTime.now().add(const Duration(days: 30)),
-                          firstDate: DateTime.now(),
-                          lastDate: DateTime.now().add(const Duration(days: 365 * 2)),
-                        );
-                        if (d != null) setS(() => expiresAt = d);
-                      },
-                      icon: const Icon(Icons.calendar_today_rounded, size: 16),
-                      label: const Text('Set Expiry'),
+                  ),
+                  const SizedBox(height: 14),
+                  DropdownButtonFormField<String>(
+                    initialValue: selectedCourseId,
+                    decoration: const InputDecoration(
+                      labelText: 'Applies To',
+                      border: OutlineInputBorder(),
+                      prefixIcon: Icon(Icons.school_outlined),
                     ),
-                  ],
-                ),
-              ],
+                    items: [
+                      const DropdownMenuItem(value: null, child: Text('Any of my courses')),
+                      ...courses.map((c) => DropdownMenuItem(
+                            value: c['_id']?.toString(),
+                            child: Text(c['title']?.toString() ?? 'Untitled', overflow: TextOverflow.ellipsis),
+                          )),
+                    ],
+                    onChanged: (v) => setS(() => selectedCourseId = v),
+                  ),
+                  const SizedBox(height: 14),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: SegmentedButton<String>(
+                          segments: const [
+                            ButtonSegment(value: 'percent', label: Text('% Off')),
+                            ButtonSegment(value: 'flat', label: Text('Flat Amount')),
+                          ],
+                          selected: {discountType},
+                          onSelectionChanged: (s) => setS(() => discountType = s.first),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  TextField(
+                    controller: discountCtrl,
+                    keyboardType: TextInputType.number,
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                    decoration: InputDecoration(
+                      labelText: discountType == 'percent' ? 'Discount % (1–100) *' : 'Discount Amount (PKR) *',
+                      border: const OutlineInputBorder(),
+                      prefixIcon: Icon(discountType == 'percent' ? Icons.percent_rounded : Icons.payments_outlined),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          expiresAt == null
+                              ? 'No expiry date'
+                              : 'Expires: ${expiresAt!.day}/${expiresAt!.month}/${expiresAt!.year}',
+                          style: const TextStyle(fontSize: 13, color: Color(0xFF64748B)),
+                        ),
+                      ),
+                      TextButton.icon(
+                        onPressed: () async {
+                          final d = await showDatePicker(
+                            context: ctx,
+                            initialDate: DateTime.now().add(const Duration(days: 30)),
+                            firstDate: DateTime.now(),
+                            lastDate: DateTime.now().add(const Duration(days: 365 * 2)),
+                          );
+                          if (d != null) setS(() => expiresAt = d);
+                        },
+                        icon: const Icon(Icons.calendar_today_rounded, size: 16),
+                        label: const Text('Set Expiry'),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
           ),
           actions: [
@@ -107,9 +182,17 @@ class _InstructorVoucherScreenState extends State<InstructorVoucherScreen> {
               onPressed: () async {
                 final code = codeCtrl.text.trim().toUpperCase();
                 final discount = int.tryParse(discountCtrl.text.trim()) ?? 0;
-                if (code.isEmpty || discount < 1 || discount > 100) {
+                final isValid = discountType == 'percent'
+                    ? (discount >= 1 && discount <= 100)
+                    : (discount >= 1);
+                if (code.isEmpty || !isValid) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Enter a valid code and discount (1–100%)'), backgroundColor: Colors.red),
+                    SnackBar(
+                      content: Text(discountType == 'percent'
+                          ? 'Enter a valid code and discount (1–100%)'
+                          : 'Enter a valid code and a discount amount'),
+                      backgroundColor: Colors.red,
+                    ),
                   );
                   return;
                 }
@@ -118,6 +201,8 @@ class _InstructorVoucherScreenState extends State<InstructorVoucherScreen> {
                   await _api.post('/vouchers', {
                     'code': code,
                     'discount': discount,
+                    'discountType': discountType,
+                    if (selectedCourseId != null) 'courseId': selectedCourseId,
                     if (expiresAt != null) 'expiresAt': expiresAt!.toIso8601String(),
                   });
                   if (mounted) {
@@ -234,6 +319,8 @@ class _InstructorVoucherScreenState extends State<InstructorVoucherScreen> {
                       final v = _vouchers[i];
                       final code = v['code']?.toString() ?? '';
                       final discount = v['discount']?.toString() ?? '';
+                      final discountType = v['discountType']?.toString() ?? 'percent';
+                      final discountLabel = discountType == 'flat' ? 'PKR $discount off' : '$discount% off';
                       final usedBy = v['usedBy'];
                       final isUsed = usedBy != null;
                       final expiresAt = v['expiresAt'];
@@ -294,7 +381,7 @@ class _InstructorVoucherScreenState extends State<InstructorVoucherScreen> {
                                     ),
                                     const SizedBox(height: 4),
                                     Text(
-                                      '$discount% off · ${isUsed ? "Used" : "Available"}',
+                                      '$discountLabel · ${isUsed ? "Used" : "Available"}',
                                       style: TextStyle(
                                         fontSize: 13,
                                         fontWeight: FontWeight.w600,

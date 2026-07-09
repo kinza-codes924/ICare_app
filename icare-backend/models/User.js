@@ -14,6 +14,11 @@ const userSchema = new mongoose.Schema({
   // Multi-role support: all roles this account is approved for.
   // Empty/missing means the single `role` above is the only one.
   roles: [{ type: String }],
+  // Roles requested (e.g. a second Work-With-Us application under a role
+  // this same email doesn't have yet) but not yet approved by admin. Kept
+  // separate from `roles` so an approved account isn't granted a new role
+  // silently — admin must explicitly approve it via the pending-users flow.
+  pendingRoles: [{ type: String }],
   mrNumber: { type: String, unique: true, sparse: true }, // Medical Record Number (auto-generated for patients)
   is_approved: { type: Boolean, default: true },
   is_active: { type: Boolean, default: true },

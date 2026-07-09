@@ -36,6 +36,9 @@ class _QuizTakeScreenState extends State<QuizTakeScreen> {
   bool _showPalette = false;
   bool _quizCompleted = false;
   Map<String, dynamic>? _result;
+  int _maxAttempts = 3;
+  int _attemptsUsed = 0;
+  bool get _canRetake => _attemptsUsed < _maxAttempts;
 
   // Timer
   Timer? _timer;
@@ -67,21 +70,25 @@ class _QuizTakeScreenState extends State<QuizTakeScreen> {
     Map<String, dynamic>? latestAttempt;
     try {
       final attempts = await _lmsService.getMyQuizAttempts(_quizId);
+      _attemptsUsed = attempts.length;
       if (attempts.isNotEmpty) {
         // Most recent attempt first (backend sorts by attemptNumber desc)
         latestAttempt = Map<String, dynamic>.from(attempts.first as Map);
       }
     } catch (_) {}
 
-    if (_questions.isEmpty) {
-      try {
-        final data = await _lmsService.getQuiz(_quizId);
-        final q = data['quiz'] ?? data;
+    // Always fetch maxAttempts (independent of whether questions were
+    // already passed in) so the Retake button can be gated correctly.
+    try {
+      final data = await _lmsService.getQuiz(_quizId);
+      final q = data['quiz'] ?? data;
+      _maxAttempts = (q['maxAttempts'] as num?)?.toInt() ?? 3;
+      if (_questions.isEmpty) {
         _questions = (q['questions'] as List?) ?? [];
         final tl = (q['timeLimit'] as num?)?.toInt() ?? 0;
         if (tl > 0) _timeLimitSeconds = tl * 60;
-      } catch (_) {}
-    }
+      }
+    } catch (_) {}
 
     if (!mounted) return;
 
@@ -237,6 +244,7 @@ class _QuizTakeScreenState extends State<QuizTakeScreen> {
           _isSubmitting = false;
           _quizCompleted = true;
           _result = result;
+          _attemptsUsed += 1;
         });
       }
     } catch (e) {
@@ -1008,6 +1016,28 @@ class _QuizTakeScreenState extends State<QuizTakeScreen> {
                   ],
 
                   // Action buttons
+                  if (!_canRetake) ...[
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      margin: const EdgeInsets.only(bottom: 12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFEF3C7),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.info_outline_rounded, size: 18, color: Color(0xFFB45309)),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'No attempts remaining ($_attemptsUsed of $_maxAttempts used)',
+                              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFFB45309)),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                   Row(
                     children: [
                       Expanded(
@@ -1023,30 +1053,32 @@ class _QuizTakeScreenState extends State<QuizTakeScreen> {
                           ),
                         ),
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: ElevatedButton.icon(
-                          onPressed: () {
-                            setState(() {
-                              _answers.clear();
-                              _currentIndex = 0;
-                              _quizCompleted = false;
-                              _result = null;
-                              _showPalette = false;
-                            });
-                            _startTimerAndStopwatch();
-                          },
-                          icon: const Icon(Icons.replay_rounded, size: 18),
-                          label: const Text('Retake', style: TextStyle(fontWeight: FontWeight.w700)),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.primaryColor,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                            elevation: 0,
+                      if (_canRetake) ...[
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            onPressed: () {
+                              setState(() {
+                                _answers.clear();
+                                _currentIndex = 0;
+                                _quizCompleted = false;
+                                _result = null;
+                                _showPalette = false;
+                              });
+                              _startTimerAndStopwatch();
+                            },
+                            icon: const Icon(Icons.replay_rounded, size: 18),
+                            label: const Text('Retake', style: TextStyle(fontWeight: FontWeight.w700)),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.primaryColor,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              elevation: 0,
+                            ),
                           ),
                         ),
-                      ),
+                      ],
                     ],
                   ),
                 ],

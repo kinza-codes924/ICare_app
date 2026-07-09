@@ -12,6 +12,7 @@ const QuizAttempt = require('../models/QuizAttempt');
 const { sendEmail } = require('../utils/email');
 const LiveSession = require('../models/LiveSession');
 const CourseReview = require('../models/CourseReview');
+const { Voucher, applyVoucherDiscount } = require('./vouchers');
 
 function toId(id) {
   try { return new mongoose.Types.ObjectId(id); } catch { return null; }
@@ -208,7 +209,7 @@ router.get('/', authMiddleware, async (req, res) => {
 router.post('/enrollments', authMiddleware, async (req, res) => {
   try {
     await connectMongoDB();
-    const { courseId } = req.body;
+    const { courseId, voucherCode } = req.body;
     if (!courseId) return res.status(400).json({ success: false, message: 'courseId required' });
 
     const cId = toId(courseId);
@@ -224,7 +225,36 @@ router.post('/enrollments', authMiddleware, async (req, res) => {
       return res.json({ success: true, message: 'Already enrolled', enrollment: existing });
     }
 
-    const enrollment = await Enrollment.create({ userId: uId, courseId: cId });
+    let amountPaid = course.isFree ? 0 : (course.discountedPrice || course.price || 0);
+    let redeemedVoucher = null;
+
+    if (voucherCode) {
+      const voucher = await Voucher.findOne({ code: voucherCode.trim().toUpperCase() });
+      if (!voucher) return res.status(400).json({ success: false, message: 'Invalid voucher code' });
+      if (voucher.usedBy) return res.status(400).json({ success: false, message: 'This voucher has already been used' });
+      if (voucher.expiresAt && new Date() > voucher.expiresAt) {
+        return res.status(400).json({ success: false, message: 'Voucher has expired' });
+      }
+      if (voucher.courseId && voucher.courseId.toString() !== cId.toString()) {
+        return res.status(400).json({ success: false, message: 'Voucher is not valid for this course' });
+      }
+      amountPaid = applyVoucherDiscount(voucher, course.price || 0);
+      redeemedVoucher = voucher;
+    }
+
+    const enrollment = await Enrollment.create({
+      userId: uId,
+      courseId: cId,
+      amountPaid,
+      voucherCode: redeemedVoucher ? redeemedVoucher.code : null,
+    });
+
+    if (redeemedVoucher) {
+      redeemedVoucher.usedBy = uId;
+      redeemedVoucher.usedAt = new Date();
+      await redeemedVoucher.save();
+    }
+
     res.status(201).json({ success: true, enrollment });
   } catch (e) {
     if (e.code === 11000) {
@@ -730,6 +760,22 @@ router.post('/:id/reviews', authMiddleware, async (req, res) => {
       { courseId, studentId, instructorId: course.instructor_id, rating: stars, comment: comment || '' },
       { upsert: true, new: true }
     );
+
+    // Notify instructor (best-effort — never blocks feedback submission)
+    if (course.instructor_id) {
+      try {
+        const Notification = require('../models/Notification');
+        const User = require('../models/User');
+        const student = await User.findById(studentId).select('name username').lean();
+        await Notification.create({
+          userId: course.instructor_id,
+          type: 'general',
+          title: 'New Course Feedback',
+          message: `${student?.name || student?.username || 'A student'} rated "${course.title}" ${stars}★`,
+          data: { type: 'course_feedback', courseId: courseId.toString(), rating: stars },
+        });
+      } catch (_) {}
+    }
 
     // Recompute the course's aggregate rating/count for display on course cards.
     const agg = await CourseReview.aggregate([

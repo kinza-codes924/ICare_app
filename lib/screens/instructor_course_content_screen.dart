@@ -37,6 +37,7 @@ class InstructorCourseContentScreenState extends State<InstructorCourseContentSc
   bool _isLoading = true;
   CertificateTemplate _certificateTemplate = CertificateTemplate.classic;
   String _courseType = 'self-paced';
+  bool _isFreeDisplay = false;
 
   // Standalone assignments, quizzes, sessions (created outside modules)
   List<dynamic> _assignments = [];
@@ -62,6 +63,7 @@ class InstructorCourseContentScreenState extends State<InstructorCourseContentSc
         setState(() {
           _course = (results[0] as Map)['course'];
           _courseType = _course?['courseType']?.toString() ?? 'self-paced';
+          _isFreeDisplay = _course?['isFree'] == true;
           _assignments = results[1] as List;
           _quizzes = results[2] as List;
           _liveSessions = results[3] as List;
@@ -204,6 +206,26 @@ class InstructorCourseContentScreenState extends State<InstructorCourseContentSc
         );
       }
     } catch (_) {}
+  }
+
+  // Worst-case fallback for vouchers: display the course as "Free" without
+  // changing its real price — e.g. while a voucher rollout is still being
+  // finalized. Toggled independently of the actual `price` field.
+  Future<void> _toggleFreeDisplay(bool value) async {
+    setState(() => _isFreeDisplay = value);
+    try {
+      await _lmsService.updateCourse(widget.courseId, {'isFree': value});
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(value ? 'Course now shows as Free to students' : 'Course now shows its real price'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (_) {
+      if (mounted) setState(() => _isFreeDisplay = !value);
+    }
   }
 
   void _showEditThumbnail() {
@@ -559,7 +581,124 @@ class InstructorCourseContentScreenState extends State<InstructorCourseContentSc
             ),
           ),
           const SizedBox(width: 4),
-          // Go Live button
+          // "Show as Free" pricing-display toggle — flips the catalog/checkout
+          // display between "Free" and the course's real price without
+          // touching the price field itself (worst-case voucher fallback).
+          GestureDetector(
+            onTap: () => _toggleFreeDisplay(!_isFreeDisplay),
+            child: Container(
+              margin: const EdgeInsets.symmetric(vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: _isFreeDisplay ? const Color(0xFFF59E0B).withValues(alpha: 0.12) : const Color(0xFFF1F5F9),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: _isFreeDisplay ? const Color(0xFFF59E0B).withValues(alpha: 0.4) : const Color(0xFFE2E8F0)),
+              ),
+              child: Row(mainAxisSize: MainAxisSize.min, children: [
+                Icon(_isFreeDisplay ? Icons.money_off_rounded : Icons.sell_outlined,
+                    size: 14, color: _isFreeDisplay ? const Color(0xFFF59E0B) : const Color(0xFF64748B)),
+                const SizedBox(width: 5),
+                Text(_isFreeDisplay ? 'Showing: Free' : 'Showing: Price',
+                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: _isFreeDisplay ? const Color(0xFFF59E0B) : const Color(0xFF64748B))),
+              ]),
+            ),
+          ),
+        ],
+      ),
+      // Course Settings is now settings-only — modules, Go Live, and Add
+      // Module all moved to the Course Content tab (_buildEmbeddedBody) to
+      // avoid duplicating the modules list in two places.
+      body: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Course Settings', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Color(0xFF0F172A))),
+            const SizedBox(height: 6),
+            const Text(
+              'Manage thumbnail, certificate template, course type, and pricing display above. '
+              'Modules, sessions, and Go Live are managed from the Course Content tab.',
+              style: TextStyle(fontSize: 13, color: Color(0xFF64748B)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmbeddedBody(List<Map<String, dynamic>> modules) {
+    final hasContent = modules.isNotEmpty || _assignments.isNotEmpty ||
+        _quizzes.isNotEmpty || _liveSessions.isNotEmpty;
+
+    final items = <Widget>[];
+
+    if (!hasContent) {
+      items.add(_buildEmptyState());
+    } else {
+      // Modules
+      for (int i = 0; i < modules.length; i++) {
+        items.add(_buildModuleCard(modules[i], i));
+      }
+
+      // Live Sessions not linked to any module — kept flat for backward
+      // compatibility with sessions created before module-linking existed.
+      final unlinkedSessions = _liveSessions.where((s) {
+        final linked = (s as Map)['linkedModuleId']?.toString();
+        return linked == null || linked.isEmpty || !modules.any((m) => m['_id']?.toString() == linked);
+      }).toList();
+      if (unlinkedSessions.isNotEmpty) {
+        items.add(_buildSectionHeader(Icons.live_tv_rounded, 'Live Sessions', Colors.red));
+        for (final s in unlinkedSessions) {
+          items.add(_buildStandaloneSessionTile(s));
+        }
+      }
+
+      // Assignments section
+      if (_assignments.isNotEmpty) {
+        items.add(_buildSectionHeader(Icons.assignment_rounded, 'Assignments', const Color(0xFF6366F1)));
+        for (final a in _assignments) {
+          items.add(_buildStandaloneAssignmentTile(a));
+        }
+      }
+
+      // Quizzes section
+      if (_quizzes.isNotEmpty) {
+        items.add(_buildSectionHeader(Icons.quiz_rounded, 'Quizzes', const Color(0xFFF59E0B)));
+        for (final q in _quizzes) {
+          items.add(_buildStandaloneQuizTile(q));
+        }
+      }
+    }
+
+    return Column(
+      children: [
+        _buildContentHeader(),
+        Expanded(
+          child: RefreshIndicator(
+            onRefresh: _loadCourse,
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 96),
+              children: items,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildContentHeader() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              _course?['title']?.toString() ?? 'Course Content',
+              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          const SizedBox(width: 8),
           ElevatedButton.icon(
             onPressed: _startLiveClass,
             icon: const Icon(Icons.live_tv_rounded, size: 16),
@@ -579,63 +718,6 @@ class InstructorCourseContentScreenState extends State<InstructorCourseContentSc
             onPressed: _addModule,
           ),
         ],
-      ),
-      body: modules.isEmpty
-          ? _buildEmptyState()
-          : RefreshIndicator(
-              onRefresh: _loadCourse,
-              child: ListView.builder(
-                padding: const EdgeInsets.all(16),
-                itemCount: modules.length,
-                itemBuilder: (context, index) {
-                  return _buildModuleCard(modules[index], index);
-                },
-              ),
-            ),
-    );
-  }
-
-  Widget _buildEmbeddedBody(List<Map<String, dynamic>> modules) {
-    final hasContent = modules.isNotEmpty || _assignments.isNotEmpty ||
-        _quizzes.isNotEmpty || _liveSessions.isNotEmpty;
-    if (!hasContent) return _buildEmptyState();
-
-    final items = <Widget>[];
-
-    // Modules
-    for (int i = 0; i < modules.length; i++) {
-      items.add(_buildModuleCard(modules[i], i));
-    }
-
-    // Live Sessions section
-    if (_liveSessions.isNotEmpty) {
-      items.add(_buildSectionHeader(Icons.live_tv_rounded, 'Live Sessions', Colors.red));
-      for (final s in _liveSessions) {
-        items.add(_buildStandaloneSessionTile(s));
-      }
-    }
-
-    // Assignments section
-    if (_assignments.isNotEmpty) {
-      items.add(_buildSectionHeader(Icons.assignment_rounded, 'Assignments', const Color(0xFF6366F1)));
-      for (final a in _assignments) {
-        items.add(_buildStandaloneAssignmentTile(a));
-      }
-    }
-
-    // Quizzes section
-    if (_quizzes.isNotEmpty) {
-      items.add(_buildSectionHeader(Icons.quiz_rounded, 'Quizzes', const Color(0xFFF59E0B)));
-      for (final q in _quizzes) {
-        items.add(_buildStandaloneQuizTile(q));
-      }
-    }
-
-    return RefreshIndicator(
-      onRefresh: _loadCourse,
-      child: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
-        children: items,
       ),
     );
   }
@@ -899,6 +981,8 @@ class InstructorCourseContentScreenState extends State<InstructorCourseContentSc
 
   Widget _buildModuleCard(Map<String, dynamic> module, int index) {
     final lessons = List<Map<String, dynamic>>.from(module['lessons'] ?? []);
+    final moduleId = module['_id']?.toString();
+    final linkedSessions = _liveSessions.where((s) => (s as Map)['linkedModuleId']?.toString() == moduleId).toList();
     final title = module['title'] ?? 'Module ${index + 1}';
     final description = module['description'] ?? '';
     final completions = List<Map<String, dynamic>>.from(module['completions'] ?? []);
@@ -1049,6 +1133,13 @@ class InstructorCourseContentScreenState extends State<InstructorCourseContentSc
                 final lesson = entry.value;
                 return _buildLessonItem(lesson, lessonIndex);
               }),
+            if (linkedSessions.isNotEmpty) ...[
+              const Padding(
+                padding: EdgeInsets.only(top: 4, bottom: 6),
+                child: Text('Live Sessions', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF64748B))),
+              ),
+              ...linkedSessions.map((s) => _buildStandaloneSessionTile(s)),
+            ],
             Padding(
               padding: const EdgeInsets.only(bottom: 8),
               child: OutlinedButton.icon(

@@ -21,7 +21,7 @@ class SelectPaymentMethod extends StatefulWidget {
   final String? labBookingId;
   final String? appointmentId;
   final double? amount;
-  final void Function(BuildContext context)? onPaymentSuccess;
+  final void Function(BuildContext context, {String? voucherCode})? onPaymentSuccess;
 
   const SelectPaymentMethod({
     super.key,
@@ -41,6 +41,55 @@ class _SelectPaymentMethodState extends State<SelectPaymentMethod> {
   final _labService = LaboratoryService();
   bool _isLoading = false;
   String? _selectedMethod = "VISA";
+
+  // Voucher state — only relevant when widget.courseId is set
+  final _voucherController = TextEditingController();
+  bool _applyingVoucher = false;
+  String? _voucherError;
+  String? _appliedVoucherCode;
+  double? _discountedAmount; // null = no voucher applied, use widget.amount
+
+  double get _finalAmount => _discountedAmount ?? (widget.amount ?? 0);
+
+  Future<void> _applyVoucher() async {
+    final code = _voucherController.text.trim();
+    if (code.isEmpty) return;
+    setState(() { _applyingVoucher = true; _voucherError = null; });
+    try {
+      final res = await _courseService.validateVoucher(code, widget.courseId);
+      final discount = (res['discount'] as num?)?.toDouble() ?? 0;
+      final discountType = res['discountType']?.toString() ?? 'percent';
+      final base = widget.amount ?? 0;
+      final discounted = discountType == 'flat'
+          ? (base - discount).clamp(0, double.infinity)
+          : (base - (base * discount / 100)).clamp(0, double.infinity);
+      setState(() {
+        _discountedAmount = discounted.toDouble();
+        _appliedVoucherCode = code;
+        _applyingVoucher = false;
+      });
+    } catch (e) {
+      setState(() {
+        _voucherError = e.toString().replaceFirst('Exception: ', '');
+        _applyingVoucher = false;
+      });
+    }
+  }
+
+  void _removeVoucher() {
+    setState(() {
+      _discountedAmount = null;
+      _appliedVoucherCode = null;
+      _voucherController.clear();
+      _voucherError = null;
+    });
+  }
+
+  @override
+  void dispose() {
+    _voucherController.dispose();
+    super.dispose();
+  }
 
   final List<Map<String, String>> paymentMethods = [
     {
@@ -83,8 +132,12 @@ class _SelectPaymentMethodState extends State<SelectPaymentMethod> {
 
     setState(() => _isLoading = true);
     try {
-      // Simulate real-world payment processing delay
-      await Future.delayed(const Duration(seconds: 2));
+      // A voucher that brings the price to 0 skips the fake card-payment
+      // delay entirely — there's nothing to "process."
+      if (_finalAmount > 0) {
+        // Simulate real-world payment processing delay
+        await Future.delayed(const Duration(seconds: 2));
+      }
 
       if (widget.appointmentId != null) {
         // Appointment payment — simulate success
@@ -109,9 +162,9 @@ class _SelectPaymentMethodState extends State<SelectPaymentMethod> {
           // Pass this screen's own context: it's the one actually mounted
           // when the user clicks Confirm & Pay (lms_purchase_flow's screen
           // was already replaced by this one via pushReplacement).
-          if (mounted) widget.onPaymentSuccess!(context);
+          if (mounted) widget.onPaymentSuccess!(context, voucherCode: _appliedVoucherCode);
         } else {
-          await _courseService.buyCourse(widget.courseId!);
+          await _courseService.buyCourse(widget.courseId!, voucherCode: _appliedVoucherCode);
           if (mounted) {
             _showSuccessDialog(
               "Course Purchased!",
@@ -331,9 +384,13 @@ class _SelectPaymentMethodState extends State<SelectPaymentMethod> {
                       },
                     ),
                   ),
+                  if (widget.courseId != null) ...[
+                    const SizedBox(height: 20),
+                    _buildVoucherField(),
+                  ],
                   const SizedBox(height: 20),
                   CustomButton(
-                    label: "Confirm & Pay PKR ${widget.amount ?? 0}",
+                    label: "Confirm & Pay PKR ${_finalAmount.toStringAsFixed(0)}",
                     borderRadius: 35,
                     onPressed: _processPayment,
                   ),
@@ -341,6 +398,77 @@ class _SelectPaymentMethodState extends State<SelectPaymentMethod> {
                 ],
               ),
             ),
+    );
+  }
+
+  Widget _buildVoucherField() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        CustomText(
+          text: "Have a voucher code?",
+          fontFamily: "Gilroy-Bold",
+          fontSize: 14,
+          color: AppColors.primary500,
+        ),
+        const SizedBox(height: 8),
+        if (_appliedVoucherCode != null)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            decoration: BoxDecoration(
+              color: const Color(0xFF10B981).withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.3)),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.check_circle_rounded, color: Color(0xFF10B981), size: 18),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Voucher "$_appliedVoucherCode" applied',
+                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF10B981)),
+                  ),
+                ),
+                TextButton(onPressed: _removeVoucher, child: const Text("Remove")),
+              ],
+            ),
+          )
+        else
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _voucherController,
+                  textCapitalization: TextCapitalization.characters,
+                  decoration: InputDecoration(
+                    hintText: "Enter voucher code",
+                    isDense: true,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              ElevatedButton(
+                onPressed: _applyingVoucher ? null : _applyVoucher,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primaryColor,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                child: _applyingVoucher
+                    ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                    : const Text("Apply"),
+              ),
+            ],
+          ),
+        if (_voucherError != null) ...[
+          const SizedBox(height: 6),
+          Text(_voucherError!, style: const TextStyle(color: Colors.red, fontSize: 12)),
+        ],
+      ],
     );
   }
 
@@ -480,15 +608,24 @@ class _SelectPaymentMethodState extends State<SelectPaymentMethod> {
                             const SizedBox(height: 24),
                             _buildSummaryItem(
                               "Service Price",
-                              "PKR ${widget.amount ?? 0}",
+                              "PKR ${(widget.amount ?? 0).toStringAsFixed(0)}",
                             ),
+                            if (_appliedVoucherCode != null)
+                              _buildSummaryItem(
+                                "Voucher ($_appliedVoucherCode)",
+                                "- PKR ${((widget.amount ?? 0) - _finalAmount).toStringAsFixed(0)}",
+                              ),
                             _buildSummaryItem("Processing Fee", "PKR 0.00"),
                             const Divider(height: 32, color: Color(0xFFF1F5F9)),
                             _buildSummaryItem(
                               "Total",
-                              "PKR ${widget.amount ?? 0}",
+                              "PKR ${_finalAmount.toStringAsFixed(0)}",
                               isTotal: true,
                             ),
+                            if (widget.courseId != null) ...[
+                              const SizedBox(height: 24),
+                              _buildVoucherField(),
+                            ],
                             const SizedBox(height: 32),
                             SizedBox(
                               width: double.infinity,

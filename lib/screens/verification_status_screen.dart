@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:icare/services/api_service.dart';
@@ -20,12 +22,29 @@ class VerificationStatusScreen extends StatefulWidget {
 
 class _VerificationStatusScreenState extends State<VerificationStatusScreen> {
   bool _isRefreshing = false;
+  Timer? _pollTimer;
 
-  // Mock status - in real implementation, this will come from API
-  int _currentStep = 1; // 0: Submitted, 1: In Progress, 2: Activated
+  // 0: Submitted, 1: In Progress, 2: Activated
+  int _currentStep = 1;
 
-  Future<void> _refreshStatus() async {
-    setState(() => _isRefreshing = true);
+  @override
+  void initState() {
+    super.initState();
+    // Fetch real status immediately instead of showing the mock "In
+    // Progress" state until the user manually taps Refresh.
+    _refreshStatus(silent: true);
+    // Poll every 10s so admin approval reflects here without a manual tap.
+    _pollTimer = Timer.periodic(const Duration(seconds: 10), (_) => _refreshStatus(silent: true));
+  }
+
+  @override
+  void dispose() {
+    _pollTimer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _refreshStatus({bool silent = false}) async {
+    if (!silent) setState(() => _isRefreshing = true);
 
     try {
       // Check approval status from backend
@@ -39,14 +58,15 @@ class _VerificationStatusScreenState extends State<VerificationStatusScreen> {
         }
       }
     } catch (_) {
-      // Silently ignore — just show snackbar below
+      // Silently ignore — just show snackbar below (manual refresh only)
     } finally {
-      if (mounted) setState(() => _isRefreshing = false);
+      if (mounted && !silent) setState(() => _isRefreshing = false);
     }
 
     if (!mounted) return;
 
     if (_currentStep >= 2) {
+      _pollTimer?.cancel();
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(
           builder: (_) => AccountActivatedScreen(
@@ -55,7 +75,7 @@ class _VerificationStatusScreenState extends State<VerificationStatusScreen> {
           ),
         ),
       );
-    } else {
+    } else if (!silent) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Still in progress. Check back soon.'),

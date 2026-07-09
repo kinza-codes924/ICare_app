@@ -114,8 +114,8 @@ class _ViewCourseState extends ConsumerState<ViewCourse> {
     final price = course['discountedPrice'] ?? course['price'] ?? course['cost'] ?? 0;
     final amount = (price is num) ? price.toDouble() : double.tryParse(price.toString()) ?? 0.0;
 
-    // Free courses → enroll directly without payment
-    if (amount <= 0) {
+    // Free courses (real $0 price, or instructor's "Free" display toggle) → enroll directly without payment
+    if (amount <= 0 || course['isFree'] == true) {
       setState(() => _isPurchasing = true);
       try {
         final result = await _courseService.buyCourse(courseId);
@@ -699,7 +699,7 @@ class _ViewCourseState extends ConsumerState<ViewCourse> {
     }
 
     final price = widget.courseData?['price'];
-    final isFree = price == null || price == 0;
+    final isFree = price == null || price == 0 || widget.courseData?['isFree'] == true;
 
     return Column(
       children: [

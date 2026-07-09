@@ -89,9 +89,17 @@ async function withRetry(fn, maxAttempts = 3) {
 router.get('/pending-users', authMiddleware, adminOnly, async (req, res) => {
   try {
     await connectMongoDB();
+    // Brand-new accounts awaiting first approval, UNION accounts already
+    // approved under one role but requesting an additional role (e.g. an
+    // approved doctor who applied again as a student with the same email).
     const users = await withRetry(() =>
-      User.find({ is_approved: false, role: { $nin: ['admin', 'patient'] } })
-        .select('name username email role roles phone createdAt verificationDetails')
+      User.find({
+        $or: [
+          { is_approved: false, role: { $nin: ['admin', 'patient'] } },
+          { pendingRoles: { $exists: true, $not: { $size: 0 } } },
+        ],
+      })
+        .select('name username email role roles pendingRoles phone createdAt verificationDetails is_approved')
         .maxTimeMS(8000)
         .lean(),
     2
@@ -103,6 +111,10 @@ router.get('/pending-users', authMiddleware, adminOnly, async (req, res) => {
       email: u.email || '',
       role: u.role || '',
       roles: u.roles || [],
+      pendingRoles: u.pendingRoles || [],
+      // true when this is an already-approved account requesting an extra
+      // role, rather than a brand-new unapproved account.
+      isExistingAccount: u.is_approved === true,
       phone: u.phone || '',
       createdAt: u.createdAt,
       verificationDetails: u.verificationDetails || {},
@@ -192,6 +204,21 @@ router.get('/users', authMiddleware, adminOnly, async (req, res) => {
 });
 
 // ─── APPROVE USER ─────────────────────────────────────────────────────────────
+// Best-effort — the applicant's VerificationStatusScreen also polls
+// /auth/profile every 10s, so a failed notification never blocks approval.
+async function notifyUserApproved(user) {
+  try {
+    const Notification = require('../models/Notification');
+    await Notification.create({
+      userId: user._id,
+      type: 'general',
+      title: 'Account Approved!',
+      message: `Your ${user.role} account has been approved. You can now log in and get started.`,
+      data: { type: 'account_approved', role: user.role },
+    });
+  } catch (_) {}
+}
+
 router.put('/approve/:userId', authMiddleware, adminOnly, async (req, res) => {
   try {
     await connectMongoDB();
@@ -202,6 +229,7 @@ router.put('/approve/:userId', authMiddleware, adminOnly, async (req, res) => {
     ).select('-password').lean();
 
     if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+    notifyUserApproved(user);
     res.json({ success: true, message: 'User approved', user: { _id: user._id.toString(), email: user.email, role: user.role } });
   } catch (err) {
     console.error('approve user error:', err);
@@ -210,9 +238,42 @@ router.put('/approve/:userId', authMiddleware, adminOnly, async (req, res) => {
 });
 
 // Flutter uses POST /admin/approve-user/:id
+// Body may include { role } to disambiguate which pending role to approve
+// when the account has more than one queued.
 router.post('/approve-user/:userId', authMiddleware, adminOnly, async (req, res) => {
   try {
     await connectMongoDB();
+    const existing = await User.findById(toId(req.params.userId)).select('pendingRoles roles is_approved').lean();
+    if (!existing) return res.status(404).json({ success: false, message: 'User not found' });
+
+    // Existing approved account requesting an additional role — promote
+    // pendingRoles -> roles instead of the brand-new-account approval path.
+    if (existing.is_approved === true && (existing.pendingRoles || []).length > 0) {
+      const roleToApprove = req.body?.role || existing.pendingRoles[0];
+      if (!existing.pendingRoles.includes(roleToApprove)) {
+        return res.status(400).json({ success: false, message: 'That role is not pending for this account' });
+      }
+      const user = await User.findByIdAndUpdate(
+        toId(req.params.userId),
+        {
+          $addToSet: { roles: roleToApprove },
+          $pull: { pendingRoles: roleToApprove },
+        },
+        { new: true }
+      ).select('-password').lean();
+      try {
+        const Notification = require('../models/Notification');
+        await Notification.create({
+          userId: user._id,
+          type: 'general',
+          title: 'New Role Approved!',
+          message: `Your request to also use this account as a ${roleToApprove} has been approved.`,
+          data: { type: 'role_approved', role: roleToApprove },
+        });
+      } catch (_) {}
+      return res.json({ success: true, message: 'Role approved', user: { _id: user._id.toString(), email: user.email, role: user.role, roles: user.roles } });
+    }
+
     const user = await User.findByIdAndUpdate(
       toId(req.params.userId),
       { $set: { is_approved: true, is_active: true } },
@@ -220,6 +281,7 @@ router.post('/approve-user/:userId', authMiddleware, adminOnly, async (req, res)
     ).select('-password').lean();
 
     if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+    notifyUserApproved(user);
     res.json({ success: true, message: 'User approved', user: { _id: user._id.toString(), email: user.email, role: user.role } });
   } catch (err) {
     console.error('approve-user error:', err);
@@ -271,6 +333,18 @@ router.put('/reject/:userId', authMiddleware, adminOnly, async (req, res) => {
 router.post('/reject-user/:userId', authMiddleware, adminOnly, async (req, res) => {
   try {
     await connectMongoDB();
+    const existing = await User.findById(toId(req.params.userId)).select('pendingRoles is_approved').lean();
+    if (!existing) return res.status(404).json({ success: false, message: 'User not found' });
+
+    // Existing approved account requesting an additional role — only clear
+    // the pending role request. The account itself (and its existing role)
+    // must NOT be deactivated by rejecting an unrelated role request.
+    if (existing.is_approved === true && (existing.pendingRoles || []).length > 0) {
+      const roleToReject = req.body?.role || existing.pendingRoles[0];
+      await User.findByIdAndUpdate(toId(req.params.userId), { $pull: { pendingRoles: roleToReject } });
+      return res.json({ success: true, message: 'Role request rejected' });
+    }
+
     const user = await User.findByIdAndUpdate(
       toId(req.params.userId),
       { $set: { is_approved: false, is_active: false } },

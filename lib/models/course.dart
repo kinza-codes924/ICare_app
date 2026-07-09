@@ -261,8 +261,9 @@ class LessonResource {
 class Quiz {
   final List<QuizQuestion> questions;
   final int passingScore;
+  final int maxAttempts;
 
-  Quiz({required this.questions, required this.passingScore});
+  Quiz({required this.questions, required this.passingScore, this.maxAttempts = 3});
 
   factory Quiz.fromJson(Map<String, dynamic> json) {
     return Quiz(
@@ -272,6 +273,7 @@ class Quiz {
               .toList() ??
           [],
       passingScore: json['passingScore'] ?? 70,
+      maxAttempts: json['maxAttempts'] ?? 3,
     );
   }
 
@@ -279,6 +281,7 @@ class Quiz {
     return {
       'questions': questions.map((q) => q.toJson()).toList(),
       'passingScore': passingScore,
+      'maxAttempts': maxAttempts,
     };
   }
 }

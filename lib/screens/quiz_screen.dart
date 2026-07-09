@@ -28,6 +28,8 @@ class _QuizScreenState extends State<QuizScreen> {
   final Map<int, int> _selectedAnswers = {};
   bool _isFinished = false;
   bool _showReview = false;
+  int _attemptsUsed = 1; // this screen's own load counts as attempt 1
+  bool get _canRetake => _attemptsUsed < widget.quiz.maxAttempts;
 
   void _submitAnswer(int answerIndex) {
     if (_isFinished) return;
@@ -110,7 +112,7 @@ class _QuizScreenState extends State<QuizScreen> {
             },
             child: const Text('Review Answers'),
           ),
-          if (!passed)
+          if (!passed && _canRetake)
             TextButton(
               onPressed: () {
                 Navigator.pop(context);
@@ -119,6 +121,7 @@ class _QuizScreenState extends State<QuizScreen> {
                   _showReview = false;
                   _currentQuestionIndex = 0;
                   _selectedAnswers.clear();
+                  _attemptsUsed += 1;
                 });
               },
               child: const Text('Retake Quiz'),
