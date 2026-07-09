@@ -646,7 +646,15 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
     setState(() {});
   }
 
+  // Guards against rapid double-taps on the screen-share button invoking
+  // lmsToggleScreenShare() twice concurrently — the JS side also has its
+  // own busy-guard (window._lmsScreenBusy) as the authoritative lock, but
+  // disabling the button here means a double-tap never even reaches JS.
+  bool _screenShareBusy = false;
+
   Future<void> _toggleScreenShare() async {
+    if (_screenShareBusy) return;
+    setState(() => _screenShareBusy = true);
     try {
       final result = await lmsToggleScreenShare();
       if (mounted) {
@@ -673,7 +681,10 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
         final uid = result == 'screen' ? lmsGetLocalUid() : null;
         await _lms.setScreenSharingUid(sessionId: _sessionDocId, uid: uid);
       }
-    } catch (_) {}
+    } catch (_) {
+    } finally {
+      if (mounted) setState(() => _screenShareBusy = false);
+    }
   }
 
   void _toggleHand() {
