@@ -62,6 +62,9 @@ const ALLOWED_ORIGINS = [
   'https://icare-app.vercel.app',
   // Vercel preview URLs
   /^https:\/\/icare-[a-z0-9-]+-wajahatfrontdev-8765s-projects\.vercel\.app$/,
+  // Local dev (flutter run -d chrome binds a random localhost port each run)
+  /^https?:\/\/localhost:\d+$/,
+  /^https?:\/\/127\.0\.0\.1:\d+$/,
 ];
 
 app.use((req, res, next) => {

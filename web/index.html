@@ -70,6 +70,32 @@
       background: rgba(0,0,0,0.6); color: #fff; font-size: 12px; font-weight: 600;
       padding: 2px 8px; border-radius: 4px; z-index: 10; pointer-events: none;
     }
+    /* Screen-share spotlight: the sharing participant's EXISTING tile grows
+       to fill most of the space, other tiles shrink into a strip below it.
+       Deliberately reuses the same tile <div> that's already playing video
+       the whole time (just resized via CSS/class toggle) instead of moving
+       video into a new container — an earlier "big main view" attempt did
+       that (played the track into a separate, previously-hidden element)
+       and caused blank/stuck shared screens. #lms-grid-container carries
+       inline display:grid set once from Dart, so overriding it needs
+       !important same as the rest of this stylesheet's grid overrides. */
+    #lms-grid-container.lms-spotlight-active {
+      display: flex !important;
+      flex-direction: column !important;
+    }
+    #lms-grid-container.lms-spotlight-active .lms-remote-tile {
+      aspect-ratio: auto !important;
+    }
+    #lms-grid-container.lms-spotlight-active .lms-spotlight-tile {
+      flex: 1 1 auto !important;
+      order: -1 !important;
+      min-height: 0 !important;
+    }
+    #lms-grid-container.lms-spotlight-active .lms-remote-tile:not(.lms-spotlight-tile) {
+      flex: 0 0 84px !important;
+      height: 84px !important;
+      order: 1 !important;
+    }
   </style>
 </head>
 <body>
@@ -593,6 +619,24 @@
       window.dispatchEvent(new CustomEvent('lms-remote-left', { detail: String(uid) }));
     };
 
+    // Every grid resize reflows every tile's box size. Agora's internal
+    // <video>/<canvas> element doesn't always pick up on that reflow (it can
+    // be left sized against the pre-reflow box), which is what makes tiles
+    // go blank after a resize. Re-playing each already-subscribed remote
+    // track a beat later forces Agora to re-measure the (now correctly
+    // sized) container. Shared by column-count changes and spotlight
+    // toggling — both resize existing tiles without recreating them.
+    window._lmsReplayGridTiles = function() {
+      if (!window._lmsAgoraClient) return;
+      setTimeout(function() {
+        window._lmsAgoraClient.remoteUsers.forEach(function(u) {
+          if (!u.videoTrack) return;
+          var vd = document.getElementById('lms-tile-' + u.uid + '-video');
+          if (vd) { try { u.videoTrack.play(vd.id, { fit: window._lmsVideoFit || 'cover' }); } catch(_) {} }
+        });
+      }, 120);
+    };
+
     window._lmsUpdateGridLayout = function() {
       var grid = document.getElementById('lms-grid-container');
       if (!grid) return;
@@ -601,21 +645,7 @@
       // number, so grids with 20+ students still lay out sensibly.
       var cols = count <= 1 ? 1 : count <= 4 ? 2 : count <= 9 ? 3 : count <= 16 ? 4 : 5;
       grid.style.gridTemplateColumns = 'repeat(' + cols + ', 1fr)';
-      // Every grid resize reflows every tile's box size. Agora's internal
-      // <video>/<canvas> element doesn't always pick up on that reflow (it
-      // can be left sized against the pre-reflow box), which is what makes
-      // tiles go blank once enough participants join to change the column
-      // count. Re-playing each already-subscribed remote track a beat later
-      // forces Agora to re-measure the (now correctly sized) container.
-      if (window._lmsAgoraClient) {
-        setTimeout(function() {
-          window._lmsAgoraClient.remoteUsers.forEach(function(u) {
-            if (!u.videoTrack) return;
-            var vd = document.getElementById('lms-tile-' + u.uid + '-video');
-            if (vd) { try { u.videoTrack.play(vd.id, { fit: window._lmsVideoFit || 'cover' }); } catch(_) {} }
-          });
-        }, 120);
-      }
+      window._lmsReplayGridTiles();
     };
 
     window.lmsSetTileName = function(uid, name) {
@@ -896,10 +926,39 @@
       return window._lmsAgoraClient ? String(window._lmsAgoraClient.uid || '') : '';
     };
 
-    // No-op kept only so Dart's existing call site (guarded, harmless if
-    // undefined anyway) doesn't need touching — screen-share no longer
-    // drives any special big-view layout to switch into.
-    window.lmsApplyRemoteScreenShare = function(sharingUid) {};
+    // Called on Dart's 2s poll cycle with the session's current
+    // screenSharingUid (or '' if nobody is sharing). If that uid has an
+    // existing grid tile, enlarge it into a spotlight view via CSS classes
+    // — the tile keeps playing the same video it already was, nothing is
+    // moved or replayed into a new container, which is what made the
+    // earlier big-view layout unreliable (see .lms-spotlight-active above).
+    window.lmsApplyRemoteScreenShare = function(sharingUid) {
+      try {
+        var grid = document.getElementById('lms-grid-container');
+        if (!grid) return;
+        var myUid = window.lmsGetLocalUid();
+        // Nobody remote is sharing, or it's our own uid (self-share shows
+        // via our own small corner preview, handled in lmsToggleScreenShare) —
+        // clear any active spotlight.
+        if (!sharingUid || sharingUid === myUid) {
+          if (grid.classList.contains('lms-spotlight-active')) {
+            grid.classList.remove('lms-spotlight-active');
+            var prevTile = grid.querySelector('.lms-spotlight-tile');
+            if (prevTile) prevTile.classList.remove('lms-spotlight-tile');
+            window._lmsReplayGridTiles();
+          }
+          return;
+        }
+        var tile = document.getElementById('lms-tile-' + sharingUid);
+        if (!tile) return; // sharer's tile not created yet — next poll tick retries
+        if (tile.classList.contains('lms-spotlight-tile') && grid.classList.contains('lms-spotlight-active')) return;
+        var other = grid.querySelector('.lms-spotlight-tile');
+        if (other && other !== tile) other.classList.remove('lms-spotlight-tile');
+        tile.classList.add('lms-spotlight-tile');
+        grid.classList.add('lms-spotlight-active');
+        window._lmsReplayGridTiles();
+      } catch(e) { console.warn('lmsApplyRemoteScreenShare error:', e); }
+    };
 
     window.lmsSetParticipantNames = function(localName, remoteName) {
       var ln = document.getElementById('lms-local-name');
