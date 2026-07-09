@@ -800,6 +800,7 @@ class _WebProgressListState extends State<_WebProgressList> {
   double _progressOf(dynamic item) {
     final p = item['progress'];
     if (p is num) return (p.toDouble()).clamp(0, 100);
+    if (p is Map) return ((p['percent'] ?? 0) as num).toDouble().clamp(0, 100);
     return 0;
   }
 

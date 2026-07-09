@@ -159,6 +159,7 @@ class _AssignmentSubmitScreenState extends State<AssignmentSubmitScreen> {
         assignmentId: _assignmentId,
         content: content.isNotEmpty ? content : null,
         fileUrl: fileUrl.isNotEmpty ? fileUrl : null,
+        fileName: fileUrl.isNotEmpty ? _uploadedFileName : null,
       );
       if (mounted) {
         setState(() {

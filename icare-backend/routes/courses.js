@@ -247,9 +247,13 @@ router.get('/enrollments/my', authMiddleware, async (req, res) => {
     const courses = await Course.find({ _id: { $in: courseIds } }).lean();
     const courseMap = {};
     courses.forEach(c => { courseMap[c._id.toString()] = c; });
-    const items = enrollments.map(e => ({
-      ...e,
-      course: courseMap[e.courseId.toString()] || null,
+    const items = await Promise.all(enrollments.map(async (e) => {
+      const { progressPct } = await computeProgress(e);
+      return {
+        ...e,
+        course: courseMap[e.courseId.toString()] || null,
+        progress: { ...e.progress, percent: progressPct },
+      };
     }));
     res.json({ success: true, enrollments: items, items, count: items.length });
   } catch (e) {

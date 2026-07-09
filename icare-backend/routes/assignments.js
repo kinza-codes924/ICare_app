@@ -166,9 +166,15 @@ router.post('/:assignmentId/submit', authMiddleware, upload.single('file'), asyn
 
     let fileUrl = null, fileName = null;
     if (req.file) {
+      // Multipart upload directly to this endpoint
       const result = await uploadBuffer(req.file.buffer, 'icare/lms/submissions');
       fileUrl  = result.secure_url;
       fileName = req.file.originalname;
+    } else if (req.body.fileUrl) {
+      // File was already uploaded client-side (e.g. via /upload/blob-doc)
+      // and only the resulting URL is sent here as JSON.
+      fileUrl  = req.body.fileUrl;
+      fileName = req.body.fileName || null;
     }
 
     const status = assignment.dueDate && new Date() > new Date(assignment.dueDate) ? 'late' : 'submitted';

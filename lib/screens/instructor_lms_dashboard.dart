@@ -768,9 +768,9 @@ class _InstructorLmsDashboardState extends ConsumerState<InstructorLmsDashboard>
                       ),
                     ),
                     const Spacer(),
-                    // Students count — opens directly to Course Content tab
+                    // Students count — opens directly to the People tab
                     _cardIconButton(Icons.people_outlined, enrolledCount > 0 ? '$enrolledCount' : null,
-                        () => _openCourseAtTab(course, 1)),
+                        () => _openCourseAtTab(course, 2)),
                     // More menu (settings) — only button kept
                     _cardMoreButton(course),
                   ],

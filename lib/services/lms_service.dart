@@ -222,10 +222,12 @@ class LmsService {
     required String assignmentId,
     String? content,
     String? fileUrl,
+    String? fileName,
   }) async {
     final response = await _api.post('/lms/assignments/$assignmentId/submit', {
       'content': content,
       'fileUrl': fileUrl,
+      'fileName': fileName,
     });
     return response.data;
   }

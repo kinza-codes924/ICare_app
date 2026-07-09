@@ -7,6 +7,7 @@ const User = require('../models/User');
 const InstructorProfile = require('../models/InstructorProfile');
 const Course = require('../models/Course');
 const Precaution = require('../models/Precaution');
+const Enrollment = require('../models/Enrollment');
 
 function toId(id) {
   try { return new mongoose.Types.ObjectId(id); } catch { return null; }
@@ -109,9 +110,19 @@ router.get('/my-courses', authMiddleware, async (req, res) => {
     }).lean();
     // Tag co-taught courses so the frontend can distinguish them
     const userId = instructorId.toString();
+
+    // Real enrolled-student counts (Course docs don't store this field)
+    const counts = await Enrollment.aggregate([
+      { $match: { courseId: { $in: courses.map(c => c._id) } } },
+      { $group: { _id: '$courseId', count: { $sum: 1 } } },
+    ]);
+    const countMap = {};
+    counts.forEach(c => { countMap[c._id.toString()] = c.count; });
+
     const tagged = courses.map(c => ({
       ...c,
       isCoTeacher: c.instructor_id?.toString() !== userId,
+      enrolledCount: countMap[c._id.toString()] || 0,
     }));
     res.json({ success: true, courses: tagged, count: tagged.length });
   } catch (e) {
