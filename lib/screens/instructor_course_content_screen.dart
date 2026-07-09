@@ -12,6 +12,9 @@ import 'package:icare/screens/lms_live_session_screen.dart';
 import 'package:icare/screens/instructor_create_assignment_screen.dart';
 import 'package:icare/screens/instructor_create_quiz_screen.dart';
 import 'package:icare/screens/instructor_quiz_attempts_screen.dart';
+import 'package:icare/screens/instructor_course_analytics_screen.dart';
+import 'package:icare/screens/instructor_student_progress_screen.dart';
+import 'package:icare/screens/instructor_voucher_screen.dart';
 import 'package:icare/widgets/video_player_widget.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -519,7 +522,7 @@ class InstructorCourseContentScreenState extends State<InstructorCourseContentSc
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              'Course Content',
+              'Course Settings',
               style: TextStyle(
                 color: Color(0xFF0F172A),
                 fontWeight: FontWeight.w800,
@@ -536,90 +539,147 @@ class InstructorCourseContentScreenState extends State<InstructorCourseContentSc
             ),
           ],
         ),
-        actions: [
-          // Edit Thumbnail
-          IconButton(
-            icon: const Icon(Icons.image_outlined, color: Color(0xFF6366F1)),
-            tooltip: 'Edit Thumbnail',
-            onPressed: _showEditThumbnail,
-          ),
-          // Certificate template picker
-          IconButton(
-            icon: const Icon(Icons.workspace_premium_rounded, color: Color(0xFFD4AF37)),
-            tooltip: 'Certificate Template',
-            onPressed: () {
-              Navigator.push(context, MaterialPageRoute(
-                builder: (_) => CertificateTemplateSelectorScreen(
-                  courseTitle: _course?['title'] ?? 'Course',
-                  instructorName: _course?['instructor']?['name'] ?? 'Instructor',
-                  courseId: widget.courseId,
-                  currentTemplate: _certificateTemplate,
-                  certificateReleased: _course?['certificateReleased'] == true,
-                  onSelect: (t) => setState(() => _certificateTemplate = t),
-                ),
-              )).then((_) => _loadCourse()); // reload course to get updated certificateReleased
-            },
-          ),
-          // Course Type badge
-          GestureDetector(
-            onTap: _showCourseTypeDialog,
-            child: Container(
-              margin: const EdgeInsets.symmetric(vertical: 8),
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              decoration: BoxDecoration(
-                color: _courseType == 'pragmatic' ? const Color(0xFF6366F1).withValues(alpha: 0.1) : const Color(0xFF10B981).withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: _courseType == 'pragmatic' ? const Color(0xFF6366F1).withValues(alpha: 0.3) : const Color(0xFF10B981).withValues(alpha: 0.3)),
-              ),
-              child: Row(mainAxisSize: MainAxisSize.min, children: [
-                Icon(_courseType == 'pragmatic' ? Icons.timeline_rounded : Icons.self_improvement_rounded,
-                    size: 14, color: _courseType == 'pragmatic' ? const Color(0xFF6366F1) : const Color(0xFF10B981)),
-                const SizedBox(width: 5),
-                Text(_courseType == 'pragmatic' ? 'Pragmatic' : 'Self-paced',
-                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: _courseType == 'pragmatic' ? const Color(0xFF6366F1) : const Color(0xFF10B981))),
-              ]),
-            ),
-          ),
-          const SizedBox(width: 4),
-          // "Show as Free" pricing-display toggle — flips the catalog/checkout
-          // display between "Free" and the course's real price without
-          // touching the price field itself (worst-case voucher fallback).
-          GestureDetector(
-            onTap: () => _toggleFreeDisplay(!_isFreeDisplay),
-            child: Container(
-              margin: const EdgeInsets.symmetric(vertical: 8),
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              decoration: BoxDecoration(
-                color: _isFreeDisplay ? const Color(0xFFF59E0B).withValues(alpha: 0.12) : const Color(0xFFF1F5F9),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: _isFreeDisplay ? const Color(0xFFF59E0B).withValues(alpha: 0.4) : const Color(0xFFE2E8F0)),
-              ),
-              child: Row(mainAxisSize: MainAxisSize.min, children: [
-                Icon(_isFreeDisplay ? Icons.money_off_rounded : Icons.sell_outlined,
-                    size: 14, color: _isFreeDisplay ? const Color(0xFFF59E0B) : const Color(0xFF64748B)),
-                const SizedBox(width: 5),
-                Text(_isFreeDisplay ? 'Showing: Free' : 'Showing: Price',
-                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: _isFreeDisplay ? const Color(0xFFF59E0B) : const Color(0xFF64748B))),
-              ]),
-            ),
-          ),
-        ],
       ),
-      // Course Settings is now settings-only — modules, Go Live, and Add
-      // Module all moved to the Course Content tab (_buildEmbeddedBody) to
-      // avoid duplicating the modules list in two places.
-      body: Padding(
+      // Course Settings is settings-only — modules, Go Live, and Add Module
+      // all live in the Course Content tab (_buildEmbeddedBody) to avoid
+      // duplicating the modules list in two places.
+      body: _buildSettingsBody(),
+    );
+  }
+
+  Widget _buildSettingsBody() {
+    final width = MediaQuery.of(context).size.width;
+    final crossCount = width > 1000 ? 3 : (width > 650 ? 2 : 1);
+    return RefreshIndicator(
+      onRefresh: _loadCourse,
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.all(20),
+        child: GridView.count(
+          crossAxisCount: crossCount,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          crossAxisSpacing: 16,
+          mainAxisSpacing: 16,
+          childAspectRatio: 1.7,
+          children: [
+            _buildSettingsCard(
+              icon: Icons.image_outlined,
+              color: const Color(0xFF6366F1),
+              title: 'Thumbnail',
+              rows: const ['Change the course cover image'],
+              onTap: _showEditThumbnail,
+            ),
+            _buildSettingsCard(
+              icon: Icons.workspace_premium_rounded,
+              color: const Color(0xFFD4AF37),
+              title: 'Certificate Template',
+              rows: ['Template: ${_certificateTemplate.name}'],
+              onTap: () {
+                Navigator.push(context, MaterialPageRoute(
+                  builder: (_) => CertificateTemplateSelectorScreen(
+                    courseTitle: _course?['title'] ?? 'Course',
+                    instructorName: _course?['instructor']?['name'] ?? 'Instructor',
+                    courseId: widget.courseId,
+                    currentTemplate: _certificateTemplate,
+                    certificateReleased: _course?['certificateReleased'] == true,
+                    onSelect: (t) => setState(() => _certificateTemplate = t),
+                  ),
+                )).then((_) => _loadCourse());
+              },
+            ),
+            _buildSettingsCard(
+              icon: _courseType == 'pragmatic' ? Icons.timeline_rounded : Icons.self_improvement_rounded,
+              color: _courseType == 'pragmatic' ? const Color(0xFF6366F1) : const Color(0xFF10B981),
+              title: 'Course Type',
+              rows: [_courseType == 'pragmatic' ? 'Pragmatic (Timeline)' : 'Self-paced'],
+              onTap: _showCourseTypeDialog,
+            ),
+            _buildSettingsCard(
+              icon: _isFreeDisplay ? Icons.money_off_rounded : Icons.sell_outlined,
+              color: const Color(0xFFF59E0B),
+              title: 'Pricing Display',
+              rows: [_isFreeDisplay ? 'Showing as: Free' : 'Showing real price'],
+              onTap: () => _toggleFreeDisplay(!_isFreeDisplay),
+            ),
+            _buildSettingsCard(
+              icon: Icons.people_outline_rounded,
+              color: const Color(0xFF0EA5E9),
+              title: 'Students & Progress',
+              rows: const ['View enrolled students and their progress'],
+              onTap: () => Navigator.push(context, MaterialPageRoute(
+                builder: (_) => InstructorStudentProgressScreen(
+                  courseId: widget.courseId,
+                  courseTitle: _course?['title']?.toString() ?? 'Course',
+                ),
+              )),
+            ),
+            _buildSettingsCard(
+              icon: Icons.analytics_outlined,
+              color: const Color(0xFF8B5CF6),
+              title: 'Analytics',
+              rows: const ['Engagement, completion, and quiz stats'],
+              onTap: () => Navigator.push(context, MaterialPageRoute(
+                builder: (_) => InstructorCourseAnalyticsScreen(
+                  courseId: widget.courseId,
+                  courseTitle: _course?['title']?.toString() ?? 'Course',
+                ),
+              )),
+            ),
+            _buildSettingsCard(
+              icon: Icons.confirmation_number_outlined,
+              color: const Color(0xFFEF4444),
+              title: 'Discount Vouchers',
+              rows: const ['Create and manage enrollment vouchers'],
+              onTap: () => Navigator.push(context, MaterialPageRoute(
+                builder: (_) => const InstructorVoucherScreen(),
+              )),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSettingsCard({
+    required IconData icon,
+    required Color color,
+    required String title,
+    required List<String> rows,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(14),
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: const Color(0xFFE2E8F0)),
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Course Settings', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Color(0xFF0F172A))),
-            const SizedBox(height: 6),
-            const Text(
-              'Manage thumbnail, certificate template, course type, and pricing display above. '
-              'Modules, sessions, and Go Live are managed from the Course Content tab.',
-              style: TextStyle(fontSize: 13, color: Color(0xFF64748B)),
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(10)),
+                  child: Icon(icon, color: color, size: 20),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(title, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: Color(0xFF0F172A))),
+                ),
+                const Icon(Icons.chevron_right_rounded, color: Color(0xFF94A3B8), size: 18),
+              ],
             ),
+            const SizedBox(height: 10),
+            ...rows.map((r) => Padding(
+                  padding: const EdgeInsets.only(bottom: 3),
+                  child: Text(r, style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)), overflow: TextOverflow.ellipsis),
+                )),
           ],
         ),
       ),
