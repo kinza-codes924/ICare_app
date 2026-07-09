@@ -1,14 +1,17 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_size_matters/flutter_size_matters.dart';
 import 'package:icare/utils/theme.dart';
 import 'package:icare/utils/utils.dart';
 import 'package:icare/widgets/back_button.dart';
 import 'package:icare/widgets/custom_text.dart';
+import 'package:icare/utils/pdf_invoice_generator.dart';
 import '../services/laboratory_service.dart';
-import 'package:intl/intl.dart';
+import '../services/pharmacy_service.dart';
 
 class PaymentInvoices extends StatefulWidget {
-  const PaymentInvoices({super.key});
+  final bool isPharmacy;
+  const PaymentInvoices({super.key, this.isPharmacy = false});
 
   @override
   State<PaymentInvoices> createState() => _PaymentInvoicesState();
@@ -18,14 +21,17 @@ class _PaymentInvoicesState extends State<PaymentInvoices>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   final LaboratoryService _labService = LaboratoryService();
+  final PharmacyService _pharmacyService = PharmacyService();
   String _selectedFilter = "All";
   bool _isLoading = true;
   List<Map<String, dynamic>> _invoices = [];
+  List<Map<String, dynamic>> _labDoctors = [];
+  String _labName = 'iCare Laboratory';
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
+    _tabController = TabController(length: 2, vsync: this);
     _tabController.addListener(() {
       setState(() {
         switch (_tabController.index) {
@@ -34,12 +40,6 @@ class _PaymentInvoicesState extends State<PaymentInvoices>
             break;
           case 1:
             _selectedFilter = "Paid";
-            break;
-          case 2:
-            _selectedFilter = "Pending";
-            break;
-          case 3:
-            _selectedFilter = "Overdue";
             break;
         }
       });
@@ -50,34 +50,105 @@ class _PaymentInvoicesState extends State<PaymentInvoices>
   Future<void> _fetchInvoices() async {
     setState(() => _isLoading = true);
     try {
-      final profile = await _labService.getProfile();
-      final bookings = await _labService.getBookings(profile['_id']);
-
-      setState(() {
-        _invoices = bookings.map((b) {
-          final status = b['status'] == 'completed'
-              ? 'Paid'
-              : (b['status'] == 'cancelled' ? 'Overdue' : 'Pending');
-          final dateStr = b['date'] ?? '';
-          DateTime? dateObj = DateTime.tryParse(dateStr);
-          final formattedDate = dateObj != null
-              ? DateFormat('dd MMM, yyyy').format(dateObj)
-              : '—';
-
-          return {
-            "id":
-                b['bookingNumber'] ??
-                "INV-${b['_id'].toString().substring(18)}",
-            "patient": b['patient']?['name'] ?? "Unknown Patient",
-            "test": b['testName'] ?? "Laboratory Test",
-            "amount": (b['price'] ?? 0).toDouble(),
-            "date": formattedDate,
-            "status": status,
-            "method": b['paymentMethod'] ?? "Cash",
-          };
-        }).toList();
-        _isLoading = false;
-      });
+      if (widget.isPharmacy) {
+        final orders = await _pharmacyService.getPharmacyOrders();
+        setState(() {
+          _invoices = orders.map((o) {
+            final rawStatus = o['status']?.toString() ?? '';
+            final status = rawStatus == 'completed'
+                ? 'Paid'
+                : (rawStatus == 'cancelled' || rawStatus == 'rejected'
+                    ? 'Cancelled'
+                    : 'Pending');
+            final dateStr = o['createdAt'] ?? o['date'] ?? '';
+            DateTime? dateObj = DateTime.tryParse(dateStr);
+            final formattedDate = dateObj != null
+                ? DateFormat('dd MMM, yyyy').format(dateObj)
+                : '—';
+            final id = o['orderNumber'] ?? "INV-${(o['_id'] ?? '').toString().replaceAll(RegExp(r'.+(.{6})'), r'\1')}";
+            final items = (o['items'] as List<dynamic>?)
+                    ?.map((i) => i['name'] ?? i['medicineName'] ?? '')
+                    .where((s) => s.isNotEmpty)
+                    .join(', ') ??
+                'Medicine Order';
+            return {
+              "id": id,
+              "patient": o['patient']?['name'] ?? o['customerName'] ?? "Customer",
+              "test": items.isEmpty ? 'Medicine Order' : items,
+              "amount": (o['totalAmount'] ?? o['total'] ?? 0).toDouble(),
+              "date": formattedDate,
+              "status": status,
+              "method": o['paymentMethod'] ?? "Cash",
+            };
+          }).toList();
+          _isLoading = false;
+        });
+      } else {
+        final profile = await _labService.getProfile();
+        final labId = profile['_id'] ?? profile['id'] ?? '';
+        // Store lab doctors and name for PDF footer
+        final doctorsList = (profile['doctors'] as List<dynamic>? ?? []);
+        _labDoctors = doctorsList
+            .map((d) => {
+                  'name': d['name']?.toString() ?? '',
+                  'education': d['education']?.toString() ?? '',
+                  'designation': d['designation']?.toString() ?? '',
+                })
+            .where((d) => (d['name'] as String).isNotEmpty)
+            .toList();
+        _labName = profile['labName'] ?? profile['lab_name'] ?? profile['name'] ?? 'iCare Laboratory';
+        final bookings = await _labService.getBookings(labId);
+        setState(() {
+          _invoices = bookings.map((b) {
+            final rawLabStatus = (b['status'] ?? '').toString();
+            final status = rawLabStatus == 'completed'
+                ? 'Paid'
+                : (rawLabStatus == 'cancelled' ? 'Cancelled' : 'Pending');
+            final dateStr = b['createdAt'] ?? b['test_date'] ?? b['date'] ?? '';
+            DateTime? dateObj = DateTime.tryParse(dateStr);
+            final formattedDate = dateObj != null
+                ? DateFormat('dd MMM, yyyy').format(dateObj)
+                : DateFormat('dd MMM, yyyy').format(DateTime.now());
+            final id = b['bookingNumber'] ?? b['_id']?.toString() ?? 'N/A';
+            final shortId = id.length > 6 ? 'LAB-${id.substring(id.length - 6).toUpperCase()}' : 'LAB-$id';
+            // Patient name — try multiple field names
+            final patientName = b['patient_name'] ??
+                b['patientName'] ??
+                b['patient']?['name'] ??
+                b['patient']?['username'] ??
+                'Patient';
+            // Test name
+            final testName = b['test_type'] ?? b['testName'] ?? b['test'] ?? 'Laboratory Test';
+            // Default prices by test type
+            final defaultPrices = {
+              'cbc': 800, 'complete blood count': 800,
+              'lipid profile': 1500, 'lft': 1200, 'liver function': 1200,
+              'kft': 1200, 'kidney function': 1200,
+              'thyroid': 1800, 'hba1c': 1500, 'diabetes': 1500,
+              'vitamin d': 2000, 'covid': 3500, 'pcr': 3500,
+              'urine': 500, 'blood sugar': 400,
+            };
+            final testLower = testName.toLowerCase();
+            double price = (b['price'] ?? b['amount'] ?? b['totalAmount'] ?? 0).toDouble();
+            if (price == 0) {
+              for (final key in defaultPrices.keys) {
+                if (testLower.contains(key)) { price = defaultPrices[key]!.toDouble(); break; }
+              }
+              if (price == 0) price = 1000;
+            }
+            return {
+              "id": shortId,
+              "patient": patientName,
+              "test": testName,
+              "amount": price,
+              "date": formattedDate,
+              "status": status,
+              "method": b['paymentMethod'] ?? "Cash",
+            };
+          }).toList();
+          _isLoading = false;
+        });
+      }
     } catch (e) {
       debugPrint('Error fetching invoices: $e');
       setState(() => _isLoading = false);
@@ -98,12 +169,61 @@ class _PaymentInvoicesState extends State<PaymentInvoices>
   double get _totalRevenue => _invoices
       .where((i) => i["status"] == "Paid")
       .fold(0.0, (sum, i) => sum + (i["amount"] as double));
-  double get _totalPending => _invoices
-      .where((i) => i["status"] == "Pending")
-      .fold(0.0, (sum, i) => sum + (i["amount"] as double));
-  double get _totalOverdue => _invoices
-      .where((i) => i["status"] == "Overdue")
-      .fold(0.0, (sum, i) => sum + (i["amount"] as double));
+
+  Future<void> _downloadInvoice(Map<String, dynamic> invoice) async {
+    try {
+      // Parse date safely
+      DateTime invoiceDate;
+      final rawDate = invoice['date'];
+      if (rawDate is DateTime) {
+        invoiceDate = rawDate;
+      } else if (rawDate != null) {
+        try {
+          invoiceDate = DateFormat('dd MMM, yyyy').parse(rawDate.toString());
+        } catch (_) {
+          invoiceDate = DateTime.tryParse(rawDate.toString()) ?? DateTime.now();
+        }
+      } else {
+        invoiceDate = DateTime.now();
+      }
+
+      final amount = (invoice['amount'] ?? 0).toDouble();
+      final id = (invoice['id'] ?? invoice['_id'] ?? 'N/A').toString();
+      final patient = (invoice['patient'] ?? invoice['patientName'] ?? 'Patient').toString();
+      final test = (invoice['test'] ?? invoice['testName'] ?? 'Service').toString();
+
+      if (widget.isPharmacy) {
+        await PdfInvoiceGenerator.generatePharmacyInvoice(
+          orderNumber: id,
+          patientName: patient,
+          patientPhone: 'N/A',
+          patientAddress: 'N/A',
+          items: [{'name': test, 'quantity': 1, 'price': amount}],
+          deliveryFee: 0,
+          totalAmount: amount,
+          orderDate: invoiceDate,
+          pharmacyName: 'iCare Pharmacy',
+        );
+      } else {
+        await PdfInvoiceGenerator.generateLabInvoice(
+          bookingNumber: id,
+          patientName: patient,
+          patientPhone: 'N/A',
+          testName: test,
+          testPrice: amount,
+          bookingDate: invoiceDate,
+          labName: _labName,
+          doctors: _labDoctors.isNotEmpty ? _labDoctors : null,
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to generate invoice: $e')),
+        );
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -120,7 +240,7 @@ class _PaymentInvoicesState extends State<PaymentInvoices>
         elevation: 0,
         centerTitle: true,
         title: CustomText(
-          text: "Payment Invoices",
+          text: widget.isPharmacy ? "Order Invoices".tr() : "Payment Invoices".tr(),
           fontFamily: "Gilroy-Bold",
           fontSize: 18,
           fontWeight: FontWeight.w900,
@@ -180,8 +300,8 @@ class _PaymentInvoicesState extends State<PaymentInvoices>
                 children: [
                   Expanded(
                     child: _buildSummaryCard(
-                      title: "Total Revenue",
-                      amount: "\$${_totalRevenue.toStringAsFixed(0)}",
+                      title: "Total Revenue".tr(),
+                      amount: "PKR ${_totalRevenue.toStringAsFixed(0)}",
                       subtitle:
                           "${_invoices.where((i) => i['status'] == 'Paid').length} invoices paid",
                       icon: Icons.account_balance_wallet_rounded,
@@ -195,39 +315,9 @@ class _PaymentInvoicesState extends State<PaymentInvoices>
                   const SizedBox(width: 20),
                   Expanded(
                     child: _buildSummaryCard(
-                      title: "Pending",
-                      amount: "\$${_totalPending.toStringAsFixed(0)}",
-                      subtitle:
-                          "${_invoices.where((i) => i['status'] == 'Pending').length} awaiting payment",
-                      icon: Icons.schedule_rounded,
-                      gradientColors: [
-                        const Color(0xFFF59E0B),
-                        const Color(0xFFD97706),
-                      ],
-                      bgAccent: const Color(0xFFFEF3C7),
-                    ),
-                  ),
-                  const SizedBox(width: 20),
-                  Expanded(
-                    child: _buildSummaryCard(
-                      title: "Overdue",
-                      amount: "\$${_totalOverdue.toStringAsFixed(0)}",
-                      subtitle:
-                          "${_invoices.where((i) => i['status'] == 'Overdue').length} need attention",
-                      icon: Icons.warning_rounded,
-                      gradientColors: [
-                        const Color(0xFFEF4444),
-                        const Color(0xFFDC2626),
-                      ],
-                      bgAccent: const Color(0xFFFEE2E2),
-                    ),
-                  ),
-                  const SizedBox(width: 20),
-                  Expanded(
-                    child: _buildSummaryCard(
-                      title: "Total Invoices",
+                      title: "Total Invoices".tr(),
                       amount: "${_invoices.length}",
-                      subtitle: "This month",
+                      subtitle: "This month".tr(),
                       icon: Icons.receipt_long_rounded,
                       gradientColors: [
                         const Color(0xFF3B82F6),
@@ -248,7 +338,7 @@ class _PaymentInvoicesState extends State<PaymentInvoices>
                   borderRadius: BorderRadius.circular(20),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.04),
+                      color: Colors.black.withValues(alpha: 0.04),
                       blurRadius: 20,
                       offset: const Offset(0, 6),
                     ),
@@ -261,9 +351,9 @@ class _PaymentInvoicesState extends State<PaymentInvoices>
                       padding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
                       child: Row(
                         children: [
-                          const Text(
-                            "Invoice List",
-                            style: TextStyle(
+                          Text(
+                            "Invoice List".tr(),
+                            style: const TextStyle(
                               fontWeight: FontWeight.w800,
                               fontSize: 20,
                               color: Color(0xFF0F172A),
@@ -271,8 +361,7 @@ class _PaymentInvoicesState extends State<PaymentInvoices>
                             ),
                           ),
                           const Spacer(),
-                          SizedBox(
-                            width: 400,
+                          Flexible(
                             child: TabBar(
                               controller: _tabController,
                               indicatorColor: AppColors.primaryColor,
@@ -289,14 +378,6 @@ class _PaymentInvoicesState extends State<PaymentInvoices>
                                 Tab(
                                   text:
                                       "Paid (${_invoices.where((i) => i['status'] == 'Paid').length})",
-                                ),
-                                Tab(
-                                  text:
-                                      "Pending (${_invoices.where((i) => i['status'] == 'Pending').length})",
-                                ),
-                                Tab(
-                                  text:
-                                      "Overdue (${_invoices.where((i) => i['status'] == 'Overdue').length})",
                                 ),
                               ],
                             ),
@@ -320,9 +401,9 @@ class _PaymentInvoicesState extends State<PaymentInvoices>
                           bottom: BorderSide(color: Colors.grey.shade200),
                         ),
                       ),
-                      child: const Row(
+                      child: Row(
                         children: [
-                          Expanded(
+                          const Expanded(
                             flex: 2,
                             child: Text(
                               "INVOICE ID",
@@ -334,7 +415,7 @@ class _PaymentInvoicesState extends State<PaymentInvoices>
                               ),
                             ),
                           ),
-                          Expanded(
+                          const Expanded(
                             flex: 3,
                             child: Text(
                               "PATIENT",
@@ -349,8 +430,8 @@ class _PaymentInvoicesState extends State<PaymentInvoices>
                           Expanded(
                             flex: 3,
                             child: Text(
-                              "TEST",
-                              style: TextStyle(
+                              widget.isPharmacy ? "ORDER ITEMS" : "TEST",
+                              style: const TextStyle(
                                 fontWeight: FontWeight.w700,
                                 fontSize: 11,
                                 color: Color(0xFF94A3B8),
@@ -489,8 +570,8 @@ class _PaymentInvoicesState extends State<PaymentInvoices>
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       colors: [
-                        AppColors.primaryColor.withOpacity(0.1),
-                        AppColors.primaryColor.withOpacity(0.05),
+                        AppColors.primaryColor.withValues(alpha: 0.1),
+                        AppColors.primaryColor.withValues(alpha: 0.05),
                       ],
                     ),
                     shape: BoxShape.circle,
@@ -546,7 +627,7 @@ class _PaymentInvoicesState extends State<PaymentInvoices>
           Expanded(
             flex: 2,
             child: Text(
-              "\$${(inv["amount"] as double).toStringAsFixed(2)}",
+              "PKR ${(inv["amount"] as double).toStringAsFixed(2)}",
               style: const TextStyle(
                 fontWeight: FontWeight.w800,
                 fontSize: 14,
@@ -593,7 +674,7 @@ class _PaymentInvoicesState extends State<PaymentInvoices>
             child: MouseRegion(
               cursor: SystemMouseCursors.click,
               child: GestureDetector(
-                onTap: () {},
+                onTap: () => _downloadInvoice(inv),
                 child: Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
@@ -601,7 +682,7 @@ class _PaymentInvoicesState extends State<PaymentInvoices>
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: const Icon(
-                    Icons.visibility_rounded,
+                    Icons.download_rounded,
                     size: 16,
                     color: Color(0xFF64748B),
                   ),
@@ -629,22 +710,20 @@ class _PaymentInvoicesState extends State<PaymentInvoices>
           ),
           child: Row(
             children: [
-              _buildMiniStat(
-                "Revenue",
-                "\$${_totalRevenue.toStringAsFixed(0)}",
-                const Color(0xFF10B981),
+              Expanded(
+                child: _buildMiniStat(
+                  "Total Revenue",
+                  "PKR ${_totalRevenue.toStringAsFixed(0)}",
+                  const Color(0xFF10B981),
+                ),
               ),
               const SizedBox(width: 12),
-              _buildMiniStat(
-                "Pending",
-                "\$${_totalPending.toStringAsFixed(0)}",
-                const Color(0xFFF59E0B),
-              ),
-              const SizedBox(width: 12),
-              _buildMiniStat(
-                "Overdue",
-                "\$${_totalOverdue.toStringAsFixed(0)}",
-                const Color(0xFFEF4444),
+              Expanded(
+                child: _buildMiniStat(
+                  "Total Invoices",
+                  "${_invoices.length}",
+                  const Color(0xFF3B82F6),
+                ),
               ),
             ],
           ),
@@ -668,8 +747,6 @@ class _PaymentInvoicesState extends State<PaymentInvoices>
             tabs: const [
               Tab(text: "All"),
               Tab(text: "Paid"),
-              Tab(text: "Pending"),
-              Tab(text: "Overdue"),
             ],
           ),
         ),
@@ -725,7 +802,7 @@ class _PaymentInvoicesState extends State<PaymentInvoices>
         borderRadius: BorderRadius.circular(18),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),
@@ -778,8 +855,8 @@ class _PaymentInvoicesState extends State<PaymentInvoices>
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     colors: [
-                      AppColors.primaryColor.withOpacity(0.12),
-                      AppColors.primaryColor.withOpacity(0.04),
+                      AppColors.primaryColor.withValues(alpha: 0.12),
+                      AppColors.primaryColor.withValues(alpha: 0.04),
                     ],
                   ),
                   shape: BoxShape.circle,
@@ -821,7 +898,7 @@ class _PaymentInvoicesState extends State<PaymentInvoices>
                 ),
               ),
               Text(
-                "\$${(inv["amount"] as double).toStringAsFixed(2)}",
+                "PKR ${(inv["amount"] as double).toStringAsFixed(2)}",
                 style: const TextStyle(
                   fontWeight: FontWeight.w900,
                   fontSize: 18,
@@ -900,12 +977,12 @@ class _PaymentInvoicesState extends State<PaymentInvoices>
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: gradientColors[0].withOpacity(0.08),
+            color: gradientColors[0].withValues(alpha: 0.08),
             blurRadius: 24,
             offset: const Offset(0, 8),
           ),
           BoxShadow(
-            color: Colors.black.withOpacity(0.03),
+            color: Colors.black.withValues(alpha: 0.03),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -928,7 +1005,7 @@ class _PaymentInvoicesState extends State<PaymentInvoices>
                   borderRadius: BorderRadius.circular(14),
                   boxShadow: [
                     BoxShadow(
-                      color: gradientColors[0].withOpacity(0.3),
+                      color: gradientColors[0].withValues(alpha: 0.3),
                       blurRadius: 12,
                       offset: const Offset(0, 4),
                     ),
@@ -995,9 +1072,9 @@ class _PaymentInvoicesState extends State<PaymentInvoices>
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.06),
+          color: color.withValues(alpha: 0.06),
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: color.withOpacity(0.12)),
+          border: Border.all(color: color.withValues(alpha: 0.12)),
         ),
         child: Column(
           children: [
@@ -1015,7 +1092,7 @@ class _PaymentInvoicesState extends State<PaymentInvoices>
               style: TextStyle(
                 fontSize: 11,
                 fontWeight: FontWeight.w600,
-                color: color.withOpacity(0.7),
+                color: color.withValues(alpha: 0.7),
               ),
             ),
           ],

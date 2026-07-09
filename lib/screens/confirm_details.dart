@@ -37,8 +37,6 @@ class ConfirmDetails extends StatelessWidget {
               color: AppColors.primary500,
             ),
             SizedBox(height: Utils.windowHeight(context) * 0.015),
-            _buildMobileSummaryItem("Platform Fee", "100"),
-            SizedBox(height: Utils.windowHeight(context) * 0.01),
             _buildMobileSummaryItem("Coure Amount", "2000"),
             SizedBox(height: Utils.windowHeight(context) * 0.01),
             _buildMobileSummaryItem("Discounted Offer", "5%"),
@@ -111,7 +109,7 @@ class ConfirmDetails extends StatelessWidget {
                   borderRadius: BorderRadius.circular(24),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.04),
+                      color: Colors.black.withValues(alpha: 0.04),
                       blurRadius: 24,
                       offset: const Offset(0, 12),
                     ),
@@ -150,8 +148,7 @@ class ConfirmDetails extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 48),
-                    _buildWebSummaryItem("Platform Fee", "\$100.00"),
-                    _buildWebSummaryItem("Course Amount", "\$2,000.00"),
+                    _buildWebSummaryItem("Course Amount", "PKR 2,000"),
                     _buildWebSummaryItem(
                       "Discount Offer",
                       "5% Off",
@@ -160,7 +157,7 @@ class ConfirmDetails extends StatelessWidget {
                     const Divider(height: 48, color: Color(0xFFF1F5F9)),
                     _buildWebSummaryItem(
                       "Total Amount",
-                      "\$2,100.00",
+                      "PKR 2,100",
                       isTotal: true,
                     ),
                     const SizedBox(height: 48),
@@ -182,7 +179,7 @@ class ConfirmDetails extends StatelessWidget {
                             borderRadius: BorderRadius.circular(16),
                           ),
                           elevation: 10,
-                          shadowColor: AppColors.primaryColor.withOpacity(0.4),
+                          shadowColor: AppColors.primaryColor.withValues(alpha: 0.4),
                         ),
                         child: const Text(
                           "Confirm & Proceed",

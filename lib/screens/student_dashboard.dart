@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:icare/screens/courses.dart';
-import 'package:icare/screens/resource_library_screen.dart';
-import 'package:icare/screens/view_profile.dart';
+import 'package:icare/screens/doctors_list.dart';
+import 'package:icare/screens/student_lms_dashboard.dart';
+import 'package:icare/screens/lms_public_catalog.dart';
 import 'package:icare/screens/view_course.dart';
 import 'package:icare/services/course_service.dart';
 import 'package:icare/services/analytics_service.dart';
@@ -106,7 +106,7 @@ class _StudentDashboardState extends ConsumerState<StudentDashboard> {
                         borderRadius: BorderRadius.circular(20),
                         boxShadow: [
                           BoxShadow(
-                            color: AppColors.primaryColor.withOpacity(0.3),
+                            color: AppColors.primaryColor.withValues(alpha: 0.3),
                             blurRadius: 20,
                             offset: const Offset(0, 8),
                           ),
@@ -131,7 +131,7 @@ class _StudentDashboardState extends ConsumerState<StudentDashboard> {
                                 Text(
                                   'Continue your learning journey',
                                   style: TextStyle(
-                                    color: Colors.white.withOpacity(0.8),
+                                    color: Colors.white.withValues(alpha: 0.8),
                                     fontSize: 13,
                                   ),
                                 ),
@@ -139,7 +139,7 @@ class _StudentDashboardState extends ConsumerState<StudentDashboard> {
                                 GestureDetector(
                                   onTap: () => Navigator.of(context).push(
                                     MaterialPageRoute(
-                                      builder: (ctx) => const Courses(),
+                                      builder: (ctx) => const StudentLmsDashboard(),
                                     ),
                                   ),
                                   child: Container(
@@ -148,23 +148,23 @@ class _StudentDashboardState extends ConsumerState<StudentDashboard> {
                                       vertical: 10,
                                     ),
                                     decoration: BoxDecoration(
-                                      color: Colors.white.withOpacity(0.2),
+                                      color: Colors.white.withValues(alpha: 0.2),
                                       borderRadius: BorderRadius.circular(30),
                                       border: Border.all(
-                                        color: Colors.white.withOpacity(0.4),
+                                        color: Colors.white.withValues(alpha: 0.4),
                                       ),
                                     ),
                                     child: const Row(
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
                                         Icon(
-                                          Icons.play_circle_outline_rounded,
+                                          Icons.class_rounded,
                                           color: Colors.white,
                                           size: 18,
                                         ),
                                         SizedBox(width: 8),
                                         Text(
-                                          'Browse Programs',
+                                          'Open Classroom',
                                           style: TextStyle(
                                             color: Colors.white,
                                             fontSize: 13,
@@ -182,7 +182,7 @@ class _StudentDashboardState extends ConsumerState<StudentDashboard> {
                           Container(
                             padding: const EdgeInsets.all(16),
                             decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.15),
+                              color: Colors.white.withValues(alpha: 0.15),
                               borderRadius: BorderRadius.circular(16),
                             ),
                             child: const Icon(
@@ -277,9 +277,6 @@ class _StudentDashboardState extends ConsumerState<StudentDashboard> {
 
                     const SizedBox(height: 32),
 
-                    // ── Resource Library Quick Access ──────────────────────
-                    _buildResourceLibraryBanner(),
-
                     // ── Continue Learning ──────────────────────────────────
                     if (_recentCourses.isNotEmpty) ...[
                       const SizedBox(height: 28),
@@ -298,8 +295,7 @@ class _StudentDashboardState extends ConsumerState<StudentDashboard> {
                           GestureDetector(
                             onTap: () => Navigator.of(context).push(
                               MaterialPageRoute(
-                                builder: (ctx) =>
-                                    const Courses(myPurchased: true),
+                                builder: (ctx) => const StudentLmsDashboard(),
                               ),
                             ),
                             child: const Text(
@@ -320,12 +316,12 @@ class _StudentDashboardState extends ConsumerState<StudentDashboard> {
                                 as Map<String, dynamic>;
                         final progressData = enrollment['progress'];
                         int progress = 0;
-                        if (progressData is int)
+                        if (progressData is int) {
                           progress = progressData;
-                        else if (progressData is Map)
+                        } else if (progressData is Map)
                           progress = (progressData['percent'] ?? 0).toInt();
                         final status =
-                            (enrollment['status'] ?? 'active') as String;
+                            (enrollment['status'] ?? 'active').toString();
                         final enrollmentId =
                             enrollment['_id'] ?? enrollment['id'] as String?;
                         return _buildContinueLearningCard(
@@ -353,13 +349,13 @@ class _StudentDashboardState extends ConsumerState<StudentDashboard> {
                       children: [
                         Expanded(
                           child: _buildActionCard(
-                            'Browse Courses',
-                            Icons.explore_outlined,
+                            'iCare Academy',
+                            Icons.school_rounded,
                             AppColors.primaryColor,
                             () {
                               Navigator.of(context).push(
                                 MaterialPageRoute(
-                                  builder: (ctx) => const Courses(),
+                                  builder: (ctx) => const StudentLmsDashboard(),
                                 ),
                               );
                             },
@@ -368,14 +364,13 @@ class _StudentDashboardState extends ConsumerState<StudentDashboard> {
                         const SizedBox(width: 12),
                         Expanded(
                           child: _buildActionCard(
-                            'My Learning',
-                            Icons.play_lesson_outlined,
-                            const Color(0xFF6366F1),
+                            'Telehealth',
+                            Icons.video_call_rounded,
+                            const Color(0xFF0EA5E9),
                             () {
                               Navigator.of(context).push(
                                 MaterialPageRoute(
-                                  builder: (ctx) =>
-                                      const Courses(myPurchased: true),
+                                  builder: (ctx) => const DoctorsList(),
                                 ),
                               );
                             },
@@ -384,13 +379,13 @@ class _StudentDashboardState extends ConsumerState<StudentDashboard> {
                         const SizedBox(width: 12),
                         Expanded(
                           child: _buildActionCard(
-                            'My Profile',
-                            Icons.person_outline_rounded,
+                            'Browse Courses',
+                            Icons.explore_outlined,
                             const Color(0xFF10B981),
                             () {
                               Navigator.of(context).push(
                                 MaterialPageRoute(
-                                  builder: (ctx) => const ViewProfile(),
+                                  builder: (ctx) => const LmsPublicCatalog(),
                                 ),
                               );
                             },
@@ -399,6 +394,8 @@ class _StudentDashboardState extends ConsumerState<StudentDashboard> {
                       ],
                     ),
                     const SizedBox(height: 20),
+                    // Extra bottom space so content clears the floating WhatsApp button
+                    const SizedBox(height: 80),
                   ],
                 ),
               ),
@@ -419,7 +416,7 @@ class _StudentDashboardState extends ConsumerState<StudentDashboard> {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -431,7 +428,7 @@ class _StudentDashboardState extends ConsumerState<StudentDashboard> {
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
+              color: color.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(10),
             ),
             child: Icon(icon, color: color, size: 22),
@@ -472,7 +469,7 @@ class _StudentDashboardState extends ConsumerState<StudentDashboard> {
         Container(
           padding: const EdgeInsets.all(10),
           decoration: BoxDecoration(
-            color: color.withOpacity(0.1),
+            color: color.withValues(alpha: 0.1),
             shape: BoxShape.circle,
           ),
           child: Icon(icon, color: color, size: 20),
@@ -499,66 +496,6 @@ class _StudentDashboardState extends ConsumerState<StudentDashboard> {
     );
   }
 
-  Widget _buildResourceLibraryBanner() {
-    return GestureDetector(
-      onTap: () {
-        Navigator.of(context).push(
-          MaterialPageRoute(builder: (ctx) => const ResourceLibraryScreen()),
-        );
-      },
-      child: Container(
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: const Color(0xFFF1F5F9),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: const Color(0xFFE2E8F0)),
-        ),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: const Icon(
-                Icons.library_books_rounded,
-                color: AppColors.primaryColor,
-                size: 24,
-              ),
-            ),
-            const SizedBox(width: 16),
-            const Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Resource Library',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w800,
-                      color: Color(0xFF0F172A),
-                    ),
-                  ),
-                  SizedBox(height: 2),
-                  Text(
-                    'Access clinical PDFs & research papers',
-                    style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
-                  ),
-                ],
-              ),
-            ),
-            const Icon(
-              Icons.arrow_forward_ios_rounded,
-              size: 14,
-              color: Color(0xFF94A3B8),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   Widget _buildContinueLearningCard(
     Map<String, dynamic> course,
     int progress,
@@ -581,7 +518,7 @@ class _StudentDashboardState extends ConsumerState<StudentDashboard> {
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.04),
+              color: Colors.black.withValues(alpha: 0.04),
               blurRadius: 10,
               offset: const Offset(0, 4),
             ),
@@ -691,7 +628,7 @@ class _StudentDashboardState extends ConsumerState<StudentDashboard> {
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: color.withOpacity(0.3),
+              color: color.withValues(alpha: 0.3),
               blurRadius: 12,
               offset: const Offset(0, 6),
             ),

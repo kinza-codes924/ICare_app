@@ -62,7 +62,7 @@ class _InstructorLearnersScreenState extends State<InstructorLearnersScreen> {
                   : ListView.separated(
                       padding: const EdgeInsets.all(20),
                       itemCount: _learners.length,
-                      separatorBuilder: (_, __) => const SizedBox(height: 16),
+                      separatorBuilder: (_, _) => const SizedBox(height: 16),
                       itemBuilder: (context, index) {
                         final learner = _learners[index];
                         final double progress = (learner['progress'] ?? 0.0)
@@ -83,7 +83,7 @@ class _InstructorLearnersScreenState extends State<InstructorLearnersScreen> {
                                   CircleAvatar(
                                     radius: 24,
                                     backgroundColor: AppColors.primaryColor
-                                        .withOpacity(0.1),
+                                        .withValues(alpha: 0.1),
                                     child: const Icon(
                                       Icons.person_rounded,
                                       color: AppColors.primaryColor,
@@ -119,8 +119,8 @@ class _InstructorLearnersScreenState extends State<InstructorLearnersScreen> {
                                     ),
                                     decoration: BoxDecoration(
                                       color: learner['role'] == 'Student'
-                                          ? Colors.blue.withOpacity(0.1)
-                                          : Colors.green.withOpacity(0.1),
+                                          ? Colors.blue.withValues(alpha: 0.1)
+                                          : Colors.green.withValues(alpha: 0.1),
                                       borderRadius: BorderRadius.circular(8),
                                     ),
                                     child: Text(
@@ -178,7 +178,7 @@ class _InstructorLearnersScreenState extends State<InstructorLearnersScreen> {
                               LinearProgressIndicator(
                                 value: progress / 100.0,
                                 backgroundColor: AppColors.primaryColor
-                                    .withOpacity(0.1),
+                                    .withValues(alpha: 0.1),
                                 valueColor: const AlwaysStoppedAnimation<Color>(
                                   AppColors.primaryColor,
                                 ),

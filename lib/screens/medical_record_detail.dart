@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'dart:convert';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:icare/models/medical_record.dart';
+import 'package:icare/providers/auth_provider.dart';
 import 'package:icare/screens/patient_profile_view.dart';
 import 'package:icare/utils/theme.dart';
 import 'package:icare/widgets/back_button.dart';
 import 'package:intl/intl.dart';
 
-class MedicalRecordDetailScreen extends StatelessWidget {
+class MedicalRecordDetailScreen extends ConsumerWidget {
   final MedicalRecord record;
 
   const MedicalRecordDetailScreen({super.key, required this.record});
@@ -112,7 +114,7 @@ class MedicalRecordDetailScreen extends StatelessWidget {
                 child: Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.05),
+                    color: Colors.black.withValues(alpha: 0.05),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: SingleChildScrollView(
@@ -156,7 +158,8 @@ class MedicalRecordDetailScreen extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final isPatient = ref.read(authProvider).userRole == 'Patient';
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
@@ -260,8 +263,8 @@ class MedicalRecordDetailScreen extends StatelessWidget {
               const SizedBox(height: 16),
             ],
 
-            // CRITICAL FIX: Display SOAP Notes for Patient
-            if (record.soapNotes != null) ...[
+            // SOAP Notes: doctor-facing only, hidden from patients
+            if (record.soapNotes != null && !isPatient) ...[
               _buildSoapNotesCard(),
               const SizedBox(height: 16),
             ],

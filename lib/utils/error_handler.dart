@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/material.dart';
 
 /// Centralized error handler for user-friendly error messages
 class ErrorHandler {
@@ -109,6 +110,44 @@ class ErrorHandler {
     } else {
       return 'An error occurred. Please try again.';
     }
+  }
+
+  /// Show error snackbar with Dismiss always + optional Retry
+  static void showSnackBar(
+    BuildContext context,
+    dynamic error, {
+    VoidCallback? onRetry,
+  }) {
+    final message = getFriendlyMessage(error);
+    final canRetry = onRetry != null || isRetryable(error);
+
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            const Icon(Icons.error_outline_rounded, color: Colors.white, size: 18),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(message, style: const TextStyle(fontSize: 13, color: Colors.white)),
+            ),
+          ],
+        ),
+        backgroundColor: const Color(0xFFEF4444),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        duration: const Duration(seconds: 6),
+        // Always show Dismiss; show Retry only when applicable
+        action: SnackBarAction(
+          label: canRetry ? 'Retry' : 'Dismiss',
+          textColor: Colors.white,
+          onPressed: () {
+            ScaffoldMessenger.of(context).hideCurrentSnackBar();
+            if (canRetry && onRetry != null) onRetry();
+          },
+        ),
+      ),
+    );
   }
 
   /// Log error for debugging (send to analytics/crash reporting)

@@ -1,29 +1,31 @@
 import 'dart:developer';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_size_matters/flutter_size_matters.dart';
+import 'package:icare/providers/auth_provider.dart';
 import 'package:icare/screens/receipt.dart';
 import 'package:icare/services/laboratory_service.dart';
 import 'package:icare/utils/theme.dart';
 import 'package:icare/utils/utils.dart';
 import 'package:icare/widgets/back_button.dart';
 import 'package:icare/widgets/custom_button.dart';
-import 'package:icare/widgets/custom_check_box.dart';
 import 'package:icare/widgets/custom_text.dart';
 import 'package:icare/widgets/custom_text_input.dart';
 import 'package:intl/intl.dart';
 
-class FillLabForm extends StatefulWidget {
+class FillLabForm extends ConsumerStatefulWidget {
   final Map<String, dynamic>? labData;
   final List<String>? selectedTests;
+  final String? prescriptionId;
 
-  const FillLabForm({super.key, this.labData, this.selectedTests});
+  const FillLabForm({super.key, this.labData, this.selectedTests, this.prescriptionId});
 
   @override
-  State<FillLabForm> createState() => _FillLabFormState();
+  ConsumerState<FillLabForm> createState() => _FillLabFormState();
 }
 
-class _FillLabFormState extends State<FillLabForm> {
+class _FillLabFormState extends ConsumerState<FillLabForm> {
   final _labService = LaboratoryService();
 
   final _nameController = TextEditingController();
@@ -36,6 +38,7 @@ class _FillLabFormState extends State<FillLabForm> {
 
   bool _homeSample = false;
   bool _isLoading = false;
+  String _selectedGender = 'Male';
 
   @override
   void initState() {
@@ -43,7 +46,27 @@ class _FillLabFormState extends State<FillLabForm> {
     _dateController.text = DateFormat('yyyy-MM-dd').format(DateTime.now());
     _timeController.text = "10:00 AM";
     if (widget.labData?['address'] != null) {
-      _locationController.text = widget.labData?['address'];
+      _locationController.text = widget.labData!['address'];
+    }
+    // Pre-fill patient details from logged-in account
+    final user = ref.read(authProvider).user;
+    if (user != null) {
+      final name = user.name ?? '';
+      if (name.isNotEmpty) {
+        _nameController.text = name;
+        _patientNameController.text = name;
+      }
+      final age = user.age ?? '';
+      if (age.isNotEmpty) _ageController.text = age;
+      final phone = user.phoneNumber ?? '';
+      if (phone.isNotEmpty) _phoneController.text = phone;
+      final gender = (user.gender ?? '').trim();
+      if (gender.isNotEmpty) {
+        final g = gender[0].toUpperCase() + gender.substring(1).toLowerCase();
+        if (g == 'Male' || g == 'Female' || g == 'Other') {
+          _selectedGender = g;
+        }
+      }
     }
   }
 
@@ -72,24 +95,49 @@ class _FillLabFormState extends State<FillLabForm> {
     setState(() => _isLoading = true);
 
     try {
+      debugPrint('🔍 LAB BOOKING DEBUG - Full labData: ${widget.labData}');
       final labId = widget.labData?['_id'] ?? widget.labData?['id'];
+      debugPrint('🔍 LAB BOOKING DEBUG - Extracted labId: $labId');
+      debugPrint('🔍 LAB BOOKING DEBUG - labData keys: ${widget.labData?.keys.toList()}');
+      
       if (labId == null) {
         throw Exception("Laboratory ID missing");
       }
 
+      // Backend expects: testType (required), testDate (optional), notes (optional)
+      final tests = widget.selectedTests ?? ["Complete Blood Count (CBC)"];
       final bookingData = {
-        'patientName': _patientNameController.text,
-        'age': int.tryParse(_ageController.text) ?? 25,
-        'phoneNumber': _phoneController.text,
-        'location': _locationController.text,
+        'testType': tests.join(', '),
+        'test_type': tests.join(', '),
+        'testDate': _dateController.text,
         'date': _dateController.text,
-        'time': _timeController.text,
-        'tests': widget.selectedTests ?? ["Complete Blood Count (CBC)"],
-        'homeSampleAvailable': _homeSample,
-        'totalPrice': (widget.selectedTests?.length ?? 1) * 3000,
+        // Send patient details as separate fields
+        'patientName': _patientNameController.text.trim(),
+        'patient_name': _patientNameController.text.trim(),
+        'patientAge': _ageController.text.trim(),
+        'patient_age': _ageController.text.trim(),
+        'patientGender': _selectedGender,
+        'patient_gender': _selectedGender,
+        'patientPhone': _phoneController.text.trim(),
+        'patient_phone': _phoneController.text.trim(),
+        'patientAddress': _locationController.text.trim(),
+        'patient_address': _locationController.text.trim(),
+        'collectionType': _homeSample ? 'home' : 'in-lab',
+        'collection_type': _homeSample ? 'home' : 'in-lab',
+        'preferred_time': _timeController.text,
+        'notes': 'Requester: ${_nameController.text.trim()}',
+        if (widget.prescriptionId != null && widget.prescriptionId!.isNotEmpty)
+          'prescriptionId': widget.prescriptionId,
+        if (widget.prescriptionId != null && widget.prescriptionId!.isNotEmpty)
+          'medicalRecordId': widget.prescriptionId,
       };
 
+      debugPrint('🔍 LAB BOOKING DEBUG - Booking data: $bookingData');
+      debugPrint('🔍 LAB BOOKING DEBUG - Calling createBooking with labId: $labId');
+      
       final booking = await _labService.createBooking(labId, bookingData);
+      
+      debugPrint('✅ LAB BOOKING DEBUG - Booking created successfully: $booking');
 
       if (mounted) {
         Navigator.of(context).push(
@@ -158,7 +206,7 @@ class _FillLabFormState extends State<FillLabForm> {
                   children: [
                     ScheduledTest(name: test),
                     const CustomText(
-                      text: "Rs. 3000",
+                      text: "PKR 3000",
                       fontSize: 12,
                       fontFamily: "vGilroy-SemiBold",
                       color: AppColors.primary500,
@@ -216,7 +264,7 @@ class _FillLabFormState extends State<FillLabForm> {
             children: [
               CustomInputField(
                 controller: _locationController,
-                hintText: "Location",
+                hintText: "Address",
                 borderRadius: 0,
                 hintStyle: TextStyle(
                   color: AppColors.grayColor.withAlpha(70),
@@ -297,17 +345,96 @@ class _FillLabFormState extends State<FillLabForm> {
             ),
             keyboardType: TextInputType.phone,
           ),
-          InkWell(
-            onTap: () => setState(() => _homeSample = !_homeSample),
-            child: Row(
+          SizedBox(height: ScallingConfig.scale(15)),
+          // Gender selector
+          SizedBox(
+            width: Utils.windowWidth(context) * 0.9,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                SizedBox(width: Utils.windowWidth(context) * 0.05),
-                Checkbox(
-                  value: _homeSample,
-                  onChanged: (v) => setState(() => _homeSample = v ?? false),
-                  activeColor: AppColors.primaryColor,
+                const CustomText(text: "Gender", fontSize: 13, fontFamily: "Gilroy-Bold"),
+                const SizedBox(height: 8),
+                Row(
+                  children: ['Male', 'Female', 'Other'].map((g) => Expanded(
+                    child: GestureDetector(
+                      onTap: () => setState(() => _selectedGender = g),
+                      child: Container(
+                        margin: const EdgeInsets.only(right: 8),
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        decoration: BoxDecoration(
+                          color: _selectedGender == g ? AppColors.primaryColor : const Color(0xFFF1F5F9),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Text(
+                          g,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: _selectedGender == g ? Colors.white : const Color(0xFF64748B),
+                          ),
+                        ),
+                      ),
+                    ),
+                  )).toList(),
                 ),
-                const CustomText(text: "Home Sample Available", fontSize: 13),
+              ],
+            ),
+          ),
+          SizedBox(height: ScallingConfig.scale(15)),
+          // Collection Type
+          SizedBox(
+            width: Utils.windowWidth(context) * 0.9,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const CustomText(text: "Sample Collection", fontSize: 13, fontFamily: "Gilroy-Bold"),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () => setState(() => _homeSample = false),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          decoration: BoxDecoration(
+                            color: !_homeSample ? AppColors.primaryColor : const Color(0xFFF1F5F9),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.business_rounded, size: 16, color: !_homeSample ? Colors.white : const Color(0xFF64748B)),
+                              const SizedBox(width: 6),
+                              Text('In-Lab', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: !_homeSample ? Colors.white : const Color(0xFF64748B))),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () => setState(() => _homeSample = true),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          decoration: BoxDecoration(
+                            color: _homeSample ? const Color(0xFF0EA5E9) : const Color(0xFFF1F5F9),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.home_rounded, size: 16, color: _homeSample ? Colors.white : const Color(0xFF64748B)),
+                              const SizedBox(width: 6),
+                              Text('Home Sample', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: _homeSample ? Colors.white : const Color(0xFF64748B))),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ],
             ),
           ),
@@ -340,7 +467,7 @@ class _FillLabFormState extends State<FillLabForm> {
                 ),
                 const SizedBox(width: 10),
                 const CustomText(
-                  text: "Schedule Laboratory Appointment",
+                  text: "Book a Lab Test",
                   fontSize: 24,
                   fontWeight: FontWeight.w900,
                   fontFamily: "Gilroy-Bold",
@@ -373,7 +500,7 @@ class _FillLabFormState extends State<FillLabForm> {
                     borderRadius: BorderRadius.circular(32),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.03),
+                        color: Colors.black.withValues(alpha: 0.03),
                         blurRadius: 50,
                         offset: const Offset(0, 20),
                       ),
@@ -399,7 +526,7 @@ class _FillLabFormState extends State<FillLabForm> {
                                   Expanded(child: ScheduledTest(name: test)),
                                   const SizedBox(width: 20),
                                   CustomText(
-                                    text: "Rs. 3000",
+                                    text: "PKR 3000",
                                     fontSize: 16,
                                     fontWeight: FontWeight.bold,
                                     color: AppColors.primaryColor,
@@ -451,8 +578,8 @@ class _FillLabFormState extends State<FillLabForm> {
                         children: [
                           Expanded(
                             child: _buildWebInputField(
-                              "Location",
-                              "Enter sample location",
+                              "Address",
+                              "Enter patient address",
                               Icons.location_on_outlined,
                               _locationController,
                             ),
@@ -497,23 +624,93 @@ class _FillLabFormState extends State<FillLabForm> {
                         Icons.phone_outlined,
                         _phoneController,
                       ),
-                      const SizedBox(height: 40),
-                      InkWell(
-                        onTap: () => setState(() => _homeSample = !_homeSample),
-                        child: Row(
-                          children: [
-                            Checkbox(
-                              value: _homeSample,
-                              onChanged: (v) =>
-                                  setState(() => _homeSample = v ?? false),
-                              activeColor: AppColors.primaryColor,
+                      const SizedBox(height: 32),
+
+                      // ── Gender ────────────────────────────────────────────
+                      const CustomText(text: "Gender", fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF334155)),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: ['Male', 'Female', 'Other'].map((g) => Expanded(
+                          child: GestureDetector(
+                            onTap: () => setState(() => _selectedGender = g),
+                            child: Container(
+                              margin: const EdgeInsets.only(right: 10),
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              decoration: BoxDecoration(
+                                color: _selectedGender == g ? AppColors.primaryColor : const Color(0xFFF1F5F9),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: _selectedGender == g ? AppColors.primaryColor : const Color(0xFFE2E8F0),
+                                ),
+                              ),
+                              child: Text(
+                                g,
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w700,
+                                  color: _selectedGender == g ? Colors.white : const Color(0xFF64748B),
+                                ),
+                              ),
                             ),
-                            const CustomText(
-                              text: "Home Sample Available",
-                              fontSize: 15,
+                          ),
+                        )).toList(),
+                      ),
+                      const SizedBox(height: 32),
+
+                      // ── Sample Collection ─────────────────────────────────
+                      const CustomText(text: "Sample Collection", fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF334155)),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: GestureDetector(
+                              onTap: () => setState(() => _homeSample = false),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(vertical: 16),
+                                decoration: BoxDecoration(
+                                  color: !_homeSample ? AppColors.primaryColor : const Color(0xFFF1F5F9),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: !_homeSample ? AppColors.primaryColor : const Color(0xFFE2E8F0),
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(Icons.business_rounded, size: 18, color: !_homeSample ? Colors.white : const Color(0xFF64748B)),
+                                    const SizedBox(width: 8),
+                                    Text('In-Lab', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: !_homeSample ? Colors.white : const Color(0xFF64748B))),
+                                  ],
+                                ),
+                              ),
                             ),
-                          ],
-                        ),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: GestureDetector(
+                              onTap: () => setState(() => _homeSample = true),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(vertical: 16),
+                                decoration: BoxDecoration(
+                                  color: _homeSample ? const Color(0xFF0EA5E9) : const Color(0xFFF1F5F9),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: _homeSample ? const Color(0xFF0EA5E9) : const Color(0xFFE2E8F0),
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(Icons.home_rounded, size: 18, color: _homeSample ? Colors.white : const Color(0xFF64748B)),
+                                    const SizedBox(width: 8),
+                                    Text('Home Sample', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: _homeSample ? Colors.white : const Color(0xFF64748B))),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                       const SizedBox(height: 60),
 

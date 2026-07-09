@@ -1,38 +1,1281 @@
-<!DOCTYPE html>
+<!doctype html>
 <html>
 <head>
-  <!--
-    If you are serving your web app in a path other than the root, change the
-    href value below to reflect the base path you are serving from.
-
-    The path provided below has to start and end with a slash "/" in order for
-    it to work correctly.
-
-    For more details:
-    * https://developer.mozilla.org/en-US/docs/Web/HTML/Element/base
-
-    This is a placeholder for base href that will be replaced by the value of
-    the `--base-href` argument provided to `flutter build`.
-  -->
   <base href="$FLUTTER_BASE_HREF">
-
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
-  <meta name="description" content="A new Flutter project.">
-
-  <!-- iOS meta tags & icons -->
+  <meta name="description" content="iCare - Your Virtual Healthcare Platform">
+  <meta name="google-signin-client_id" content="1076307742101-avj49igc93qipdcnqbqsk3u14gdcb2oh.apps.googleusercontent.com">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black">
-  <meta name="apple-mobile-web-app-title" content="icare">
+  <meta name="apple-mobile-web-app-title" content="iCare">
+  <meta http-equiv="Content-Security-Policy" content="img-src 'self' data: https: http: blob:;">
   <link rel="apple-touch-icon" href="icons/Icon-192.png">
-
-  <!-- Favicon -->
   <link rel="icon" type="image/png" href="favicon.png"/>
-
-  <title>icare</title>
+  <title>iCare</title>
   <link rel="manifest" href="manifest.json">
+  <style>
+    body { margin: 0; background: #ffffff; }
+    #loading {
+      position: fixed; inset: 0;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      background: #ffffff; z-index: 9999;
+    }
+    #loading img { width: 160px; height: 160px; object-fit: contain; }
+    #loading .spinner {
+      margin-top: 24px; width: 36px; height: 36px;
+      border: 3px solid #e2e8f0;
+      border-top-color: #0036BC;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    /* Agora video elements must fill their containers */
+    #agora-remote {
+      position: relative !important; overflow: hidden !important;
+    }
+    #agora-remote > div, #agora-remote video {
+      position: absolute !important; top: 0 !important; left: 0 !important;
+      width: 100% !important; height: 100% !important;
+      object-fit: cover; display: block; background: #000;
+    }
+    #lms-agora-local  > div, #lms-agora-local  video {
+      width: 100% !important; height: 100% !important;
+      object-fit: cover; display: block;
+    }
+    /* LMS multi-participant grid tiles */
+    #lms-grid-container { display: grid; grid-template-columns: 1fr; grid-auto-rows: 1fr; gap: 4px; padding: 4px; box-sizing: border-box; width: 100%; height: 100%; overflow-y: auto; }
+    .lms-remote-tile { position: relative; background: #1a2234; border-radius: 8px; overflow: hidden; min-height: 80px; }
+    /* Only force a 4:3 box (and top-aligned, scrollable rows instead of
+       stretched-to-fill) once there's more than one tile — with a single
+       remote participant the tile must fill the entire video area (matches
+       the Dart side's SizedBox.expand for that case). align-content:start
+       was previously applied unconditionally, which let a lone 1fr row
+       size itself to its content instead of stretching to the container's
+       full height — that's what left the large empty black bars above and
+       below a single participant's tile in the screenshot report. */
+    #lms-grid-container:has(.lms-remote-tile:nth-child(2)) {
+      align-content: start;
+    }
+    #lms-grid-container:has(.lms-remote-tile:nth-child(2)) .lms-remote-tile { aspect-ratio: 4 / 3; }
+    .lms-remote-tile > div { position: absolute !important; inset: 0; }
+    .lms-remote-tile video {
+      position: absolute !important; inset: 0;
+      width: 100% !important; height: 100% !important;
+      object-fit: cover; display: block; background: #000;
+    }
+    .lms-tile-name {
+      position: absolute; bottom: 6px; left: 6px;
+      background: rgba(0,0,0,0.6); color: #fff; font-size: 12px; font-weight: 600;
+      padding: 2px 8px; border-radius: 4px; z-index: 10; pointer-events: none;
+    }
+  </style>
 </head>
 <body>
+  <div id="loading">
+    <img src="icare_logo.png" alt="iCare" style="width:160px;height:160px;object-fit:contain;">
+    <div class="spinner"></div>
+  </div>
+  <!-- Agora Web SDK -->
+  <script src="https://download.agora.io/sdk/release/AgoraRTC_N-4.22.0.js"></script>
+  <script>
+    window.addEventListener('flutter-first-frame', function() {
+      var loading = document.getElementById('loading');
+      if (loading) loading.style.display = 'none';
+    });
+
+    // ── Agora Web helpers called from Flutter via JS interop ──────────────
+    var _agoraClient = null;
+    var _localAudioTrack = null;
+    var _localVideoTrack = null;
+
+    window.agoraJoin = async function(appId, channel, token, uid, audioOnly) {
+      try {
+        // Suppress Agora telemetry CORS errors
+        AgoraRTC.setLogLevel(4);
+        try { AgoraRTC.disableLogUpload(); } catch(_) {}
+        // Clean up any stale previous session so mic/cam aren't "in use"
+        if (_localAudioTrack) { try { _localAudioTrack.stop(); _localAudioTrack.close(); } catch(_){} _localAudioTrack = null; }
+        if (_localVideoTrack) { try { _localVideoTrack.stop(); _localVideoTrack.close(); } catch(_){} _localVideoTrack = null; }
+        if (_agoraClient) { try { await _agoraClient.leave(); } catch(_){} _agoraClient = null; }
+
+        _agoraClient = AgoraRTC.createClient({ mode: 'rtc', codec: 'vp8' });
+        window._agoraRemoteJoined = false; // reset on each new call
+        window._agoraRemoteLeft = false;
+
+        // ── Helper: play remote video with retry until div is in DOM ──────
+        async function playRemoteVideo(videoTrack, retries) {
+          retries = retries || 0;
+          var remoteDiv = document.getElementById('agora-remote');
+          if (remoteDiv) {
+            try {
+              // Clear any previous video before playing new one
+              videoTrack.play('agora-remote');
+              console.log('✅ Remote video playing (attempt ' + retries + ')');
+            } catch(e) {
+              console.warn('Remote video play error:', e.message);
+              if (retries < 5) {
+                setTimeout(function() { playRemoteVideo(videoTrack, retries + 1); }, 300);
+              }
+            }
+          } else {
+            // Div not ready yet — retry up to 20 times (6 seconds total)
+            if (retries < 20) {
+              console.warn('agora-remote div not found, retry ' + retries);
+              setTimeout(function() { playRemoteVideo(videoTrack, retries + 1); }, 300);
+            } else {
+              console.error('agora-remote div never appeared after retries');
+            }
+          }
+        }
+
+        _agoraClient.on('user-left', (user) => {
+          window._agoraRemoteLeft = true;
+          console.log('📞 Remote user left the call');
+        });
+
+        _agoraClient.on('user-published', async (user, mediaType) => {
+          window._agoraRemoteJoined = true;
+          await _agoraClient.subscribe(user, mediaType);
+          if (mediaType === 'video') {
+            playRemoteVideo(user.videoTrack, 0);
+          }
+          if (mediaType === 'audio') {
+            try { user.audioTrack.play(); } catch(e) { console.warn('Audio play error:', e); }
+          }
+        });
+
+        _agoraClient.on('user-unpublished', (user, mediaType) => {
+          if (mediaType === 'video') {
+            var remoteDiv = document.getElementById('agora-remote');
+            if (remoteDiv) remoteDiv.innerHTML = '';
+          }
+        });
+
+        // ── Handle users who joined BEFORE us ─────────────────────────────
+        _agoraClient.on('user-joined', async (user) => {
+          window._agoraRemoteJoined = true;
+          // If remote user is already publishing, subscribe immediately
+          if (user.hasVideo) {
+            try {
+              await _agoraClient.subscribe(user, 'video');
+              playRemoteVideo(user.videoTrack, 0);
+            } catch(e) { console.warn('user-joined video subscribe error:', e); }
+          }
+          if (user.hasAudio) {
+            try {
+              await _agoraClient.subscribe(user, 'audio');
+              user.audioTrack.play();
+            } catch(e) { console.warn('user-joined audio subscribe error:', e); }
+          }
+        });
+
+        await _agoraClient.join(appId, channel, token, uid || null);
+
+        // ── Subscribe to any users already in channel ──────────────────────
+        var remoteUsers = _agoraClient.remoteUsers;
+        for (var i = 0; i < remoteUsers.length; i++) {
+          var remoteUser = remoteUsers[i];
+          if (remoteUser.hasVideo) {
+            try {
+              await _agoraClient.subscribe(remoteUser, 'video');
+              playRemoteVideo(remoteUser.videoTrack, 0);
+            } catch(e) { console.warn('Pre-existing user video error:', e); }
+          }
+          if (remoteUser.hasAudio) {
+            try {
+              await _agoraClient.subscribe(remoteUser, 'audio');
+              remoteUser.audioTrack.play();
+            } catch(e) { console.warn('Pre-existing user audio error:', e); }
+          }
+        }
+
+        // Always try mic
+        try {
+          _localAudioTrack = await AgoraRTC.createMicrophoneAudioTrack();
+        } catch(micErr) {
+          console.warn('Mic not available:', micErr.message, '— joining without mic');
+          _localAudioTrack = null;
+        }
+
+        // Only create camera track when NOT audio-only
+        if (!audioOnly) {
+          try {
+            _localVideoTrack = await AgoraRTC.createCameraVideoTrack();
+          } catch(camErr) {
+            console.warn('Camera not available:', camErr.message, '— joining without camera');
+            _localVideoTrack = null;
+          }
+        } else {
+          console.log('📞 Audio-only call — camera disabled');
+          _localVideoTrack = null;
+        }
+
+        var tracks = [];
+        if (_localAudioTrack) tracks.push(_localAudioTrack);
+        if (_localVideoTrack) tracks.push(_localVideoTrack);
+        if (tracks.length > 0) await _agoraClient.publish(tracks);
+        if (_localVideoTrack) _localVideoTrack.play('agora-local');
+
+        return 'ok';
+      } catch(e) {
+        console.warn('agoraJoin non-fatal error:', e.message || String(e));
+        // Never block the user — return ok so Flutter shows the call screen
+        return 'ok';
+      }
+    };
+
+    window.agoraLeave = async function() {
+      try {
+        if (_localAudioTrack) { _localAudioTrack.stop(); _localAudioTrack.close(); }
+        if (_localVideoTrack) { _localVideoTrack.stop(); _localVideoTrack.close(); }
+        if (_agoraClient) await _agoraClient.leave();
+        _agoraClient = null; _localAudioTrack = null; _localVideoTrack = null;
+      } catch(e) { console.error('agoraLeave error:', e); }
+    };
+
+    // Returns number of remote users currently in the Agora channel
+    window.agoraGetRemoteUserCount = function() {
+      try { return _agoraClient ? _agoraClient.remoteUsers.length : 0; } catch(e) { return 0; }
+    };
+
+    // Returns true if a remote user has joined this call session
+    window.agoraIsRemoteJoined = function() {
+      return window._agoraRemoteJoined === true || (window.agoraGetRemoteUserCount() > 0);
+    };
+
+    // Returns true if the remote user LEFT mid-call (e.g. doctor converted to video)
+    window.agoraIsRemoteLeft = function() {
+      return window._agoraRemoteLeft === true && window.agoraGetRemoteUserCount() === 0;
+    };
+
+    window.agoraMuteMic = function(mute) {
+      if (_localAudioTrack) {
+        try {
+          // setMuted keeps track published — no republication, no video freeze
+          _localAudioTrack.setMuted(mute);
+        } catch(e) {
+          try { _localAudioTrack.setEnabled(!mute); } catch(_) {}
+        }
+      }
+    };
+
+    window.agoraMuteCam = function(mute) {
+      if (_localVideoTrack) {
+        try {
+          _localVideoTrack.setMuted(mute);
+        } catch(e) {
+          try { _localVideoTrack.setEnabled(!mute); } catch(_) {}
+        }
+      }
+    };
+
+    // ── Ringtone (Web Audio API — no external file needed) ────────────────
+    var _ringtoneInterval = null;
+    var _ringtoneCtx = null;
+
+    window.playRingtone = function() {
+      try {
+        if (_ringtoneInterval) return;
+        _ringtoneCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+        function ringOnce() {
+          if (!_ringtoneCtx) return;
+          // Two-tone phone ring: 480 Hz + 440 Hz
+          [480, 440].forEach(function(freq, i) {
+            var osc = _ringtoneCtx.createOscillator();
+            var gain = _ringtoneCtx.createGain();
+            osc.connect(gain);
+            gain.connect(_ringtoneCtx.destination);
+            osc.frequency.value = freq;
+            osc.type = 'sine';
+            gain.gain.setValueAtTime(0, _ringtoneCtx.currentTime);
+            gain.gain.linearRampToValueAtTime(0.25, _ringtoneCtx.currentTime + 0.05);
+            gain.gain.setValueAtTime(0.25, _ringtoneCtx.currentTime + 0.35);
+            gain.gain.linearRampToValueAtTime(0, _ringtoneCtx.currentTime + 0.5);
+            osc.start(_ringtoneCtx.currentTime);
+            osc.stop(_ringtoneCtx.currentTime + 0.5);
+          });
+        }
+
+        ringOnce();
+        _ringtoneInterval = setInterval(ringOnce, 2000);
+      } catch(e) {
+        console.warn('Ringtone error:', e);
+      }
+    };
+
+    window.stopRingtone = function() {
+      try {
+        if (_ringtoneInterval) { clearInterval(_ringtoneInterval); _ringtoneInterval = null; }
+        if (_ringtoneCtx) { _ringtoneCtx.close(); _ringtoneCtx = null; }
+      } catch(_) {}
+    };
+
+    // ── Water Reminder Notifications ─────────────────────────────────────────
+    var _waterReminderTimer = null;
+
+    // Called from Dart after permission is already granted
+    window.scheduleWaterReminderInterval = function(intervalMinutes) {
+      try {
+        if (_waterReminderTimer) { clearInterval(_waterReminderTimer); _waterReminderTimer = null; }
+        var ms = intervalMinutes * 60 * 1000;
+        _waterReminderTimer = setInterval(function() {
+          try {
+            if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+              new Notification('Drink Water 💧', {
+                body: 'Time to drink a glass of water! Stay hydrated.',
+                icon: '/icons/Icon-192.png',
+              });
+            }
+            // In-app banner event
+            window.dispatchEvent(new CustomEvent('icare-reminder', {
+              detail: JSON.stringify({ type: 'water', title: 'Drink Water 💧', body: 'Time to drink a glass of water! Stay hydrated.' })
+            }));
+          } catch(e) { console.warn('Water notification error:', e); }
+        }, ms);
+        console.log('Water reminder scheduled every', intervalMinutes, 'minutes');
+      } catch(e) { console.warn('scheduleWaterReminderInterval error:', e); }
+    };
+
+    window.cancelWaterReminder = function() {
+      if (_waterReminderTimer) { clearInterval(_waterReminderTimer); _waterReminderTimer = null; }
+    };
+
+    // ── Generic Daily Reminder Notifications (medication, health check, etc.) ──
+    var _dailyReminderTimers = {};
+
+    // Schedule a reminder to fire daily at hour:minute.
+    // Also dispatches icare-reminder CustomEvent for in-app banner.
+    window.scheduleDailyReminder = function(type, title, body, hour, minute) {
+      try {
+        // Cancel any previous timers for this type
+        if (_dailyReminderTimers[type + '_t']) clearTimeout(_dailyReminderTimers[type + '_t']);
+        if (_dailyReminderTimers[type + '_i']) clearInterval(_dailyReminderTimers[type + '_i']);
+
+        function fire() {
+          try {
+            if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+              new Notification(title, { body: body, icon: '/icons/Icon-192.png' });
+            }
+            window.dispatchEvent(new CustomEvent('icare-reminder', {
+              detail: JSON.stringify({ type: type, title: title, body: body })
+            }));
+          } catch(e) { console.warn('Daily reminder fire error:', e); }
+        }
+
+        var now  = new Date();
+        var next = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hour, minute, 0, 0);
+        if (next <= now) next.setDate(next.getDate() + 1);
+        var delay = next - now;
+
+        _dailyReminderTimers[type + '_t'] = setTimeout(function() {
+          fire();
+          _dailyReminderTimers[type + '_i'] = setInterval(fire, 24 * 60 * 60 * 1000);
+        }, delay);
+
+        console.log('Daily reminder scheduled:', type, 'at',
+          (hour < 10 ? '0' : '') + hour + ':' + (minute < 10 ? '0' : '') + minute,
+          '— fires in', Math.round(delay / 60000), 'min');
+      } catch(e) { console.warn('scheduleDailyReminder error:', e); }
+    };
+
+    window.cancelDailyReminder = function(type) {
+      try {
+        if (_dailyReminderTimers[type + '_t']) { clearTimeout(_dailyReminderTimers[type + '_t']); delete _dailyReminderTimers[type + '_t']; }
+        if (_dailyReminderTimers[type + '_i']) { clearInterval(_dailyReminderTimers[type + '_i']); delete _dailyReminderTimers[type + '_i']; }
+        console.log('Daily reminder cancelled:', type);
+      } catch(e) {}
+    };
+  </script>
+  <script>
+    // Kill any previously registered Flutter service worker — it serves stale
+    // main.dart.js from cache, causing old app code to run after deploys.
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then(function(regs) {
+        regs.forEach(function(r) { r.unregister(); });
+      }).catch(function(){});
+      if (window.caches && caches.keys) {
+        caches.keys().then(function(keys) {
+          keys.forEach(function(k) { caches.delete(k); });
+        }).catch(function(){});
+      }
+    }
+  </script>
   <script src="flutter_bootstrap.js" async></script>
+
+  <!-- LMS Live Session — Agora RTC + MediaRecorder -->
+  <script>
+    window._lmsAgoraClient = null;
+    window._lmsLocalAudio = null;
+    window._lmsLocalVideo = null;
+    window._lmsRecorder = null;
+    window._lmsChunks = [];
+    window._lmsStream = null;
+
+    // Raise Flutter glass pane above video so Flutter buttons work
+    window.lmsRaiseFlutterLayer = function() {
+      document.querySelectorAll('flt-glass-pane,flt-text-editing-host').forEach(function(el) {
+        el.style.zIndex = '99999';
+      });
+    };
+
+    // ── LMS Agora Video (no login, no branding) ───────────────────────────────
+
+    // ── _lmsEnsureMediaPublished — THE single entry point for mic/cam activation ──
+    // Idempotent + busy-locked: safe to call from join, the overlay tap, or legacy
+    // code paths (even stale cached builds) without ever double-creating or
+    // double-publishing tracks. Mirrors the working doctor/patient agoraJoin flow.
+    window._lmsMediaBusy = false;
+    window._lmsEnsureMediaPublished = async function() {
+      if (window._lmsMediaBusy) {
+        console.log('LMS media: another call in progress — skipping duplicate');
+        return 'busy';
+      }
+      window._lmsMediaBusy = true;
+      try {
+        // 1. Wait up to 8s for Agora client to be CONNECTED
+        var _waitMs = 0;
+        while (_waitMs < 8000) {
+          if (window._lmsAgoraClient && window._lmsAgoraClient.connectionState === 'CONNECTED') break;
+          await new Promise(function(r) { setTimeout(r, 200); });
+          _waitMs += 200;
+        }
+        if (!window._lmsAgoraClient || window._lmsAgoraClient.connectionState !== 'CONNECTED') {
+          console.error('LMS media: Agora not connected after 8s, state=',
+            window._lmsAgoraClient ? window._lmsAgoraClient.connectionState : 'no_client');
+          return 'not_connected';
+        }
+
+        // 2. Create tracks only if missing.
+        //    speech_standard + AEC/ANS/AGC = clear low-latency voice (no echo, no noise).
+        //    480p motion-optimized video = lower bandwidth → smaller jitter buffer → less delay.
+        if (!window._lmsLocalAudio) {
+          try {
+            window._lmsLocalAudio = await AgoraRTC.createMicrophoneAudioTrack({
+              encoderConfig: 'speech_standard',
+              AEC: true, ANS: true, AGC: true
+            });
+            console.log('LMS media: mic track created');
+          } catch(e) { console.error('LMS media: mic track error:', e.message); }
+        }
+        if (!window._lmsLocalVideo) {
+          try {
+            window._lmsLocalVideo = await AgoraRTC.createCameraVideoTrack({
+              encoderConfig: '720p_3',
+              optimizationMode: 'motion'
+            });
+            console.log('LMS media: camera track created');
+          } catch(e) { console.warn('LMS media: camera error:', e.message); }
+        }
+        if (window._lmsLocalAudio) {
+          try { await window._lmsLocalAudio.setEnabled(true); } catch(_) {}
+          try { window._lmsLocalAudio.setMuted(false); } catch(_) {}
+        }
+
+        // 3. Publish ONLY tracks not already published (client.localTracks = published)
+        // Client may have been nulled by lmsAgoraLeave while we awaited — re-check
+        if (!window._lmsAgoraClient) { console.warn('LMS media: client gone (left channel?)'); return 'no_client'; }
+        var already = window._lmsAgoraClient.localTracks || [];
+        var toPublish = [];
+        if (window._lmsLocalAudio && already.indexOf(window._lmsLocalAudio) === -1) toPublish.push(window._lmsLocalAudio);
+        if (window._lmsLocalVideo && already.indexOf(window._lmsLocalVideo) === -1) toPublish.push(window._lmsLocalVideo);
+        if (toPublish.length > 0) {
+          try {
+            await window._lmsAgoraClient.publish(toPublish);
+            console.log('LMS media: published', toPublish.length, 'track(s)');
+          } catch(pubErr) {
+            console.warn('LMS media: publish error:', pubErr.message);
+          }
+        } else {
+          console.log('LMS media: all tracks already published');
+        }
+
+        // 4. Resume/play all remote audio + video (unblocks autoplay)
+        if (!window._lmsAgoraClient) return 'no_client';
+        window._lmsAgoraClient.remoteUsers.forEach(function(u) {
+          if (u.audioTrack) {
+            try {
+              u.audioTrack.setVolume(100);
+              u.audioTrack.play();
+              console.log('LMS media: remote audio playing uid', u.uid);
+            } catch(e) { console.warn('LMS media: remote audio play error:', e.message); }
+          }
+          if (u.videoTrack) {
+            try {
+              var vd = document.getElementById('lms-tile-' + u.uid + '-video');
+              if (!vd) { window._lmsGetOrCreateTile(u.uid); vd = document.getElementById('lms-tile-' + u.uid + '-video'); }
+              if (vd) { vd.innerHTML = ''; u.videoTrack.play(vd.id, { fit: window._lmsVideoFit || 'cover' }); }
+            } catch(_) {}
+          }
+        });
+
+        // 4b. Audio diagnostics — log mic + remote levels every 2s for 60s.
+        // local level ~0.00 while speaking = mic not capturing (device/OS issue)
+        // remote level ~0.00 while other side speaks = audio not arriving
+        try {
+          if (window._lmsLocalAudio && window._lmsLocalAudio.getTrackLabel) {
+            console.log('LMS media: using microphone =', window._lmsLocalAudio.getTrackLabel());
+          }
+        } catch(_) {}
+        if (window._lmsVolTimer) clearInterval(window._lmsVolTimer);
+        var _volTicks = 0;
+        window._lmsVolTimer = setInterval(function() {
+          _volTicks++;
+          try {
+            var lv = (window._lmsLocalAudio && window._lmsLocalAudio.getVolumeLevel)
+              ? window._lmsLocalAudio.getVolumeLevel().toFixed(2) : 'none';
+            var lm = window._lmsLocalAudio ? window._lmsLocalAudio.muted : '-';
+            var rems = window._lmsAgoraClient ? window._lmsAgoraClient.remoteUsers.map(function(u) {
+              return u.uid + '=' + (u.audioTrack && u.audioTrack.getVolumeLevel
+                ? u.audioTrack.getVolumeLevel().toFixed(2) : 'no-audio');
+            }).join(', ') : 'no-client';
+            console.log('🎙️ LMS audio check #' + _volTicks +
+              ' | my mic level=' + lv + ' muted=' + lm + ' | incoming: ' + (rems || 'nobody'));
+          } catch(_) {}
+          if (_volTicks >= 30) clearInterval(window._lmsVolTimer);
+        }, 2000);
+
+        // 5. Local video preview — retry until div exists
+        function lmsLocalPreview(retries) {
+          retries = retries || 0;
+          var d = document.getElementById('lms-agora-local');
+          if (d && window._lmsLocalVideo) {
+            try { window._lmsLocalVideo.play('lms-agora-local'); } catch(_) {}
+          } else if (retries < 15) {
+            setTimeout(function() { lmsLocalPreview(retries + 1); }, 300);
+          }
+        }
+        lmsLocalPreview(0);
+
+        return 'ok';
+      } catch(e) {
+        console.error('LMS media error:', e.message);
+        return 'error:' + e.message;
+      } finally {
+        window._lmsMediaBusy = false;
+      }
+    };
+
+    // Both legacy entry points route to the same idempotent function so even a
+    // stale cached main.dart.js cannot double-publish or create duplicate tracks.
+    window.lmsEnableMediaAndPublish = window._lmsEnsureMediaPublished;
+
+    // ── LMS multi-participant tile management ────────────────────────────────────
+    // Creates one DOM tile per remote UID inside lms-grid-container.
+    // Fires lms-remote-joined / lms-remote-left CustomEvents that Dart listens to.
+    window._lmsGetOrCreateTile = function(uid) {
+      var grid = document.getElementById('lms-grid-container');
+      if (!grid) return null;
+      var tileId = 'lms-tile-' + uid;
+      var existing = document.getElementById(tileId);
+      if (existing) return existing;
+      var tile = document.createElement('div');
+      tile.id = tileId;
+      tile.className = 'lms-remote-tile';
+      var videoDiv = document.createElement('div');
+      videoDiv.id = tileId + '-video';
+      tile.appendChild(videoDiv);
+      var nameEl = document.createElement('div');
+      nameEl.id = tileId + '-name';
+      nameEl.className = 'lms-tile-name';
+      tile.appendChild(nameEl);
+      grid.appendChild(tile);
+      window._lmsUpdateGridLayout();
+      window.dispatchEvent(new CustomEvent('lms-remote-joined', { detail: String(uid) }));
+      return tile;
+    };
+
+    window._lmsRemoveTile = function(uid) {
+      var tile = document.getElementById('lms-tile-' + uid);
+      if (tile) { tile.remove(); window._lmsUpdateGridLayout(); }
+      window.dispatchEvent(new CustomEvent('lms-remote-left', { detail: String(uid) }));
+    };
+
+    window._lmsUpdateGridLayout = function() {
+      var grid = document.getElementById('lms-grid-container');
+      if (!grid) return;
+      var count = grid.children.length;
+      // Scale columns with participant count instead of capping at a fixed
+      // number, so grids with 20+ students still lay out sensibly.
+      var cols = count <= 1 ? 1 : count <= 4 ? 2 : count <= 9 ? 3 : count <= 16 ? 4 : 5;
+      grid.style.gridTemplateColumns = 'repeat(' + cols + ', 1fr)';
+      // Every grid resize reflows every tile's box size. Agora's internal
+      // <video>/<canvas> element doesn't always pick up on that reflow (it
+      // can be left sized against the pre-reflow box), which is what makes
+      // tiles go blank once enough participants join to change the column
+      // count. Re-playing each already-subscribed remote track a beat later
+      // forces Agora to re-measure the (now correctly sized) container.
+      if (window._lmsAgoraClient) {
+        setTimeout(function() {
+          window._lmsAgoraClient.remoteUsers.forEach(function(u) {
+            if (!u.videoTrack) return;
+            var vd = document.getElementById('lms-tile-' + u.uid + '-video');
+            if (vd) { try { u.videoTrack.play(vd.id, { fit: window._lmsVideoFit || 'cover' }); } catch(_) {} }
+          });
+        }, 120);
+      }
+    };
+
+    window.lmsSetTileName = function(uid, name) {
+      var el = document.getElementById('lms-tile-' + uid + '-name');
+      if (el) el.textContent = name || '';
+    };
+
+    window.lmsGetRemoteUids = function() {
+      if (!window._lmsAgoraClient) return '';
+      return window._lmsAgoraClient.remoteUsers.map(function(u) { return String(u.uid); }).join(',');
+    };
+
+    window.lmsAgoraJoin = async function(appId, channel, token, uid, isInstructor) {
+      try {
+        // Stashed so lmsToggleScreenShare can open a second client on the
+        // same app/channel for the screen track without re-deriving them.
+        window._lmsJoinAppId = appId;
+        window._lmsJoinChannel = channel;
+
+        // Clean up previous session
+        if (window._lmsLocalAudio) { try { window._lmsLocalAudio.stop(); window._lmsLocalAudio.close(); } catch(_){} window._lmsLocalAudio = null; }
+        if (window._lmsLocalVideo) { try { window._lmsLocalVideo.stop(); window._lmsLocalVideo.close(); } catch(_){} window._lmsLocalVideo = null; }
+        if (window._lmsAgoraClient) { try { await window._lmsAgoraClient.leave(); } catch(_){} window._lmsAgoraClient = null; }
+
+        AgoraRTC.setLogLevel(4);
+        try { AgoraRTC.disableLogUpload(); } catch(_) {}
+
+        // Chrome autoplay fix — must be set before any audio track is played
+        AgoraRTC.onAudioAutoplayFailed = function() {
+          console.warn('LMS: audio autoplay blocked — dispatching lms-audio-blocked event');
+          window.dispatchEvent(new CustomEvent('lms-audio-blocked', {}));
+        };
+        // Define lmsShowAudioBtn so legacy calls don't crash
+        window.lmsShowAudioBtn = function() {
+          window.dispatchEvent(new CustomEvent('lms-audio-blocked', {}));
+        };
+
+        window._lmsAgoraClient = AgoraRTC.createClient({ mode: 'rtc', codec: 'vp8' });
+
+        // ── Helper: play remote video into per-UID tile with retry ──────────
+        function lmsPlayIntoTile(uid, videoTrack, retries) {
+          retries = retries || 0;
+          var tile = window._lmsGetOrCreateTile(uid);
+          var videoDiv = tile ? document.getElementById('lms-tile-' + uid + '-video') : null;
+          if (videoDiv) {
+            try {
+              videoDiv.innerHTML = '';
+              // Agora's player crops to its OWN internal canvas using this
+              // fit mode — our CSS object-fit override on the outer <video>
+              // element only resizes that already-cropped canvas, it can't
+              // undo the crop. Without passing `fit` here Agora defaults to
+              // 'cover' regardless of the CSS, which is why "Fit" mode still
+              // looked zoomed/cropped instead of showing the full frame.
+              videoTrack.play(videoDiv.id, { fit: window._lmsVideoFit || 'cover' });
+              console.log('LMS: remote video playing uid=' + uid + ' (attempt ' + retries + ')');
+              // Verify Agora actually attached a rendering element (canvas/video)
+              // into the tile — under rapid concurrent joins this can silently
+              // no-op. If nothing landed, retry once the DOM has settled.
+              setTimeout(function() {
+                if (videoDiv.childElementCount === 0 && retries < 8) {
+                  lmsPlayIntoTile(uid, videoTrack, retries + 1);
+                }
+              }, 400);
+            } catch(e) {
+              console.warn('LMS remote video play error uid=' + uid + ':', e.message);
+              if (retries < 8) setTimeout(function() { lmsPlayIntoTile(uid, videoTrack, retries + 1); }, 400);
+            }
+          } else {
+            if (retries < 30) {
+              console.warn('lms-grid-container not ready for uid=' + uid + ', retry ' + retries);
+              setTimeout(function() { lmsPlayIntoTile(uid, videoTrack, retries + 1); }, 250);
+            } else {
+              console.error('lms-grid-container never appeared for uid=' + uid);
+            }
+          }
+        }
+
+        // Subscribe to remote users — each UID gets its own tile, never clobbers existing feeds
+        window._lmsAgoraClient.on('user-published', async function(user, mediaType) {
+          await window._lmsAgoraClient.subscribe(user, mediaType);
+          if (mediaType === 'video') {
+            lmsPlayIntoTile(user.uid, user.videoTrack, 0);
+          }
+          if (mediaType === 'audio') {
+            try {
+              user.audioTrack.play();
+              console.log('LMS: remote audio playing for uid', user.uid);
+            } catch(e) {
+              console.warn('LMS: remote audio play failed:', e.message);
+              lmsShowAudioBtn();
+            }
+          }
+        });
+
+        window._lmsAgoraClient.on('user-unpublished', function(user, mediaType) {
+          if (mediaType === 'video') {
+            var videoDiv = document.getElementById('lms-tile-' + user.uid + '-video');
+            if (videoDiv) videoDiv.innerHTML = '';
+          }
+        });
+
+        window._lmsAgoraClient.on('user-left', function(user) {
+          window._lmsRemoveTile(user.uid);
+          console.log('LMS: user left uid=' + user.uid);
+        });
+
+        await window._lmsAgoraClient.join(appId, channel, token || null, uid || null);
+        console.log('LMS: joined Agora channel', channel);
+
+        // Subscribe to anyone already in channel when joining late
+        for (var j = 0; j < window._lmsAgoraClient.remoteUsers.length; j++) {
+          var ru = window._lmsAgoraClient.remoteUsers[j];
+          if (ru.hasVideo) { try { await window._lmsAgoraClient.subscribe(ru,'video'); lmsPlayIntoTile(ru.uid, ru.videoTrack, 0); } catch(_){} }
+          if (ru.hasAudio) {
+            try { await window._lmsAgoraClient.subscribe(ru,'audio'); ru.audioTrack.play(); }
+            catch(_) { /* autoplay blocked — lmsEnableMediaAndPublish() will resume */ }
+          }
+        }
+
+        // Create mic + camera tracks and publish via the single idempotent media
+        // function (same one-shot flow as the working doctor/patient agoraJoin).
+        await window._lmsEnsureMediaPublished();
+
+        setTimeout(window.lmsRaiseFlutterLayer, 800);
+
+        // Auto-start recording for instructor after 3s (MediaRecorder — unchanged)
+        if (isInstructor) {
+          setTimeout(function() { window.lmsStartRecording(); }, 3000);
+        }
+
+        console.log('LMS: Agora joined channel', channel);
+        return 'ok';
+      } catch(e) {
+        console.warn('lmsAgoraJoin error:', e.message || String(e));
+        return 'error:' + (e.message || String(e));
+      }
+    };
+
+    // ── LMS Microphone Permission Request (called from Dart via JS interop) ──
+    // Uses getUserMedia with retry loop to explicitly request browser mic permission
+    // before Agora tries to access it. This prevents silent denial in Flutter Web.
+    window.lmsRequestMicPermission = async function(maxRetries, retryDelayMs) {
+      maxRetries = maxRetries || 3;
+      retryDelayMs = retryDelayMs || 500;
+      for (var attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+          // Try audio + video first
+          var stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
+          stream.getTracks().forEach(function(t) { t.stop(); });
+          console.log('LMS: Mic+cam permission granted (attempt ' + attempt + ')');
+          return true;
+        } catch(e) {
+          var errStr = (e.message || String(e)).toLowerCase();
+          // If both failed, try audio only
+          if (errStr.indexOf('notfound') >= 0 || errStr.indexOf('notallowed') >= 0 ||
+              errStr.indexOf('permission') >= 0 || errStr.indexOf('denied') >= 0 ||
+              errStr.indexOf('aborterror') >= 0) {
+            try {
+              var audioOnly = await navigator.mediaDevices.getUserMedia({ audio: true });
+              audioOnly.getTracks().forEach(function(t) { t.stop(); });
+              console.log('LMS: Mic permission granted (audio-only, attempt ' + attempt + ')');
+              return true;
+            } catch(audioErr) {
+              console.warn('LMS: Audio attempt ' + attempt + ' failed: ' + audioErr.message);
+            }
+          } else {
+            console.warn('LMS: getUserMedia attempt ' + attempt + ' failed: ' + e.message);
+          }
+          if (attempt < maxRetries) {
+            await new Promise(function(r) { setTimeout(r, retryDelayMs); });
+          }
+        }
+      }
+      console.error('LMS: Microphone permission denied after ' + maxRetries + ' attempts');
+      return false;
+    };
+
+    // Legacy alias — routes to the single idempotent media function so stale
+    // cached builds calling this cannot create duplicate tracks.
+    window.lmsStudentEnableAudio = window._lmsEnsureMediaPublished;
+
+    window._lmsScreenTrack = null;
+    window._lmsScreenSharing = false;
+
+    // Screen-share plays into the same small self-preview corner box used
+    // for the camera (#lms-agora-local) — it's treated as just another
+    // video source for that slot, not a separate big-view layout. Other
+    // participants see it the same way they see any camera: as a normal
+    // tile in #lms-grid-container via the regular user-published/
+    // lmsPlayIntoTile path, no special-casing needed. This is deliberately
+    // the simple, proven-stable behavior — an earlier "big main view +
+    // sidebar" layout (and, before that, a dual-Agora-client attempt to
+    // keep the camera tile alive during a share) both made screen-sharing
+    // itself unreliable in practice (blank/stuck sharing), so this was
+    // reverted back to what was known to work.
+    window.lmsToggleScreenShare = async function() {
+      try {
+        if (window._lmsScreenSharing && window._lmsScreenTrack) {
+          // Stop screen sharing — switch back to camera
+          if (window._lmsAgoraClient) {
+            try { await window._lmsAgoraClient.unpublish([window._lmsScreenTrack]); } catch(_) {}
+          }
+          try { window._lmsScreenTrack.stop(); window._lmsScreenTrack.close(); } catch(_) {}
+          window._lmsScreenTrack = null;
+          window._lmsScreenSharing = false;
+          // Mobile Chrome sometimes force-rotates to landscape while
+          // getDisplayMedia() is capturing and doesn't revert it on its
+          // own — release any orientation lock we took and let the OS
+          // sensor take back over so the page returns to portrait.
+          try {
+            if (screen.orientation && screen.orientation.unlock) screen.orientation.unlock();
+          } catch(_) {}
+          // Re-publish camera
+          if (window._lmsLocalVideo && window._lmsAgoraClient) {
+            try {
+              await window._lmsLocalVideo.setEnabled(true);
+              await window._lmsAgoraClient.publish([window._lmsLocalVideo]);
+              var ld = document.getElementById('lms-agora-local');
+              if (ld) { ld.innerHTML = ''; window._lmsLocalVideo.play('lms-agora-local'); }
+            } catch(_) {}
+          }
+          // Point the recording back at the live camera track
+          if (window._lmsRebindRecordLocal) { try { window._lmsRebindRecordLocal(); } catch(_) {} }
+          return 'camera';
+        } else {
+          // Start screen sharing
+          window._lmsScreenTrack = await AgoraRTC.createScreenVideoTrack({
+            encoderConfig: {
+              width: { ideal: 1920, max: 1920 },
+              height: { ideal: 1080, max: 1080 },
+              frameRate: 30,
+              bitrateMax: 4000,
+              bitrateMin: 800,
+              optimizationMode: 'detail'
+            }
+          }, 'disable');
+          // Best-effort: ask to stay in portrait. Only actually works while
+          // fullscreen on most mobile browsers, so this is allowed to fail
+          // silently — the real fix is the unlock() call on stop, above,
+          // which recovers from whatever rotation the capture itself forced.
+          try {
+            if (screen.orientation && screen.orientation.lock) {
+              await screen.orientation.lock('portrait').catch(function(){});
+            }
+          } catch(_) {}
+          // Unpublish camera
+          if (window._lmsLocalVideo && window._lmsAgoraClient) {
+            try { await window._lmsAgoraClient.unpublish([window._lmsLocalVideo]); } catch(_) {}
+          }
+          if (window._lmsAgoraClient) {
+            await window._lmsAgoraClient.publish([window._lmsScreenTrack]);
+          }
+          // Local preview
+          var ld2 = document.getElementById('lms-agora-local');
+          if (ld2) { ld2.innerHTML = ''; window._lmsScreenTrack.play('lms-agora-local'); }
+          window._lmsScreenSharing = true;
+          // Point the recording at the live screen track so it captures the
+          // real screen (not a frozen camera frame).
+          if (window._lmsRebindRecordLocal) { try { window._lmsRebindRecordLocal(); } catch(_) {} }
+          // If user stops via browser native UI button
+          window._lmsScreenTrack.on('track-ended', async function() {
+            if (window._lmsScreenSharing) {
+              await window.lmsToggleScreenShare();
+              window.dispatchEvent(new CustomEvent('lms-screen-share-ended'));
+            }
+          });
+          return 'screen';
+        }
+      } catch(e) {
+        console.warn('lmsToggleScreenShare error:', e.message || String(e));
+        window._lmsScreenSharing = false;
+        window._lmsScreenTrack = null;
+        return 'error:' + (e.message || String(e));
+      }
+    };
+
+    window.lmsGetLocalUid = function() {
+      return window._lmsAgoraClient ? String(window._lmsAgoraClient.uid || '') : '';
+    };
+
+    // No-op kept only so Dart's existing call site (guarded, harmless if
+    // undefined anyway) doesn't need touching — screen-share no longer
+    // drives any special big-view layout to switch into.
+    window.lmsApplyRemoteScreenShare = function(sharingUid) {};
+
+    window.lmsSetParticipantNames = function(localName, remoteName) {
+      var ln = document.getElementById('lms-local-name');
+      if (ln) { ln.textContent = localName; ln.style.display = localName ? 'block' : 'none'; }
+      // Per-tile remote names are set via lmsSetTileName(uid, name)
+    };
+
+    // Toggle video fit: 'cover' fills rectangle (no black bars), 'contain' shows full content.
+    // The CSS override alone only resizes Agora's own internal canvas — it
+    // doesn't change what Agora cropped when it first rendered the frame —
+    // so every currently-playing remote tile has to be re-played with the
+    // new `fit` value passed directly to Agora for the toggle to actually
+    // change what's visible (see lmsPlayIntoTile for the same fix on join).
+    window._lmsVideoFit = 'cover';
+    window.lmsSetVideoFit = function(mode) {
+      window._lmsVideoFit = mode;
+      var st = document.getElementById('lms-agora-fit-override');
+      if (!st) {
+        st = document.createElement('style');
+        st.id = 'lms-agora-fit-override';
+        document.head.appendChild(st);
+      }
+      st.textContent =
+        '.lms-remote-tile > div, .lms-remote-tile video {' +
+        'object-fit: ' + mode + ' !important; }';
+      if (window._lmsAgoraClient) {
+        window._lmsAgoraClient.remoteUsers.forEach(function(u) {
+          if (!u.videoTrack) return;
+          var vd = document.getElementById('lms-tile-' + u.uid + '-video');
+          if (vd) { try { vd.innerHTML = ''; u.videoTrack.play(vd.id, { fit: mode }); } catch(_) {} }
+        });
+      }
+    };
+
+    window.lmsRequestFullscreen = function() {
+      try {
+        var el = document.documentElement;
+        if (el.requestFullscreen) el.requestFullscreen();
+        else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+      } catch(e) { console.warn('Fullscreen error:', e); }
+    };
+
+    window.lmsExitFullscreen = function() {
+      try {
+        if (document.exitFullscreen) document.exitFullscreen();
+        else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+      } catch(e) {}
+    };
+
+    window.lmsAgoraLeave = async function() {
+      try {
+        if (window._lmsLocalAudio) { window._lmsLocalAudio.stop(); window._lmsLocalAudio.close(); window._lmsLocalAudio = null; }
+        if (window._lmsLocalVideo) { window._lmsLocalVideo.stop(); window._lmsLocalVideo.close(); window._lmsLocalVideo = null; }
+        if (window._lmsAgoraClient) { await window._lmsAgoraClient.leave(); window._lmsAgoraClient = null; }
+        var h = document.getElementById('lms-jitsi-host');
+        if (h && h.parentNode === document.body) h.remove();
+      } catch(_) {}
+    };
+
+    window.lmsAgoraMuteMic = function(mute) {
+      if (window._lmsLocalAudio) { try { window._lmsLocalAudio.setMuted(mute); } catch(_) {} }
+    };
+
+    window.lmsAgoraMuteCamera = function(mute) {
+      if (window._lmsLocalVideo) { try { window._lmsLocalVideo.setMuted(mute); } catch(_) {} }
+    };
+
+    window.lmsSetPanelWidth = function(panelOpen) {};
+
+    // Called from Dart when entering/exiting fullscreen so Agora replays
+    // video tracks into the (now resized) container divs.
+    window.lmsRefreshVideoLayout = function() {
+      try {
+        var ld = document.getElementById('lms-agora-local');
+        if (ld) {
+          if (window._lmsScreenSharing && window._lmsScreenTrack) {
+            try { ld.innerHTML = ''; window._lmsScreenTrack.play('lms-agora-local'); } catch(_) {}
+          } else if (window._lmsLocalVideo) {
+            try { ld.innerHTML = ''; window._lmsLocalVideo.play('lms-agora-local'); } catch(_) {}
+          }
+        }
+        if (window._lmsAgoraClient) {
+          window._lmsAgoraClient.remoteUsers.forEach(function(u) {
+            if (u.videoTrack) {
+              var vd = document.getElementById('lms-tile-' + u.uid + '-video');
+              if (!vd) { window._lmsGetOrCreateTile(u.uid); vd = document.getElementById('lms-tile-' + u.uid + '-video'); }
+              if (vd) { try { vd.innerHTML = ''; u.videoTrack.play(vd.id); } catch(_) {} }
+            }
+          });
+        }
+      } catch(e) { console.warn('lmsRefreshVideoLayout error:', e); }
+    };
+
+    // Composite recording: instructor (right) + student (left) side-by-side on canvas
+    window.lmsStartRecording = async function() {
+      try {
+        if (window._lmsRecorder && window._lmsRecorder.state === 'recording') return;
+
+        // ── Build hidden video elements from Agora tracks ───────────────
+        // Elements MUST be in the DOM for browser hardware decoding to activate
+        var _hiddenStyle = function(el) {
+          el.style.position = 'fixed';
+          el.style.top = '-9999px'; el.style.left = '-9999px';
+          el.style.width = '2px'; el.style.height = '2px';
+          el.style.opacity = '0'; el.style.pointerEvents = 'none';
+        };
+
+        var localVid = document.createElement('video');
+        localVid.autoplay = true; localVid.muted = true; localVid.playsInline = true;
+        _hiddenStyle(localVid);
+        document.body.appendChild(localVid);
+
+        // Bind the recording's local video element to whichever track is the
+        // instructor's active local video — screen track while sharing, camera
+        // otherwise. Exposed so lmsToggleScreenShare can re-bind on switch.
+        window._lmsRebindRecordLocal = function() {
+          var srcTrack = (window._lmsScreenSharing && window._lmsScreenTrack)
+            ? window._lmsScreenTrack
+            : window._lmsLocalVideo;
+          if (!srcTrack || !localVid) return;
+          try {
+            var s = new MediaStream();
+            s.addTrack(srcTrack.getMediaStreamTrack());
+            localVid.srcObject = s;
+            localVid.play().catch(function(){});
+          } catch(_) {}
+        };
+        window._lmsRebindRecordLocal();
+
+        var remoteVid = null;
+        var remoteUsers = window._lmsAgoraClient ? window._lmsAgoraClient.remoteUsers : [];
+        if (remoteUsers.length > 0 && remoteUsers[0].videoTrack) {
+          remoteVid = document.createElement('video');
+          remoteVid.autoplay = true; remoteVid.muted = true; remoteVid.playsInline = true;
+          _hiddenStyle(remoteVid);
+          var rs = new MediaStream();
+          try { rs.addTrack(remoteUsers[0].videoTrack.getMediaStreamTrack()); } catch(_) {}
+          remoteVid.srcObject = rs;
+          document.body.appendChild(remoteVid);
+          remoteVid.play().catch(function(){});
+        }
+        localVid.play().catch(function(){});
+
+        // ── Canvas composite ─────────────────────────────────────────────
+        // 1080p so shared screen content (text/slides) stays legible.
+        var W = 1920, H = 1080;
+        var canvas = document.createElement('canvas');
+        canvas.width = W; canvas.height = H;
+        var ctx = canvas.getContext('2d');
+        window._lmsRecordCanvas = canvas;
+        window._lmsRecordLocalVid = localVid;
+        window._lmsRecordRemoteVid = remoteVid;
+
+        // Draw a source video into a target rect preserving aspect ratio
+        // (letterboxed) so screen content is never stretched/squeezed.
+        var drawFit = function(vid, dx, dy, dw, dh) {
+          var vw = vid.videoWidth, vh = vid.videoHeight;
+          if (!vw || !vh) return;
+          var scale = Math.min(dw / vw, dh / vh);
+          var w = vw * scale, h = vh * scale;
+          ctx.drawImage(vid, dx + (dw - w) / 2, dy + (dh - h) / 2, w, h);
+        };
+
+        var drawFrame = function() {
+          if (!window._lmsRecorder || window._lmsRecorder.state !== 'recording') return;
+          ctx.fillStyle = '#111';
+          ctx.fillRect(0, 0, W, H);
+          var hasRemote = remoteVid && remoteVid.readyState >= 2 && remoteVid.videoWidth > 0;
+          var hasLocal  = localVid  && localVid.readyState  >= 2 && localVid.videoWidth  > 0;
+          if (window._lmsScreenSharing && hasLocal) {
+            // Screen share: fill the whole frame with the shared screen
+            // (aspect-preserved), camera goes to a small PiP corner.
+            drawFit(localVid, 0, 0, W, H);
+            if (hasRemote) {
+              var pipW = W * 0.22, pipH = pipW * 9 / 16;
+              ctx.fillStyle = '#000';
+              ctx.fillRect(W - pipW - 12, H - pipH - 12, pipW, pipH);
+              drawFit(remoteVid, W - pipW - 12, H - pipH - 12, pipW, pipH);
+            }
+          } else if (hasRemote && hasLocal) {
+            drawFit(remoteVid, 0,   0, W/2, H);   // student  — left
+            drawFit(localVid,  W/2, 0, W/2, H);   // instructor — right
+          } else if (hasLocal) {
+            drawFit(localVid, 0, 0, W, H);
+          } else if (hasRemote) {
+            drawFit(remoteVid, 0, 0, W, H);
+          }
+        };
+        // Start drawing after delay — DOM-attached video needs time to decode first frame.
+        // Uses setInterval (not requestAnimationFrame) because browsers throttle/
+        // pause rAF entirely when the tab is backgrounded or minimized — which is
+        // exactly when instructors tend to switch away during a live session —
+        // causing the recording to drop frames and look choppy. setInterval is
+        // only clamped to a minimum delay in background tabs, so it keeps drawing
+        // at a steady (if occasionally slightly slower) rate instead of stalling.
+        setTimeout(function() {
+          window._lmsRecordDrawTimer = setInterval(drawFrame, 1000 / 30);
+        }, 1500);
+
+        // ── MediaRecorder from canvas stream + mixed audio ───────────────
+        // 30fps for smooth motion; matches Agora screen-share frameRate.
+        var canvasStream = canvas.captureStream(30);
+
+        // Mix local mic + all remote audio tracks via Web Audio API
+        try {
+          var audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+          // Resume in case browser suspended the context (autoplay policy) —
+          // MUST be awaited: connecting sources before the context is truly
+          // 'running' produces a silent destination track (recording plays
+          // back with no sound even though a track exists).
+          if (audioCtx.state === 'suspended') {
+            try { await audioCtx.resume(); } catch(_) {}
+          }
+          // If the mic track isn't ready yet (race with Agora publish flow,
+          // e.g. recording auto-starts 3s after join), wait briefly and retry
+          // instead of silently recording with no local audio at all.
+          if (!window._lmsLocalAudio) {
+            for (var waitTry = 0; waitTry < 10 && !window._lmsLocalAudio; waitTry++) {
+              await new Promise(function(r) { setTimeout(r, 300); });
+            }
+          }
+          var dest = audioCtx.createMediaStreamDestination();
+          var audioSourceCount = 0;
+          if (window._lmsLocalAudio) {
+            try {
+              var localStream = new MediaStream([window._lmsLocalAudio.getMediaStreamTrack()]);
+              audioCtx.createMediaStreamSource(localStream).connect(dest);
+              audioSourceCount++;
+            } catch(ae) { console.warn('LMS rec: local audio mix error:', ae.message); }
+          } else {
+            console.warn('LMS rec: local mic track still unavailable after wait — recording will have no local audio');
+          }
+          if (window._lmsAgoraClient) {
+            window._lmsAgoraClient.remoteUsers.forEach(function(u) {
+              if (u.audioTrack) {
+                try {
+                  var remStream = new MediaStream([u.audioTrack.getMediaStreamTrack()]);
+                  audioCtx.createMediaStreamSource(remStream).connect(dest);
+                  audioSourceCount++;
+                } catch(re) { console.warn('LMS rec: remote audio mix error:', re.message); }
+              }
+            });
+          }
+          var mixedTrack = dest.stream.getAudioTracks()[0];
+          if (mixedTrack) {
+            canvasStream.addTrack(mixedTrack);
+            console.log('LMS: mixed ' + audioSourceCount + ' audio source(s) into recording, audioCtx.state=' + audioCtx.state);
+          } else {
+            console.warn('LMS rec: no mixed audio track produced — recording will be silent');
+          }
+          // Keep a handle so we can verify/resume if the context gets
+          // suspended again mid-recording (some browsers do this on tab blur).
+          window._lmsRecordAudioCtx = audioCtx;
+        } catch(audioErr) {
+          // Fallback: local only
+          if (window._lmsLocalAudio) {
+            try { canvasStream.addTrack(window._lmsLocalAudio.getMediaStreamTrack()); } catch(_) {}
+          }
+          console.warn('LMS rec: audio mix failed, falling back to local only:', audioErr.message);
+        }
+
+        // Fallback: if canvas captureStream not supported, record tracks directly
+        if (!canvas.captureStream) {
+          canvasStream = new MediaStream();
+          if (window._lmsLocalAudio) { try { canvasStream.addTrack(window._lmsLocalAudio.getMediaStreamTrack()); } catch(_) {} }
+          if (window._lmsLocalVideo) { try { canvasStream.addTrack(window._lmsLocalVideo.getMediaStreamTrack()); } catch(_) {} }
+        }
+
+        window._lmsChunks = [];
+        // Include opus audio codec so MediaRecorder captures audio alongside video
+        var mimeType = [
+          'video/webm;codecs=vp9,opus',
+          'video/webm;codecs=vp8,opus',
+          'video/webm;codecs=h264,opus',
+          'video/webm;codecs=vp9',
+          'video/webm;codecs=vp8',
+          'video/webm'
+        ].find(function(t) { return MediaRecorder.isTypeSupported(t); }) || 'video/webm';
+
+        // 4 Mbps @ 1080p keeps shared-screen text crisp without huge files.
+        window._lmsRecorder = new MediaRecorder(canvasStream, { mimeType: mimeType, videoBitsPerSecond: 4000000, audioBitsPerSecond: 128000 });
+        window._lmsRecorder.ondataavailable = function(e) {
+          if (e.data && e.data.size > 0) window._lmsChunks.push(e.data);
+        };
+        window._lmsRecorder.start(5000);
+        console.log('LMS: composite recording started (canvas ' + W + 'x' + H + ')');
+      } catch(e) {
+        console.warn('LMS: recording unavailable:', e.message);
+      }
+    };
+
+    // Stop recording → upload to Cloudinary via signed backend endpoint → save URL in LMS
+    window.lmsStopRecordingAndUpload = function(sessionId, backendUrl, authToken) {
+      if (!window._lmsRecorder) return;
+
+      var doSave = async function() {
+        // Clean up canvas recording helpers
+        if (window._lmsRecordDrawTimer) { clearInterval(window._lmsRecordDrawTimer); window._lmsRecordDrawTimer = null; }
+        if (window._lmsRecordLocalVid) { try { window._lmsRecordLocalVid.pause(); window._lmsRecordLocalVid.srcObject = null; if (window._lmsRecordLocalVid.parentNode) window._lmsRecordLocalVid.parentNode.removeChild(window._lmsRecordLocalVid); } catch(_){} window._lmsRecordLocalVid = null; }
+        if (window._lmsRecordRemoteVid) { try { window._lmsRecordRemoteVid.pause(); window._lmsRecordRemoteVid.srcObject = null; if (window._lmsRecordRemoteVid.parentNode) window._lmsRecordRemoteVid.parentNode.removeChild(window._lmsRecordRemoteVid); } catch(_){} window._lmsRecordRemoteVid = null; }
+        window._lmsRecordCanvas = null;
+        window._lmsRebindRecordLocal = null;
+        if (window._lmsRecordAudioCtx) {
+          try { window._lmsRecordAudioCtx.close(); } catch(_) {}
+          window._lmsRecordAudioCtx = null;
+        }
+        if (window._lmsStream) {
+          window._lmsStream.getTracks().forEach(function(t) { t.stop(); });
+          window._lmsStream = null;
+        }
+        var blob = new Blob(window._lmsChunks, { type: 'video/webm' });
+        window._lmsChunks = [];
+
+        if (blob.size < 5000) { console.log('LMS: recording too short, skipping save'); return; }
+
+        var sizeMB = (blob.size / 1048576).toFixed(1);
+        console.log('LMS: uploading session recording (' + sizeMB + ' MB) to LMS...');
+
+        try {
+          // Step 1: get a signed upload token from the backend
+          var signResp = await fetch(
+            backendUrl + '/upload/sign?folder=icare%2Flms-recordings&resource_type=video',
+            { headers: { 'Authorization': 'Bearer ' + authToken } }
+          );
+          var sign = await signResp.json();
+
+          if (!sign.success || !sign.cloud_name) {
+            console.warn('LMS: could not get Cloudinary signature:', sign);
+            return;
+          }
+
+          // Step 2: upload blob directly to Cloudinary (signed — bypasses Vercel 4.5 MB limit)
+          var fd = new FormData();
+          var recTs = new Date().toISOString().replace(/[:.]/g,'-').slice(0,19);
+          fd.append('file', blob, 'icare-session-' + sessionId + '-' + recTs + '.webm');
+          fd.append('api_key', sign.api_key);
+          fd.append('timestamp', String(sign.timestamp));
+          fd.append('signature', sign.signature);
+          fd.append('folder', sign.folder);
+
+          var uploadResp = await fetch(
+            'https://api.cloudinary.com/v1_1/' + sign.cloud_name + '/video/upload',
+            { method: 'POST', body: fd }
+          );
+          var data = await uploadResp.json();
+
+          if (!data.secure_url) {
+            console.warn('LMS: Cloudinary upload error:', data.error || data);
+            return;
+          }
+
+          // Step 3: save the URL to the live session document in MongoDB
+          var patchResp = await fetch(backendUrl + '/live-sessions/' + sessionId + '/set-recording-url', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
+            body: JSON.stringify({ recordingUrl: data.secure_url }),
+          });
+          var patchData = await patchResp.json();
+          console.log('LMS: recording saved to LMS:', data.secure_url);
+          // Notify Flutter so the session list can refresh and show the ▶ REC badge
+          if (window._lmsRecordingSavedCallback) {
+            try { window._lmsRecordingSavedCallback(data.secure_url); } catch(_) {}
+          }
+        } catch(e) {
+          console.warn('LMS: upload failed:', e.message);
+        }
+      };
+
+      if (window._lmsRecorder.state === 'recording') {
+        window._lmsRecorder.onstop = doSave;
+        window._lmsRecorder.stop();
+      } else {
+        doSave();
+      }
+    };
+  </script>
+
 </body>
 </html>

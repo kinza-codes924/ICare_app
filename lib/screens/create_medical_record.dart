@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:icare/models/appointment_detail.dart';
+import 'package:icare/services/efficiency_service.dart';
 import 'package:icare/services/medical_record_service.dart';
 import 'package:icare/utils/theme.dart';
 import 'package:icare/widgets/back_button.dart';
@@ -28,6 +29,132 @@ class _CreateMedicalRecordScreenState extends State<CreateMedicalRecordScreen> {
   final _symptomsController = TextEditingController();
   final _notesController = TextEditingController();
 
+  // Common diagnoses for searchable dropdown
+  static const List<String> _commonDiagnoses = [
+    'Hypertension', 'Type 2 Diabetes Mellitus', 'Type 1 Diabetes Mellitus',
+    'Upper Respiratory Tract Infection (URTI)', 'Lower Respiratory Tract Infection',
+    'Pneumonia', 'Bronchitis', 'Asthma', 'COPD',
+    'Acute Gastroenteritis', 'Peptic Ulcer Disease', 'GERD',
+    'Urinary Tract Infection (UTI)', 'Kidney Stones',
+    'Anemia', 'Iron Deficiency Anemia',
+    'Migraine', 'Tension Headache',
+    'Acute Pharyngitis', 'Tonsillitis', 'Sinusitis', 'Otitis Media',
+    'Conjunctivitis', 'Allergic Rhinitis',
+    'Eczema', 'Psoriasis', 'Acne Vulgaris', 'Urticaria',
+    'Hypothyroidism', 'Hyperthyroidism',
+    'Anxiety Disorder', 'Depression',
+    'Osteoarthritis', 'Rheumatoid Arthritis', 'Gout',
+    'Dengue Fever', 'Typhoid Fever', 'Malaria',
+    'COVID-19', 'Influenza',
+    'Coronary Artery Disease', 'Heart Failure', 'Arrhythmia',
+    'Stroke', 'Epilepsy',
+    'Hepatitis A', 'Hepatitis B', 'Hepatitis C',
+    'Appendicitis', 'Cholecystitis',
+    'Other',
+  ];
+
+  // Common medicines for searchable dropdown
+  static const List<String> _commonMedicines = [
+    'Paracetamol (Panadol)', 'Ibuprofen (Brufen)', 'Aspirin', 'Diclofenac (Voltaren)',
+    'Naproxen', 'Mefenamic Acid (Ponstan)', 'Tramadol', 'Codeine',
+    'Amoxicillin', 'Amoxicillin + Clavulanate (Augmentin)', 'Azithromycin (Zithromax)',
+    'Clarithromycin', 'Ciprofloxacin', 'Levofloxacin', 'Doxycycline',
+    'Metronidazole (Flagyl)', 'Clindamycin', 'Cephalexin', 'Cefuroxime', 'Ceftriaxone',
+    'Flucloxacillin', 'Co-trimoxazole (Septrin)',
+    'Omeprazole', 'Pantoprazole', 'Ranitidine', 'Esomeprazole (Nexium)',
+    'Domperidone (Motilium)', 'Metoclopramide', 'Ondansetron (Zofran)',
+    'Loperamide (Imodium)', 'Oral Rehydration Salts (ORS)',
+    'Metformin', 'Glibenclamide', 'Gliclazide', 'Sitagliptin', 'Insulin (Regular)',
+    'Amlodipine', 'Lisinopril', 'Enalapril', 'Losartan', 'Valsartan',
+    'Atenolol', 'Metoprolol', 'Propranolol', 'Bisoprolol',
+    'Hydrochlorothiazide (HCT)', 'Furosemide (Lasix)', 'Spironolactone',
+    'Atorvastatin (Lipitor)', 'Rosuvastatin', 'Simvastatin',
+    'Aspirin (Low Dose 75mg)', 'Warfarin', 'Clopidogrel', 'Rivaroxaban',
+    'Salbutamol (Ventolin) Inhaler', 'Beclomethasone Inhaler', 'Montelukast',
+    'Levothyroxine (Euthyrox)', 'Carbimazole',
+    'Prednisolone', 'Dexamethasone', 'Hydrocortisone',
+    'Cetirizine (Zyrtec)', 'Loratadine (Claritin)', 'Fexofenadine',
+    'Chlorpheniramine', 'Diphenhydramine',
+    'Amitriptyline', 'Sertraline (Zoloft)', 'Fluoxetine (Prozac)', 'Escitalopram',
+    'Diazepam', 'Lorazepam', 'Alprazolam', 'Zolpidem',
+    'Phenytoin', 'Carbamazepine', 'Sodium Valproate',
+    'Ferrous Sulphate (Iron)', 'Folic Acid', 'Vitamin C',
+    'Vitamin D3', 'Calcium + Vitamin D', 'Vitamin B Complex', 'Vitamin B12',
+    'Zinc Sulphate', 'Multivitamin',
+    'Clotrimazole (Canesten)', 'Fluconazole (Diflucan)', 'Terbinafine',
+    'Acyclovir (Zovirax)', 'Oseltamivir (Tamiflu)',
+    'Chloroquine', 'Artemether + Lumefantrine (Coartem)',
+    'Other',
+  ];
+
+  // Common lab tests for searchable dropdown
+  static const List<String> _commonLabTests = [
+    'Complete Blood Count (CBC)',
+    'Blood Glucose (Fasting)',
+    'Blood Glucose (Random)',
+    'HbA1c (Glycated Hemoglobin)',
+    'Lipid Profile',
+    'Liver Function Tests (LFTs)',
+    'Kidney Function Tests (KFTs)',
+    'Thyroid Function Tests (TFTs)',
+    'TSH (Thyroid Stimulating Hormone)',
+    'T3 / T4',
+    'Urine Complete Examination (UCE)',
+    'Urine Culture & Sensitivity',
+    'Blood Culture & Sensitivity',
+    'Serum Electrolytes (Na, K, Cl)',
+    'Serum Creatinine',
+    'Blood Urea Nitrogen (BUN)',
+    'Serum Uric Acid',
+    'Serum Calcium',
+    'Serum Iron / TIBC',
+    'Serum Ferritin',
+    'Vitamin D (25-OH)',
+    'Vitamin B12',
+    'Folic Acid',
+    'Prothrombin Time (PT/INR)',
+    'APTT',
+    'ESR (Erythrocyte Sedimentation Rate)',
+    'CRP (C-Reactive Protein)',
+    'HBsAg (Hepatitis B Surface Antigen)',
+    'Anti-HCV (Hepatitis C Antibody)',
+    'HIV Test',
+    'Widal Test (Typhoid)',
+    'Malaria Antigen Test (RDT)',
+    'Dengue NS1 Antigen',
+    'Dengue IgM / IgG',
+    'COVID-19 PCR',
+    'COVID-19 Rapid Antigen Test',
+    'Stool Complete Examination',
+    'Stool Culture',
+    'Serum Albumin',
+    'Serum Bilirubin (Total / Direct)',
+    'ALT (SGPT)',
+    'AST (SGOT)',
+    'Alkaline Phosphatase (ALP)',
+    'GGT',
+    'Serum Amylase',
+    'Serum Lipase',
+    'Blood Group & Rh Factor',
+    'X-Ray Chest',
+    'X-Ray KUB',
+    'ECG (Electrocardiogram)',
+    'Echocardiogram',
+    'Ultrasound Abdomen',
+    'Ultrasound Pelvis',
+    'Ultrasound Whole Abdomen',
+    'CT Scan Head',
+    'CT Scan Chest',
+    'MRI Brain',
+    'Bone Marrow Aspiration',
+    'Sputum AFB (TB)',
+    'GeneXpert (MTB/RIF)',
+    'Pap Smear',
+    'PSA (Prostate Specific Antigen)',
+    'Beta-HCG (Pregnancy Test)',
+    'Other',
+  ];
+
   // Vital Signs
   final _bpController = TextEditingController();
   final _tempController = TextEditingController();
@@ -35,11 +162,18 @@ class _CreateMedicalRecordScreenState extends State<CreateMedicalRecordScreen> {
   final _weightController = TextEditingController();
   final _heightController = TextEditingController();
 
+  String? _referSpecialty;
+  final _referReasonController = TextEditingController();
+  bool _referToEmergency = false;
+  String? _emergencyReason;
+  int _followUpDays = 0;
+  int _followUpMonths = 0;
+
   // Prescription list
-  List<Map<String, String>> _prescriptions = [];
+  final List<Map<String, String>> _prescriptions = [];
 
   // Lab tests list
-  List<String> _labTests = [];
+  final List<String> _labTests = [];
 
   DateTime? _followUpDate;
   bool _isSubmitting = false;
@@ -47,9 +181,10 @@ class _CreateMedicalRecordScreenState extends State<CreateMedicalRecordScreen> {
   final CourseService _courseService = CourseService();
   final LaboratoryService _labService = LaboratoryService();
   final PharmacyService _pharmacyService = PharmacyService();
+  final EfficiencyService _efficiencyService = EfficiencyService();
 
   List<dynamic> _availablePrograms = [];
-  List<String> _selectedProgramIds = [];
+  final List<String> _selectedProgramIds = [];
   bool _isLoadingPrograms = true;
 
   List<dynamic> _availableLabs = [];
@@ -119,7 +254,70 @@ class _CreateMedicalRecordScreenState extends State<CreateMedicalRecordScreen> {
     _heartRateController.dispose();
     _weightController.dispose();
     _heightController.dispose();
+    _referReasonController.dispose();
     super.dispose();
+  }
+
+  Future<void> _showUseTemplateDialog() async {
+    final templates = await _efficiencyService.getPrescriptionTemplates();
+    if (!mounted) return;
+    if (templates.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No templates saved. Create one from Prescription Templates.')),
+      );
+      return;
+    }
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Select Template', style: TextStyle(fontWeight: FontWeight.w800)),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: ListView.separated(
+            shrinkWrap: true,
+            itemCount: templates.length,
+            separatorBuilder: (_, _) => const Divider(height: 1),
+            itemBuilder: (_, i) {
+              final t = templates[i];
+              final drugs = (t['drugs'] ?? []) as List<dynamic>;
+              return ListTile(
+                leading: const Icon(Icons.medical_services_rounded, color: AppColors.primaryColor),
+                title: Text(t['name'] ?? '', style: const TextStyle(fontWeight: FontWeight.w700)),
+                subtitle: Text(
+                  drugs.map((d) => '${d['name']} (${d['dosage']})').join(', '),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 12),
+                ),
+                onTap: () {
+                  setState(() {
+                    for (final drug in drugs) {
+                      _prescriptions.add({
+                        'name': drug['name']?.toString() ?? '',
+                        'dosage': drug['dosage']?.toString() ?? '',
+                        'frequency': '',
+                        'duration': '',
+                        'instructions': '',
+                      });
+                    }
+                  });
+                  Navigator.pop(ctx);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('${drugs.length} drug(s) added from "${t['name']}"'),
+                      backgroundColor: const Color(0xFF10B981),
+                    ),
+                  );
+                },
+              );
+            },
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+        ],
+      ),
+    );
   }
 
   void _addPrescription() {
@@ -129,9 +327,12 @@ class _CreateMedicalRecordScreenState extends State<CreateMedicalRecordScreen> {
         final nameController = TextEditingController();
         final dosageController = TextEditingController();
         final frequencyController = TextEditingController();
-        final durationController = TextEditingController();
+        final durationNumberController = TextEditingController();
+        String durationUnit = 'Days';
         final instructionsController = TextEditingController();
 
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
         return Dialog(
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(24),
@@ -195,12 +396,92 @@ class _CreateMedicalRecordScreenState extends State<CreateMedicalRecordScreen> {
                   Padding(
                     padding: const EdgeInsets.all(24),
                     child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _buildModalTextField(
-                          controller: nameController,
-                          label: 'Medicine Name',
-                          icon: Icons.medical_services_rounded,
-                          hint: 'e.g., Paracetamol',
+                        // Medicine Name — searchable Autocomplete
+                        const Text(
+                          'Medicine Name',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF0F172A),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Autocomplete<String>(
+                          optionsBuilder: (TextEditingValue textEditingValue) {
+                            if (textEditingValue.text.isEmpty) {
+                              return const Iterable<String>.empty();
+                            }
+                            return _commonMedicines.where((m) => m
+                                .toLowerCase()
+                                .contains(textEditingValue.text.toLowerCase()));
+                          },
+                          onSelected: (String selection) {
+                            nameController.text = selection;
+                          },
+                          fieldViewBuilder: (context, fieldController, focusNode, onSubmitted) {
+                            fieldController.addListener(() {
+                              nameController.text = fieldController.text;
+                            });
+                            return TextField(
+                              controller: fieldController,
+                              focusNode: focusNode,
+                              decoration: InputDecoration(
+                                hintText: 'e.g., Paracetamol',
+                                prefixIcon: const Icon(
+                                  Icons.medical_services_rounded,
+                                  color: Color(0xFF64748B),
+                                  size: 20,
+                                ),
+                                filled: true,
+                                fillColor: const Color(0xFFF8FAFC),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                                ),
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: const BorderSide(color: Color(0xFF10B981), width: 2),
+                                ),
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                              ),
+                            );
+                          },
+                          optionsViewBuilder: (context, onSelected, options) {
+                            return Align(
+                              alignment: Alignment.topLeft,
+                              child: Material(
+                                elevation: 4,
+                                borderRadius: BorderRadius.circular(12),
+                                child: ConstrainedBox(
+                                  constraints: const BoxConstraints(maxHeight: 200),
+                                  child: ListView.builder(
+                                    padding: EdgeInsets.zero,
+                                    shrinkWrap: true,
+                                    itemCount: options.length,
+                                    itemBuilder: (context, index) {
+                                      final option = options.elementAt(index);
+                                      return ListTile(
+                                        dense: true,
+                                        leading: const Icon(
+                                            Icons.medication_rounded,
+                                            size: 18,
+                                            color: Color(0xFF10B981)),
+                                        title: Text(option,
+                                            style: const TextStyle(fontSize: 14)),
+                                        onTap: () => onSelected(option),
+                                      );
+                                    },
+                                  ),
+                                ),
+                              ),
+                            );
+                          },
                         ),
                         const SizedBox(height: 16),
                         Row(
@@ -214,12 +495,80 @@ class _CreateMedicalRecordScreenState extends State<CreateMedicalRecordScreen> {
                               ),
                             ),
                             const SizedBox(width: 12),
+                            // Duration: number input + unit dropdown
                             Expanded(
-                              child: _buildModalTextField(
-                                controller: durationController,
-                                label: 'Duration',
-                                icon: Icons.timer_rounded,
-                                hint: 'e.g., 5 days',
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    'Duration',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w700,
+                                      color: Color(0xFF0F172A),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        flex: 2,
+                                        child: TextField(
+                                          controller: durationNumberController,
+                                          keyboardType: TextInputType.number,
+                                          decoration: InputDecoration(
+                                            hintText: '7',
+                                            filled: true,
+                                            fillColor: const Color(0xFFF8FAFC),
+                                            border: OutlineInputBorder(
+                                              borderRadius: BorderRadius.circular(12),
+                                              borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                                            ),
+                                            enabledBorder: OutlineInputBorder(
+                                              borderRadius: BorderRadius.circular(12),
+                                              borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                                            ),
+                                            focusedBorder: OutlineInputBorder(
+                                              borderRadius: BorderRadius.circular(12),
+                                              borderSide: const BorderSide(color: Color(0xFF10B981), width: 2),
+                                            ),
+                                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        flex: 3,
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 10),
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xFFF8FAFC),
+                                            border: Border.all(color: const Color(0xFFE2E8F0)),
+                                            borderRadius: BorderRadius.circular(12),
+                                          ),
+                                          child: DropdownButtonHideUnderline(
+                                            child: DropdownButton<String>(
+                                              value: durationUnit,
+                                              isExpanded: true,
+                                              items: const [
+                                                DropdownMenuItem(value: 'Days', child: Text('Days')),
+                                                DropdownMenuItem(value: 'Weeks', child: Text('Weeks')),
+                                                DropdownMenuItem(value: 'Months', child: Text('Months')),
+                                              ],
+                                              onChanged: (val) {
+                                                if (val != null) setDialogState(() => durationUnit = val);
+                                              },
+                                              style: const TextStyle(
+                                                fontSize: 14,
+                                                color: Color(0xFF0F172A),
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
                               ),
                             ),
                           ],
@@ -358,7 +707,9 @@ class _CreateMedicalRecordScreenState extends State<CreateMedicalRecordScreen> {
                                           'name': nameController.text,
                                           'dosage': dosageController.text,
                                           'frequency': frequencyController.text,
-                                          'duration': durationController.text,
+                                          'duration': durationNumberController.text.isNotEmpty
+                                              ? '${durationNumberController.text} $durationUnit'
+                                              : '',
                                           'instructions':
                                               instructionsController.text,
                                         });
@@ -484,16 +835,18 @@ class _CreateMedicalRecordScreenState extends State<CreateMedicalRecordScreen> {
             ),
           ),
         );
+        }, // StatefulBuilder
+        );
       },
     );
   }
 
   void _addLabTest() {
+    final testController = TextEditingController();
+
     showDialog(
       context: context,
       builder: (context) {
-        final testController = TextEditingController();
-
         return Dialog(
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(24),
@@ -556,12 +909,97 @@ class _CreateMedicalRecordScreenState extends State<CreateMedicalRecordScreen> {
                 Padding(
                   padding: const EdgeInsets.all(24),
                   child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _buildModalTextField(
-                        controller: testController,
-                        label: 'Test Name',
-                        icon: Icons.science_rounded,
-                        hint: 'e.g., Complete Blood Count (CBC)',
+                      const Text(
+                        'Test Name',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF0F172A),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Autocomplete<String>(
+                        optionsBuilder: (TextEditingValue textEditingValue) {
+                          if (textEditingValue.text.isEmpty) {
+                            return const Iterable<String>.empty();
+                          }
+                          return _commonLabTests.where((t) => t
+                              .toLowerCase()
+                              .contains(textEditingValue.text.toLowerCase()));
+                        },
+                        onSelected: (String selection) {
+                          testController.text = selection;
+                        },
+                        fieldViewBuilder:
+                            (context, fieldController, focusNode, onSubmitted) {
+                          // Sync internal controller with our testController
+                          fieldController.addListener(() {
+                            testController.text = fieldController.text;
+                          });
+                          return TextField(
+                            controller: fieldController,
+                            focusNode: focusNode,
+                            decoration: InputDecoration(
+                              hintText: 'e.g., Complete Blood Count (CBC)',
+                              prefixIcon: const Icon(
+                                Icons.science_rounded,
+                                color: Color(0xFF64748B),
+                                size: 20,
+                              ),
+                              filled: true,
+                              fillColor: const Color(0xFFF8FAFC),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: const BorderSide(
+                                    color: Color(0xFFE2E8F0)),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: const BorderSide(
+                                    color: Color(0xFFE2E8F0)),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: const BorderSide(
+                                    color: Color(0xFF8B5CF6), width: 2),
+                              ),
+                              contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 16, vertical: 14),
+                            ),
+                          );
+                        },
+                        optionsViewBuilder: (context, onSelected, options) {
+                          return Align(
+                            alignment: Alignment.topLeft,
+                            child: Material(
+                              elevation: 4,
+                              borderRadius: BorderRadius.circular(12),
+                              child: ConstrainedBox(
+                                constraints: const BoxConstraints(maxHeight: 200),
+                                child: ListView.builder(
+                                  padding: EdgeInsets.zero,
+                                  shrinkWrap: true,
+                                  itemCount: options.length,
+                                  itemBuilder: (context, index) {
+                                    final option = options.elementAt(index);
+                                    return ListTile(
+                                      dense: true,
+                                      leading: const Icon(
+                                          Icons.science_rounded,
+                                          size: 18,
+                                          color: Color(0xFF8B5CF6)),
+                                      title: Text(option,
+                                          style: const TextStyle(fontSize: 14)),
+                                      onTap: () => onSelected(option),
+                                    );
+                                  },
+                                ),
+                              ),
+                            ),
+                          );
+                        },
                       ),
                       const SizedBox(height: 24),
 
@@ -696,33 +1134,76 @@ class _CreateMedicalRecordScreenState extends State<CreateMedicalRecordScreen> {
         .where((s) => s.isNotEmpty)
         .toList();
 
-    final data = {
+    // Build vitalSigns only with non-empty values
+    final Map<String, dynamic> vitalSigns = {};
+    if (_bpController.text.isNotEmpty) vitalSigns['bloodPressure'] = _bpController.text;
+    if (_tempController.text.isNotEmpty) vitalSigns['temperature'] = _tempController.text;
+    if (_heartRateController.text.isNotEmpty) {
+      vitalSigns['heartRate'] = int.tryParse(_heartRateController.text) ?? 0;
+    }
+    if (_weightController.text.isNotEmpty) {
+      vitalSigns['weight'] = double.tryParse(_weightController.text) ?? 0.0;
+    }
+    if (_heightController.text.isNotEmpty) {
+      vitalSigns['height'] = double.tryParse(_heightController.text) ?? 0.0;
+    }
+
+    // Strip prescription to minimal fields backend expects
+    final cleanPrescription = _prescriptions.map((p) => {
+      'name': p['name'] ?? '',
+      'dosage': p['dosage'] ?? '',
+      if ((p['frequency'] ?? '').isNotEmpty) 'frequency': p['frequency'],
+      if ((p['duration'] ?? '').isNotEmpty) 'duration': p['duration'],
+      if ((p['instructions'] ?? '').isNotEmpty) 'instructions': p['instructions'],
+    }).toList();
+
+    final data = <String, dynamic>{
       'patientId': widget.appointment.patient!.id,
       'appointmentId': widget.appointment.id,
-      'diagnosis': _diagnosisController.text,
-      'symptoms': symptoms,
-      'prescription': _prescriptions,
-      'labTests': _labTests,
-      'vitalSigns': {
-        'bloodPressure': _bpController.text,
-        'temperature': _tempController.text,
-        'heartRate': _heartRateController.text.isNotEmpty
-            ? int.tryParse(_heartRateController.text) ?? 0
-            : 0,
-        'weight': _weightController.text.isNotEmpty
-            ? double.tryParse(_weightController.text) ?? 0.0
-            : 0.0,
-        'height': _heightController.text.isNotEmpty
-            ? double.tryParse(_heightController.text) ?? 0.0
-            : 0.0,
-      },
-      'notes': _notesController.text,
-      if (_followUpDate != null)
-        'followUpDate': _followUpDate!.toIso8601String(),
-      'assignedCourses': _selectedProgramIds,
-      'referredLaboratory': _selectedLabId,
-      'selectedPharmacy': _selectedPharmacyId,
+      'diagnosis': _diagnosisController.text.trim(),
     };
+
+    if (symptoms.isNotEmpty) data['symptoms'] = symptoms;
+
+    // Build prescription object
+    final Map<String, dynamic> prescriptionObj = {};
+    if (cleanPrescription.isNotEmpty) prescriptionObj['medicines'] = cleanPrescription;
+    if (_referToEmergency) {
+      prescriptionObj['emergencyReferral'] = {
+        'referred': true,
+        if (_emergencyReason != null) 'reason': _emergencyReason,
+      };
+    }
+    if (_referSpecialty != null) {
+      prescriptionObj['referral'] = {
+        'specialty': _referSpecialty,
+        if (_referReasonController.text.trim().isNotEmpty)
+          'reason': _referReasonController.text.trim(),
+      };
+    }
+    // Lab tests go INSIDE prescription so patient_prescriptions.dart can read them
+    if (_labTests.isNotEmpty) {
+      prescriptionObj['labTests'] = _labTests
+          .map((t) => {'name': t, 'urgency': 'Routine'})
+          .toList();
+    }
+    if (prescriptionObj.isNotEmpty) data['prescription'] = prescriptionObj;
+    if (_notesController.text.trim().isNotEmpty) data['notes'] = _notesController.text.trim();
+    if (vitalSigns.isNotEmpty) data['vitalSigns'] = vitalSigns;
+    if (_followUpDate != null) {
+      data['followUpDate'] = _followUpDate!.toIso8601String();
+    } else if (_followUpDays > 0 || _followUpMonths > 0) {
+      data['followUpDate'] = DateTime.now()
+          .add(Duration(days: _followUpDays + (_followUpMonths * 30)))
+          .toIso8601String();
+    }
+    if (_followUpDays > 0) data['followUpDays'] = _followUpDays;
+    if (_followUpMonths > 0) data['followUpMonths'] = _followUpMonths;
+    if (_selectedLabId != null) data['referredLaboratory'] = _selectedLabId;
+    if (_selectedPharmacyId != null) data['selectedPharmacy'] = _selectedPharmacyId;
+    if (_selectedProgramIds.isNotEmpty) data['assignedCourses'] = _selectedProgramIds;
+
+    debugPrint('📤 Sending medical record: $data');
 
     final result = await _medicalRecordService.createMedicalRecord(data);
 
@@ -860,29 +1341,7 @@ class _CreateMedicalRecordScreenState extends State<CreateMedicalRecordScreen> {
 
                   const SizedBox(height: 32),
 
-                  // Diagnosis Section
-                  _buildModernSectionCard(
-                    'Diagnosis',
-                    Icons.medical_information_rounded,
-                    const Color(0xFFEF4444),
-                    child: TextFormField(
-                      controller: _diagnosisController,
-                      decoration: _modernInputDecoration(
-                        'Enter primary diagnosis',
-                        Icons.edit_note_rounded,
-                      ),
-                      validator: (v) =>
-                          v?.isEmpty ?? true ? 'Diagnosis is required' : null,
-                      style: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-
-                  const SizedBox(height: 20),
-
-                  // Symptoms Section
+                  // Symptoms Section (first per clinical workflow)
                   _buildModernSectionCard(
                     'Symptoms',
                     Icons.sick_rounded,
@@ -890,7 +1349,7 @@ class _CreateMedicalRecordScreenState extends State<CreateMedicalRecordScreen> {
                     child: TextFormField(
                       controller: _symptomsController,
                       decoration: _modernInputDecoration(
-                        'e.g., Fever, Headache, Cough',
+                        'e.g., Fever, Headache, Cough (comma separated)',
                         Icons.list_alt_rounded,
                       ),
                       maxLines: 3,
@@ -900,63 +1359,76 @@ class _CreateMedicalRecordScreenState extends State<CreateMedicalRecordScreen> {
 
                   const SizedBox(height: 20),
 
-                  // Vital Signs
-                  _buildSectionTitle('Vital Signs'),
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Column(
-                      children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: TextFormField(
-                                controller: _bpController,
-                                decoration: _inputDecoration('BP (120/80)'),
+                  // Diagnosis Section (after symptoms)
+                  _buildModernSectionCard(
+                    'Diagnosis',
+                    Icons.medical_information_rounded,
+                    const Color(0xFFEF4444),
+                    child: Autocomplete<String>(
+                      optionsBuilder: (TextEditingValue textEditingValue) {
+                        if (textEditingValue.text.isEmpty) {
+                          return const Iterable<String>.empty();
+                        }
+                        return _commonDiagnoses.where((d) =>
+                          d.toLowerCase().contains(textEditingValue.text.toLowerCase()));
+                      },
+                      onSelected: (String selection) {
+                        _diagnosisController.text = selection;
+                      },
+                      fieldViewBuilder: (context, controller, focusNode, onSubmitted) {
+                        // sync with _diagnosisController
+                        controller.text = _diagnosisController.text;
+                        controller.addListener(() {
+                          _diagnosisController.text = controller.text;
+                        });
+                        return TextFormField(
+                          controller: controller,
+                          focusNode: focusNode,
+                          decoration: _modernInputDecoration(
+                            'Search or type diagnosis',
+                            Icons.search_rounded,
+                          ),
+                          validator: (v) =>
+                              v?.isEmpty ?? true ? 'Diagnosis is required' : null,
+                          style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        );
+                      },
+                      optionsViewBuilder: (context, onSelected, options) {
+                        return Align(
+                          alignment: Alignment.topLeft,
+                          child: Material(
+                            elevation: 6,
+                            borderRadius: BorderRadius.circular(12),
+                            child: ConstrainedBox(
+                              constraints: const BoxConstraints(maxHeight: 220),
+                              child: ListView.builder(
+                                padding: EdgeInsets.zero,
+                                shrinkWrap: true,
+                                itemCount: options.length,
+                                itemBuilder: (context, index) {
+                                  final option = options.elementAt(index);
+                                  return ListTile(
+                                    dense: true,
+                                    leading: Icon(
+                                      option == 'Other'
+                                          ? Icons.edit_outlined
+                                          : Icons.medical_information_outlined,
+                                      size: 18,
+                                      color: const Color(0xFFEF4444),
+                                    ),
+                                    title: Text(option,
+                                        style: const TextStyle(fontSize: 14)),
+                                    onTap: () => onSelected(option),
+                                  );
+                                },
                               ),
                             ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: TextFormField(
-                                controller: _tempController,
-                                decoration: _inputDecoration('Temp (°F)'),
-                                keyboardType: TextInputType.number,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: TextFormField(
-                                controller: _heartRateController,
-                                decoration: _inputDecoration('Heart Rate'),
-                                keyboardType: TextInputType.number,
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: TextFormField(
-                                controller: _weightController,
-                                decoration: _inputDecoration('Weight (kg)'),
-                                keyboardType: TextInputType.number,
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: TextFormField(
-                                controller: _heightController,
-                                decoration: _inputDecoration('Height (cm)'),
-                                keyboardType: TextInputType.number,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
+                          ),
+                        );
+                      },
                     ),
                   ),
 
@@ -967,12 +1439,25 @@ class _CreateMedicalRecordScreenState extends State<CreateMedicalRecordScreen> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       _buildSectionTitle('Prescriptions'),
-                      IconButton(
-                        onPressed: _addPrescription,
-                        icon: const Icon(
-                          Icons.add_circle,
-                          color: AppColors.primaryColor,
-                        ),
+                      Row(
+                        children: [
+                          TextButton.icon(
+                            onPressed: _showUseTemplateDialog,
+                            icon: const Icon(Icons.folder_open_rounded, size: 18),
+                            label: const Text('Use Template'),
+                            style: TextButton.styleFrom(
+                              foregroundColor: AppColors.primaryColor,
+                              textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                            ),
+                          ),
+                          IconButton(
+                            onPressed: _addPrescription,
+                            icon: const Icon(
+                              Icons.add_circle,
+                              color: AppColors.primaryColor,
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
@@ -1069,6 +1554,68 @@ class _CreateMedicalRecordScreenState extends State<CreateMedicalRecordScreen> {
 
                   const SizedBox(height: 20),
 
+                  // History — Vital Signs (moved out of main prescription)
+                  _buildSectionTitle('History — Vital Signs'),
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Column(
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: TextFormField(
+                                controller: _bpController,
+                                decoration: _inputDecoration('BP (120/80)'),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: TextFormField(
+                                controller: _tempController,
+                                decoration: _inputDecoration('Temp (°F)'),
+                                keyboardType: TextInputType.number,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: TextFormField(
+                                controller: _heartRateController,
+                                decoration: _inputDecoration('Heart Rate'),
+                                keyboardType: TextInputType.number,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: TextFormField(
+                                controller: _weightController,
+                                decoration: _inputDecoration('Weight (kg)'),
+                                keyboardType: TextInputType.number,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: TextFormField(
+                                controller: _heightController,
+                                decoration: _inputDecoration('Height (cm)'),
+                                keyboardType: TextInputType.number,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 20),
+
                   // Notes
                   _buildSectionTitle('Additional Notes'),
                   TextFormField(
@@ -1079,8 +1626,198 @@ class _CreateMedicalRecordScreenState extends State<CreateMedicalRecordScreen> {
 
                   const SizedBox(height: 20),
 
-                  // Follow-up Date
-                  _buildSectionTitle('Follow-up Date (Optional)'),
+                  // Refer to Emergency / Hospital
+                  _buildModernSectionCard(
+                    'Refer to Emergency / Hospital',
+                    Icons.local_hospital_rounded,
+                    const Color(0xFFEF4444),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Switch(
+                              value: _referToEmergency,
+                              onChanged: (val) => setState(() => _referToEmergency = val),
+                              activeThumbColor: const Color(0xFFEF4444),
+                            ),
+                            const SizedBox(width: 8),
+                            const Text(
+                              'Refer patient to Emergency / Hospital',
+                              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                            ),
+                          ],
+                        ),
+                        if (_referToEmergency) ...[
+                          const SizedBox(height: 12),
+                          DropdownButtonFormField<String>(
+                            initialValue: _emergencyReason,
+                            isExpanded: true,
+                            decoration: _modernInputDecoration(
+                              'Select Reason',
+                              Icons.warning_amber_rounded,
+                            ),
+                            dropdownColor: Colors.white,
+                            items: [
+                              'Emergency Care Required',
+                              'Immediate Hospitalization',
+                              'Surgical Intervention',
+                              'ICU Admission',
+                              'Life-Threatening Condition',
+                              'Other',
+                            ].map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
+                            onChanged: (val) => setState(() => _emergencyReason = val),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 20),
+
+                  // Refer to Specialist
+                  _buildModernSectionCard(
+                    'Refer to Specialist',
+                    Icons.person_search_rounded,
+                    const Color(0xFFF59E0B),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        DropdownButtonFormField<String>(
+                          initialValue: _referSpecialty,
+                          isExpanded: true,
+                          decoration: _modernInputDecoration(
+                            'Select Specialty',
+                            Icons.medical_services_rounded,
+                          ),
+                          dropdownColor: Colors.white,
+                          items: [
+                            'Cardiology', 'Dermatology', 'Neurology',
+                            'Orthopedics', 'Pediatrics', 'Gynecology',
+                            'Ophthalmology', 'ENT', 'Psychiatry',
+                            'Endocrinology', 'Gastroenterology', 'Urology',
+                          ].map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
+                          onChanged: (val) => setState(() => _referSpecialty = val),
+                        ),
+                        const SizedBox(height: 12),
+                        TextFormField(
+                          controller: _referReasonController,
+                          maxLines: 3,
+                          decoration: _modernInputDecoration(
+                            'Reason for referral (optional)',
+                            Icons.note_alt_rounded,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 20),
+
+                  // Follow-up
+                  _buildModernSectionCard(
+                    'Follow-up Schedule',
+                    Icons.event_repeat_rounded,
+                    const Color(0xFF3B82F6),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Follow up after:',
+                          style: TextStyle(fontSize: 13, color: Color(0xFF64748B), fontWeight: FontWeight.w600),
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text('Days', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF0F172A))),
+                                  const SizedBox(height: 6),
+                                  Container(
+                                    height: 100,
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFF8FAFC),
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                                    ),
+                                    child: ListWheelScrollView(
+                                      itemExtent: 36,
+                                      physics: const FixedExtentScrollPhysics(),
+                                      onSelectedItemChanged: (i) => setState(() => _followUpDays = i),
+                                      children: List.generate(31, (i) => Center(
+                                        child: Text('$i', style: TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: _followUpDays == i ? FontWeight.w900 : FontWeight.w400,
+                                          color: _followUpDays == i ? AppColors.primaryColor : const Color(0xFF64748B),
+                                        )),
+                                      )),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text('Months', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF0F172A))),
+                                  const SizedBox(height: 6),
+                                  Container(
+                                    height: 100,
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFF8FAFC),
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                                    ),
+                                    child: ListWheelScrollView(
+                                      itemExtent: 36,
+                                      physics: const FixedExtentScrollPhysics(),
+                                      onSelectedItemChanged: (i) => setState(() => _followUpMonths = i),
+                                      children: List.generate(13, (i) => Center(
+                                        child: Text('$i', style: TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: _followUpMonths == i ? FontWeight.w900 : FontWeight.w400,
+                                          color: _followUpMonths == i ? AppColors.primaryColor : const Color(0xFF64748B),
+                                        )),
+                                      )),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                        if (_followUpDays > 0 || _followUpMonths > 0) ...[
+                          const SizedBox(height: 12),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: AppColors.primaryColor.withValues(alpha: 0.08),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(Icons.check_circle_rounded, color: AppColors.primaryColor, size: 16),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'Follow up in${_followUpMonths > 0 ? ' $_followUpMonths month${_followUpMonths > 1 ? 's' : ''}' : ''}${_followUpDays > 0 ? ' $_followUpDays day${_followUpDays > 1 ? 's' : ''}' : ''}',
+                                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.primaryColor),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 20),
+
+                  // Follow-up Date (calendar picker — kept for exact date)
+                  _buildSectionTitle('Or pick exact Follow-up Date'),
                   InkWell(
                     onTap: () async {
                       final date = await showDatePicker(
@@ -1127,98 +1864,6 @@ class _CreateMedicalRecordScreenState extends State<CreateMedicalRecordScreen> {
                   ),
 
                   const SizedBox(height: 20),
-
-                  // Laboratory Referral (Task 11.1)
-                  _buildModernSectionCard(
-                    'Refer to Laboratory',
-                    Icons.biotech_rounded,
-                    const Color(0xFF0EA5E9),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Select a laboratory to automatically receive these test requests.',
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: Color(0xFF64748B),
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        if (_isLoadingLabs)
-                          const Center(child: CircularProgressIndicator())
-                        else if (_availableLabs.isEmpty)
-                          const Text('No laboratories available in your region')
-                        else
-                          DropdownButtonFormField<String>(
-                            value: _selectedLabId,
-                            isExpanded: true,
-                            decoration: _modernInputDecoration(
-                              'Select Laboratory',
-                              Icons.local_hospital_rounded,
-                            ),
-                            dropdownColor: Colors.white,
-                            items: _availableLabs.map((lab) {
-                              return DropdownMenuItem<String>(
-                                value: lab['_id'],
-                                child: Text(
-                                  "${lab['labName']} (${lab['city']})",
-                                ),
-                              );
-                            }).toList(),
-                            onChanged: (val) =>
-                                setState(() => _selectedLabId = val),
-                          ),
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(height: 24),
-
-                  // Pharmacy Referral (Task 12.1)
-                  _buildModernSectionCard(
-                    'Refer to Pharmacy',
-                    Icons.medication_liquid_rounded,
-                    const Color(0xFF10B981),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Select a pharmacy to automatically send this prescription for fulfillment.',
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: Color(0xFF64748B),
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        if (_isLoadingPharmacies)
-                          const Center(child: CircularProgressIndicator())
-                        else if (_availablePharmacies.isEmpty)
-                          const Text('No pharmacies available')
-                        else
-                          DropdownButtonFormField<String>(
-                            value: _selectedPharmacyId,
-                            isExpanded: true,
-                            decoration: _modernInputDecoration(
-                              'Select Pharmacy',
-                              Icons.medication_rounded,
-                            ),
-                            dropdownColor: Colors.white,
-                            items: _availablePharmacies.map((pharmacy) {
-                              return DropdownMenuItem<String>(
-                                value: pharmacy['_id'],
-                                child: Text(
-                                  "${pharmacy['pharmacyName']} (${pharmacy['city']})",
-                                ),
-                              );
-                            }).toList(),
-                            onChanged: (val) =>
-                                setState(() => _selectedPharmacyId = val),
-                          ),
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(height: 24),
 
                   // Health Programs Assignment (Task 19.3)
                   _buildModernSectionCard(

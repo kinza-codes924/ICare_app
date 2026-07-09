@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_size_matters/flutter_size_matters.dart';
@@ -9,8 +10,6 @@ import 'package:icare/utils/utils.dart';
 import 'package:icare/widgets/custom_button.dart';
 import 'package:icare/widgets/custom_text.dart';
 import 'package:icare/widgets/user_type_card.dart';
-import 'package:icare/screens/tabs.dart';
-import 'package:path/path.dart';
 
 class SelectUserType extends ConsumerStatefulWidget {
   const SelectUserType({super.key});
@@ -20,8 +19,8 @@ class SelectUserType extends ConsumerStatefulWidget {
 }
 
 class _SelectUserTypeState extends ConsumerState<SelectUserType> {
-  // Only Patient & Doctor are shown publicly.
-  // Lab, Pharmacy, Instructor, Student accounts are created by Admin.
+  // Sign Up is for Patients only.
+  // Doctors, Pharmacy, Lab sign up via Work With Us.
   final List<Map<String, dynamic>> userTypes = [
     {
       "id": 1,
@@ -30,14 +29,6 @@ class _SelectUserTypeState extends ConsumerState<SelectUserType> {
           "Consult verified doctors, access prescriptions & manage your complete health journey.",
       "role": "patient",
       "image": ImagePaths.userType1,
-    },
-    {
-      "id": 2,
-      "title": "I am a Doctor",
-      "description":
-          "Manage patients, conduct consultations & issue digital prescriptions securely.",
-      "role": "doctor",
-      "image": ImagePaths.userType2,
     },
   ];
 
@@ -88,7 +79,7 @@ class _SelectUserTypeState extends ConsumerState<SelectUserType> {
           children: [
             SizedBox(height: ScallingConfig.scale(50)),
             CustomText(
-              text: "Welcome to Your Healthcare Journey",
+              text: "Welcome to Your Healthcare Journey".tr(),
               fontSize: 28,
               maxLines: 2,
               padding: EdgeInsets.only(left: ScallingConfig.moderateScale(12)),
@@ -98,7 +89,7 @@ class _SelectUserTypeState extends ConsumerState<SelectUserType> {
               isBold: true,
             ),
             CustomText(
-              text: "Your role helps personalize your experience",
+              text: "Your role helps personalize your experience".tr(),
               padding: EdgeInsets.only(
                 top: ScallingConfig.verticalScale(8),
                 left: ScallingConfig.moderateScale(12),
@@ -157,7 +148,7 @@ class _SelectUserTypeState extends ConsumerState<SelectUserType> {
                       left: ScallingConfig.scale(20),
                       child: CustomButton(
                         width: Utils.windowWidth(context) * 0.9,
-                        label: "Continue to Login",
+                        label: "Continue to Login".tr(),
                         borderRadius: ScallingConfig.moderateScale(30),
                         onPressed: () {
                           Navigator.of(context).push(
@@ -207,7 +198,7 @@ class _SelectUserTypeState extends ConsumerState<SelectUserType> {
                       height: 300,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: Colors.white.withOpacity(0.04),
+                        color: Colors.white.withValues(alpha: 0.04),
                       ),
                     ),
                   ),
@@ -219,7 +210,7 @@ class _SelectUserTypeState extends ConsumerState<SelectUserType> {
                       height: 350,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: Colors.white.withOpacity(0.03),
+                        color: Colors.white.withValues(alpha: 0.03),
                       ),
                     ),
                   ),
@@ -230,26 +221,23 @@ class _SelectUserTypeState extends ConsumerState<SelectUserType> {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Container(
-                            width: 100,
-                            height: 100,
-                            padding: const EdgeInsets.all(16),
+                            width: 110,
+                            height: 110,
+                            padding: const EdgeInsets.all(18),
                             decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.12),
+                              color: Colors.white,
                               borderRadius: BorderRadius.circular(28),
-                              border: Border.all(
-                                color: Colors.white.withOpacity(0.2),
-                                width: 1.5,
-                              ),
+                              boxShadow: [
+                                BoxShadow(color: Colors.black.withValues(alpha: 0.18), blurRadius: 32, spreadRadius: 0, offset: Offset(0, 8)),
+                                BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 8, spreadRadius: 0, offset: Offset(0, 2)),
+                              ],
                             ),
-                            child: Image.asset(
-                              ImagePaths.logo,
-                              fit: BoxFit.contain,
-                            ),
+                            child: Image.asset('assets/Asset 1.png', fit: BoxFit.contain, filterQuality: FilterQuality.high),
                           ),
                           const SizedBox(height: 32),
-                          const Text(
-                            "Welcome to iCare",
-                            style: TextStyle(
+                          Text(
+                            "Welcome to iCare".tr(),
+                            style: const TextStyle(
                               fontSize: 40,
                               fontWeight: FontWeight.w800,
                               color: Colors.white,
@@ -259,23 +247,23 @@ class _SelectUserTypeState extends ConsumerState<SelectUserType> {
                           ),
                           const SizedBox(height: 8),
                           Text(
-                            "Your Virtual Healthcare Platform",
+                            "Your Virtual Healthcare Platform".tr(),
                             textAlign: TextAlign.center,
                             style: TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.w700,
-                              color: Colors.white.withOpacity(0.95),
+                              color: Colors.white.withValues(alpha: 0.95),
                               fontFamily: "Gilroy-Bold",
                             ),
                           ),
                           const SizedBox(height: 12),
                           Text(
-                            "Secure consultations, prescriptions & health records",
+                            "Secure consultations, prescriptions & health records".tr(),
                             textAlign: TextAlign.center,
                             style: TextStyle(
                               fontSize: 15,
                               fontWeight: FontWeight.w500,
-                              color: Colors.white.withOpacity(0.75),
+                              color: Colors.white.withValues(alpha: 0.75),
                               fontFamily: "Gilroy-Medium",
                               height: 1.6,
                             ),
@@ -285,17 +273,17 @@ class _SelectUserTypeState extends ConsumerState<SelectUserType> {
                             children: [
                               _buildTrustIndicator(
                                 Icons.shield_rounded,
-                                "HIPAA Compliant & Secure",
+                                "HIPAA Compliant & Secure".tr(),
                               ),
                               const SizedBox(height: 12),
                               _buildTrustIndicator(
                                 Icons.verified_user_rounded,
-                                "Licensed Healthcare Providers",
+                                "Licensed Healthcare Providers".tr(),
                               ),
                               const SizedBox(height: 12),
                               _buildTrustIndicator(
                                 Icons.star_rounded,
-                                "Trusted by 10,000+ Patients",
+                                "Trusted by 10,000+ Patients".tr(),
                               ),
                             ],
                           ),
@@ -355,7 +343,7 @@ class _SelectUserTypeState extends ConsumerState<SelectUserType> {
                       color: Colors.white,
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.04),
+                          color: Colors.black.withValues(alpha: 0.04),
                           blurRadius: 12,
                           offset: const Offset(0, -4),
                         ),
@@ -429,12 +417,12 @@ class _SelectUserTypeState extends ConsumerState<SelectUserType> {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, color: Colors.white.withOpacity(0.9), size: 20),
+        Icon(icon, color: Colors.white.withValues(alpha: 0.9), size: 20),
         const SizedBox(width: 12),
         Text(
           text,
           style: TextStyle(
-            color: Colors.white.withOpacity(0.9),
+            color: Colors.white.withValues(alpha: 0.9),
             fontSize: 15,
             fontWeight: FontWeight.w600,
             fontFamily: "Gilroy-Medium",

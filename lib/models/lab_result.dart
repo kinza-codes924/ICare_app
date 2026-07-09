@@ -16,15 +16,24 @@ class LabResult {
   });
 
   factory LabResult.fromJson(Map<String, dynamic> json) {
+    ReferenceRange? referenceRange;
+    final ref = json['referenceRange'];
+    if (ref != null) {
+      if (ref is Map) {
+        // Proper map format: {min, max, text}
+        referenceRange = ReferenceRange.fromJson(Map<String, dynamic>.from(ref));
+      } else if (ref is String && ref.isNotEmpty) {
+        // Legacy: stored as plain string e.g. "80-120"
+        referenceRange = ReferenceRange(text: ref);
+      }
+    }
     return LabResult(
-      testParameter: json['testParameter'] ?? '',
-      value: json['value'] ?? '',
-      unit: json['unit'] ?? '',
-      referenceRange: json['referenceRange'] != null
-          ? ReferenceRange.fromJson(json['referenceRange'])
-          : null,
-      isAbnormal: json['isAbnormal'] ?? false,
-      severity: json['severity'] ?? 'normal',
+      testParameter: json['testParameter']?.toString() ?? '',
+      value: json['value']?.toString() ?? '',
+      unit: json['unit']?.toString() ?? '',
+      referenceRange: referenceRange,
+      isAbnormal: json['isAbnormal'] == true,
+      severity: json['severity']?.toString() ?? 'normal',
     );
   }
 

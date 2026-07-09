@@ -55,6 +55,8 @@ class _DoctorForumScreenState extends State<DoctorForumScreen> {
     final contentController = TextEditingController();
     String category = 'General';
     bool isAnonymized = false;
+    List<String> attachedImages = [];
+    List<String> attachedDocuments = [];
 
     showModalBottomSheet(
       context: context,
@@ -62,82 +64,192 @@ class _DoctorForumScreenState extends State<DoctorForumScreen> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (ctx) => Padding(
-        padding: EdgeInsets.only(
-          bottom: MediaQuery.of(ctx).viewInsets.bottom,
-          left: 24,
-          right: 24,
-          top: 24,
-        ),
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Start a Discussion',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: titleController,
-                decoration: const InputDecoration(
-                  hintText: 'Post Title',
-                  border: OutlineInputBorder(),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setModalState) => Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(ctx).viewInsets.bottom,
+            left: 24,
+            right: 24,
+            top: 24,
+          ),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Start a Discussion',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                 ),
-              ),
-              const SizedBox(height: 12),
-              DropdownButtonFormField<String>(
-                value: category,
-                items: _categories
-                    .where((c) => c != 'All')
-                    .map((c) => DropdownMenuItem(value: c, child: Text(c)))
-                    .toList(),
-                onChanged: (v) => category = v!,
-                decoration: const InputDecoration(
-                  labelText: 'Category',
-                  border: OutlineInputBorder(),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: titleController,
+                  decoration: const InputDecoration(
+                    hintText: 'Post Title',
+                    border: OutlineInputBorder(),
+                  ),
                 ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: contentController,
-                maxLines: 5,
-                decoration: const InputDecoration(
-                  hintText: 'Share your thoughts or clinical case...',
-                  border: OutlineInputBorder(),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  initialValue: category,
+                  items: _categories
+                      .where((c) => c != 'All')
+                      .map((c) => DropdownMenuItem(value: c, child: Text(c)))
+                      .toList(),
+                  onChanged: (v) => setModalState(() => category = v!),
+                  decoration: const InputDecoration(
+                    labelText: 'Category',
+                    border: OutlineInputBorder(),
+                  ),
                 ),
-              ),
-              const SizedBox(height: 12),
-              SwitchListTile(
-                title: const Text('Post Anonymously'),
-                subtitle: const Text('Hide your name from other specialists'),
-                value: isAnonymized,
-                onChanged: (v) => setState(() => isAnonymized = v),
-              ),
-              const SizedBox(height: 24),
-              CustomButton(
-                label: 'Publish Post',
-                onPressed: () async {
-                  if (titleController.text.isEmpty ||
-                      contentController.text.isEmpty)
-                    return;
-                  try {
-                    await _apiService.post('/forum', {
-                      'title': titleController.text,
-                      'content': contentController.text,
-                      'category': category,
-                      'isAnonymized': isAnonymized,
-                    });
-                    Navigator.pop(ctx);
-                    _fetchPosts();
-                  } catch (e) {
-                    debugPrint('Post creation error: $e');
-                  }
-                },
-              ),
-              const SizedBox(height: 24),
-            ],
+                const SizedBox(height: 12),
+                TextField(
+                  controller: contentController,
+                  maxLines: 5,
+                  decoration: const InputDecoration(
+                    hintText: 'Share your thoughts or clinical case...',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // ── ATTACHMENTS ─────────────────────────────────────────
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () {
+                          // TODO: Implement image picker
+                          setModalState(() => attachedImages.add('image_${DateTime.now().millisecondsSinceEpoch}.jpg'));
+                        },
+                        icon: const Icon(Icons.image_rounded, size: 18),
+                        label: const Text('Add Image'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: const Color(0xFF3B82F6),
+                          side: const BorderSide(color: Color(0xFF3B82F6)),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () {
+                          // TODO: Implement document picker
+                          setModalState(() => attachedDocuments.add('document_${DateTime.now().millisecondsSinceEpoch}.pdf'));
+                        },
+                        icon: const Icon(Icons.attach_file_rounded, size: 18),
+                        label: const Text('Add Document'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: const Color(0xFF8B5CF6),
+                          side: const BorderSide(color: Color(0xFF8B5CF6)),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                if (attachedImages.isNotEmpty || attachedDocuments.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Attachments',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF64748B),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        ...attachedImages.map((img) => Padding(
+                          padding: const EdgeInsets.only(bottom: 6),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.image_rounded, size: 16, color: Color(0xFF3B82F6)),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  img,
+                                  style: const TextStyle(fontSize: 12),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.close, size: 16),
+                                onPressed: () => setModalState(() => attachedImages.remove(img)),
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(),
+                              ),
+                            ],
+                          ),
+                        )),
+                        ...attachedDocuments.map((doc) => Padding(
+                          padding: const EdgeInsets.only(bottom: 6),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.description_rounded, size: 16, color: Color(0xFF8B5CF6)),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  doc,
+                                  style: const TextStyle(fontSize: 12),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.close, size: 16),
+                                onPressed: () => setModalState(() => attachedDocuments.remove(doc)),
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(),
+                              ),
+                            ],
+                          ),
+                        )),
+                      ],
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 12),
+                SwitchListTile(
+                  title: const Text('Post Anonymously'),
+                  subtitle: const Text('Hide your name from other specialists'),
+                  value: isAnonymized,
+                  onChanged: (v) => setModalState(() => isAnonymized = v),
+                ),
+                const SizedBox(height: 24),
+                CustomButton(
+                  label: 'Publish Post',
+                  onPressed: () async {
+                    if (titleController.text.isEmpty ||
+                        contentController.text.isEmpty) {
+                      return;
+                    }
+                    try {
+                      await _apiService.post('/forum', {
+                        'title': titleController.text,
+                        'content': contentController.text,
+                        'category': category,
+                        'isAnonymized': isAnonymized,
+                        'attachedImages': attachedImages,
+                        'attachedDocuments': attachedDocuments,
+                      });
+                      Navigator.pop(ctx);
+                      _fetchPosts();
+                    } catch (e) {
+                      debugPrint('Post creation error: $e');
+                    }
+                  },
+                ),
+                const SizedBox(height: 24),
+              ],
+            ),
           ),
         ),
       ),
@@ -204,7 +316,7 @@ class _DoctorForumScreenState extends State<DoctorForumScreen> {
                 setState(() => _selectedCategory = _categories[i]);
                 _fetchPosts();
               },
-              selectedColor: AppColors.primaryColor.withOpacity(0.2),
+              selectedColor: AppColors.primaryColor.withValues(alpha: 0.2),
               checkmarkColor: AppColors.primaryColor,
             ),
           );
@@ -232,7 +344,7 @@ class _DoctorForumScreenState extends State<DoctorForumScreen> {
           border: Border.all(color: const Color(0xFFE2E8F0)),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.02),
+              color: Colors.black.withValues(alpha: 0.02),
               blurRadius: 10,
               offset: const Offset(0, 4),
             ),
@@ -244,7 +356,7 @@ class _DoctorForumScreenState extends State<DoctorForumScreen> {
             Row(
               children: [
                 CircleAvatar(
-                  backgroundColor: AppColors.primaryColor.withOpacity(0.1),
+                  backgroundColor: AppColors.primaryColor.withValues(alpha: 0.1),
                   child: Text(
                     (post['author']?['name'] ?? 'D')[0].toUpperCase(),
                     style: const TextStyle(
@@ -295,7 +407,7 @@ class _DoctorForumScreenState extends State<DoctorForumScreen> {
                     vertical: 4,
                   ),
                   decoration: BoxDecoration(
-                    color: AppColors.primaryColor.withOpacity(0.1),
+                    color: AppColors.primaryColor.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
@@ -471,7 +583,7 @@ class _ForumDetailScreenState extends State<ForumDetailScreen> {
                       child: Text('No comments yet. Be the first to respond!'),
                     )
                   else
-                    ..._comments.map((c) => _buildCommentTile(c)).toList(),
+                    ..._comments.map((c) => _buildCommentTile(c)),
                 ],
               ),
             ),
@@ -486,7 +598,7 @@ class _ForumDetailScreenState extends State<ForumDetailScreen> {
     return Row(
       children: [
         CircleAvatar(
-          backgroundColor: AppColors.primaryColor.withOpacity(0.1),
+          backgroundColor: AppColors.primaryColor.withValues(alpha: 0.1),
           child: const Icon(Icons.person, color: AppColors.primaryColor),
         ),
         const SizedBox(width: 12),
@@ -582,7 +694,7 @@ class _ForumDetailScreenState extends State<ForumDetailScreen> {
         color: Colors.white,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 10,
             offset: const Offset(0, -5),
           ),

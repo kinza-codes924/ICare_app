@@ -1,6 +1,5 @@
 class ApiConstants {
-  // Update this with your backend URL
-  static const String baseUrl = 'http://localhost:3000/api';
+  static const String baseUrl = 'https://icare-backend-inky.vercel.app/api';
 
   // Auth endpoints
   static const String login = '/auth/login';

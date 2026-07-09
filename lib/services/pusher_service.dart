@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'chat_service.dart';
 
 // Note: To enable real-time chat, add pusher_channels_flutter: ^2.2.1 to pubspec.yaml

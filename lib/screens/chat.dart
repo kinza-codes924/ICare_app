@@ -342,7 +342,7 @@ class _WebChatScreenState extends State<_WebChatScreen> {
                       Container(
                         padding: const EdgeInsets.all(10),
                         decoration: BoxDecoration(
-                          color: AppColors.primaryColor.withOpacity(0.08),
+                          color: AppColors.primaryColor.withValues(alpha: 0.08),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Icon(
@@ -411,7 +411,7 @@ class _WebChatScreenState extends State<_WebChatScreen> {
                               padding: const EdgeInsets.all(16),
                               decoration: BoxDecoration(
                                 color: isSelected
-                                    ? AppColors.primaryColor.withOpacity(0.05)
+                                    ? AppColors.primaryColor.withValues(alpha: 0.05)
                                     : Colors.transparent,
                                 borderRadius: BorderRadius.circular(16),
                               ),
@@ -759,7 +759,7 @@ class _WebMessageBubble extends StatelessWidget {
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color: const Color(0xFF000000).withOpacity(0.03),
+                        color: const Color(0xFF000000).withValues(alpha: 0.03),
                         blurRadius: 10,
                         offset: const Offset(0, 4),
                       ),

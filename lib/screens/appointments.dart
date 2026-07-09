@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_size_matters/flutter_size_matters.dart';
 
@@ -33,13 +34,13 @@ class Appointments extends StatelessWidget {
       },
     ];
     return Scaffold(
-      appBar: AppBar(title: CustomText(text: "My Appointments")),
+      appBar: AppBar(title: CustomText(text: "My Appointments".tr())),
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           CustomText(
             padding: EdgeInsets.only(left: ScallingConfig.scale(25)),
-            text: "Appointments",
+            text: "Appointments".tr(),
           ),
           Expanded(
             child: ListView.builder(

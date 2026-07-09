@@ -29,29 +29,40 @@ class Appointment {
 
   factory Appointment.fromJson(Map<String, dynamic> json) {
     return Appointment(
-      id: json['_id'] ?? '',
-      doctorId: json['doctor'] is String
-          ? json['doctor']
-          : json['doctor']?['_id'] ?? '',
-      patientId: json['patient'] is String
-          ? json['patient']
-          : json['patient']?['_id'] ?? '',
-      date: DateTime.parse(json['date']),
-      timeSlot: json['timeSlot'] ?? '',
-      reason: json['reason'],
-      status: json['status'] ?? 'pending',
-      cancellationReason: json['cancellationReason'],
-      cancelledBy: json['cancelledBy'],
+      id: json['_id'] ?? json['id'] ?? '',
+      // Backend may send doctor_id (snake_case) or doctor (populated object)
+      doctorId: json['doctor_id'] as String? ??
+          (json['doctor'] is String
+              ? json['doctor'] as String
+              : (json['doctor'] as Map<String, dynamic>?)?['_id'] as String? ??
+                    ''),
+      patientId: json['patient_id'] as String? ??
+          (json['patient'] is String
+              ? json['patient'] as String
+              : (json['patient'] as Map<String, dynamic>?)?['_id'] as String? ??
+                    ''),
+      // Backend may send appointment_date (date-only string) or date (ISO)
+      date: _parseDate(json['appointment_date'] ?? json['date']),
+      timeSlot: json['appointment_time'] as String? ??
+          json['timeSlot'] as String? ??
+          '',
+      reason: json['reason'] as String? ?? json['notes'] as String?,
+      status: json['status'] as String? ?? 'pending',
+      cancellationReason: json['cancellationReason'] as String?,
+      cancelledBy: json['cancelledBy'] as String?,
       cancelledAt: json['cancelledAt'] != null
-          ? DateTime.parse(json['cancelledAt'])
+          ? DateTime.tryParse(json['cancelledAt'] as String)
           : null,
-      createdAt: DateTime.parse(
-        json['createdAt'] ?? DateTime.now().toIso8601String(),
-      ),
-      updatedAt: DateTime.parse(
-        json['updatedAt'] ?? DateTime.now().toIso8601String(),
-      ),
+      createdAt: DateTime.tryParse(json['createdAt'] as String? ?? '') ??
+          DateTime.now(),
+      updatedAt: DateTime.tryParse(json['updatedAt'] as String? ?? '') ??
+          DateTime.now(),
     );
+  }
+
+  static DateTime _parseDate(dynamic value) {
+    if (value == null) return DateTime.now();
+    return DateTime.tryParse(value.toString()) ?? DateTime.now();
   }
 
   Map<String, dynamic> toJson() {

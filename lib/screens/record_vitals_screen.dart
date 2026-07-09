@@ -239,7 +239,7 @@ class _RecordVitalsScreenState extends State<RecordVitalsScreen> {
         children: [
           CircleAvatar(
             radius: 24,
-            backgroundColor: AppColors.primaryColor.withOpacity(0.1),
+            backgroundColor: AppColors.primaryColor.withValues(alpha: 0.1),
             child: const Icon(
               Icons.person_rounded,
               color: AppColors.primaryColor,

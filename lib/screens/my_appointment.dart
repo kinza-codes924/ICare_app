@@ -80,7 +80,7 @@ class MyAppointment extends StatelessWidget {
                                 borderRadius: BorderRadius.circular(24),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: Colors.black.withOpacity(0.04),
+                                    color: Colors.black.withValues(alpha: 0.04),
                                     blurRadius: 20,
                                     offset: const Offset(0, 8),
                                   ),
@@ -123,7 +123,7 @@ class MyAppointment extends StatelessWidget {
                                                 Icons.visibility_outlined,
                                                 size: 18,
                                               ),
-                                              label: const Text("View Profile"),
+                                              label: const Text("View Full Details"),
                                               style: TextButton.styleFrom(
                                                 foregroundColor:
                                                     AppColors.primaryColor,
@@ -133,6 +133,36 @@ class MyAppointment extends StatelessWidget {
                                               ),
                                             ),
                                           ],
+                                        ),
+                                        const SizedBox(height: 8),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 10,
+                                            vertical: 4,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: Color(0xFF10B981).withValues(alpha: 0.1),
+                                            borderRadius: BorderRadius.circular(8),
+                                          ),
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Icon(
+                                                Icons.check_circle,
+                                                size: 14,
+                                                color: Color(0xFF10B981),
+                                              ),
+                                              const SizedBox(width: 4),
+                                              Text(
+                                                "Confirmed",
+                                                style: TextStyle(
+                                                  color: Color(0xFF10B981),
+                                                  fontWeight: FontWeight.w700,
+                                                  fontSize: 12,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
                                         ),
                                         const SizedBox(height: 8),
                                         Row(
@@ -159,7 +189,7 @@ class MyAppointment extends StatelessWidget {
                                           ),
                                           decoration: BoxDecoration(
                                             color: AppColors.primaryColor
-                                                .withOpacity(0.1),
+                                                .withValues(alpha: 0.1),
                                             borderRadius: BorderRadius.circular(
                                               10,
                                             ),
@@ -240,7 +270,7 @@ class MyAppointment extends StatelessWidget {
                             borderRadius: BorderRadius.circular(24),
                             boxShadow: [
                               BoxShadow(
-                                color: Colors.black.withOpacity(0.06),
+                                color: Colors.black.withValues(alpha: 0.06),
                                 blurRadius: 24,
                                 offset: const Offset(0, 10),
                               ),
@@ -399,7 +429,7 @@ class MyAppointment extends StatelessWidget {
               },
             ),
             SizedBox(height: ScallingConfig.scale(10)),
-            AmountContainer(leadingText: "PKR Rs.", trailingText: "2000"),
+            AmountContainer(leadingText: "PKR", trailingText: "2000"),
             SizedBox(height: ScallingConfig.scale(20)),
             HorizontalText(
               padding: EdgeInsets.symmetric(
@@ -407,7 +437,7 @@ class MyAppointment extends StatelessWidget {
                 vertical: ScallingConfig.scale(10),
               ),
               leadingText: "Service charges",
-              trailingText: "Rs. 2000",
+              trailingText: "PKR 2000",
             ),
             HorizontalText(
               padding: EdgeInsets.symmetric(
@@ -415,7 +445,7 @@ class MyAppointment extends StatelessWidget {
                 vertical: ScallingConfig.scale(10),
               ),
               leadingText: "App Deduction (20%)",
-              trailingText: "-Rs. 200",
+              trailingText: "-PKR 200",
             ),
             HorizontalText(
               padding: EdgeInsets.symmetric(
@@ -423,7 +453,7 @@ class MyAppointment extends StatelessWidget {
                 vertical: ScallingConfig.scale(10),
               ),
               leadingText: "Total Balance",
-              trailingText: "Rs. 1800",
+              trailingText: "PKR 1800",
             ),
             SizedBox(height: ScallingConfig.scale(20)),
           ],
@@ -462,13 +492,36 @@ class ProfileInfoWidget extends StatelessWidget {
                     // Spacer(),
                     SizedBox(width: ScallingConfig.scale(50)),
                     CustomText(
-                      text: "View Profile",
+                      text: "View Full Details",
                       underline: true,
                       onTap: () {},
 
                       isSemiBold: true,
                     ),
                   ],
+                ),
+                SizedBox(height: ScallingConfig.scale(6)),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Color(0xFF10B981).withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.check_circle, size: 12, color: Color(0xFF10B981)),
+                      const SizedBox(width: 4),
+                      Text(
+                        "Confirmed",
+                        style: TextStyle(
+                          color: Color(0xFF10B981),
+                          fontWeight: FontWeight.w700,
+                          fontSize: 11,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
                 SizedBox(height: ScallingConfig.scale(10)),
                 Row(
@@ -650,7 +703,7 @@ class _WebInfoCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 20,
             offset: const Offset(0, 8),
           ),
@@ -664,7 +717,7 @@ class _WebInfoCard extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: accentColor.withOpacity(0.1),
+                  color: accentColor.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Icon(icon, color: accentColor, size: 20),

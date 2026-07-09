@@ -242,7 +242,7 @@ class _SecuritySettingsScreenState extends ConsumerState<SecuritySettingsScreen>
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [scoreColor, scoreColor.withOpacity(0.8)],
+          colors: [scoreColor, scoreColor.withValues(alpha: 0.8)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -318,8 +318,8 @@ class _SecuritySettingsScreenState extends ConsumerState<SecuritySettingsScreen>
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
               color: _securitySettings!.emailVerified
-                  ? const Color(0xFF10B981).withOpacity(0.1)
-                  : const Color(0xFFF59E0B).withOpacity(0.1),
+                  ? const Color(0xFF10B981).withValues(alpha: 0.1)
+                  : const Color(0xFFF59E0B).withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Icon(
@@ -376,7 +376,7 @@ class _SecuritySettingsScreenState extends ConsumerState<SecuritySettingsScreen>
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
               color: _securitySettings!.twoFactorEnabled
-                  ? const Color(0xFF10B981).withOpacity(0.1)
+                  ? const Color(0xFF10B981).withValues(alpha: 0.1)
                   : const Color(0xFFF1F5F9),
               borderRadius: BorderRadius.circular(12),
             ),
@@ -436,7 +436,7 @@ class _SecuritySettingsScreenState extends ConsumerState<SecuritySettingsScreen>
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: const Color(0xFF3B82F6).withOpacity(0.1),
+              color: const Color(0xFF3B82F6).withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(12),
             ),
             child: const Icon(Icons.lock, color: Color(0xFF3B82F6), size: 24),
@@ -506,7 +506,7 @@ class _SecuritySettingsScreenState extends ConsumerState<SecuritySettingsScreen>
           Switch(
             value: value,
             onChanged: onChanged,
-            activeColor: AppColors.primaryColor,
+            activeThumbColor: AppColors.primaryColor,
           ),
         ],
       ),
@@ -533,7 +533,7 @@ class _SecuritySettingsScreenState extends ConsumerState<SecuritySettingsScreen>
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: session.isCurrentSession ? AppColors.primaryColor.withOpacity(0.3) : const Color(0xFFF1F5F9),
+          color: session.isCurrentSession ? AppColors.primaryColor.withValues(alpha: 0.3) : const Color(0xFFF1F5F9),
           width: session.isCurrentSession ? 2 : 1,
         ),
       ),
@@ -562,7 +562,7 @@ class _SecuritySettingsScreenState extends ConsumerState<SecuritySettingsScreen>
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                             decoration: BoxDecoration(
-                              color: const Color(0xFF10B981).withOpacity(0.1),
+                              color: const Color(0xFF10B981).withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(6),
                             ),
                             child: const Text(

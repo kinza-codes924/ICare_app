@@ -135,23 +135,21 @@ class _ReferralDetailScreenState extends State<ReferralDetailScreen> {
             _buildDoctorCards(),
             const SizedBox(height: 16),
             _buildReasonCard(),
-            if (widget.referral.clinicalNotes != null) ...[
+            const SizedBox(height: 16),
+            _buildClinicalNotesCard(),
+            if (widget.referral.specialistNotes != null) ...[
               const SizedBox(height: 16),
-              _buildClinicalNotesCard(),
+              _buildSpecialistNotesCard(),
             ],
-            if (widget.referral.consultationSummary != null) ...[
-              const SizedBox(height: 16),
-              _buildSummaryCard(),
-            ],
-            if (widget.referral.declineReason != null) ...[
+            if (widget.referral.rejectionReason != null) ...[
               const SizedBox(height: 16),
               _buildDeclineReasonCard(),
             ],
-            if (!widget.isSent && widget.referral.status == 'pending') ...[
+            if (!widget.isSent && widget.referral.status == ReferralStatus.pending) ...[
               const SizedBox(height: 24),
               _buildActionButtons(),
             ],
-            if (!widget.isSent && widget.referral.status == 'accepted') ...[
+            if (!widget.isSent && widget.referral.status == ReferralStatus.accepted) ...[
               const SizedBox(height: 24),
               _buildCompleteButton(),
             ],
@@ -167,22 +165,22 @@ class _ReferralDetailScreenState extends State<ReferralDetailScreen> {
     String statusText;
 
     switch (widget.referral.status) {
-      case 'pending':
+      case ReferralStatus.pending:
         statusColor = const Color(0xFFF59E0B);
         statusIcon = Icons.schedule;
         statusText = 'Pending Review';
         break;
-      case 'accepted':
+      case ReferralStatus.accepted:
         statusColor = const Color(0xFF3B82F6);
         statusIcon = Icons.check_circle_outline;
         statusText = 'Accepted';
         break;
-      case 'completed':
+      case ReferralStatus.completed:
         statusColor = const Color(0xFF10B981);
         statusIcon = Icons.check_circle;
         statusText = 'Completed';
         break;
-      case 'declined':
+      case ReferralStatus.rejected:
         statusColor = const Color(0xFFEF4444);
         statusIcon = Icons.cancel_outlined;
         statusText = 'Declined';
@@ -235,10 +233,7 @@ class _ReferralDetailScreenState extends State<ReferralDetailScreen> {
       Icons.person,
       AppColors.primaryColor,
       [
-        _buildInfoRow('Name', widget.referral.patient.name),
-        _buildInfoRow('Email', widget.referral.patient.email),
-        if (widget.referral.patient.phoneNumber != null)
-          _buildInfoRow('Phone', widget.referral.patient.phoneNumber!),
+        _buildInfoRow('Patient ID', widget.referral.patientId),
       ],
     );
   }
@@ -251,19 +246,17 @@ class _ReferralDetailScreenState extends State<ReferralDetailScreen> {
           Icons.medical_services,
           const Color(0xFF3B82F6),
           [
-            _buildInfoRow('Name', widget.referral.referringDoctor.name),
-            _buildInfoRow('Email', widget.referral.referringDoctor.email),
+            _buildInfoRow('Doctor ID', widget.referral.referringDoctorId),
           ],
         ),
-        if (widget.referral.referredToDoctor != null) ...[
+        if (widget.referral.specialistDoctorId != null) ...[
           const SizedBox(height: 16),
           _buildInfoCard(
             'Specialist',
             Icons.local_hospital,
             const Color(0xFF8B5CF6),
             [
-              _buildInfoRow('Name', widget.referral.referredToDoctor!.name),
-              _buildInfoRow('Email', widget.referral.referredToDoctor!.email),
+              _buildInfoRow('Specialist ID', widget.referral.specialistDoctorId!),
             ],
           ),
         ],
@@ -278,7 +271,7 @@ class _ReferralDetailScreenState extends State<ReferralDetailScreen> {
       const Color(0xFFF59E0B),
       [
         Text(
-          widget.referral.reason,
+          widget.referral.reasonForReferral,
           style: const TextStyle(fontSize: 14, height: 1.5),
         ),
       ],
@@ -287,26 +280,26 @@ class _ReferralDetailScreenState extends State<ReferralDetailScreen> {
 
   Widget _buildClinicalNotesCard() {
     return _buildInfoCard(
-      'Clinical Notes',
+      'Clinical Summary',
       Icons.note_alt,
       const Color(0xFF10B981),
       [
         Text(
-          widget.referral.clinicalNotes!,
+          widget.referral.clinicalSummary,
           style: const TextStyle(fontSize: 14, height: 1.5),
         ),
       ],
     );
   }
 
-  Widget _buildSummaryCard() {
+  Widget _buildSpecialistNotesCard() {
     return _buildInfoCard(
-      'Consultation Summary',
+      'Specialist Notes',
       Icons.summarize,
       const Color(0xFF10B981),
       [
         Text(
-          widget.referral.consultationSummary!,
+          widget.referral.specialistNotes!,
           style: const TextStyle(fontSize: 14, height: 1.5),
         ),
       ],
@@ -315,12 +308,12 @@ class _ReferralDetailScreenState extends State<ReferralDetailScreen> {
 
   Widget _buildDeclineReasonCard() {
     return _buildInfoCard(
-      'Decline Reason',
+      'Rejection Reason',
       Icons.info_outline,
       const Color(0xFFEF4444),
       [
         Text(
-          widget.referral.declineReason!,
+          widget.referral.rejectionReason!,
           style: const TextStyle(fontSize: 14, height: 1.5),
         ),
       ],

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:icare/services/security_service.dart';
-import 'package:icare/utils/theme.dart';
 import 'package:icare/widgets/back_button.dart';
 import 'package:intl/intl.dart';
 
@@ -70,7 +69,7 @@ class _SecurityAuditLogScreenState extends State<SecurityAuditLogScreen> {
     return ListView.separated(
       padding: const EdgeInsets.all(24),
       itemCount: _logs.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 12),
+      separatorBuilder: (_, _) => const SizedBox(height: 12),
       itemBuilder: (context, index) {
         final log = _logs[index];
         final timestamp = DateTime.parse(
@@ -161,7 +160,7 @@ class _SecurityAuditLogScreenState extends State<SecurityAuditLogScreen> {
     return Container(
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         shape: BoxShape.circle,
       ),
       child: Icon(icon, color: color, size: 20),

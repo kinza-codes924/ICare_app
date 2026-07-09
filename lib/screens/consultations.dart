@@ -1,6 +1,6 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_size_matters/flutter_size_matters.dart';
-import 'package:icare/screens/booking_categories.dart';
 import 'package:icare/screens/my_appointment.dart';
 import 'package:icare/utils/theme.dart';
 import 'package:icare/widgets/back_button.dart';
@@ -16,7 +16,7 @@ class Consultations extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: CustomText(
-          text: "Consultations",
+          text: "Consultations".tr(),
           fontSize: 16.78,
           fontFamily: "Gilroy-Bold",
           fontWeight: FontWeight.w400,

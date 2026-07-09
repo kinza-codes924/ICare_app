@@ -1,53 +1,94 @@
+import 'package:flutter/foundation.dart';
 import 'package:icare/services/api_service.dart';
 
 class CommunityService {
   final ApiService _apiService = ApiService();
 
-  // Forums & Discussions
-  Future<List<dynamic>> getCategories() async {
+  static const List<String> defaultCategories = [
+    'All', 'General', 'Diabetes', 'Heart Health',
+    'Mental Wellness', 'Nutrition', 'Pregnancy', 'COVID-19',
+  ];
+
+  Future<List<String>> getCategories() async {
     try {
       final response = await _apiService.get('/community/categories');
-      return response.data['categories'] ?? [];
+      final raw = response.data['categories'] as List? ?? [];
+      final custom = raw.map((e) => e.toString()).where((n) => !defaultCategories.contains(n)).toList();
+      return [...defaultCategories, ...custom];
     } catch (e) {
-      return [];
+      return defaultCategories;
     }
   }
 
-  Future<List<dynamic>> getDiscussions(String categoryId) async {
+  Future<bool> addCategory(String name) async {
     try {
-      final response = await _apiService.get(
-        '/community/discussions/$categoryId',
-      );
-      return response.data['discussions'] ?? [];
+      final response = await _apiService.post('/community/categories', {'name': name});
+      return response.data['success'] == true;
     } catch (e) {
+      return false;
+    }
+  }
+
+  Future<List<dynamic>> getPosts(String category) async {
+    try {
+      final param = category == 'All' ? '' : '?category=${Uri.encodeComponent(category)}';
+      final response = await _apiService.get('/community/posts$param');
+      return response.data['posts'] as List? ?? [];
+    } catch (e) {
+      debugPrint('getPosts error: $e');
       return [];
     }
   }
 
-  Future<void> createDiscussion(Map<String, dynamic> data) async {
-    await _apiService.post('/community/discussions', data);
+  Future<Map<String, dynamic>> createPost({
+    required String content,
+    required String category,
+    String? imageUrl,
+  }) async {
+    try {
+      final response = await _apiService.post('/community/posts', {
+        'content': content,
+        'category': category,
+        if (imageUrl != null) 'imageUrl': imageUrl,
+      });
+      return response.data as Map<String, dynamic>;
+    } catch (e) {
+      return {'success': false, 'message': e.toString()};
+    }
   }
 
-  Future<void> replyToDiscussion(
-    String discussionId,
-    Map<String, dynamic> data,
-  ) async {
-    await _apiService.post(
-      '/community/discussions/$discussionId/replies',
-      data,
-    );
+  Future<void> likePost(String postId) async {
+    try {
+      await _apiService.post('/community/posts/$postId/like', {});
+    } catch (e) {
+      debugPrint('likePost error: $e');
+    }
   }
 
-  // Moderation (Admin/Expert only)
-  Future<void> reportContent(String type, String id, String reason) async {
-    await _apiService.post('/community/reports', {
-      'type': type,
-      'id': id,
-      'reason': reason,
-    });
+  Future<Map<String, dynamic>> addComment(String postId, String content) async {
+    try {
+      final response = await _apiService.post('/community/posts/$postId/comment', {'content': content});
+      return response.data as Map<String, dynamic>;
+    } catch (e) {
+      return {'success': false};
+    }
   }
 
-  Future<void> deleteContent(String type, String id) async {
-    await _apiService.delete('/community/$type/$id');
+  Future<bool> deletePost(String postId) async {
+    try {
+      await _apiService.delete('/community/posts/$postId');
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  Future<bool> deleteComment(String postId, String commentId) async {
+    try {
+      await _apiService.delete('/community/posts/$postId/comments/$commentId');
+      return true;
+    } catch (e) {
+      return false;
+    }
   }
 }

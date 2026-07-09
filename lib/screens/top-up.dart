@@ -202,11 +202,12 @@ class _TopUpScreenState extends State<TopUpScreen> {
                             onPressed: (str) {
                               setState(() {
                                 if (str == "BACKSPACE") {
-                                  if (amount.isNotEmpty)
+                                  if (amount.isNotEmpty) {
                                     amount = amount.substring(
                                       0,
                                       amount.length - 1,
                                     );
+                                  }
                                 } else {
                                   amount += str;
                                 }

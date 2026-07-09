@@ -6,7 +6,6 @@ import 'package:icare/services/clinical_service.dart';
 import 'package:icare/services/icd_service.dart';
 import 'package:icare/utils/theme.dart';
 import 'package:icare/widgets/back_button.dart';
-import 'package:intl/intl.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 
 class SoapNotesRedesign extends StatefulWidget {
@@ -81,7 +80,7 @@ class _SoapNotesRedesignState extends State<SoapNotesRedesign> {
             style: TextStyle(fontWeight: FontWeight.w900),
           ),
           content: Text(
-            'Would you like to auto-fill the SOAP notes with the standard template for ${code}?',
+            'Would you like to auto-fill the SOAP notes with the standard template for $code?',
           ),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(20),
@@ -322,8 +321,9 @@ class _SoapNotesRedesignState extends State<SoapNotesRedesign> {
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading)
+    if (_isLoading) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
     final isDesktop = MediaQuery.of(context).size.width > 900;
     return isDesktop ? _buildWebView() : _buildMobileView();
   }
@@ -441,7 +441,7 @@ class _SoapNotesRedesignState extends State<SoapNotesRedesign> {
                           a['createdAt']?.toString().substring(0, 16) ?? '',
                         ),
                       )
-                      .toList(),
+                      ,
               ],
 
               const SizedBox(height: 40),
@@ -477,7 +477,7 @@ class _SoapNotesRedesignState extends State<SoapNotesRedesign> {
       padding: const EdgeInsets.all(12),
       margin: const EdgeInsets.only(bottom: 20),
       decoration: BoxDecoration(
-        color: Colors.orange.withOpacity(0.1),
+        color: Colors.orange.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(8),
       ),
       child: const Row(
@@ -574,19 +574,7 @@ class _SoapNotesRedesignState extends State<SoapNotesRedesign> {
               borderRadius: BorderRadius.circular(12),
               borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
             ),
-            suffixIcon: _isFinalized
-                ? null
-                : IconButton(
-                    onPressed: () => _startListening(controller, hint),
-                    icon: Icon(
-                      isThisListening
-                          ? Icons.mic_rounded
-                          : Icons.mic_none_rounded,
-                      color: isThisListening
-                          ? Colors.redAccent
-                          : AppColors.primaryColor,
-                    ),
-                  ),
+            suffixIcon: null,
           ),
         ),
       ],
@@ -601,9 +589,9 @@ class _SoapNotesRedesignState extends State<SoapNotesRedesign> {
             padding: const EdgeInsets.all(12),
             margin: const EdgeInsets.only(bottom: 12),
             decoration: BoxDecoration(
-              color: Colors.blue.withOpacity(0.05),
+              color: Colors.blue.withValues(alpha: 0.05),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.blue.withOpacity(0.2)),
+              border: Border.all(color: Colors.blue.withValues(alpha: 0.2)),
             ),
             child: Row(
               children: [
@@ -654,7 +642,7 @@ class _SoapNotesRedesignState extends State<SoapNotesRedesign> {
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
               itemCount: _icdResults.length,
-              separatorBuilder: (_, __) => const Divider(height: 1),
+              separatorBuilder: (_, _) => const Divider(height: 1),
               itemBuilder: (ctx, i) => ListTile(
                 title: Text(
                   _icdResults[i]['code']!,

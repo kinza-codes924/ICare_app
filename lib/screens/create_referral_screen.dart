@@ -7,7 +7,7 @@ import 'package:icare/utils/theme.dart';
 import 'package:icare/widgets/back_button.dart';
 
 class CreateReferralScreen extends StatefulWidget {
-  final User patient;
+  final User? patient;
   final String? appointmentId;
 
   const CreateReferralScreen({
@@ -32,7 +32,7 @@ class _CreateReferralScreenState extends State<CreateReferralScreen> {
   List<dynamic> _specialists = [];
   List<dynamic> _medicalRecords = [];
   dynamic _selectedSpecialist;
-  List<String> _selectedRecords = [];
+  final List<String> _selectedRecords = [];
   bool _isLoading = false;
   bool _isLoadingData = true;
 
@@ -53,7 +53,7 @@ class _CreateReferralScreenState extends State<CreateReferralScreen> {
 
     // Load patient's medical records
     final recordsResult = await _medicalRecordService.getPatientRecords(
-      widget.patient.id,
+      widget.patient?.id ?? '',
     );
     if (recordsResult['success']) {
       _medicalRecords = recordsResult['records'];
@@ -74,7 +74,7 @@ class _CreateReferralScreenState extends State<CreateReferralScreen> {
     setState(() => _isLoading = true);
 
     final data = {
-      'patientId': widget.patient.id,
+      'patientId': widget.patient?.id ?? '',
       'referredTo': _selectedSpecialist['_id'],
       'reason': _reasonController.text,
       'clinicalNotes': _clinicalNotesController.text,
@@ -270,7 +270,7 @@ class _CreateReferralScreenState extends State<CreateReferralScreen> {
             ),
             child: Center(
               child: Text(
-                widget.patient.name.substring(0, 1).toUpperCase(),
+                (widget.patient?.name ?? '?').substring(0, 1).toUpperCase(),
                 style: const TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.w900,
@@ -290,7 +290,7 @@ class _CreateReferralScreenState extends State<CreateReferralScreen> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  widget.patient.name,
+                  widget.patient?.name ?? '',
                   style: const TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.w900,
@@ -298,7 +298,7 @@ class _CreateReferralScreenState extends State<CreateReferralScreen> {
                   ),
                 ),
                 Text(
-                  widget.patient.email,
+                  widget.patient?.email ?? '',
                   style: const TextStyle(fontSize: 12, color: Colors.white70),
                 ),
               ],

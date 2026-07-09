@@ -134,16 +134,16 @@ class _DoctorAssignProgramScreenState extends State<DoctorAssignProgramScreen> {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: AppColors.primaryColor.withOpacity(0.05),
+        color: AppColors.primaryColor.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.primaryColor.withOpacity(0.1)),
+        border: Border.all(color: AppColors.primaryColor.withValues(alpha: 0.1)),
       ),
       child: Row(
         children: [
           CircleAvatar(
             backgroundColor: AppColors.primaryColor,
             child: Text(
-              widget.appointment.patient?.name?[0] ?? 'P',
+              widget.appointment.patient?.name[0] ?? 'P',
               style: const TextStyle(color: Colors.white),
             ),
           ),
@@ -174,7 +174,7 @@ class _DoctorAssignProgramScreenState extends State<DoctorAssignProgramScreen> {
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       itemCount: _availablePrograms.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 12),
+      separatorBuilder: (_, _) => const SizedBox(height: 12),
       itemBuilder: (ctx, i) {
         final program = _availablePrograms[i];
         final isSelected = _selectedProgram?.id == program.id;

@@ -1,8 +1,8 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:icare/utils/imagePaths.dart';
 import 'package:icare/utils/theme.dart';
 import 'package:icare/widgets/custom_tab_button.dart';
-import 'package:icare/models/app_enums.dart';
 
 List<Widget> _doctorTabs(
   BuildContext context,
@@ -18,8 +18,9 @@ List<Widget> _doctorTabs(
           ? AppColors.primaryColor
           : AppColors.grayColor,
       image: ImagePaths.home,
-      title: "Home",
+      title: 'home'.tr(),
     ),
+    SizedBox(width: 20),
     CustomTabButton(
       onPressed: () {
         onSelect(1);
@@ -28,28 +29,7 @@ List<Widget> _doctorTabs(
           ? AppColors.primaryColor
           : AppColors.grayColor,
       image: ImagePaths.bookings,
-      title: "Bookings",
-    ),
-    SizedBox(width: 20),
-    CustomTabButton(
-      onPressed: () {
-        onSelect(2);
-      },
-      iconColor: currentIndex == 2
-          ? AppColors.primaryColor
-          : AppColors.grayColor,
-      image: ImagePaths.chat,
-      title: "Chat",
-    ),
-    CustomTabButton(
-      onPressed: () {
-        onSelect(3);
-      },
-      iconColor: currentIndex == 3
-          ? AppColors.primaryColor
-          : AppColors.grayColor,
-      image: ImagePaths.profile2,
-      title: "Profile",
+      title: 'bookings'.tr(),
     ),
   ];
 }
@@ -66,7 +46,7 @@ List<Widget> _patientTabs(
       },
       iconColor: currentIndex == 0 ? AppColors.primaryColor : AppColors.grayColor,
       image: ImagePaths.home,
-      title: "Home",
+      title: 'home'.tr(),
     ),
     CustomTabButton(
       onPressed: () {
@@ -74,7 +54,7 @@ List<Widget> _patientTabs(
       },
       iconColor: currentIndex == 1 ? AppColors.primaryColor : AppColors.grayColor,
       image: ImagePaths.bookings,
-      title: "Bookings",
+      title: 'my_learning'.tr(),
     ),
     SizedBox(width: 20),
     CustomTabButton(
@@ -82,24 +62,8 @@ List<Widget> _patientTabs(
         onSelect(2);
       },
       iconColor: currentIndex == 2 ? AppColors.primaryColor : AppColors.grayColor,
-      image: ImagePaths.chat,
-      title: "Chat",
-    ),
-    CustomTabButton(
-      onPressed: () {
-        onSelect(4); // 4 is the new index for Programs for Patient
-      },
-      iconColor: currentIndex == 4 ? AppColors.primaryColor : AppColors.grayColor,
-      image: ImagePaths.track,
-      title: "Programs",
-    ),
-    CustomTabButton(
-      onPressed: () {
-        onSelect(3);
-      },
-      iconColor: currentIndex == 3 ? AppColors.primaryColor : AppColors.grayColor,
       image: ImagePaths.profile2,
-      title: "Profile",
+      title: 'profile'.tr(),
     ),
   ];
 }
@@ -118,7 +82,7 @@ List<Widget> _labTabs(
           ? AppColors.primaryColor
           : AppColors.grayColor,
       image: ImagePaths.home,
-      title: "Home",
+      title: 'home'.tr(),
     ),
     CustomTabButton(
       onPressed: () {
@@ -128,7 +92,7 @@ List<Widget> _labTabs(
           ? AppColors.primaryColor
           : AppColors.grayColor,
       image: ImagePaths.bookings,
-      title: "Requests",
+      title: 'requests'.tr(),
     ),
     SizedBox(width: 20),
     CustomTabButton(
@@ -139,7 +103,7 @@ List<Widget> _labTabs(
           ? AppColors.primaryColor
           : AppColors.grayColor,
       image: ImagePaths.track,
-      title: "Reports",
+      title: 'reports'.tr(),
     ),
     CustomTabButton(
       onPressed: () {
@@ -149,7 +113,7 @@ List<Widget> _labTabs(
           ? AppColors.primaryColor
           : AppColors.grayColor,
       image: ImagePaths.profile2,
-      title: "Profile",
+      title: 'profile'.tr(),
     ),
   ];
 }
@@ -164,26 +128,26 @@ List<Widget> _instructorTabs(
       onPressed: () => onSelect(0),
       iconColor: currentIndex == 0 ? AppColors.primaryColor : AppColors.grayColor,
       image: ImagePaths.home,
-      title: "Dashboard",
+      title: 'dashboard'.tr(),
     ),
     CustomTabButton(
       onPressed: () => onSelect(1),
       iconColor: currentIndex == 1 ? AppColors.primaryColor : AppColors.grayColor,
       image: ImagePaths.bookings,
-      title: "Courses",
+      title: 'my_learning'.tr(),
     ),
     SizedBox(width: 20),
     CustomTabButton(
       onPressed: () => onSelect(2),
       iconColor: currentIndex == 2 ? AppColors.primaryColor : AppColors.grayColor,
       image: ImagePaths.chat,
-      title: "Chat",
+      title: 'messages'.tr(),
     ),
     CustomTabButton(
       onPressed: () => onSelect(3),
       iconColor: currentIndex == 3 ? AppColors.primaryColor : AppColors.grayColor,
       image: ImagePaths.profile2,
-      title: "Profile",
+      title: 'profile'.tr(),
     ),
   ];
 }
@@ -202,7 +166,7 @@ List<Widget> _pharmacistTabs(
           ? AppColors.primaryColor
           : AppColors.grayColor,
       image: ImagePaths.home,
-      title: "Home",
+      title: 'home'.tr(),
     ),
     CustomTabButton(
       onPressed: () {
@@ -212,7 +176,7 @@ List<Widget> _pharmacistTabs(
           ? AppColors.primaryColor
           : AppColors.grayColor,
       image: ImagePaths.bookings,
-      title: "Prescriptions",
+      title: 'orders'.tr(),
     ),
     SizedBox(width: 20),
     CustomTabButton(
@@ -223,7 +187,7 @@ List<Widget> _pharmacistTabs(
           ? AppColors.primaryColor
           : AppColors.grayColor,
       image: ImagePaths.track,
-      title: "Inventory",
+      title: 'inventory'.tr(),
     ),
     CustomTabButton(
       onPressed: () {
@@ -233,7 +197,7 @@ List<Widget> _pharmacistTabs(
           ? AppColors.primaryColor
           : AppColors.grayColor,
       image: ImagePaths.profile2,
-      title: "Profile",
+      title: 'profile'.tr(),
     ),
   ];
 }
@@ -252,7 +216,7 @@ List<Widget> _studentTabs(
           ? AppColors.primaryColor
           : AppColors.grayColor,
       image: ImagePaths.home,
-      title: "Home",
+      title: 'home'.tr(),
     ),
     CustomTabButton(
       onPressed: () {
@@ -261,7 +225,7 @@ List<Widget> _studentTabs(
       iconColor: currentIndex == 1 ? AppColors.primaryColor : AppColors.grayColor,
       image: ImagePaths
           .bookings, // Reusing bookings icon for courses context or could use a book icon
-      title: "Programs",
+      title: 'programs'.tr(),
     ),
     SizedBox(width: 20),
     CustomTabButton(
@@ -271,18 +235,8 @@ List<Widget> _studentTabs(
       iconColor: currentIndex == 2
           ? AppColors.primaryColor
           : AppColors.grayColor,
-      image: ImagePaths.chat,
-      title: "Chat",
-    ),
-    CustomTabButton(
-      onPressed: () {
-        onSelect(3);
-      },
-      iconColor: currentIndex == 3
-          ? AppColors.primaryColor
-          : AppColors.grayColor,
       image: ImagePaths.profile2,
-      title: "Profile",
+      title: 'profile'.tr(),
     ),
   ];
 }
@@ -301,7 +255,7 @@ List<Widget> _adminTabs(
           ? AppColors.primaryColor
           : AppColors.grayColor,
       image: ImagePaths.home,
-      title: "Verify",
+      title: 'verified'.tr(),
     ),
     const SizedBox(width: 20),
     CustomTabButton(
@@ -312,7 +266,7 @@ List<Widget> _adminTabs(
           ? AppColors.primaryColor
           : AppColors.grayColor,
       image: ImagePaths.chat,
-      title: "Chat",
+      title: 'messages'.tr(),
     ),
     CustomTabButton(
       onPressed: () {
@@ -322,7 +276,7 @@ List<Widget> _adminTabs(
           ? AppColors.primaryColor
           : AppColors.grayColor,
       image: ImagePaths.profile2,
-      title: "Profile",
+      title: 'profile'.tr(),
     ),
   ];
 }

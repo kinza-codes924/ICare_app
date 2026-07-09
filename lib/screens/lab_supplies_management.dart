@@ -66,7 +66,7 @@ class _LabSuppliesManagementState extends State<LabSuppliesManagement> {
                 ),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<String>(
-                  value: category,
+                  initialValue: category,
                   decoration: const InputDecoration(labelText: 'Category'),
                   items: ['Reagent', 'Equipment', 'Consumable', 'Other']
                       .map((c) => DropdownMenuItem(value: c, child: Text(c)))
@@ -180,7 +180,7 @@ class _LabSuppliesManagementState extends State<LabSuppliesManagement> {
               ),
               const SizedBox(height: 16),
               DropdownButtonFormField<String>(
-                value: action,
+                initialValue: action,
                 decoration: const InputDecoration(labelText: 'Action'),
                 items: [
                   const DropdownMenuItem(

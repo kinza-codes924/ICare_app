@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_rating_bar/flutter_rating_bar.dart';
 import 'package:flutter_size_matters/flutter_size_matters.dart';
@@ -23,7 +24,7 @@ class _WrtieReviewScreenState extends State<WrtieReviewScreen> {
         leading: CustomBackButton(),
         automaticallyImplyLeading: false,
         title: CustomText(
-          text: "Write A Review",
+          text: "Write A Review".tr(),
           fontFamily: "Gilroy-Bold",
           fontSize: 16.78,
           color: AppColors.primary500,

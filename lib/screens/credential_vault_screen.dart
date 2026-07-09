@@ -1,8 +1,12 @@
+import 'dart:typed_data';
+import 'package:dio/dio.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:icare/services/api_service.dart';
 import 'package:icare/utils/theme.dart';
 import 'package:icare/widgets/back_button.dart';
 import 'package:icare/widgets/custom_button.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class CredentialVaultScreen extends StatefulWidget {
   const CredentialVaultScreen({super.key});
@@ -14,6 +18,7 @@ class CredentialVaultScreen extends StatefulWidget {
 class _CredentialVaultScreenState extends State<CredentialVaultScreen> {
   final ApiService _apiService = ApiService();
   List<dynamic> _credentials = [];
+  List<Map<String, String>> _verificationDocs = [];
   bool _isLoading = true;
 
   @override
@@ -25,10 +30,61 @@ class _CredentialVaultScreenState extends State<CredentialVaultScreen> {
   Future<void> _fetchCredentials() async {
     setState(() => _isLoading = true);
     try {
-      final response = await _apiService.get('/credentials/me');
+      // Load LMS credentials
+      List<dynamic> creds = [];
+      try {
+        final credsResp = await _apiService.get('/credentials/me');
+        creds = credsResp.data['credentials'] ?? [];
+      } catch (_) {}
+
+      // Load verification documents — check multiple sources since different backend
+      // endpoints expose different fields.
+      final verDocs = <Map<String, String>>[];
+      void extractVerDocs(Map? vd) {
+        if (vd == null) return;
+        if (vd['cnicDocument'] != null && vd['cnicDocument'].toString().isNotEmpty) {
+          verDocs.add({'title': 'CNIC / National ID', 'type': 'Identity Document', 'documentUrl': vd['cnicDocument'].toString(), 'name': vd['cnicDocumentName']?.toString() ?? 'cnic'});
+        }
+        if (vd['pmdcCertDocument'] != null && vd['pmdcCertDocument'].toString().isNotEmpty) {
+          verDocs.add({'title': 'PMDC Certificate', 'type': 'Medical License', 'documentUrl': vd['pmdcCertDocument'].toString(), 'name': vd['pmdcCertDocumentName']?.toString() ?? 'pmdc_cert'});
+        }
+        if (vd['experienceCertDocument'] != null && vd['experienceCertDocument'].toString().isNotEmpty) {
+          verDocs.add({'title': 'Experience Certificate', 'type': 'Professional Document', 'documentUrl': vd['experienceCertDocument'].toString(), 'name': vd['experienceCertDocumentName']?.toString() ?? 'experience_cert'});
+        }
+      }
+
+      // Source 1: /users/profile → user.verificationDetails
+      try {
+        final profileResp = await _apiService.get('/users/profile');
+        final data = profileResp.data;
+        final user = (data is Map && data['user'] is Map) ? data['user'] as Map
+                   : (data is Map ? data : null);
+        if (user != null) {
+          extractVerDocs(user['verificationDetails'] as Map?);
+          // Some backends also store docs at top-level of user
+          extractVerDocs(user as Map?);
+        }
+      } catch (_) {}
+
+      // Source 2: /doctors/my-profile → doctor.verificationDetails (separate doctor collection)
+      if (verDocs.isEmpty) {
+        try {
+          final docResp = await _apiService.get('/doctors/my-profile');
+          final data = docResp.data;
+          final doc = (data is Map && data['doctor'] is Map) ? data['doctor'] as Map
+                    : (data is Map ? data : null);
+          if (doc != null) {
+            extractVerDocs(doc['verificationDetails'] as Map?);
+            // Also check if documents are stored directly on doctor doc
+            extractVerDocs(doc as Map?);
+          }
+        } catch (_) {}
+      }
+
       if (mounted) {
         setState(() {
-          _credentials = response.data['credentials'] ?? [];
+          _credentials = creds;
+          _verificationDocs = verDocs;
           _isLoading = false;
         });
       }
@@ -37,10 +93,292 @@ class _CredentialVaultScreenState extends State<CredentialVaultScreen> {
     }
   }
 
+  /// Page-1 JPEG thumbnail — for showing preview inside the modal
+  String _cloudinaryPdfThumbnail(String pdfUrl) {
+    try {
+      return pdfUrl
+          .replaceFirst('/raw/upload/', '/image/upload/f_jpg,pg_1/')
+          .replaceFirstMapped(
+            RegExp(r'/image/upload/(?!f_jpg,pg_1/)'),
+            (_) => '/image/upload/f_jpg,pg_1/',
+          );
+    } catch (_) {
+      return pdfUrl;
+    }
+  }
+
+  /// Ensures Cloudinary PDF URL has no transformation flags that cause 400.
+  /// Just returns the clean URL — browsers open PDFs inline by default.
+  String _cloudinaryCleanUrl(String url) {
+    // Strip any existing flags we may have inserted
+    try {
+      return url
+          .replaceFirst('/fl_inline/', '/')
+          .replaceFirst('/fl_attachment/', '/');
+    } catch (_) {
+      return url;
+    }
+  }
+
+  /// Opens a URL in a new browser tab using url_launcher.
+  Future<void> _openDocUrl(String url) async {
+    if (url.isEmpty) return;
+    try {
+      final uri = Uri.parse(url);
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } catch (e) {
+      debugPrint('Cannot open URL: $e');
+    }
+  }
+
+  /// Downloads via Cloudinary fl_attachment flag so CDN forces Content-Disposition: attachment.
+  Future<void> _downloadDocUrl(String url) async {
+    if (url.isEmpty) return;
+    try {
+      String dlUrl = _cloudinaryCleanUrl(url);
+      // fl_attachment makes Cloudinary send Content-Disposition: attachment → browser saves the file
+      if (dlUrl.contains('cloudinary.com') && dlUrl.contains('/upload/')) {
+        dlUrl = dlUrl.replaceFirst('/upload/', '/upload/fl_attachment/');
+      }
+      final uri = Uri.parse(dlUrl);
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } catch (e) {
+      await _openDocUrl(url);
+    }
+  }
+
+  void _viewDocument(dynamic cred) {
+    // documentUrl can be stored under different keys — check all variants
+    final docUrl = (cred['documentUrl'] as String?)?.trim() ??
+                   (cred['document_url'] as String?)?.trim() ??
+                   (cred['url'] as String?)?.trim() ?? '';
+    final title  = cred['title']?.toString() ?? 'Document';
+    final type   = cred['type']?.toString() ?? '';
+
+    // PDF check FIRST — a Cloudinary PDF may have /image/upload/ in its path
+    // if it was uploaded with wrong resource_type. Extension is the ground truth.
+    final isPdf = docUrl.isNotEmpty &&
+        RegExp(r'\.pdf(\?.*)?$', caseSensitive: false).hasMatch(docUrl);
+
+    // Image only when NOT a PDF
+    final isImage = !isPdf && docUrl.isNotEmpty &&
+        RegExp(r'\.(jpg|jpeg|png|gif|webp|svg|png)(\?.*)?$', caseSensitive: false)
+            .hasMatch(docUrl);
+
+    showDialog(
+      context: context,
+      builder: (ctx) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 700, maxHeight: 750),
+          decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(24)),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Header
+              Container(
+                padding: const EdgeInsets.fromLTRB(20, 20, 12, 20),
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.only(topLeft: Radius.circular(24), topRight: Radius.circular(24)),
+                  border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0))),
+                ),
+                child: Row(children: [
+                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Color(0xFF0F172A))),
+                    Text(type, style: const TextStyle(fontSize: 13, color: Color(0xFF64748B))),
+                  ])),
+                  IconButton(onPressed: () => Navigator.pop(ctx), icon: const Icon(Icons.close_rounded)),
+                ]),
+              ),
+
+              // Document preview
+              Expanded(
+                child: docUrl.isEmpty
+                    // ── No URL stored ─────────────────────────────────────────
+                    ? Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                        Icon(Icons.upload_file_rounded, size: 64, color: Colors.grey.shade300),
+                        const SizedBox(height: 12),
+                        const Text('No document attached to this certificate.', style: TextStyle(color: Color(0xFF94A3B8))),
+                        const SizedBox(height: 6),
+                        const Text('Upload a new certificate to attach a file.', style: TextStyle(fontSize: 12, color: Color(0xFFCBD5E1))),
+                      ]))
+                    // ── Image preview ─────────────────────────────────────────
+                    : isImage
+                    ? Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
+                          child: Image.network(
+                            docUrl,
+                            fit: BoxFit.contain,
+                            loadingBuilder: (_, child, prog) => prog == null
+                                ? child
+                                : const Center(child: CircularProgressIndicator()),
+                            errorBuilder: (_, _, _) => _urlFallback(ctx, docUrl),
+                          ),
+                        ),
+                      )
+                    // ── PDF — show Cloudinary page-1 thumbnail ────────────────
+                    : _buildPdfPreview(ctx, docUrl),
+              ),
+
+              // Download button
+              // Bottom download button only for images (PDFs have their own buttons above)
+              if (docUrl.isNotEmpty && isImage)
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: const BoxDecoration(border: Border(top: BorderSide(color: Color(0xFFE2E8F0)))),
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: () { _openDocUrl(docUrl); Navigator.pop(ctx); },
+                      icon: const Icon(Icons.download_rounded),
+                      label: const Text('Open / Download', style: TextStyle(fontWeight: FontWeight.bold)),
+                      style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryColor, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 14), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // Renders page-1 of a Cloudinary PDF as an image, with open/download button
+  Widget _buildPdfPreview(BuildContext ctx, String pdfUrl) {
+    final thumbUrl = _cloudinaryPdfThumbnail(pdfUrl);
+    return Column(
+      children: [
+        // Page-1 thumbnail
+        Expanded(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: Image.network(
+                thumbUrl,
+                fit: BoxFit.contain,
+                loadingBuilder: (_, child, prog) => prog == null
+                    ? child
+                    : const Center(child: CircularProgressIndicator()),
+                errorBuilder: (_, _, _) => Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEF4444).withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: const Icon(Icons.picture_as_pdf_rounded, size: 64, color: Color(0xFFEF4444)),
+                    ),
+                    const SizedBox(height: 12),
+                    const Text('PDF — tap below to open', style: TextStyle(fontSize: 13, color: Color(0xFF64748B))),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+        // Open in browser tab + Download as .pdf
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          child: Row(children: [
+            Expanded(
+              child: OutlinedButton.icon(
+                // Open FIRST then close dialog — preserves user-gesture for url_launcher/popup
+                onPressed: () { _openDocUrl(_cloudinaryCleanUrl(pdfUrl)); Navigator.pop(ctx); },
+                icon: const Icon(Icons.open_in_new_rounded, size: 16),
+                label: const Text('Open PDF', style: TextStyle(fontWeight: FontWeight.w700)),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.primaryColor,
+                  side: BorderSide(color: AppColors.primaryColor),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: ElevatedButton.icon(
+                // Download FIRST then close dialog — preserves user-gesture for url_launcher/popup
+                onPressed: () { _downloadDocUrl(_cloudinaryCleanUrl(pdfUrl)); Navigator.pop(ctx); },
+                icon: const Icon(Icons.download_rounded, size: 16),
+                label: const Text('Download', style: TextStyle(fontWeight: FontWeight.w700)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primaryColor,
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                ),
+              ),
+            ),
+          ]),
+        ),
+      ],
+    );
+  }
+
+
+  // Shown when Image.network fails — still gives user a way to open the file
+  Widget _urlFallback(BuildContext ctx, String url) {
+    return Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+      Icon(Icons.broken_image_rounded, size: 48, color: Colors.grey.shade300),
+      const SizedBox(height: 12),
+      const Text('Could not render preview.', style: TextStyle(color: Color(0xFF94A3B8))),
+      const SizedBox(height: 16),
+      ElevatedButton.icon(
+        onPressed: () { _openDocUrl(url); Navigator.pop(ctx); },
+        icon: const Icon(Icons.open_in_new_rounded, size: 16),
+        label: const Text('Open in Browser'),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: AppColors.primaryColor,
+          foregroundColor: Colors.white,
+          elevation: 0,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        ),
+      ),
+    ]);
+  }
+
+
+  // Upload using Dio FormData — same auth headers as all other API calls.
+  // package:http MultipartRequest was failing silently because it doesn't
+  // share the Dio auth token injection logic.
+  Future<String?> _uploadFileToBackend(Uint8List bytes, String fileName) async {
+    try {
+      final formData = FormData.fromMap({
+        'file': MultipartFile.fromBytes(
+          bytes,
+          filename: fileName,
+          // Guess content type from extension
+          contentType: fileName.toLowerCase().endsWith('.pdf')
+              ? DioMediaType('application', 'pdf')
+              : DioMediaType('image', 'jpeg'),
+        ),
+      });
+      final response = await _apiService.postMultipart('/upload/prescription', formData);
+      debugPrint('Upload response: ${response.data}');
+      if (response.data['success'] == true) {
+        return response.data['url'] as String?;
+      }
+      debugPrint('Upload failed: ${response.data}');
+      return null;
+    } catch (e) {
+      debugPrint('Upload exception: $e');
+      return null;
+    }
+  }
+
   void _showUploadDialog() {
     final titleController = TextEditingController();
     String type = 'Medical License';
     bool isUploading = false;
+    String? pickedFileName;
+    Uint8List? pickedBytes;
 
     showModalBottomSheet(
       context: context,
@@ -91,7 +429,7 @@ class _CredentialVaultScreenState extends State<CredentialVaultScreen> {
               ),
               const SizedBox(height: 8),
               DropdownButtonFormField<String>(
-                value: type,
+                initialValue: type,
                 items:
                     [
                           'Medical License',
@@ -144,16 +482,28 @@ class _CredentialVaultScreenState extends State<CredentialVaultScreen> {
               ),
               const SizedBox(height: 24),
               InkWell(
-                onTap: () {}, // File Picker
+                onTap: () async {
+                  final result = await FilePicker.platform.pickFiles(
+                    type: FileType.custom,
+                    allowedExtensions: ['pdf', 'jpg', 'jpeg', 'png'],
+                    withData: true,
+                  );
+                  if (result != null && result.files.single.bytes != null) {
+                    setModalState(() {
+                      pickedFileName = result.files.single.name;
+                      pickedBytes   = result.files.single.bytes;
+                    });
+                  }
+                },
+                borderRadius: BorderRadius.circular(20),
                 child: Container(
                   height: 120,
                   width: double.infinity,
                   decoration: BoxDecoration(
-                    color: const Color(0xFFF1F5F9),
+                    color: pickedFileName != null ? const Color(0xFFEFF6FF) : const Color(0xFFF1F5F9),
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(
-                      color: AppColors.primaryColor.withOpacity(0.2),
-                      style: BorderStyle.solid,
+                      color: pickedFileName != null ? AppColors.primaryColor : AppColors.primaryColor.withValues(alpha: 0.2),
                       width: 2,
                     ),
                   ),
@@ -163,30 +513,28 @@ class _CredentialVaultScreenState extends State<CredentialVaultScreen> {
                       Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: AppColors.primaryColor.withOpacity(0.1),
+                          color: AppColors.primaryColor.withValues(alpha: 0.1),
                           shape: BoxShape.circle,
                         ),
-                        child: const Icon(
-                          Icons.cloud_upload_rounded,
-                          color: AppColors.primaryColor,
+                        child: Icon(
+                          pickedFileName != null ? Icons.check_circle_rounded : Icons.cloud_upload_rounded,
+                          color: pickedFileName != null ? Colors.green : AppColors.primaryColor,
                           size: 32,
                         ),
                       ),
                       const SizedBox(height: 12),
-                      const Text(
-                        'Tap to select PDF or Image',
+                      Text(
+                        pickedFileName ?? 'Tap to select PDF or Image',
+                        textAlign: TextAlign.center,
                         style: TextStyle(
-                          color: Color(0xFF475569),
+                          color: pickedFileName != null ? AppColors.primaryColor : const Color(0xFF475569),
                           fontSize: 13,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
-                      const Text(
-                        'Max file size: 10MB',
-                        style: TextStyle(
-                          color: Color(0xFF94A3B8),
-                          fontSize: 11,
-                        ),
+                      Text(
+                        pickedFileName != null ? 'Tap to change file' : 'PDF, JPG, PNG  •  Max 10MB',
+                        style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 11),
                       ),
                     ],
                   ),
@@ -202,18 +550,47 @@ class _CredentialVaultScreenState extends State<CredentialVaultScreen> {
                   onPressed: isUploading
                       ? null
                       : () async {
-                          if (titleController.text.isEmpty) return;
+                          if (titleController.text.trim().isEmpty) {
+                            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please enter a title')));
+                            return;
+                          }
+                          if (pickedBytes == null) {
+                            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please select a file')));
+                            return;
+                          }
                           setModalState(() => isUploading = true);
                           try {
+                            // Step 1: upload file → get Cloudinary URL
+                            final url = await _uploadFileToBackend(
+                              pickedBytes!, pickedFileName ?? 'document');
+                            if (url == null || url.isEmpty) {
+                              setModalState(() => isUploading = false);
+                              if (ctx.mounted) {
+                                ScaffoldMessenger.of(ctx).showSnackBar(
+                                const SnackBar(
+                                  content: Text('File upload failed. Check your connection and try again.'),
+                                  backgroundColor: Colors.red,
+                                ),
+                              );
+                              }
+                              return;
+                            }
+                            // Step 2: save credential record with the returned URL
                             await _apiService.post('/credentials', {
                               'type': type,
-                              'title': titleController.text,
-                              'documentUrl': 'https://example.com/mock-doc.pdf',
+                              'title': titleController.text.trim(),
+                              'documentUrl': url,
                             });
-                            Navigator.pop(ctx);
+                            if (ctx.mounted) Navigator.pop(ctx);
+                            // Small delay so the backend finishes writing before we re-fetch
+                            await Future.delayed(const Duration(milliseconds: 400));
                             _fetchCredentials();
                           } catch (e) {
                             setModalState(() => isUploading = false);
+                            if (ctx.mounted) {
+                              ScaffoldMessenger.of(ctx).showSnackBar(
+                              SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red));
+                            }
                           }
                         },
                 ),
@@ -235,7 +612,7 @@ class _CredentialVaultScreenState extends State<CredentialVaultScreen> {
         backgroundColor: Colors.white,
         elevation: 0,
         title: const Text(
-          'Credential Vault',
+          'Certificate',
           style: TextStyle(
             color: Color(0xFF0F172A),
             fontWeight: FontWeight.w900,
@@ -254,13 +631,32 @@ class _CredentialVaultScreenState extends State<CredentialVaultScreen> {
           Expanded(
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator())
-                : _credentials.isEmpty
-                ? _buildEmptyState()
-                : ListView.builder(
+                : ListView(
                     padding: const EdgeInsets.symmetric(horizontal: 20),
-                    itemCount: _credentials.length,
-                    itemBuilder: (ctx, i) =>
-                        _buildCredentialCard(_credentials[i]),
+                    children: [
+                      // Verification documents uploaded during Work With Us signup
+                      if (_verificationDocs.isNotEmpty) ...[
+                        const Padding(
+                          padding: EdgeInsets.only(top: 20, bottom: 10),
+                          child: Text(
+                            'Verification Documents',
+                            style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
+                          ),
+                        ),
+                        ..._verificationDocs.map((doc) => _buildVerificationDocCard(doc)),
+                        const Padding(
+                          padding: EdgeInsets.only(top: 20, bottom: 10),
+                          child: Text(
+                            'LMS Certificates',
+                            style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
+                          ),
+                        ),
+                      ],
+                      if (_credentials.isEmpty && _verificationDocs.isEmpty)
+                        _buildEmptyState()
+                      else
+                        ..._credentials.map((c) => _buildCredentialCard(c)),
+                    ],
                   ),
           ),
         ],
@@ -292,7 +688,7 @@ class _CredentialVaultScreenState extends State<CredentialVaultScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            'Secure Document Storage',
+            'My Certificates',
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.w900,
@@ -307,11 +703,11 @@ class _CredentialVaultScreenState extends State<CredentialVaultScreen> {
           const SizedBox(height: 20),
           Row(
             children: [
-              _buildVaultStat('Total', '03', Colors.blue),
+              _buildVaultStat('Total', '${_credentials.length}', Colors.blue),
               const SizedBox(width: 12),
-              _buildVaultStat('Verified', '02', Colors.green),
+              _buildVaultStat('Verified', '${_credentials.where((c) => c['status'] == 'verified').length}', Colors.green),
               const SizedBox(width: 12),
-              _buildVaultStat('Pending', '01', Colors.orange),
+              _buildVaultStat('Unverified', '${_credentials.where((c) => c['status'] != 'verified').length}', Colors.orange),
             ],
           ),
         ],
@@ -323,9 +719,9 @@ class _CredentialVaultScreenState extends State<CredentialVaultScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.05),
+        color: color.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withOpacity(0.1)),
+        border: Border.all(color: color.withValues(alpha: 0.1)),
       ),
       child: Row(
         children: [
@@ -345,6 +741,56 @@ class _CredentialVaultScreenState extends State<CredentialVaultScreen> {
               fontSize: 11,
               fontWeight: FontWeight.bold,
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildVerificationDocCard(Map<String, String> doc) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: const [BoxShadow(color: Color(0x06000000), blurRadius: 8, offset: Offset(0, 2))],
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: AppColors.primaryColor.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Icon(Icons.verified_user_rounded, color: AppColors.primaryColor, size: 24),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(doc['title'] ?? '', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Color(0xFF0F172A))),
+                const SizedBox(height: 2),
+                Text(doc['type'] ?? '', style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                const SizedBox(height: 4),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFDCFCE7),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: const Text('Uploaded', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF16A34A))),
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            onPressed: () => _viewDocument({'documentUrl': doc['documentUrl'] ?? '', 'title': doc['title'] ?? '', 'type': doc['type'] ?? ''}),
+            icon: const Icon(Icons.visibility_rounded, color: Color(0xFF64748B), size: 20),
+            tooltip: 'View',
           ),
         ],
       ),
@@ -416,9 +862,9 @@ class _CredentialVaultScreenState extends State<CredentialVaultScreen> {
         statusIcon = Icons.warning_rounded;
         break;
       default:
-        statusColor = Colors.blue;
-        statusText = 'UNDER REVIEW';
-        statusIcon = Icons.history_rounded;
+        statusColor = const Color(0xFFF59E0B);
+        statusText = 'UNVERIFIED';
+        statusIcon = Icons.pending_rounded;
     }
 
     return Container(
@@ -427,10 +873,10 @@ class _CredentialVaultScreenState extends State<CredentialVaultScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: statusColor.withOpacity(0.2)),
+        border: Border.all(color: statusColor.withValues(alpha: 0.2)),
         boxShadow: [
           BoxShadow(
-            color: statusColor.withOpacity(0.05),
+            color: statusColor.withValues(alpha: 0.05),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -441,7 +887,7 @@ class _CredentialVaultScreenState extends State<CredentialVaultScreen> {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: statusColor.withOpacity(0.1),
+              color: statusColor.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(16),
             ),
             child: Icon(
@@ -471,29 +917,47 @@ class _CredentialVaultScreenState extends State<CredentialVaultScreen> {
                     fontWeight: FontWeight.w600,
                   ),
                 ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Icon(statusIcon, color: statusColor, size: 14),
-                    const SizedBox(width: 4),
-                    Text(
-                      statusText,
-                      style: TextStyle(
-                        color: statusColor,
-                        fontSize: 10,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 0.5,
+                const SizedBox(height: 10),
+                // Prominent verified / unverified badge
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: statusColor.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: statusColor.withValues(alpha: 0.3)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(statusIcon, color: statusColor, size: 13),
+                      const SizedBox(width: 5),
+                      Text(
+                        statusText,
+                        style: TextStyle(
+                          color: statusColor,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 0.4,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
+                if (statusText == 'UNVERIFIED')
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Text(
+                      'Pending admin review',
+                      style: TextStyle(fontSize: 10, color: Colors.grey[500]),
+                    ),
+                  ),
               ],
             ),
           ),
           Column(
             children: [
               IconButton(
-                onPressed: () {},
+                onPressed: () => _viewDocument(cred),
                 icon: const Icon(
                   Icons.visibility_outlined,
                   color: Color(0xFF64748B),

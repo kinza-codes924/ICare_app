@@ -5,6 +5,7 @@
 ///
 /// IMPORTANT: These are for DEMO/TESTING purposes only.
 /// In production, users should create their own accounts.
+library;
 
 class DemoUsers {
   static const String demoPassword = 'Pass@123';
@@ -80,7 +81,7 @@ class DemoUsers {
       'email': 'hassan.doctor@icare.demo',
       'phone': '+923001234601',
       'role': 'Doctor',
-      'specialty': 'General Physician',
+      'specialty': 'General Practitioner',
     },
     {
       'name': 'Dr. Sana Tariq',

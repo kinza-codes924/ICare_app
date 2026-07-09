@@ -47,7 +47,7 @@ class ProductDetailsScreen extends StatelessWidget {
               Center(
                 child: Hero(
                   tag: 'product_image_capsule',
-                  child: Container(
+                  child: SizedBox(
                     height: 500,
                     child: Image.asset(ImagePaths.capsule, fit: BoxFit.contain),
                   ),
@@ -73,7 +73,7 @@ class ProductDetailsScreen extends StatelessWidget {
                   ),
                   const SizedBox(width: 40),
                   CustomText(
-                    text: "Rs. 2,000",
+                    text: "PKR 2,000",
                     fontSize: 38,
                     fontWeight: FontWeight.w900,
                     fontFamily: "Gilroy-Bold",

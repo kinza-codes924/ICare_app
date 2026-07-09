@@ -1,10 +1,11 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:icare/utils/theme.dart';
 import 'package:icare/widgets/back_button.dart';
 import 'package:icare/screens/star_click_game.dart';
 import 'package:icare/services/gamification_service.dart';
-import 'package:icare/services/vital_service.dart';
-import 'package:icare/models/vital.dart';
+import 'package:icare/services/health_tracker_service.dart';
+import 'package:icare/models/health_tracker_entry.dart';
 import 'package:intl/intl.dart';
 
 class HealthTracker extends StatefulWidget {
@@ -16,11 +17,17 @@ class HealthTracker extends StatefulWidget {
 
 class _HealthTrackerState extends State<HealthTracker> {
   final GamificationService _gamificationService = GamificationService();
-  final VitalService _vitalService = VitalService();
+  final HealthTrackerService _healthTrackerService = HealthTrackerService();
   int _points = 0;
   List<dynamic> _badges = [];
-  List<Vital> _realVitals = [];
+  List<HealthTrackerEntry> _latestEntries = [];
   bool _isLoading = true;
+
+  // Login streak data
+  int _loginStreak = 0;
+  List<Map<String, dynamic>> _weekActivity = [];
+  bool _loggedInToday = false;
+  bool _checkingIn = false;
 
   @override
   void initState() {
@@ -31,14 +38,15 @@ class _HealthTrackerState extends State<HealthTracker> {
   Future<void> _loadAllData() async {
     setState(() => _isLoading = true);
 
-    // Concurrent data loading
     final results = await Future.wait([
       _gamificationService.getMyStats(),
-      _vitalService.getMyVitals(),
+      _healthTrackerService.getLatestEntries(),
+      _gamificationService.getLoginStreak(),
     ]);
 
     final gamificationResult = results[0];
-    final vitalsResult = results[1];
+    final entriesResult = results[1];
+    final loginResult = results[2];
 
     if (mounted) {
       setState(() {
@@ -46,15 +54,34 @@ class _HealthTrackerState extends State<HealthTracker> {
           _points = gamificationResult['points'] ?? 0;
           _badges = gamificationResult['badges'] ?? [];
         }
-
-        if (vitalsResult['success'] == true) {
-          _realVitals = (vitalsResult['vitals'] as List)
-              .map((v) => Vital.fromJson(v))
+        if (entriesResult['success'] == true) {
+          _latestEntries = (entriesResult['entries'] as List)
+              .map((e) => HealthTrackerEntry.fromJson(e))
               .toList();
         }
+        if (loginResult['success'] == true) {
+          _loginStreak = (loginResult['loginStreak'] as num?)?.toInt() ?? 0;
+          final today = DateTime.now().toIso8601String().split('T')[0];
+          final raw = loginResult['weekActivity'];
+          if (raw is List) {
+            _weekActivity = raw.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+            _loggedInToday = _weekActivity.any((d) => d['date'] == today && d['logged'] == true);
+          }
+        }
+        if (_weekActivity.isEmpty) _weekActivity = _buildFallbackWeek();
         _isLoading = false;
       });
     }
+  }
+
+  List<Map<String, dynamic>> _buildFallbackWeek() {
+    const labels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    final now = DateTime.now();
+    final monday = now.subtract(Duration(days: now.weekday - 1));
+    return List.generate(7, (i) {
+      final d = monday.add(Duration(days: i));
+      return {'day': labels[i], 'date': d.toIso8601String().split('T')[0], 'logged': false};
+    });
   }
 
   // Fallback map for rendering cards even if no data
@@ -95,40 +122,100 @@ class _HealthTrackerState extends State<HealthTracker> {
       'icon': Icons.air_rounded,
       'color': const Color(0xFF10B981),
     },
+    {
+      'type': 'Steps',
+      'unit': 'steps',
+      'icon': Icons.directions_walk_rounded,
+      'color': const Color(0xFF06B6D4),
+    },
+    {
+      'type': 'Sleep',
+      'unit': 'hours',
+      'icon': Icons.bedtime_rounded,
+      'color': const Color(0xFF6366F1),
+    },
+    {
+      'type': 'Water Intake',
+      'unit': 'glasses',
+      'icon': Icons.local_drink_rounded,
+      'color': const Color(0xFF14B8A6),
+    },
+    {
+      'type': 'Medication Adherence',
+      'unit': '%',
+      'icon': Icons.medication_rounded,
+      'color': const Color(0xFFF43F5E),
+    },
   ];
+
+  Future<void> _doCheckIn() async {
+    if (_loggedInToday || _checkingIn) return;
+    setState(() => _checkingIn = true);
+    final result = await _gamificationService.recordDailyLogin();
+    if (!mounted) return;
+    if (result['success'] == true) {
+      final streak = (result['loginStreak'] as num?)?.toInt() ?? _loginStreak;
+      final raw = result['weekActivity'];
+      setState(() {
+        _loginStreak = streak;
+        _loggedInToday = true;
+        _checkingIn = false;
+        if (raw is List) {
+          _weekActivity = raw.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+        }
+        _points += result['alreadyLoggedToday'] == true ? 0 : 5;
+      });
+      if (result['alreadyLoggedToday'] != true) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Day logged! +5 pts 🔥 Keep your streak alive!'),
+          backgroundColor: Color(0xFF10B981),
+          duration: Duration(seconds: 3),
+        ));
+      }
+    } else {
+      setState(() => _checkingIn = false);
+    }
+  }
 
   void _addVitalReading(String type, String unit) {
     showDialog(
       context: context,
       builder: (context) => _AddVitalDialog(
         vitalType: type,
-        onSave: (value) async {
-          final newVital = Vital(
-            type: type,
+        unit: unit,
+        onSave: (value, notes, timestamp) async {
+          final res = await _healthTrackerService.addEntry(
+            vitalType: type,
             value: value,
             unit: unit,
-            status: _determineStatus(type, value),
+            notes: notes,
+            timestamp: timestamp,
           );
 
-          final res = await _vitalService.addVital(newVital);
           if (res['success']) {
             _loadAllData();
+            _gamificationService.logMetric().then((pts) {
+              if (!mounted) return;
+              final awarded = (pts['pointsAwarded'] as num?)?.toInt() ?? 5;
+              ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                content: Text('$type reading added! +$awarded pts 🏆'),
+                backgroundColor: const Color(0xFF10B981),
+                duration: const Duration(seconds: 3),
+              ));
+            });
+          } else {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Failed to add reading: ${res['message']}'),
+                  backgroundColor: Colors.red,
+                ),
+              );
+            }
           }
         },
       ),
     );
-  }
-
-  String _determineStatus(String type, String value) {
-    // Simple logic for demonstration
-    try {
-      double val = double.parse(value.split('/')[0]); // Handle BP like 120/80
-      if (type == 'Temperature' && val > 37.5) return 'Elevated';
-      if (type == 'Heart Rate' && val > 100) return 'High';
-      return 'Normal';
-    } catch (e) {
-      return 'Normal';
-    }
   }
 
   @override
@@ -192,15 +279,14 @@ class _HealthTrackerState extends State<HealthTracker> {
                           itemBuilder: (context, index) {
                             final typeInfo = _vitalTypes[index];
                             // Find most recent reading for this type
-                            final lastReading = _realVitals.firstWhere(
-                              (v) => v.type == typeInfo['type'],
-                              orElse: () => Vital(
-                                type: '',
-                                value: '--',
-                                unit: typeInfo['unit'],
-                                status: 'No Data',
-                              ),
-                            );
+                            HealthTrackerEntry? lastReading;
+                            try {
+                              lastReading = _latestEntries.firstWhere(
+                                (entry) => entry.vitalType == typeInfo['type'],
+                              );
+                            } catch (_) {
+                              lastReading = null;
+                            }
                             return _buildVitalCard(typeInfo, lastReading);
                           },
                         ),
@@ -278,9 +364,9 @@ class _HealthTrackerState extends State<HealthTracker> {
     );
   }
 
-  Widget _buildVitalCard(Map<String, dynamic> typeInfo, Vital lastReading) {
+  Widget _buildVitalCard(Map<String, dynamic> typeInfo, HealthTrackerEntry? lastReading) {
     final Color color = typeInfo['color'];
-    final bool hasData = lastReading.type.isNotEmpty;
+    final bool hasData = lastReading != null;
 
     return InkWell(
       onTap: () => _addVitalReading(typeInfo['type'], typeInfo['unit']),
@@ -320,23 +406,25 @@ class _HealthTrackerState extends State<HealthTracker> {
                   ),
                   decoration: BoxDecoration(
                     color:
-                        (lastReading.status == 'Normal' ||
-                            lastReading.status == 'Healthy' ||
-                            lastReading.status == 'No Data')
+                        (hasData && (lastReading.status == 'Normal' ||
+                            lastReading.status == 'Healthy'))
                         ? const Color(0xFF10B981).withValues(alpha: 0.1)
+                        : !hasData
+                        ? const Color(0xFF94A3B8).withValues(alpha: 0.1)
                         : const Color(0xFFEF4444).withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: Text(
-                    lastReading.status,
+                    hasData ? lastReading.status : 'No Data',
                     style: TextStyle(
                       fontSize: 10,
                       fontWeight: FontWeight.w900,
                       color:
-                          (lastReading.status == 'Normal' ||
-                              lastReading.status == 'Healthy' ||
-                              lastReading.status == 'No Data')
+                          (hasData && (lastReading.status == 'Normal' ||
+                              lastReading.status == 'Healthy'))
                           ? const Color(0xFF10B981)
+                          : !hasData
+                          ? const Color(0xFF94A3B8)
                           : const Color(0xFFEF4444),
                     ),
                   ),
@@ -357,7 +445,7 @@ class _HealthTrackerState extends State<HealthTracker> {
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 Text(
-                  lastReading.value,
+                  hasData ? lastReading.value : '--',
                   style: const TextStyle(
                     fontSize: 24,
                     fontWeight: FontWeight.w900,
@@ -381,7 +469,7 @@ class _HealthTrackerState extends State<HealthTracker> {
             const SizedBox(height: 8),
             Text(
               hasData
-                  ? DateFormat('MMM dd, HH:mm').format(lastReading.createdAt!)
+                  ? DateFormat('MMM dd, HH:mm').format(lastReading.timestamp)
                   : 'Never updated',
               style: const TextStyle(fontSize: 10, color: Color(0xFF94A3B8)),
             ),
@@ -412,78 +500,150 @@ class _HealthTrackerState extends State<HealthTracker> {
   }
 
   Widget _buildStreakCard() {
+    final bool hasStreak = _loginStreak > 0;
+    final Color streakColor = _loginStreak >= 7
+        ? const Color(0xFFEF4444)
+        : _loginStreak >= 3
+            ? const Color(0xFFD97706)
+            : const Color(0xFF3B82F6);
+
     return Container(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: const Color(0xFFE2E8F0)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10, offset: const Offset(0, 4))],
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: const Color(0xFFFDE68A),
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(
-              Icons.flash_on_rounded,
-              color: Color(0xFFD97706),
-              size: 32,
-            ),
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(color: streakColor.withValues(alpha: 0.12), shape: BoxShape.circle),
+                child: Icon(Icons.local_fire_department_rounded, color: streakColor, size: 28),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      hasStreak ? '$_loginStreak Day${_loginStreak == 1 ? '' : 's'} Streak! 🔥' : 'Start Your Streak!',
+                      style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w900, color: Color(0xFF0F172A)),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      hasStreak
+                          ? 'Login daily to keep your streak alive. +5 pts/day'
+                          : 'Login every day to earn 5 pts and build your streak.',
+                      style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(color: const Color(0xFF10B981).withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)),
+                child: const Text('+5/day', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF10B981))),
+              ),
+            ],
           ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  '7 Day Streak!',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w900,
-                    color: Color(0xFF0F172A),
+          const SizedBox(height: 18),
+          // Weekly Mon-Sun chart
+          if (_weekActivity.isNotEmpty) ...[
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: _weekActivity.map((day) {
+                final logged = day['logged'] == true;
+                final label = day['day'] as String;
+                final isToday = day['date'] == DateTime.now().toIso8601String().split('T')[0];
+                return Expanded(
+                  child: Column(
+                    children: [
+                      Text(
+                        label,
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: isToday ? FontWeight.w800 : FontWeight.w500,
+                          color: isToday ? streakColor : const Color(0xFF94A3B8),
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Container(
+                        width: 32,
+                        height: 32,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: logged ? streakColor : const Color(0xFFF1F5F9),
+                          border: isToday && !logged
+                              ? Border.all(color: streakColor, width: 2)
+                              : null,
+                        ),
+                        child: Center(
+                          child: logged
+                              ? const Icon(Icons.check_rounded, color: Colors.white, size: 16)
+                              : isToday
+                                  ? Icon(Icons.circle, color: streakColor, size: 8)
+                                  : const Icon(Icons.circle_outlined, color: Color(0xFFCBD5E1), size: 12),
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-                const Text(
-                  'You updated your vitals 7 days in a row. Keep it up!',
-                  style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
-                ),
-                const SizedBox(height: 12),
-                ElevatedButton.icon(
-                  onPressed: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(builder: (ctx) => StarClickGame()),
-                    );
-                  },
-                  icon: const Icon(Icons.videogame_asset_rounded, size: 16),
-                  label: const Text(
-                    'Earn Daily Points',
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFD97706),
-                    foregroundColor: Colors.white,
-                    elevation: 0,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 8,
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                ),
-              ],
+                );
+              }).toList(),
             ),
+            const SizedBox(height: 14),
+          ],
+          Row(
+            children: [
+              Expanded(
+                child: _loggedInToday
+                    ? Container(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF10B981).withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.3)),
+                        ),
+                        child: const Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.check_circle_rounded, color: Color(0xFF10B981), size: 18),
+                            SizedBox(width: 8),
+                            Text('Logged in today ✓', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF10B981))),
+                          ],
+                        ),
+                      )
+                    : ElevatedButton.icon(
+                        onPressed: _checkingIn ? null : _doCheckIn,
+                        icon: _checkingIn
+                            ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                            : const Icon(Icons.login_rounded, size: 16),
+                        label: const Text('Log In Today', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: streakColor,
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                      ),
+              ),
+              const SizedBox(width: 10),
+              OutlinedButton(
+                onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => StarClickGame())),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: streakColor,
+                  side: BorderSide(color: streakColor.withValues(alpha: 0.4)),
+                  padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+                child: const Icon(Icons.videogame_asset_rounded, size: 18),
+              ),
+            ],
           ),
         ],
       ),
@@ -583,9 +743,14 @@ class _HealthTrackerState extends State<HealthTracker> {
 
 class _AddVitalDialog extends StatefulWidget {
   final String vitalType;
-  final Function(String) onSave;
+  final String unit;
+  final Function(String value, String? notes, DateTime? timestamp) onSave;
 
-  const _AddVitalDialog({required this.vitalType, required this.onSave});
+  const _AddVitalDialog({
+    required this.vitalType,
+    required this.unit,
+    required this.onSave,
+  });
 
   @override
   State<_AddVitalDialog> createState() => _AddVitalDialogState();
@@ -593,17 +758,56 @@ class _AddVitalDialog extends StatefulWidget {
 
 class _AddVitalDialogState extends State<_AddVitalDialog> {
   final _valueController = TextEditingController();
+  final _notesController = TextEditingController();
+  DateTime? _selectedDateTime;
+
+  // Vitals that need text input (not pure numbers)
+  bool get _isTextInput =>
+      widget.vitalType == 'Blood Pressure'; // e.g. 120/80
 
   @override
   void dispose() {
     _valueController.dispose();
+    _notesController.dispose();
     super.dispose();
   }
 
   void _save() {
     if (_valueController.text.isEmpty) return;
-    widget.onSave(_valueController.text);
+    widget.onSave(
+      _valueController.text,
+      _notesController.text.isEmpty ? null : _notesController.text,
+      _selectedDateTime,
+    );
     Navigator.pop(context);
+  }
+
+  Future<void> _pickDateTime() async {
+    final date = await showDatePicker(
+      context: context,
+      initialDate: _selectedDateTime ?? DateTime.now(),
+      firstDate: DateTime.now().subtract(const Duration(days: 365)),
+      lastDate: DateTime.now(),
+    );
+
+    if (date != null && mounted) {
+      final time = await showTimePicker(
+        context: context,
+        initialTime: TimeOfDay.fromDateTime(_selectedDateTime ?? DateTime.now()),
+      );
+
+      if (time != null && mounted) {
+        setState(() {
+          _selectedDateTime = DateTime(
+            date.year,
+            date.month,
+            date.day,
+            time.hour,
+            time.minute,
+          );
+        });
+      }
+    }
   }
 
   @override
@@ -613,50 +817,96 @@ class _AddVitalDialogState extends State<_AddVitalDialog> {
       child: Container(
         constraints: const BoxConstraints(maxWidth: 400),
         padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Add ${widget.vitalType} Reading',
-              style: const TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.w900,
-                color: Color(0xFF0F172A),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Add ${widget.vitalType} Reading',
+                style: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w900,
+                  color: Color(0xFF0F172A),
+                ),
               ),
-            ),
-            const SizedBox(height: 20),
-            TextField(
-              controller: _valueController,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(
-                labelText: 'Value',
-                hintText: 'Enter reading',
-                border: OutlineInputBorder(),
+              const SizedBox(height: 20),
+              TextField(
+                controller: _valueController,
+                keyboardType: _isTextInput
+                    ? TextInputType.text
+                    : const TextInputType.numberWithOptions(decimal: true),
+                textInputAction: TextInputAction.done,
+                onSubmitted: (_) => _save(),
+                decoration: InputDecoration(
+                  labelText: 'Value',
+                  hintText: widget.vitalType == 'Blood Pressure'
+                      ? 'e.g. 120/80'
+                      : 'Enter reading',
+                  suffixText: widget.unit,
+                  border: const OutlineInputBorder(),
+                ),
               ),
-            ),
-            const SizedBox(height: 24),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () => Navigator.pop(context),
-                    child: const Text('Cancel'),
+              const SizedBox(height: 16),
+              TextField(
+                controller: _notesController,
+                maxLines: 2,
+                decoration: const InputDecoration(
+                  labelText: 'Notes (Optional)',
+                  hintText: 'Add any notes',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 16),
+              InkWell(
+                onTap: _pickDateTime,
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.grey),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.calendar_today, size: 20),
+                      const SizedBox(width: 12),
+                      Text(
+                        _selectedDateTime != null
+                            ? DateFormat('MMM dd, yyyy HH:mm').format(_selectedDateTime!)
+                            : 'Select Date & Time (Optional)',
+                        style: TextStyle(
+                          color: _selectedDateTime != null
+                              ? Colors.black87
+                              : Colors.grey,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: _save,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primaryColor,
+              ),
+              const SizedBox(height: 24),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text('Cancel'),
                     ),
-                    child: const Text('Save'),
                   ),
-                ),
-              ],
-            ),
-          ],
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: _save,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primaryColor,
+                      ),
+                      child: const Text('Save'),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );

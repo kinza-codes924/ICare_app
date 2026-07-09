@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:icare/services/api_service.dart';
 
 class CartService {
@@ -5,42 +6,74 @@ class CartService {
 
   // Get user's cart
   Future<Map<String, dynamic>> getCart() async {
-    final response = await _apiService.get('/cart');
-    return response.data['cart'];
+    try {
+      final response = await _apiService.get('/cart');
+      return {'success': true, 'cart': response.data['cart'] ?? [], 'total': response.data['total'] ?? '0'};
+    } catch (e) {
+      debugPrint('CartService.getCart error: $e');
+      return {'success': false, 'cart': [], 'total': '0'};
+    }
   }
 
-  // Add item to cart
-  Future<Map<String, dynamic>> addItem(String medicineId, int quantity) async {
-    final response = await _apiService.post('/cart/items', {
-      'medicineId': medicineId,
-      'quantity': quantity,
-    });
-    return response.data['cart'];
+  // Add item to cart — backend: POST /cart/add { productId, quantity }
+  Future<Map<String, dynamic>> addItem(String productId, int quantity, {String? prescriptionId}) async {
+    try {
+      final response = await _apiService.post('/cart/add', {
+        'productId': productId,
+        'quantity': quantity,
+        if (prescriptionId != null) 'prescriptionId': prescriptionId,
+      });
+      return response.data;
+    } catch (e) {
+      debugPrint('CartService.addItem error: $e');
+      rethrow;
+    }
   }
 
-  // Update item quantity in cart
-  Future<Map<String, dynamic>> updateItem(
-    String medicineId,
-    int quantity,
-  ) async {
-    final response = await _apiService.put('/cart/items', {
-      'medicineId': medicineId,
-      'quantity': quantity,
-    });
-    return response.data['cart'];
+  // Update item quantity — backend: PUT /cart/:id { quantity }
+  Future<Map<String, dynamic>> updateItem(String cartItemId, int quantity) async {
+    try {
+      final response = await _apiService.put('/cart/$cartItemId', {'quantity': quantity});
+      return response.data;
+    } catch (e) {
+      debugPrint('CartService.updateItem error: $e');
+      rethrow;
+    }
   }
 
-  // Remove item from cart (set quantity to 0)
-  Future<Map<String, dynamic>> removeItem(String medicineId) async {
-    final response = await _apiService.put('/cart/items', {
-      'medicineId': medicineId,
-      'quantity': 0,
-    });
-    return response.data['cart'];
+  // Remove item — backend: DELETE /cart/:id
+  Future<void> removeItem(String cartItemId) async {
+    try {
+      await _apiService.delete('/cart/$cartItemId');
+    } catch (e) {
+      debugPrint('CartService.removeItem error: $e');
+      rethrow;
+    }
   }
 
   // Clear entire cart
   Future<void> clearCart() async {
-    await _apiService.delete('/cart');
+    try {
+      await _apiService.delete('/cart');
+    } catch (e) {
+      debugPrint('CartService.clearCart error: $e');
+    }
+  }
+
+  // Checkout
+  Future<Map<String, dynamic>> checkout({
+    required String deliveryAddress,
+    String? pharmacyId,
+  }) async {
+    try {
+      final response = await _apiService.post('/cart/checkout', {
+        'deliveryAddress': deliveryAddress,
+        if (pharmacyId != null) 'pharmacyId': pharmacyId,
+      });
+      return response.data;
+    } catch (e) {
+      debugPrint('CartService.checkout error: $e');
+      rethrow;
+    }
   }
 }

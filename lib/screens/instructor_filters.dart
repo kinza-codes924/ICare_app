@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_size_matters/flutter_size_matters.dart';
-import 'package:icare/utils/imagePaths.dart';
 import 'package:icare/utils/theme.dart';
 import 'package:icare/utils/utils.dart';
 import 'package:icare/widgets/back_button.dart';
@@ -60,10 +59,10 @@ class _InstructorFiltersScreenState extends State<InstructorFiltersScreen> {
   ];
 
   final List<String> priceRangeList = [
-    'Under \$10',
-    '\$10 – \$25',
-    '\$25 – \$50',
-    'Above \$50',
+    'Under PKR 10',
+    'PKR 10 – PKR 25',
+    'PKR 25 – PKR 50',
+    'Above PKR 50',
   ];
 
   final List<String> reviewsList = [
@@ -231,7 +230,7 @@ class _InstructorFiltersScreenState extends State<InstructorFiltersScreen> {
               borderRadius: BorderRadius.circular(24),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.04),
+                  color: Colors.black.withValues(alpha: 0.04),
                   blurRadius: 24,
                   offset: const Offset(0, 12),
                 ),
@@ -380,7 +379,7 @@ class _InstructorFiltersScreenState extends State<InstructorFiltersScreen> {
                             borderRadius: BorderRadius.circular(16),
                           ),
                           elevation: 10,
-                          shadowColor: AppColors.primaryColor.withOpacity(0.4),
+                          shadowColor: AppColors.primaryColor.withValues(alpha: 0.4),
                         ),
                         child: const Text(
                           "Apply Filters",

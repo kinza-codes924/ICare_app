@@ -19,12 +19,12 @@ class OrderService {
 
   // Get user's orders
   Future<List<dynamic>> getMyOrders({String? status}) async {
-    String url = '/pharmacy/orders/my';
+    String url = '/pharmacy/orders';
     if (status != null && status.isNotEmpty) {
       url += '?status=$status';
     }
     final response = await _apiService.get(url);
-    return response.data['orders'] as List;
+    return (response.data['orders'] as List?) ?? [];
   }
 
   // Get order by ID

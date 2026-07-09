@@ -1,9 +1,9 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_size_matters/flutter_size_matters.dart';
 import 'package:icare/screens/login.dart';
-import 'package:icare/screens/select_user_type.dart';
 import 'package:icare/utils/theme.dart';
 import 'package:icare/utils/utils.dart';
 import 'package:icare/widgets/custom_button.dart';
@@ -19,21 +19,21 @@ class Walkthrough extends ConsumerStatefulWidget {
 class _WalkthroughState extends ConsumerState<Walkthrough> {
   final List<ContentConfig> listContentConfig = [
     ContentConfig(
-      title: "More Comfortable Chat With the Doctor",
+      title: "More Comfortable Chat With the Doctor".tr(),
       description:
-          "Book an appointment with doctor. Chat with doctor via appointment letter and get consultation.",
+          "Book an appointment with doctor. Chat with doctor via appointment letter and get consultation.".tr(),
       pathImage: "assets/images/walkthrough1.png",
     ),
     ContentConfig(
-      title: "More Comfortable Chat With the Doctor",
+      title: "More Comfortable Chat With the Doctor".tr(),
       description:
-          "Book an appointment with doctor. Chat with doctor via appointment letter and get consultation.",
+          "Book an appointment with doctor. Chat with doctor via appointment letter and get consultation.".tr(),
       pathImage: "assets/images/walkthrough2.png",
     ),
     ContentConfig(
-      title: "More Comfortable Chat With the Doctor",
+      title: "More Comfortable Chat With the Doctor".tr(),
       description:
-          "Book an appointment with doctor. Chat with doctor via appointment letter and get consultation.",
+          "Book an appointment with doctor. Chat with doctor via appointment letter and get consultation.".tr(),
       pathImage: "assets/images/walkthrough3.png",
     ),
   ];
@@ -176,7 +176,7 @@ class _WalkthroughState extends ConsumerState<Walkthrough> {
                                 ),
 
                                 CustomButton(
-                                  label: index != 2 ? "Next" : "Done",
+                                  label: index != 2 ? "Next".tr() : "Done".tr(),
                                   onPressed: () {
                                     if (index != 2) {
                                       goToTab(currentIndex + 1);
@@ -222,7 +222,7 @@ class _WalkthroughState extends ConsumerState<Walkthrough> {
                     );
                   },
                   labelColor: AppColors.primaryColor,
-                  label: "Skip",
+                  label: "Skip".tr(),
                   labelSize: 14,
                 ),
               ),

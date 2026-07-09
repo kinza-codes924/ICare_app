@@ -1,6 +1,9 @@
 class ApiConfig {
-  // Production backend URL
-  static const String baseUrl = 'https://api.icare-virtual-hospital.com/api';
+  // Production backend URL - Vercel (latest fixes)
+  static const String baseUrl = 'https://icare-backend-inky.vercel.app/api';
+
+  // Virtual Hospital VPS backend (old):
+  // static const String baseUrl = 'https://api.icare-virtual-hospital.com/api';
 
   // For local development (web/Chrome):
   // static const String baseUrl = 'http://localhost:5000/api';

@@ -10,9 +10,9 @@ class EmailVerificationScreen extends ConsumerStatefulWidget {
   final String email;
 
   const EmailVerificationScreen({
-    Key? key,
+    super.key,
     required this.email,
-  }) : super(key: key);
+  });
 
   @override
   ConsumerState<EmailVerificationScreen> createState() => _EmailVerificationScreenState();
@@ -135,7 +135,7 @@ class _EmailVerificationScreenState extends ConsumerState<EmailVerificationScree
                 width: 100,
                 height: 100,
                 decoration: BoxDecoration(
-                  color: AppColors.primaryColor.withOpacity(0.1),
+                  color: AppColors.primaryColor.withValues(alpha: 0.1),
                   shape: BoxShape.circle,
                 ),
                 child: Icon(

@@ -6,8 +6,9 @@ import 'package:icare/widgets/back_button.dart';
 
 class IntakeNotesScreen extends StatefulWidget {
   final AppointmentDetail appointment;
+  final bool isReadOnly;
 
-  const IntakeNotesScreen({super.key, required this.appointment});
+  const IntakeNotesScreen({super.key, required this.appointment, this.isReadOnly = false});
 
   @override
   State<IntakeNotesScreen> createState() => _IntakeNotesScreenState();
@@ -101,6 +102,26 @@ class _IntakeNotesScreenState extends State<IntakeNotesScreen> {
             fontWeight: FontWeight.w900,
           ),
         ),
+        actions: widget.isReadOnly
+            ? [
+                Container(
+                  margin: const EdgeInsets.only(right: 16),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF1F5F9),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.visibility_rounded, size: 14, color: Color(0xFF64748B)),
+                      SizedBox(width: 6),
+                      Text('Read Only', style: TextStyle(fontSize: 12, color: Color(0xFF64748B), fontWeight: FontWeight.w600)),
+                    ],
+                  ),
+                ),
+              ]
+            : null,
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -162,32 +183,28 @@ class _IntakeNotesScreenState extends State<IntakeNotesScreen> {
                       maxLines: 3,
                     ),
 
-                    const SizedBox(height: 48),
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        onPressed: _isSaving ? null : _saveIntakeNotes,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.primaryColor,
-                          padding: const EdgeInsets.symmetric(vertical: 18),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
+                    if (!widget.isReadOnly) ...[
+                      const SizedBox(height: 48),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          onPressed: _isSaving ? null : _saveIntakeNotes,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.primaryColor,
+                            padding: const EdgeInsets.symmetric(vertical: 18),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
                           ),
-                        ),
-                        child: _isSaving
-                            ? const CircularProgressIndicator(
-                                color: Colors.white,
-                              )
-                            : const Text(
-                                'Save Intake Notes',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 16,
-                                  color: Colors.white,
+                          child: _isSaving
+                              ? const CircularProgressIndicator(color: Colors.white)
+                              : const Text(
+                                  'Save Intake Notes',
+                                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white),
                                 ),
-                              ),
+                        ),
                       ),
-                    ),
+                    ],
                     const SizedBox(height: 40),
                   ],
                 ),
@@ -221,14 +238,16 @@ class _IntakeNotesScreenState extends State<IntakeNotesScreen> {
     String hint, {
     int maxLines = 1,
   }) {
+    final readOnly = widget.isReadOnly;
     return TextFormField(
       controller: controller,
       maxLines: maxLines,
+      readOnly: readOnly,
       decoration: InputDecoration(
-        hintText: hint,
+        hintText: controller.text.isEmpty ? (readOnly ? 'Not provided' : hint) : null,
         hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 14),
         filled: true,
-        fillColor: Colors.white,
+        fillColor: readOnly ? const Color(0xFFF8FAFC) : Colors.white,
         contentPadding: const EdgeInsets.all(16),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),

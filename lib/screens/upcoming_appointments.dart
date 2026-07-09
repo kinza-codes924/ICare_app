@@ -1,6 +1,7 @@
 import 'dart:developer';
 
 import 'package:easy_date_timeline/easy_date_timeline.dart';
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_size_matters/flutter_size_matters.dart';
 import 'package:icare/utils/theme.dart';
@@ -8,7 +9,6 @@ import 'package:icare/utils/utils.dart';
 import 'package:icare/widgets/appointment_card.dart';
 import 'package:icare/widgets/back_button.dart';
 import 'package:icare/widgets/custom_text.dart';
-import 'package:intl/intl.dart';
 
 class UpcomingAppointments extends StatefulWidget {
   const UpcomingAppointments({super.key});
@@ -29,7 +29,7 @@ class _UpcomingAppointmentsState extends State<UpcomingAppointments> {
       return Scaffold(
         appBar: AppBar(
           title: CustomText(
-            text: "Upcoming Appointments",
+            text: "Upcoming Appointments".tr(),
             fontSize: 16.78,
             fontFamily: "Gilroy-Bold",
             letterSpacing: -0.31,
@@ -49,7 +49,7 @@ class _UpcomingAppointmentsState extends State<UpcomingAppointments> {
               itemExtent: ScallingConfig.scale(70),
               itemBuilder:
                   (context, date, isSelected, isDisabled, isToday, onTap) {
-                    debugPrint(_selectedDate);
+                    debugPrint(_selectedDate?.toString());
                     return InkWell(
                       onTap: () {
                         onTap();
@@ -91,7 +91,7 @@ class _UpcomingAppointmentsState extends State<UpcomingAppointments> {
                     );
                   },
               onDateChange: (date) {
-                debugPrint(date);
+                debugPrint(date.toString());
                 setState(() {
                   log('$date ====      ');
                   _selectedDate = date;
@@ -134,7 +134,7 @@ class _UpcomingAppointmentsState extends State<UpcomingAppointments> {
               color: Colors.white,
               boxShadow: [
                 BoxShadow(
-                  color: const Color(0xFF0F172A).withOpacity(0.04),
+                  color: const Color(0xFF0F172A).withValues(alpha: 0.04),
                   blurRadius: 20,
                   offset: const Offset(0, 4),
                 ),
@@ -168,7 +168,7 @@ class _UpcomingAppointmentsState extends State<UpcomingAppointments> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               CustomText(
-                                text: "Upcoming Appointments",
+                                text: "Upcoming Appointments".tr(),
                                 fontSize: 24,
                                 fontWeight: FontWeight.w900,
                                 color: const Color(0xFF0F172A),
@@ -190,7 +190,7 @@ class _UpcomingAppointmentsState extends State<UpcomingAppointments> {
                             vertical: 8,
                           ),
                           decoration: BoxDecoration(
-                            color: AppColors.primaryColor.withOpacity(0.06),
+                            color: AppColors.primaryColor.withValues(alpha: 0.06),
                             borderRadius: BorderRadius.circular(20),
                           ),
                           child: Row(
@@ -240,13 +240,13 @@ class _UpcomingAppointmentsState extends State<UpcomingAppointments> {
                                   color: isSelected
                                       ? AppColors.primaryColor
                                       : isToday
-                                      ? AppColors.primaryColor.withOpacity(0.06)
+                                      ? AppColors.primaryColor.withValues(alpha: 0.06)
                                       : const Color(0xFFF8FAFC),
                                   borderRadius: BorderRadius.circular(16),
                                   border: isToday && !isSelected
                                       ? Border.all(
                                           color: AppColors.primaryColor
-                                              .withOpacity(0.2),
+                                              .withValues(alpha: 0.2),
                                           width: 1.5,
                                         )
                                       : null,
@@ -254,7 +254,7 @@ class _UpcomingAppointmentsState extends State<UpcomingAppointments> {
                                       ? [
                                           BoxShadow(
                                             color: AppColors.primaryColor
-                                                .withOpacity(0.25),
+                                                .withValues(alpha: 0.25),
                                             blurRadius: 12,
                                             offset: const Offset(0, 4),
                                           ),
@@ -283,7 +283,7 @@ class _UpcomingAppointmentsState extends State<UpcomingAppointments> {
                                         fontSize: 12,
                                         fontWeight: FontWeight.w500,
                                         color: isSelected
-                                            ? Colors.white.withOpacity(0.7)
+                                            ? Colors.white.withValues(alpha: 0.7)
                                             : const Color(0xFF94A3B8),
                                       ),
                                     ),

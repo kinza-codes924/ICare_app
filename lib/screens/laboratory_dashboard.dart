@@ -3,10 +3,9 @@ import '../services/laboratory_service.dart';
 import 'package:intl/intl.dart';
 import 'package:icare/screens/lab_bookings_management.dart';
 import 'package:icare/screens/lab_tests_management.dart';
+import 'package:icare/screens/lab_reports_screen.dart';
 import 'package:icare/screens/lab_analytics.dart';
-import 'package:icare/screens/settings.dart';
 import 'package:icare/screens/payment_invoices.dart';
-import 'package:icare/screens/tasks.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'dart:async';
 import 'package:icare/screens/lab_supplies_management.dart';
@@ -55,7 +54,7 @@ class _LaboratoryDashboardState extends State<LaboratoryDashboard>
   }
 
   void _startAutoRefresh() {
-    _refreshTimer = Timer.periodic(const Duration(seconds: 45), (timer) {
+    _refreshTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
       if (mounted && !_isLoading) {
         _checkForNewBookings();
       }
@@ -70,9 +69,15 @@ class _LaboratoryDashboardState extends State<LaboratoryDashboard>
 
       if (currentCount > _lastKnownBookingCount && _lastKnownBookingCount > 0) {
         _showNewBookingNotification();
-        _loadData(); // Full refresh to update UI
       }
       _lastKnownBookingCount = currentCount;
+
+      // Always update stats so completed/pending counts stay live
+      if (mounted) {
+        setState(() {
+          _stats = stats;
+        });
+      }
     } catch (e) {
       debugPrint('Error auto-refreshing: $e');
     }
@@ -146,15 +151,23 @@ class _LaboratoryDashboardState extends State<LaboratoryDashboard>
     });
 
     try {
+      debugPrint('🔍 LAB DASHBOARD - Loading profile...');
       final profile = await _labService.getProfile();
+      debugPrint('🔍 LAB DASHBOARD - Profile loaded: ${profile['labName'] ?? profile['lab_name']}');
+      debugPrint('🔍 LAB DASHBOARD - Profile _id: ${profile['_id']}');
+      debugPrint('🔍 LAB DASHBOARD - Profile keys: ${profile.keys.toList()}');
+      
+      debugPrint('🔍 LAB DASHBOARD - Fetching dashboard stats for labId: ${profile['_id']}');
       final stats = await _labService.getDashboardStats(profile['_id']);
+      debugPrint('✅ LAB DASHBOARD - Stats loaded: $stats');
 
-      // Load low stock alerts
+      // Load low stock alerts (optional feature, don't fail if endpoint missing)
       try {
         final lowStockData = await LabSupplyService.getLowStockAlerts();
         _lowStockCount = lowStockData['count'] ?? 0;
       } catch (e) {
-        debugPrint('Error loading low stock alerts: $e');
+        // Endpoint may not exist yet - gracefully ignore
+        debugPrint('Low stock alerts not available: $e');
         _lowStockCount = 0;
       }
 
@@ -166,6 +179,7 @@ class _LaboratoryDashboardState extends State<LaboratoryDashboard>
       });
       _animationController?.forward();
     } catch (e) {
+      debugPrint('❌ LAB DASHBOARD - Error loading data: $e');
       setState(() {
         _error = ErrorHandler.getFriendlyMessage(e);
         _isLoading = false;
@@ -245,6 +259,8 @@ class _LaboratoryDashboardState extends State<LaboratoryDashboard>
                               const SizedBox(height: 24),
                             ],
                             _buildStatsGrid(isMobile),
+                            const SizedBox(height: 16),
+                            _buildLabRevenueCard(),
                             const SizedBox(height: 32),
                             _buildQuickActions(isMobile),
                             const SizedBox(height: 32),
@@ -262,6 +278,8 @@ class _LaboratoryDashboardState extends State<LaboratoryDashboard>
                             const SizedBox(height: 24),
                           ],
                           _buildStatsGrid(isMobile),
+                          const SizedBox(height: 16),
+                          _buildLabRevenueCard(),
                           const SizedBox(height: 32),
                           _buildQuickActions(isMobile),
                           const SizedBox(height: 32),
@@ -284,7 +302,7 @@ class _LaboratoryDashboardState extends State<LaboratoryDashboard>
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: primaryColor.withOpacity(0.3),
+            color: primaryColor.withValues(alpha: 0.3),
             blurRadius: 24,
             offset: const Offset(0, 12),
           ),
@@ -298,7 +316,7 @@ class _LaboratoryDashboardState extends State<LaboratoryDashboard>
             child: Icon(
               Icons.science,
               size: 150,
-              color: Colors.white.withOpacity(0.05),
+              color: Colors.white.withValues(alpha: 0.05),
             ),
           ),
           Padding(
@@ -308,9 +326,9 @@ class _LaboratoryDashboardState extends State<LaboratoryDashboard>
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.15),
+                    color: Colors.white.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: Colors.white.withOpacity(0.2)),
+                    border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
                   ),
                   child: Icon(
                     Icons.biotech,
@@ -337,7 +355,7 @@ class _LaboratoryDashboardState extends State<LaboratoryDashboard>
                         'Welcome back! Here\'s your overview',
                         style: TextStyle(
                           fontSize: isMobile ? 14 : 16,
-                          color: Colors.white.withOpacity(0.85),
+                          color: Colors.white.withValues(alpha: 0.85),
                         ),
                       ),
                       if (!isMobile) ...[
@@ -354,7 +372,7 @@ class _LaboratoryDashboardState extends State<LaboratoryDashboard>
                               _labProfile?['city'] ?? 'Location not set',
                               style: TextStyle(
                                 fontSize: 14,
-                                color: Colors.white.withOpacity(0.85),
+                                color: Colors.white.withValues(alpha: 0.85),
                                 fontWeight: FontWeight.w500,
                               ),
                             ),
@@ -365,18 +383,21 @@ class _LaboratoryDashboardState extends State<LaboratoryDashboard>
                   ),
                 ),
                 IconButton(
-                  onPressed: () => Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (ctx) => const LabBookingsManagement(),
-                    ),
-                  ),
+                  onPressed: () async {
+                    await Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (ctx) => const LabBookingsManagement(),
+                      ),
+                    );
+                    _loadData();
+                  },
                   icon: const Icon(
                     Icons.notifications_none_rounded,
                     color: Colors.white,
                     size: 28,
                   ),
                   style: IconButton.styleFrom(
-                    backgroundColor: Colors.white.withOpacity(0.1),
+                    backgroundColor: Colors.white.withValues(alpha: 0.1),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
@@ -401,7 +422,7 @@ class _LaboratoryDashboardState extends State<LaboratoryDashboard>
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.orange.withOpacity(0.3),
+            color: Colors.orange.withValues(alpha: 0.3),
             blurRadius: 15,
             offset: const Offset(0, 8),
           ),
@@ -421,7 +442,7 @@ class _LaboratoryDashboardState extends State<LaboratoryDashboard>
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.2),
+                    color: Colors.white.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: const Icon(
@@ -448,7 +469,7 @@ class _LaboratoryDashboardState extends State<LaboratoryDashboard>
                         '$_lowStockCount ${_lowStockCount == 1 ? 'item needs' : 'items need'} restocking',
                         style: TextStyle(
                           fontSize: isMobile ? 13 : 14,
-                          color: Colors.white.withOpacity(0.9),
+                          color: Colors.white.withValues(alpha: 0.9),
                         ),
                       ),
                     ],
@@ -467,10 +488,74 @@ class _LaboratoryDashboardState extends State<LaboratoryDashboard>
     );
   }
 
+  Widget _buildLabRevenueCard() {
+    final revenue = (_stats?['revenue'] as num?)?.toInt() ?? 0;
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFF0B2D6E), Color(0xFF1565C0)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF0B2D6E).withValues(alpha: 0.25),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Icon(Icons.payments_rounded, color: Colors.white, size: 28),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'PKR $revenue',
+                  style: const TextStyle(
+                    fontSize: 28,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+                Text(
+                  'Total Revenue',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Colors.white.withValues(alpha: 0.85),
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildStatsGrid(bool isMobile) {
     final stats = [
       {
-        'title': 'Total Requests',
+        'title': 'Today',
+        'value': _stats?['todayBookings']?.toString() ?? '0',
+        'icon': Icons.today_rounded,
+        'trend': 'New',
+      },
+      {
+        'title': 'Total',
         'value': _stats?['totalBookings']?.toString() ?? '0',
         'icon': Icons.calendar_month_rounded,
         'trend': '+12%',
@@ -486,12 +571,6 @@ class _LaboratoryDashboardState extends State<LaboratoryDashboard>
         'value': _stats?['completedBookings']?.toString() ?? '0',
         'icon': Icons.task_alt_rounded,
         'trend': '+8%',
-      },
-      {
-        'title': 'Today',
-        'value': _stats?['todayBookings']?.toString() ?? '0',
-        'icon': Icons.today_rounded,
-        'trend': 'New',
       },
     ];
 
@@ -513,17 +592,17 @@ class _LaboratoryDashboardState extends State<LaboratoryDashboard>
             borderRadius: BorderRadius.circular(20),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.03),
+                color: Colors.black.withValues(alpha: 0.03),
                 blurRadius: 15,
                 offset: const Offset(0, 8),
               ),
               BoxShadow(
-                color: primaryColor.withOpacity(0.02),
+                color: primaryColor.withValues(alpha: 0.02),
                 blurRadius: 4,
                 offset: const Offset(0, 2),
               ),
             ],
-            border: Border.all(color: Colors.grey.withOpacity(0.1)),
+            border: Border.all(color: Colors.grey.withValues(alpha: 0.1)),
           ),
           child: Padding(
             padding: EdgeInsets.all(isMobile ? 16 : 20),
@@ -537,7 +616,7 @@ class _LaboratoryDashboardState extends State<LaboratoryDashboard>
                     Container(
                       padding: EdgeInsets.all(isMobile ? 10 : 12),
                       decoration: BoxDecoration(
-                        color: primaryColor.withOpacity(0.08),
+                        color: primaryColor.withValues(alpha: 0.08),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Icon(
@@ -553,10 +632,10 @@ class _LaboratoryDashboardState extends State<LaboratoryDashboard>
                       ),
                       decoration: BoxDecoration(
                         color: stat['trend'] == 'Needs Action'
-                            ? Colors.orange.withOpacity(0.1)
+                            ? Colors.orange.withValues(alpha: 0.1)
                             : stat['trend'] == 'New'
-                            ? accentColor.withOpacity(0.1)
-                            : Colors.green.withOpacity(0.1),
+                            ? accentColor.withValues(alpha: 0.1)
+                            : Colors.green.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: Text(
@@ -637,12 +716,12 @@ class _LaboratoryDashboardState extends State<LaboratoryDashboard>
             borderRadius: BorderRadius.circular(20),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.03),
+                color: Colors.black.withValues(alpha: 0.03),
                 blurRadius: 15,
                 offset: const Offset(0, 5),
               ),
             ],
-            border: Border.all(color: Colors.grey.withOpacity(0.1)),
+            border: Border.all(color: Colors.grey.withValues(alpha: 0.1)),
           ),
           child: Padding(
             padding: const EdgeInsets.all(20),
@@ -651,50 +730,50 @@ class _LaboratoryDashboardState extends State<LaboratoryDashboard>
               runSpacing: 16,
               children: [
                 _buildActionButton(
-                  'Diagnostic Queue',
-                  Icons.assignment_ind_rounded,
+                  'New Requests',
+                  Icons.pending_actions_rounded,
+                  () async {
+                    await Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (ctx) => const LabBookingsManagement(
+                          title: 'New Requests',
+                          initialFilter: 'pending',
+                        ),
+                      ),
+                    );
+                    _loadData();
+                  },
+                  isMobile,
+                ),
+                _buildActionButton(
+                  'Records',
+                  Icons.folder_copy_rounded,
                   () => Navigator.of(context).push(
                     MaterialPageRoute(
-                      builder: (ctx) => const LabBookingsManagement(
-                        title: 'Diagnostic Queue',
-                        initialFilter: 'pending',
-                      ),
+                      builder: (ctx) => const LabReportsScreen(),
                     ),
                   ),
                   isMobile,
                 ),
                 _buildActionButton(
-                  'Result Entry',
-                  Icons.biotech_rounded,
-                  () => Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (ctx) => const LabBookingsManagement(
-                        title: 'Result Entry',
-                        initialFilter: 'confirmed',
+                  'Orders',
+                  Icons.list_alt_rounded,
+                  () async {
+                    await Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (ctx) => const LabBookingsManagement(),
                       ),
-                    ),
-                  ),
+                    );
+                    _loadData();
+                  },
                   isMobile,
                 ),
                 _buildActionButton(
-                  'Clinical Archive',
-                  Icons.history_rounded,
+                  'Test Catalog',
+                  Icons.science_rounded,
                   () => Navigator.of(context).push(
                     MaterialPageRoute(
-                      builder: (ctx) => const LabBookingsManagement(
-                        title: 'Clinical Archive',
-                        initialFilter: 'completed',
-                      ),
-                    ),
-                  ),
-                  isMobile,
-                ),
-                _buildActionButton(
-                  'Supplies',
-                  Icons.inventory_2_outlined,
-                  () => Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (ctx) => const LabSuppliesManagement(),
+                      builder: (ctx) => const LabTestsManagement(),
                     ),
                   ),
                   isMobile,
@@ -717,22 +796,6 @@ class _LaboratoryDashboardState extends State<LaboratoryDashboard>
                   ),
                   isMobile,
                 ),
-                _buildActionButton(
-                  'Tasks',
-                  Icons.task_alt_rounded,
-                  () => Navigator.of(context).push(
-                    MaterialPageRoute(builder: (ctx) => const TaskScreen()),
-                  ),
-                  isMobile,
-                ),
-                _buildActionButton(
-                  'Settings',
-                  Icons.settings_outlined,
-                  () => Navigator.of(context).push(
-                    MaterialPageRoute(builder: (ctx) => const SettingsScreen()),
-                  ),
-                  isMobile,
-                ),
               ],
             ),
           ),
@@ -752,8 +815,8 @@ class _LaboratoryDashboardState extends State<LaboratoryDashboard>
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(16),
-        hoverColor: primaryColor.withOpacity(0.05),
-        splashColor: primaryColor.withOpacity(0.1),
+        hoverColor: primaryColor.withValues(alpha: 0.05),
+        splashColor: primaryColor.withValues(alpha: 0.1),
         child: Container(
           width: isMobile ? 140 : 160,
           padding: EdgeInsets.symmetric(
@@ -763,7 +826,7 @@ class _LaboratoryDashboardState extends State<LaboratoryDashboard>
           decoration: BoxDecoration(
             color: backgroundColor,
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: Colors.grey.withOpacity(0.15)),
+            border: Border.all(color: Colors.grey.withValues(alpha: 0.15)),
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -826,12 +889,12 @@ class _LaboratoryDashboardState extends State<LaboratoryDashboard>
             borderRadius: BorderRadius.circular(20),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.03),
+                color: Colors.black.withValues(alpha: 0.03),
                 blurRadius: 15,
                 offset: const Offset(0, 5),
               ),
             ],
-            border: Border.all(color: Colors.grey.withOpacity(0.1)),
+            border: Border.all(color: Colors.grey.withValues(alpha: 0.1)),
           ),
           child: Padding(
             padding: const EdgeInsets.all(8),
@@ -930,7 +993,7 @@ class _LaboratoryDashboardState extends State<LaboratoryDashboard>
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
+              color: color.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Icon(icon, color: color, size: 22),

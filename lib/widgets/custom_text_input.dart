@@ -30,8 +30,9 @@ class CustomInputField extends StatefulWidget {
   final EdgeInsetsGeometry? margin;
   final int? maxLines;
   final BoxBorder? borderType;
+  final VoidCallback? onEditingComplete;
   const CustomInputField({
-    Key? key,
+    super.key,
     this.title,
     required this.hintText,
     this.leadingIcon,
@@ -60,7 +61,8 @@ class CustomInputField extends StatefulWidget {
     this.titleFontSize = 15,
     this.titleFontWeight = FontWeight.w600,
     this.margin,
-  }) : super(key: key);
+    this.onEditingComplete,
+  });
 
   @override
   State<CustomInputField> createState() => _CustomInputFieldState();
@@ -120,6 +122,11 @@ class _CustomInputFieldState extends State<CustomInputField> {
                     maxLines: widget.maxLines ?? 1,
                     controller: widget.controller,
                     obscureText: widget.isPassword ? _obscureText : false,
+                    enableInteractiveSelection: true,
+                    contextMenuBuilder: (context, editableTextState) =>
+                        AdaptiveTextSelectionToolbar.editableText(
+                          editableTextState: editableTextState,
+                        ),
                     onChanged: widget.onChanged,
                     validator: widget.validator,
                     keyboardType: widget.keyboardType,
@@ -127,6 +134,7 @@ class _CustomInputFieldState extends State<CustomInputField> {
                     focusNode: widget.focusNode,
                     autofocus: widget.autoFocus,
                     enabled: widget.enabled,
+                    onEditingComplete: widget.onEditingComplete,
                     style:
                         widget.textStyle ??
                         const TextStyle(

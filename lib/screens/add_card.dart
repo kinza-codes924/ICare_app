@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_size_matters/flutter_size_matters.dart';
 import 'package:icare/screens/confirm_details.dart';
@@ -34,7 +35,7 @@ class _AddCardState extends State<AddCard> {
       appBar: AppBar(
         leading: CustomBackButton(),
         automaticallyImplyLeading: false,
-        title: CustomText(text: "Add Card"),
+        title: CustomText(text: "Add Card".tr()),
       ),
       body: SingleChildScrollView(
         child: Center(
@@ -195,7 +196,7 @@ class _AddCardState extends State<AddCard> {
               borderRadius: BorderRadius.circular(24),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.04),
+                  color: Colors.black.withValues(alpha: 0.04),
                   blurRadius: 24,
                   offset: const Offset(0, 12),
                 ),
@@ -279,7 +280,7 @@ class _AddCardState extends State<AddCard> {
                         borderRadius: BorderRadius.circular(16),
                       ),
                       elevation: 8,
-                      shadowColor: AppColors.primaryColor.withOpacity(0.4),
+                      shadowColor: AppColors.primaryColor.withValues(alpha: 0.4),
                     ),
                     child: const Text(
                       "Save Card Details",

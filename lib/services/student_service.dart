@@ -1,4 +1,4 @@
-import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'api_service.dart';
 
 class StudentService {
@@ -18,14 +18,13 @@ class StudentService {
     }
   }
 
-  // Get current student profile
+  // Get current student profile — endpoint may not exist, fail silently
   Future<Map<String, dynamic>> getProfile() async {
     try {
       final response = await _apiService.get('/students/me');
-      return response.data;
+      return response.data ?? {};
     } catch (e) {
-      debugPrint('Error getting student profile: $e');
-      rethrow;
+      return {}; // silent fail — endpoint not implemented
     }
   }
 

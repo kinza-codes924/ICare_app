@@ -1,14 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/widgets.dart';
-import 'package:flutter_size_matters/flutter_size_matters.dart';
 import 'package:icare/models/lab.dart';
 import 'package:icare/screens/book_lab.dart';
 import 'package:icare/utils/imagePaths.dart';
 import 'package:icare/utils/theme.dart';
-import 'package:icare/utils/utils.dart';
 import 'package:icare/widgets/custom_button.dart';
 import 'package:icare/widgets/custom_text.dart';
-import 'package:icare/widgets/svg_wrapper.dart';
 
 class LabWidget extends StatelessWidget {
   const LabWidget({
@@ -31,12 +27,12 @@ class LabWidget extends StatelessWidget {
         border: Border.all(color: const Color(0xFFF1F5F9), width: 1.5),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF0F172A).withOpacity(0.05),
+            color: const Color(0xFF0F172A).withValues(alpha: 0.05),
             blurRadius: 24,
             offset: const Offset(0, 12),
           ),
           BoxShadow(
-            color: AppColors.primaryColor.withOpacity(0.04),
+            color: AppColors.primaryColor.withValues(alpha: 0.04),
             blurRadius: 40,
             offset: const Offset(0, 20),
           ),
@@ -56,7 +52,7 @@ class LabWidget extends StatelessWidget {
                       borderRadius: BorderRadius.circular(24),
                       boxShadow: [
                         BoxShadow(
-                          color: AppColors.primaryColor.withOpacity(0.1),
+                          color: AppColors.primaryColor.withValues(alpha: 0.1),
                           blurRadius: 10,
                           offset: const Offset(0, 4),
                         ),
@@ -144,7 +140,7 @@ class LabWidget extends StatelessWidget {
                               BoxShadow(
                                 color: const Color(
                                   0xFFD97706,
-                                ).withOpacity(0.08),
+                                ).withValues(alpha: 0.08),
                                 blurRadius: 10,
                                 offset: const Offset(0, 4),
                               ),
@@ -287,7 +283,7 @@ class LabWidget extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.08),
+        color: color.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(8),
       ),
       child: CustomText(

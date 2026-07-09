@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:icare/providers/auth_provider.dart';
+import 'package:icare/screens/certificate_templates_screen.dart';
 import 'package:icare/services/course_service.dart';
-import 'package:icare/utils/theme.dart';
 import 'package:icare/widgets/back_button.dart';
 import 'package:intl/intl.dart';
 
@@ -16,7 +16,6 @@ class CertificatesScreen extends ConsumerStatefulWidget {
 class _CertificatesScreenState extends ConsumerState<CertificatesScreen> {
   final CourseService _courseService = CourseService();
   bool _isLoading = true;
-  bool _isDownloading = false;
   List<dynamic> _certificates = [];
 
   @override
@@ -79,7 +78,7 @@ class _CertificatesScreenState extends ConsumerState<CertificatesScreen> {
               shape: BoxShape.circle,
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
+                  color: Colors.black.withValues(alpha: 0.05),
                   blurRadius: 20,
                   offset: const Offset(0, 10),
                 ),
@@ -134,7 +133,7 @@ class _CertificatesScreenState extends ConsumerState<CertificatesScreen> {
             border: Border.all(color: const Color(0xFFE2E8F0)),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.02),
+                color: Colors.black.withValues(alpha: 0.02),
                 blurRadius: 10,
                 offset: const Offset(0, 4),
               ),
@@ -206,214 +205,41 @@ class _CertificatesScreenState extends ConsumerState<CertificatesScreen> {
   }
 
   void _viewCertificate(dynamic certificate) {
-    final createdAtStr = certificate['createdAt']?.toString();
-    final issuedAt = createdAtStr != null
-        ? DateTime.tryParse(createdAtStr)
-        : null;
-    final issuedAtFormatted = issuedAt != null
-        ? DateFormat('MMM dd, yyyy').format(issuedAt)
-        : 'N/A';
-    final userName = ref.read(authProvider).user?.name ?? 'Learner';
+    final user = ref.read(authProvider).user;
+    final studentName = certificate['studentName']?.toString().isNotEmpty == true
+        ? certificate['studentName'].toString()
+        : user?.name ?? 'Student';
+    final courseTitle = certificate['courseName']?.toString() ??
+        certificate['course']?['title']?.toString() ?? 'Course';
+    final instructorName = certificate['instructorName']?.toString() ?? 'Instructor';
+    final enrollmentId = certificate['enrollmentId']?.toString() ?? '';
+    final courseId = certificate['courseId']?.toString() ??
+        certificate['course']?['_id']?.toString() ?? '';
+    final completionDate = certificate['completionDate'] != null
+        ? DateTime.tryParse(certificate['completionDate'].toString())
+        : certificate['issuedAt'] != null
+            ? DateTime.tryParse(certificate['issuedAt'].toString())
+            : null;
 
-    // Show a certificate preview dialog
-    showDialog(
-      context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => Dialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(24),
-          ),
-          insetPadding: const EdgeInsets.all(20),
-          child: Container(
-            padding: const EdgeInsets.all(32),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(24),
-              border: Border.all(color: const Color(0xFFF1F5F9), width: 8),
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(
-                  Icons.workspace_premium,
-                  color: Color(0xFFD97706),
-                  size: 64,
-                ),
-                const SizedBox(height: 24),
-                const Text(
-                  'CERTIFICATE OF COMPLETION',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 2,
-                    color: Color(0xFF64748B),
-                  ),
-                ),
-                const SizedBox(height: 32),
-                const Text(
-                  'This is to certify that',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontStyle: FontStyle.italic,
-                    color: Color(0xFF334155),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  userName,
-                  style: const TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.w900,
-                    color: Color(0xFF0F172A),
-                  ),
-                ),
-                const SizedBox(height: 24),
-                const Text(
-                  'has successfully completed the program',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontStyle: FontStyle.italic,
-                    color: Color(0xFF334155),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  certificate['course']?['title'] ?? 'Medical Training Program',
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.primaryColor,
-                  ),
-                ),
-                const SizedBox(height: 48),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Column(
-                      children: [
-                        const Text(
-                          'Dr. Sarah Johnson',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF0F172A),
-                          ),
-                        ),
-                        Container(
-                          height: 1,
-                          width: 120,
-                          color: const Color(0xFFE2E8F0),
-                          margin: const EdgeInsets.symmetric(vertical: 4),
-                        ),
-                        const Text(
-                          'Chief Medical Officer',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Color(0xFF64748B),
-                          ),
-                        ),
-                      ],
-                    ),
-                    Column(
-                      children: [
-                        Text(
-                          issuedAtFormatted,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF0F172A),
-                          ),
-                        ),
-                        Container(
-                          height: 1,
-                          width: 120,
-                          color: const Color(0xFFE2E8F0),
-                          margin: const EdgeInsets.symmetric(vertical: 4),
-                        ),
-                        const Text(
-                          'Issue Date',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Color(0xFF64748B),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 40),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: _isDownloading
-                        ? null
-                        : () async {
-                            setDialogState(() => _isDownloading = true);
+    CertificateTemplate template;
+    switch ((certificate['template']?.toString() ?? '').toLowerCase()) {
+      case 'modern':      template = CertificateTemplate.modern; break;
+      case 'elegant':     template = CertificateTemplate.elegant; break;
+      case 'achievement': template = CertificateTemplate.achievement; break;
+      default:            template = CertificateTemplate.classic;
+    }
 
-                            // Simulate PDF Generation
-                            await Future.delayed(const Duration(seconds: 2));
-
-                            if (context.mounted) {
-                              setDialogState(() => _isDownloading = false);
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text(
-                                    'Certificate downloaded successfully!',
-                                  ),
-                                  backgroundColor: Colors.green,
-                                ),
-                              );
-                              Navigator.pop(context);
-                            }
-                          },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primaryColor,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      elevation: 0,
-                    ),
-                    child: _isDownloading
-                        ? const Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              SizedBox(
-                                width: 20,
-                                height: 20,
-                                child: CircularProgressIndicator(
-                                  color: Colors.white,
-                                  strokeWidth: 2,
-                                ),
-                              ),
-                              SizedBox(width: 12),
-                              Text(
-                                'Generating PDF...',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white,
-                                ),
-                              ),
-                            ],
-                          )
-                        : const Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(Icons.download_rounded, color: Colors.white),
-                              SizedBox(width: 8),
-                              Text(
-                                'Download Official Certificate',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white,
-                                ),
-                              ),
-                            ],
-                          ),
-                  ),
-                ),
-              ],
-            ),
-          ),
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => LmsCertificateScreen(
+          studentName: studentName,
+          courseTitle: courseTitle,
+          instructorName: instructorName,
+          template: template,
+          completionDate: completionDate,
+          enrollmentId: enrollmentId,
+          courseId: courseId,
         ),
       ),
     );

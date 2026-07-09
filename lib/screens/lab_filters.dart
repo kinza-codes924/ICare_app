@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_size_matters/flutter_size_matters.dart';
-import 'package:icare/utils/imagePaths.dart';
 import 'package:icare/utils/theme.dart';
 import 'package:icare/utils/utils.dart';
 import 'package:icare/widgets/back_button.dart';
@@ -8,7 +7,6 @@ import 'package:icare/widgets/choose_location_button.dart';
 import 'package:icare/widgets/custom_button.dart';
 import 'package:icare/widgets/custom_drop_down.dart';
 import 'package:icare/widgets/custom_text.dart';
-import 'package:icare/widgets/svg_wrapper.dart';
 import 'package:icare/widgets/toggle_switch_button_with_placeHolder.dart';
 
 class LabFilters extends StatefulWidget {
@@ -157,7 +155,7 @@ class _LabFiltersState extends State<LabFilters> {
               borderRadius: BorderRadius.circular(24),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.04),
+                  color: Colors.black.withValues(alpha: 0.04),
                   blurRadius: 24,
                   offset: const Offset(0, 12),
                 ),
@@ -243,7 +241,7 @@ class _LabFiltersState extends State<LabFilters> {
                                 ),
                                 Switch(
                                   value: _isHomeSample,
-                                  activeColor: AppColors.primaryColor,
+                                  activeThumbColor: AppColors.primaryColor,
                                   onChanged: (val) {
                                     setState(() => _isHomeSample = val);
                                   },
@@ -315,7 +313,7 @@ class _LabFiltersState extends State<LabFilters> {
                             borderRadius: BorderRadius.circular(16),
                           ),
                           elevation: 10,
-                          shadowColor: AppColors.primaryColor.withOpacity(0.4),
+                          shadowColor: AppColors.primaryColor.withValues(alpha: 0.4),
                         ),
                         child: const Text(
                           "Show Laboratories",

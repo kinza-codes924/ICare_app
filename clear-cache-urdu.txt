@@ -1,0 +1,39 @@
+=== Browser Cache Clear Karne Ka Tareeqa ===
+
+SABSE AASAN TAREEQA:
+
+1. Chrome/Edge Browser Band Karo (completely close)
+2. Phir se kholo aur ye steps follow karo:
+
+   a) F12 press karo (DevTools khulega)
+   b) Application tab pe jao (upar menu mein)
+   c) Left side mein "Service Workers" pe click karo
+   d) "Unregister" button dabao
+   e) Left side mein "Storage" pe click karo
+   f) "Clear site data" button dabao
+   g) DevTools band karo
+   h) Ctrl + Shift + Delete dabao
+   i) "All time" select karo
+   j) Sab checkboxes tick karo
+   k) "Clear data" dabao
+   l) Browser completely band karo
+   m) Phir se kholo aur website kholo
+
+YA PHIR:
+
+Incognito/Private Window mein kholo:
+- Ctrl + Shift + N (Chrome)
+- Ctrl + Shift + P (Firefox)
+- Phir website kholo: https://icare-diix1jkcv-wajahatfrontdev-8765s-projects.vercel.app
+
+YA PHIR:
+
+Koi aur browser use karo jo pehle kabhi use nahi kiya (Edge, Firefox, etc.)
+
+=== Test Karne Ke Liye ===
+
+1. Payment: Appointment book karo → Pay Now → Green success dialog dikhna chahiye
+2. Certificate: Doctor login → Certificates → Download button → PDF download hoga
+3. Jitsi: Live session join karo → Seedha video call, NO LOGIN SCREEN
+
+Agar phir bhi nahi dikha toh batao!

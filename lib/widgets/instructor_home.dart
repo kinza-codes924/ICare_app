@@ -304,7 +304,7 @@ class _InstructorWebDashboardState extends State<_InstructorWebDashboard> {
             border: Border.all(color: const Color(0xFFE2E8F0)),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.04),
+                color: Colors.black.withValues(alpha: 0.04),
                 blurRadius: 12,
                 offset: const Offset(0, 4),
               ),
@@ -347,7 +347,7 @@ class _InstructorWebDashboardState extends State<_InstructorWebDashboard> {
               borderRadius: BorderRadius.circular(14),
             ),
             elevation: 8,
-            shadowColor: AppColors.primaryColor.withOpacity(0.35),
+            shadowColor: AppColors.primaryColor.withValues(alpha: 0.35),
           ),
         ),
       ],
@@ -369,12 +369,12 @@ class _InstructorWebDashboardState extends State<_InstructorWebDashboard> {
               borderRadius: BorderRadius.circular(20),
               boxShadow: [
                 BoxShadow(
-                  color: (stat['color'] as Color).withOpacity(0.07),
+                  color: (stat['color'] as Color).withValues(alpha: 0.07),
                   blurRadius: 20,
                   offset: const Offset(0, 8),
                 ),
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.03),
+                  color: Colors.black.withValues(alpha: 0.03),
                   blurRadius: 8,
                   offset: const Offset(0, 2),
                 ),
@@ -385,7 +385,7 @@ class _InstructorWebDashboardState extends State<_InstructorWebDashboard> {
                 Container(
                   padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
-                    color: (stat['color'] as Color).withOpacity(0.1),
+                    color: (stat['color'] as Color).withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(16),
                   ),
                   child: Icon(
@@ -448,7 +448,7 @@ class _InstructorWebDashboardState extends State<_InstructorWebDashboard> {
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             decoration: BoxDecoration(
-              color: AppColors.primaryColor.withOpacity(0.07),
+              color: AppColors.primaryColor.withValues(alpha: 0.07),
               borderRadius: BorderRadius.circular(10),
             ),
             child: Text(
@@ -491,7 +491,7 @@ class _InstructorWebDashboardState extends State<_InstructorWebDashboard> {
               borderRadius: BorderRadius.circular(20),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
+                  color: Colors.black.withValues(alpha: 0.05),
                   blurRadius: 20,
                   offset: const Offset(0, 8),
                 ),
@@ -504,7 +504,7 @@ class _InstructorWebDashboardState extends State<_InstructorWebDashboard> {
                 Container(
                   height: 160,
                   decoration: BoxDecoration(
-                    color: AppColors.primaryColor.withOpacity(0.1),
+                    color: AppColors.primaryColor.withValues(alpha: 0.1),
                     borderRadius: const BorderRadius.vertical(
                       top: Radius.circular(20),
                     ),
@@ -513,7 +513,7 @@ class _InstructorWebDashboardState extends State<_InstructorWebDashboard> {
                     child: Icon(
                       Icons.school_rounded,
                       size: 60,
-                      color: AppColors.primaryColor.withOpacity(0.5),
+                      color: AppColors.primaryColor.withValues(alpha: 0.5),
                     ),
                   ),
                 ),
@@ -637,7 +637,7 @@ class _InstructorWebDashboardState extends State<_InstructorWebDashboard> {
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.12),
+                    color: Colors.black.withValues(alpha: 0.12),
                     blurRadius: 20,
                     offset: const Offset(0, 8),
                   ),
@@ -654,7 +654,7 @@ class _InstructorWebDashboardState extends State<_InstructorWebDashboard> {
                         end: Alignment.bottomCenter,
                         colors: [
                           Colors.transparent,
-                          Colors.black.withOpacity(0.72),
+                          Colors.black.withValues(alpha: 0.72),
                         ],
                       ),
                     ),

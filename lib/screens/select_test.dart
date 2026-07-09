@@ -3,7 +3,6 @@ import 'package:icare/models/lab_test.dart';
 import 'package:icare/screens/confirm_booking.dart';
 import 'package:icare/services/laboratory_service.dart';
 import 'package:icare/utils/theme.dart';
-import 'package:icare/utils/utils.dart';
 import 'package:icare/widgets/back_button.dart';
 import 'package:icare/widgets/custom_text.dart';
 
@@ -31,7 +30,9 @@ class _SelectTestState extends State<SelectTest> {
 
   Future<void> _fetchLabTests() async {
     try {
-      final labId = widget.bookingData['labId'];
+      // Use profileId for fetching lab details (availableTests),
+      // labId (user._id) is only used for booking creation routes
+      final labId = widget.bookingData['labProfileId'] ?? widget.bookingData['labId'];
       if (labId == null) throw 'Lab ID is missing';
 
       final lab = await _labService.getLabById(labId);
@@ -45,10 +46,32 @@ class _SelectTestState extends State<SelectTest> {
         );
       }).toList();
 
+      // Pre-select any tests whose names match what the patient chose in Step 2
+      final preSelected = (widget.bookingData['preSelectedTests'] as List?)
+          ?.map((t) => t.toString().toLowerCase())
+          .toList() ?? [];
+      final preSelectedTests = <LabTest>[];
+      if (preSelected.isNotEmpty) {
+        for (final test in loadedTests) {
+          final testNameLower = test.name.toLowerCase();
+          final matches = preSelected.any((pre) {
+            final words = pre.replaceAll(RegExp(r'[^\w\s]'), '')
+                .split(' ')
+                .where((w) => w.length > 2)
+                .toList();
+            return words.any((w) => testNameLower.contains(w));
+          });
+          if (matches) preSelectedTests.add(test);
+        }
+      }
+
       if (mounted) {
         setState(() {
           _allTests = loadedTests;
           _filteredTests = loadedTests;
+          if (preSelectedTests.isNotEmpty) {
+            _selectedTests.addAll(preSelectedTests);
+          }
           _isLoading = false;
         });
       }
@@ -153,7 +176,7 @@ class _SelectTestState extends State<SelectTest> {
             borderRadius: BorderRadius.circular(16),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.04),
+                color: Colors.black.withValues(alpha: 0.04),
                 blurRadius: 10,
                 offset: const Offset(0, 4),
               ),
@@ -241,7 +264,7 @@ class _SelectTestState extends State<SelectTest> {
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             color: isSelected
-                ? AppColors.primaryColor.withOpacity(0.05)
+                ? AppColors.primaryColor.withValues(alpha: 0.05)
                 : Colors.white,
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
@@ -253,7 +276,7 @@ class _SelectTestState extends State<SelectTest> {
             boxShadow: isSelected
                 ? [
                     BoxShadow(
-                      color: AppColors.primaryColor.withOpacity(0.1),
+                      color: AppColors.primaryColor.withValues(alpha: 0.1),
                       blurRadius: 10,
                       offset: const Offset(0, 4),
                     ),
@@ -298,12 +321,12 @@ class _SelectTestState extends State<SelectTest> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      "Rs. ${test.price.toInt()}",
+                      "PKR ${test.price.toInt()}",
                       style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
                         color: isSelected
-                            ? AppColors.primaryColor.withOpacity(0.7)
+                            ? AppColors.primaryColor.withValues(alpha: 0.7)
                             : const Color(0xFF64748B),
                       ),
                     ),
@@ -329,7 +352,7 @@ class _SelectTestState extends State<SelectTest> {
           borderRadius: BorderRadius.circular(24),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.2),
+              color: Colors.black.withValues(alpha: 0.2),
               blurRadius: 20,
               offset: const Offset(0, 10),
             ),
@@ -351,7 +374,7 @@ class _SelectTestState extends State<SelectTest> {
                     ),
                   ),
                   Text(
-                    "Total: Rs. ${_totalPrice.toInt()}",
+                    "Total: PKR ${_totalPrice.toInt()}",
                     style: const TextStyle(
                       color: Colors.white,
                       fontSize: 20,

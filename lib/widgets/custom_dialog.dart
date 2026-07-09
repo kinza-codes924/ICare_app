@@ -2,10 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_size_matters/flutter_size_matters.dart';
 import 'package:icare/utils/imagePaths.dart';
 import 'package:icare/utils/theme.dart';
-import 'package:icare/utils/utils.dart';
 import 'package:icare/widgets/svg_wrapper.dart';
 import 'custom_button.dart';
-import 'custom_text.dart';
 
 enum DialogStatus { success, error, warning, failed, info }
 
@@ -32,8 +30,8 @@ class CustomDialog {
     Color? backgroundColor,
     double borderRadius = 20,
   }) {
-    final _statusIcon = _getStatusIcon(status);
-    final _statusColor = _getStatusColor(status);
+    final statusIcon = _getStatusIcon(status);
+    final statusColor = _getStatusColor(status);
 
     return showDialog<T>(
       context: context,
@@ -64,7 +62,7 @@ class CustomDialog {
                         shape: BoxShape.circle,
                       ),
                       child: SvgWrapper(
-                        assetPath: _statusIcon,
+                        assetPath: statusIcon,
                         width: ScallingConfig.scale(60),
                         height: ScallingConfig.scale(60),
                       ),

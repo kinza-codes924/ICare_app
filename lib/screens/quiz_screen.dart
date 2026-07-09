@@ -194,8 +194,8 @@ class _QuizScreenState extends State<QuizScreen> {
                       color:
                           _selectedAnswers[_currentQuestionIndex] ==
                               question.correctAnswer
-                          ? Colors.green.withOpacity(0.1)
-                          : Colors.red.withOpacity(0.1),
+                          ? Colors.green.withValues(alpha: 0.1)
+                          : Colors.red.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
@@ -230,7 +230,7 @@ class _QuizScreenState extends State<QuizScreen> {
             Expanded(
               child: ListView.separated(
                 itemCount: question.options.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 16),
+                separatorBuilder: (_, _) => const SizedBox(height: 16),
                 itemBuilder: (context, index) {
                   final isSelected =
                       _selectedAnswers[_currentQuestionIndex] == index;
@@ -243,7 +243,7 @@ class _QuizScreenState extends State<QuizScreen> {
                   if (_showReview) {
                     if (isCorrect) {
                       borderColor = Colors.green;
-                      bgColor = Colors.green.withOpacity(0.05);
+                      bgColor = Colors.green.withValues(alpha: 0.05);
                       trailing = const Icon(
                         Icons.check_circle,
                         color: Colors.green,
@@ -251,7 +251,7 @@ class _QuizScreenState extends State<QuizScreen> {
                       );
                     } else if (isSelected && !isCorrect) {
                       borderColor = Colors.red;
-                      bgColor = Colors.red.withOpacity(0.05);
+                      bgColor = Colors.red.withValues(alpha: 0.05);
                       trailing = const Icon(
                         Icons.cancel,
                         color: Colors.red,
@@ -260,7 +260,7 @@ class _QuizScreenState extends State<QuizScreen> {
                     }
                   } else if (isSelected) {
                     borderColor = AppColors.primaryColor;
-                    bgColor = AppColors.primaryColor.withOpacity(0.1);
+                    bgColor = AppColors.primaryColor.withValues(alpha: 0.1);
                   }
 
                   return InkWell(

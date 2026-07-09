@@ -56,10 +56,20 @@ class _PatientFiltersScreenState extends State<PatientFiltersScreen> {
     "Veterinary",
   ];
 
+  final List<String> spokenLanguagesList = [
+    'Urdu',
+    'Punjabi',
+    'Pashto',
+    'Sindhi',
+    'Balochi',
+    'English',
+  ];
+
   String? _selectedSpeciality;
   String? _selectedReviews;
   String? _selectedSortByOption;
   String? _selectedPharmacyType;
+  String? _selectedSpokenLanguage;
   bool _medicineAvailablity = false;
   bool _homeAvailablity = false;
 
@@ -126,6 +136,19 @@ class _PatientFiltersScreenState extends State<PatientFiltersScreen> {
                 onChanged: (value) {
                   setState(() {
                     _selectedSortByOption = value!;
+                  });
+                },
+              ),
+              CustomDropdown<String>(
+                title: "Spoken Language",
+                selectedItem: _selectedSpokenLanguage,
+                margin: EdgeInsets.symmetric(
+                  vertical: ScallingConfig.verticalScale(6),
+                ),
+                items: spokenLanguagesList,
+                onChanged: (value) {
+                  setState(() {
+                    _selectedSpokenLanguage = value!;
                   });
                 },
               ),
@@ -216,7 +239,7 @@ class _PatientFiltersScreenState extends State<PatientFiltersScreen> {
               borderRadius: BorderRadius.circular(24),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.04),
+                  color: Colors.black.withValues(alpha: 0.04),
                   blurRadius: 24,
                   offset: const Offset(0, 12),
                 ),
@@ -268,6 +291,14 @@ class _PatientFiltersScreenState extends State<PatientFiltersScreen> {
                       _selectedSortByOption,
                       (val) {
                         setState(() => _selectedSortByOption = val);
+                      },
+                    ),
+                    _buildWebDropdown(
+                      "Spoken Language",
+                      spokenLanguagesList,
+                      _selectedSpokenLanguage,
+                      (val) {
+                        setState(() => _selectedSpokenLanguage = val);
                       },
                     ),
                     _buildWebDropdown(
@@ -341,6 +372,7 @@ class _PatientFiltersScreenState extends State<PatientFiltersScreen> {
                             _selectedReviews = null;
                             _selectedSortByOption = null;
                             _selectedPharmacyType = null;
+                            _selectedSpokenLanguage = null;
                             _medicineAvailablity = false;
                             _homeAvailablity = false;
                           });
@@ -375,7 +407,7 @@ class _PatientFiltersScreenState extends State<PatientFiltersScreen> {
                             borderRadius: BorderRadius.circular(16),
                           ),
                           elevation: 10,
-                          shadowColor: AppColors.primaryColor.withOpacity(0.4),
+                          shadowColor: AppColors.primaryColor.withValues(alpha: 0.4),
                         ),
                         child: const Text(
                           "Search results",
@@ -485,7 +517,7 @@ class _PatientFiltersScreenState extends State<PatientFiltersScreen> {
               ),
               Switch(
                 value: value,
-                activeColor: AppColors.primaryColor,
+                activeThumbColor: AppColors.primaryColor,
                 onChanged: onChanged,
               ),
             ],

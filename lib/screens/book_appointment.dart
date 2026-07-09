@@ -1,124 +1,223 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:icare/models/doctor.dart';
+import 'package:icare/providers/auth_provider.dart';
+import 'package:icare/screens/select_payment_method.dart';
 import 'package:icare/services/appointment_service.dart';
+import 'package:icare/services/doctor_service.dart';
 import 'package:icare/utils/theme.dart';
 import 'package:icare/utils/utils.dart';
 import 'package:icare/widgets/back_button.dart';
-import 'package:icare/widgets/custom_text.dart';
-import 'package:intl/intl.dart';
 
-class BookAppointmentScreen extends StatefulWidget {
+class BookAppointmentScreen extends ConsumerStatefulWidget {
   const BookAppointmentScreen({super.key, required this.doctor});
-
   final Doctor doctor;
 
   @override
-  State<BookAppointmentScreen> createState() => _BookAppointmentScreenState();
+  ConsumerState<BookAppointmentScreen> createState() => _BookAppointmentScreenState();
 }
 
-class _BookAppointmentScreenState extends State<BookAppointmentScreen> {
+class _BookAppointmentScreenState extends ConsumerState<BookAppointmentScreen> {
   final AppointmentService _appointmentService = AppointmentService();
-  final TextEditingController _reasonController = TextEditingController();
+  final PageController _datePageController = PageController();
 
-  DateTime _selectedDate = DateTime.now();
-  String? _selectedTimeSlot;
+  // Date selection
+  late List<DateTime> _dateRange;
+  int _selectedDateIndex = 0;
+
+  // Time slot selection
+  String? _selectedSlot;
+
+  // Step: 0 = slot selection, 1 = reviews, 2 = checkout
+  int _step = 0;
+
   bool _isBooking = false;
+  bool _appointmentForMyself = true; // toggle between Myself / Someone else
+  bool _isEmergency = false; // emergency booking (outside regular hours)
+  final _nameController = TextEditingController();
+  final _reasonController = TextEditingController();
+  final _genderController = TextEditingController();
+  final _ageController = TextEditingController();
+  bool _certifyChecked = false; // "I certify all details are correct"
+  double? _actualFee; // fetched from doctor profile if not in doctor model
+
+  // Morning slots 9:00 AM - 11:45 AM (15 min intervals)
+  List<String> _morningSlots = [
+    '09:00 AM', '09:15 AM', '09:30 AM', '09:45 AM',
+    '10:00 AM', '10:15 AM', '10:30 AM', '10:45 AM',
+    '11:00 AM', '11:15 AM', '11:30 AM', '11:45 AM',
+  ];
+
+  // Afternoon slots 12:00 PM - 01:45 PM
+  List<String> _afternoonSlots = [
+    '12:00 PM', '12:15 PM', '12:30 PM', '12:45 PM',
+    '01:00 PM', '01:15 PM', '01:30 PM', '01:45 PM',
+  ];
+
+  // Evening slots — generated from doctor's working hours
+  List<String> _eveningSlots = [];
+
+  // Dummy reviews
+  final List<Map<String, String>> _reviews = [
+    {'text': 'Consultation was good', 'patient': 'Verified Patient F', 'ago': '18 days ago'},
+    {'text': 'Quickly respond the call and guide properly', 'patient': 'Verified Patient F', 'ago': '19 days ago'},
+    {'text': 'I was extremely satisfied with my consultation. The doctor was extremely attentive to listening to my issues and had extremely professional and practical advice.', 'patient': 'Verified Patient U', 'ago': '19 days ago'},
+  ];
+
+  static const _dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+
+  bool _isDayAvailable(DateTime date) {
+    final days = widget.doctor.availableDays;
+    if (days.isEmpty) return true; // no restriction → all days open
+    final dayName = _dayNames[date.weekday - 1]; // DateTime.weekday: 1=Mon…7=Sun
+    return days.any((d) => d.trim().toLowerCase() == dayName.toLowerCase());
+  }
 
   @override
   void initState() {
     super.initState();
-    // Ensure initial date is valid
-    _selectedDate = _getNextAvailableDate();
-  }
-
-  DateTime _getNextAvailableDate() {
-    DateTime date = DateTime.now();
-    if (widget.doctor.availableDays.isEmpty) return date;
-
-    // Find next available day within 30 days
-    for (int i = 0; i < 30; i++) {
-      final checkDate = date.add(Duration(days: i));
-      if (_isDayAvailable(checkDate)) {
-        return checkDate;
-      }
+    // Generate next 30 days and keep only those matching the doctor's available days
+    final today = DateTime.now();
+    final allDays = List.generate(30, (i) => today.add(Duration(days: i)));
+    _dateRange = allDays.where(_isDayAvailable).take(14).toList();
+    if (_dateRange.isEmpty) {
+      // Fallback: show all days if none matched (safety net)
+      _dateRange = List.generate(8, (i) => today.add(Duration(days: i)));
     }
-    return date; // Fallback to today
+    // Generate slots from doctor's working hours
+    _generateSlotsFromDoctorHours();
+    // Auto-fill user details for "Myself"
+    WidgetsBinding.instance.addPostFrameCallback((_) => _fillMyselfDetails());
+    // Fetch actual consultation fee from doctor profile
+    _fetchActualFee();
   }
 
-  List<String> _getAvailableTimeSlots() {
-    if (widget.doctor.availableTime != null) {
-      final startTime = widget.doctor.availableTime!.start;
-
-      return [
-        '$startTime',
-        '${_incrementTime(startTime, 1)}',
-        '${_incrementTime(startTime, 2)}',
-        '${_incrementTime(startTime, 3)}',
-      ];
+  Future<void> _fetchActualFee() async {
+    // If fee already set in doctor model, use it
+    if ((widget.doctor.consultationFee ?? 0) > 0) {
+      setState(() => _actualFee = widget.doctor.consultationFee);
+      return;
     }
-
-    return [
-      '09:00 AM',
-      '10:00 AM',
-      '11:00 AM',
-      '12:00 PM',
-      '02:00 PM',
-      '03:00 PM',
-      '04:00 PM',
-      '05:00 PM',
-    ];
-  }
-
-  String _incrementTime(String time, int hours) {
+    // Otherwise fetch from doctor profile endpoint
     try {
-      // Handle 24-hour format (e.g., "08:00")
-      if (!time.contains('AM') && !time.contains('PM')) {
-        final timeParts = time.split(':');
-        int hour = int.parse(timeParts[0]);
-        final minute = timeParts.length > 1 ? timeParts[1] : '00';
-
-        hour += hours;
-        if (hour >= 24) hour -= 24;
-
-        // Convert to 12-hour format with AM/PM
-        final period = hour >= 12 ? 'PM' : 'AM';
-        final displayHour = hour == 0 ? 12 : (hour > 12 ? hour - 12 : hour);
-
-        return '$displayHour:$minute $period';
+      final doctorId = widget.doctor.user.id.isNotEmpty
+          ? widget.doctor.user.id
+          : widget.doctor.id;
+      if (doctorId.isEmpty) return;
+      final response = await DoctorService().getDoctorById(doctorId);
+      final doctor = response['doctor'];
+      final fee = doctor?['consultationFee'] ?? doctor?['consultation_fee'];
+      if (fee != null && (fee is num) && fee > 0 && mounted) {
+        setState(() => _actualFee = fee.toDouble());
       }
+    } catch (_) {}
+  }
 
-      // Handle 12-hour format (e.g., "09:00 AM")
-      final parts = time.split(' ');
-      if (parts.length < 2) return time;
+  /// Parse time string like "9:00 AM", "09:00 AM", "9:00", "21:00" → TimeOfDay
+  TimeOfDay? _parseTime(String? raw) {
+    if (raw == null || raw.isEmpty) return null;
+    try {
+      final s = raw.trim().toUpperCase();
+      // Format: "9:00 AM" / "09:00 PM"
+      final amPmMatch = RegExp(r'^(\d{1,2}):(\d{2})\s*(AM|PM)$').firstMatch(s);
+      if (amPmMatch != null) {
+        int h = int.parse(amPmMatch.group(1)!);
+        final m = int.parse(amPmMatch.group(2)!);
+        final isPm = amPmMatch.group(3) == 'PM';
+        if (isPm && h != 12) h += 12;
+        if (!isPm && h == 12) h = 0;
+        return TimeOfDay(hour: h, minute: m);
+      }
+      // Format: "21:00" / "09:00"
+      final h24Match = RegExp(r'^(\d{1,2}):(\d{2})$').firstMatch(s);
+      if (h24Match != null) {
+        return TimeOfDay(
+          hour: int.parse(h24Match.group(1)!),
+          minute: int.parse(h24Match.group(2)!),
+        );
+      }
+    } catch (_) {}
+    return null;
+  }
 
-      final timeParts = parts[0].split(':');
-      int hour = int.parse(timeParts[0]);
-      final minute = timeParts.length > 1 ? timeParts[1] : '00';
-      final period = parts[1];
+  void _generateSlotsFromDoctorHours() {
+    final avail = widget.doctor.availableTime;
+    final startTime = _parseTime(avail?.start) ?? const TimeOfDay(hour: 9, minute: 0);
+    final endTime = _parseTime(avail?.end) ?? const TimeOfDay(hour: 22, minute: 0);
 
-      hour += hours;
-      if (hour > 12) hour -= 12;
+    final allSlots = <String>[];
+    int h = startTime.hour;
+    int m = startTime.minute;
 
-      return '$hour:$minute $period';
-    } catch (e) {
-      debugPrint('Error parsing time: $time, error: $e');
-      return time;
+    while (h < endTime.hour || (h == endTime.hour && m < endTime.minute)) {
+      final period = h < 12 ? 'AM' : 'PM';
+      final displayH = h == 0 ? 12 : (h > 12 ? h - 12 : h);
+      allSlots.add('${displayH.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')} $period');
+      m += 15;
+      if (m >= 60) { m -= 60; h++; }
+    }
+
+    // Split into morning (before 12), afternoon (12-17), evening (17+)
+    _morningSlots = allSlots.where((s) {
+      final t = _parseTime(s);
+      return t != null && t.hour < 12;
+    }).toList();
+
+    _afternoonSlots = allSlots.where((s) {
+      final t = _parseTime(s);
+      return t != null && t.hour >= 12 && t.hour < 17;
+    }).toList();
+
+    _eveningSlots = allSlots.where((s) {
+      final t = _parseTime(s);
+      return t != null && t.hour >= 17;
+    }).toList();
+  }
+
+  @override
+  void dispose() {
+    _datePageController.dispose();
+    _nameController.dispose();
+    _reasonController.dispose();
+    _genderController.dispose();
+    _ageController.dispose();
+    super.dispose();
+  }
+
+  void _fillMyselfDetails() {
+    final user = ref.read(authProvider).user;
+    if (user != null && _appointmentForMyself) {
+      _nameController.text = user.name;
+      _genderController.text = user.gender ?? '';
+      _ageController.text = user.age ?? '';
     }
   }
 
-  bool _isDayAvailable(DateTime date) {
-    if (widget.doctor.availableDays.isEmpty) return true;
+  DateTime get _selectedDate => _dateRange[_selectedDateIndex];
 
-    final dayName = DateFormat('EEEE').format(date);
-    return widget.doctor.availableDays.contains(dayName);
-  }
+  Future<void> _confirmBooking() async {
+    if (_selectedSlot == null && !_isEmergency) return;
 
-  Future<void> _bookAppointment() async {
-    if (_selectedTimeSlot == null) {
+    // Validate reason
+    if (_reasonController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please select a time slot'),
-          backgroundColor: Colors.orange,
+        SnackBar(
+          content: Text('Please enter Reason for Consultation'.tr()),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    // Validate certification checkbox
+    if (!_certifyChecked) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Please confirm that all details are correct'.tr()),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
         ),
       );
       return;
@@ -129,587 +228,884 @@ class _BookAppointmentScreenState extends State<BookAppointmentScreen> {
     final result = await _appointmentService.bookAppointment(
       doctorId: widget.doctor.id,
       date: _selectedDate,
-      timeSlot: _selectedTimeSlot!,
-      reason: _reasonController.text.trim().isEmpty
-          ? null
-          : _reasonController.text.trim(),
+      timeSlot: _isEmergency ? 'Emergency' : _selectedSlot!,
+      reason: _reasonController.text.trim(),
+      isEmergency: _isEmergency,
     );
 
     setState(() => _isBooking = false);
-
     if (!mounted) return;
 
     if (result['success']) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Row(
-            children: [
-              const Icon(Icons.check_circle, color: Colors.white),
-              const SizedBox(width: 12),
-              Expanded(child: Text(result['message'])),
-            ],
+      final fee = _actualFee ?? widget.doctor.consultationFee ?? 0;
+      final appointmentId = result['appointment']?.id ?? '';
+      if (mounted) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => SelectPaymentMethod(
+              appointmentId: appointmentId,
+              amount: fee.toDouble(),
+              onPaymentSuccess: (successContext) {
+                Navigator.of(successContext).popUntil((route) => route.isFirst);
+              },
+            ),
           ),
-          backgroundColor: Colors.green,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-          ),
-        ),
-      );
-      Navigator.of(context).pop(true);
+        );
+      }
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Row(
-            children: [
-              const Icon(Icons.error, color: Colors.white),
-              const SizedBox(width: 12),
-              Expanded(child: Text(result['message'])),
-            ],
-          ),
+          content: Text(result['message'] ?? 'Booking failed'),
           backgroundColor: Colors.red,
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-          ),
         ),
       );
     }
   }
 
-  @override
-  void dispose() {
-    _reasonController.dispose();
-    super.dispose();
+  /// Returns true if a time slot string is in the past for today's date
+  bool _isSlotPast(String slot) {
+    final selectedDate = _selectedDate;
+    final now = DateTime.now();
+    // Only check past for today
+    if (selectedDate.year != now.year ||
+        selectedDate.month != now.month ||
+        selectedDate.day != now.day) {
+      return false;
+    }
+    // Parse slot time e.g. "09:00 AM"
+    try {
+      final parts = slot.split(' ');
+      final timeParts = parts[0].split(':');
+      int hour = int.parse(timeParts[0]);
+      final minute = int.parse(timeParts[1]);
+      final isPm = parts[1] == 'PM';
+      if (isPm && hour != 12) hour += 12;
+      if (!isPm && hour == 12) hour = 0;
+      final slotTime = DateTime(now.year, now.month, now.day, hour, minute);
+      return slotTime.isBefore(now);
+    } catch (_) {
+      return false;
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final bool isDesktop = Utils.windowWidth(context) > 600;
-    final availableSlots = _getAvailableTimeSlots();
-
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
-        leading: CustomBackButton(),
-        automaticallyImplyLeading: false,
+        leading: _step > 0
+            ? IconButton(
+                icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18, color: AppColors.primaryColor),
+                onPressed: () => setState(() => _step--),
+              )
+            : const CustomBackButton(),
         backgroundColor: Colors.white,
         elevation: 0,
         centerTitle: true,
-        title: CustomText(
-          text: "Book Appointment",
-          fontFamily: "Gilroy-Bold",
-          fontSize: 18,
-          fontWeight: FontWeight.w900,
-          color: const Color(0xFF0F172A),
+        title: Text(
+          _step == 2 ? 'Checkout'.tr() : 'Book Appointment'.tr(),
+          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
         ),
       ),
-      body: SingleChildScrollView(
-        padding: EdgeInsets.all(isDesktop ? 24 : 16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Doctor Info Card with Gradient
-            Container(
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    AppColors.primaryColor,
-                    AppColors.primaryColor.withValues(alpha: 0.8),
-                  ],
+      body: _step == 0
+          ? _buildSlotSelection()
+          : _step == 1
+              ? _buildReviews()
+              : _buildCheckout(),
+    );
+  }
+
+  // ── STEP 0: Date + Slot Selection ─────────────────────────────────────────
+  Widget _buildSlotSelection() {
+    final fee = _actualFee ?? widget.doctor.consultationFee;
+    return SingleChildScrollView(
+      child: Column(
+        children: [
+          // Doctor info card
+          Container(
+            margin: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: Row(
+              children: [
+                CircleAvatar(
+                  radius: 28,
+                  backgroundColor: AppColors.primaryColor.withValues(alpha: 0.1),
+                  backgroundImage: (widget.doctor.user.profilePicture != null && widget.doctor.user.profilePicture!.isNotEmpty)
+                      ? NetworkImage(widget.doctor.user.profilePicture!)
+                      : null,
+                  child: (widget.doctor.user.profilePicture == null || widget.doctor.user.profilePicture!.isEmpty)
+                      ? Text(
+                          widget.doctor.user.name.isNotEmpty ? widget.doctor.user.name.substring(0, 1).toUpperCase() : 'D',
+                          style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: AppColors.primaryColor),
+                        )
+                      : null,
                 ),
-                borderRadius: BorderRadius.circular(24),
-                boxShadow: [
-                  BoxShadow(
-                    color: AppColors.primaryColor.withValues(alpha: 0.3),
-                    blurRadius: 20,
-                    offset: const Offset(0, 8),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Dr. ${widget.doctor.user.name}',
+                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Color(0xFF0F172A))),
+                      Text(widget.doctor.specialization ?? 'General Practitioner',
+                          style: const TextStyle(fontSize: 13, color: Color(0xFF64748B))),
+                      if (fee != null && fee > 0)
+                        Text('Fee: PKR ${fee.toInt()}',
+                            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF0F172A))),
+                    ],
                   ),
-                ],
-              ),
-              child: Row(
-                children: [
+                ),
+              ],
+            ),
+          ),
+
+          // Date strip
+          Container(
+            color: Colors.white,
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            child: Row(
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.chevron_left_rounded),
+                  onPressed: _selectedDateIndex > 0
+                      ? () => setState(() => _selectedDateIndex--)
+                      : null,
+                ),
+                Expanded(
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: List.generate(_dateRange.length, (i) {
+                        final d = _dateRange[i];
+                        final isSelected = i == _selectedDateIndex;
+                        return GestureDetector(
+                          onTap: () => setState(() {
+                            _selectedDateIndex = i;
+                            _selectedSlot = null;
+                          }),
+                          child: Container(
+                            margin: const EdgeInsets.symmetric(horizontal: 4),
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: isSelected ? AppColors.primaryColor : Colors.transparent,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: isSelected ? AppColors.primaryColor : const Color(0xFFE2E8F0),
+                              ),
+                            ),
+                            child: Column(
+                              children: [
+                                Text(
+                                  DateFormat('MMM').format(d),
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: isSelected ? Colors.white70 : const Color(0xFF94A3B8),
+                                  ),
+                                ),
+                                Text(
+                                  DateFormat('dd').format(d),
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w800,
+                                    color: isSelected ? Colors.white : const Color(0xFF0F172A),
+                                  ),
+                                ),
+                                Text(
+                                  DateFormat('EEE').format(d),
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: isSelected ? Colors.white70 : const Color(0xFF94A3B8),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      }),
+                    ),
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.chevron_right_rounded),
+                  onPressed: _selectedDateIndex < _dateRange.length - 1
+                      ? () => setState(() => _selectedDateIndex++)
+                      : null,
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 8),
+
+          // Emergency Booking Option (only for doctors with emergency slots)
+          if (widget.doctor.emergencySlots) ...[
+            GestureDetector(
+              onTap: () => setState(() {
+                _isEmergency = !_isEmergency;
+                if (_isEmergency) _selectedSlot = null;
+              }),
+              child: Container(
+                margin: const EdgeInsets.symmetric(horizontal: 16),
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: _isEmergency ? const Color(0xFFDC2626).withValues(alpha: 0.08) : Colors.white,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                    color: _isEmergency ? const Color(0xFFDC2626) : const Color(0xFFE2E8F0),
+                    width: _isEmergency ? 2 : 1,
+                  ),
+                ),
+                child: Row(children: [
                   Container(
+                    padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
+                      color: const Color(0xFFDC2626).withValues(alpha: 0.1),
                       shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white, width: 3),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.2),
-                          blurRadius: 10,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
                     ),
-                    child: CircleAvatar(
-                      radius: 35,
-                      backgroundColor: Colors.white,
-                      child: Text(
-                        widget.doctor.user.name.isNotEmpty
-                            ? widget.doctor.user.name
-                                  .substring(0, 1)
-                                  .toUpperCase()
-                            : 'D',
-                        style: TextStyle(
-                          fontSize: 28,
-                          fontWeight: FontWeight.w900,
-                          color: AppColors.primaryColor,
-                        ),
-                      ),
-                    ),
+                    child: const Icon(Icons.emergency_rounded, color: Color(0xFFDC2626), size: 20),
                   ),
-                  const SizedBox(width: 16),
+                  const SizedBox(width: 12),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          widget.doctor.user.name,
-                          style: const TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.w900,
-                            color: Colors.white,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.2),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Text(
-                            widget.doctor.specialization ??
-                                'General Practitioner',
-                            style: const TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ),
+                        Text('Emergency Booking'.tr(), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: Color(0xFF1A1A2E))),
+                        const SizedBox(height: 2),
+                        Text('Book outside regular hours. Doctor will confirm.'.tr(), style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
                       ],
                     ),
                   ),
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.2),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.calendar_today_rounded,
-                      color: Colors.white,
-                      size: 24,
+                  Transform.scale(
+                    scale: 0.9,
+                    child: Switch(
+                      value: _isEmergency,
+                      onChanged: (v) => setState(() {
+                        _isEmergency = v;
+                        if (v) _selectedSlot = null;
+                      }),
+                      activeThumbColor: const Color(0xFFDC2626),
                     ),
                   ),
-                ],
+                ]),
               ),
             ),
+            const SizedBox(height: 8),
+          ],
 
-            const SizedBox(height: 28),
+          // Morning Slots (hidden when emergency mode on)
+          if (!_isEmergency) ...[
+          _buildSlotSection('Morning Slots'.tr(), Icons.wb_sunny_outlined, _morningSlots),
+          const SizedBox(height: 8),
 
-            // Select Date Section
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF3B82F6).withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Icon(
-                    Icons.calendar_month_rounded,
-                    color: Color(0xFF3B82F6),
-                    size: 20,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                const Text(
-                  'Select Date',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w900,
-                    color: Color(0xFF0F172A),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
+          // Afternoon Slots
+          _buildSlotSection('Afternoon Slots'.tr(), Icons.wb_twilight_outlined, _afternoonSlots),
+          const SizedBox(height: 8),
 
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(24),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.04),
-                    blurRadius: 20,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: Column(
-                children: [
-                  Theme(
-                    data: Theme.of(context).copyWith(
-                      colorScheme: ColorScheme.light(
-                        primary: AppColors.primaryColor,
-                        onPrimary: Colors.white,
-                        surface: Colors.white,
-                      ),
-                    ),
-                    child: CalendarDatePicker(
-                      initialDate: _selectedDate,
-                      firstDate: DateTime.now(),
-                      lastDate: DateTime.now().add(const Duration(days: 90)),
-                      onDateChanged: (date) {
-                        if (_isDayAvailable(date)) {
-                          setState(() => _selectedDate = date);
-                        }
-                      },
-                      selectableDayPredicate:
-                          widget.doctor.availableDays.isEmpty
-                          ? null
-                          : (DateTime date) => _isDayAvailable(date),
-                    ),
-                  ),
-                  if (widget.doctor.availableDays.isNotEmpty) ...[
-                    const Divider(height: 32),
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.info_outline_rounded,
-                          size: 18,
-                          color: AppColors.primaryColor,
-                        ),
-                        const SizedBox(width: 8),
-                        const Text(
-                          'Available Days',
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w700,
-                            color: Color(0xFF64748B),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: widget.doctor.availableDays.map((day) {
-                        return Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 14,
-                            vertical: 8,
-                          ),
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: [
-                                AppColors.primaryColor.withValues(alpha: 0.1),
-                                AppColors.primaryColor.withValues(alpha: 0.05),
-                              ],
-                            ),
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(
-                              color: AppColors.primaryColor.withValues(
-                                alpha: 0.3,
-                              ),
-                            ),
-                          ),
-                          child: Text(
-                            day,
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.primaryColor,
-                            ),
-                          ),
-                        );
-                      }).toList(),
-                    ),
-                  ],
-                ],
-              ),
-            ),
+          // Evening Slots
+          if (_eveningSlots.isNotEmpty) ...[
+            _buildSlotSection('Evening Slots'.tr(), Icons.nights_stay_outlined, _eveningSlots),
+            const SizedBox(height: 8),
+          ],
+          ],
 
-            const SizedBox(height: 28),
+          const SizedBox(height: 24),
 
-            // Select Time Slot Section
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF8B5CF6).withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Icon(
-                    Icons.access_time_rounded,
-                    color: Color(0xFF8B5CF6),
-                    size: 20,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                const Text(
-                  'Select Time Slot',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w900,
-                    color: Color(0xFF0F172A),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-
-            Container(
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(24),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.04),
-                    blurRadius: 20,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: Wrap(
-                spacing: 12,
-                runSpacing: 12,
-                children: availableSlots.map((slot) {
-                  final isSelected = _selectedTimeSlot == slot;
-                  return InkWell(
-                    onTap: () => setState(() => _selectedTimeSlot = slot),
-                    borderRadius: BorderRadius.circular(16),
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 200),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 24,
-                        vertical: 14,
-                      ),
-                      decoration: BoxDecoration(
-                        gradient: isSelected
-                            ? LinearGradient(
-                                colors: [
-                                  const Color(0xFF8B5CF6),
-                                  const Color(
-                                    0xFF8B5CF6,
-                                  ).withValues(alpha: 0.8),
-                                ],
-                              )
-                            : null,
-                        color: isSelected ? null : const Color(0xFFF8FAFC),
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(
-                          color: isSelected
-                              ? const Color(0xFF8B5CF6)
-                              : const Color(0xFFE2E8F0),
-                          width: 2,
-                        ),
-                        boxShadow: isSelected
-                            ? [
-                                BoxShadow(
-                                  color: const Color(
-                                    0xFF8B5CF6,
-                                  ).withValues(alpha: 0.3),
-                                  blurRadius: 12,
-                                  offset: const Offset(0, 4),
-                                ),
-                              ]
-                            : null,
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.schedule_rounded,
-                            size: 18,
-                            color: isSelected
-                                ? Colors.white
-                                : const Color(0xFF8B5CF6),
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            slot,
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w700,
-                              color: isSelected
-                                  ? Colors.white
-                                  : const Color(0xFF0F172A),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
-                }).toList(),
-              ),
-            ),
-
-            const SizedBox(height: 28),
-
-            // Reason Section
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF10B981).withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Icon(
-                    Icons.edit_note_rounded,
-                    color: Color(0xFF10B981),
-                    size: 20,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                const Text(
-                  'Reason for Visit',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w900,
-                    color: Color(0xFF0F172A),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 2,
-                  ),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF64748B).withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: const Text(
-                    'Optional',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      color: Color(0xFF64748B),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-
-            Container(
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(24),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.04),
-                    blurRadius: 20,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: TextField(
-                controller: _reasonController,
-                maxLines: 4,
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                  color: Color(0xFF0F172A),
-                ),
-                decoration: InputDecoration(
-                  hintText:
-                      'Describe your symptoms or reason for consultation...',
-                  hintStyle: const TextStyle(
-                    color: Color(0xFF94A3B8),
-                    fontSize: 14,
-                  ),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(24),
-                    borderSide: BorderSide.none,
-                  ),
-                  contentPadding: const EdgeInsets.all(24),
-                  filled: true,
-                  fillColor: Colors.white,
-                ),
-              ),
-            ),
-
-            const SizedBox(height: 32),
-
-            // Book Button with Gradient
-            Container(
+          // Continue to Book button
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: SizedBox(
               width: double.infinity,
-              height: 56,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    AppColors.primaryColor,
-                    AppColors.primaryColor.withValues(alpha: 0.8),
+              height: 52,
+              child: ElevatedButton(
+                onPressed: (_selectedSlot != null || _isEmergency) ? () => setState(() => _step = 1) : null,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primaryColor,
+                  foregroundColor: Colors.white,
+                  disabledBackgroundColor: const Color(0xFFE2E8F0),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  elevation: 0,
+                ),
+                child: Text('Continue to Book'.tr(), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+              ),
+            ),
+          ),
+          const SizedBox(height: 24),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSlotSection(String title, IconData icon, List<String> slots) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, size: 16, color: const Color(0xFF64748B)),
+              const SizedBox(width: 6),
+              Text(title, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF64748B))),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: slots.map((slot) {
+              final isSelected = _selectedSlot == slot;
+              final isPast = _isSlotPast(slot);
+              return GestureDetector(
+                onTap: isPast ? null : () => setState(() => _selectedSlot = slot),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: isPast
+                        ? const Color(0xFFF1F5F9)
+                        : isSelected
+                            ? AppColors.primaryColor
+                            : Colors.white,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: isPast
+                          ? const Color(0xFFE2E8F0)
+                          : isSelected
+                              ? AppColors.primaryColor
+                              : const Color(0xFFE2E8F0),
+                      width: isSelected ? 2 : 1,
+                    ),
+                  ),
+                  child: Text(
+                    slot,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: isPast
+                          ? const Color(0xFFCBD5E1)
+                          : isSelected
+                              ? Colors.white
+                              : const Color(0xFF0F172A),
+                      decoration: isPast ? TextDecoration.lineThrough : null,
+                    ),
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── STEP 1: Reviews ────────────────────────────────────────────────────────
+  Widget _buildReviews() {
+    final reviewCount = widget.doctor.reviewCount;
+
+    return SingleChildScrollView(
+      child: Column(
+        children: [
+          // Trust badge
+          Container(
+            margin: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFFBEB),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFFDE68A)),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.shield_rounded, color: Color(0xFFF59E0B), size: 28),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('95% patients feel satisfied after booking'.tr(),
+                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF92400E))),
+                      Text('It takes only 30 sec to book an appointment'.tr(),
+                          style: const TextStyle(fontSize: 12, color: Color(0xFFB45309))),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // Reviews header
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Row(
+              children: [
+                Text(
+                  'Reviews About Dr. ${widget.doctor.user.name} ($reviewCount)',
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          // Review cards
+          ..._reviews.map((r) => Container(
+            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.thumb_up_outlined, size: 16, color: Color(0xFF3B82F6)),
+                    const SizedBox(width: 6),
+                    Text('I recommend the doctor'.tr(),
+                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF0F172A))),
                   ],
                 ),
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: [
-                  BoxShadow(
-                    color: AppColors.primaryColor.withValues(alpha: 0.4),
-                    blurRadius: 20,
-                    offset: const Offset(0, 8),
+                const SizedBox(height: 8),
+                Text('" ${r['text']} "',
+                    style: const TextStyle(fontSize: 13, color: Color(0xFF64748B), fontStyle: FontStyle.italic)),
+                const SizedBox(height: 8),
+                Text('${r['patient']} • ${r['ago']}',
+                    style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8))),
+              ],
+            ),
+          )),
+
+          const SizedBox(height: 24),
+
+          // Continue to Book button
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: SizedBox(
+              width: double.infinity,
+              height: 52,
+              child: ElevatedButton(
+                onPressed: () => setState(() => _step = 2),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primaryColor,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  elevation: 0,
+                ),
+                child: Text('Continue to Book'.tr(), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+              ),
+            ),
+          ),
+          const SizedBox(height: 24),
+        ],
+      ),
+    );
+  }
+
+  // ── STEP 2: Checkout ───────────────────────────────────────────────────────
+  Widget _buildCheckout() {
+    final fee = _actualFee ?? widget.doctor.consultationFee ?? 0;
+    final dateStr = DateFormat('MMM dd').format(_selectedDate);
+    final bool isDesktop = Utils.windowWidth(context) > 700;
+
+    final summaryCard = Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Doctor mini card
+          Row(
+            children: [
+              CircleAvatar(
+                radius: 20,
+                backgroundColor: AppColors.primaryColor.withValues(alpha: 0.1),
+                child: Text(
+                  widget.doctor.user.name.isNotEmpty
+                      ? widget.doctor.user.name.substring(0, 1).toUpperCase()
+                      : 'D',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.primaryColor),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Dr. ${widget.doctor.user.name}',
+                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: Color(0xFF0F172A))),
+                    Text(widget.doctor.specialization ?? 'General Practitioner',
+                        style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          const Divider(color: Color(0xFFF1F5F9)),
+          const SizedBox(height: 8),
+
+          // Date + time
+          Row(
+            children: [
+              const Icon(Icons.access_time_rounded, size: 14, color: Color(0xFF64748B)),
+              const SizedBox(width: 4),
+              Text('$dateStr, $_selectedSlot',
+                  style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+            ],
+          ),
+          const SizedBox(height: 8),
+
+          // Consultation type + fee
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('Consultation Fee'.tr(), style: const TextStyle(fontSize: 13, color: Color(0xFF64748B))),
+              Text(
+                fee > 0 ? 'PKR ${fee.toInt()}' : 'Free / As per clinic'.tr(),
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w800,
+                  color: fee > 0 ? const Color(0xFF0F172A) : const Color(0xFF10B981),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          const Divider(color: Color(0xFFF1F5F9)),
+          const SizedBox(height: 16),
+
+          // Certification checkbox
+          GestureDetector(
+            onTap: () => setState(() => _certifyChecked = !_certifyChecked),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 150),
+                  width: 22,
+                  height: 22,
+                  decoration: BoxDecoration(
+                    color: _certifyChecked ? AppColors.primaryColor : Colors.white,
+                    borderRadius: BorderRadius.circular(5),
+                    border: Border.all(
+                      color: _certifyChecked ? AppColors.primaryColor : const Color(0xFFCBD5E1),
+                      width: 2,
+                    ),
+                  ),
+                  child: _certifyChecked
+                      ? const Icon(Icons.check_rounded, size: 14, color: Colors.white)
+                      : null,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'I certify that all the information I provided is correct.'.tr(),
+                    style: const TextStyle(fontSize: 13, color: Color(0xFF334155), height: 1.4),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // Confirm Booking button
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: _isBooking ? null : _confirmBooking,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primaryColor,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                elevation: 0,
+              ),
+              child: _isBooking
+                  ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  : Text('Confirm Booking'.tr(), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800)),
+            ),
+          ),
+        ],
+      ),
+    );  // end summaryCard
+
+    final formCard = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Appointment For
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: const Color(0xFFE2E8F0)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Appointment For'.tr(),
+                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: Color(0xFF0F172A))),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  _forChip('Myself'.tr(), _appointmentForMyself, () {
+                    setState(() => _appointmentForMyself = true);
+                    _fillMyselfDetails();
+                  }),
+                  const SizedBox(width: 10),
+                  _forChip('+ Someone else'.tr(), !_appointmentForMyself, () {
+                    setState(() {
+                      _appointmentForMyself = false;
+                      _nameController.clear();
+                      _genderController.clear();
+                      _ageController.clear();
+                    });
+                  }),
+                ],
+              ),
+              const SizedBox(height: 16),
+              // Patient Name
+              Text('Patient Name'.tr(),
+                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF64748B))),
+              const SizedBox(height: 8),
+              TextField(
+                controller: _nameController,
+                readOnly: _appointmentForMyself,
+                decoration: InputDecoration(
+                  hintText: 'Enter patient name'.tr(),
+                  hintStyle: const TextStyle(color: Color(0xFF94A3B8)),
+                  prefixIcon: const Icon(Icons.person_outline_rounded, color: Color(0xFF94A3B8)),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                  focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: AppColors.primaryColor)),
+                  filled: true,
+                  fillColor: _appointmentForMyself ? const Color(0xFFF1F5F9) : const Color(0xFFF8FAFC),
+                ),
+              ),
+              const SizedBox(height: 12),
+              // Gender + Age row
+              Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Gender'.tr(),
+                            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF64748B))),
+                        const SizedBox(height: 8),
+                        TextField(
+                          controller: _genderController,
+                          readOnly: _appointmentForMyself,
+                          decoration: InputDecoration(
+                            hintText: 'Male / Female'.tr(),
+                            hintStyle: const TextStyle(color: Color(0xFF94A3B8)),
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: AppColors.primaryColor)),
+                            filled: true,
+                            fillColor: _appointmentForMyself ? const Color(0xFFF1F5F9) : const Color(0xFFF8FAFC),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Age'.tr(),
+                            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF64748B))),
+                        const SizedBox(height: 8),
+                        TextField(
+                          controller: _ageController,
+                          readOnly: _appointmentForMyself,
+                          keyboardType: TextInputType.number,
+                          decoration: InputDecoration(
+                            hintText: 'e.g. 30'.tr(),
+                            hintStyle: const TextStyle(color: Color(0xFF94A3B8)),
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: AppColors.primaryColor)),
+                            filled: true,
+                            fillColor: _appointmentForMyself ? const Color(0xFFF1F5F9) : const Color(0xFFF8FAFC),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),
-              child: Material(
-                color: Colors.transparent,
-                child: InkWell(
-                  onTap: _isBooking ? null : _bookAppointment,
-                  borderRadius: BorderRadius.circular(16),
-                  child: Center(
-                    child: _isBooking
-                        ? const SizedBox(
-                            height: 24,
-                            width: 24,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2.5,
-                              valueColor: AlwaysStoppedAnimation<Color>(
-                                Colors.white,
-                              ),
-                            ),
-                          )
-                        : Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: const [
-                              Icon(
-                                Icons.check_circle_rounded,
-                                color: Colors.white,
-                                size: 24,
-                              ),
-                              SizedBox(width: 12),
-                              Text(
-                                'Confirm Booking',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w800,
-                                  color: Colors.white,
-                                  letterSpacing: 0.5,
-                                ),
-                              ),
-                            ],
-                          ),
+              const SizedBox(height: 16),
+              // Reason for Consultation — MANDATORY
+              Row(
+                children: [
+                  Text('Reason for Consultation'.tr(),
+                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF64748B))),
+                  const SizedBox(width: 6),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Colors.red.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text('Mandatory'.tr(),
+                        style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Colors.red)),
                   ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: _reasonController,
+                maxLines: 3,
+                decoration: InputDecoration(
+                  hintText: 'Describe your symptoms or reason for visit...'.tr(),
+                  hintStyle: const TextStyle(color: Color(0xFF94A3B8)),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                  focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: AppColors.primaryColor)),
+                  filled: true,
+                  fillColor: const Color(0xFFF8FAFC),
                 ),
               ),
-            ),
+              const SizedBox(height: 16),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
 
-            const SizedBox(height: 20),
+        // Payment method
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: const Color(0xFFE2E8F0)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Select Payment Method'.tr(),
+                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: Color(0xFF0F172A))),
+              const SizedBox(height: 12),
+              // Online Payment option
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: AppColors.primaryColor.withValues(alpha: 0.05),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: AppColors.primaryColor.withValues(alpha: 0.3)),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.radio_button_checked_rounded, color: AppColors.primaryColor, size: 20),
+                    const SizedBox(width: 10),
+                    Expanded(child: Text('Online Payment'.tr(), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700))),
+                    if (fee > 0)
+                      Text('PKR ${fee.toInt()}',
+                          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: Color(0xFF0F172A))),
+                  ],
+                ),
+              ),
+              if (fee == 0) ...[
+                const SizedBox(height: 10),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFFBEB),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: const Color(0xFFFDE68A)),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.info_outline_rounded, color: Color(0xFFF59E0B), size: 16),
+                      SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Consultation fee will be confirmed by the doctor.'.tr(),
+                          style: const TextStyle(fontSize: 12, color: Color(0xFF92400E)),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ],
+    );  // end formCard
+
+    if (isDesktop) {
+      return SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(flex: 3, child: formCard),
+            const SizedBox(width: 16),
+            Expanded(flex: 2, child: summaryCard),
+          ],
+        ),
+      );
+    }
+
+    // Mobile: stacked layout
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        children: [
+          summaryCard,
+          const SizedBox(height: 16),
+          formCard,
+          const SizedBox(height: 24),
+        ],
+      ),
+    );
+  }
+
+  Widget _forChip(String label, bool isSelected, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected ? AppColors.primaryColor.withValues(alpha: 0.1) : Colors.white,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: isSelected ? AppColors.primaryColor : const Color(0xFFE2E8F0),
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (isSelected)
+              Icon(Icons.check_rounded, size: 14, color: AppColors.primaryColor),
+            if (isSelected) const SizedBox(width: 4),
+            Text(label,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: isSelected ? AppColors.primaryColor : const Color(0xFF64748B),
+                )),
           ],
         ),
       ),

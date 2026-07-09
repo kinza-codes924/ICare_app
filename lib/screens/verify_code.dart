@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_size_matters/flutter_size_matters.dart';
 import 'package:icare/screens/reset_password.dart';
@@ -5,6 +6,7 @@ import 'package:icare/services/auth_service.dart';
 import 'package:icare/utils/imagePaths.dart';
 import 'package:icare/utils/theme.dart';
 import 'package:icare/utils/utils.dart';
+import 'package:icare/widgets/auth_left_panel.dart';
 import 'package:icare/widgets/back_button.dart';
 import 'package:icare/widgets/custom_text.dart';
 import 'package:pin_code_fields/pin_code_fields.dart';
@@ -62,7 +64,6 @@ class _VerifyCodeState extends State<VerifyCode> {
       final result = await _authService.forgotPassword(email: widget.email);
 
       if (result['success']) {
-        debugPrint('New OTP for testing: ${result['otp']}');
         _showSuccess('OTP resent successfully');
       } else {
         _showError(result['message']);
@@ -129,12 +130,9 @@ class _VerifyCodeState extends State<VerifyCode> {
           // ══════════════════════════════════════════════════════════════
           // LEFT HERO PANEL — gradient + branding
           // ══════════════════════════════════════════════════════════════
-          Expanded(
+          const Expanded(
             flex: 5,
-            child: SizedBox(
-              height: screenHeight,
-              child: Image.asset("assets/images/splash.jpg", fit: BoxFit.cover),
-            ),
+            child: AuthLeftPanel(),
           ),
 
           // ══════════════════════════════════════════════════════════════
@@ -155,7 +153,7 @@ class _VerifyCodeState extends State<VerifyCode> {
                       borderRadius: BorderRadius.circular(28),
                       boxShadow: [
                         BoxShadow(
-                          color: const Color(0xFF0036BC).withOpacity(0.06),
+                          color: const Color(0xFF0036BC).withValues(alpha: 0.06),
                           blurRadius: 40,
                           offset: const Offset(0, 16),
                         ),
@@ -186,9 +184,9 @@ class _VerifyCodeState extends State<VerifyCode> {
                         ),
                         const SizedBox(height: 24),
                         // Header
-                        const Text(
-                          "Verification Code",
-                          style: TextStyle(
+                        Text(
+                          "Verification Code".tr(),
+                          style: const TextStyle(
                             fontSize: 26,
                             fontWeight: FontWeight.w800,
                             color: Color(0xFF0B2D6E),
@@ -197,7 +195,7 @@ class _VerifyCodeState extends State<VerifyCode> {
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          "We've sent a 5-digit verification code to your registered account",
+                          "We've sent a 5-digit verification code to your registered account".tr(),
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             fontSize: 14,
@@ -246,7 +244,7 @@ class _VerifyCodeState extends State<VerifyCode> {
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
                                   Text(
-                                    "Didn't receive the code?",
+                                    "Didn't receive the code?".tr(),
                                     style: TextStyle(
                                       color: Colors.grey[500],
                                       fontSize: 14,
@@ -257,9 +255,9 @@ class _VerifyCodeState extends State<VerifyCode> {
                                     onPressed: isLoading
                                         ? null
                                         : _handleResendOTP,
-                                    child: const Text(
-                                      "Resend",
-                                      style: TextStyle(
+                                    child: Text(
+                                      "Resend".tr(),
+                                      style: const TextStyle(
                                         color: AppColors.primaryColor,
                                         fontWeight: FontWeight.w700,
                                         fontSize: 14,
@@ -294,9 +292,9 @@ class _VerifyCodeState extends State<VerifyCode> {
                                             strokeWidth: 2,
                                           ),
                                         )
-                                      : const Text(
-                                          "Confirm & Verify",
-                                          style: TextStyle(
+                                      : Text(
+                                          "Confirm & Verify".tr(),
+                                          style: const TextStyle(
                                             color: Colors.white,
                                             fontSize: 16,
                                             fontWeight: FontWeight.w700,
@@ -339,7 +337,7 @@ class _VerifyCodeState extends State<VerifyCode> {
         height: size,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          color: Colors.white.withOpacity(opacity),
+          color: Colors.white.withValues(alpha: opacity),
         ),
       ),
     );
@@ -352,16 +350,16 @@ class _VerifyCodeState extends State<VerifyCode> {
         Container(
           padding: const EdgeInsets.all(10),
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.12),
+            color: Colors.white.withValues(alpha: 0.12),
             borderRadius: BorderRadius.circular(12),
           ),
-          child: Icon(icon, color: Colors.white.withOpacity(0.9), size: 18),
+          child: Icon(icon, color: Colors.white.withValues(alpha: 0.9), size: 18),
         ),
         const SizedBox(width: 16),
         Text(
           text,
           style: TextStyle(
-            color: Colors.white.withOpacity(0.8),
+            color: Colors.white.withValues(alpha: 0.8),
             fontSize: 14,
             fontWeight: FontWeight.w500,
             fontFamily: "Gilroy-Medium",
@@ -380,7 +378,7 @@ class _VerifyCodeState extends State<VerifyCode> {
         child: Text(
           "© 2026 iCare Health Technologies",
           style: TextStyle(
-            color: Colors.white.withOpacity(0.35),
+            color: Colors.white.withValues(alpha: 0.35),
             fontSize: 12,
             fontWeight: FontWeight.w400,
           ),
@@ -417,7 +415,7 @@ class _VerifyCodeState extends State<VerifyCode> {
             children: [
               SizedBox(height: ScallingConfig.moderateScale(30)),
               CustomText(
-                text: "Verification Code",
+                text: "Verification Code".tr(),
                 fontWeight: FontWeight.w900,
                 fontSize: 22,
                 color: AppColors.primaryColor,
@@ -498,7 +496,7 @@ class _VerifyCodeState extends State<VerifyCode> {
                       child: TextButton(
                         onPressed: isLoading ? null : _handleResendOTP,
                         child: Text(
-                          "Resend Code",
+                          "Resend Code".tr(),
                           style: TextStyle(
                             color: isTablet
                                 ? AppColors.white
@@ -531,9 +529,9 @@ class _VerifyCodeState extends State<VerifyCode> {
                                   strokeWidth: 2,
                                 ),
                               )
-                            : const Text(
-                                "Confirm",
-                                style: TextStyle(
+                            : Text(
+                                "Confirm".tr(),
+                                style: const TextStyle(
                                   color: Colors.white,
                                   fontSize: 16,
                                 ),

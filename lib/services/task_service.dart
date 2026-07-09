@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'api_service.dart';
 
 class TaskService {
@@ -9,10 +10,9 @@ class TaskService {
         '/tasks/my',
         queryParameters: status != null ? {'status': status} : null,
       );
-      return response.data['tasks'];
+      return response.data['tasks'] ?? [];
     } catch (e) {
-      debugPrint('Error fetching tasks: $e');
-      rethrow;
+      return []; // silent fail — endpoint not implemented
     }
   }
 

@@ -1,14 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_size_matters/flutter_size_matters.dart';
-import 'package:icare/providers/common_provider.dart';
 import 'package:icare/utils/imagePaths.dart';
 import 'package:icare/utils/theme.dart';
 import 'package:icare/utils/utils.dart';
 import 'package:icare/widgets/custom_button.dart';
 import 'package:icare/widgets/custom_text.dart';
 import 'package:icare/widgets/svg_wrapper.dart';
-import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 
 class AppDialogs {
   static void showSuccessDialog(
@@ -88,7 +85,7 @@ class AppDialogs {
     dynamic onPrimaryButtonPressed,
     dynamic onSecondaryButtonPressed,
     String? selectedReason,
-    Widget? centerAction = null,
+    Widget? centerAction,
     bool isShowActions = true,
   }) {
     showDialog(
@@ -207,49 +204,47 @@ class AppDialogs {
   }
 }
 
-class Options extends ConsumerStatefulWidget {
+class Options extends StatefulWidget {
   Options({super.key, this.selectedReason = '', this.options});
   String selectedReason;
   final List<String>? options;
   @override
-  ConsumerState<Options> createState() => _OptionsState();
+  State<Options> createState() => _OptionsState();
 }
 
-class _OptionsState extends ConsumerState<Options> {
+class _OptionsState extends State<Options> {
   @override
   Widget build(BuildContext context) {
-    return RadioGroup<String>(
-      groupValue: widget.selectedReason,
-      onChanged: (value) {
-        setState(() {
-          widget.selectedReason = value!;
-        });
-        // ref.read(commonProvider.notifier).setSelectedReason(value!);
-      },
-
-      child: Column(
-        children: widget.options!.map((reason) {
-          return Padding(
-            padding: EdgeInsets.zero,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                Radio(activeColor: AppColors.primaryColor, value: reason),
-                Expanded(
-                  child: CustomText(
-                    padding: EdgeInsets.only(top: 1),
-                    text: reason,
-                    fontFamily: "Gilroy-Medium",
-                    // isBold: true,
-                    fontSize: ScallingConfig.moderateScale(16),
-                  ),
+    return Column(
+      children: (widget.options ?? []).map((reason) {
+        return Padding(
+          padding: EdgeInsets.zero,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Radio<String>(
+                activeColor: AppColors.primaryColor,
+                value: reason,
+                groupValue: widget.selectedReason,
+                onChanged: (value) {
+                  setState(() {
+                    widget.selectedReason = value!;
+                  });
+                },
+              ),
+              Expanded(
+                child: CustomText(
+                  padding: EdgeInsets.only(top: 1),
+                  text: reason,
+                  fontFamily: "Gilroy-Medium",
+                  fontSize: ScallingConfig.moderateScale(16),
                 ),
-              ],
-            ),
-          );
-        }).toList(),
-      ),
+              ),
+            ],
+          ),
+        );
+      }).toList(),
     );
   }
 }

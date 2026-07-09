@@ -1,16 +1,23 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
 import '../services/student_service.dart';
+import '../services/api_service.dart';
+import '../models/user.dart';
+import '../providers/auth_provider.dart';
 import 'tabs.dart';
 import '../widgets/back_button.dart';
 
-class StudentProfileSetup extends StatefulWidget {
+class StudentProfileSetup extends ConsumerStatefulWidget {
   const StudentProfileSetup({super.key});
 
   @override
-  State<StudentProfileSetup> createState() => _StudentProfileSetupState();
+  ConsumerState<StudentProfileSetup> createState() => _StudentProfileSetupState();
 }
 
-class _StudentProfileSetupState extends State<StudentProfileSetup>
+class _StudentProfileSetupState extends ConsumerState<StudentProfileSetup>
     with TickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
   final StudentService _studentService = StudentService();
@@ -18,6 +25,7 @@ class _StudentProfileSetupState extends State<StudentProfileSetup>
   bool _isLoading = true;
   bool _isSaving = false;
 
+  final _nameController = TextEditingController();
   final _bioController = TextEditingController();
   final _qualificationController = TextEditingController();
   final _ageController = TextEditingController();
@@ -25,6 +33,10 @@ class _StudentProfileSetupState extends State<StudentProfileSetup>
   final _addressController = TextEditingController();
   final _educationLevelController = TextEditingController();
   final _preferencesController = TextEditingController();
+
+  Uint8List? _imageBytes;
+  String? _existingProfilePictureUrl;
+  final ImagePicker _picker = ImagePicker();
 
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
@@ -51,6 +63,7 @@ class _StudentProfileSetupState extends State<StudentProfileSetup>
   @override
   void dispose() {
     _animationController.dispose();
+    _nameController.dispose();
     _bioController.dispose();
     _qualificationController.dispose();
     _ageController.dispose();
@@ -61,19 +74,34 @@ class _StudentProfileSetupState extends State<StudentProfileSetup>
     super.dispose();
   }
 
+  Future<void> _pickProfileImage() async {
+    final picked = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 80, maxWidth: 600);
+    if (picked != null) {
+      final bytes = await picked.readAsBytes();
+      if (mounted) setState(() => _imageBytes = bytes);
+    }
+  }
+
   Future<void> _loadProfile() async {
     try {
       final data = await _studentService.getProfile();
-      final profile = data['student'];
+      final profile = data['student'] as Map<String, dynamic>?;
+      if (profile == null) {
+        setState(() => _isLoading = false);
+        _animationController.forward();
+        return;
+      }
       setState(() {
-        _bioController.text = profile['bio'] ?? '';
-        _qualificationController.text = profile['qualification'] ?? '';
+        _nameController.text = profile['name']?.toString() ?? '';
+        _bioController.text = profile['bio']?.toString() ?? '';
+        _qualificationController.text = profile['qualification']?.toString() ?? '';
         _ageController.text = profile['age']?.toString() ?? '';
-        _genderController.text = profile['gender'] ?? '';
-        _addressController.text = profile['address'] ?? '';
-        _educationLevelController.text = profile['educationLevel'] ?? '';
+        _genderController.text = profile['gender']?.toString() ?? '';
+        _addressController.text = profile['address']?.toString() ?? '';
+        _educationLevelController.text = profile['educationLevel']?.toString() ?? '';
         _preferencesController.text =
             (profile['preferences'] as List?)?.join(', ') ?? '';
+        _existingProfilePictureUrl = profile['profilePicture']?.toString();
         _isLoading = false;
       });
       _animationController.forward();
@@ -96,6 +124,7 @@ class _StudentProfileSetupState extends State<StudentProfileSetup>
           .toList();
 
       await _studentService.updateProfile({
+        'name': _nameController.text,
         'bio': _bioController.text,
         'qualification': _qualificationController.text,
         'age': int.tryParse(_ageController.text) ?? 0,
@@ -103,7 +132,26 @@ class _StudentProfileSetupState extends State<StudentProfileSetup>
         'address': _addressController.text,
         'educationLevel': _educationLevelController.text,
         'preferences': prefs,
+        if (_imageBytes != null)
+          'profilePicture': 'data:image/jpeg;base64,${base64Encode(_imageBytes!)}',
       });
+      if (_imageBytes != null) {
+        final pic = 'data:image/jpeg;base64,${base64Encode(_imageBytes!)}';
+        setState(() => _existingProfilePictureUrl = pic);
+        ref.read(authProvider.notifier).patchPicture(pic);
+      }
+      try {
+        final resp = await ApiService().get('/users/profile');
+        if (resp.data != null && mounted) {
+          final fetched = User.fromJson(resp.data);
+          final localPic = _existingProfilePictureUrl;
+          if (fetched.profilePicture == null && localPic != null) {
+            ref.read(authProvider.notifier).patchPicture(localPic);
+          } else {
+            await ref.read(authProvider.notifier).setUser(fetched);
+          }
+        }
+      } catch (_) {}
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -175,6 +223,13 @@ class _StudentProfileSetupState extends State<StudentProfileSetup>
                             'Personal Details',
                             Icons.person_outline_rounded,
                             [
+                              _buildTextField(
+                                controller: _nameController,
+                                label: 'Full Name',
+                                icon: Icons.badge_outlined,
+                                hint: 'Your full name',
+                              ),
+                              const SizedBox(height: 16),
                               Row(
                                 children: [
                                   Expanded(
@@ -291,7 +346,7 @@ class _StudentProfileSetupState extends State<StudentProfileSetup>
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: primaryColor.withOpacity(0.3),
+            color: primaryColor.withValues(alpha: 0.3),
             blurRadius: 20,
             offset: const Offset(0, 8),
           ),
@@ -299,17 +354,41 @@ class _StudentProfileSetupState extends State<StudentProfileSetup>
       ),
       child: Row(
         children: [
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.12),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: Colors.white.withOpacity(0.2)),
-            ),
-            child: const Icon(
-              Icons.school_rounded,
-              size: 48,
-              color: Colors.white,
+          GestureDetector(
+            onTap: _pickProfileImage,
+            child: Stack(
+              children: [
+                Container(
+                  width: 80,
+                  height: 80,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: Colors.white.withValues(alpha: 0.4), width: 2),
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(14),
+                    child: _imageBytes != null
+                        ? Image.memory(_imageBytes!, fit: BoxFit.cover)
+                        : _existingProfilePictureUrl != null
+                            ? Image.network(_existingProfilePictureUrl!, fit: BoxFit.cover,
+                                errorBuilder: (_, _, _) => const Icon(Icons.school_rounded, size: 40, color: Colors.white))
+                            : const Icon(Icons.school_rounded, size: 40, color: Colors.white),
+                  ),
+                ),
+                Positioned(
+                  bottom: 0,
+                  right: 0,
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: const BoxDecoration(
+                      color: accentColor,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.camera_alt_rounded, size: 14, color: Colors.white),
+                  ),
+                ),
+              ],
             ),
           ),
           const SizedBox(width: 20),
@@ -330,7 +409,7 @@ class _StudentProfileSetupState extends State<StudentProfileSetup>
                   'Customize your learning experience by completing your profile',
                   style: TextStyle(
                     fontSize: 14,
-                    color: Colors.white.withOpacity(0.85),
+                    color: Colors.white.withValues(alpha: 0.85),
                   ),
                 ),
               ],
@@ -346,10 +425,10 @@ class _StudentProfileSetupState extends State<StudentProfileSetup>
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.grey.withOpacity(0.1)),
+        border: Border.all(color: Colors.grey.withValues(alpha: 0.1)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 15,
             offset: const Offset(0, 4),
           ),
@@ -364,7 +443,7 @@ class _StudentProfileSetupState extends State<StudentProfileSetup>
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: accentColor.withOpacity(0.1),
+                  color: accentColor.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(icon, color: accentColor, size: 24),
@@ -437,7 +516,7 @@ class _StudentProfileSetupState extends State<StudentProfileSetup>
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: primaryColor.withOpacity(0.3),
+            color: primaryColor.withValues(alpha: 0.3),
             blurRadius: 15,
             offset: const Offset(0, 8),
           ),
@@ -469,7 +548,7 @@ class _StudentProfileSetupState extends State<StudentProfileSetup>
                     color: Colors.white,
                     size: 22,
                   ),
-                  const SizedBox(width: 12),
+                  SizedBox(width: 12),
                   Text(
                     'Save Profile Details',
                     style: TextStyle(

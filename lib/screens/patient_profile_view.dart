@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:icare/models/user.dart';
-import 'package:icare/utils/theme.dart';
+import 'package:icare/utils/utils.dart' show buildProfileImageProvider;
 import 'package:icare/widgets/back_button.dart';
 import 'package:intl/intl.dart';
 import 'package:icare/services/course_service.dart';
@@ -104,17 +104,40 @@ class _PatientProfileViewState extends State<PatientProfileView> {
                             ),
                           ],
                         ),
-                        child: Center(
-                          child: Text(
-                            widget.patient.name.isNotEmpty
-                                ? widget.patient.name[0].toUpperCase()
-                                : 'P',
-                            style: const TextStyle(
-                              fontSize: 48,
-                              fontWeight: FontWeight.w900,
-                              color: Color(0xFF6366F1),
-                            ),
-                          ),
+                        child: ClipOval(
+                          child: widget.patient.profilePicture != null &&
+                                  widget.patient.profilePicture!.isNotEmpty
+                              ? Image(
+                                  image: buildProfileImageProvider(
+                                      widget.patient.profilePicture)!,
+                                  width: 120,
+                                  height: 120,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, _, _) => Center(
+                                    child: Text(
+                                      widget.patient.name.isNotEmpty
+                                          ? widget.patient.name[0].toUpperCase()
+                                          : 'P',
+                                      style: const TextStyle(
+                                        fontSize: 48,
+                                        fontWeight: FontWeight.w900,
+                                        color: Color(0xFF6366F1),
+                                      ),
+                                    ),
+                                  ),
+                                )
+                              : Center(
+                                  child: Text(
+                                    widget.patient.name.isNotEmpty
+                                        ? widget.patient.name[0].toUpperCase()
+                                        : 'P',
+                                    style: const TextStyle(
+                                      fontSize: 48,
+                                      fontWeight: FontWeight.w900,
+                                      color: Color(0xFF6366F1),
+                                    ),
+                                  ),
+                                ),
                         ),
                       ),
                       const SizedBox(height: 20),
@@ -152,24 +175,8 @@ class _PatientProfileViewState extends State<PatientProfileView> {
                 ),
                 const SizedBox(height: 24),
 
-                // Contact Information Card
-                _buildInfoCard(
-                  'Contact Information',
-                  Icons.contact_mail_rounded,
-                  const Color(0xFF3B82F6),
-                  [
-                    _buildInfoRow(
-                      Icons.email_outlined,
-                      'Email',
-                      widget.patient.email,
-                    ),
-                    _buildInfoRow(
-                      Icons.phone_outlined,
-                      'Phone',
-                      widget.patient.phoneNumber ?? 'Not provided',
-                    ),
-                  ],
-                ),
+                // Contact Information Card — hidden from doctors per privacy policy
+                // Only patient themselves or admin should see contact details.
                 const SizedBox(height: 16),
 
                 // Account Information Card
@@ -235,7 +242,7 @@ class _PatientProfileViewState extends State<PatientProfileView> {
                               const SizedBox(height: 12),
                           ],
                         );
-                      }).toList(),
+                      }),
                   ],
                 ),
               ],
@@ -251,12 +258,15 @@ class _PatientProfileViewState extends State<PatientProfileView> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(
-              title,
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+            Expanded(
+              child: Text(
+                title,
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
+            const SizedBox(width: 8),
             Text(
               '${(progress * 100).toInt()}%',
               style: const TextStyle(

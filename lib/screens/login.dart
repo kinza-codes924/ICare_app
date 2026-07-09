@@ -1,17 +1,22 @@
+import 'package:easy_localization/easy_localization.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'dart:io' show Platform;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_size_matters/flutter_size_matters.dart';
+import 'package:go_router/go_router.dart';
 import 'package:icare/providers/auth_provider.dart';
 import 'package:icare/screens/forget_password.dart';
-import 'package:icare/screens/privacy_policy.dart';
-import 'package:icare/screens/select_user_type.dart';
-import 'package:icare/screens/tabs.dart';
 import 'package:icare/screens/lab_profile_setup.dart';
 import 'package:icare/screens/pharmacy_profile_setup.dart';
 import 'package:icare/screens/student_profile_setup.dart';
 import 'package:icare/services/auth_service.dart';
+import 'package:icare/services/biometric_service.dart';
+import 'package:icare/services/face_auth_service.dart';
+import 'package:icare/screens/face_capture_screen.dart';
 import 'package:icare/services/user_service.dart';
+import 'package:icare/utils/shared_pref.dart';
 import 'package:icare/models/user.dart' as app_user;
 import 'package:icare/utils/imagePaths.dart';
 import 'package:icare/utils/theme.dart';
@@ -44,11 +49,27 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
 
   final AuthService _authService = AuthService();
   final UserService _userService = UserService();
+  final BiometricService _biometricService = BiometricService();
+  final FaceAuthService _faceAuthService = FaceAuthService();
+
   bool rememberMe = false;
   bool isLogin = true;
   bool isLoading = false;
   bool agreedToTerms = false;
   String selectedSignupRole = 'Patient';
+
+  // Biometric state
+  bool _biometricAvailable = false;
+  bool _biometricEnabled = false;
+  bool _biometricLoading = false;
+
+  // Face auth state
+  bool _faceEnabled = false;
+  bool _faceLoading = false;
+
+  // Social sign-in state
+  bool _googleLoading = false;
+  bool _appleLoading = false;
 
   @override
   void initState() {
@@ -68,6 +89,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     );
     _logoController.forward();
     _checkExistingRole();
+    _initBiometrics();
   }
 
   @override
@@ -90,11 +112,344 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     final existingRole = authState.userRole;
 
     // If user has a role saved, skip to login directly
-    if (existingRole != null && existingRole.isNotEmpty) {
+    if (existingRole.isNotEmpty) {
       setState(() {
         isLogin = true; // Force login mode
       });
     }
+  }
+
+  // ── Biometric helpers ────────────────────────────────────────────────────
+
+  Future<void> _initBiometrics() async {
+    final available = await _biometricService.isAvailable();
+    final enabled = await _biometricService.isBiometricEnabled();
+    final faceEnabled = await _faceAuthService.isFaceEnabled();
+    if (!mounted) return;
+    setState(() {
+      _biometricAvailable = available;
+      _biometricEnabled = enabled;
+      _faceEnabled = faceEnabled;
+    });
+    // Auto-trigger face login first; fall back to fingerprint
+    if (faceEnabled) {
+      await Future.delayed(const Duration(milliseconds: 400));
+      if (mounted) _triggerFaceLogin(auto: true);
+    } else if (available && enabled) {
+      await Future.delayed(const Duration(milliseconds: 600));
+      if (mounted) _triggerBiometricLogin();
+    }
+  }
+
+  /// Called automatically on app open when biometrics are enabled,
+  /// or when the user taps the fingerprint button.
+  Future<void> _triggerBiometricLogin() async {
+    if (_biometricLoading) return;
+    setState(() => _biometricLoading = true);
+
+    try {
+      final result = await _biometricService.authenticate(
+        reason: 'Sign in to iCare',
+      );
+
+      if (!mounted) return;
+      setState(() => _biometricLoading = false);
+
+      switch (result) {
+        case BiometricResult.success:
+          // Use persistent biometric token (survives logout)
+          final token = await SharedPref().getBiometricToken();
+          if (token != null && token.isNotEmpty) {
+            final user = await SharedPref().getBiometricUserData();
+            if (user != null && mounted) {
+              await ref.read(authProvider.notifier).setUserToken(token);
+              await ref.read(authProvider.notifier).setUser(user);
+              if (mounted) context.go('/dashboard');
+            } else {
+              _showError('Session expired. Please sign in with your password.');
+            }
+          } else {
+            _showError('Biometric not set up. Please sign in with your password first.');
+          }
+          break;
+        case BiometricResult.notAvailable:
+          _showError('Biometric not available on this device.');
+          break;
+        case BiometricResult.lockedOut:
+          _showError('Too many attempts. Please use password to sign in.');
+          break;
+        case BiometricResult.cancelled:
+        case BiometricResult.failed:
+          // User dismissed — do nothing
+          break;
+      }
+    } catch (e) {
+      debugPrint('Biometric login error: $e');
+      if (!mounted) return;
+      setState(() => _biometricLoading = false);
+      _showError('Biometric authentication failed. Please use your password.');
+    }
+  }
+
+  Future<void> _triggerFaceLogin({bool auto = false}) async {
+    if (_faceLoading) return;
+    setState(() => _faceLoading = true);
+    try {
+      final path = await Navigator.push<String>(
+        context,
+        MaterialPageRoute(
+          builder: (_) => const FaceCaptureScreen(mode: FaceCaptureMode.verify),
+        ),
+      );
+      if (!mounted) return;
+      if (path == null) {
+        // User cancelled
+        setState(() => _faceLoading = false);
+        return;
+      }
+      final result = await _faceAuthService.verifyFace(path);
+      if (!mounted) return;
+      setState(() => _faceLoading = false);
+
+      switch (result) {
+        case FaceVerifyResult.match:
+          final token = await SharedPref().getBiometricToken();
+          final user = await SharedPref().getBiometricUserData();
+          if (token != null && token.isNotEmpty && user != null && mounted) {
+            await ref.read(authProvider.notifier).setUserToken(token);
+            await ref.read(authProvider.notifier).setUser(user);
+            if (mounted) context.go('/dashboard');
+          } else {
+            _showError('Session expired. Please sign in with your password first.');
+          }
+          break;
+        case FaceVerifyResult.noMatch:
+          _showError('Face not recognised. Please try again or use your password.');
+          break;
+        case FaceVerifyResult.noFace:
+          _showError('No face detected. Please try again in good lighting.');
+          break;
+        case FaceVerifyResult.multipleFaces:
+          _showError('Multiple faces detected. Please ensure only your face is visible.');
+          break;
+        case FaceVerifyResult.notRegistered:
+          _showError('Face ID not set up. Please sign in with your password first.');
+          break;
+        case FaceVerifyResult.error:
+          _showError('Face ID error. Please try again.');
+          break;
+      }
+    } catch (e) {
+      debugPrint('Face login error: $e');
+      if (mounted) {
+        setState(() => _faceLoading = false);
+        _showError('Face ID failed. Please use your password.');
+      }
+    }
+  }
+
+  Future<void> _offerFaceSetup(String email) async {
+    final alreadySet = await _faceAuthService.isFaceEnabled();
+    if (alreadySet) return;
+    if (!mounted) return;
+
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        icon: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppColors.primaryColor.withValues(alpha: 0.1),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(Icons.face_retouching_natural, color: AppColors.primaryColor, size: 36),
+        ),
+        title: const Text(
+          'Enable Face ID?',
+          textAlign: TextAlign.center,
+          style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18),
+        ),
+        content: const Text(
+          'Sign in faster next time by looking at your camera — works on any Android device.',
+          textAlign: TextAlign.center,
+          style: TextStyle(fontSize: 14, color: Color(0xFF64748B), height: 1.5),
+        ),
+        actionsAlignment: MainAxisAlignment.center,
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Not Now', style: TextStyle(color: Color(0xFF64748B))),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(ctx);
+              await Future.delayed(const Duration(milliseconds: 300));
+              if (!mounted) return;
+              final path = await Navigator.push<String>(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const FaceCaptureScreen(mode: FaceCaptureMode.register),
+                ),
+              );
+              if (path == null || !mounted) return;
+              final error = await _faceAuthService.registerFace(path);
+              if (!mounted) return;
+              if (error == null) {
+                // Save token so face login can retrieve the session
+                final token = await SharedPref().getToken();
+                final user = await SharedPref().getUserData();
+                await _biometricService.enableBiometrics(email, token: token, user: user);
+                setState(() { _faceEnabled = true; });
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Face ID enabled! You can now sign in with your face.'),
+                    backgroundColor: Color(0xFF059669),
+                  ),
+                );
+              } else {
+                _showError(error);
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primaryColor,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              elevation: 0,
+            ),
+            child: const Text('Set Up Face ID'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _handleGoogleSignIn() async {
+    if (_googleLoading) return;
+    setState(() => _googleLoading = true);
+    try {
+      final result = await _authService.loginWithGoogle();
+      if (!mounted) return;
+      if (result['success'] == true) {
+        await _completeSocialLogin(result);
+      } else {
+        _showError(result['message'] ?? 'Google sign-in failed');
+      }
+    } catch (e) {
+      if (mounted) _showError('Google sign-in error: $e');
+    } finally {
+      if (mounted) setState(() => _googleLoading = false);
+    }
+  }
+
+  Future<void> _handleAppleSignIn() async {
+    if (_appleLoading) return;
+    setState(() => _appleLoading = true);
+    try {
+      final result = await _authService.loginWithApple();
+      if (!mounted) return;
+      if (result['success'] == true) {
+        await _completeSocialLogin(result);
+      } else {
+        _showError(result['message'] ?? 'Apple sign-in failed');
+      }
+    } catch (e) {
+      if (mounted) _showError('Apple sign-in error: $e');
+    } finally {
+      if (mounted) setState(() => _appleLoading = false);
+    }
+  }
+
+  Future<void> _completeSocialLogin(Map<String, dynamic> authResult) async {
+    final data = authResult['data'] as Map<String, dynamic>? ?? {};
+    final token = data['token']?.toString() ?? '';
+    if (token.isEmpty) {
+      _showError('Sign-in failed: no token received');
+      return;
+    }
+    final profileResult = await _userService.getUserProfile(token: token);
+    if (!mounted) return;
+    if (profileResult['success'] == true) {
+      final user = app_user.User.fromJson(profileResult['user'] as Map<String, dynamic>);
+      await ref.read(authProvider.notifier).setUserToken(token);
+      await ref.read(authProvider.notifier).setUser(user);
+      if (mounted) context.go('/dashboard');
+    } else {
+      _showError('Could not load profile: ${profileResult['message']}');
+    }
+  }
+
+  /// After a successful password login, offer to enable biometrics.
+  Future<void> _offerBiometricSetup(String email) async {
+    if (!_biometricAvailable) return;
+    // Check if biometrics are already set up for THIS specific user
+    final savedEmail = await _biometricService.getBiometricEmail();
+    if (_biometricEnabled && savedEmail == email) return;
+    final label = await _biometricService.getBiometricLabel();
+    if (!mounted) return;
+
+    // await so navigation to dashboard waits until user responds
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        icon: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppColors.primaryColor.withValues(alpha: 0.1),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(
+            label.contains('Face') ? Icons.face_retouching_natural : Icons.fingerprint,
+            color: AppColors.primaryColor,
+            size: 36,
+          ),
+        ),
+        title: Text(
+          'Enable $label Sign-In?',
+          textAlign: TextAlign.center,
+          style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 18),
+        ),
+        content: Text(
+          'Sign in faster next time using $label instead of your password.',
+          textAlign: TextAlign.center,
+          style: const TextStyle(fontSize: 14, color: Color(0xFF64748B), height: 1.5),
+        ),
+        actionsAlignment: MainAxisAlignment.center,
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Not Now', style: TextStyle(color: Color(0xFF64748B))),
+          ),
+          const SizedBox(width: 8),
+          ElevatedButton(
+            onPressed: () async {
+              // Save token+user BEFORE closing dialog to avoid race condition
+              final token = await SharedPref().getToken();
+              final user = await SharedPref().getUserData();
+              await _biometricService.enableBiometrics(
+                email,
+                token: token,
+                user: user,
+              );
+              if (mounted) setState(() => _biometricEnabled = true);
+              Navigator.pop(ctx);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primaryColor,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              elevation: 0,
+            ),
+            child: Text('Enable $label'),
+          ),
+        ],
+      ),
+    );
   }
 
   List<Widget> _buildDynamicFields({bool isMobile = false}) {
@@ -268,7 +623,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                       width: 300, height: 300,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: Colors.white.withOpacity(0.04),
+                        color: Colors.white.withValues(alpha: 0.04),
                       ),
                     ),
                   ),
@@ -278,7 +633,30 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                       width: 350, height: 350,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: Colors.white.withOpacity(0.03),
+                        color: Colors.white.withValues(alpha: 0.03),
+                      ),
+                    ),
+                  ),
+                  // Back to Home button
+                  Positioned(
+                    top: 24, left: 24,
+                    child: GestureDetector(
+                      onTap: () => context.go('/home'),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: Colors.white.withValues(alpha: 0.3), width: 1),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.arrow_back_rounded, color: Colors.white, size: 16),
+                            const SizedBox(width: 6),
+                            Text('Home', style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600)),
+                          ],
+                        ),
                       ),
                     ),
                   ),
@@ -289,31 +667,53 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Container(
-                            width: 90, height: 90,
-                            padding: const EdgeInsets.all(14),
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                             decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.12),
-                              borderRadius: BorderRadius.circular(24),
-                              border: Border.all(color: Colors.white.withOpacity(0.2), width: 1.5),
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(14),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.10),
+                                  blurRadius: 12,
+                                  offset: const Offset(0, 4),
+                                ),
+                              ],
                             ),
-                            child: Image.asset(ImagePaths.logo, fit: BoxFit.contain),
+                            child: Image.asset(
+                              'assets/Asset 1.png',
+                              height: 80,
+                              fit: BoxFit.contain,
+                              filterQuality: FilterQuality.high,
+                            ),
                           ),
-                          const SizedBox(height: 28),
+                          const SizedBox(height: 16),
+                          // "by" text only
                           const Text(
-                            "iCare Virtual Hospital",
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontSize: 32, fontWeight: FontWeight.w800,
-                              color: Colors.white, letterSpacing: 0.5,
-                            ),
+                            "by",
+                            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: Colors.white70),
                           ),
                           const SizedBox(height: 10),
+                          // RM Health Solutions logo below "by"
+                          Container(
+                            height: 44,
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Image.asset(
+                              'assets/images/health.jpeg',
+                              fit: BoxFit.contain,
+                              errorBuilder: (_, _, _) => const Text('RM Health Solutions', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF0036BC))),
+                            ),
+                          ),
+                          const SizedBox(height: 14),
                           Text(
-                            "Your Virtual Healthcare Platform",
+                            "Your Trusted Healthcare Platform",
                             textAlign: TextAlign.center,
                             style: TextStyle(
                               fontSize: 16, fontWeight: FontWeight.w600,
-                              color: Colors.white.withOpacity(0.9),
+                              color: Colors.white.withValues(alpha: 0.9),
                             ),
                           ),
                           const SizedBox(height: 8),
@@ -322,18 +722,41 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                             textAlign: TextAlign.center,
                             style: TextStyle(
                               fontSize: 14,
-                              color: Colors.white.withOpacity(0.7),
+                              color: Colors.white.withValues(alpha: 0.7),
                               height: 1.6,
                             ),
                           ),
                           const SizedBox(height: 44),
-                          _buildHeroTrust(Icons.shield_rounded, "Data Protected & Secure"),
-                          const SizedBox(height: 14),
-                          _buildHeroTrust(Icons.verified_user_rounded, "Verified Doctors Only"),
-                          const SizedBox(height: 14),
-                          _buildHeroTrust(Icons.medical_services_rounded, "Complete Virtual Hospital"),
-                          const SizedBox(height: 14),
-                          _buildHeroTrust(Icons.people_rounded, "Trusted by Patients Nationwide"),
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // Left Column - 2 items
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    _buildHeroTrust(Icons.shield_rounded, "Data Protected & Secure", "End-to-end encrypted health records", color: const Color(0xFFEF4444)),
+                                    const SizedBox(height: 18),
+                                    _buildHeroTrust(Icons.verified_user_rounded, "HIPAA Compliant", "Meeting US healthcare data security standards", color: const Color(0xFF10B981)),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 20),
+                              // Right Column - 2 items
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    _buildHeroTrust(Icons.local_hospital_rounded, "Complete Digital Health Care Platform", "Consult, prescribe & manage all-in-one", color: const Color(0xFF8B5CF6)),
+                                    const SizedBox(height: 18),
+                                    _buildHeroTrust(Icons.people_rounded, "Open for Everyone", "For patients, doctors & healthcare providers", color: const Color(0xFFF59E0B)),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
                         ],
                       ),
                     ),
@@ -364,13 +787,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                       borderRadius: BorderRadius.circular(28),
                       boxShadow: [
                         BoxShadow(
-                          color: const Color(0xFF0036BC).withOpacity(0.06),
+                          color: const Color(0xFF0036BC).withValues(alpha: 0.06),
                           blurRadius: 40,
                           offset: const Offset(0, 16),
                           spreadRadius: 0,
                         ),
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.03),
+                          color: Colors.black.withValues(alpha: 0.03),
                           blurRadius: 12,
                           offset: const Offset(0, 4),
                         ),
@@ -406,7 +829,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                                           ? [
                                               BoxShadow(
                                                 color: AppColors.primaryColor
-                                                    .withOpacity(0.3),
+                                                    .withValues(alpha: 0.3),
                                                 blurRadius: 12,
                                                 offset: const Offset(0, 4),
                                               ),
@@ -431,7 +854,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                               ),
                               Expanded(
                                 child: GestureDetector(
-                                  onTap: () => setState(() => isLogin = false),
+                                  onTap: () => context.push('/signup'),
                                   child: AnimatedContainer(
                                     duration: const Duration(milliseconds: 250),
                                     curve: Curves.easeInOut,
@@ -447,7 +870,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                                           ? [
                                               BoxShadow(
                                                 color: AppColors.primaryColor
-                                                    .withOpacity(0.3),
+                                                    .withValues(alpha: 0.3),
                                                 blurRadius: 12,
                                                 offset: const Offset(0, 4),
                                               ),
@@ -477,7 +900,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
 
                         // Welcome Text
                         Text(
-                          isLogin ? "Welcome Back!" : "Create Your Account",
+                          isLogin ? "Welcome Back!".tr() : "Create Your Account".tr(),
                           style: const TextStyle(
                             fontSize: 28,
                             fontWeight: FontWeight.w900,
@@ -489,8 +912,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                         const SizedBox(height: 8),
                         Text(
                           isLogin
-                              ? "Access your health dashboard securely"
-                              : "Join iCare for a better healthcare experience",
+                              ? "Access your health dashboard securely".tr()
+                              : "Join iCare for a better healthcare experience".tr(),
                           style: TextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.w500,
@@ -508,8 +931,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                               // Username field (always shown)
                               CustomInputField(
                                 hintText: isLogin
-                                    ? "Username or Email"
-                                    : "Full Name",
+                                    ? "Username or Email".tr()
+                                    : "Full Name".tr(),
                                 leadingIcon: const Icon(
                                   Icons.person_outline_rounded,
                                   color: Color(0xFF94A3B8),
@@ -530,7 +953,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                               if (!isLogin) ...[
                                 const SizedBox(height: 16),
                                 CustomInputField(
-                                  hintText: "Email Address",
+                                  hintText: "Email Address".tr(),
                                   leadingIcon: const Icon(
                                     Icons.email_outlined,
                                     color: Color(0xFF94A3B8),
@@ -550,7 +973,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                                 ),
                                 const SizedBox(height: 16),
                                 CustomInputField(
-                                  hintText: "Phone Number",
+                                  hintText: "Phone Number".tr(),
                                   leadingIcon: const Icon(
                                     Icons.phone_outlined,
                                     color: Color(0xFF94A3B8),
@@ -572,7 +995,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                               const SizedBox(height: 16),
 
                               CustomInputField(
-                                hintText: "Password",
+                                hintText: "Password".tr(),
                                 leadingIcon: const Icon(
                                   Icons.lock_outline_rounded,
                                   color: Color(0xFF94A3B8),
@@ -584,6 +1007,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                                 borderRadius: 14,
                                 borderColor: const Color(0xFFE2E8F0),
                                 borderWidth: 1.5,
+                                textInputAction: isLogin ? TextInputAction.done : TextInputAction.next,
+                                onEditingComplete: isLogin && !isLoading ? _handleSubmit : null,
                                 validator: (val) {
                                   if (val == null || val.isEmpty) {
                                     return "Please enter your password";
@@ -599,7 +1024,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                                 const SizedBox(height: 16),
                                 CustomInputField(
                                   controller: confirmPasswordController,
-                                  hintText: "Confirm Password",
+                                  hintText: "Confirm Password".tr(),
                                   leadingIcon: const Icon(
                                     Icons.lock_outline_rounded,
                                     color: Color(0xFF94A3B8),
@@ -663,11 +1088,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                                               ),
                                               recognizer: TapGestureRecognizer()
                                                 ..onTap = () {
-                                                  Navigator.of(context).push(
-                                                    MaterialPageRoute(
-                                                      builder: (ctx) => const PrivacyPolicy(),
-                                                    ),
-                                                  );
+                                                  context.go('/terms');
                                                 },
                                             ),
                                             const TextSpan(text: " and "),
@@ -680,11 +1101,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                                               ),
                                               recognizer: TapGestureRecognizer()
                                                 ..onTap = () {
-                                                  Navigator.of(context).push(
-                                                    MaterialPageRoute(
-                                                      builder: (ctx) => const PrivacyPolicy(),
-                                                    ),
-                                                  );
+                                                  context.go('/privacypolicy');
                                                 },
                                             ),
                                           ],
@@ -724,8 +1141,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                                           ),
                                         ),
                                         const SizedBox(width: 8),
-                                        const Text(
-                                          "Remember me",
+                                        Text(
+                                          "Remember me".tr(),
                                           style: TextStyle(
                                             fontSize: 13,
                                             fontWeight: FontWeight.w500,
@@ -749,8 +1166,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                                         tapTargetSize:
                                             MaterialTapTargetSize.shrinkWrap,
                                       ),
-                                      child: const Text(
-                                        "Forgot Password?",
+                                      child: Text(
+                                        "Forgot Password?".tr(),
                                         style: TextStyle(
                                           color: AppColors.primaryColor,
                                           fontWeight: FontWeight.w600,
@@ -791,8 +1208,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                                         )
                                       : Text(
                                           isLogin
-                                              ? "Sign In"
-                                              : "Create Account",
+                                              ? "Sign In".tr()
+                                              : "Create Account".tr(),
                                           style: const TextStyle(
                                             color: Colors.white,
                                             fontSize: 16,
@@ -818,7 +1235,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                                         horizontal: 16,
                                       ),
                                       child: Text(
-                                        "Or continue with",
+                                        "Or continue with".tr(),
                                         style: TextStyle(
                                           color: Colors.grey[500],
                                           fontSize: 13,
@@ -836,23 +1253,25 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                                   ],
                                 ),
                                 const SizedBox(height: 24),
-                                Row(
-                                  children: [
-                                    Expanded(
-                                      child: _webSocialButton(
-                                        ImagePaths.google_icon,
-                                        "Google",
-                                      ),
-                                    ),
-                                    const SizedBox(width: 16),
-                                    Expanded(
-                                      child: _webSocialButton(
-                                        ImagePaths.facebook_icon,
-                                        "Facebook",
-                                      ),
-                                    ),
-                                  ],
+                                _webSocialButton(
+                                  ImagePaths.google_icon,
+                                  "Continue with Google",
+                                  onTap: _handleGoogleSignIn,
+                                  isLoading: _googleLoading,
                                 ),
+                                // Apple Sign In: only on iOS native (Services ID not configured for web/Android)
+                                if (!kIsWeb && Platform.isIOS) ...[
+                                  const SizedBox(height: 10),
+                                  _webAppleButton(
+                                    onTap: _handleAppleSignIn,
+                                    isLoading: _appleLoading,
+                                  ),
+                                ],
+                                // Biometric / Face Unlock sign-in button — show whenever hardware is available
+                                if (_faceEnabled || (_biometricAvailable && _biometricEnabled)) ...[
+                                  const SizedBox(height: 12),
+                                  _buildBiometricButton(isDesktop: true),
+                                ],
                               ],
                             ],
                           ),
@@ -990,7 +1409,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                           ),
                           Expanded(
                             child: GestureDetector(
-                              onTap: () => setState(() => isLogin = false),
+                              onTap: () => context.push('/signup'),
                               child: Container(
                                 padding: EdgeInsets.symmetric(vertical: 15),
                                 decoration: BoxDecoration(
@@ -1046,7 +1465,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                           if (!isLogin) SizedBox(height: 5),
                           if (!isLogin)
                             CustomInputField(
-                              hintText: "Email Address",
+                              hintText: "Email Address".tr(),
                               leadingIcon: Icon(
                                 Icons.email_outlined,
                                 color: AppColors.primary500,
@@ -1066,7 +1485,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                           if (!isLogin) SizedBox(height: 5),
                           if (!isLogin)
                             CustomInputField(
-                              hintText: "Phone Number",
+                              hintText: "Phone Number".tr(),
                               leadingIcon: Icon(
                                 Icons.phone_outlined,
                                 color: AppColors.primary500,
@@ -1106,7 +1525,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                           SizedBox(height: 5),
 
                           CustomInputField(
-                            hintText: "Enter Your Password",
+                            hintText: "Enter Your Password".tr(),
                             leadingIcon: Icon(
                               Icons.key,
                               color: AppColors.primary500,
@@ -1117,6 +1536,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                             borderRadius: 30,
                             borderColor: AppColors.veryLightGrey,
                             borderWidth: 2,
+                            textInputAction: isLogin ? TextInputAction.done : TextInputAction.next,
+                            onEditingComplete: isLogin && !isLoading ? _handleSubmit : null,
                             validator: (val) {
                               if (val == null || val.isEmpty) {
                                 return "Please enter your password";
@@ -1132,7 +1553,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                             SizedBox(height: 5),
                             CustomInputField(
                               controller: confirmPasswordController,
-                              hintText: "Confirm Password",
+                              hintText: "Confirm Password".tr(),
                               leadingIcon: Icon(
                                 Icons.key,
                                 color: AppColors.primary500,
@@ -1195,11 +1616,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                                           ),
                                           recognizer: TapGestureRecognizer()
                                             ..onTap = () {
-                                              Navigator.of(context).push(
-                                                MaterialPageRoute(
-                                                  builder: (ctx) => const PrivacyPolicy(),
-                                                ),
-                                              );
+                                              context.go('/terms');
                                             },
                                         ),
                                         const TextSpan(text: " and "),
@@ -1212,11 +1629,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                                           ),
                                           recognizer: TapGestureRecognizer()
                                             ..onTap = () {
-                                              Navigator.of(context).push(
-                                                MaterialPageRoute(
-                                                  builder: (ctx) => const PrivacyPolicy(),
-                                                ),
-                                              );
+                                              context.go('/privacypolicy');
                                             },
                                         ),
                                       ],
@@ -1250,7 +1663,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                                       ),
                                     ),
                                     CustomText(
-                                      text: "Remember me",
+                                      text: "Remember me".tr(),
                                       fontSize: isTablet ? 12 : 15,
                                       color: isTablet
                                           ? AppColors.white
@@ -1305,7 +1718,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                                       ),
                                     )
                                   : Text(
-                                      isLogin ? "Sign In" : "Sign Up",
+                                      isLogin ? "Sign In".tr() : "Sign Up".tr(),
                                       style: const TextStyle(
                                         color: Colors.white,
                                         fontSize: 16,
@@ -1322,30 +1735,76 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
               ),
             ),
           ),
+          // Home button for mobile
+          Positioned(
+            top: MediaQuery.of(context).padding.top + 12,
+            left: 16,
+            child: GestureDetector(
+              onTap: () => context.go('/home'),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.85),
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 6)],
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.arrow_back_rounded, color: AppColors.primaryColor, size: 15),
+                    const SizedBox(width: 5),
+                    Text('Home', style: TextStyle(color: AppColors.primaryColor, fontSize: 12, fontWeight: FontWeight.w700)),
+                  ],
+                ),
+              ),
+            ),
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildHeroTrust(IconData icon, String text) {
+  Widget _buildHeroTrust(IconData icon, String title, String subtitle, {Color? color}) {
+    final iconColor = color ?? Colors.white;
     return Row(
       mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         Container(
-          padding: const EdgeInsets.all(6),
+          width: 44, height: 44,
+          alignment: Alignment.center,
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.15),
-            borderRadius: BorderRadius.circular(8),
+            color: iconColor,
+            borderRadius: BorderRadius.circular(12),
           ),
-          child: Icon(icon, color: Colors.white, size: 18),
+          child: Icon(icon, color: Colors.white, size: 22),
         ),
-        const SizedBox(width: 12),
-        Text(
-          text,
-          style: TextStyle(
-            color: Colors.white.withOpacity(0.9),
-            fontSize: 14,
-            fontWeight: FontWeight.w500,
+        const SizedBox(width: 14),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.1,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                subtitle,
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.65),
+                  fontSize: 11,
+                  fontWeight: FontWeight.w400,
+                  height: 1.3,
+                ),
+              ),
+            ],
           ),
         ),
       ],
@@ -1356,60 +1815,227 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     return Column(
       children: [
         const SizedBox(height: 25),
-        const Text("Or Continue With", style: TextStyle(color: Colors.grey)),
+        Text("Or Continue With".tr(), style: const TextStyle(color: Colors.grey)),
         const SizedBox(height: 15),
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            _socialButton(ImagePaths.facebook_icon, "Facebook"),
-            const SizedBox(width: 20),
-            _socialButton(ImagePaths.google_icon, "Google"),
+            _socialButton(ImagePaths.google_icon, "Google",
+                onTap: _handleGoogleSignIn, isLoading: _googleLoading),
+            // Apple Sign In: only on iOS native (Services ID not configured for web/Android)
+            if (!kIsWeb && Platform.isIOS) ...[
+              const SizedBox(width: 12),
+              _mobileAppleButton(onTap: _handleAppleSignIn, isLoading: _appleLoading),
+            ],
           ],
         ),
+        // Face ID (camera) or hardware biometric sign-in
+        if (_faceEnabled || (_biometricAvailable && _biometricEnabled)) ...[
+          const SizedBox(height: 12),
+          _buildBiometricButton(isDesktop: false),
+        ],
       ],
     );
   }
 
-  Widget _webSocialButton(String assetPath, String label) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFE2E8F0), width: 1.5),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Image.asset(assetPath, width: 24, height: 24),
-          const SizedBox(width: 10),
-          Text(
-            label,
-            style: const TextStyle(
-              color: Color(0xFF475569),
-              fontWeight: FontWeight.w600,
-              fontSize: 14,
-            ),
+  Widget _buildBiometricButton({required bool isDesktop}) {
+    return Column(
+      children: [
+        // Face ID button (camera-based, works on all Android devices)
+        if (_faceEnabled) ...[
+          _authButton(
+            icon: Icons.face_retouching_natural,
+            label: 'Sign in with Face ID',
+            loading: _faceLoading,
+            onTap: _triggerFaceLogin,
+            isDesktop: isDesktop,
           ),
+          const SizedBox(height: 10),
         ],
+        // Hardware biometrics (fingerprint)
+        if (_biometricAvailable && _biometricEnabled)
+          FutureBuilder<String>(
+            future: _biometricService.getBiometricLabel(),
+            builder: (ctx, snap) {
+              final label = snap.data ?? 'Fingerprint';
+              final icon = label.contains('Face') ? Icons.face_retouching_natural : Icons.fingerprint;
+              return _authButton(
+                icon: icon,
+                label: 'Sign in with $label',
+                loading: _biometricLoading,
+                onTap: _triggerBiometricLogin,
+                isDesktop: isDesktop,
+              );
+            },
+          ),
+      ],
+    );
+  }
+
+  Widget _authButton({
+    required IconData icon,
+    required String label,
+    required bool loading,
+    required VoidCallback onTap,
+    required bool isDesktop,
+  }) {
+    if (isDesktop) {
+      return GestureDetector(
+        onTap: loading ? null : onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 14),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: AppColors.primaryColor.withValues(alpha: 0.4), width: 1.5),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              loading
+                  ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2))
+                  : Icon(icon, color: AppColors.primaryColor, size: 24),
+              const SizedBox(width: 10),
+              Text(
+                loading ? 'Authenticating…' : label,
+                style: TextStyle(color: AppColors.primaryColor, fontWeight: FontWeight.w600, fontSize: 14),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+    return GestureDetector(
+      onTap: loading ? null : onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 13, horizontal: 20),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(30),
+          border: Border.all(color: AppColors.primaryColor.withValues(alpha: 0.4)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            loading
+                ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                : Icon(icon, color: AppColors.primaryColor, size: 22),
+            const SizedBox(width: 8),
+            Text(
+              loading ? 'Authenticating…' : label,
+              style: TextStyle(color: AppColors.primaryColor, fontSize: 13, fontWeight: FontWeight.w600),
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _socialButton(String assetPath, String label) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 13, horizontal: 20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(30),
-        border: Border.all(color: Colors.grey.shade300),
+  Widget _webSocialButton(String assetPath, String label, {VoidCallback? onTap, bool isLoading = false}) {
+    return GestureDetector(
+      onTap: isLoading ? null : onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: const Color(0xFFE2E8F0), width: 1.5),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            if (isLoading)
+              const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF475569)))
+            else
+              Image.asset(assetPath, width: 24, height: 24),
+            const SizedBox(width: 10),
+            Text(
+              isLoading ? 'Signing in...' : label,
+              style: const TextStyle(
+                color: Color(0xFF475569),
+                fontWeight: FontWeight.w600,
+                fontSize: 14,
+              ),
+            ),
+          ],
+        ),
       ),
-      child: Row(
-        children: [
-          Image.asset(assetPath, width: 24, height: 24),
-          const SizedBox(width: 8),
-          Text(label, style: TextStyle(color: Colors.grey[700], fontSize: 12)),
-        ],
+    );
+  }
+
+  Widget _webAppleButton({VoidCallback? onTap, bool isLoading = false}) {
+    return GestureDetector(
+      onTap: isLoading ? null : onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        decoration: BoxDecoration(
+          color: Colors.black,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: Colors.black, width: 1.5),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            if (isLoading)
+              const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+            else
+              const Icon(Icons.apple, color: Colors.white, size: 24),
+            const SizedBox(width: 10),
+            Text(
+              isLoading ? 'Signing in...' : 'Continue with Apple',
+              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 14),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _socialButton(String assetPath, String label, {VoidCallback? onTap, bool isLoading = false}) {
+    return GestureDetector(
+      onTap: isLoading ? null : onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 13, horizontal: 20),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(30),
+          border: Border.all(color: Colors.grey.shade300),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (isLoading)
+              const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2))
+            else
+              Image.asset(assetPath, width: 24, height: 24),
+            const SizedBox(width: 8),
+            Text(isLoading ? 'Signing in...' : label, style: TextStyle(color: Colors.grey[700], fontSize: 12)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _mobileAppleButton({VoidCallback? onTap, bool isLoading = false}) {
+    return GestureDetector(
+      onTap: isLoading ? null : onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 13, horizontal: 20),
+        decoration: BoxDecoration(
+          color: Colors.black,
+          borderRadius: BorderRadius.circular(30),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (isLoading)
+              const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+            else
+              const Icon(Icons.apple, color: Colors.white, size: 22),
+            const SizedBox(width: 8),
+            Text(isLoading ? 'Signing in...' : 'Apple', style: const TextStyle(color: Colors.white, fontSize: 12)),
+          ],
+        ),
       ),
     );
   }
@@ -1417,12 +2043,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
   Widget _buildTrustRow(IconData icon, String text) {
     return Row(
       children: [
-        Icon(icon, color: Colors.white.withOpacity(0.9), size: 18),
+        Icon(icon, color: Colors.white.withValues(alpha: 0.9), size: 18),
         const SizedBox(width: 12),
         Text(
           text,
           style: TextStyle(
-            color: Colors.white.withOpacity(0.9),
+            color: Colors.white.withValues(alpha: 0.9),
             fontSize: 14,
             fontWeight: FontWeight.w600,
             fontFamily: "Gilroy-Medium",
@@ -1438,7 +2064,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
         Container(
           padding: const EdgeInsets.all(6),
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.15),
+            color: Colors.white.withValues(alpha: 0.15),
             shape: BoxShape.circle,
           ),
           child: Icon(icon, color: Colors.white, size: 16),
@@ -1457,14 +2083,124 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     );
   }
 
+  static const _roleDisplayNames = {
+    'doctor': 'Doctor',
+    'student': 'Student',
+    'instructor': 'Instructor',
+    'patient': 'Patient',
+    'lab': 'Laboratory',
+    'pharmacy': 'Pharmacy',
+  };
+
+  static const _roleIcons = {
+    'doctor': Icons.medical_services_rounded,
+    'student': Icons.school_rounded,
+    'instructor': Icons.cast_for_education_rounded,
+    'patient': Icons.person_rounded,
+    'lab': Icons.biotech_rounded,
+    'pharmacy': Icons.local_pharmacy_rounded,
+  };
+
+  /// Multi-role accounts: pick which role to log in as.
+  Future<String?> _showLoginAsSheet(List<String> roles, String activeRole) {
+    return showModalBottomSheet<String>(
+      context: context,
+      isDismissible: false,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40, height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Text('Login As',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: Color(0xFF0F172A))),
+              const SizedBox(height: 4),
+              const Text('Your account has multiple roles. Choose how you want to continue.',
+                  style: TextStyle(fontSize: 13, color: Color(0xFF64748B))),
+              const SizedBox(height: 16),
+              ...roles.map((r) {
+                final key = r.toLowerCase();
+                final isActive = key == activeRole.toLowerCase();
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: InkWell(
+                    onTap: () => Navigator.pop(ctx, key),
+                    borderRadius: BorderRadius.circular(14),
+                    child: Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: isActive
+                            ? const Color(0xFF0036BC).withValues(alpha: 0.06)
+                            : Colors.white,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                          color: isActive
+                              ? const Color(0xFF0036BC)
+                              : const Color(0xFFE2E8F0),
+                          width: isActive ? 1.5 : 1,
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 42, height: 42,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF0036BC).withValues(alpha: 0.08),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Icon(
+                              _roleIcons[key] ?? Icons.person_rounded,
+                              color: const Color(0xFF0036BC), size: 22,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              'Login as ${_roleDisplayNames[key] ?? r}',
+                              style: const TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xFF0F172A)),
+                            ),
+                          ),
+                          if (isActive)
+                            const Icon(Icons.check_circle_rounded,
+                                color: Color(0xFF0036BC), size: 20),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              }),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   void _handleSubmit() async {
     if (!_formKey.currentState!.validate()) return;
     // Terms & Conditions check for signup
     if (!isLogin && !agreedToTerms) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please agree to the Terms & Conditions to continue.'),
-          backgroundColor: Color(0xFFEF4444),
+        SnackBar(
+          content: Text('Please agree to the Terms & Conditions to continue.'.tr()),
+          backgroundColor: const Color(0xFFEF4444),
         ),
       );
       return;
@@ -1479,13 +2215,44 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
           email: usernameController.text.trim(),
           password: passwordController.text.trim(),
         );
+        // 2FA check
+        if (result['requiresOtp'] == true) {
+          final tempToken = result['tempToken']?.toString() ?? '';
+          if (mounted) await _show2FADialog(tempToken: tempToken);
+          if (mounted) setState(() => isLoading = false);
+          return;
+        }
+
         if (result['success']) {
           debugPrint("✅ Login successful, token saved");
           debugPrint("🔍 Fetching user profile...");
 
           // Get the token from the login result
-          final token = result['data']['token'];
+          var token = result['data']['token'];
           debugPrint("🔑 Token from login: ${token.substring(0, 20)}...");
+
+          // Multi-role account: ask which role to log in as
+          final loginUser = result['data']['user'];
+          final rolesRaw = (loginUser is Map) ? loginUser['roles'] : null;
+          if (rolesRaw is List && rolesRaw.length > 1 && mounted) {
+            final roles = rolesRaw.map((e) => e.toString()).toList();
+            final activeRole = loginUser['role']?.toString() ?? '';
+            final picked = await _showLoginAsSheet(roles, activeRole);
+            if (picked == null) {
+              setState(() => isLoading = false);
+              return;
+            }
+            if (picked.toLowerCase() != activeRole.toLowerCase()) {
+              final sw = await _authService.switchRole(picked, token: token);
+              if (sw['success'] == true) {
+                token = sw['data']['token'];
+              } else {
+                _showError(sw['message']?.toString() ?? 'Role switch failed');
+                setState(() => isLoading = false);
+                return;
+              }
+            }
+          }
 
           // Fetch user profile with the token directly (don't rely on storage yet)
           final profileResult = await _userService.getUserProfile(token: token);
@@ -1504,13 +2271,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
               "👤 User object created: ${user.name}, ${user.email}, ${user.role}",
             );
 
-            ref.read(authProvider.notifier).setUser(user);
-            debugPrint("✅ User set in provider");
-
-            ref
+            // Save token first and await
+            await ref
                 .read(authProvider.notifier)
                 .setUserToken(result['data']['token']);
             debugPrint("✅ Token set in provider");
+
+            // Save user and await
+            await ref.read(authProvider.notifier).setUser(user);
+            debugPrint("✅ User set in provider");
 
             // Verify the role is set
             final currentRole = ref.read(authProvider).userRole;
@@ -1520,9 +2289,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
               "✅ Logged in as: ${user.name} (${user.email}) - Role: ${user.role}",
             );
 
-            Navigator.of(context).pushReplacement(
-              MaterialPageRoute(builder: (ctx) => const TabsScreen()),
-            );
+            // Offer biometric / face setup after first successful password login
+            final loginEmail = usernameController.text.trim();
+            await _offerFaceSetup(loginEmail);
+            if (mounted) await _offerBiometricSetup(loginEmail);
+            if (mounted) context.go('/dashboard');
           } else {
             debugPrint("❌ Failed to fetch profile: ${profileResult['message']}");
             _showError(
@@ -1557,9 +2328,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
           // credentials: credentialsController.text.trim(),
         );
         if (result['success']) {
-          // Set token in provider first
+          // Set token in provider first and await
           final token = result['data']['token'];
-          ref.read(authProvider.notifier).setUserToken(token);
+          await ref.read(authProvider.notifier).setUserToken(token);
 
           // Fetch user profile after registration, passing token directly
           final profileResult = await _userService.getUserProfile(token: token);
@@ -1567,7 +2338,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
           if (profileResult['success'] && mounted) {
             final userData = profileResult['user'];
             final user = app_user.User.fromJson(userData);
-            ref.read(authProvider.notifier).setUser(user);
+            await ref.read(authProvider.notifier).setUser(user);
 
             // Redirect based on user role
             if (user.role == 'Laboratory') {
@@ -1587,9 +2358,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                 ),
               );
             } else {
-              Navigator.of(context).pushReplacement(
-                MaterialPageRoute(builder: (ctx) => const TabsScreen()),
-              );
+              context.go('/dashboard');
             }
           }
         } else {
@@ -1646,5 +2415,83 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
   void _showError(dynamic error) {
     if (!mounted) return;
     Utils.showErrorSnackBar(context, error);
+  }
+
+  Future<void> _show2FADialog({required String tempToken}) async {
+    final otpController = TextEditingController();
+    bool verifying = false;
+
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => StatefulBuilder(builder: (ctx, setModal) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(children: [
+          Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: const Color(0xFF0036BC).withValues(alpha: 0.1), borderRadius: BorderRadius.circular(10)),
+            child: const Icon(Icons.security_rounded, color: Color(0xFF0036BC), size: 22)),
+          const SizedBox(width: 10),
+          const Text('Two-Factor Auth', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
+        ]),
+        content: SizedBox(width: double.maxFinite, child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(color: const Color(0xFFEFF6FF), borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xFFBFDBFE))),
+            child: const Row(children: [
+              Icon(Icons.phonelink_lock_rounded, color: Color(0xFF3B82F6), size: 20),
+              SizedBox(width: 10),
+              Expanded(child: Text('Open Google Authenticator and enter the 6-digit code for iCare.', style: TextStyle(fontSize: 13, color: Color(0xFF1E40AF), height: 1.4))),
+            ]),
+          ),
+          const SizedBox(height: 16),
+          const Text('Authenticator Code', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF374151))),
+          const SizedBox(height: 8),
+          TextField(
+            controller: otpController, keyboardType: TextInputType.number, maxLength: 6, autofocus: true, textAlign: TextAlign.center,
+            style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900, letterSpacing: 8),
+            decoration: InputDecoration(
+              hintText: '000000', hintStyle: TextStyle(color: Colors.grey.shade300, letterSpacing: 8), counterText: '',
+              filled: true, fillColor: const Color(0xFFF9FAFB),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFE5E7EB))),
+              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFE5E7EB))),
+              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFF0036BC), width: 1.5)),
+            ),
+          ),
+        ])),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel', style: TextStyle(color: Color(0xFF6B7280)))),
+          ElevatedButton(
+            onPressed: verifying ? null : () async {
+              if (otpController.text.length < 6) return;
+              setModal(() => verifying = true);
+              try {
+                final result = await _authService.verify2FA(tempToken: tempToken, otp: otpController.text.trim());
+                if (!ctx.mounted) return;
+                if (result['success'] == true) {
+                  final data = result['data'] as Map<String, dynamic>? ?? {};
+                  final token = data['token']?.toString() ?? '';
+                  if (token.isEmpty) { setModal(() => verifying = false); return; }
+                  Navigator.pop(ctx);
+                  final profileResult = await _userService.getUserProfile(token: token);
+                  if (!mounted) return;
+                  if (profileResult['success']) {
+                    final user = app_user.User.fromJson(profileResult['user']);
+                    await ref.read(authProvider.notifier).setUserToken(token);
+                    await ref.read(authProvider.notifier).setUser(user);
+                    if (mounted) context.go('/dashboard');
+                  }
+                } else {
+                  setModal(() => verifying = false);
+                  if (ctx.mounted) ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text(result['message']?.toString() ?? 'Invalid code'), backgroundColor: Colors.red));
+                }
+              } catch (e) {
+                setModal(() => verifying = false);
+              }
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF0036BC), foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
+            child: verifying ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) : const Text('Verify'),
+          ),
+        ],
+      )),
+    );
   }
 }

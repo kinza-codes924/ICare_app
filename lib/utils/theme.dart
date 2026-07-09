@@ -37,10 +37,14 @@ class AppColors {
 
 class AppTheme {
   static final mainTheme = ThemeData(
+    useMaterial3: false,
     fontFamily: "Gilroy",
     scaffoldBackgroundColor: AppColors.bgColor,
-    textTheme: TextTheme(
-      // titleLarge:
+    textTheme: const TextTheme(),
+
+    drawerTheme: const DrawerThemeData(
+      backgroundColor: Colors.white,
+      surfaceTintColor: Colors.transparent,
     ),
 
     appBarTheme: AppBarTheme(
@@ -59,6 +63,18 @@ class AppTheme {
           fontSize: ScallingConfig.moderateScale(24),
         ),
       ),
+    ),
+
+    // Always-visible, thicker scrollbars so scroll position is obvious
+    scrollbarTheme: ScrollbarThemeData(
+      thumbVisibility: const WidgetStatePropertyAll(true),
+      thickness: const WidgetStatePropertyAll(10),
+      radius: const Radius.circular(8),
+      thumbColor: WidgetStatePropertyAll(
+        AppColors.primaryColor.withValues(alpha: 0.45),
+      ),
+      trackColor: const WidgetStatePropertyAll(Color(0xFFE8ECF5)),
+      minThumbLength: 48,
     ),
   );
 }

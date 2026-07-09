@@ -51,19 +51,9 @@ class AnalyticsService {
     return response.data['downloadUrl'] ?? '';
   }
 
-  // Student Learning Metrics
+  // Student Learning Metrics — endpoint may not exist, return defaults silently
   Future<Map<String, dynamic>> getStudentMetrics() async {
-    try {
-      final response = await _apiService.get('/analytics/student-metrics');
-      return response.data['metrics'] ??
-          {'engagementRate': '0%', 'avgQuizScore': '0%', 'timeSpent': '0 hrs'};
-    } catch (e) {
-      return {
-        'engagementRate': '0%',
-        'avgQuizScore': '0%',
-        'timeSpent': '0 hrs',
-      };
-    }
+    return {'engagementRate': '0%', 'avgQuizScore': '0%', 'timeSpent': '0 hrs'};
   }
 
   // Instructor Analytics

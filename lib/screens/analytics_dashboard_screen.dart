@@ -134,7 +134,7 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen> {
         ),
         _buildStatCard(
           'Total Revenue',
-          '\$${_stats['totalRevenue']?.toString() ?? '0'}',
+          'PKR ${_stats['totalRevenue']?.toString() ?? '0'}',
           Icons.payments_rounded,
           Colors.green,
         ),
@@ -245,7 +245,7 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen> {
         shrinkWrap: true,
         physics: const NeverScrollableScrollPhysics(),
         itemCount: _geoDistribution.length,
-        separatorBuilder: (_, __) => const Divider(height: 32),
+        separatorBuilder: (_, _) => const Divider(height: 32),
         itemBuilder: (context, index) {
           final item = _geoDistribution[index];
           final double percentage = (item['percentage'] ?? 0.0) as double;

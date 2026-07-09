@@ -1,62 +1,31 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_size_matters/flutter_size_matters.dart';
-import 'package:flutter_steps/flutter_steps.dart';
-import 'package:icare/models/app_enums.dart';
 import 'package:icare/screens/cancellation_reason.dart';
-import 'package:icare/utils/imagePaths.dart';
 import 'package:icare/utils/theme.dart';
-import 'package:icare/utils/utils.dart';
 import 'package:icare/widgets/back_button.dart';
 import 'package:icare/widgets/custom_button.dart';
-import 'package:icare/widgets/custom_circle_icon_button.dart';
 import 'package:icare/widgets/custom_text.dart';
-import 'package:icare/widgets/order_card.dart';
-import 'package:icare/widgets/svg_wrapper.dart';
 
 class ManageOrders extends StatelessWidget {
   const ManageOrders({super.key});
 
   @override
   Widget build(BuildContext context) {
-    List<Steps> basicSteps = [
-      Steps(
-        leading: SvgWrapper(assetPath: ImagePaths.success),
-        title: 'Confirmed Order',
-        subtitle: '22/9/2025',
-        isActive: true,
-      ),
-      Steps(
-        leading: SvgWrapper(assetPath: ImagePaths.success),
-        title: 'Pharmacy is preparing your order',
-        subtitle: '',
-
-        isActive: true,
-      ),
-      Steps(
-        leading: SvgWrapper(assetPath: ImagePaths.success),
-        title: 'In Transit',
-        // subtitle: 'Subtitle',
-        isActive: false,
-      ),
-      Steps(
-        leading: SvgWrapper(assetPath: ImagePaths.success),
-        title: 'Out for Delievery',
-        // subtitle: 'Subtitle',
-        isActive: false,
-      ),
-      Steps(
-        leading: SvgWrapper(assetPath: ImagePaths.success),
-        title: 'Delievered',
-        // subtitle: 'Subtitle',
-        isActive: false,
-      ),
+    final steps = [
+      {'title': 'Confirmed Order', 'subtitle': '22/9/2025', 'active': true},
+      {'title': 'Pharmacy is preparing your order', 'subtitle': '', 'active': true},
+      {'title': 'In Transit', 'subtitle': '', 'active': false},
+      {'title': 'Out for Delivery', 'subtitle': '', 'active': false},
+      {'title': 'Delivered', 'subtitle': '', 'active': false},
     ];
+
     return Scaffold(
       appBar: AppBar(
-        leading: CustomBackButton(),
+        leading: const CustomBackButton(),
         automaticallyImplyLeading: false,
         title: CustomText(
-          text: 'Manage Orders',
+          text: 'Manage Orders'.tr(),
           fontFamily: "Gilroy-Bold",
           fontSize: 16.78,
           fontWeight: FontWeight.bold,
@@ -70,89 +39,49 @@ class ManageOrders extends StatelessWidget {
           children: [
             SizedBox(height: ScallingConfig.scale(20)),
             Padding(
-              padding: EdgeInsets.symmetric(
-                horizontal: ScallingConfig.scale(15),
-              ),
+              padding: EdgeInsets.symmetric(horizontal: ScallingConfig.scale(15)),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Column(
-                    mainAxisAlignment: MainAxisAlignment.start,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      CustomText(
-                        text: "Estimated Time",
-                        fontFamily: "Gilroy-Regular",
-                        fontSize: 14.79,
-                        color: AppColors.primary500,
-                        fontWeight: FontWeight.w400,
-                      ),
-                      CustomText(
-                        text: "1 hour",
-                        fontFamily: "Gilroy-Bold",
-                        fontSize: 14.79,
-                        color: AppColors.primary500,
-                        fontWeight: FontWeight.bold,
-                      ),
+                      CustomText(text: "Estimated Time", fontFamily: "Gilroy-Regular", fontSize: 14.79, color: AppColors.primary500),
+                      CustomText(text: "1 hour", fontFamily: "Gilroy-Bold", fontSize: 14.79, color: AppColors.primary500, fontWeight: FontWeight.bold),
                     ],
                   ),
                   Column(
                     children: [
-                      CustomText(
-                        text: "Tracking ID",
-                        fontFamily: "Gilroy-Regular",
-                        fontSize: 14.79,
-                        color: AppColors.primary500,
-                        fontWeight: FontWeight.w400,
-                      ),
-                      CustomText(
-                        text: "28194",
-                        fontFamily: "Gilroy-Bold",
-                        fontSize: 14.79,
-                        color: AppColors.primary500,
-                        fontWeight: FontWeight.bold,
-                      ),
+                      CustomText(text: "Tracking ID", fontFamily: "Gilroy-Regular", fontSize: 14.79, color: AppColors.primary500),
+                      CustomText(text: "28194", fontFamily: "Gilroy-Bold", fontSize: 14.79, color: AppColors.primary500, fontWeight: FontWeight.bold),
                     ],
                   ),
                 ],
               ),
             ),
-            SizedBox(height: ScallingConfig.scale(50)),
-            SizedBox(
-              height: Utils.windowHeight(context) * 0.4,
-              width: double.infinity,
-              child: Padding(
-                padding: EdgeInsets.symmetric(
-                  horizontal: ScallingConfig.scale(15),
-                ),
-                child: FlutterSteps(
-                  steps: basicSteps,
-                  titleFontSize: 12,
-                  showStepLine: true,
-
-                  titleStyle: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    fontFamily: "Gilroy-SemiBold",
-                    color: AppColors.primary500,
+            SizedBox(height: ScallingConfig.scale(30)),
+            // Steps list
+            ...steps.map((step) => Padding(
+              padding: EdgeInsets.symmetric(horizontal: ScallingConfig.scale(15), vertical: 6),
+              child: Row(
+                children: [
+                  Icon(
+                    step['active'] == true ? Icons.check_circle : Icons.radio_button_unchecked,
+                    color: step['active'] == true ? AppColors.themeGreen : AppColors.grayColor,
+                    size: 24,
                   ),
-                  inactiveStepLineColor: AppColors.grayColor.withAlpha(60),
-                  leadingSizeFactor: ScallingConfig.scale(1.5),
-                  hideInactiveLeading: true,
-                  showSubtitle: true,
-
-                  activeStepLineColor: AppColors.themeGreen,
-                  titleActiveColor: AppColors.primary500,
-                  subtitleStyle: TextStyle(
-                    fontSize: 12,
-                    fontFamily: "Gilroy-Medium",
-                    color: AppColors.primary500,
+                  const SizedBox(width: 12),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      CustomText(text: step['title'] as String, fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.primary500),
+                      if ((step['subtitle'] as String).isNotEmpty)
+                        CustomText(text: step['subtitle'] as String, fontSize: 12, color: AppColors.grayColor),
+                    ],
                   ),
-                  direction: Axis.vertical,
-                  inactiveColor: AppColors.grayColor.withAlpha(60),
-                ),
+                ],
               ),
-            ),
+            )),
             SizedBox(height: ScallingConfig.scale(50)),
             CustomButton(label: "Update Status", borderRadius: 40),
             CustomText(
@@ -161,9 +90,7 @@ class ManageOrders extends StatelessWidget {
               color: AppColors.themeRed,
               fontSize: 14,
               onTap: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute(builder: (ctx) => CancellationReason()),
-                );
+                Navigator.of(context).push(MaterialPageRoute(builder: (ctx) => const CancellationReason()));
               },
               fontFamily: "Gilroy-Bold",
               fontWeight: FontWeight.bold,
@@ -174,3 +101,4 @@ class ManageOrders extends StatelessWidget {
     );
   }
 }
+

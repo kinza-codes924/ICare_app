@@ -6,12 +6,13 @@ import 'package:icare/widgets/vitals_chart.dart';
 import 'package:icare/screens/intake_notes_redesign.dart';
 import 'package:icare/screens/soap_notes_redesign.dart';
 import 'package:icare/screens/create_medical_record.dart';
-import 'package:icare/screens/prescription_templates_screen.dart';
 import 'package:icare/screens/doctor_assign_program_screen.dart';
+import 'package:icare/screens/video_call.dart';
+import 'package:icare/services/appointment_service.dart';
 import 'package:icare/services/doctor_service.dart';
+import 'package:icare/utils/shared_pref.dart';
 import 'package:icare/utils/theme.dart';
 import 'package:icare/widgets/back_button.dart';
-import 'package:icare/widgets/custom_button.dart';
 import 'package:icare/screens/record_vitals_screen.dart';
 import 'package:intl/intl.dart';
 
@@ -36,7 +37,7 @@ class _ConsultationWorkflowScreenState extends State<ConsultationWorkflowScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 5, vsync: this);
+    _tabController = TabController(length: 4, vsync: this);
     _loadPatientHistory();
   }
 
@@ -88,11 +89,29 @@ class _ConsultationWorkflowScreenState extends State<ConsultationWorkflowScreen>
               color: AppColors.primaryColor,
             ),
             tooltip: 'Start Video Consultation',
-            onPressed: () {
-              // Simulated Telemedicine Integration (Req 6.9)
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Starting Secure Video Consultation...'),
+            onPressed: () async {
+              // Doctor starts call — update status to in_progress so patient sees Rejoin
+              final me = await SharedPref().getUserData();
+              if (!context.mounted) return;
+              try {
+                await AppointmentService().updateAppointmentStatus(
+                  appointmentId: widget.appointment.id ?? '',
+                  status: 'in_progress',
+                );
+              } catch (_) {}
+              if (!context.mounted) return;
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => VideoCall(
+                    channelName: widget.appointment.id ?? 'consultation',
+                    remoteUserName: widget.appointment.patient?.name ?? 'Patient',
+                    isAudioOnly: false,
+                    appointmentId: widget.appointment.id,
+                    patientId: widget.appointment.patient?.id,
+                    currentUserName: me?.name ?? widget.appointment.doctor?.name ?? 'Doctor',
+                    currentUserId: me?.id ?? '',
+                  ),
                 ),
               );
             },
@@ -122,16 +141,9 @@ class _ConsultationWorkflowScreenState extends State<ConsultationWorkflowScreen>
           indicatorColor: AppColors.primaryColor,
           tabs: const [
             Tab(text: '1. History (DHR)', icon: Icon(Icons.history_rounded)),
-            Tab(text: '2. Vitals', icon: Icon(Icons.monitor_heart_rounded)),
-            Tab(
-              text: '3. Examination',
-              icon: Icon(Icons.person_search_rounded),
-            ),
-            Tab(text: '4. Diagnosis', icon: Icon(Icons.biotech_rounded)),
-            Tab(
-              text: '5. Treatment Plan',
-              icon: Icon(Icons.assignment_rounded),
-            ),
+            Tab(text: '2. Examination', icon: Icon(Icons.person_search_rounded)),
+            Tab(text: '3. Diagnosis', icon: Icon(Icons.biotech_rounded)),
+            Tab(text: '4. Treatment Plan', icon: Icon(Icons.assignment_rounded)),
           ],
         ),
       ),
@@ -139,7 +151,6 @@ class _ConsultationWorkflowScreenState extends State<ConsultationWorkflowScreen>
         controller: _tabController,
         children: [
           _buildHistoryTab(),
-          _buildVitalsTab(),
           _buildExaminationTab(),
           _buildDiagnosisTab(),
           _buildTreatmentPlanTab(),
@@ -234,7 +245,7 @@ class _ConsultationWorkflowScreenState extends State<ConsultationWorkflowScreen>
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
+              color: color.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(10),
             ),
             child: Icon(icon, color: color, size: 20),
@@ -268,8 +279,9 @@ class _ConsultationWorkflowScreenState extends State<ConsultationWorkflowScreen>
   }
 
   Widget _buildHistoryTab() {
-    if (_isLoadingHistory)
+    if (_isLoadingHistory) {
       return const Center(child: CircularProgressIndicator());
+    }
 
     final records = _patientHistory?['records'] as List? ?? [];
     final vitals = _patientHistory?['vitals'] as List? ?? [];
@@ -325,7 +337,7 @@ class _ConsultationWorkflowScreenState extends State<ConsultationWorkflowScreen>
           if (records.isEmpty)
             const Center(child: Text('No previous intake notes found.'))
           else
-            ...records.map((r) {
+            ...records.take(10).map((r) {
               final String recordType =
                   r['type']?.toString().toUpperCase() ?? 'RECORD';
               final String createdAt = r['createdAt'] ?? '';
@@ -338,16 +350,9 @@ class _ConsultationWorkflowScreenState extends State<ConsultationWorkflowScreen>
                 recordType,
                 date,
                 diagnosis,
-                () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => CreateMedicalRecordScreen(
-                      appointment: widget.appointment,
-                    ),
-                  ),
-                ),
+                null,
               );
-            }).toList(),
+            }),
         ],
       ),
     );
@@ -400,7 +405,7 @@ class _ConsultationWorkflowScreenState extends State<ConsultationWorkflowScreen>
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
         border: (warning != null || abnormalLabs.isNotEmpty)
-            ? Border.all(color: Colors.red.withOpacity(0.5), width: 2)
+            ? Border.all(color: Colors.red.withValues(alpha: 0.5), width: 2)
             : null,
       ),
       child: Column(
@@ -482,15 +487,6 @@ class _ConsultationWorkflowScreenState extends State<ConsultationWorkflowScreen>
                     IntakeNotesRedesign(appointment: widget.appointment),
               ),
             ),
-          ),
-          const SizedBox(height: 16),
-          _buildWorkflowAction(
-            'Record Current Vitals',
-            'Update blood pressure, heart rate, and weight',
-            Icons.monitor_heart_rounded,
-            () {
-              // Navigation to vitals recording screen
-            },
           ),
         ],
       ),
@@ -581,7 +577,7 @@ class _ConsultationWorkflowScreenState extends State<ConsultationWorkflowScreen>
     String type,
     String date,
     String diagnosis,
-    VoidCallback onTap,
+    VoidCallback? onTap,
   ) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -596,7 +592,7 @@ class _ConsultationWorkflowScreenState extends State<ConsultationWorkflowScreen>
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: AppColors.primaryColor.withOpacity(0.1),
+              color: AppColors.primaryColor.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(10),
             ),
             child: const Icon(
@@ -680,7 +676,7 @@ class _ConsultationWorkflowScreenState extends State<ConsultationWorkflowScreen>
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: color.withOpacity(0.1),
+                color: color.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Icon(icon, color: color, size: 28),

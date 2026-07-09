@@ -92,7 +92,7 @@ class _ManageDependentsScreenState extends State<ManageDependentsScreen> {
     return ListView.separated(
       padding: const EdgeInsets.all(24),
       itemCount: _dependents.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 16),
+      separatorBuilder: (_, _) => const SizedBox(height: 16),
       itemBuilder: (context, index) {
         final dependent = _dependents[index];
         return Container(
@@ -106,7 +106,7 @@ class _ManageDependentsScreenState extends State<ManageDependentsScreen> {
             children: [
               CircleAvatar(
                 radius: 28,
-                backgroundColor: AppColors.primaryColor.withOpacity(0.1),
+                backgroundColor: AppColors.primaryColor.withValues(alpha: 0.1),
                 child: const Icon(
                   Icons.person_rounded,
                   color: AppColors.primaryColor,

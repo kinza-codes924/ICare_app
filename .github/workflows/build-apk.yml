@@ -2,63 +2,41 @@ name: Build Flutter APK
 
 on:
   push:
-    branches: [ "main", "master" ]
-  pull_request:
-    branches: [ "main", "master" ]
-  workflow_dispatch:  # Manual trigger button
+    branches: [ "wajahat" ]
+  workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
+      - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Setup Java
-        uses: actions/setup-java@v3
         with:
-          distribution: 'zulu'
-          java-version: '17'
+          ref: wajahat
 
-      - name: Setup Flutter
+      - name: Setup Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Setup Flutter 3.44.0
         uses: subosito/flutter-action@v2
         with:
-          channel: 'stable'
+          flutter-version: '3.44.0'
+          channel: stable
+          cache: true
 
-      - name: Install dependencies
+      - name: Flutter pub get
         run: flutter pub get
 
-      - name: Analyze project
-        run: flutter analyze
-        continue-on-error: true
-
-      - name: Run tests
-        run: flutter test
-        continue-on-error: true
-
       - name: Build APK
-        run: flutter build apk --release
+        run: flutter build apk --release --no-tree-shake-icons
 
-      - name: Upload APK Artifact
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: icare-app-release
+          name: iCare-release-APK
           path: build/app/outputs/flutter-apk/app-release.apk
-          retention-days: 30
-
-      - name: Get current date
-        id: date
-        run: echo "date=$(date +'%Y-%m-%d-%H%M')" >> $GITHUB_OUTPUT
-
-      - name: Rename APK with date
-        run: |
-          cp build/app/outputs/flutter-apk/app-release.apk \
-             build/app/outputs/flutter-apk/icare-${{ steps.date.outputs.date }}.apk
-
-      - name: Upload dated APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: icare-${{ steps.date.outputs.date }}
-          path: build/app/outputs/flutter-apk/icare-${{ steps.date.outputs.date }}.apk
-          retention-days: 30
+          retention-days: 7

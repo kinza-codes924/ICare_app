@@ -3,7 +3,6 @@ import 'package:icare/models/appointment_detail.dart';
 import 'package:icare/services/clinical_service.dart';
 import 'package:icare/utils/theme.dart';
 import 'package:icare/widgets/back_button.dart';
-import 'package:intl/intl.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 
 class IntakeNotesRedesign extends StatefulWidget {
@@ -273,8 +272,9 @@ class _IntakeNotesRedesignState extends State<IntakeNotesRedesign> {
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading)
+    if (_isLoading) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
 
     final isDesktop = MediaQuery.of(context).size.width > 900;
     return isDesktop ? _buildWebView() : _buildMobileView();
@@ -316,7 +316,7 @@ class _IntakeNotesRedesignState extends State<IntakeNotesRedesign> {
                   padding: const EdgeInsets.all(12),
                   margin: const EdgeInsets.only(bottom: 20),
                   decoration: BoxDecoration(
-                    color: Colors.orange.withOpacity(0.1),
+                    color: Colors.orange.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: const Row(
@@ -417,7 +417,7 @@ class _IntakeNotesRedesignState extends State<IntakeNotesRedesign> {
                           a['createdAt']?.toString().substring(0, 16) ?? '',
                         ),
                       )
-                      .toList(),
+                      ,
               ],
 
               const SizedBox(height: 40),

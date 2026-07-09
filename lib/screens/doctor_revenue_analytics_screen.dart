@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:icare/utils/theme.dart';
 import 'package:icare/widgets/back_button.dart';
+import 'package:intl/intl.dart';
 
 class DoctorRevenueAnalyticsScreen extends StatefulWidget {
   const DoctorRevenueAnalyticsScreen({super.key});
@@ -14,6 +15,44 @@ class DoctorRevenueAnalyticsScreen extends StatefulWidget {
 class _DoctorRevenueAnalyticsScreenState
     extends State<DoctorRevenueAnalyticsScreen> {
   String _selectedPeriod = 'Monthly';
+  DateTimeRange? _customRange;
+
+  String get _periodLabel {
+    if (_customRange != null) {
+      final fmt = DateFormat('dd MMM yyyy');
+      return '${fmt.format(_customRange!.start)} – ${fmt.format(_customRange!.end)}';
+    }
+    return _selectedPeriod;
+  }
+
+  Future<void> _pickDateRange() async {
+    final now = DateTime.now();
+    final picked = await showDateRangePicker(
+      context: context,
+      firstDate: DateTime(now.year - 3),
+      lastDate: now,
+      initialDateRange: _customRange ??
+          DateTimeRange(
+            start: now.subtract(const Duration(days: 30)),
+            end: now,
+          ),
+      builder: (ctx, child) => Theme(
+        data: Theme.of(ctx).copyWith(
+          colorScheme: ColorScheme.light(
+            primary: AppColors.primaryColor,
+            onPrimary: Colors.white,
+          ),
+        ),
+        child: child!,
+      ),
+    );
+    if (picked != null) {
+      setState(() {
+        _customRange = picked;
+        _selectedPeriod = 'Custom';
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -48,8 +87,6 @@ class _DoctorRevenueAnalyticsScreenState
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _buildPeriodSelector(),
-            const SizedBox(height: 24),
-            _buildTotalEarningsCard(),
             const SizedBox(height: 24),
             _buildUsageStats(),
             const SizedBox(height: 32),
@@ -88,37 +125,97 @@ class _DoctorRevenueAnalyticsScreenState
   }
 
   Widget _buildPeriodSelector() {
-    return Container(
-      padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: ['Weekly', 'Monthly', 'Yearly'].map((period) {
-          final isSelected = _selectedPeriod == period;
-          return GestureDetector(
-            onTap: () => setState(() => _selectedPeriod = period),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              decoration: BoxDecoration(
-                color: isSelected ? AppColors.primaryColor : Colors.transparent,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(
-                period,
-                style: TextStyle(
-                  color: isSelected ? Colors.white : const Color(0xFF64748B),
-                  fontWeight: FontWeight.bold,
-                  fontSize: 13,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            // Period chips
+            Expanded(
+              child: Container(
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                ),
+                child: Row(
+                  children: ['Weekly', 'Monthly', 'Yearly'].map((period) {
+                    final isSelected = _selectedPeriod == period;
+                    return Expanded(
+                      child: GestureDetector(
+                        onTap: () => setState(() {
+                          _selectedPeriod = period;
+                          _customRange = null;
+                        }),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 9),
+                          decoration: BoxDecoration(
+                            color: isSelected ? AppColors.primaryColor : Colors.transparent,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            period,
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: isSelected ? Colors.white : const Color(0xFF64748B),
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  }).toList(),
                 ),
               ),
             ),
-          );
-        }).toList(),
-      ),
+            const SizedBox(width: 8),
+            // Date range picker button
+            GestureDetector(
+              onTap: _pickDateRange,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: _customRange != null
+                        ? AppColors.primaryColor
+                        : const Color(0xFFE2E8F0),
+                    width: _customRange != null ? 1.5 : 1,
+                  ),
+                ),
+                child: Icon(
+                  Icons.date_range_rounded,
+                  color: _customRange != null
+                      ? AppColors.primaryColor
+                      : const Color(0xFF64748B),
+                  size: 20,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            const Icon(Icons.calendar_today_rounded, size: 13, color: Color(0xFF94A3B8)),
+            const SizedBox(width: 5),
+            Text(
+              _periodLabel,
+              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF64748B)),
+            ),
+            if (_customRange != null) ...[
+              const SizedBox(width: 8),
+              GestureDetector(
+                onTap: () => setState(() { _customRange = null; _selectedPeriod = 'Monthly'; }),
+                child: const Icon(Icons.close_rounded, size: 14, color: Color(0xFF94A3B8)),
+              ),
+            ],
+          ],
+        ),
+      ],
     );
   }
 
@@ -191,69 +288,6 @@ class _DoctorRevenueAnalyticsScreenState
         fontSize: 18,
         fontWeight: FontWeight.w800,
         color: Color(0xFF0F172A),
-      ),
-    );
-  }
-
-  Widget _buildTotalEarningsCard() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: AppColors.primaryColor,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.primaryColor.withOpacity(0.3),
-            blurRadius: 20,
-            offset: const Offset(0, 10),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Total Net Earnings',
-            style: TextStyle(color: Colors.white70, fontSize: 14),
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            'PKR 452,800',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 32,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-          const SizedBox(height: 16),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.2),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: const Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  Icons.trending_up_rounded,
-                  color: Colors.greenAccent,
-                  size: 16,
-                ),
-                SizedBox(width: 4),
-                Text(
-                  '+12.5% from last month',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
       ),
     );
   }

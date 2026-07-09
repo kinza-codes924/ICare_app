@@ -1,8 +1,9 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'dart:async';
-import 'package:intl/intl.dart';
 import '../services/chat_service.dart';
+import '../services/call_service.dart';
 import '../utils/theme.dart';
 import '../utils/shared_pref.dart';
 import 'video_call.dart';
@@ -29,6 +30,7 @@ class ChatScreen extends StatefulWidget {
 
 class _ChatScreenState extends State<ChatScreen> {
   final ChatService _chatService = ChatService();
+  final CallService _callService = CallService();
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final FocusNode _messageFocusNode = FocusNode();
@@ -72,12 +74,15 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
+  String _currentUserName = '';
+
   Future<void> _loadCurrentUser() async {
     try {
       final userData = await SharedPref().getUserData();
       if (mounted) {
         setState(() {
           _currentUserId = userData?.id ?? '';
+          _currentUserName = userData?.name ?? '';
         });
       }
     } catch (e) {
@@ -88,6 +93,37 @@ class _ChatScreenState extends State<ChatScreen> {
         });
       }
     }
+  }
+
+  Future<void> _startCall({required bool isAudioOnly}) async {
+    debugPrint('🚀 CALL BUTTON CLICKED! isAudioOnly: $isAudioOnly');
+    debugPrint('🚀 Current user ID: $_currentUserId');
+    debugPrint('🚀 Current user name: $_currentUserName');
+    debugPrint('🚀 Remote user ID: ${widget.userId}');
+
+    final channelName = _buildChannelName();
+    debugPrint('🚀 Channel name: $channelName');
+
+    // Send signal to backend so the other party gets notified
+    await _callService.initiateCall(
+      receiverId: widget.userId,
+      channelName: channelName,
+      callerName: _currentUserName.isNotEmpty ? _currentUserName : 'Unknown',
+      callType: isAudioOnly ? 'audio' : 'video',
+    );
+    if (!mounted) return;
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => VideoCall(
+          channelName: channelName,
+          remoteUserName: widget.userName,
+          isAudioOnly: isAudioOnly,
+          currentUserId: _currentUserId,
+          currentUserName: _currentUserName,
+        ),
+      ),
+    );
   }
 
   void _setupTypingListener() {
@@ -324,7 +360,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 Icons.camera_alt,
                 color: AppColors.primaryColor,
               ),
-              title: const Text('Camera'),
+              title: Text('Camera'.tr()),
               onTap: () {
                 Navigator.pop(context);
                 _pickAndSendMessage(ImageSource.camera);
@@ -335,7 +371,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 Icons.photo_library,
                 color: AppColors.primaryColor,
               ),
-              title: const Text('Gallery'),
+              title: Text('Gallery'.tr()),
               onTap: () {
                 Navigator.pop(context);
                 _pickAndSendMessage(ImageSource.gallery);
@@ -346,7 +382,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 Icons.insert_drive_file,
                 color: AppColors.primaryColor,
               ),
-              title: const Text('Document'),
+              title: Text('Document'.tr()),
               onTap: () {
                 Navigator.pop(context);
                 _pickAndSendFile();
@@ -383,7 +419,7 @@ class _ChatScreenState extends State<ChatScreen> {
           children: [
             CircleAvatar(
               radius: 20,
-              backgroundColor: AppColors.primaryColor.withOpacity(0.1),
+              backgroundColor: AppColors.primaryColor.withValues(alpha: 0.1),
               backgroundImage: widget.userImage != null
                   ? NetworkImage(widget.userImage!)
                   : null,
@@ -420,34 +456,14 @@ class _ChatScreenState extends State<ChatScreen> {
           ],
         ),
         actions: [
-          if (!kIsWeb) ...[
-            IconButton(
-              icon: const Icon(Icons.videocam, color: Colors.black),
-              onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => VideoCall(
-                    channelName: _buildChannelName(),
-                    remoteUserName: widget.userName,
-                    isAudioOnly: false,
-                  ),
-                ),
-              ),
-            ),
-            IconButton(
-              icon: const Icon(Icons.call, color: Colors.black),
-              onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => VideoCall(
-                    channelName: _buildChannelName(),
-                    remoteUserName: widget.userName,
-                    isAudioOnly: true,
-                  ),
-                ),
-              ),
-            ),
-          ],
+          IconButton(
+            icon: const Icon(Icons.videocam, color: Colors.black),
+            onPressed: () => _startCall(isAudioOnly: false),
+          ),
+          IconButton(
+            icon: const Icon(Icons.call, color: Colors.black),
+            onPressed: () => _startCall(isAudioOnly: true),
+          ),
           IconButton(
             icon: const Icon(Icons.refresh, color: Colors.black),
             onPressed: _refreshMessages,
@@ -600,7 +616,7 @@ class _ChatScreenState extends State<ChatScreen> {
           ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.05),
+              color: Colors.black.withValues(alpha: 0.05),
               blurRadius: 5,
               offset: const Offset(0, 2),
             ),
@@ -623,7 +639,7 @@ class _ChatScreenState extends State<ChatScreen> {
                           att['url'],
                           width: 200,
                           fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) =>
+                          errorBuilder: (_, _, _) =>
                               const Icon(Icons.broken_image),
                         ),
                       ),
@@ -661,7 +677,7 @@ class _ChatScreenState extends State<ChatScreen> {
                     ),
                   );
                 }
-              }).toList(),
+              }),
             Text(
               message['message'],
               style: TextStyle(
@@ -704,7 +720,7 @@ class _ChatScreenState extends State<ChatScreen> {
         color: Colors.white,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 10,
             offset: const Offset(0, -2),
           ),
@@ -745,8 +761,8 @@ class _ChatScreenState extends State<ChatScreen> {
                 child: TextField(
                   controller: _messageController,
                   focusNode: _messageFocusNode,
-                  decoration: const InputDecoration(
-                    hintText: 'Type a message...',
+                  decoration: InputDecoration(
+                    hintText: 'Type a message...'.tr(),
                     border: InputBorder.none,
                     hintStyle: TextStyle(color: Colors.grey),
                   ),
@@ -767,7 +783,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   shape: BoxShape.circle,
                   boxShadow: [
                     BoxShadow(
-                      color: AppColors.primaryColor.withOpacity(0.3),
+                      color: AppColors.primaryColor.withValues(alpha: 0.3),
                       blurRadius: 8,
                       offset: const Offset(0, 2),
                     ),

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:icare/services/api_service.dart';
 
 class GamificationService {
@@ -26,6 +27,46 @@ class GamificationService {
     } catch (e) {
       debugPrint('Error awarding points: $e');
       return {'success': false, 'message': e.toString()};
+    }
+  }
+
+  Future<Map<String, dynamic>> logMetric() async {
+    try {
+      final response = await _apiService.post('/gamification/log-metric', {});
+      return response.data;
+    } catch (e) {
+      debugPrint('Error logging metric for points: $e');
+      return {'success': false};
+    }
+  }
+
+  Future<Map<String, dynamic>> redeemReward(String rewardId) async {
+    try {
+      final response = await _apiService.post('/gamification/redeem', {'rewardId': rewardId});
+      return response.data;
+    } catch (e) {
+      debugPrint('Error redeeming reward: $e');
+      return {'success': false, 'message': e.toString()};
+    }
+  }
+
+  Future<Map<String, dynamic>> getLoginStreak() async {
+    try {
+      final response = await _apiService.get('/gamification/login-streak');
+      return response.data is Map ? Map<String, dynamic>.from(response.data) : {'success': false};
+    } catch (e) {
+      debugPrint('Error getting login streak: $e');
+      return {'success': false};
+    }
+  }
+
+  Future<Map<String, dynamic>> recordDailyLogin() async {
+    try {
+      final response = await _apiService.post('/gamification/daily-login', {});
+      return response.data is Map ? Map<String, dynamic>.from(response.data) : {'success': false};
+    } catch (e) {
+      debugPrint('Error recording daily login: $e');
+      return {'success': false};
     }
   }
 

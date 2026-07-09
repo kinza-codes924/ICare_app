@@ -7,14 +7,22 @@
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:564788374793:android:4e30c04020dce01a0877d8",
+        "mobilesdk_app_id": "1:564788374793:android:6a88daba9a33df510877d8",
         "android_client_info": {
-          "package_name": "com.example.icare"
+          "package_name": "com.cartzlink.icare"
         }
       },
       "oauth_client": [
         {
-          "client_id": "564788374793-ctggcd8ni9oq17gnbhvnednj74noqk9r.apps.googleusercontent.com",
+          "client_id": "564788374793-uvi3um1ae8t5cvolki37dc8hkvgjk8t2.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.cartzlink.icare",
+            "certificate_hash": "3f846c263f3aca4ea1bf771cd090c398d702a78f"
+          }
+        },
+        {
+          "client_id": "564788374793-1eptqsl65ohkvsquqhc4qnhlia592v2f.apps.googleusercontent.com",
           "client_type": 3
         }
       ],
@@ -27,8 +35,67 @@
         "appinvite_service": {
           "other_platform_oauth_client": [
             {
-              "client_id": "564788374793-ctggcd8ni9oq17gnbhvnednj74noqk9r.apps.googleusercontent.com",
+              "client_id": "564788374793-1eptqsl65ohkvsquqhc4qnhlia592v2f.apps.googleusercontent.com",
               "client_type": 3
+            },
+            {
+              "client_id": "564788374793-a40uq10q9g6brhggea66v2dve7cq9eta.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.icare"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:564788374793:android:4e30c04020dce01a0877d8",
+        "android_client_info": {
+          "package_name": "com.example.icare"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "564788374793-3qs097d3fo9f5v1juk6jeqf6uel5tajb.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.icare",
+            "certificate_hash": "e4c8748d8066de6e129ed65f6461fb35c8e1f2e3"
+          }
+        },
+        {
+          "client_id": "564788374793-3secirjbbqvf96b5f1e6n7hgd3gngr8a.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.icare",
+            "certificate_hash": "3b18aff0bb03030c7c1a16ea111de1f43d73c4cf"
+          }
+        },
+        {
+          "client_id": "564788374793-1eptqsl65ohkvsquqhc4qnhlia592v2f.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCyGcCmJffRByCAzyiBQBzQeMUhLuMoNTw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "564788374793-1eptqsl65ohkvsquqhc4qnhlia592v2f.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "564788374793-a40uq10q9g6brhggea66v2dve7cq9eta.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.icare"
+              }
             }
           ]
         }

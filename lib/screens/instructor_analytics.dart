@@ -1,8 +1,10 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:icare/services/analytics_service.dart';
 import 'package:icare/utils/theme.dart';
 import 'package:icare/widgets/back_button.dart';
+import 'package:intl/intl.dart';
 
 class InstructorAnalytics extends ConsumerStatefulWidget {
   const InstructorAnalytics({super.key});
@@ -16,6 +18,7 @@ class _InstructorAnalyticsState extends ConsumerState<InstructorAnalytics> {
   final AnalyticsService _analyticsService = AnalyticsService();
   bool _isLoading = true;
   Map<String, dynamic> _data = {};
+  DateTimeRange? _customRange;
 
   @override
   void initState() {
@@ -64,6 +67,28 @@ class _InstructorAnalyticsState extends ConsumerState<InstructorAnalytics> {
           ),
         );
       }
+    }
+  }
+
+  Future<void> _pickDateRange() async {
+    final now = DateTime.now();
+    final picked = await showDateRangePicker(
+      context: context,
+      firstDate: DateTime(now.year - 2),
+      lastDate: now,
+      initialDateRange: _customRange ?? DateTimeRange(
+        start: DateTime(now.year, now.month, 1),
+        end: now,
+      ),
+      builder: (ctx, child) => Theme(
+        data: ThemeData.light().copyWith(
+          colorScheme: ColorScheme.light(primary: AppColors.primaryColor),
+        ),
+        child: child!,
+      ),
+    );
+    if (picked != null && mounted) {
+      setState(() => _customRange = picked);
     }
   }
 
@@ -139,6 +164,14 @@ class _InstructorAnalyticsState extends ConsumerState<InstructorAnalytics> {
         ),
         actions: [
           IconButton(
+            icon: Icon(
+              Icons.calendar_month_rounded,
+              color: _customRange != null ? AppColors.primaryColor : const Color(0xFF0F172A),
+            ),
+            tooltip: 'Select Date Range',
+            onPressed: _pickDateRange,
+          ),
+          IconButton(
             icon: const Icon(Icons.download_rounded, color: Color(0xFF0F172A)),
             tooltip: 'Export Analytics',
             onPressed: _showExportDialog,
@@ -163,6 +196,30 @@ class _InstructorAnalyticsState extends ConsumerState<InstructorAnalytics> {
                         color: Color(0xFF0F172A),
                       ),
                     ),
+                    if (_customRange != null) ...[
+                      const SizedBox(height: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: AppColors.primaryColor.withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: AppColors.primaryColor.withValues(alpha: 0.3)),
+                        ),
+                        child: Row(children: [
+                          Icon(Icons.calendar_today_rounded, size: 14, color: AppColors.primaryColor),
+                          const SizedBox(width: 8),
+                          Text(
+                            '${DateFormat('MMM d').format(_customRange!.start)} – ${DateFormat('MMM d, yyyy').format(_customRange!.end)}',
+                            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.primaryColor),
+                          ),
+                          const Spacer(),
+                          GestureDetector(
+                            onTap: () => setState(() => _customRange = null),
+                            child: Icon(Icons.close_rounded, size: 16, color: AppColors.primaryColor),
+                          ),
+                        ]),
+                      ),
+                    ],
                     const SizedBox(height: 16),
                     _buildOverviewCard(),
                     const SizedBox(height: 24),

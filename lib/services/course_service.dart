@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:icare/models/course.dart';
 import 'package:icare/services/api_service.dart';
 
@@ -28,11 +29,13 @@ class CourseService {
     if (category != null) queryParams['category'] = category;
     if (targetAudience != null) queryParams['targetAudience'] = targetAudience;
     if (difficulty != null) queryParams['difficulty'] = difficulty;
-    if (isPublished != null)
+    if (isPublished != null) {
       queryParams['isPublished'] = isPublished.toString();
+    }
     if (instructorId != null) queryParams['instructorId'] = instructorId;
-    if (healthCondition != null)
+    if (healthCondition != null) {
       queryParams['healthCondition'] = healthCondition;
+    }
 
     final response = await _apiService.get(
       '/courses',
@@ -194,6 +197,22 @@ class CourseService {
     }
   }
 
+  // Get my document verification status ('not_submitted' | 'pending' | 'approved' | 'rejected')
+  // and access level ('limited' | 'full')
+  Future<Map<String, String>> getVerificationStatus() async {
+    try {
+      final response = await _apiService.get('/verification/my-status');
+      final v = response.data['verification'] ?? {};
+      return {
+        'status': (v['status'] ?? 'not_submitted').toString(),
+        'level': (v['verificationLevel'] ?? 'limited').toString(),
+      };
+    } catch (e) {
+      debugPrint('Error getting verification status: $e');
+      return {'status': 'not_submitted', 'level': 'limited'};
+    }
+  }
+
   // Update course progress
   Future<Map<String, dynamic>> updateProgress(
     String enrollmentId,
@@ -257,8 +276,9 @@ class CourseService {
   Future<List<dynamic>> getForumPosts({String? category}) async {
     try {
       final queryParams = <String, dynamic>{};
-      if (category != null && category != 'All')
+      if (category != null && category != 'All') {
         queryParams['category'] = category;
+      }
       final response = await _apiService.get(
         '/community/posts',
         queryParameters: queryParams,
@@ -292,6 +312,15 @@ class CourseService {
     }
   }
 
+  Future<void> reshareForumPost(String postId) async {
+    try {
+      await _apiService.post('/community/posts/$postId/reshare', {});
+    } catch (e) {
+      debugPrint('Error resharing forum post: $e');
+      rethrow;
+    }
+  }
+
   // Comment on forum post
   Future<void> addForumComment(String postId, String comment) async {
     try {
@@ -302,5 +331,31 @@ class CourseService {
       debugPrint('Error adding forum comment: $e');
       rethrow;
     }
+  }
+
+  // Get community categories (includes admin-added custom topics)
+  Future<List<String>> getCommunityCategories() async {
+    try {
+      final r = await _apiService.get('/community/categories');
+      final cats = (r.data['categories'] as List? ?? []).map((e) => e.toString()).toList();
+      return cats;
+    } catch (_) {
+      return ['General', 'Diabetes', 'Heart Health', 'Mental Wellness', 'Nutrition', 'Pregnancy', 'COVID-19'];
+    }
+  }
+
+  // Admin: add new community topic
+  Future<void> addCommunityTopic(String name) async {
+    await _apiService.post('/community/categories', {'name': name});
+  }
+
+  // Admin or owner: delete a post
+  Future<void> deleteForumPost(String postId) async {
+    await _apiService.delete('/community/posts/$postId');
+  }
+
+  // Admin or comment owner: delete a comment
+  Future<void> deleteForumComment(String postId, String commentId) async {
+    await _apiService.delete('/community/posts/$postId/comments/$commentId');
   }
 }

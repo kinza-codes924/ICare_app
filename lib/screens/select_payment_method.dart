@@ -19,13 +19,17 @@ import 'package:icare/widgets/custom_button.dart';
 class SelectPaymentMethod extends StatefulWidget {
   final String? courseId;
   final String? labBookingId;
+  final String? appointmentId;
   final double? amount;
+  final void Function(BuildContext context)? onPaymentSuccess;
 
   const SelectPaymentMethod({
     super.key,
     this.courseId,
     this.labBookingId,
+    this.appointmentId,
     this.amount,
+    this.onPaymentSuccess,
   });
 
   @override
@@ -67,7 +71,7 @@ class _SelectPaymentMethodState extends State<SelectPaymentMethod> {
 
   Future<void> _processPayment() async {
     // Validate inputs
-    if (widget.courseId == null && widget.labBookingId == null) {
+    if (widget.courseId == null && widget.labBookingId == null && widget.appointmentId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text("Invalid payment request. Please try again."),
@@ -82,7 +86,15 @@ class _SelectPaymentMethodState extends State<SelectPaymentMethod> {
       // Simulate real-world payment processing delay
       await Future.delayed(const Duration(seconds: 2));
 
-      if (widget.courseId != null) {
+      if (widget.appointmentId != null) {
+        // Appointment payment — simulate success
+        if (mounted) {
+          _showSuccessDialog(
+            "Appointment Confirmed!",
+            "Your appointment has been booked and payment received. You will receive a confirmation shortly.",
+          );
+        }
+      } else if (widget.courseId != null) {
         log("Attempting to buy course with ID: ${widget.courseId}");
 
         // Validate courseId is not empty
@@ -90,12 +102,22 @@ class _SelectPaymentMethodState extends State<SelectPaymentMethod> {
           throw Exception("Invalid course ID");
         }
 
-        await _courseService.buyCourse(widget.courseId!);
-        if (mounted) {
-          _showSuccessDialog(
-            "Course Purchased!",
-            "You have successfully enrolled in the course. You can now start learning.",
-          );
+        if (widget.onPaymentSuccess != null) {
+          // LMS purchase flow (lms_purchase_flow.dart) owns enrollment itself
+          // and routes to document verification next — don't double-enroll
+          // or short-circuit that flow with the generic "Go to Home" dialog.
+          // Pass this screen's own context: it's the one actually mounted
+          // when the user clicks Confirm & Pay (lms_purchase_flow's screen
+          // was already replaced by this one via pushReplacement).
+          if (mounted) widget.onPaymentSuccess!(context);
+        } else {
+          await _courseService.buyCourse(widget.courseId!);
+          if (mounted) {
+            _showSuccessDialog(
+              "Course Purchased!",
+              "You have successfully enrolled in the course. You can now start learning.",
+            );
+          }
         }
       } else if (widget.labBookingId != null) {
         // Update booking status to 'confirmed' or similar if needed
@@ -176,7 +198,7 @@ class _SelectPaymentMethodState extends State<SelectPaymentMethod> {
                 width: 80,
                 height: 80,
                 decoration: BoxDecoration(
-                  color: const Color(0xFF10B981).withOpacity(0.1),
+                  color: const Color(0xFF10B981).withValues(alpha: 0.1),
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(
@@ -311,7 +333,7 @@ class _SelectPaymentMethodState extends State<SelectPaymentMethod> {
                   ),
                   const SizedBox(height: 20),
                   CustomButton(
-                    label: "Confirm & Pay Rs. ${widget.amount ?? 0}",
+                    label: "Confirm & Pay PKR ${widget.amount ?? 0}",
                     borderRadius: 35,
                     onPressed: _processPayment,
                   ),
@@ -377,7 +399,7 @@ class _SelectPaymentMethodState extends State<SelectPaymentMethod> {
                           // Payment Method List
                           ...paymentMethods.asMap().entries.map((entry) {
                             return _buildWebPaymentCard(context, entry.value);
-                          }).toList(),
+                          }),
 
                           const SizedBox(height: 24),
 
@@ -393,13 +415,13 @@ class _SelectPaymentMethodState extends State<SelectPaymentMethod> {
                               padding: const EdgeInsets.all(20),
                               decoration: BoxDecoration(
                                 border: Border.all(
-                                  color: AppColors.primaryColor.withOpacity(
-                                    0.3,
+                                  color: AppColors.primaryColor.withValues(
+                                    alpha: 0.3,
                                   ),
                                   style: BorderStyle.solid,
                                 ),
                                 borderRadius: BorderRadius.circular(16),
-                                color: AppColors.primaryColor.withOpacity(0.04),
+                                color: AppColors.primaryColor.withValues(alpha: 0.04),
                               ),
                               child: Row(
                                 mainAxisAlignment: MainAxisAlignment.center,
@@ -438,7 +460,7 @@ class _SelectPaymentMethodState extends State<SelectPaymentMethod> {
                           borderRadius: BorderRadius.circular(24),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withOpacity(0.04),
+                              color: Colors.black.withValues(alpha: 0.04),
                               blurRadius: 24,
                               offset: const Offset(0, 12),
                             ),
@@ -458,13 +480,13 @@ class _SelectPaymentMethodState extends State<SelectPaymentMethod> {
                             const SizedBox(height: 24),
                             _buildSummaryItem(
                               "Service Price",
-                              "Rs. ${widget.amount ?? 0}",
+                              "PKR ${widget.amount ?? 0}",
                             ),
-                            _buildSummaryItem("Processing Fee", "Rs. 0.00"),
+                            _buildSummaryItem("Processing Fee", "PKR 0.00"),
                             const Divider(height: 32, color: Color(0xFFF1F5F9)),
                             _buildSummaryItem(
                               "Total",
-                              "Rs. ${widget.amount ?? 0}",
+                              "PKR ${widget.amount ?? 0}",
                               isTotal: true,
                             ),
                             const SizedBox(height: 32),
@@ -483,7 +505,7 @@ class _SelectPaymentMethodState extends State<SelectPaymentMethod> {
                                   ),
                                   elevation: 8,
                                   shadowColor: AppColors.primaryColor
-                                      .withOpacity(0.4),
+                                      .withValues(alpha: 0.4),
                                 ),
                                 child: const Text(
                                   "Confirm & Pay",
@@ -544,7 +566,7 @@ class _SelectPaymentMethodState extends State<SelectPaymentMethod> {
           ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.02),
+              color: Colors.black.withValues(alpha: 0.02),
               blurRadius: 10,
               offset: const Offset(0, 4),
             ),
@@ -600,7 +622,7 @@ class _SelectPaymentMethodState extends State<SelectPaymentMethod> {
                   value: item['type'],
                   groupValue: _selectedMethod,
                   onChanged: (val) {
-                    setState(() => _selectedMethod = val as String?);
+                    setState(() => _selectedMethod = val);
                   },
                   activeColor: AppColors.primaryColor,
                 ),

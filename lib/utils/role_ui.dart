@@ -193,7 +193,7 @@ String quickActionSecondaryLabel(String? role) {
     case AppRoleKind.doctor:
       return 'Open Schedule';
     case AppRoleKind.laboratory:
-      return 'Upload Reports';
+      return 'Records';
     case AppRoleKind.pharmacy:
       return 'Inventory';
     case AppRoleKind.instructor:

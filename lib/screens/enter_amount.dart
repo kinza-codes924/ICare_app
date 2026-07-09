@@ -149,7 +149,7 @@ class _EnterAmountScreenState extends State<EnterAmountScreen> {
             borderRadius: BorderRadius.circular(24),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.04),
+                color: Colors.black.withValues(alpha: 0.04),
                 blurRadius: 24,
                 offset: const Offset(0, 12),
               ),
@@ -192,12 +192,12 @@ class _EnterAmountScreenState extends State<EnterAmountScreen> {
                   color: const Color(0xFFF1F5F9),
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(
-                    color: AppColors.primaryColor.withOpacity(0.2),
+                    color: AppColors.primaryColor.withValues(alpha: 0.2),
                   ),
                 ),
                 child: Center(
                   child: Text(
-                    amount.isEmpty ? "\$0.00" : "\$${amount}",
+                    amount.isEmpty ? "PKR 0.00" : "PKR $amount",
                     style: TextStyle(
                       fontSize: 48,
                       fontWeight: FontWeight.w900,
@@ -258,7 +258,7 @@ class _EnterAmountScreenState extends State<EnterAmountScreen> {
                       borderRadius: BorderRadius.circular(16),
                     ),
                     elevation: 10,
-                    shadowColor: AppColors.primaryColor.withOpacity(0.4),
+                    shadowColor: AppColors.primaryColor.withValues(alpha: 0.4),
                   ),
                   child: const Text(
                     "Pay Now",
@@ -286,8 +286,9 @@ class _EnterAmountScreenState extends State<EnterAmountScreen> {
       onTap: () {
         setState(() {
           if (isBack) {
-            if (amount.isNotEmpty)
+            if (amount.isNotEmpty) {
               amount = amount.substring(0, amount.length - 1);
+            }
           } else {
             if (amount.length < 10) amount += text;
           }
@@ -298,7 +299,7 @@ class _EnterAmountScreenState extends State<EnterAmountScreen> {
         width: 80,
         height: 60,
         decoration: BoxDecoration(
-          color: isBack ? Colors.redAccent.withOpacity(0.05) : Colors.white,
+          color: isBack ? Colors.redAccent.withValues(alpha: 0.05) : Colors.white,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(color: const Color(0xFFE2E8F0)),
         ),

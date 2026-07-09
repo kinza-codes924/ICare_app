@@ -43,8 +43,23 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+android/app/build/
+android/build/
+android/.gradle/
+android/.kotlin/
 .vercel
 .env*.local
 
 # Backend (separate repository)
 Icare_backend-main/
+
+# Python embed files
+python-embed/
+python-embed.zip
+get-pip.py
+build.bat
+
+.vercel
+.env*.local
+
+.vercel

@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:responsive_framework/responsive_framework.dart';
 
@@ -61,6 +62,21 @@ class Utils {
       ),
     );
   }
+}
+
+/// Returns an ImageProvider that handles both HTTP URLs and base64 data URIs.
+/// Returns null if the url is empty or null.
+ImageProvider? buildProfileImageProvider(String? url) {
+  if (url == null || url.isEmpty) return null;
+  if (url.startsWith('data:image/')) {
+    try {
+      final base64Str = url.split(',').last;
+      return MemoryImage(base64Decode(base64Str));
+    } catch (_) {
+      return null;
+    }
+  }
+  return NetworkImage(url);
 }
 
 class ResponsiveHelper {

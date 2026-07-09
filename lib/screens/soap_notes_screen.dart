@@ -3,6 +3,7 @@ import 'package:icare/models/appointment_detail.dart';
 import 'package:icare/services/clinical_service.dart';
 import 'package:icare/utils/theme.dart';
 import 'package:icare/widgets/back_button.dart';
+import 'package:icare/widgets/icd_code_selector.dart';
 
 class SoapNotesScreen extends StatefulWidget {
   final AppointmentDetail appointment;
@@ -26,6 +27,8 @@ class _SoapNotesScreenState extends State<SoapNotesScreen> {
       TextEditingController();
   String? _selectedSpecialty;
 
+  List<Map<String, dynamic>> _selectedICDCodes = [];
+
   bool _isSaving = false;
   bool _isLoading = true;
 
@@ -40,12 +43,15 @@ class _SoapNotesScreenState extends State<SoapNotesScreen> {
     final notes = await _clinicalService.getSoapNotes(
       widget.appointment.id ?? '',
     );
-    if (notes != null && mounted) {
+    if (mounted) {
       setState(() {
         _subjectiveController.text = notes['subjective'] ?? '';
         _objectiveController.text = notes['objective'] ?? '';
         _assessmentController.text = notes['assessment'] ?? '';
         _planController.text = notes['plan'] ?? '';
+        if (notes['icdCodes'] != null) {
+          _selectedICDCodes = List<Map<String, dynamic>>.from(notes['icdCodes']);
+        }
       });
     }
     if (mounted) setState(() => _isLoading = false);
@@ -62,6 +68,7 @@ class _SoapNotesScreenState extends State<SoapNotesScreen> {
         'objective': _objectiveController.text,
         'assessment': _assessmentController.text,
         'plan': _planController.text,
+        'icdCodes': _selectedICDCodes,
       };
 
       await _clinicalService.saveSoapNotes(
@@ -246,6 +253,8 @@ class _SoapNotesScreenState extends State<SoapNotesScreen> {
                 'What is your clinical impression? (diagnosis, differential diagnosis)',
                 maxLines: 3,
               ),
+              const SizedBox(height: 16),
+              _buildICDCodesSection(),
 
               const SizedBox(height: 32),
               _buildSectionHeader('P - Plan', Icons.edit_note_rounded),
@@ -334,6 +343,139 @@ class _SoapNotesScreenState extends State<SoapNotesScreen> {
           borderSide: const BorderSide(color: AppColors.primaryColor, width: 2),
         ),
       ),
+    );
+  }
+
+  Widget _buildICDCodesSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Text(
+              'ICD-10 Diagnosis Codes',
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF475569),
+              ),
+            ),
+            const Spacer(),
+            TextButton.icon(
+              onPressed: () {
+                showModalBottomSheet(
+                  context: context,
+                  isScrollControlled: true,
+                  backgroundColor: Colors.transparent,
+                  builder: (context) => ICDCodeSelector(
+                    onCodeSelected: (code) {
+                      setState(() {
+                        if (!_selectedICDCodes.any((c) => c['code'] == code['code'])) {
+                          _selectedICDCodes.add(code);
+                        }
+                      });
+                    },
+                  ),
+                );
+              },
+              icon: const Icon(Icons.add_circle_outline_rounded, size: 18),
+              label: const Text('Add Code'),
+              style: TextButton.styleFrom(
+                foregroundColor: AppColors.primaryColor,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        if (_selectedICDCodes.isEmpty)
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.info_outline_rounded,
+                  color: const Color(0xFF94A3B8),
+                  size: 20,
+                ),
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: Text(
+                    'No diagnosis codes added yet',
+                    style: TextStyle(
+                      color: Color(0xFF64748B),
+                      fontSize: 14,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          )
+        else
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: _selectedICDCodes.map((code) {
+              return Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: AppColors.primaryColor.withValues(alpha: 0.3)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: AppColors.primaryColor.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        code['code'] ?? '',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.primaryColor,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 200),
+                      child: Text(
+                        code['description'] ?? '',
+                        style: const TextStyle(
+                          fontSize: 13,
+                          color: Color(0xFF0F172A),
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    InkWell(
+                      onTap: () {
+                        setState(() {
+                          _selectedICDCodes.removeWhere((c) => c['code'] == code['code']);
+                        });
+                      },
+                      child: const Icon(
+                        Icons.close_rounded,
+                        size: 18,
+                        color: Color(0xFF64748B),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }).toList(),
+          ),
+      ],
     );
   }
 }

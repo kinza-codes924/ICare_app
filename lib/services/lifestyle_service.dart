@@ -6,7 +6,7 @@ import '../utils/shared_pref.dart';
 class LifestyleService {
   static Future<Map<String, dynamic>> getTodayData() async {
     try {
-      final token = await SharedPref.getToken();
+      final token = await SharedPref().getToken();
       final response = await http.get(
         Uri.parse('${ApiConfig.baseUrl}/lifestyle/today'),
         headers: {
@@ -33,7 +33,7 @@ class LifestyleService {
     String? notes,
   }) async {
     try {
-      final token = await SharedPref.getToken();
+      final token = await SharedPref().getToken();
       final body = <String, dynamic>{};
 
       if (waterIntake != null) body['waterIntake'] = waterIntake;
@@ -63,7 +63,7 @@ class LifestyleService {
 
   static Future<Map<String, dynamic>> getHistory({int days = 7}) async {
     try {
-      final token = await SharedPref.getToken();
+      final token = await SharedPref().getToken();
       final response = await http.get(
         Uri.parse('${ApiConfig.baseUrl}/lifestyle/history?days=$days'),
         headers: {
@@ -84,7 +84,7 @@ class LifestyleService {
 
   static Future<Map<String, dynamic>> getWeeklySummary() async {
     try {
-      final token = await SharedPref.getToken();
+      final token = await SharedPref().getToken();
       final response = await http.get(
         Uri.parse('${ApiConfig.baseUrl}/lifestyle/weekly-summary'),
         headers: {

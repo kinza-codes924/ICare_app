@@ -187,7 +187,7 @@ class _SubscriptionManagementScreenState extends ConsumerState<SubscriptionManag
         gradient: LinearGradient(
           colors: [
             AppColors.primaryColor,
-            AppColors.primaryColor.withOpacity(0.8),
+            AppColors.primaryColor.withValues(alpha: 0.8),
           ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
@@ -355,7 +355,7 @@ class _SubscriptionManagementScreenState extends ConsumerState<SubscriptionManag
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF10B981).withOpacity(0.1),
+                          color: const Color(0xFF10B981).withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: const Text(
@@ -472,8 +472,8 @@ class _SubscriptionManagementScreenState extends ConsumerState<SubscriptionManag
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 colors: [
-                  AppColors.primaryColor.withOpacity(0.05),
-                  AppColors.primaryColor.withOpacity(0.02),
+                  AppColors.primaryColor.withValues(alpha: 0.05),
+                  AppColors.primaryColor.withValues(alpha: 0.02),
                 ],
               ),
               borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),

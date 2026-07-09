@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_size_matters/flutter_size_matters.dart';
 import 'package:icare/screens/select_payment_method.dart';
-import 'package:icare/utils/imagePaths.dart';
 import 'package:icare/utils/theme.dart';
 import 'package:icare/utils/utils.dart';
 import 'package:icare/widgets/back_button.dart';
@@ -20,10 +19,25 @@ class REceiptScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tests = (bookingData?['tests'] as List?)?.cast<String>() ?? [];
-    final totalPrice = bookingData?['totalPrice'] ?? (tests.length * 3000);
-    final date = bookingData?['date'] ?? "Not set";
-    final time = bookingData?['time'] ?? "Not set";
+    // Support both 'tests' list and 'test_type' string
+    final rawTests = bookingData?['tests'];
+    final List<String> tests;
+    if (rawTests is List && rawTests.isNotEmpty) {
+      tests = rawTests.cast<String>();
+    } else if (bookingData?['test_type'] != null) {
+      // test_type is a comma-separated string like "CBC, Blood Sugar"
+      tests = bookingData!['test_type'].toString().split(',').map((t) => t.trim()).where((t) => t.isNotEmpty).toList();
+    } else if (bookingData?['testType'] != null) {
+      tests = bookingData!['testType'].toString().split(',').map((t) => t.trim()).where((t) => t.isNotEmpty).toList();
+    } else {
+      tests = [];
+    }
+    
+    // Calculate price: Rs. 3000 per test
+    final int testCount = tests.isNotEmpty ? tests.length : 1;
+    final totalPrice = bookingData?['totalPrice'] ?? bookingData?['price'] ?? (testCount * 3000);
+    final date = bookingData?['test_date'] ?? bookingData?['date'] ?? "Not set";
+    final time = bookingData?['preferred_time'] ?? bookingData?['time'] ?? "Not set";
     final bookingId = bookingData?['_id'] ?? bookingData?['id'] ?? "N/A";
 
     return Scaffold(
@@ -54,7 +68,7 @@ class REceiptScreen extends StatelessWidget {
                   borderRadius: BorderRadius.circular(20),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.05),
+                      color: Colors.black.withValues(alpha: 0.05),
                       blurRadius: 15,
                       offset: const Offset(0, 5),
                     ),
@@ -122,7 +136,7 @@ class REceiptScreen extends StatelessWidget {
                           fontSize: 16,
                         ),
                         CustomText(
-                          text: "Rs. $totalPrice",
+                          text: "PKR $totalPrice",
                           fontWeight: FontWeight.bold,
                           fontSize: 18,
                           color: AppColors.primaryColor,

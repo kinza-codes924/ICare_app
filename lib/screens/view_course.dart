@@ -1,14 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:icare/services/lms_service.dart';
 import 'package:icare/models/course.dart';
 import 'package:icare/screens/lesson_player.dart';
+import 'package:icare/screens/lms_course_page.dart';
+import 'package:icare/screens/lms_purchase_flow.dart';
 import 'package:icare/screens/quiz_screen.dart';
 import 'package:icare/services/course_service.dart';
 import 'package:icare/services/course_question_service.dart';
 import 'package:icare/utils/imagePaths.dart';
+import 'package:icare/utils/shared_pref.dart';
 import 'package:icare/utils/theme.dart';
 import 'package:icare/widgets/back_button.dart';
-import 'package:icare/screens/select_payment_method.dart';
 
 class ViewCourse extends ConsumerStatefulWidget {
   final String? enrollmentId;
@@ -22,12 +25,16 @@ class ViewCourse extends ConsumerStatefulWidget {
 
 class _ViewCourseState extends ConsumerState<ViewCourse> {
   final CourseService _courseService = CourseService();
+  final LmsService _lms = LmsService();
   final TextEditingController _questionController = TextEditingController();
   bool _isPurchased = false;
   String? _currentEnrollmentId;
   bool _isPurchasing = false;
   List<dynamic> _questions = [];
   bool _loadingQuestions = false;
+  bool _isInstructor = false;
+  final Set<String> _completedModuleIds = {};
+  final Set<String> _completedLessonIds = {};
 
   @override
   void initState() {
@@ -37,6 +44,19 @@ class _ViewCourseState extends ConsumerState<ViewCourse> {
         widget.enrollmentId != null;
     _currentEnrollmentId = widget.enrollmentId;
     _loadQuestions();
+    _checkRole();
+  }
+
+  Future<void> _checkRole() async {
+    final role = await SharedPref().getUserRole();
+    if (mounted) {
+      final isInstr = role != null &&
+          (role.toLowerCase() == 'instructor' || role.toLowerCase() == 'doctor');
+      setState(() {
+        _isInstructor = isInstr;
+        if (isInstr) _isPurchased = true; // instructors always have access
+      });
+    }
   }
 
   @override
@@ -90,41 +110,57 @@ class _ViewCourseState extends ConsumerState<ViewCourse> {
 
   Future<void> _enrollInCourse(String courseId) async {
     if (_isPurchasing) return;
+    final course = widget.courseData ?? {};
+    final price = course['discountedPrice'] ?? course['price'] ?? course['cost'] ?? 0;
+    final amount = (price is num) ? price.toDouble() : double.tryParse(price.toString()) ?? 0.0;
 
-    setState(() => _isPurchasing = true);
-    try {
-      final result = await _courseService.buyCourse(courseId);
-      if (mounted) {
-        setState(() {
-          _isPurchased = true;
-          _currentEnrollmentId = result['enrollment']?['_id'];
-          _isPurchasing = false;
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Program started successfully!")),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        final errorStr = e.toString();
-        if (errorStr.contains('Already purchased')) {
+    // Free courses → enroll directly without payment
+    if (amount <= 0) {
+      setState(() => _isPurchasing = true);
+      try {
+        final result = await _courseService.buyCourse(courseId);
+        if (mounted) {
           setState(() {
             _isPurchased = true;
+            _currentEnrollmentId = result['enrollment']?['_id'];
             _isPurchasing = false;
           });
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text("You are already enrolled in this program."),
-            ),
+            const SnackBar(content: Text("Enrolled successfully!")),
           );
-        } else {
-          setState(() => _isPurchasing = false);
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(content: Text("Enrollment failed: $e")));
+        }
+      } catch (e) {
+        if (mounted) {
+          final errorStr = e.toString();
+          if (errorStr.contains('Already purchased')) {
+            setState(() { _isPurchased = true; _isPurchasing = false; });
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text("You are already enrolled.")),
+            );
+          } else {
+            setState(() => _isPurchasing = false);
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Enrollment failed: $e")));
+          }
         }
       }
+      return;
     }
+
+    // Paid courses → go through full purchase/payment flow
+    if (!mounted) return;
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => LmsPurchaseFlow(course: course),
+      ),
+    ).then((_) {
+      // On return, re-check enrollment status
+      if (mounted) {
+        setState(() {
+          _isPurchased = widget.courseData?['isPurchased'] == true || _currentEnrollmentId != null;
+        });
+      }
+    });
   }
 
   @override
@@ -632,70 +668,62 @@ class _ViewCourseState extends ConsumerState<ViewCourse> {
     if (_isPurchased) {
       return Column(
         children: [
-          const Icon(
-            Icons.check_circle_rounded,
-            color: Color(0xFF10B981),
-            size: 48,
-          ),
+          const Icon(Icons.check_circle_rounded, color: Color(0xFF10B981), size: 48),
           const SizedBox(height: 12),
-          const Text(
-            "Enrolled",
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF10B981),
-            ),
-          ),
+          const Text('Enrolled', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF10B981))),
           const SizedBox(height: 8),
-          const Text(
-            "You have active access to this program.",
-            textAlign: TextAlign.center,
-            style: TextStyle(color: Color(0xFF64748B)),
+          const Text('You have active access to this course.', textAlign: TextAlign.center, style: TextStyle(color: Color(0xFF64748B))),
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              icon: const Icon(Icons.open_in_new_rounded, color: Colors.white),
+              label: const Text('Open Course', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+              onPressed: () => Navigator.push(context, MaterialPageRoute(
+                builder: (_) => LmsCoursePage(
+                  course: widget.courseData ?? {},
+                  enrollmentId: _currentEnrollmentId,
+                  isInstructor: _isInstructor,
+                ),
+              )),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primaryColor,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                elevation: 0,
+              ),
+            ),
           ),
         ],
       );
     }
 
+    final price = widget.courseData?['price'];
+    final isFree = price == null || price == 0;
+
     return Column(
       children: [
-        const Text(
-          "\$45.00",
+        Text(
+          isFree ? 'Free' : 'PKR ${price.toString()}',
           style: TextStyle(
-            fontSize: 32,
-            fontWeight: FontWeight.w900,
-            color: Color(0xFF0F172A),
+            fontSize: 32, fontWeight: FontWeight.w900,
+            color: isFree ? const Color(0xFF10B981) : const Color(0xFF0F172A),
           ),
         ),
         const SizedBox(height: 16),
         SizedBox(
           width: double.infinity,
           child: ElevatedButton(
-            onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (ctx) => SelectPaymentMethod(
-                    courseId: courseId,
-                    amount: 45.0, // Fixed price from UI context
-                  ),
-                ),
-              );
-            },
+            onPressed: _isPurchasing ? null : () => _enrollInCourse(courseId),
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.primaryColor,
               padding: const EdgeInsets.symmetric(vertical: 16),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               elevation: 0,
             ),
-            child: const Text(
-              "Start Program",
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 16,
-                color: Colors.white,
-              ),
-            ),
+            child: _isPurchasing
+                ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                : const Text('Enroll Now', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white)),
           ),
         ),
       ],
@@ -743,29 +771,126 @@ class _ViewCourseState extends ConsumerState<ViewCourse> {
         ),
       );
     }
+
+    // Flatten all lessons to detect the last one for certificate
+    final allLessons = modules.expand((m) => (m['lessons'] as List? ?? [])).toList();
+    final lastLessonId = allLessons.isNotEmpty
+        ? (allLessons.last['_id'] ?? allLessons.last['id'])?.toString()
+        : null;
+    // Get course meta for certificate
+    final dynamic titleVal2 = widget.courseData?['title'] ?? widget.courseData?['name'];
+    final courseTitle = (titleVal2 is String) ? titleVal2 : 'Course';
+    String instructorName = 'Instructor';
+    final dynamic instrVal2 = widget.courseData?['instructor'];
+    if (instrVal2 is Map) {
+      instructorName = instrVal2['name']?.toString() ?? instructorName;
+    } else if (instrVal2 is String) instructorName = instrVal2;
+
+    // Course type + lock metadata from backend
+    final courseType = widget.courseData?['courseType']?.toString() ?? 'self-paced';
+    final startDateRaw = widget.courseData?['startDate'];
+    DateTime? courseStartDate;
+    if (startDateRaw != null) {
+      try { courseStartDate = DateTime.parse(startDateRaw.toString()); } catch (_) {}
+    }
+    // Backend-provided completed module IDs (for self-paced sequential lock)
+    final completedModuleIds = <String>{
+      ...((widget.courseData?['completedModuleIds'] as List?) ?? []).map((e) => e.toString()),
+      ..._completedModuleIds,
+    };
+
     return Column(
       children: modules.asMap().entries.map((mEntry) {
         final mIndex = mEntry.key;
         final module = mEntry.value;
         final lessons = module['lessons'] as List? ?? [];
 
+        // Prefer backend-computed isLocked + unlockDate fields, fall back to client-side
+        bool isModuleLocked = module['isLocked'] == true;
+        String? moduleLockLabel;
+
+        if (isPurchased && !_isInstructor) {
+          if (isModuleLocked) {
+            // Use backend-provided unlock date if available
+            final unlockRaw = module['unlockDate']?.toString() ?? '';
+            if (unlockRaw.isNotEmpty) {
+              try {
+                final unlockDate = DateTime.parse(unlockRaw);
+                moduleLockLabel = 'Unlocks ${unlockDate.day}/${unlockDate.month}/${unlockDate.year}';
+              } catch (_) {}
+            } else if (courseType == 'pragmatic' && courseStartDate != null) {
+              final unlockDays = (module['unlockAfterDays'] as num?)?.toInt() ?? 0;
+              final unlockDate = courseStartDate.add(Duration(days: unlockDays));
+              moduleLockLabel = 'Unlocks ${unlockDate.day}/${unlockDate.month}/${unlockDate.year}';
+            } else if (courseType == 'self-paced' && mIndex > 0) {
+              moduleLockLabel = 'Complete the previous module first';
+            }
+          } else if (!isModuleLocked && courseType == 'pragmatic') {
+            // Client-side fallback for pragmatic if backend didn't set isLocked
+            final unlockDays = (module['unlockAfterDays'] as num?)?.toInt() ?? 0;
+            if (unlockDays > 0 && courseStartDate != null) {
+              final unlockDate = courseStartDate.add(Duration(days: unlockDays));
+              if (DateTime.now().isBefore(unlockDate)) {
+                isModuleLocked = true;
+                moduleLockLabel = 'Unlocks ${unlockDate.day}/${unlockDate.month}/${unlockDate.year}';
+              }
+            }
+          } else if (!isModuleLocked && courseType == 'self-paced' && mIndex > 0) {
+            // Client-side fallback for self-paced sequential lock
+            final prevModule = modules[mIndex - 1];
+            final prevId = prevModule['_id']?.toString() ?? '';
+            if (prevId.isNotEmpty && !completedModuleIds.contains(prevId)) {
+              isModuleLocked = true;
+              moduleLockLabel = 'Complete the previous module first';
+            }
+          }
+        }
+
         return Container(
           margin: const EdgeInsets.only(bottom: 12),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: isModuleLocked ? const Color(0xFFF8FAFC) : Colors.white,
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: const Color(0xFFE2E8F0)),
+            border: Border.all(color: isModuleLocked ? const Color(0xFFCBD5E1) : const Color(0xFFE2E8F0)),
           ),
           child: ExpansionTile(
-            initiallyExpanded: mIndex == 0,
-            title: Text(
-              module['title'] ?? "Module ${mIndex + 1}",
-              style: const TextStyle(
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF0F172A),
-              ),
+            initiallyExpanded: mIndex == 0 && !isModuleLocked,
+            leading: isModuleLocked
+                ? const Icon(Icons.lock_rounded, color: Color(0xFF94A3B8), size: 20)
+                : null,
+            title: Row(
+              children: [
+                Expanded(child: Text(
+                  module['title'] ?? "Module ${mIndex + 1}",
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: isModuleLocked ? const Color(0xFF94A3B8) : const Color(0xFF0F172A),
+                  ),
+                )),
+                if (moduleLockLabel != null)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(color: const Color(0xFFF1F5F9), borderRadius: BorderRadius.circular(6)),
+                    child: Text(moduleLockLabel, style: const TextStyle(fontSize: 11, color: Color(0xFF64748B), fontWeight: FontWeight.w600)),
+                  ),
+              ],
             ),
             children: [
+              if (isModuleLocked)
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.schedule_rounded, color: Color(0xFF94A3B8), size: 18),
+                      const SizedBox(width: 8),
+                      Text(
+                        moduleLockLabel ?? 'Locked',
+                        style: const TextStyle(color: Color(0xFF94A3B8), fontStyle: FontStyle.italic),
+                      ),
+                    ],
+                  ),
+                )
+              else
               ...lessons.map((lesson) {
                 return ListTile(
                   leading: const Icon(
@@ -797,9 +922,20 @@ class _ViewCourseState extends ConsumerState<ViewCourse> {
                         ),
                   onTap: isPurchased
                       ? () {
+                          final lessonId = (lesson['_id'] ?? lesson['id'])?.toString();
+                          final isLast = lastLessonId != null && lessonId == lastLessonId;
                           Navigator.of(context).push(
                             MaterialPageRoute(
-                              builder: (ctx) => LessonPlayer(lesson: lesson),
+                              builder: (ctx) => LessonPlayer(
+                                lesson: lesson,
+                                isLastLesson: isLast,
+                                courseTitle: courseTitle,
+                                instructorName: instructorName,
+                                certificateReleased: widget.courseData?['certificateReleased'] == true,
+                                enrollmentId: _currentEnrollmentId,
+                                initialIsCompleted: lessonId != null && _completedLessonIds.contains(lessonId),
+                                onLessonCompleted: (id) => setState(() => _completedLessonIds.add(id)),
+                              ),
                             ),
                           );
                         }
@@ -814,7 +950,49 @@ class _ViewCourseState extends ConsumerState<ViewCourse> {
                         },
                 );
               }),
-              if (module['quiz'] != null) ...[
+              // Mark Module Complete button (students, unlocked modules, enrolled)
+              if (!isModuleLocked && isPurchased && !_isInstructor && _currentEnrollmentId != null) ...[
+                const Divider(height: 1),
+                Builder(builder: (ctx) {
+                  final moduleId = module['_id']?.toString() ?? '';
+                  final isDone = _completedModuleIds.contains(moduleId);
+                  return ListTile(
+                    leading: Icon(
+                      isDone ? Icons.check_circle_rounded : Icons.check_circle_outline_rounded,
+                      color: isDone ? const Color(0xFF10B981) : const Color(0xFF64748B),
+                    ),
+                    title: Text(
+                      isDone ? 'Module Completed' : 'Mark Module as Complete',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        color: isDone ? const Color(0xFF10B981) : const Color(0xFF14B1FF),
+                      ),
+                    ),
+                    onTap: isDone ? null : () async {
+                      if (moduleId.isEmpty) return;
+                      final result = await _lms.markModuleComplete(
+                        enrollmentId: _currentEnrollmentId!,
+                        moduleId: moduleId,
+                      );
+                      if (mounted) {
+                        if (result['success'] != false) {
+                          setState(() => _completedModuleIds.add(moduleId));
+                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                            content: Text('Module marked as complete!'),
+                            backgroundColor: Color(0xFF10B981),
+                          ));
+                        } else {
+                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                            content: Text(result['message']?.toString() ?? 'Failed'),
+                            backgroundColor: Colors.red,
+                          ));
+                        }
+                      }
+                    },
+                  );
+                }),
+              ],
+              if (!isModuleLocked && module['quiz'] != null) ...[
                 const Divider(height: 1),
                 ListTile(
                   leading: const Icon(

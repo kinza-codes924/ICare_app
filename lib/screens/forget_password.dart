@@ -1,3 +1,4 @@
+﻿import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_size_matters/flutter_size_matters.dart';
 import 'package:icare/screens/verify_code.dart';
@@ -5,6 +6,7 @@ import 'package:icare/services/auth_service.dart';
 import 'package:icare/utils/imagePaths.dart';
 import 'package:icare/utils/theme.dart';
 import 'package:icare/utils/utils.dart';
+import 'package:icare/widgets/auth_left_panel.dart';
 import 'package:icare/widgets/back_button.dart';
 import 'package:icare/widgets/custom_text.dart';
 import 'package:icare/widgets/custom_text_input.dart';
@@ -34,14 +36,48 @@ class _ForgetPasswordState extends State<ForgetPassword> {
 
       if (result['success']) {
         if (mounted) {
-          // Show OTP in console for testing
-          debugPrint('OTP for testing: ${result['otp']}');
-
-          Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (ctx) => VerifyCode(email: emailController.text.trim()),
+          final emailSent = result['emailSent'] == true;
+          await showDialog(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              title: Row(children: [
+                Icon(Icons.mark_email_read_rounded,
+                  color: const Color(0xFF10B981), size: 22),
+                const SizedBox(width: 8),
+                const Text('Code Sent',
+                  style: TextStyle(fontFamily: 'Gilroy-Bold', fontSize: 18)),
+              ]),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'A verification code has been sent to ${emailController.text.trim()}. Please check your email.',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      color: Color(0xFF374151),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  const Text('The code is valid for 10 minutes.', textAlign: TextAlign.center, style: TextStyle(fontSize: 11, color: Color(0xFF94A3B8))),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('OK', style: TextStyle(color: Color(0xFF0036BC), fontWeight: FontWeight.bold)),
+                ),
+              ],
             ),
           );
+          if (mounted) {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (ctx) => VerifyCode(email: emailController.text.trim()),
+              ),
+            );
+          }
         }
       } else {
         _showError(result['message']);
@@ -92,12 +128,9 @@ class _ForgetPasswordState extends State<ForgetPassword> {
           // ══════════════════════════════════════════════════════════════
           // LEFT HERO PANEL — gradient + branding
           // ══════════════════════════════════════════════════════════════
-          Expanded(
+          const Expanded(
             flex: 5,
-            child: SizedBox(
-              height: screenHeight,
-              child: Image.asset("assets/images/splash.jpg", fit: BoxFit.cover),
-            ),
+            child: AuthLeftPanel(),
           ),
 
           // ══════════════════════════════════════════════════════════════
@@ -118,7 +151,7 @@ class _ForgetPasswordState extends State<ForgetPassword> {
                       borderRadius: BorderRadius.circular(28),
                       boxShadow: [
                         BoxShadow(
-                          color: const Color(0xFF0036BC).withOpacity(0.06),
+                          color: const Color(0xFF0036BC).withValues(alpha: 0.06),
                           blurRadius: 40,
                           offset: const Offset(0, 16),
                         ),
@@ -149,9 +182,9 @@ class _ForgetPasswordState extends State<ForgetPassword> {
                         ),
                         const SizedBox(height: 24),
                         // Header
-                        const Text(
-                          "Forgot Password?",
-                          style: TextStyle(
+                        Text(
+                          "Forgot Password?".tr(),
+                          style: const TextStyle(
                             fontSize: 26,
                             fontWeight: FontWeight.w800,
                             color: Color(0xFF0B2D6E),
@@ -160,7 +193,7 @@ class _ForgetPasswordState extends State<ForgetPassword> {
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          "Enter your email or phone to receive a verification code",
+                          "Enter your email or phone to receive a verification code".tr(),
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             fontSize: 14,
@@ -177,7 +210,7 @@ class _ForgetPasswordState extends State<ForgetPassword> {
                           child: Column(
                             children: [
                               CustomInputField(
-                                hintText: "Email or Phone Number",
+                                hintText: "Email or Phone Number".tr(),
                                 leadingIcon: const Icon(
                                   Icons.mail_outline_rounded,
                                   color: Color(0xFF94A3B8),
@@ -190,7 +223,7 @@ class _ForgetPasswordState extends State<ForgetPassword> {
                                 borderWidth: 1.5,
                                 validator: (val) {
                                   if (val == null || val.isEmpty) {
-                                    return "This field is required";
+                                    return "This field is required".tr();
                                   }
                                   return null;
                                 },
@@ -223,9 +256,9 @@ class _ForgetPasswordState extends State<ForgetPassword> {
                                             strokeWidth: 2,
                                           ),
                                         )
-                                      : const Text(
-                                          "Send Verification Code",
-                                          style: TextStyle(
+                                      : Text(
+                                          "Send Verification Code".tr(),
+                                          style: const TextStyle(
                                             color: Colors.white,
                                             fontSize: 16,
                                             fontWeight: FontWeight.w700,
@@ -238,9 +271,9 @@ class _ForgetPasswordState extends State<ForgetPassword> {
                               // Back to Login link for those who don't see the top button
                               TextButton(
                                 onPressed: () => Navigator.pop(context),
-                                child: const Text(
-                                  "Back to Login",
-                                  style: TextStyle(
+                                child: Text(
+                                  "Back to Login".tr(),
+                                  style: const TextStyle(
                                     color: Color(0xFF64748B),
                                     fontWeight: FontWeight.w600,
                                     fontSize: 14,
@@ -282,7 +315,7 @@ class _ForgetPasswordState extends State<ForgetPassword> {
         height: size,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          color: Colors.white.withOpacity(opacity),
+          color: Colors.white.withValues(alpha: opacity),
         ),
       ),
     );
@@ -295,16 +328,16 @@ class _ForgetPasswordState extends State<ForgetPassword> {
         Container(
           padding: const EdgeInsets.all(10),
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.12),
+            color: Colors.white.withValues(alpha: 0.12),
             borderRadius: BorderRadius.circular(12),
           ),
-          child: Icon(icon, color: Colors.white.withOpacity(0.9), size: 18),
+          child: Icon(icon, color: Colors.white.withValues(alpha: 0.9), size: 18),
         ),
         const SizedBox(width: 16),
         Text(
           text,
           style: TextStyle(
-            color: Colors.white.withOpacity(0.8),
+            color: Colors.white.withValues(alpha: 0.8),
             fontSize: 14,
             fontWeight: FontWeight.w500,
             fontFamily: "Gilroy-Medium",
@@ -323,7 +356,7 @@ class _ForgetPasswordState extends State<ForgetPassword> {
         child: Text(
           "© 2026 iCare Health Technologies",
           style: TextStyle(
-            color: Colors.white.withOpacity(0.35),
+            color: Colors.white.withValues(alpha: 0.35),
             fontSize: 12,
             fontWeight: FontWeight.w400,
           ),
@@ -362,7 +395,7 @@ class _ForgetPasswordState extends State<ForgetPassword> {
             children: [
               SizedBox(height: ScallingConfig.moderateScale(30)),
               CustomText(
-                text: "Forget Password",
+                text: "Forget Password".tr(),
                 fontWeight: FontWeight.w900,
                 textAlign: TextAlign.center,
                 fontSize: 22,
@@ -373,7 +406,7 @@ class _ForgetPasswordState extends State<ForgetPassword> {
                 maxLines: 2,
                 textAlign: TextAlign.center,
                 text:
-                    "Please enter your email or phone number to reset password",
+                    "Please enter your email or phone number to reset password".tr(),
                 fontSize: 13,
                 width: Utils.windowHeight(context) * 0.4,
                 color: AppColors.themeBlack,
@@ -411,7 +444,7 @@ class _ForgetPasswordState extends State<ForgetPassword> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     CustomInputField(
-                      hintText: "Email or Phone Number",
+                      hintText: "Email or Phone Number".tr(),
                       leadingIcon: Icon(
                         Icons.person_outline,
                         color: AppColors.primary500,
@@ -423,7 +456,7 @@ class _ForgetPasswordState extends State<ForgetPassword> {
                       borderWidth: 2,
                       validator: (val) {
                         if (val == null || val.isEmpty) {
-                          return "Please enter your username";
+                          return "Please enter your username".tr();
                         }
                         return null;
                       },
@@ -453,9 +486,9 @@ class _ForgetPasswordState extends State<ForgetPassword> {
                                   strokeWidth: 2,
                                 ),
                               )
-                            : const Text(
-                                "Send",
-                                style: TextStyle(
+                            : Text(
+                                "Send".tr(),
+                                style: const TextStyle(
                                   color: Colors.white,
                                   fontSize: 16,
                                 ),
@@ -466,9 +499,9 @@ class _ForgetPasswordState extends State<ForgetPassword> {
                     Center(
                       child: TextButton(
                         onPressed: () => Navigator.pop(context),
-                        child: const Text(
-                          "Back to Login",
-                          style: TextStyle(
+                        child: Text(
+                          "Back to Login".tr(),
+                          style: const TextStyle(
                             color: AppColors.primaryColor,
                             fontWeight: FontWeight.w500,
                           ),

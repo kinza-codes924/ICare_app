@@ -30,6 +30,10 @@ class _CreateProfileState extends State<CreateProfile> {
   final TextEditingController bioController = TextEditingController();
   final TextEditingController qualificationController = TextEditingController();
   final TextEditingController ageController = TextEditingController();
+  final TextEditingController cnicController = TextEditingController();
+  final TextEditingController heightController = TextEditingController();
+  final TextEditingController weightController = TextEditingController();
+  final TextEditingController addressController = TextEditingController();
 
   @override
   Widget build(BuildContext context) {
@@ -43,6 +47,10 @@ class _CreateProfileState extends State<CreateProfile> {
         bioController: bioController,
         qualificationController: qualificationController,
         ageController: ageController,
+        cnicController: cnicController,
+        heightController: heightController,
+        weightController: weightController,
+        addressController: addressController,
         onSuccess: () => _showSuccessModal(context),
       );
     }
@@ -143,6 +151,50 @@ class _CreateProfileState extends State<CreateProfile> {
                         borderColor: AppColors.lightGrey200,
                         controller: ageController,
                       ),
+                      CustomInputField(
+                        hintText: "CNIC Number (e.g. 35201-1234567-1)",
+                        leadingIcon: const Icon(
+                          Icons.credit_card_outlined,
+                          color: AppColors.lightGrey200,
+                        ),
+                        bgColor: AppColors.bgColor,
+                        borderRadius: 30,
+                        borderColor: AppColors.lightGrey200,
+                        controller: cnicController,
+                      ),
+                      CustomInputField(
+                        hintText: "Height (e.g. 5'7\")",
+                        leadingIcon: const Icon(
+                          Icons.height_rounded,
+                          color: AppColors.lightGrey200,
+                        ),
+                        bgColor: AppColors.bgColor,
+                        borderRadius: 30,
+                        borderColor: AppColors.lightGrey200,
+                        controller: heightController,
+                      ),
+                      CustomInputField(
+                        hintText: "Weight (kg)",
+                        leadingIcon: const Icon(
+                          Icons.monitor_weight_outlined,
+                          color: AppColors.lightGrey200,
+                        ),
+                        bgColor: AppColors.bgColor,
+                        borderRadius: 30,
+                        borderColor: AppColors.lightGrey200,
+                        controller: weightController,
+                      ),
+                      CustomInputField(
+                        hintText: "Address",
+                        leadingIcon: const Icon(
+                          Icons.location_on_outlined,
+                          color: AppColors.lightGrey200,
+                        ),
+                        bgColor: AppColors.bgColor,
+                        borderRadius: 30,
+                        borderColor: AppColors.lightGrey200,
+                        controller: addressController,
+                      ),
                       const SizedBox(height: 30),
                       SizedBox(
                         width: double.infinity,
@@ -190,6 +242,10 @@ class _WebCreateProfile extends StatelessWidget {
   final TextEditingController bioController;
   final TextEditingController qualificationController;
   final TextEditingController ageController;
+  final TextEditingController cnicController;
+  final TextEditingController heightController;
+  final TextEditingController weightController;
+  final TextEditingController addressController;
   final VoidCallback onSuccess;
 
   const _WebCreateProfile({
@@ -201,6 +257,10 @@ class _WebCreateProfile extends StatelessWidget {
     required this.bioController,
     required this.qualificationController,
     required this.ageController,
+    required this.cnicController,
+    required this.heightController,
+    required this.weightController,
+    required this.addressController,
     required this.onSuccess,
   });
 
@@ -223,7 +283,7 @@ class _WebCreateProfile extends StatelessWidget {
                     width: 300,
                     height: 300,
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.05),
+                      color: Colors.white.withValues(alpha: 0.05),
                       shape: BoxShape.circle,
                     ),
                   ),
@@ -235,7 +295,7 @@ class _WebCreateProfile extends StatelessWidget {
                     width: 250,
                     height: 250,
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.05),
+                      color: Colors.white.withValues(alpha: 0.05),
                       shape: BoxShape.circle,
                     ),
                   ),
@@ -258,7 +318,7 @@ class _WebCreateProfile extends StatelessWidget {
                       Text(
                         "Your profile is your digital business card in the ICare platform. Fill out the details to get started with patients.",
                         style: TextStyle(
-                          color: Colors.white.withOpacity(0.8),
+                          color: Colors.white.withValues(alpha: 0.8),
                           fontSize: 18,
                           height: 1.6,
                         ),
@@ -364,12 +424,55 @@ class _WebCreateProfile extends StatelessWidget {
                               ],
                             ),
                             const SizedBox(height: 32),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: _buildInput(
+                                    label: "CNIC Number",
+                                    controller: cnicController,
+                                    icon: Icons.credit_card_outlined,
+                                    hint: "35201-1234567-1",
+                                  ),
+                                ),
+                                const SizedBox(width: 32),
+                                Expanded(
+                                  child: _buildInput(
+                                    label: "Address",
+                                    controller: addressController,
+                                    icon: Icons.location_on_outlined,
+                                    hint: "Enter your address",
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 32),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: _buildInput(
+                                    label: "Height",
+                                    controller: heightController,
+                                    icon: Icons.height_rounded,
+                                    hint: "e.g. 5'7\"",
+                                  ),
+                                ),
+                                const SizedBox(width: 32),
+                                Expanded(
+                                  child: _buildInput(
+                                    label: "Weight (kg)",
+                                    controller: weightController,
+                                    icon: Icons.monitor_weight_outlined,
+                                    hint: "e.g. 70",
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 32),
                             _buildInput(
                               label: "Bio & Description",
                               controller: bioController,
                               icon: Icons.description_outlined,
-                              hint:
-                                  "Tell us about your professional background...",
+                              hint: "Tell us a bit about yourself...",
                               maxLines: 4,
                             ),
                             const SizedBox(height: 32),

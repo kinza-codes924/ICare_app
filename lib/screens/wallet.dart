@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_size_matters/flutter_size_matters.dart';
 import 'package:icare/screens/top-up.dart';
@@ -23,7 +24,7 @@ class WalletScreen extends StatelessWidget {
         automaticallyImplyLeading: false,
         leading: CustomBackButton(),
         title: CustomText(
-          text: "Wallet",
+          text: "Wallet".tr(),
           fontWeight: FontWeight.bold,
           letterSpacing: -0.31,
           lineHeight: 1.0,
@@ -47,12 +48,12 @@ class WalletScreen extends StatelessWidget {
                     context,
                   ).push(MaterialPageRoute(builder: (ctx) => TopUpScreen()));
                 },
-                label: "Top Up",
+                label: "Top Up".tr(),
                 width: Utils.windowWidth(context) * 0.85,
               ),
               SizedBox(height: ScallingConfig.scale(20)),
               CustomText(
-                text: "Recieved Amounts",
+                text: "Received Amounts".tr(),
                 textAlign: TextAlign.start,
                 width: Utils.windowWidth(context) * 0.8,
               ),
@@ -287,7 +288,7 @@ class _WebWalletScreen extends StatelessWidget {
                           borderRadius: BorderRadius.circular(24),
                           boxShadow: [
                             BoxShadow(
-                              color: AppColors.secondaryColor.withOpacity(0.3),
+                              color: AppColors.secondaryColor.withValues(alpha: 0.3),
                               blurRadius: 20,
                               offset: const Offset(0, 10),
                             ),
@@ -311,7 +312,7 @@ class _WebWalletScreen extends StatelessWidget {
                                 Container(
                                   padding: const EdgeInsets.all(8),
                                   decoration: BoxDecoration(
-                                    color: Colors.white.withOpacity(0.2),
+                                    color: Colors.white.withValues(alpha: 0.2),
                                     borderRadius: BorderRadius.circular(8),
                                   ),
                                   child: const Icon(

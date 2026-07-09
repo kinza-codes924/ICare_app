@@ -1,0 +1,1143 @@
+const express = require('express');
+const router = express.Router();
+const mongoose = require('mongoose');
+const { connectMongoDB } = require('../config/mongodb');
+const User = require('../models/User');
+const PharmacyProfile = require('../models/PharmacyProfile');
+const Product = require('../models/Product');
+const PharmacyOrder = require('../models/PharmacyOrder');
+const EnhancedPrescription = require('../models/EnhancedPrescription');
+const MedicalRecord = require('../models/MedicalRecord');
+const { authMiddleware } = require('../middleware/auth');
+const { sendToUser } = require('../services/notificationService');
+const { sendEmail } = require('../utils/email');
+
+async function _sendDeliveredEmail(order) {
+  try {
+    const patient = await User.findById(order.patient_id).select('email name username').lean();
+    if (!patient?.email) return;
+    const orderNum = order.order_number || `#${order._id.toString().slice(-6).toUpperCase()}`;
+    const dateStr = new Date().toLocaleDateString('en-PK', { day: 'numeric', month: 'long', year: 'numeric' });
+    const receiptUrl = `https://icare-backend-inky.vercel.app/api/pharmacy/receipt/${order._id}`;
+    const itemsHtml = (order.items || []).map(i => {
+      const unitPrice = i.price || 0;
+      const qty = i.quantity || 1;
+      return `<tr>
+        <td style="padding:10px 14px;border-bottom:1px solid #f1f5f9;color:#1f2937;font-size:14px;">${i.product_name || i.name || 'Item'}${i.generic_name ? `<br/><span style="color:#94a3b8;font-size:12px;">${i.generic_name}</span>` : ''}</td>
+        <td style="padding:10px 14px;border-bottom:1px solid #f1f5f9;color:#64748b;text-align:center;font-size:14px;">×${qty}</td>
+        <td style="padding:10px 14px;border-bottom:1px solid #f1f5f9;color:#374151;text-align:right;font-size:14px;">Rs ${unitPrice.toFixed(0)}</td>
+        <td style="padding:10px 14px;border-bottom:1px solid #f1f5f9;color:#1f2937;text-align:right;font-weight:600;font-size:14px;">Rs ${(unitPrice * qty).toFixed(0)}</td>
+      </tr>`;
+    }).join('');
+    await sendEmail({
+      to: patient.email,
+      subject: `iCare — Your Medicine Order ${orderNum} has been Delivered ✅`,
+      html: `
+<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;background:#f8fafc;">
+  <div style="background:#0036BC;padding:28px 32px;border-radius:12px 12px 0 0;text-align:center;">
+    <h2 style="color:#fff;margin:0;font-size:22px;">📦 Order Delivered!</h2>
+    <p style="color:rgba(255,255,255,0.8);margin:6px 0 0;font-size:14px;">Your medicines have arrived safely</p>
+  </div>
+  <div style="background:#fff;padding:32px;border-radius:0 0 12px 12px;box-shadow:0 4px 20px rgba(0,0,0,0.06);">
+    <p style="color:#374151;font-size:15px;">Dear <strong>${patient.name || patient.username || 'Patient'}</strong>,</p>
+    <p style="color:#374151;font-size:14px;line-height:1.6;">Great news! Your pharmacy order <strong>${orderNum}</strong> has been delivered successfully. Please find your receipt below.</p>
+
+    <div style="background:#ECFDF5;border-left:4px solid #10B981;border-radius:8px;padding:14px 18px;margin:20px 0;">
+      <p style="margin:0;color:#065F46;font-weight:700;font-size:14px;">✅ Delivery Confirmed</p>
+      <p style="margin:6px 0 0;color:#374151;font-size:13px;"><strong>Order No:</strong> ${orderNum}</p>
+      <p style="margin:4px 0 0;color:#374151;font-size:13px;"><strong>Date:</strong> ${dateStr}</p>
+      ${order.delivery_address ? `<p style="margin:4px 0 0;color:#374151;font-size:13px;"><strong>Delivered to:</strong> ${order.delivery_address}</p>` : ''}
+    </div>
+
+    ${itemsHtml ? `
+    <p style="color:#0f172a;font-weight:700;font-size:14px;margin:24px 0 10px;">🧾 Order Summary</p>
+    <table style="width:100%;border-collapse:collapse;border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;">
+      <thead><tr style="background:#f8fafc;">
+        <th style="padding:10px 14px;text-align:left;color:#64748b;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;">Medicine</th>
+        <th style="padding:10px 14px;text-align:center;color:#64748b;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;">Qty</th>
+        <th style="padding:10px 14px;text-align:right;color:#64748b;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;">Unit Price</th>
+        <th style="padding:10px 14px;text-align:right;color:#64748b;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;">Total</th>
+      </tr></thead>
+      <tbody>${itemsHtml}</tbody>
+    </table>
+    <table width="100%" cellpadding="0" cellspacing="0" style="margin-top:12px;border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;">
+      <tr style="background:#f8fafc;">
+        <td style="padding:14px 18px;color:#64748b;font-size:13px;font-weight:600;">Grand Total</td>
+        <td style="padding:14px 18px;text-align:right;color:#0036BC;font-weight:800;font-size:18px;">Rs ${(order.total_amount || 0).toFixed(0)}</td>
+      </tr>
+    </table>` : ''}
+
+    <div style="text-align:center;margin:28px 0 16px;">
+      <a href="${receiptUrl}" style="background:#0036BC;color:#fff;padding:13px 32px;border-radius:8px;text-decoration:none;font-weight:700;font-size:15px;display:inline-block;">🧾 Download Receipt</a>
+    </div>
+    <p style="color:#64748b;font-size:12px;text-align:center;margin:0 0 20px;">Click above to open your receipt — you can save it as PDF from your browser.</p>
+
+    <hr style="border:none;border-top:1px solid #e2e8f0;margin:20px 0;">
+    <p style="color:#64748b;font-size:13px;margin:0 0 4px;">Any concerns? Contact your pharmacy through the <strong>iCare app</strong>.</p>
+    <p style="color:#94a3b8;font-size:12px;text-align:center;margin:20px 0 0;">iCare Healthcare Platform &nbsp;|&nbsp; <a href="https://www.icare.com.co" style="color:#0036BC;text-decoration:none;">www.icare.com.co</a></p>
+  </div>
+</div>`,
+    });
+  } catch (e) { console.error('[Pharmacy] Delivered email error:', e.message); }
+}
+
+// Notification messages per status
+function _statusNotifPayload(status, orderNumber) {
+  const map = {
+    confirmed:         { title: '✅ Order Confirmed', body: `Your order ${orderNumber} has been confirmed by the pharmacy.`, type: 'delivery_update' },
+    preparing:         { title: '⚗️ Order Being Prepared', body: `Your order ${orderNumber} is now being prepared.`, type: 'delivery_update' },
+    'out-for-delivery':{ title: '🚚 Order Dispatched', body: `Your order ${orderNumber} is on its way!`, type: 'order_dispatched' },
+    delivered:         { title: '📦 Order Delivered', body: `Your order ${orderNumber} has been delivered. Enjoy!`, type: 'delivery_update' },
+    completed:         { title: '✅ Order Completed', body: `Your order ${orderNumber} is marked complete.`, type: 'delivery_update' },
+    rejected:          { title: '❌ Order Rejected', body: `Your order ${orderNumber} was rejected. Please contact the pharmacy.`, type: 'delivery_update' },
+    cancelled:         { title: '🚫 Order Cancelled', body: `Your order ${orderNumber} has been cancelled.`, type: 'delivery_update' },
+  };
+  return map[status] || null;
+}
+
+function toId(id) {
+  try { return new mongoose.Types.ObjectId(id); } catch { return null; }
+}
+
+// ─── HAVERSINE DISTANCE (km) ──────────────────────────────────────────────────
+function haversineKm(lat1, lng1, lat2, lng2) {
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLng = (lng2 - lng1) * Math.PI / 180;
+  const a = Math.sin(dLat / 2) ** 2 +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+// ─── GET ALL PHARMACIES ───────────────────────────────────────────────────────
+router.get('/', async (req, res) => {
+  try {
+    await connectMongoDB();
+    const users = await User.find({ role: { $in: ['pharmacy', 'Pharmacy'] }, is_active: { $ne: false } }).lean();
+    const ids = users.map(u => u._id);
+    const profiles = await PharmacyProfile.find({ user_id: { $in: ids } }).lean();
+    const pMap = {};
+    profiles.forEach(p => { pMap[p.user_id.toString()] = p; });
+
+    const pharmacies = users.map(u => {
+      const p = pMap[u._id.toString()] || {};
+      return {
+        id: u._id.toString(), _id: u._id.toString(),
+        name: u.username || u.name, email: u.email, phone: u.phone,
+        pharmacy_name: p.pharmacy_name, license_number: p.license_number,
+        operating_hours: p.operating_hours, delivery_available: p.delivery_available,
+        delivery_fee: p.delivery_fee, address: p.address, city: p.city,
+        latitude: p.latitude ?? null, longitude: p.longitude ?? null,
+        lat: p.latitude ?? null, lng: p.longitude ?? null,
+        rating: p.rating ?? 0, total_reviews: p.total_reviews ?? 0,
+      };
+    });
+    res.json({ success: true, pharmacies });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: 'Failed to fetch pharmacies' });
+  }
+});
+
+router.get('/get_all_pharmacy', async (req, res) => {
+  try {
+    await connectMongoDB();
+    const users = await User.find({ role: { $in: ['pharmacy', 'Pharmacy'] }, is_active: { $ne: false } }).lean();
+    const ids = users.map(u => u._id);
+    const profiles = await PharmacyProfile.find({ user_id: { $in: ids } }).lean();
+    const pMap = {};
+    profiles.forEach(p => { pMap[p.user_id.toString()] = p; });
+
+    const pharmacies = users.map(u => {
+      const p = pMap[u._id.toString()] || {};
+      return {
+        id: u._id.toString(), _id: u._id.toString(),
+        name: u.username || u.name, email: u.email, phone: u.phone,
+        pharmacy_name: p.pharmacy_name, license_number: p.license_number,
+        operating_hours: p.operating_hours, delivery_available: p.delivery_available,
+        delivery_fee: p.delivery_fee, address: p.address, city: p.city,
+        latitude: p.latitude ?? null, longitude: p.longitude ?? null,
+        lat: p.latitude ?? null, lng: p.longitude ?? null,
+        rating: p.rating ?? 0, total_reviews: p.total_reviews ?? 0,
+      };
+    });
+    res.json({ success: true, pharmacies });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: 'Failed to fetch pharmacies' });
+  }
+});
+
+// ─── GET NEARBY PHARMACIES ────────────────────────────────────────────────────
+// GET /pharmacy/nearby?lat=31.5&lng=74.3&radius=20
+router.get('/nearby', async (req, res) => {
+  try {
+    await connectMongoDB();
+    const userLat = parseFloat(req.query.lat);
+    const userLng = parseFloat(req.query.lng);
+    const radius = parseFloat(req.query.radius) || 20; // default 20 km
+
+    if (isNaN(userLat) || isNaN(userLng)) {
+      return res.status(400).json({ success: false, message: 'lat and lng are required' });
+    }
+
+    const users = await User.find({ role: { $in: ['pharmacy', 'Pharmacy'] }, is_active: { $ne: false } }).lean();
+    const ids = users.map(u => u._id);
+    const profiles = await PharmacyProfile.find({ user_id: { $in: ids } }).lean();
+    const pMap = {};
+    profiles.forEach(p => { pMap[p.user_id.toString()] = p; });
+
+    const pharmacies = users
+      .map(u => {
+        const p = pMap[u._id.toString()] || {};
+        const lat = p.latitude ?? null;
+        const lng = p.longitude ?? null;
+        const distance = (lat != null && lng != null)
+          ? haversineKm(userLat, userLng, lat, lng)
+          : null;
+        return {
+          id: u._id.toString(), _id: u._id.toString(),
+          name: u.username || u.name, email: u.email, phone: u.phone,
+          pharmacy_name: p.pharmacy_name, license_number: p.license_number,
+          operating_hours: p.operating_hours, delivery_available: p.delivery_available,
+          delivery_fee: p.delivery_fee, address: p.address, city: p.city,
+          latitude: lat, longitude: lng, distance_km: distance,
+        };
+      })
+      .filter(p => p.distance_km === null || p.distance_km <= radius)
+      .sort((a, b) => {
+        if (a.distance_km === null) return 1;
+        if (b.distance_km === null) return -1;
+        return a.distance_km - b.distance_km;
+      });
+
+    res.json({ success: true, pharmacies, count: pharmacies.length });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: 'Failed to fetch nearby pharmacies' });
+  }
+});
+
+// ─── PHARMACY PROFILE BY USER ID (admin use) ────────────────────────────────
+router.get('/profile/:userId', authMiddleware, async (req, res) => {
+  try {
+    await connectMongoDB();
+    const userId = toId(req.params.userId);
+    const user = await User.findById(userId).lean();
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+    const profile = await PharmacyProfile.findOne({ user_id: userId }).lean() || {};
+    res.json({
+      success: true,
+      pharmacy: {
+        id: user._id.toString(), _id: user._id.toString(), userId: user._id.toString(),
+        username: user.username || user.name, email: user.email, phone: user.phone,
+        profilePicture: user.profilePicture || null,
+        ...profile,
+        pharmacyName: profile?.pharmacy_name || user.name || user.username || '',
+        ownerName: profile?.pharmacy_name || user.name || user.username || '',
+        licenseNumber: profile?.license_number || '',
+        cnic: profile?.cnic || user.cnic || null,
+        openHours: profile?.openHours || null,
+      },
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Failed to fetch pharmacy profile' });
+  }
+});
+
+// ─── PHARMACY PROFILE GET ─────────────────────────────────────────────────────
+router.get('/profile', authMiddleware, async (req, res) => {
+  try {
+    await connectMongoDB();
+    const userId = toId(req.user.id);
+    const user = await User.findById(userId).lean();
+    const profile = await PharmacyProfile.findOne({ user_id: userId }).lean() || {};
+
+    res.json({
+      success: true,
+      pharmacy: {
+        id: user._id.toString(),
+        _id: user._id.toString(),
+        userId: user._id.toString(),
+        username: user.username || user.name, email: user.email, phone: user.phone,
+        profilePicture: user.profilePicture || null,
+        ...profile,
+        // Explicit camelCase fields Flutter reads — must come AFTER spread so they win
+        pharmacyName: profile?.pharmacy_name || user.name || user.username || '',
+        ownerName: profile?.pharmacy_name || user.name || user.username || '',
+        licenseNumber: profile?.license_number || '',
+        drugSaleLicense: profile?.license_number || '',
+        openHours: profile?.openHours || null,
+        cnic: profile?.cnic || user.cnic || null,
+        _id: user._id.toString(),
+        id: user._id.toString(),
+      },
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: 'Failed to fetch profile' });
+  }
+});
+
+// ─── PHARMACY PROFILE UPSERT ──────────────────────────────────────────────────
+router.post('/add_pharmacy_details', authMiddleware, async (req, res) => {
+  try {
+    await connectMongoDB();
+    const userId = toId(req.user.id);
+    const { pharmacyName, ownerName, cnic, licenseNumber, operatingHours, openHours, deliveryAvailable, deliveryFee, address, city, drapCompliance, profilePicture, latitude, longitude } = req.body;
+    const resolvedName = pharmacyName || ownerName;
+    const resolvedHours = openHours || operatingHours || null;
+
+    const profile = await PharmacyProfile.findOneAndUpdate(
+      { user_id: userId },
+      {
+        $set: {
+          pharmacy_name: resolvedName,
+          license_number: licenseNumber,
+          cnic: cnic,
+          openHours: resolvedHours,
+          operating_hours: typeof resolvedHours === 'string' ? resolvedHours : null,
+          delivery_available: deliveryAvailable ?? false,
+          delivery_fee: deliveryFee ?? 0,
+          address, city,
+          drap_compliance: drapCompliance ?? false,
+          ...(latitude != null && { latitude: parseFloat(latitude) }),
+          ...(longitude != null && { longitude: parseFloat(longitude) }),
+        },
+      },
+      { new: true, upsert: true }
+    );
+
+    // Save profilePicture and name to User model so auth state reflects it
+    const userUpdate = {};
+    if (profilePicture !== undefined) userUpdate.profilePicture = profilePicture;
+    if (resolvedName) { userUpdate.name = resolvedName; userUpdate.username = resolvedName; }
+    if (Object.keys(userUpdate).length > 0) {
+      await User.findByIdAndUpdate(userId, { $set: userUpdate });
+    }
+
+    res.json({ success: true, pharmacy: profile, existingProfile: profile });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: 'Failed to update pharmacy details' });
+  }
+});
+
+// ─── PHARMACY PROFILE PUT ─────────────────────────────────────────────────────
+router.put('/profile', authMiddleware, async (req, res) => {
+  try {
+    await connectMongoDB();
+    const userId = toId(req.user.id);
+    const update = {};
+    const { pharmacyName, licenseNumber, operatingHours, deliveryAvailable, deliveryFee, address, city, drapCompliance } = req.body;
+    if (pharmacyName) update.pharmacy_name = pharmacyName;
+    if (licenseNumber) update.license_number = licenseNumber;
+    if (operatingHours) update.operating_hours = operatingHours;
+    if (deliveryAvailable !== undefined) update.delivery_available = deliveryAvailable;
+    if (deliveryFee !== undefined) update.delivery_fee = deliveryFee;
+    if (address) update.address = address;
+    if (city) update.city = city;
+    if (drapCompliance !== undefined) update.drap_compliance = drapCompliance;
+
+    if (Object.keys(update).length === 0) {
+      return res.status(400).json({ success: false, message: 'No fields to update' });
+    }
+
+    const profile = await PharmacyProfile.findOneAndUpdate(
+      { user_id: userId },
+      { $set: update },
+      { new: true, upsert: true }
+    );
+    res.json({ success: true, profile });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: 'Failed to update pharmacy profile' });
+  }
+});
+
+// ─── STATS ────────────────────────────────────────────────────────────────────
+router.get('/stats', authMiddleware, async (req, res) => {
+  try {
+    await connectMongoDB();
+    const userId = toId(req.user.id);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const [orders, products] = await Promise.all([
+      PharmacyOrder.find({ pharmacy_id: userId }).lean(),
+      Product.find({ pharmacy_id: userId, is_active: true }).lean(),
+    ]);
+
+    const todayOrders = orders.filter(o => new Date(o.createdAt) >= today).length;
+    const totalOrders = orders.length;
+    const pendingOrders = orders.filter(o => o.status === 'pending').length;
+    const completedOrders = orders.filter(o => ['delivered', 'completed'].includes(o.status)).length;
+    const totalProducts = products.length;
+    const lowStock = products.filter(p => (p.stock_quantity ?? 0) < 30).length;
+    const revenue = orders
+      .filter(o => ['delivered', 'completed'].includes(o.status))
+      .reduce((sum, o) => sum + (o.total_amount || 0), 0);
+
+    res.json({ success: true, todayOrders, totalOrders, pendingOrders, completedOrders, totalProducts, lowStock, revenue: Math.round(revenue) });
+  } catch (err) {
+    console.error(err);
+    res.json({ success: true, todayOrders: 0, totalOrders: 0, pendingOrders: 0, completedOrders: 0, totalProducts: 0, lowStock: 0, revenue: 0 });
+  }
+});
+
+// ─── ANALYTICS ────────────────────────────────────────────────────────────────
+router.get('/analytics', authMiddleware, async (req, res) => {
+  try {
+    await connectMongoDB();
+    const userId = toId(req.user.id);
+
+    const [orders, products] = await Promise.all([
+      PharmacyOrder.find({ pharmacy_id: userId }).lean(),
+      Product.find({ pharmacy_id: userId }).lean(),
+    ]);
+
+    const completedOrders = orders.filter(o => ['delivered', 'completed'].includes(o.status));
+    const totalRevenue = completedOrders.reduce((s, o) => s + (o.total_amount || 0), 0);
+    const totalOrders = orders.length;
+    const avgOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
+
+    const ordersAccepted = orders.filter(o => !['pending', 'cancelled', 'rejected'].includes(o.status)).length;
+    const ordersCompleted = completedOrders.length;
+    const failedDeliveries = orders.filter(o => ['cancelled', 'rejected'].includes(o.status)).length;
+    const outOfStockCount = products.filter(p => (p.stock_quantity ?? 0) === 0).length;
+
+    // Top selling: aggregate order items by product name
+    const productSales = {};
+    for (const order of orders) {
+      for (const item of (order.items || [])) {
+        const name = item.product_name || 'Unknown';
+        if (!productSales[name]) productSales[name] = { name, sales: 0, revenue: 0 };
+        productSales[name].sales += item.quantity || 1;
+        productSales[name].revenue += (item.quantity || 1) * (item.price || 0);
+      }
+    }
+    const topSellingProducts = Object.values(productSales)
+      .sort((a, b) => b.sales - a.sales)
+      .slice(0, 5)
+      .map(p => ({ name: p.name, sales: p.sales, revenue: Math.round(p.revenue) }));
+
+    res.json({
+      success: true,
+      totalRevenue: Math.round(totalRevenue),
+      totalOrders,
+      averageOrderValue: parseFloat(avgOrderValue.toFixed(2)),
+      ordersAccepted,
+      ordersCompleted,
+      failedDeliveries,
+      outOfStockCount,
+      complaintsCount: 0,
+      averageRating: 0,
+      averageProcessTime: 'N/A',
+      responseTime: '< 30m',
+      topSellingProducts,
+    });
+  } catch (err) {
+    console.error(err);
+    res.json({ success: true, totalRevenue: 0, totalOrders: 0, averageOrderValue: 0, ordersAccepted: 0, ordersCompleted: 0, failedDeliveries: 0, outOfStockCount: 0, complaintsCount: 0, averageRating: 0, averageProcessTime: 'N/A', responseTime: '< 30m', topSellingProducts: [] });
+  }
+});
+
+// ─── TOP SELLING PRODUCTS ─────────────────────────────────────────────────────
+router.get('/top-selling', authMiddleware, async (req, res) => {
+  try {
+    await connectMongoDB();
+    const userId = toId(req.user.id);
+    const orders = await PharmacyOrder.find({ pharmacy_id: userId }).lean();
+
+    const productSales = {};
+    for (const order of orders) {
+      for (const item of (order.items || [])) {
+        const name = item.product_name || 'Unknown';
+        if (!productSales[name]) productSales[name] = { name, sales: 0, revenue: 0 };
+        productSales[name].sales += item.quantity || 1;
+        productSales[name].revenue += (item.quantity || 1) * (item.price || 0);
+      }
+    }
+    const topProducts = Object.values(productSales)
+      .sort((a, b) => b.sales - a.sales)
+      .slice(0, 5)
+      .map(p => ({ name: p.name, sales: p.sales, revenue: Math.round(p.revenue) }));
+
+    res.json({ success: true, topProducts });
+  } catch (err) {
+    console.error(err);
+    res.json({ success: true, topProducts: [] });
+  }
+});
+
+// ─── GET ORDERS (list for pharmacy) ──────────────────────────────────────────
+router.get('/orders/pharmacy/list', authMiddleware, async (req, res) => {
+  try {
+    await connectMongoDB();
+    const rawUserId = req.user.id || req.user._id;
+    const userId = toId(rawUserId);
+    if (!userId) return res.status(401).json({ success: false, message: 'Invalid token' });
+
+    const { status } = req.query;
+
+    // Search by this pharmacy's user_id AND also by any profile linked to them
+    const profile = await PharmacyProfile.findOne({ user_id: userId }).lean().catch(() => null);
+    const idSet = new Set([rawUserId]);
+    if (profile?._id) idSet.add(profile._id.toString());
+    const pharmacyIds = [...idSet].map(id => toId(id)).filter(Boolean);
+
+    // Show ALL orders — direct cart orders may have any pharmacy_id value
+    // In a single-pharmacy system all orders belong to this pharmacy
+    const query = {};
+    if (status && status !== 'all') query.status = status;
+
+    const rawOrders = await PharmacyOrder.find(query).sort({ createdAt: -1 }).lean();
+
+    // Safe patient lookup — skip nulls
+    const patientIdStrings = [...new Set(
+      rawOrders.map(o => o.patient_id?.toString()).filter(Boolean)
+    )];
+    const patients = patientIdStrings.length > 0
+      ? await User.find({ _id: { $in: patientIdStrings.map(id => toId(id)) } }).lean()
+      : [];
+    const pMap = {};
+    patients.forEach(p => { pMap[p._id.toString()] = p; });
+
+    // Look up doctor names for prescription orders
+    const prescriptionIds = rawOrders
+      .map(o => o.prescription_id?.toString())
+      .filter(id => id && id.length === 24);
+    const prescriptionDoctorMap = {};
+    if (prescriptionIds.length > 0) {
+      try {
+        const objIds = prescriptionIds.map(id => toId(id)).filter(Boolean);
+        const [enhancedRx, medRecords] = await Promise.all([
+          EnhancedPrescription.find({ _id: { $in: objIds } })
+            .populate('doctorId', 'name username').lean(),
+          MedicalRecord.find({ _id: { $in: objIds } })
+            .populate('doctor', 'name username').lean(),
+        ]);
+        enhancedRx.forEach(rx => {
+          const name = rx.doctorId?.name || rx.doctorId?.username;
+          if (name) prescriptionDoctorMap[rx._id.toString()] = name;
+        });
+        medRecords.forEach(mr => {
+          const name = mr.doctor?.name || mr.doctor?.username;
+          if (name) prescriptionDoctorMap[mr._id.toString()] = name;
+        });
+      } catch (_) {}
+    }
+
+    const orders = rawOrders.map(o => {
+      const pid = o.patient_id?.toString() || '';
+      const pt = pMap[pid];
+      const rxId = o.prescription_id?.toString() || '';
+      const doctorName = prescriptionDoctorMap[rxId] || null;
+      return {
+        _id: o._id.toString(),
+        orderNumber: o.order_number || `#${o._id.toString().slice(-6).toUpperCase()}`,
+        status: o.status,
+        totalAmount: o.total_amount || 0,
+        deliveryFee: o.delivery_fee || 0,
+        deliveryAddress: o.delivery_address || '',
+        expectedDeliveryTime: o.expected_delivery_time || '',
+        createdAt: o.createdAt,
+        prescriptionId: o.prescription_id || null,
+        rejectionReason: o.rejection_reason || '',
+        walkInMedicines: o.orderType === 'walk-in' ? (o.medicines || '') : '',
+        orderType: o.orderType || 'cart',
+        doctorName,
+        user: {
+          _id: pt?._id?.toString() || '',
+          name: o.orderType === 'walk-in'
+            ? (o.patientName || 'Walk-in Patient')
+            : (pt?.username || pt?.name || 'Patient'),
+          email: pt?.email || '',
+          phoneNumber: o.orderType === 'walk-in' ? (o.contact || '') : (pt?.phone || pt?.phoneNumber || ''),
+          address: pt?.address || '',
+        },
+        items: o.items || [],
+      };
+    });
+
+    res.json({ success: true, orders, pharmacyId: rawUserId });
+  } catch (err) {
+    console.error('GET /pharmacy/orders/pharmacy/list error:', err.message);
+    res.status(500).json({ success: false, message: err.message, orders: [] });
+  }
+});
+
+router.get('/orders', authMiddleware, async (req, res) => {
+  try {
+    await connectMongoDB();
+    const userId = toId(req.user.id);
+    const userRole = req.user.role;
+    const { status } = req.query;
+
+    const query = userRole === 'pharmacy' ? { pharmacy_id: userId } : { patient_id: userId };
+    if (status && status !== 'all') query.status = status;
+
+    const orders = await PharmacyOrder.find(query).sort({ createdAt: -1 }).lean();
+
+    // Fetch pharmacy names for all unique pharmacy IDs
+    const pharmacyIds = [...new Set(orders.map(o => o.pharmacy_id?.toString()).filter(Boolean))];
+    const pharmacyProfiles = await PharmacyProfile.find({ user_id: { $in: pharmacyIds.map(id => toId(id)) } }).lean();
+    const pharmacyUsers = await User.find({ _id: { $in: pharmacyIds.map(id => toId(id)) } }).lean();
+    const pharmNameMap = {};
+    pharmacyUsers.forEach(u => { pharmNameMap[u._id.toString()] = u.username || u.name || 'Pharmacy'; });
+    pharmacyProfiles.forEach(p => {
+      if (p.pharmacy_name) pharmNameMap[p.user_id.toString()] = p.pharmacy_name;
+    });
+
+    res.json({
+      success: true,
+      orders: orders.map(o => ({
+        ...o,
+        _id: o._id.toString(),
+        prescriptionId: o.prescription_id?.toString() || null,
+        pharmacyId: o.pharmacy_id?.toString() || null,
+        pharmacyName: pharmNameMap[o.pharmacy_id?.toString()] || 'Pharmacy',
+        patientId: o.patient_id?.toString() || null,
+        totalAmount: o.total_amount || 0,
+        deliveryFee: o.delivery_fee || 0,
+        deliveryAddress: o.delivery_address || '',
+        items: (o.items || []).map(item => ({
+          ...item,
+          name: item.productName || item.product_name || item.name || item.medicine_name || item.medicine || item.title || 'Unknown Item',
+        })),
+      })),
+    });
+  } catch (err) {
+    console.error(err);
+    res.json({ success: true, orders: [] });
+  }
+});
+
+// ─── GET ORDER BY ID ──────────────────────────────────────────────────────────
+router.get('/orders/:id', authMiddleware, async (req, res) => {
+  try {
+    await connectMongoDB();
+    const userId = toId(req.user.id);
+    const orderId = toId(req.params.id);
+    if (!orderId) return res.status(400).json({ success: false, message: 'Invalid order ID' });
+
+    const order = await PharmacyOrder.findOne({
+      _id: orderId,
+      $or: [{ patient_id: userId }, { pharmacy_id: userId }],
+    }).lean();
+
+    if (!order) return res.status(404).json({ success: false, message: 'Order not found' });
+    res.json({ success: true, order: { ...order, _id: order._id.toString() } });
+  } catch (err) {
+    console.error('GET /pharmacy/orders/:id error:', err.message);
+    res.status(500).json({ success: false, message: 'Failed to fetch order' });
+  }
+});
+
+// ─── CREATE ORDER ─────────────────────────────────────────────────────────────
+router.post('/orders', authMiddleware, async (req, res) => {
+  try {
+    await connectMongoDB();
+
+    const patientId = toId(req.user.id);
+    if (!patientId) return res.status(401).json({ success: false, message: 'Invalid patient token' });
+
+    const { pharmacyId, userId: bodyUserId, prescriptionId, deliveryAddress, totalAmount, deliveryFee, items } = req.body;
+
+    // Accept either pharmacyId or userId (frontend may send either)
+    const rawPharmacyId = pharmacyId || bodyUserId;
+    if (!rawPharmacyId) return res.status(400).json({ success: false, message: 'pharmacyId is required' });
+
+    const resolvedPharmacyId = toId(rawPharmacyId);
+    if (!resolvedPharmacyId) return res.status(400).json({ success: false, message: `Invalid pharmacy ID: ${rawPharmacyId}` });
+
+    // Normalize items — frontend may send productName or product_name
+    const normalizedItems = Array.isArray(items) ? items.map(i => ({
+      product_name: i.product_name || i.productName || i.name || '',
+      generic_name: i.generic_name || i.genericName || '',
+      quantity: Number(i.quantity) || 1,
+      price: Number(i.price) || 0,
+    })) : [];
+
+    // Calculate total from items if totalAmount not provided or is 0
+    const calculatedTotal = normalizedItems.reduce((sum, i) => sum + (i.price * i.quantity), 0);
+    const finalTotal = Number(totalAmount) > 0 ? Number(totalAmount) : calculatedTotal;
+
+    // Generate unique order number with random suffix to avoid collisions
+    const orderNumber = `ORD-${Date.now().toString().slice(-8)}-${Math.random().toString(36).slice(-4).toUpperCase()}`;
+
+    const order = await PharmacyOrder.create({
+      patient_id: patientId,
+      pharmacy_id: resolvedPharmacyId,
+      prescription_id: prescriptionId || undefined,
+      delivery_address: deliveryAddress || '',
+      total_amount: finalTotal,
+      delivery_fee: Number(deliveryFee) || 0,
+      status: 'pending',
+      order_number: orderNumber,
+      orderNumber: orderNumber,
+      items: normalizedItems,
+    });
+
+    res.status(201).json({ success: true, message: 'Order created successfully', order: { ...order.toObject(), _id: order._id.toString() } });
+  } catch (err) {
+    console.error('POST /pharmacy/orders error:', err.message, err.stack);
+    // Return the actual error message so the client can display it
+    res.status(500).json({ success: false, message: err.message || 'Failed to create order' });
+  }
+});
+
+// ─── UPDATE ORDER STATUS ──────────────────────────────────────────────────────
+router.put('/update_order_status/:id', authMiddleware, async (req, res) => {
+  try {
+    await connectMongoDB();
+    const userId = toId(req.user.id);
+    let { status, expectedDeliveryTime, rejectionReason } = req.body;
+
+    // Normalize underscore vs hyphen variants
+    if (status === 'out_for_delivery') status = 'out-for-delivery';
+
+    const validStatuses = ['pending', 'confirmed', 'preparing', 'out-for-delivery', 'delivered', 'cancelled', 'completed', 'rejected'];
+    if (!validStatuses.includes(status)) {
+      return res.status(400).json({ success: false, message: `Invalid status: ${status}` });
+    }
+
+    const update = { status };
+    if (expectedDeliveryTime) update.expected_delivery_time = expectedDeliveryTime;
+    if (status === 'rejected') {
+      if (rejectionReason != null && String(rejectionReason).trim()) {
+        update.rejection_reason = String(rejectionReason).trim().slice(0, 500);
+      }
+    } else {
+      update.rejection_reason = '';
+    }
+
+    const order = await PharmacyOrder.findOneAndUpdate(
+      { _id: toId(req.params.id), $or: [{ patient_id: userId }, { pharmacy_id: userId }] },
+      { $set: update },
+      { new: true }
+    );
+
+    if (!order) return res.status(404).json({ success: false, message: 'Order not found or access denied' });
+
+    // Notify patient about status change
+    const notifPayload = _statusNotifPayload(status, order.order_number || order._id.toString().slice(-6));
+    if (notifPayload && order.patient_id && String(order.patient_id) !== String(userId)) {
+      sendToUser(order.patient_id, { ...notifPayload, data: { orderId: String(order._id), type: notifPayload.type } }).catch(() => {});
+    }
+    if (status === 'delivered' || status === 'completed') _sendDeliveredEmail(order);
+
+    res.json({ success: true, message: 'Order updated successfully', order: { ...order.toObject(), _id: order._id.toString() } });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: 'Failed to update order' });
+  }
+});
+
+router.put('/orders/:id', authMiddleware, async (req, res) => {
+  try {
+    await connectMongoDB();
+    const userId = toId(req.user.id);
+    let { status, expectedDeliveryTime, rejectionReason } = req.body;
+
+    // Normalize underscore vs hyphen variants
+    if (status === 'out_for_delivery') status = 'out-for-delivery';
+
+    const validStatuses = ['pending', 'confirmed', 'preparing', 'out-for-delivery', 'delivered', 'cancelled', 'completed', 'rejected'];
+    if (!validStatuses.includes(status)) {
+      return res.status(400).json({ success: false, message: `Invalid status: ${status}` });
+    }
+
+    const update = { status };
+    if (expectedDeliveryTime) update.expected_delivery_time = expectedDeliveryTime;
+    if (status === 'rejected') {
+      if (rejectionReason != null && String(rejectionReason).trim()) {
+        update.rejection_reason = String(rejectionReason).trim().slice(0, 500);
+      }
+    } else {
+      update.rejection_reason = '';
+    }
+
+    const order = await PharmacyOrder.findOneAndUpdate(
+      { _id: toId(req.params.id), $or: [{ patient_id: userId }, { pharmacy_id: userId }] },
+      { $set: update },
+      { new: true }
+    );
+
+    if (!order) return res.status(404).json({ success: false, message: 'Order not found' });
+
+    // Notify patient about status change
+    const notifPayload2 = _statusNotifPayload(status, order.order_number || order._id.toString().slice(-6));
+    if (notifPayload2 && order.patient_id && String(order.patient_id) !== String(userId)) {
+      sendToUser(order.patient_id, { ...notifPayload2, data: { orderId: String(order._id), type: notifPayload2.type } }).catch(() => {});
+    }
+    if (status === 'delivered' || status === 'completed') _sendDeliveredEmail(order);
+
+    res.json({ success: true, message: 'Order updated', order: { ...order.toObject(), _id: order._id.toString() } });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: 'Failed to update order' });
+  }
+});
+
+// ─── CANCEL ORDER ─────────────────────────────────────────────────────────────
+router.put('/orders/:id/cancel', authMiddleware, async (req, res) => {
+  try {
+    await connectMongoDB();
+    const userId = toId(req.user.id);
+    const order = await PharmacyOrder.findOneAndUpdate(
+      { _id: toId(req.params.id), patient_id: userId, status: { $in: ['pending', 'confirmed'] } },
+      { $set: { status: 'cancelled', cancellation_reason: req.body.reason || '' } },
+      { new: true }
+    );
+    if (!order) return res.status(404).json({ success: false, message: 'Order not found or cannot be cancelled' });
+    res.json({ success: true, message: 'Order cancelled', order: { ...order.toObject(), _id: order._id.toString() } });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: 'Failed to cancel order' });
+  }
+});
+
+// ─── PRODUCTS ─────────────────────────────────────────────────────────────────
+router.get('/products', async (req, res) => {
+  try {
+    await connectMongoDB();
+    const { pharmacyId, category, q } = req.query;
+    const uid = toId(pharmacyId || req.user.id);
+    const query = { pharmacy_id: uid, is_active: true };
+    if (category && category !== 'All') query.category = category;
+
+    let products = await Product.find(query).lean();
+
+    if (q) {
+      const lq = q.toLowerCase();
+      products = products.filter(p => p.name?.toLowerCase().includes(lq) || p.description?.toLowerCase().includes(lq));
+    }
+
+    res.json({ success: true, medicines: products.map(p => ({ ...p, _id: p._id.toString() })) });
+  } catch (err) {
+    console.error(err);
+    res.json({ success: true, medicines: [] });
+  }
+});
+
+// Helper: check if generic name is on the admin-controlled list
+async function resolveControlledCategory(genericName) {
+  if (!genericName) return null;
+  try {
+    const ControlledDrug = require('../models/ControlledDrug');
+    const match = await ControlledDrug.findOne({
+      genericName: { $regex: `^${genericName.trim()}$`, $options: 'i' },
+    }).lean();
+    return match ? 'Controlled' : null;
+  } catch (_) { return null; }
+}
+
+router.post('/products', authMiddleware, async (req, res) => {
+  try {
+    await connectMongoDB();
+    const userId = toId(req.user.id);
+    const { name, description, category, price, stockQuantity, stock_quantity, quantity, stock, manufacturer, requiresPrescription, genericName, medicineCategory } = req.body;
+    const resolvedQty = stockQuantity ?? stock_quantity ?? quantity ?? stock ?? 0;
+
+    // Admin-controlled drug list takes precedence — pharmacist cannot override classification
+    const adminCategory = await resolveControlledCategory(genericName);
+    const finalCategory = adminCategory || medicineCategory || 'OTC';
+    const finalRequiresPrescription = adminCategory === 'Controlled' ? true : (requiresPrescription ?? false);
+
+    const product = await Product.create({
+      pharmacy_id: userId, name, description, category: category || 'OTC',
+      medicine_category: finalCategory,
+      price: price || 0, stock_quantity: Number(resolvedQty),
+      manufacturer, requires_prescription: finalRequiresPrescription, generic_name: genericName,
+    });
+
+    res.status(201).json({ success: true, medicine: { ...product.toObject(), _id: product._id.toString() } });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: 'Failed to create product' });
+  }
+});
+
+router.put('/products/:id', authMiddleware, async (req, res) => {
+  try {
+    await connectMongoDB();
+    const { name, price, stockQuantity, stock_quantity, quantity, stock, category, description, genericName, medicineCategory } = req.body;
+    const update = {};
+    if (name) update.name = name;
+    if (price !== undefined) update.price = price;
+    const resolvedQty = stockQuantity ?? stock_quantity ?? quantity ?? stock;
+    if (resolvedQty !== undefined) update.stock_quantity = Number(resolvedQty);
+    if (category) update.category = category;
+    if (description) update.description = description;
+    if (genericName !== undefined) update.generic_name = genericName;
+
+    // Admin classification always wins — pharmacist cannot reclassify
+    const adminCategory = await resolveControlledCategory(genericName || (await Product.findById(req.params.id).lean())?.generic_name);
+    if (adminCategory) {
+      update.medicine_category = adminCategory;
+      update.requires_prescription = true;
+    } else if (medicineCategory) {
+      update.medicine_category = medicineCategory;
+    }
+
+    if (Object.keys(update).length === 0) {
+      return res.status(400).json({ success: false, message: 'Nothing to update' });
+    }
+
+    const product = await Product.findByIdAndUpdate(req.params.id, { $set: update }, { new: true });
+    res.json({ success: true, medicine: { ...product.toObject(), _id: product._id.toString() } });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: 'Failed to update product' });
+  }
+});
+
+router.delete('/products/:id', authMiddleware, async (req, res) => {
+  try {
+    await connectMongoDB();
+    await Product.findByIdAndUpdate(req.params.id, { is_active: false });
+    res.json({ success: true, message: 'Product deleted' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: 'Failed to delete product' });
+  }
+});
+
+// ─── WALK-IN ORDER (created by pharmacy for walk-in patients) ─────────────────
+router.post('/orders/walk-in', authMiddleware, async (req, res) => {
+  try {
+    await connectMongoDB();
+    const pharmacyUserId = toId(req.user.id);
+
+    // Resolve pharmacy _id from the logged-in user
+    const PharmacyProfile = require('../models/PharmacyProfile');
+    const pharmacyProfile = await PharmacyProfile.findOne({ user_id: pharmacyUserId }).lean();
+    const pharmacyId = pharmacyProfile ? pharmacyProfile._id : pharmacyUserId;
+
+    const { patientName, contact, medicines, deliveryOption, deliveryAddress, notes, prescriptionId, totalAmount, items } = req.body;
+    if (!patientName || !medicines) {
+      return res.status(400).json({ success: false, message: 'patientName and medicines are required' });
+    }
+
+    // If any controlled medicine is in the order, validate prescriptionId against iCare prescriptions
+    const Product = require('../models/Product');
+    const EnhancedPrescription = require('../models/EnhancedPrescription');
+
+    // Parse item names and check if any are controlled
+    const itemNames = Array.isArray(items)
+      ? items.map(i => (i.name || '').toLowerCase())
+      : medicines.split(',').map(m => m.trim().toLowerCase());
+
+    // Find any matching product with medicine_category = Controlled
+    const controlledCheck = await Product.findOne({
+      pharmacy_id: pharmacyUserId,
+      is_active: true,
+      medicine_category: 'Controlled',
+      $or: itemNames.map(n => ({ name: { $regex: n.split(' ')[0], $options: 'i' } })),
+    }).lean().catch(() => null);
+
+    if (controlledCheck) {
+      if (!prescriptionId || !prescriptionId.toString().trim()) {
+        return res.status(400).json({
+          success: false,
+          requiresPrescription: true,
+          message: 'A valid iCare prescription ID is required for controlled medicines.',
+        });
+      }
+      // Verify the prescriptionId exists in iCare prescriptions
+      const mongoose = require('mongoose');
+      let rxValid = false;
+      try {
+        const rxId = new mongoose.Types.ObjectId(prescriptionId.trim());
+        const rx = await EnhancedPrescription.findById(rxId).lean();
+        rxValid = !!rx;
+      } catch (_) { rxValid = false; }
+
+      if (!rxValid) {
+        return res.status(400).json({
+          success: false,
+          requiresPrescription: true,
+          message: 'The provided iCare Prescription ID was not found. Please enter a valid prescription ID issued by an iCare doctor.',
+        });
+      }
+    }
+
+    // Normalize items from Flutter (may have name/price/qty fields)
+    const normalizedItems = Array.isArray(items) ? items.map(i => ({
+      product_name: i.product_name || i.name || '',
+      generic_name: i.generic_name || '',
+      quantity: Number(i.quantity) || 1,
+      price: Number(i.price) || 0,
+    })) : [];
+
+    // Compute total from items if not provided
+    const computedTotal = normalizedItems.reduce((sum, i) => sum + i.price * i.quantity, 0);
+    const finalTotal = Number(totalAmount) > 0 ? Number(totalAmount) : computedTotal;
+
+    const orderNumber = `WO-${Date.now().toString().slice(-8)}-${Math.random().toString(36).slice(-4).toUpperCase()}`;
+
+    const order = await PharmacyOrder.create({
+      pharmacy_id: pharmacyId,
+      patient_id: pharmacyUserId,
+      orderType: 'walk-in',
+      patientName,
+      contact,
+      medicines,
+      delivery_address: deliveryAddress || '',
+      deliveryOption: deliveryOption || 'pickup',
+      notes: notes || '',
+      status: 'pending',
+      order_number: orderNumber,
+      orderNumber,
+      total_amount: finalTotal,
+      items: normalizedItems,
+      ...(prescriptionId ? { prescription_id: prescriptionId } : {}),
+    });
+
+    res.status(201).json({ success: true, message: 'Walk-in order created', order: { ...order.toObject(), _id: order._id.toString() } });
+  } catch (err) {
+    console.error('POST /pharmacy/orders/walk-in error:', err.message);
+    res.status(500).json({ success: false, message: err.message || 'Failed to create walk-in order' });
+  }
+});
+
+// ─── ORDER RATING ─────────────────────────────────────────────────────────────
+router.post('/orders/:id/rating', authMiddleware, async (req, res) => {
+  try {
+    await connectMongoDB();
+    const { rating, comment } = req.body;
+    const order = await PharmacyOrder.findByIdAndUpdate(
+      toId(req.params.id),
+      { $set: { rating: Number(rating) || 0, ratingComment: comment || '', ratedAt: new Date() } },
+      { new: true }
+    );
+    if (!order) return res.status(404).json({ success: false, message: 'Order not found' });
+    // Recalculate pharmacy average rating
+    try {
+      const pharmacyUserId = order.pharmacyId || order.pharmacy_id;
+      if (pharmacyUserId) {
+        const ratedOrders = await PharmacyOrder.find({
+          $or: [{ pharmacyId: pharmacyUserId }, { pharmacy_id: pharmacyUserId }],
+          rating: { $gt: 0 }
+        }).lean();
+        if (ratedOrders.length > 0) {
+          const avg = ratedOrders.reduce((s, o) => s + (o.rating || 0), 0) / ratedOrders.length;
+          await PharmacyProfile.findOneAndUpdate(
+            { user_id: pharmacyUserId },
+            { $set: { rating: Math.round(avg * 10) / 10, total_reviews: ratedOrders.length } },
+            { upsert: false }
+          );
+        }
+      }
+    } catch (_) {}
+    res.json({ success: true, message: 'Rating submitted', order: { ...order.toObject(), _id: order._id.toString() } });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: 'Failed to submit rating' });
+  }
+});
+
+// ─── PRINTABLE RECEIPT PAGE (public, no auth) ─────────────────────────────────
+router.get('/receipt/:orderId', async (req, res) => {
+  try {
+    await connectMongoDB();
+    const order = await PharmacyOrder.findById(toId(req.params.orderId)).lean();
+    if (!order) return res.status(404).send('<h2>Receipt not found</h2>');
+
+    const patient = await User.findById(order.patient_id).select('name username email').lean().catch(() => null);
+    const pharmProfile = await PharmacyProfile.findOne({ user_id: order.pharmacy_id }).lean().catch(() => null);
+    const pharmUser = await User.findById(order.pharmacy_id).select('username name').lean().catch(() => null);
+    const pharmName = pharmProfile?.pharmacy_name || pharmUser?.username || pharmUser?.name || 'iCare Pharmacy';
+    const patientName = patient?.name || patient?.username || 'Patient';
+    const orderNum = order.order_number || `#${order._id.toString().slice(-6).toUpperCase()}`;
+    const dateStr = new Date(order.createdAt || Date.now()).toLocaleDateString('en-PK', { day: 'numeric', month: 'long', year: 'numeric' });
+    const itemsHtml = (order.items || []).map((i, idx) => {
+      const unitPrice = i.price || 0;
+      const qty = i.quantity || 1;
+      return `<tr>
+        <td style="padding:11px 14px;border-bottom:1px solid #f1f5f9;">${idx + 1}</td>
+        <td style="padding:11px 14px;border-bottom:1px solid #f1f5f9;">
+          <strong>${i.product_name || i.name || 'Item'}</strong>
+          ${i.generic_name ? `<br/><span style="color:#94a3b8;font-size:12px;">${i.generic_name}</span>` : ''}
+        </td>
+        <td style="padding:11px 14px;border-bottom:1px solid #f1f5f9;text-align:center;">${qty}</td>
+        <td style="padding:11px 14px;border-bottom:1px solid #f1f5f9;text-align:right;">Rs ${unitPrice.toFixed(0)}</td>
+        <td style="padding:11px 14px;border-bottom:1px solid #f1f5f9;text-align:right;font-weight:600;">Rs ${(unitPrice * qty).toFixed(0)}</td>
+      </tr>`;
+    }).join('');
+
+    const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>iCare — Receipt ${orderNum}</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:Arial,sans-serif;background:#f8fafc;padding:24px;color:#1f2937}
+    .wrap{max-width:720px;margin:0 auto;background:#fff;border-radius:12px;box-shadow:0 4px 24px rgba(0,0,0,0.08);overflow:hidden}
+    .hdr{background:#0036BC;padding:28px 32px;text-align:center;color:#fff}
+    .hdr h1{font-size:22px;margin-bottom:4px}
+    .hdr p{opacity:.8;font-size:13px}
+    .body{padding:32px}
+    .meta{display:flex;justify-content:space-between;flex-wrap:wrap;gap:16px;margin-bottom:28px;padding-bottom:24px;border-bottom:1px solid #f1f5f9}
+    .meta-block h4{color:#94a3b8;font-size:10px;text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px}
+    .meta-block p{font-size:14px;font-weight:600;color:#1f2937}
+    .badge{display:inline-block;background:#DCFCE7;color:#166534;padding:3px 12px;border-radius:20px;font-size:13px;font-weight:600}
+    table{width:100%;border-collapse:collapse;font-size:14px}
+    thead tr{background:#f8fafc}
+    th{padding:10px 14px;text-align:left;color:#64748b;font-size:11px;text-transform:uppercase;letter-spacing:.5px;font-weight:700}
+    .total-row{background:#f8fafc}
+    .total-row td{padding:14px;font-weight:700;font-size:16px;color:#0036BC;border-top:2px solid #e2e8f0}
+    .print-btn{display:block;margin:28px auto 0;padding:12px 36px;background:#0036BC;color:#fff;border:none;border-radius:8px;font-size:15px;font-weight:700;cursor:pointer}
+    .ftr{text-align:center;padding:20px;color:#94a3b8;font-size:12px;border-top:1px solid #f1f5f9}
+    @media print{.print-btn{display:none}body{background:#fff;padding:0}.wrap{box-shadow:none;border-radius:0}}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="hdr">
+      <h1>🧾 Order Receipt</h1>
+      <p>iCare Healthcare Platform</p>
+    </div>
+    <div class="body">
+      <div class="meta">
+        <div class="meta-block"><h4>Order Number</h4><p>${orderNum}</p></div>
+        <div class="meta-block"><h4>Date</h4><p>${dateStr}</p></div>
+        <div class="meta-block"><h4>Patient</h4><p>${patientName}</p></div>
+        <div class="meta-block"><h4>Pharmacy</h4><p>${pharmName}</p></div>
+        <div class="meta-block"><h4>Status</h4><span class="badge">✅ Delivered</span></div>
+        ${order.delivery_address ? `<div class="meta-block" style="flex:1 1 100%"><h4>Delivery Address</h4><p>${order.delivery_address}</p></div>` : ''}
+      </div>
+
+      <table>
+        <thead><tr>
+          <th>#</th><th>Medicine</th><th style="text-align:center">Qty</th>
+          <th style="text-align:right">Unit Price</th><th style="text-align:right">Total</th>
+        </tr></thead>
+        <tbody>${itemsHtml}</tbody>
+        <tfoot>
+          <tr class="total-row">
+            <td colspan="4" style="text-align:right;padding:14px">Grand Total</td>
+            <td style="text-align:right;padding:14px">Rs ${(order.total_amount || 0).toFixed(0)}</td>
+          </tr>
+        </tfoot>
+      </table>
+
+      <button class="print-btn" onclick="window.print()">🖨️ Print / Save as PDF</button>
+    </div>
+    <div class="ftr">iCare Healthcare Platform &nbsp;|&nbsp; www.icare.com.co &nbsp;|&nbsp; This is an official delivery receipt.</div>
+  </div>
+</body>
+</html>`;
+    res.setHeader('Content-Type', 'text/html');
+    res.send(html);
+  } catch (e) {
+    console.error('[Pharmacy] Receipt page error:', e.message);
+    res.status(500).send('<h2>Error loading receipt</h2>');
+  }
+});
+
+module.exports = router;
+

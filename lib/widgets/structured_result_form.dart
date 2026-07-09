@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../models/lab_result.dart';
 
 class StructuredResultForm extends StatefulWidget {
   final Function(List<Map<String, dynamic>>) onResultsSubmit;
@@ -201,7 +200,7 @@ class _StructuredResultFormState extends State<StructuredResultForm> {
 
             // Test Parameter Dropdown
             DropdownButtonFormField<String>(
-              value: result['testParameter'].toString().isEmpty
+              initialValue: result['testParameter'].toString().isEmpty
                   ? null
                   : result['testParameter'],
               decoration: const InputDecoration(

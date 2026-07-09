@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:icare/utils/imagePaths.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -28,7 +27,7 @@ class _SplashScreenState extends State<SplashScreen>
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
     final isDesktop = screenWidth >= 1920;
-    final logoSize = isDesktop ? 180.0 : 130.0;
+    final logoSize = isDesktop ? 280.0 : screenWidth * 0.55;
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -39,7 +38,14 @@ class _SplashScreenState extends State<SplashScreen>
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Image.asset(ImagePaths.logo, width: logoSize, height: logoSize, fit: BoxFit.contain),
+              SizedBox(
+                width: logoSize,
+                height: logoSize,
+                child: Image.asset(
+                  'assets/images/splash_logo.png',
+                  fit: BoxFit.contain,
+                ),
+              ),
               const SizedBox(height: 24),
               const CircularProgressIndicator(
                 valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF0036BC)),

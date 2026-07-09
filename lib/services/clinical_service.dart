@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:icare/services/api_service.dart';
 
 class ClinicalService {
@@ -38,6 +39,15 @@ class ClinicalService {
       return response.data;
     } catch (e) {
       debugPrint('Error getting SOAP notes: $e');
+      // If notes don't exist yet (404), return empty notes structure
+      if (e.toString().contains('404')) {
+        return {
+          'subjective': '',
+          'objective': '',
+          'assessment': '',
+          'plan': '',
+        };
+      }
       rethrow;
     }
   }

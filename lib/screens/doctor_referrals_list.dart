@@ -157,7 +157,7 @@ class _DoctorReferralsListScreenState extends State<DoctorReferralsListScreen>
           final result = await Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => const CreateReferralScreen(
+              builder: (context) => CreateReferralScreen(
                 patient: null, // Will need to select patient
               ),
             ),
@@ -229,22 +229,22 @@ class _DoctorReferralsListScreenState extends State<DoctorReferralsListScreen>
     String statusText;
 
     switch (referral.status) {
-      case 'pending':
+      case ReferralStatus.pending:
         statusColor = const Color(0xFFF59E0B);
         statusIcon = Icons.schedule;
         statusText = 'Pending';
         break;
-      case 'accepted':
+      case ReferralStatus.accepted:
         statusColor = const Color(0xFF3B82F6);
         statusIcon = Icons.check_circle_outline;
         statusText = 'Accepted';
         break;
-      case 'completed':
+      case ReferralStatus.completed:
         statusColor = const Color(0xFF10B981);
         statusIcon = Icons.check_circle;
         statusText = 'Completed';
         break;
-      case 'declined':
+      case ReferralStatus.rejected:
         statusColor = const Color(0xFFEF4444);
         statusIcon = Icons.cancel_outlined;
         statusText = 'Declined';
@@ -300,13 +300,10 @@ class _DoctorReferralsListScreenState extends State<DoctorReferralsListScreen>
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Center(
-                        child: Text(
-                          referral.patient.name.substring(0, 1).toUpperCase(),
-                          style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.w900,
-                            color: statusColor,
-                          ),
+                        child: Icon(
+                          Icons.person,
+                          size: 24,
+                          color: statusColor,
                         ),
                       ),
                     ),
@@ -316,7 +313,7 @@ class _DoctorReferralsListScreenState extends State<DoctorReferralsListScreen>
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            referral.patient.name,
+                            'Patient ID: ${referral.patientId}',
                             style: const TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.w900,
@@ -326,8 +323,8 @@ class _DoctorReferralsListScreenState extends State<DoctorReferralsListScreen>
                           const SizedBox(height: 4),
                           Text(
                             isSent
-                                ? 'To: ${referral.referredToDoctor?.name ?? "Specialist"}'
-                                : 'From: ${referral.referringDoctor.name}',
+                                ? 'To: ${referral.specialistDoctorId ?? "Specialist"}'
+                                : 'From: ${referral.referringDoctorId}',
                             style: const TextStyle(
                               fontSize: 13,
                               color: Color(0xFF64748B),
@@ -383,7 +380,7 @@ class _DoctorReferralsListScreenState extends State<DoctorReferralsListScreen>
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        referral.reason,
+                        referral.reasonForReferral,
                         style: const TextStyle(
                           fontSize: 13,
                           color: Color(0xFF0F172A),

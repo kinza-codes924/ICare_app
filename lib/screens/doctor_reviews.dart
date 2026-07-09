@@ -1,9 +1,10 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:icare/providers/auth_provider.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:icare/services/doctor_service.dart';
+import 'package:icare/utils/imagePaths.dart';
 import 'package:icare/widgets/back_button.dart';
-import 'package:intl/intl.dart';
 
 class DoctorReviews extends ConsumerStatefulWidget {
   const DoctorReviews({super.key});
@@ -14,8 +15,7 @@ class DoctorReviews extends ConsumerStatefulWidget {
 
 class _DoctorReviewsState extends ConsumerState<DoctorReviews> {
   final DoctorService _doctorService = DoctorService();
-  List<String> _ratings = [];
-  List<String> _reviews = [];
+  List<Map<String, dynamic>> _items = [];
   bool _isLoading = true;
 
   @override
@@ -27,39 +27,31 @@ class _DoctorReviewsState extends ConsumerState<DoctorReviews> {
   Future<void> _loadReviews() async {
     setState(() => _isLoading = true);
 
-    final userId = ref.read(authProvider).user?.id;
-    if (userId == null) {
-      setState(() => _isLoading = false);
-      return;
-    }
+    final result = await _doctorService.getMyPatientReviews();
 
-    final result = await _doctorService.getDoctorById(userId);
-
-    if (result['success'] && mounted) {
-      final doctor = result['doctor'];
+    if (mounted) {
       setState(() {
-        _ratings = List<String>.from(doctor['ratings'] ?? []);
-        _reviews = List<String>.from(doctor['reviews'] ?? []);
+        _items = result['success'] == true
+            ? List<Map<String, dynamic>>.from(result['reviews'] ?? [])
+            : [];
         _isLoading = false;
       });
-    } else {
-      setState(() => _isLoading = false);
     }
   }
 
   double get _averageRating {
-    if (_ratings.isEmpty) return 0.0;
-    final sum = _ratings.fold<double>(
+    if (_items.isEmpty) return 0.0;
+    final sum = _items.fold<double>(
       0,
-      (prev, rating) => prev + double.parse(rating),
+      (prev, e) => prev + ((e['rating'] as num?)?.toDouble() ?? 0),
     );
-    return sum / _ratings.length;
+    return sum / _items.length;
   }
 
   Map<int, int> get _ratingDistribution {
     final distribution = {5: 0, 4: 0, 3: 0, 2: 0, 1: 0};
-    for (var rating in _ratings) {
-      final r = double.parse(rating).round();
+    for (var e in _items) {
+      final r = ((e['rating'] as num?)?.toDouble() ?? 0).round().clamp(1, 5);
       distribution[r] = (distribution[r] ?? 0) + 1;
     }
     return distribution;
@@ -75,9 +67,9 @@ class _DoctorReviewsState extends ConsumerState<DoctorReviews> {
         backgroundColor: Colors.white,
         elevation: 0,
         leading: const CustomBackButton(),
-        title: const Text(
-          'Patient Reviews',
-          style: TextStyle(
+        title: Text(
+          'Patient Reviews'.tr(),
+          style: const TextStyle(
             fontSize: 18,
             fontFamily: 'Gilroy-Bold',
             fontWeight: FontWeight.w900,
@@ -132,9 +124,9 @@ class _DoctorReviewsState extends ConsumerState<DoctorReviews> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'Overall Rating',
-                  style: TextStyle(
+                Text(
+                  'Overall Rating'.tr(),
+                  style: const TextStyle(
                     fontSize: 14,
                     color: Colors.white70,
                     fontWeight: FontWeight.w600,
@@ -168,18 +160,24 @@ class _DoctorReviewsState extends ConsumerState<DoctorReviews> {
                 const SizedBox(height: 8),
                 Row(
                   children: List.generate(5, (index) {
-                    return Icon(
-                      index < _averageRating.round()
-                          ? Icons.star_rounded
-                          : Icons.star_outline_rounded,
-                      color: Colors.white,
-                      size: 24,
+                    final active = index < _averageRating.round();
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 2),
+                      child: SvgPicture.asset(
+                        ImagePaths.star,
+                        width: 24,
+                        height: 24,
+                        colorFilter: ColorFilter.mode(
+                          active ? Colors.white : Colors.white.withValues(alpha: 0.35),
+                          BlendMode.srcIn,
+                        ),
+                      ),
                     );
                   }),
                 ),
                 const SizedBox(height: 12),
                 Text(
-                  'Based on ${_ratings.length} reviews',
+                  '${'Based on'.tr()} ${_items.length} ${'reviews'.tr()}',
                   style: const TextStyle(fontSize: 13, color: Colors.white70),
                 ),
               ],
@@ -191,10 +189,11 @@ class _DoctorReviewsState extends ConsumerState<DoctorReviews> {
               color: Colors.white.withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(16),
             ),
-            child: const Icon(
-              Icons.star_rounded,
-              size: 64,
-              color: Colors.white,
+            child: SvgPicture.asset(
+              ImagePaths.star,
+              width: 64,
+              height: 64,
+              colorFilter: const ColorFilter.mode(Colors.white, BlendMode.srcIn),
             ),
           ),
         ],
@@ -221,9 +220,9 @@ class _DoctorReviewsState extends ConsumerState<DoctorReviews> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Rating Distribution',
-            style: TextStyle(
+          Text(
+            'Rating Distribution'.tr(),
+            style: const TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.w900,
               color: Color(0xFF0F172A),
@@ -233,7 +232,7 @@ class _DoctorReviewsState extends ConsumerState<DoctorReviews> {
           ...List.generate(5, (index) {
             final stars = 5 - index;
             final count = distribution[stars] ?? 0;
-            final percentage = _ratings.isEmpty ? 0.0 : count / _ratings.length;
+            final percentage = _items.isEmpty ? 0.0 : count / _items.length;
 
             return Padding(
               padding: const EdgeInsets.only(bottom: 12),
@@ -252,10 +251,11 @@ class _DoctorReviewsState extends ConsumerState<DoctorReviews> {
                           ),
                         ),
                         const SizedBox(width: 4),
-                        const Icon(
-                          Icons.star_rounded,
-                          size: 16,
-                          color: Color(0xFFF59E0B),
+                        SvgPicture.asset(
+                          ImagePaths.star,
+                          width: 16,
+                          height: 16,
+                          colorFilter: const ColorFilter.mode(Color(0xFFF59E0B), BlendMode.srcIn),
                         ),
                       ],
                     ),
@@ -296,7 +296,7 @@ class _DoctorReviewsState extends ConsumerState<DoctorReviews> {
   }
 
   Widget _buildReviewsList() {
-    if (_reviews.isEmpty) {
+    if (_items.isEmpty) {
       return Container(
         padding: const EdgeInsets.all(48),
         decoration: BoxDecoration(
@@ -312,9 +312,9 @@ class _DoctorReviewsState extends ConsumerState<DoctorReviews> {
                 color: Colors.grey.shade300,
               ),
               const SizedBox(height: 16),
-              const Text(
-                'No reviews yet',
-                style: TextStyle(fontSize: 15, color: Color(0xFF64748B)),
+              Text(
+                'No reviews yet'.tr(),
+                style: const TextStyle(fontSize: 15, color: Color(0xFF64748B)),
               ),
             ],
           ),
@@ -325,9 +325,9 @@ class _DoctorReviewsState extends ConsumerState<DoctorReviews> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Recent Reviews',
-          style: TextStyle(
+        Text(
+          'All reviews (patient-wise)'.tr(),
+          style: const TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.w900,
             color: Color(0xFF0F172A),
@@ -335,18 +335,22 @@ class _DoctorReviewsState extends ConsumerState<DoctorReviews> {
         ),
         const SizedBox(height: 16),
         ...List.generate(
-          _reviews.length,
-          (index) => _buildReviewCard(
-            _reviews[index],
-            _ratings.length > index ? double.parse(_ratings[index]) : 0.0,
-            index,
-          ),
+          _items.length,
+          (index) => _buildReviewCard(_items[index]),
         ),
       ],
     );
   }
 
-  Widget _buildReviewCard(String reviewText, double rating, int index) {
+  Widget _buildReviewCard(Map<String, dynamic> item) {
+    final name = item['patientName']?.toString() ?? 'Patient';
+    final rating = ((item['rating'] as num?)?.toDouble() ?? 0);
+    final reviewText = item['comment']?.toString() ?? '';
+    DateTime? rated;
+    final raw = item['ratedAt'];
+    if (raw is String) rated = DateTime.tryParse(raw);
+    final dateLabel = rated != null ? DateFormat('MMM dd, yyyy').format(rated.toLocal()) : '';
+
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(20),
@@ -378,9 +382,9 @@ class _DoctorReviewsState extends ConsumerState<DoctorReviews> {
                 ),
                 child: Center(
                   child: Text(
-                    'P${index + 1}',
+                    name.isNotEmpty ? name[0].toUpperCase() : 'P',
                     style: const TextStyle(
-                      fontSize: 16,
+                      fontSize: 18,
                       fontWeight: FontWeight.w900,
                       color: Colors.white,
                     ),
@@ -393,22 +397,21 @@ class _DoctorReviewsState extends ConsumerState<DoctorReviews> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Patient ${index + 1}',
+                      name,
                       style: const TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w900,
                         color: Color(0xFF0F172A),
                       ),
                     ),
-                    Text(
-                      DateFormat('MMM dd, yyyy').format(
-                        DateTime.now().subtract(Duration(days: index * 3)),
+                    if (dateLabel.isNotEmpty)
+                      Text(
+                        dateLabel,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Color(0xFF64748B),
+                        ),
                       ),
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: Color(0xFF64748B),
-                      ),
-                    ),
                   ],
                 ),
               ),
@@ -423,10 +426,11 @@ class _DoctorReviewsState extends ConsumerState<DoctorReviews> {
                 ),
                 child: Row(
                   children: [
-                    const Icon(
-                      Icons.star_rounded,
-                      size: 14,
-                      color: Color(0xFFF59E0B),
+                    SvgPicture.asset(
+                      ImagePaths.star,
+                      width: 14,
+                      height: 14,
+                      colorFilter: const ColorFilter.mode(Color(0xFFF59E0B), BlendMode.srcIn),
                     ),
                     const SizedBox(width: 4),
                     Text(
@@ -442,15 +446,17 @@ class _DoctorReviewsState extends ConsumerState<DoctorReviews> {
               ),
             ],
           ),
-          const SizedBox(height: 12),
-          Text(
-            reviewText,
-            style: const TextStyle(
-              fontSize: 14,
-              color: Color(0xFF64748B),
-              height: 1.5,
+          if (reviewText.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Text(
+              reviewText,
+              style: const TextStyle(
+                fontSize: 14,
+                color: Color(0xFF64748B),
+                height: 1.5,
+              ),
             ),
-          ),
+          ],
         ],
       ),
     );

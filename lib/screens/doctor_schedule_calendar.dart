@@ -1,10 +1,14 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:icare/models/appointment_detail.dart';
 import 'package:icare/services/appointment_service.dart';
+import 'package:icare/services/doctor_service.dart';
 import 'package:icare/utils/theme.dart';
 import 'package:icare/widgets/back_button.dart';
 import 'package:intl/intl.dart';
+
+final _doctorServiceProvider = Provider((_) => DoctorService());
 
 class DoctorScheduleCalendar extends ConsumerStatefulWidget {
   const DoctorScheduleCalendar({super.key});
@@ -18,6 +22,8 @@ class _DoctorScheduleCalendarState
     extends ConsumerState<DoctorScheduleCalendar> {
   final AppointmentService _appointmentService = AppointmentService();
   List<AppointmentDetail> _appointments = [];
+  // Approved leave ranges: list of {from, to} DateTimes
+  List<Map<String, DateTime>> _leaveRanges = [];
   bool _isLoading = true;
   DateTime _selectedDate = DateTime.now();
   DateTime _focusedMonth = DateTime.now();
@@ -25,20 +31,53 @@ class _DoctorScheduleCalendarState
   @override
   void initState() {
     super.initState();
-    _loadAppointments();
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    setState(() => _isLoading = true);
+    await Future.wait([_loadAppointments(), _loadLeaveRanges()]);
+    if (mounted) setState(() => _isLoading = false);
   }
 
   Future<void> _loadAppointments() async {
-    setState(() => _isLoading = true);
-    final result = await _appointmentService.getMyAppointmentsDetailed();
-    if (result['success']) {
-      setState(() {
-        _appointments = result['appointments'] as List<AppointmentDetail>;
-        _isLoading = false;
-      });
-    } else {
-      setState(() => _isLoading = false);
-    }
+    try {
+      final result = await _appointmentService.getMyAppointmentsDetailed();
+      if (result['success'] == true && mounted) {
+        setState(() {
+          _appointments = result['appointments'] as List<AppointmentDetail>;
+        });
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _loadLeaveRanges() async {
+    try {
+      // Reuse DoctorService
+      final svc = ref.read(_doctorServiceProvider);
+      final result = await svc.getLeaveRequests();
+      if (result['success'] == true && mounted) {
+        final requests = result['leaveRequests'] as List? ?? [];
+        final ranges = <Map<String, DateTime>>[];
+        for (final r in requests) {
+          if (r['status'] == 'approved') {
+            final from = DateTime.tryParse(r['fromDate']?.toString() ?? '');
+            final to   = DateTime.tryParse(r['toDate']?.toString() ?? '');
+            if (from != null && to != null) ranges.add({'from': from, 'to': to});
+          }
+        }
+        setState(() => _leaveRanges = ranges);
+      }
+    } catch (_) {}
+  }
+
+  bool _isOnLeave(DateTime date) {
+    final d = DateTime(date.year, date.month, date.day);
+    return _leaveRanges.any((r) {
+      final from = DateTime(r['from']!.year, r['from']!.month, r['from']!.day);
+      final to   = DateTime(r['to']!.year,   r['to']!.month,   r['to']!.day);
+      return !d.isBefore(from) && !d.isAfter(to);
+    });
   }
 
   List<AppointmentDetail> _getAppointmentsForDate(DateTime date) {
@@ -116,9 +155,30 @@ class _DoctorScheduleCalendarState
           _buildWeekDays(),
           const SizedBox(height: 12),
           _buildCalendarGrid(),
+          const SizedBox(height: 16),
+          // Legend
+          Wrap(
+            alignment: WrapAlignment.center,
+            spacing: 16,
+            runSpacing: 8,
+            children: [
+              _legendDot(AppColors.primaryColor, 'Selected / Today'),
+              _legendDot(const Color(0xFFF59E0B), 'Approved Leave'),
+              if (_appointments.isNotEmpty)
+                _legendDot(AppColors.primaryColor, 'Has Appointments'),
+            ],
+          ),
         ],
       ),
     );
+  }
+
+  Widget _legendDot(Color color, String label) {
+    return Row(mainAxisSize: MainAxisSize.min, children: [
+      Container(width: 10, height: 10, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+      const SizedBox(width: 5),
+      Text(label, style: const TextStyle(fontSize: 11, color: Color(0xFF64748B), fontWeight: FontWeight.w600)),
+    ]);
   }
 
   Widget _buildCalendarHeader() {
@@ -240,38 +300,45 @@ class _DoctorScheduleCalendarState
     bool isSelected,
     bool isToday,
   ) {
+    final onLeave = _isOnLeave(date);
     return InkWell(
-      onTap: () {
-        setState(() {
-          _selectedDate = date;
-        });
-      },
+      onTap: () => setState(() => _selectedDate = date),
       borderRadius: BorderRadius.circular(12),
       child: Container(
         decoration: BoxDecoration(
           color: isSelected
               ? AppColors.primaryColor
+              : onLeave
+              ? const Color(0xFFFEF3C7)   // amber tint for approved leave
               : isToday
               ? AppColors.primaryColor.withValues(alpha: 0.1)
               : null,
           borderRadius: BorderRadius.circular(12),
           border: isToday && !isSelected
               ? Border.all(color: AppColors.primaryColor, width: 2)
+              : onLeave && !isSelected
+              ? Border.all(color: const Color(0xFFF59E0B), width: 1.5)
               : null,
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
+            if (onLeave && !isSelected)
+              const Icon(Icons.event_busy_rounded, size: 10, color: Color(0xFFB45309)),
             Text(
               '$day',
               style: TextStyle(
-                fontSize: 14,
+                fontSize: 13,
                 fontWeight: FontWeight.w700,
-                color: isSelected ? Colors.white : const Color(0xFF0F172A),
+                color: isSelected
+                    ? Colors.white
+                    : onLeave
+                    ? const Color(0xFFB45309)
+                    : const Color(0xFF0F172A),
               ),
             ),
             if (count > 0) ...[
-              const SizedBox(height: 4),
+              const SizedBox(height: 2),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
@@ -415,11 +482,14 @@ class _DoctorScheduleCalendarState
                       ),
                     ),
                     const SizedBox(width: 12),
-                    Text(
-                      '• ${appointment.reason ?? 'No reason'}',
-                      style: const TextStyle(
-                        fontSize: 13,
-                        color: Color(0xFF64748B),
+                    Flexible(
+                      child: Text(
+                        '• ${appointment.reason ?? 'No reason'}',
+                        style: const TextStyle(
+                          fontSize: 13,
+                          color: Color(0xFF64748B),
+                        ),
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
                   ],

@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:icare/widgets/back_button.dart';
 import 'package:intl/intl.dart';
 

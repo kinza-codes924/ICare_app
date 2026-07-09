@@ -1,8 +1,13 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:icare/providers/auth_provider.dart';
 import 'package:icare/services/doctor_service.dart';
+import 'package:icare/services/api_service.dart';
+import 'package:icare/models/user.dart';
 import 'package:icare/utils/theme.dart';
 import 'package:icare/widgets/back_button.dart';
+import 'package:image_picker/image_picker.dart';
 
 class DoctorProfileSetup extends ConsumerStatefulWidget {
   const DoctorProfileSetup({super.key});
@@ -14,6 +19,7 @@ class DoctorProfileSetup extends ConsumerStatefulWidget {
 class _DoctorProfileSetupState extends ConsumerState<DoctorProfileSetup> {
   final _formKey = GlobalKey<FormState>();
   bool _isLoading = false;
+  bool _isLoadingProfile = true; // Loading saved data on init
 
   // Controllers
   final TextEditingController specializationController =
@@ -25,6 +31,185 @@ class _DoctorProfileSetupState extends ConsumerState<DoctorProfileSetup> {
   final TextEditingController clinicAddressController = TextEditingController();
   final TextEditingController startTimeController = TextEditingController();
   final TextEditingController endTimeController = TextEditingController();
+
+  // Basic account info (shared with Settings profile — saved via /users/profile)
+  final TextEditingController _phoneController = TextEditingController();
+  final TextEditingController _ageController = TextEditingController();
+  final TextEditingController _addressController = TextEditingController();
+  String? _gender;
+
+  // License expiry date
+  DateTime? _licenseValidTill;
+
+  Uint8List? _imageBytes;
+  String? _existingProfilePictureUrl;
+  final ImagePicker _picker = ImagePicker();
+
+  // Specialties — doctor selects which specialties they practice
+  final List<String> _selectedSpecialties = [];
+
+  static const _commonSpecialties = [
+    'Cardiologist', 'Dermatologist', 'Neurologist', 'Orthopedic Surgeon',
+    'Gynecologist', 'Pediatrician', 'Psychiatrist', 'Ophthalmologist',
+    'ENT Specialist', 'Urologist', 'Gastroenterologist', 'Endocrinologist',
+    'Pulmonologist', 'Oncologist', 'Nephrologist', 'Rheumatologist',
+    'Diabetologist', 'General Physician', 'Dentist', 'Nutritionist',
+  ];
+
+  // Specialty search + custom entry
+  String _specialtySearch = '';
+  final TextEditingController _specialtySearchCtrl = TextEditingController();
+  final TextEditingController _specialtyCustomCtrl = TextEditingController();
+
+  // Conditions treated — doctor selects what conditions they handle
+  final List<String> _conditionsTreated = [];
+  final TextEditingController _conditionInputCtrl = TextEditingController();
+
+  // Spoken Languages — Pakistani languages
+  final List<String> _spokenLanguages = [
+    'Urdu',
+    'Punjabi',
+    'Pashto',
+    'Sindhi',
+    'Balochi',
+    'English'
+  ];
+  final List<String> _selectedLanguages = [];
+
+  static const _commonConditions = [
+    'Hypertension', 'Diabetes', 'Heart Disease', 'Asthma', 'Back Pain',
+    'Headache / Migraine', 'Fever', 'Allergy', 'Anxiety', 'Depression',
+    'Obesity', 'Arthritis', 'Kidney Disease', 'Thyroid Disorders',
+    'Skin Conditions', 'Eye Problems', 'Dental Issues', 'Pregnancy Care',
+    'Child Health', 'Bone & Joint Pain',
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    final u = ref.read(authProvider).user;
+    _phoneController.text = u?.phoneNumber ?? '';
+    _ageController.text = u?.age ?? '';
+    _addressController.text = u?.address ?? '';
+    _gender = (u?.gender?.isNotEmpty == true) ? u!.gender : null;
+    _loadProfile();
+  }
+
+  Future<void> _loadProfile() async {
+    setState(() => _isLoadingProfile = true);
+    try {
+      // Load profile and availability in parallel
+      final results = await Future.wait([
+        DoctorService().getMyDoctorProfile(),
+        DoctorService().getAvailability(),
+      ]);
+      final profileResult = results[0];
+      final availResult = results[1];
+      if (!mounted) return;
+      if (profileResult['success'] == true && profileResult['doctor'] != null) {
+        final doc = profileResult['doctor'] as Map<String, dynamic>;
+        // Availability endpoint is the authoritative source for days/times when it has data
+        final availData = (availResult['success'] == true) ? availResult['availability'] as Map? : null;
+        setState(() {
+          // Basic info
+          specializationController.text = doc['specialization']?.toString() ?? '';
+          experienceController.text = doc['experience']?.toString() ?? '';
+          licenseController.text = doc['licenseNumber']?.toString() ?? '';
+          clinicNameController.text = doc['clinicName']?.toString() ?? '';
+          clinicAddressController.text = doc['clinicAddress']?.toString() ?? '';
+
+          // Degrees (comma-separated list)
+          final degrees = doc['degrees'];
+          if (degrees is List) {
+            degreesController.text = degrees.join(', ');
+          }
+
+          // Specialties
+          final specialties = doc['specialties'];
+          if (specialties is List) {
+            _selectedSpecialties.clear();
+            _selectedSpecialties.addAll(specialties.map((s) => s.toString()));
+          }
+
+          // Conditions treated
+          final conditions = doc['conditionsTreated'];
+          if (conditions is List) {
+            _conditionsTreated.clear();
+            _conditionsTreated.addAll(conditions.map((c) => c.toString()));
+          }
+
+          // Languages
+          final languages = doc['languages'];
+          if (languages is List) {
+            _selectedLanguages.clear();
+            _selectedLanguages.addAll(languages.map((l) => l.toString()));
+          }
+
+          // Availability days — prefer the dedicated availability endpoint, fall back to profile doc
+          final daySource = availData != null
+              ? (availData['availableDays'] ?? doc['availableDays'])
+              : doc['availableDays'];
+          if (daySource is List && daySource.isNotEmpty) {
+            selectedDays.updateAll((k, _) => false);
+            for (final day in daySource) {
+              final dayStr = day.toString();
+              if (selectedDays.containsKey(dayStr)) selectedDays[dayStr] = true;
+            }
+          }
+
+          // Availability time — prefer the dedicated availability endpoint
+          Map<String, dynamic>? timeSource;
+          if (availData != null && availData['availableTime'] is Map) {
+            timeSource = Map<String, dynamic>.from(availData['availableTime'] as Map);
+          } else if (doc['availableTime'] is Map) {
+            timeSource = Map<String, dynamic>.from(doc['availableTime'] as Map);
+          }
+          if (timeSource != null) {
+            startTimeController.text = timeSource['start']?.toString() ?? '';
+            endTimeController.text = timeSource['end']?.toString() ?? '';
+          } else {
+            final at = doc['availableTime'];
+            if (at is String && at.contains('-')) {
+              final parts = at.split('-');
+              if (parts.length == 2) {
+                startTimeController.text = parts[0].trim();
+                endTimeController.text = parts[1].trim();
+              }
+            }
+          }
+
+          // License valid till
+          if (doc['licenseValidTill'] != null) {
+            final expiry = DateTime.tryParse(doc['licenseValidTill'].toString());
+            if (expiry != null) {
+              _licenseValidTill = expiry;
+            }
+          }
+
+          // Profile picture URL (for display)
+          _existingProfilePictureUrl = doc['profilePicture']?.toString();
+
+          _isLoadingProfile = false;
+        });
+      } else {
+        // No existing profile - just show empty form
+        setState(() => _isLoadingProfile = false);
+      }
+    } catch (e) {
+      debugPrint('⚠️ Error loading doctor profile: $e');
+      if (mounted) {
+        setState(() => _isLoadingProfile = false);
+      }
+    }
+  }
+
+  Future<void> _pickProfileImage() async {
+    final picked = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 80, maxWidth: 600);
+    if (picked != null) {
+      final bytes = await picked.readAsBytes();
+      setState(() => _imageBytes = bytes);
+    }
+  }
 
   // Available days selection
   final Map<String, bool> selectedDays = {
@@ -47,18 +232,68 @@ class _DoctorProfileSetupState extends ConsumerState<DoctorProfileSetup> {
     clinicAddressController.dispose();
     startTimeController.dispose();
     endTimeController.dispose();
+    _specialtySearchCtrl.dispose();
+    _specialtyCustomCtrl.dispose();
+    _conditionInputCtrl.dispose();
+    _phoneController.dispose();
+    _ageController.dispose();
+    _addressController.dispose();
     super.dispose();
   }
 
   Future<void> _selectTime(TextEditingController controller) async {
+    // Parse existing HH:mm text as initial time, fallback to now
+    TimeOfDay initial = TimeOfDay.now();
+    final parts = controller.text.split(':');
+    if (parts.length == 2) {
+      final h = int.tryParse(parts[0]);
+      final m = int.tryParse(parts[1]);
+      if (h != null && m != null) initial = TimeOfDay(hour: h, minute: m);
+    }
     final TimeOfDay? picked = await showTimePicker(
       context: context,
-      initialTime: TimeOfDay.now(),
+      initialTime: initial,
     );
     if (picked != null) {
       setState(() {
-        controller.text = picked.format(context);
+        controller.text = '${picked.hour.toString().padLeft(2, '0')}:${picked.minute.toString().padLeft(2, '0')}';
       });
+    }
+  }
+
+  /// Opens a date picker for license expiry and schedules a 30-day admin reminder.
+  Future<void> _pickLicenseExpiry() async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _licenseValidTill ?? now.add(const Duration(days: 365)),
+      firstDate: now,
+      lastDate: DateTime(now.year + 20),
+      helpText: 'Select License Expiry Date',
+      builder: (ctx, child) => Theme(
+        data: Theme.of(ctx).copyWith(
+          colorScheme: ColorScheme.light(
+            primary: AppColors.primaryColor,
+            onPrimary: Colors.white,
+            surface: Colors.white,
+          ),
+        ),
+        child: child!,
+      ),
+    );
+    if (picked != null) {
+      setState(() => _licenseValidTill = picked);
+      // Schedule 30-day admin notification (saved to backend)
+      await _saveLicenseExpiry(picked);
+    }
+  }
+
+  /// Saves license expiry to backend. Backend will send admin notification 30 days before.
+  Future<void> _saveLicenseExpiry(DateTime expiryDate) async {
+    try {
+      await DoctorService().updateLicenseExpiry(expiryDate);
+    } catch (e) {
+      debugPrint('⚠️ Could not save license expiry: $e');
     }
   }
 
@@ -97,13 +332,72 @@ class _DoctorProfileSetupState extends ConsumerState<DoctorProfileSetup> {
       availableDays: availableDays,
       startTime: startTimeController.text,
       endTime: endTimeController.text,
+      profileImage: _imageBytes,
     );
+
+    // Sync the same days/times to doctor profile so Manage Availability shows the same data
+    try {
+      await DoctorService().patchAvailabilityOnProfile(
+        availableDays: availableDays,
+        startTime: startTimeController.text,
+        endTime: endTimeController.text,
+      );
+    } catch (_) {}
+
+    // Save basic account info (Phone/Age/Gender/Address) — same endpoint the
+    // generic Settings profile edit uses.
+    try {
+      await ApiService().put('/users/profile', {
+        'phoneNumber': _phoneController.text.trim(),
+        'age': _ageController.text.trim(),
+        'address': _addressController.text.trim(),
+        if (_gender != null) 'gender': _gender,
+      });
+    } catch (_) {}
+
+    // Save specialties separately
+    if (_selectedSpecialties.isNotEmpty) {
+      try {
+        await ApiService().post('/doctors/add_doctor_details', {
+          'specialties': _selectedSpecialties,
+        });
+      } catch (_) {}
+    }
+
+    // Save conditions treated separately
+    if (_conditionsTreated.isNotEmpty) {
+      try {
+        await ApiService().post('/doctors/add_doctor_details', {
+          'conditionsTreated': _conditionsTreated,
+        });
+      } catch (_) {}
+    }
+
+    // Save spoken languages separately
+    if (_selectedLanguages.isNotEmpty) {
+      try {
+        await ApiService().post('/doctors/add_doctor_details', {
+          'spokenLanguages': _selectedLanguages,
+        });
+      } catch (_) {}
+    }
 
     setState(() => _isLoading = false);
 
     if (!mounted) return;
 
     if (result['success']) {
+      // Re-fetch user profile to update auth provider with new photo
+      try {
+        final apiService = ApiService();
+        final response = await apiService.get('/users/profile');
+        if (response.data != null && mounted) {
+          final updatedUser = User.fromJson(response.data);
+          await ref.read(authProvider.notifier).setUser(updatedUser);
+        }
+      } catch (e) {
+        debugPrint('Could not refresh user profile: $e');
+      }
       _showSuccessModal();
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -187,6 +481,27 @@ class _DoctorProfileSetupState extends ConsumerState<DoctorProfileSetup> {
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoadingProfile) {
+      return Scaffold(
+        appBar: AppBar(
+          backgroundColor: AppColors.bgColor,
+          leading: const CustomBackButton(color: AppColors.primaryColor),
+          automaticallyImplyLeading: false,
+          title: const Text(
+            "Professional Profile",
+            style: TextStyle(
+              fontSize: 16.78,
+              fontFamily: "Gilroy-Bold",
+              fontWeight: FontWeight.w400,
+              color: AppColors.primary500,
+            ),
+          ),
+        ),
+        body: const Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
     if (MediaQuery.of(context).size.width > 900) {
       return _buildWebView();
     }
@@ -217,7 +532,96 @@ class _DoctorProfileSetupState extends ConsumerState<DoctorProfileSetup> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _buildSectionTitle("Basic Information"),
+                // Profile Photo
+                Center(
+                  child: GestureDetector(
+                    onTap: _pickProfileImage,
+                    child: Stack(
+                      children: [
+                        Container(
+                          width: 100,
+                          height: 100,
+                          decoration: BoxDecoration(
+                            color: AppColors.primaryColor.withValues(alpha: 0.1),
+                            shape: BoxShape.circle,
+                            border: Border.all(color: AppColors.primaryColor.withValues(alpha: 0.3), width: 3),
+                          ),
+                          child: ClipOval(
+                            child: _imageBytes != null
+                                ? Image.memory(_imageBytes!, fit: BoxFit.cover)
+                                : _existingProfilePictureUrl != null && _existingProfilePictureUrl!.isNotEmpty
+                                ? Image.network(_existingProfilePictureUrl!, fit: BoxFit.cover, errorBuilder: (_, _, _) => Icon(Icons.person_rounded, size: 44, color: AppColors.primaryColor))
+                                : Icon(Icons.person_rounded, size: 44, color: AppColors.primaryColor),
+                          ),
+                        ),
+                        Positioned(
+                          bottom: 0,
+                          right: 0,
+                          child: Container(
+                            padding: const EdgeInsets.all(6),
+                            decoration: BoxDecoration(
+                              color: AppColors.primaryColor,
+                              shape: BoxShape.circle,
+                              border: Border.all(color: Colors.white, width: 2),
+                            ),
+                            child: const Icon(Icons.camera_alt, size: 16, color: Colors.white),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Center(
+                  child: Text('Tap to upload profile photo', style: TextStyle(fontSize: 12, color: AppColors.primaryColor)),
+                ),
+                const SizedBox(height: 24),
+                _buildSectionTitle("Personal Information"),
+                const SizedBox(height: 16),
+                _buildTextField(
+                  controller: _phoneController,
+                  label: "Phone Number",
+                  icon: Icons.phone_outlined,
+                  hint: "+92 300 0000000",
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: _buildTextField(
+                        controller: _ageController,
+                        label: "Age",
+                        icon: Icons.cake_outlined,
+                        hint: "e.g., 30",
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: DropdownButtonFormField<String>(
+                        initialValue: _gender,
+                        decoration: InputDecoration(
+                          labelText: 'Gender',
+                          prefixIcon: const Icon(Icons.wc_rounded),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        items: ['Male', 'Female', 'Other']
+                            .map((g) => DropdownMenuItem(value: g, child: Text(g)))
+                            .toList(),
+                        onChanged: (v) => setState(() => _gender = v),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                _buildTextField(
+                  controller: _addressController,
+                  label: "Address",
+                  icon: Icons.location_on_outlined,
+                  hint: "Street, city, area",
+                ),
+                const SizedBox(height: 24),
+                _buildSectionTitle("Professional Details"),
                 const SizedBox(height: 16),
                 _buildTextField(
                   controller: specializationController,
@@ -241,29 +645,51 @@ class _DoctorProfileSetupState extends ConsumerState<DoctorProfileSetup> {
                   keyboardType: TextInputType.number,
                 ),
                 const SizedBox(height: 16),
-                _buildTextField(
-                  controller: licenseController,
-                  label: "License Number",
-                  icon: Icons.badge_outlined,
-                  hint: "Medical license number",
+                // License Number + Valid Till side by side
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: _buildTextField(
+                        controller: licenseController,
+                        label: "License Number",
+                        icon: Icons.badge_outlined,
+                        hint: "Medical license number",
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _buildValidTillField(),
+                    ),
+                  ],
                 ),
+                const SizedBox(height: 24),
+                _buildSectionTitle("Your Specialties"),
+                const SizedBox(height: 8),
+                Text(
+                  'Select all specialties you practice. Patients will find you based on these.',
+                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                ),
+                const SizedBox(height: 12),
+                _buildSpecialtiesSelector(),
+                const SizedBox(height: 24),
+                _buildSectionTitle("Conditions You Treat"),
+                const SizedBox(height: 8),
+                Text(
+                  'Select or add conditions you commonly treat. Patients will find you when searching these conditions.',
+                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                ),
+                const SizedBox(height: 12),
+                _buildConditionsTreated(),
                 const SizedBox(height: 32),
-                _buildSectionTitle("Clinic Information"),
-                const SizedBox(height: 16),
-                _buildTextField(
-                  controller: clinicNameController,
-                  label: "Clinic Name",
-                  icon: Icons.local_hospital_outlined,
-                  hint: "Your clinic or hospital name",
+                _buildSectionTitle("Languages You Speak"),
+                const SizedBox(height: 8),
+                Text(
+                  'Select all languages you speak to help patients find you.',
+                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                 ),
-                const SizedBox(height: 16),
-                _buildTextField(
-                  controller: clinicAddressController,
-                  label: "Clinic Address",
-                  icon: Icons.location_on_outlined,
-                  hint: "Full address",
-                  maxLines: 2,
-                ),
+                const SizedBox(height: 12),
+                _buildLanguagesSelector(),
                 const SizedBox(height: 32),
                 _buildSectionTitle("Availability"),
                 const SizedBox(height: 16),
@@ -396,7 +822,119 @@ class _DoctorProfileSetupState extends ConsumerState<DoctorProfileSetup> {
                             fontFamily: "Gilroy-Bold",
                           ),
                         ),
+                        const SizedBox(height: 24),
+                        // Profile Photo Upload
+                        Center(
+                          child: GestureDetector(
+                            onTap: _pickProfileImage,
+                            child: Stack(
+                              children: [
+                                Container(
+                                  width: 110,
+                                  height: 110,
+                                  decoration: BoxDecoration(
+                                    color: AppColors.primaryColor.withValues(alpha: 0.1),
+                                    shape: BoxShape.circle,
+                                    border: Border.all(color: AppColors.primaryColor.withValues(alpha: 0.3), width: 3),
+                                  ),
+                                  child: ClipOval(
+                                    child: _imageBytes != null
+                                        ? Image.memory(_imageBytes!, fit: BoxFit.cover)
+                                        : _existingProfilePictureUrl != null && _existingProfilePictureUrl!.isNotEmpty
+                                        ? Image.network(_existingProfilePictureUrl!, fit: BoxFit.cover, errorBuilder: (_, _, _) => Icon(Icons.person_rounded, size: 50, color: AppColors.primaryColor))
+                                        : Icon(Icons.person_rounded, size: 50, color: AppColors.primaryColor),
+                                  ),
+                                ),
+                                Positioned(
+                                  bottom: 0,
+                                  right: 0,
+                                  child: Container(
+                                    padding: const EdgeInsets.all(7),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.primaryColor,
+                                      shape: BoxShape.circle,
+                                      border: Border.all(color: Colors.white, width: 2),
+                                    ),
+                                    child: const Icon(Icons.camera_alt, size: 18, color: Colors.white),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Center(
+                          child: Text('Tap to upload profile photo', style: TextStyle(fontSize: 13, color: AppColors.primaryColor)),
+                        ),
+                        const SizedBox(height: 32),
+                        const Text(
+                          "Personal Information",
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF1E293B),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _buildTextField(
+                                controller: _phoneController,
+                                label: "Phone Number",
+                                icon: Icons.phone_outlined,
+                                hint: "+92 300 0000000",
+                              ),
+                            ),
+                            const SizedBox(width: 24),
+                            Expanded(
+                              child: _buildTextField(
+                                controller: _ageController,
+                                label: "Age",
+                                icon: Icons.cake_outlined,
+                                hint: "e.g., 30",
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 24),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: DropdownButtonFormField<String>(
+                                initialValue: _gender,
+                                decoration: InputDecoration(
+                                  labelText: 'Gender',
+                                  prefixIcon: const Icon(Icons.wc_rounded),
+                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                                ),
+                                items: ['Male', 'Female', 'Other']
+                                    .map((g) => DropdownMenuItem(value: g, child: Text(g)))
+                                    .toList(),
+                                onChanged: (v) => setState(() => _gender = v),
+                              ),
+                            ),
+                            const SizedBox(width: 24),
+                            Expanded(
+                              child: _buildTextField(
+                                controller: _addressController,
+                                label: "Address",
+                                icon: Icons.location_on_outlined,
+                                hint: "Street, city, area",
+                              ),
+                            ),
+                          ],
+                        ),
                         const SizedBox(height: 40),
+                        const Text(
+                          "Professional Details",
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF1E293B),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
                         Row(
                           children: [
                             Expanded(
@@ -440,30 +978,57 @@ class _DoctorProfileSetupState extends ConsumerState<DoctorProfileSetup> {
                             ),
                           ],
                         ),
+                        const SizedBox(height: 16),
+                        // Valid Till — full width row below license
+                        _buildValidTillField(),
                         const SizedBox(height: 40),
                         const Text(
-                          "Clinic Information",
+                          "Your Specialties",
                           style: TextStyle(
                             fontSize: 20,
                             fontWeight: FontWeight.w700,
                             color: Color(0xFF1E293B),
                           ),
                         ),
-                        const SizedBox(height: 24),
-                        _buildTextField(
-                          controller: clinicNameController,
-                          label: "Clinic Name",
-                          icon: Icons.local_hospital_outlined,
-                          hint: "Your clinic or hospital name",
+                        const SizedBox(height: 16),
+                        Text(
+                          'Select all specialties you practice. Patients will find you based on these.',
+                          style: TextStyle(fontSize: 13, color: Colors.grey[600]),
                         ),
-                        const SizedBox(height: 24),
-                        _buildTextField(
-                          controller: clinicAddressController,
-                          label: "Clinic Address",
-                          icon: Icons.location_on_outlined,
-                          hint: "Full address",
-                          maxLines: 2,
+                        const SizedBox(height: 12),
+                        _buildSpecialtiesSelector(),
+                        const SizedBox(height: 40),
+                        const Text(
+                          "Conditions You Treat",
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF1E293B),
+                          ),
                         ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'Select or add conditions you commonly treat.',
+                          style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+                        ),
+                        const SizedBox(height: 12),
+                        _buildConditionsTreated(),
+                        const SizedBox(height: 40),
+                        const Text(
+                          "Languages You Speak",
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF1E293B),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'Select all languages you speak to help patients find you.',
+                          style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+                        ),
+                        const SizedBox(height: 12),
+                        _buildLanguagesSelector(),
                         const SizedBox(height: 40),
                         const Text(
                           "Availability Schedule",
@@ -543,6 +1108,289 @@ class _DoctorProfileSetupState extends ConsumerState<DoctorProfileSetup> {
         fontWeight: FontWeight.w700,
         color: Color(0xFF1E293B),
       ),
+    );
+  }
+
+  Widget _buildSpecialtiesSelector() {
+    final filtered = _specialtySearch.isEmpty
+        ? _commonSpecialties
+        : _commonSpecialties
+            .where((s) => s.toLowerCase().contains(_specialtySearch.toLowerCase()))
+            .toList();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Search bar to filter chips
+        TextField(
+          controller: _specialtySearchCtrl,
+          decoration: InputDecoration(
+            hintText: 'Search specialties...',
+            hintStyle: TextStyle(fontSize: 13, color: Colors.grey[400]),
+            prefixIcon: Icon(Icons.search_rounded, color: Colors.grey[400], size: 18),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            filled: true, fillColor: const Color(0xFFF8FAFC),
+          ),
+          onChanged: (v) => setState(() => _specialtySearch = v),
+        ),
+        const SizedBox(height: 12),
+        // Filtered specialty chips
+        if (filtered.isEmpty)
+          Text('No matching specialties. Add a custom one below.', style: TextStyle(fontSize: 12, color: Colors.grey[500]))
+        else
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: filtered.map((s) {
+              final isSelected = _selectedSpecialties.contains(s);
+              return FilterChip(
+                label: Text(s, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: isSelected ? Colors.white : const Color(0xFF475569))),
+                selected: isSelected,
+                onSelected: (v) => setState(() {
+                  if (v) { _selectedSpecialties.add(s); } else { _selectedSpecialties.remove(s); }
+                }),
+                selectedColor: AppColors.primaryColor,
+                backgroundColor: const Color(0xFFF1F5F9),
+                checkmarkColor: Colors.white,
+                side: BorderSide(color: isSelected ? AppColors.primaryColor : const Color(0xFFE2E8F0)),
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+              );
+            }).toList(),
+          ),
+        const SizedBox(height: 12),
+        // Add custom specialty
+        Row(
+          children: [
+            Expanded(
+              child: TextField(
+                controller: _specialtyCustomCtrl,
+                decoration: InputDecoration(
+                  hintText: 'Add custom specialty...',
+                  hintStyle: TextStyle(fontSize: 13, color: Colors.grey[400]),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  filled: true, fillColor: const Color(0xFFF8FAFC),
+                ),
+                onSubmitted: (v) {
+                  if (v.trim().isNotEmpty && !_selectedSpecialties.contains(v.trim())) {
+                    setState(() { _selectedSpecialties.add(v.trim()); _specialtyCustomCtrl.clear(); });
+                  }
+                },
+              ),
+            ),
+            const SizedBox(width: 8),
+            IconButton(
+              icon: const Icon(Icons.add_circle_rounded, color: AppColors.primaryColor),
+              onPressed: () {
+                final v = _specialtyCustomCtrl.text.trim();
+                if (v.isNotEmpty && !_selectedSpecialties.contains(v)) {
+                  setState(() { _selectedSpecialties.add(v); _specialtyCustomCtrl.clear(); });
+                }
+              },
+            ),
+          ],
+        ),
+        if (_selectedSpecialties.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          Text('${_selectedSpecialties.length} specialty(ies) selected', style: const TextStyle(fontSize: 12, color: AppColors.primaryColor, fontWeight: FontWeight.w600)),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildConditionsTreated() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Common conditions chips
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: _commonConditions.map((c) {
+            final isSelected = _conditionsTreated.contains(c);
+            return FilterChip(
+              label: Text(c, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: isSelected ? Colors.white : const Color(0xFF475569))),
+              selected: isSelected,
+              onSelected: (v) => setState(() {
+                if (v) {
+                  _conditionsTreated.add(c);
+                } else {
+                  _conditionsTreated.remove(c);
+                }
+              }),
+              selectedColor: AppColors.primaryColor,
+              backgroundColor: const Color(0xFFF1F5F9),
+              checkmarkColor: Colors.white,
+              side: BorderSide(color: isSelected ? AppColors.primaryColor : const Color(0xFFE2E8F0)),
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+            );
+          }).toList(),
+        ),
+        const SizedBox(height: 12),
+        // Custom condition input
+        Row(
+          children: [
+            Expanded(
+              child: TextField(
+                controller: _conditionInputCtrl,
+                decoration: InputDecoration(
+                  hintText: 'Add custom condition...',
+                  hintStyle: TextStyle(fontSize: 13, color: Colors.grey[400]),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  filled: true, fillColor: const Color(0xFFF8FAFC),
+                ),
+                onSubmitted: (v) {
+                  if (v.trim().isNotEmpty && !_conditionsTreated.contains(v.trim())) {
+                    setState(() { _conditionsTreated.add(v.trim()); _conditionInputCtrl.clear(); });
+                  }
+                },
+              ),
+            ),
+            const SizedBox(width: 8),
+            IconButton(
+              icon: const Icon(Icons.add_circle_rounded, color: AppColors.primaryColor),
+              onPressed: () {
+                final v = _conditionInputCtrl.text.trim();
+                if (v.isNotEmpty && !_conditionsTreated.contains(v)) {
+                  setState(() { _conditionsTreated.add(v); _conditionInputCtrl.clear(); });
+                }
+              },
+            ),
+          ],
+        ),
+        if (_conditionsTreated.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          Text('${_conditionsTreated.length} condition(s) selected', style: const TextStyle(fontSize: 12, color: AppColors.primaryColor, fontWeight: FontWeight.w600)),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildLanguagesSelector() {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: _spokenLanguages.map((lang) {
+        final isSelected = _selectedLanguages.contains(lang);
+        return FilterChip(
+          label: Text(lang, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: isSelected ? Colors.white : const Color(0xFF475569))),
+          selected: isSelected,
+          onSelected: (v) => setState(() {
+            if (v) {
+              _selectedLanguages.add(lang);
+            } else {
+              _selectedLanguages.remove(lang);
+            }
+          }),
+          selectedColor: AppColors.primaryColor,
+          backgroundColor: const Color(0xFFF1F5F9),
+          checkmarkColor: Colors.white,
+          side: BorderSide(color: isSelected ? AppColors.primaryColor : const Color(0xFFE2E8F0)),
+          padding: const EdgeInsets.symmetric(horizontal: 4),
+        );
+      }).toList(),
+    );
+  }
+
+  /// "Valid Till" date picker field for license expiry
+  Widget _buildValidTillField() {
+    final hasDate = _licenseValidTill != null;
+    final dateStr = hasDate
+        ? '${_licenseValidTill!.day.toString().padLeft(2, '0')}/'
+          '${_licenseValidTill!.month.toString().padLeft(2, '0')}/'
+          '${_licenseValidTill!.year}'
+        : '';
+
+    // Warn if expiry is within 30 days
+    final isExpiringSoon = hasDate &&
+        _licenseValidTill!.difference(DateTime.now()).inDays <= 30;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Valid Till',
+          style: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: Color(0xFF64748B),
+          ),
+        ),
+        const SizedBox(height: 8),
+        GestureDetector(
+          onTap: _pickLicenseExpiry,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: isExpiringSoon
+                    ? const Color(0xFFF59E0B)
+                    : const Color(0xFFE2E8F0),
+                width: isExpiringSoon ? 1.5 : 1,
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.calendar_today_outlined,
+                  size: 18,
+                  color: isExpiringSoon
+                      ? const Color(0xFFF59E0B)
+                      : AppColors.primaryColor,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    hasDate ? dateStr : 'Select expiry date',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: hasDate
+                          ? (isExpiringSoon
+                              ? const Color(0xFFF59E0B)
+                              : const Color(0xFF0F172A))
+                          : const Color(0xFF94A3B8),
+                      fontWeight: hasDate ? FontWeight.w600 : FontWeight.w400,
+                    ),
+                  ),
+                ),
+                if (isExpiringSoon)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFEF3C7),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: const Text(
+                      'Expiring Soon',
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFFF59E0B),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+        if (hasDate)
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Text(
+              'Admin will be notified 30 days before expiry',
+              style: TextStyle(
+                fontSize: 11,
+                color: isExpiringSoon
+                    ? const Color(0xFFF59E0B)
+                    : const Color(0xFF94A3B8),
+              ),
+            ),
+          ),
+      ],
     );
   }
 

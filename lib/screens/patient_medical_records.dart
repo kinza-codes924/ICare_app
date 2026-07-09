@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:icare/models/medical_record.dart';
@@ -5,7 +6,6 @@ import 'package:icare/services/medical_record_service.dart';
 import 'package:icare/screens/medical_record_detail.dart';
 import 'package:icare/utils/theme.dart';
 import 'package:icare/widgets/back_button.dart';
-import 'package:intl/intl.dart';
 
 class PatientMedicalRecords extends ConsumerStatefulWidget {
   const PatientMedicalRecords({super.key});
@@ -100,8 +100,8 @@ class _PatientMedicalRecordsState extends ConsumerState<PatientMedicalRecords> {
         backgroundColor: Colors.white,
         elevation: 0,
         leading: const CustomBackButton(),
-        title: const Text(
-          'My Medical Records',
+        title: Text(
+          'My Medical Records'.tr(),
           style: TextStyle(
             fontSize: 18,
             fontFamily: 'Gilroy-Bold',
@@ -165,11 +165,12 @@ class _PatientMedicalRecordsState extends ConsumerState<PatientMedicalRecords> {
                               if (!_isLoading && _searchQuery.isEmpty) ...[
                                 const SizedBox(height: 8),
                                 const Text(
-                                  'Check console logs for details',
+                                  'Your doctor\'s records will appear here after a consultation',
                                   style: TextStyle(
                                     fontSize: 12,
                                     color: Color(0xFF94A3B8),
                                   ),
+                                  textAlign: TextAlign.center,
                                 ),
                               ],
                             ],

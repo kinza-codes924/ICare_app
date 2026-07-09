@@ -1,7 +1,9 @@
+import 'package:flutter/foundation.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'api_config.dart';
 import '../utils/shared_pref.dart';
+import '../data/icd10_codes.dart';
 
 final _sharedPref = SharedPref();
 
@@ -21,10 +23,12 @@ class ICDService {
         final data = json.decode(response.body);
         return data['results'] ?? [];
       } else {
-        throw Exception('Failed to search ICD codes');
+        debugPrint('API returned ${response.statusCode}, using local ICD data');
+        return ICD10Data.searchCodes(query);
       }
     } catch (e) {
-      throw Exception('Error searching ICD codes: $e');
+      debugPrint('API error, using local ICD data: $e');
+      return ICD10Data.searchCodes(query);
     }
   }
 
@@ -43,10 +47,12 @@ class ICDService {
         final data = json.decode(response.body);
         return List<String>.from(data['categories'] ?? []);
       } else {
-        throw Exception('Failed to get categories');
+        debugPrint('API returned ${response.statusCode}, using local ICD data');
+        return ICD10Data.getCategoryNames();
       }
     } catch (e) {
-      throw Exception('Error getting categories: $e');
+      debugPrint('API error, using local ICD data: $e');
+      return ICD10Data.getCategoryNames();
     }
   }
 
@@ -65,10 +71,12 @@ class ICDService {
         final data = json.decode(response.body);
         return data['codes'] ?? [];
       } else {
-        throw Exception('Failed to get codes by category');
+        debugPrint('API returned ${response.statusCode}, using local ICD data');
+        return ICD10Data.getCodesByCategory(category);
       }
     } catch (e) {
-      throw Exception('Error getting codes by category: $e');
+      debugPrint('API error, using local ICD data: $e');
+      return ICD10Data.getCodesByCategory(category);
     }
   }
 }
