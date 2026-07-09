@@ -63,3 +63,4 @@ build.bat
 .env*.local
 
 .vercel
+.env*

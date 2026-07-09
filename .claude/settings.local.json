@@ -1,7 +1,16 @@
 {
   "permissions": {
     "allow": [
-      "Bash(vercel *)"
+      "Bash(vercel *)",
+      "Bash(flutter analyze *)",
+      "Bash(node -e ' *)",
+      "Bash(flutter --version)",
+      "Bash(where flutter *)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)",
+      "Bash(curl -s -i -X OPTIONS https://icare-backend-inky.vercel.app/api/auth/login -H 'Origin: http://localhost:64070' -H 'Access-Control-Request-Method: POST' -H 'Access-Control-Request-Headers: Content-Type')",
+      "Bash(curl -s -i -X POST https://icare-backend-inky.vercel.app/api/auth/login -H 'Origin: http://localhost:64070' -H 'Content-Type: application/json' -d '{\"email\":\"test@nonexistent.example\",\"password\":\"wrongpass\"}')"
     ]
   }
 }
