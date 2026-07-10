@@ -635,6 +635,18 @@ class LmsService {
     } catch (_) {}
   }
 
+  // Instructor: unenroll a student from the course (deletes the enrollment).
+  Future<void> removeStudentFromCourse({
+    required String courseId,
+    required String studentId,
+  }) async {
+    final response = await _api.delete('/courses/$courseId/students/$studentId');
+    final data = response.data;
+    if (data is Map && data['success'] != true) {
+      throw Exception(data['message'] ?? 'Failed to remove student');
+    }
+  }
+
   Future<Map<String, dynamic>> admitStudent({
     required String sessionId,
     required String studentId,

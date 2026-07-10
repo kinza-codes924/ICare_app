@@ -45,18 +45,13 @@
       object-fit: cover; display: block;
     }
     /* LMS multi-participant grid tiles */
-    /* align-content defaults to 'stretch' (not set here) so every 1fr row
-       always fills its full share of the container's height — with N
-       tiles across ceil(N/cols) rows, each row gets exactly 1/rows of the
-       height, no more, no less. An earlier version forced a fixed 4:3
-       aspect-ratio on each tile once there were 2+ tiles; that fought the
-       1fr stretch whenever the aspect-derived height came out shorter than
-       the row's actual share, leaving dead black space below the last row.
-       Removing the aspect-ratio and letting object-fit:cover (below) handle
-       any crop/letterbox is what actually keeps every tile filling its box
-       with no dead space, for any tile count. */
+    /* The actual track sizes (columns/rows, in exact pixels) are computed
+       by _lmsUpdateGridLayout in JS — Google Meet style: the largest 16:9
+       tile that fits for the current participant count, centered. These
+       CSS values are only the pre-layout fallback. No min-height: it would
+       fight the computed row height and reintroduce overflow. */
     #lms-grid-container { display: grid; grid-template-columns: 1fr; grid-auto-rows: 1fr; gap: 4px; padding: 4px; box-sizing: border-box; width: 100%; height: 100%; overflow-y: auto; }
-    .lms-remote-tile { position: relative; background: #1a2234; border-radius: 8px; overflow: hidden; min-height: 80px; }
+    .lms-remote-tile { position: relative; background: #1a2234; border-radius: 8px; overflow: hidden; }
     .lms-remote-tile > div { position: absolute !important; inset: 0; }
     .lms-remote-tile video {
       position: absolute !important; inset: 0;
@@ -715,39 +710,75 @@
     // sized) container. Shared by column-count changes and spotlight
     // toggling — both resize existing tiles without recreating them.
     window._lmsReplayGridTiles = function() {
-      if (!window._lmsAgoraClient) return;
       setTimeout(function() {
-        window._lmsAgoraClient.remoteUsers.forEach(function(u) {
-          if (!u.videoTrack) return;
-          var vd = document.getElementById('lms-tile-' + u.uid + '-video');
-          if (vd) { try { u.videoTrack.play(vd.id, { fit: window._lmsVideoFit || 'cover' }); } catch(_) {} }
-        });
+        if (window._lmsAgoraClient) {
+          window._lmsAgoraClient.remoteUsers.forEach(function(u) {
+            if (!u.videoTrack) return;
+            var vd = document.getElementById('lms-tile-' + u.uid + '-video');
+            if (!vd) return;
+            // A spotlighted SCREEN share must never be cropped — play it
+            // with 'contain' (full content, letterboxed) regardless of the
+            // user's Fit/Fill choice, which only applies to camera tiles.
+            var tile = document.getElementById('lms-tile-' + u.uid);
+            var isShareSpot = window._lmsShareActive && tile && tile.classList.contains('lms-spotlight-tile');
+            try { u.videoTrack.play(vd.id, { fit: isShareSpot ? 'contain' : (window._lmsVideoFit || 'cover') }); } catch(_) {}
+          });
+        }
+        // The sharer's own screen tile isn't a remote user — replay it too
+        if (window._lmsScreenSharing && window._lmsScreenTrack) {
+          var lsd = document.getElementById('lms-tile-local-screen-video');
+          if (lsd) { try { window._lmsScreenTrack.play(lsd.id, { fit: 'contain' }); } catch(_) {} }
+        }
       }, 120);
     };
 
+    // Google Meet-style proportional layout: for the current participant
+    // count and container size, try every possible column count and pick
+    // the one that yields the LARGEST 16:9 tile that still fits — then set
+    // exact pixel track sizes and center the whole block. Tiles therefore
+    // shrink smoothly as more people join (5 → big, 50 → small, 100 →
+    // smaller) and always keep a video-shaped aspect instead of stretching
+    // to fill leftover container height.
     window._lmsUpdateGridLayout = function() {
       var grid = document.getElementById('lms-grid-container');
       if (!grid) return;
-      // While a spotlight is active the container is in flex/column mode
-      // (see .lms-spotlight-active CSS) — grid-template-columns has no
-      // effect there and setting it is a no-op we can skip.
+      // While a spotlight is active the container is in flex mode (see
+      // .lms-spotlight-active CSS) — the grid inline styles below would be
+      // inert, so just refresh the video elements and bail.
       if (grid.classList.contains('lms-spotlight-active')) {
         window._lmsReplayGridTiles();
         return;
       }
-      var count = grid.children.length;
-      // Scale columns with participant count instead of capping at a fixed
-      // number, so grids with 20+ students still lay out sensibly. On
-      // narrow (mobile) viewports, cap at 2 columns regardless of count —
-      // more than that makes each tile too small to show a recognizable
-      // face, whereas extra rows (scrollable) stay usable.
-      var isNarrow = window.innerWidth < 600;
-      var cols = isNarrow
-        ? (count <= 1 ? 1 : 2)
-        : (count <= 1 ? 1 : count <= 4 ? 2 : count <= 9 ? 3 : count <= 16 ? 4 : 5);
-      grid.style.gridTemplateColumns = 'repeat(' + cols + ', 1fr)';
+      var tiles = grid.querySelectorAll('.lms-remote-tile');
+      var count = tiles.length;
+      if (count === 0) return;
+      var gap = 4, pad = 8; // matches the CSS gap/padding
+      var W = grid.clientWidth - pad, H = grid.clientHeight - pad;
+      if (W <= 0 || H <= 0) return;
+      var AR = 16 / 9;
+      var best = { area: 0, cols: 1, tw: W, th: H };
+      for (var cols = 1; cols <= count; cols++) {
+        var rows = Math.ceil(count / cols);
+        var cellW = (W - gap * (cols - 1)) / cols;
+        var cellH = (H - gap * (rows - 1)) / rows;
+        // Largest 16:9 box that fits in this cell
+        var tw = Math.min(cellW, cellH * AR);
+        var th = tw / AR;
+        if (tw * th > best.area) best = { area: tw * th, cols: cols, tw: tw, th: th };
+      }
+      grid.style.gridTemplateColumns = 'repeat(' + best.cols + ', ' + Math.floor(best.tw) + 'px)';
+      grid.style.gridAutoRows = Math.floor(best.th) + 'px';
+      grid.style.justifyContent = 'center';
+      grid.style.alignContent = 'center';
       window._lmsReplayGridTiles();
     };
+
+    // Re-run the proportional layout whenever the window resizes — the
+    // pixel-exact track sizes above are only correct for the size they
+    // were computed against.
+    window.addEventListener('resize', function() {
+      try { window._lmsUpdateGridLayout(); } catch(_) {}
+    });
 
     window.lmsSetTileName = function(uid, name) {
       var el = document.getElementById('lms-tile-' + uid + '-name');
@@ -999,6 +1030,21 @@
           }
           // Point the recording back at the live camera track
           if (window._lmsRebindRecordLocal) { try { window._lmsRebindRecordLocal(); } catch(_) {} }
+          // Tear down the sharer's own 70/30 spotlight: remove the local
+          // screen tile and restore the proportional grid.
+          try {
+            var eGrid = document.getElementById('lms-grid-container');
+            var eTile = document.getElementById('lms-tile-local-screen');
+            if (eTile) eTile.remove();
+            if (eGrid && eGrid.classList.contains('lms-spotlight-active')) {
+              eGrid.classList.remove('lms-spotlight-active');
+              eGrid.classList.remove('lms-ratio-90');
+              var eSpot = eGrid.querySelector('.lms-spotlight-tile');
+              if (eSpot) eSpot.classList.remove('lms-spotlight-tile');
+              window._lmsDissolveThumbStrip(eGrid);
+              window._lmsUpdateGridLayout();
+            }
+          } catch(_) {}
           return 'camera';
         } else {
           // Start screen sharing
@@ -1032,6 +1078,42 @@
           var ld2 = document.getElementById('lms-agora-local');
           if (ld2) { ld2.innerHTML = ''; window._lmsScreenTrack.play('lms-agora-local', { fit: window._lmsVideoFit || 'cover' }); }
           window._lmsScreenSharing = true;
+          // Show the sharer THEIR OWN shared screen at the 70/30 split too
+          // (a dedicated grid tile that gets the spotlight), instead of only
+          // the tiny corner preview — without this, the person sharing sees
+          // no layout change at all and assumes screen-share "didn't work",
+          // while every remote participant does get the 70/30 view.
+          try {
+            var sGrid = document.getElementById('lms-grid-container');
+            if (sGrid) {
+              var lt = document.getElementById('lms-tile-local-screen');
+              if (!lt) {
+                lt = document.createElement('div');
+                lt.id = 'lms-tile-local-screen';
+                lt.className = 'lms-remote-tile';
+                var lv = document.createElement('div');
+                lv.id = 'lms-tile-local-screen-video';
+                lt.appendChild(lv);
+                var lname = document.createElement('div');
+                lname.className = 'lms-tile-name';
+                lname.textContent = 'Your screen (presenting)';
+                lt.appendChild(lname);
+              }
+              sGrid.appendChild(lt);
+              sGrid.classList.add('lms-spotlight-active');
+              sGrid.classList.remove('lms-ratio-90');
+              var prevSpot = sGrid.querySelector('.lms-spotlight-tile');
+              if (prevSpot && prevSpot !== lt) prevSpot.classList.remove('lms-spotlight-tile');
+              lt.classList.add('lms-spotlight-tile');
+              var sStrip = window._lmsGetOrCreateThumbStrip(sGrid);
+              Array.prototype.forEach.call(sGrid.querySelectorAll('.lms-remote-tile'), function(t) {
+                if (t !== lt && t.parentElement !== sStrip) sStrip.appendChild(t);
+              });
+              // Screen content must never be cropped — always 'contain'
+              window._lmsScreenTrack.play('lms-tile-local-screen-video', { fit: 'contain' });
+              window._lmsReplayGridTiles();
+            }
+          } catch(_) {}
           // Point the recording at the live screen track so it captures the
           // real screen (not a frozen camera frame).
           if (window._lmsRebindRecordLocal) { try { window._lmsRebindRecordLocal(); } catch(_) {} }
@@ -1101,12 +1183,13 @@
         var grid = document.getElementById('lms-grid-container');
         if (!grid) return;
         var myUid = window.lmsGetLocalUid();
-        // Nobody remote is sharing, or it's our own uid (self-share shows
-        // via our own small corner preview, handled in lmsToggleScreenShare) —
-        // clear any active SHARE spotlight, but leave a manually-expanded
-        // tile (user clicked it) alone: that's user intent, not share state.
+        // Nobody remote is sharing, or it's our own uid — our own share's
+        // 70/30 layout is owned by lmsToggleScreenShare (local screen tile),
+        // so the poll must leave it alone. Likewise leave a manually
+        // expanded tile (user clicked it) alone: that's user intent.
         if (!sharingUid || sharingUid === myUid) {
-          window._lmsShareActive = false;
+          window._lmsShareActive = window._lmsScreenSharing === true;
+          if (window._lmsScreenSharing) return; // own share owns the layout
           if (window._lmsManualExpandUid) return;
           if (grid.classList.contains('lms-spotlight-active')) {
             grid.classList.remove('lms-spotlight-active');

@@ -93,6 +93,47 @@ router.get('/enrolled-students/:courseId', authMiddleware, async (req, res) => {
   }
 });
 
+// DELETE /api/courses/:courseId/students/:studentId — instructor manually
+// removes (unenrolls) a student from the course. Only the course owner or a
+// co-teacher may do this. The enrollment record is deleted, which revokes
+// content access via the existing enrollment-gating on GET /:id.
+router.delete('/:courseId/students/:studentId', authMiddleware, async (req, res) => {
+  try {
+    await connectMongoDB();
+    const courseId = toId(req.params.courseId);
+    const studentId = toId(req.params.studentId);
+    if (!courseId || !studentId) return res.status(400).json({ success: false, message: 'Invalid ids' });
+
+    const course = await Course.findById(courseId).select('instructor_id coTeachers title').lean();
+    if (!course) return res.status(404).json({ success: false, message: 'Course not found' });
+    const uid = req.user.id?.toString();
+    const isOwner = course.instructor_id?.toString() === uid
+      || (course.coTeachers || []).some(t => t.userId?.toString() === uid);
+    if (!isOwner) return res.status(403).json({ success: false, message: 'Only the instructor can remove students' });
+
+    const result = await Enrollment.deleteOne({ courseId, userId: studentId });
+    if (result.deletedCount === 0) {
+      return res.status(404).json({ success: false, message: 'Student is not enrolled in this course' });
+    }
+
+    // Best-effort: tell the student (never blocks the removal)
+    try {
+      const Notification = require('../models/Notification');
+      await Notification.create({
+        userId: studentId,
+        type: 'general',
+        title: 'Removed from course',
+        message: `You have been removed from "${course.title}" by the instructor.`,
+        data: { type: 'course_removed', courseId: courseId.toString() },
+      });
+    } catch (_) {}
+
+    res.json({ success: true, message: 'Student removed' });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
 // GET /api/courses/:courseId/students/:studentId/assignments — instructor view of
 // one student's assignment submissions across the course (Student Progress screen)
 router.get('/:courseId/students/:studentId/assignments', authMiddleware, async (req, res) => {
