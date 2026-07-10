@@ -1083,9 +1083,14 @@
           if (window._lmsAgoraClient) {
             await window._lmsAgoraClient.publish([window._lmsScreenTrack]);
           }
-          // Local preview
-          var ld2 = document.getElementById('lms-agora-local');
-          if (ld2) { ld2.innerHTML = ''; window._lmsScreenTrack.play('lms-agora-local', { fit: window._lmsVideoFit || 'cover' }); }
+          // Leave the small corner preview (#lms-agora-local) alone — it's
+          // already playing the live camera track (from lmsLocalPreview),
+          // and that track is still alive (only unpublished from Agora
+          // above, never stopped/closed), so it keeps showing the
+          // presenter their own face during the share. Redirecting this
+          // box to the screen track would be redundant with the big
+          // spotlight tile below and is why the presenter's camera
+          // appeared to vanish during a share.
           window._lmsScreenSharing = true;
           // Show the sharer THEIR OWN shared screen at the 70/30 split too
           // (a dedicated grid tile that gets the spotlight), instead of only
