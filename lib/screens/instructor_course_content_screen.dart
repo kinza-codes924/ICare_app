@@ -16,6 +16,7 @@ import 'package:icare/screens/instructor_course_analytics_screen.dart';
 import 'package:icare/screens/instructor_student_progress_screen.dart';
 import 'package:icare/screens/instructor_voucher_screen.dart';
 import 'package:icare/widgets/video_player_widget.dart';
+import 'package:icare/widgets/attachment_viewer.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 /// Course Content Management - Moodle/Udemy style
@@ -1424,6 +1425,8 @@ class InstructorCourseContentScreenState extends State<InstructorCourseContentSc
     final lessonType = lesson['type']?.toString() ?? 'content';
     final content = lesson['content']?.toString() ?? '';
     final videoUrl = lesson['videoUrl']?.toString() ?? '';
+    final documentUrl = lesson['documentUrl']?.toString() ?? '';
+    final documentName = lesson['documentName']?.toString();
     final duration = lesson['duration']?.toString() ?? '';
     final isAssignment = lessonType == 'assignment';
     final isQuiz = lessonType == 'quiz';
@@ -1467,8 +1470,23 @@ class InstructorCourseContentScreenState extends State<InstructorCourseContentSc
               const SizedBox(height: 10),
             ],
             if (videoUrl.isNotEmpty) ...[
-              _detailRow(Icons.play_circle_outline, 'Video', videoUrl),
-              const SizedBox(height: 10),
+              const Text('Video', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF64748B))),
+              const SizedBox(height: 6),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: SizedBox(
+                  height: 220,
+                  width: double.infinity,
+                  child: VideoPlayerWidget(videoUrl: videoUrl),
+                ),
+              ),
+              const SizedBox(height: 14),
+            ],
+            if (documentUrl.isNotEmpty) ...[
+              const Text('Document', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF64748B))),
+              const SizedBox(height: 6),
+              AttachmentViewer(url: documentUrl, name: documentName),
+              const SizedBox(height: 14),
             ],
             if (content.isNotEmpty) ...[
               const Text('Content', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF64748B))),
@@ -1482,7 +1500,7 @@ class InstructorCourseContentScreenState extends State<InstructorCourseContentSc
               ),
               const SizedBox(height: 10),
             ],
-            if (content.isEmpty && videoUrl.isEmpty)
+            if (content.isEmpty && videoUrl.isEmpty && documentUrl.isEmpty)
               Center(child: Padding(
                 padding: const EdgeInsets.only(top: 20),
                 child: Text('No content added yet.', style: TextStyle(color: Colors.grey[500], fontSize: 14)),

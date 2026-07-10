@@ -524,12 +524,6 @@ class _WebCoursesListState extends State<_WebCoursesList> {
       final course = widget.myPurchased ? item['course'] : item;
       if (course == null) return false;
 
-      // Only show CRP course in browse mode
-      if (!widget.myPurchased) {
-        final title = (course['title'] ?? course['name'] ?? '').toString().toLowerCase();
-        if (!title.contains('certificate in research') && !title.contains('crp')) return false;
-      }
-
       // Price filter (Browse Courses: Paid / Free tabs)
       if (widget.priceFilter != 'all') {
         final price = (course['price'] is num) ? (course['price'] as num) : 0;
