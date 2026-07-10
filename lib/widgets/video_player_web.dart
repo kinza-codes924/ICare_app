@@ -175,16 +175,45 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
       return h > 0 ? '$h:$mm:$ss' : '$mm:$ss';
     }
 
-    void updateTimeLabel() {
-      timeLabel.text = '${fmt(video.currentTime)} / ${fmt(video.duration)}';
+    // Chrome-recorded WebM (MediaRecorder output — how LMS session
+    // recordings are produced) often ships with duration = Infinity in its
+    // metadata header. The browser only computes the real duration once you
+    // seek near the end, so on load we force a seek to a huge timestamp and
+    // immediately back to 0 — the standard workaround for this Chromium bug.
+    bool durationFixed = false;
+    void fixDurationIfNeeded() {
+      if (durationFixed) return;
+      final d = video.duration;
+      if (d.isInfinite || d.isNaN) {
+        video.currentTime = 1e101;
+        video.onTimeUpdate.first.then((_) {
+          video.currentTime = 0;
+          durationFixed = true;
+        });
+      } else {
+        durationFixed = true;
+      }
     }
 
-    video.onLoadedMetadata.listen((_) => updateTimeLabel());
+    num effectiveDuration() {
+      final d = video.duration;
+      return (d.isFinite && !d.isNaN) ? d : 0;
+    }
+
+    void updateTimeLabel() {
+      timeLabel.text = '${fmt(video.currentTime)} / ${fmt(effectiveDuration())}';
+    }
+
+    video.onLoadedMetadata.listen((_) {
+      fixDurationIfNeeded();
+      updateTimeLabel();
+    });
+    video.onDurationChange.listen((_) => updateTimeLabel());
 
     video.onTimeUpdate.listen((_) {
       if (!seeking) {
-        final dur = video.duration;
-        if (dur > 0 && !dur.isNaN) {
+        final dur = effectiveDuration();
+        if (dur > 0) {
           seekBar.valueAsNumber = (video.currentTime / dur) * 1000;
         }
       }
@@ -221,8 +250,8 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
 
     seekBar.onInput.listen((_) {
       seeking = true;
-      final dur = video.duration;
-      if (dur > 0 && !dur.isNaN) {
+      final dur = effectiveDuration();
+      if (dur > 0) {
         final target = (seekBar.valueAsNumber ?? 0) / 1000 * dur;
         timeLabel.text = '${fmt(target)} / ${fmt(dur)}';
       }
@@ -230,8 +259,8 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
       hideTimer?.cancel();
     });
     seekBar.onChange.listen((_) {
-      final dur = video.duration;
-      if (dur > 0 && !dur.isNaN) {
+      final dur = effectiveDuration();
+      if (dur > 0) {
         video.currentTime = (seekBar.valueAsNumber ?? 0) / 1000 * dur;
       }
       seeking = false;
