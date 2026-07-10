@@ -1528,26 +1528,7 @@ class InstructorCourseContentScreenState extends State<InstructorCourseContentSc
     showDialog(
       context: context,
       barrierDismissible: true,
-      builder: (ctx) => Dialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        insetPadding: const EdgeInsets.all(16),
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 8, 8),
-            child: Row(children: [
-              const Icon(Icons.play_circle_rounded, color: Color(0xFF10B981), size: 22),
-              const SizedBox(width: 10),
-              Expanded(child: Text(title, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16))),
-              IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(ctx)),
-            ]),
-          ),
-          Container(
-            constraints: const BoxConstraints(maxHeight: 400),
-            child: VideoPlayerWidget(videoUrl: url),
-          ),
-          const SizedBox(height: 12),
-        ]),
-      ),
+      builder: (ctx) => _RecordingDialog(title: title, url: url),
     );
   }
 
@@ -2414,6 +2395,67 @@ class _LessonDialogState extends State<_LessonDialog> {
           child: const Text('Save Lesson'),
         ),
       ],
+    );
+  }
+}
+
+class _RecordingDialog extends StatefulWidget {
+  final String title;
+  final String url;
+  const _RecordingDialog({required this.title, required this.url});
+
+  @override
+  State<_RecordingDialog> createState() => _RecordingDialogState();
+}
+
+class _RecordingDialogState extends State<_RecordingDialog> {
+  bool _expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final screenSize = MediaQuery.of(context).size;
+    final compactWidth = screenSize.width < 760 ? screenSize.width - 48 : 720.0;
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      insetPadding: _expanded
+          ? const EdgeInsets.all(16)
+          : const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
+      child: SizedBox(
+        width: _expanded ? screenSize.width - 32 : compactWidth,
+        height: _expanded ? screenSize.height - 32 : null,
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 8, 8),
+            child: Row(children: [
+              const Icon(Icons.play_circle_rounded, color: Color(0xFF10B981), size: 22),
+              const SizedBox(width: 10),
+              Expanded(child: Text(widget.title, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16))),
+              IconButton(
+                icon: Icon(_expanded ? Icons.close_fullscreen_rounded : Icons.open_in_full_rounded),
+                tooltip: _expanded ? 'Shrink' : 'Enlarge',
+                onPressed: () => setState(() => _expanded = !_expanded),
+              ),
+              IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(context)),
+            ]),
+          ),
+          if (_expanded)
+            Expanded(
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: VideoPlayerWidget(videoUrl: widget.url),
+              ),
+            )
+          else
+            AspectRatio(
+              aspectRatio: 16 / 9,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: VideoPlayerWidget(videoUrl: widget.url),
+              ),
+            ),
+          const SizedBox(height: 12),
+        ]),
+      ),
     );
   }
 }

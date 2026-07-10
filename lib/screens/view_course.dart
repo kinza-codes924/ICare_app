@@ -805,8 +805,18 @@ class _ViewCourseState extends ConsumerState<ViewCourse> {
         final module = mEntry.value;
         final lessons = module['lessons'] as List? ?? [];
 
-        // Prefer backend-computed isLocked + unlockDate fields, fall back to client-side
+        // Prefer backend-computed isLocked + unlockDate fields, fall back to client-side.
+        // For self-paced courses, a locally-recorded completion of the previous module
+        // (from _completedModuleIds, populated the moment "Mark as Completed" succeeds)
+        // always overrides a stale backend isLocked:true from the initial page fetch —
+        // otherwise the next module stays visually locked until the whole screen reloads.
         bool isModuleLocked = module['isLocked'] == true;
+        if (isModuleLocked && courseType == 'self-paced' && mIndex > 0) {
+          final prevId = modules[mIndex - 1]['_id']?.toString() ?? '';
+          if (prevId.isNotEmpty && completedModuleIds.contains(prevId)) {
+            isModuleLocked = false;
+          }
+        }
         String? moduleLockLabel;
 
         if (isPurchased && !_isInstructor) {

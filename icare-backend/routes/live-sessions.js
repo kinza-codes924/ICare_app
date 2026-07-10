@@ -735,10 +735,12 @@ router.post('/notify-start', authMiddleware, async (req, res) => {
     await connectMongoDB();
     const { courseId, sessionId, instructorName, sessionTitle } = req.body;
 
-    // Find all enrolled students for this course
+    // Find all enrolled students for this course.
+    // Enrollment has no `status` field (only isCompleted/completedAt), so a
+    // prior filter on status:{$in:['active','enrolled']} matched zero
+    // documents and silently no-op'd every "go live" notify call.
     const enrollments = await Enrollment.find({
       courseId: toId(courseId),
-      status: { $in: ['active', 'enrolled'] }
     }).select('userId').lean();
 
     if (!enrollments.length) {
@@ -1069,7 +1071,7 @@ router.put('/:id/reschedule', authMiddleware, async (req, res) => {
     // Push to enrolled students
     try {
       const { sendToUser } = require('../utils/pushNotifications');
-      const enrollments = await Enrollment.find({ courseId: session.courseId, status: 'active' }).select('userId').lean();
+      const enrollments = await Enrollment.find({ courseId: session.courseId }).select('userId').lean();
       await Promise.all(enrollments.map(e => sendToUser(e.userId, {
         title: '📅 Session Rescheduled',
         body: `"${session.title}" rescheduled to ${new Date(newDate).toLocaleString()}`,
@@ -1112,7 +1114,7 @@ router.put('/:id/cancel', authMiddleware, async (req, res) => {
     // Push to enrolled students
     try {
       const { sendToUser } = require('../utils/pushNotifications');
-      const enrollments = await Enrollment.find({ courseId: session.courseId, status: 'active' }).select('userId').lean();
+      const enrollments = await Enrollment.find({ courseId: session.courseId }).select('userId').lean();
       await Promise.all(enrollments.map(e => sendToUser(e.userId, {
         title: '❌ Session Cancelled',
         body: `"${session.title}" has been cancelled. ${reason ? reason : ''}`,

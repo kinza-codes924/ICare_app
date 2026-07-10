@@ -13,6 +13,7 @@ const { sendEmail } = require('../utils/email');
 const LiveSession = require('../models/LiveSession');
 const CourseReview = require('../models/CourseReview');
 const { Voucher, applyVoucherDiscount } = require('./vouchers');
+const { recheckModuleCompletion } = require('../utils/courseProgress');
 
 function toId(id) {
   try { return new mongoose.Types.ObjectId(id); } catch { return null; }
@@ -633,32 +634,9 @@ router.post('/enrollments/:id/complete-lesson', authMiddleware, async (req, res)
       enrollment.lessonCompletions.push({ lessonId, moduleId: moduleId || null, completedAt: new Date() });
     }
 
-    // Auto-complete module if all lessons in it are done
+    // Auto-complete module (and course) if all lessons AND all published quizzes in it are done
     if (moduleId) {
-      const course = await Course.findById(enrollment.courseId).lean();
-      if (course) {
-        const module = (course.modules || []).find(m => m._id?.toString() === moduleId);
-        if (module) {
-          const moduleLessonIds = (module.lessons || []).map(l => l._id?.toString()).filter(Boolean);
-          const completedLessonIds = new Set((enrollment.lessonCompletions || []).map(lc => lc.lessonId));
-          const allDone = moduleLessonIds.every(id => completedLessonIds.has(id));
-          if (allDone) {
-            const alreadyCompleted = (enrollment.moduleCompletions || []).find(mc => mc.moduleId === moduleId);
-            if (!alreadyCompleted) {
-              if (!enrollment.moduleCompletions) enrollment.moduleCompletions = [];
-              enrollment.moduleCompletions.push({ moduleId, completedAt: new Date() });
-            }
-          }
-
-          // Auto-complete course if all modules done
-          const allModuleIds = (course.modules || []).map(m => m._id?.toString()).filter(Boolean);
-          const completedModuleIds = new Set((enrollment.moduleCompletions || []).map(mc => mc.moduleId));
-          if (allModuleIds.every(id => completedModuleIds.has(id))) {
-            enrollment.isCompleted = true;
-            enrollment.completedAt = enrollment.completedAt || new Date();
-          }
-        }
-      }
+      await recheckModuleCompletion(enrollment, moduleId);
     }
 
     await enrollment.save();

@@ -1568,9 +1568,9 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
       onTap: () => Navigator.push(context, MaterialPageRoute(
         builder: (_) => QuizTakeScreen(
           quiz: Map<String, dynamic>.from(quiz is Map ? quiz : {}),
-          enrollmentId: '',
+          enrollmentId: widget.enrollmentId ?? '',
         ),
-      )),
+      )).then((_) => _loadModules()),
       child: Container(
         margin: const EdgeInsets.only(bottom: 8),
         padding: const EdgeInsets.all(12),
@@ -1695,14 +1695,14 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
           assignment: Map<String, dynamic>.from(lesson),
           courseId: _courseId,
         ),
-      ));
+      )).then((_) => _loadModules());
     } else if (type == 'quiz') {
       Navigator.push(context, MaterialPageRoute(
         builder: (_) => QuizTakeScreen(
           quiz: Map<String, dynamic>.from(lesson),
-          enrollmentId: '',
+          enrollmentId: widget.enrollmentId ?? '',
         ),
-      ));
+      )).then((_) => _loadModules());
     } else {
       // Content lesson — open detail page
       Navigator.push(context, MaterialPageRoute(
@@ -1710,9 +1710,9 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
           lesson: Map<String, dynamic>.from(lesson),
           courseId: _courseId,
           moduleId: lesson['moduleId']?.toString() ?? '',
-          enrollmentId: '',
+          enrollmentId: widget.enrollmentId ?? '',
         ),
-      ));
+      )).then((_) => _loadModules());
     }
   }
 

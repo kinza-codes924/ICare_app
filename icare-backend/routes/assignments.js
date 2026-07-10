@@ -284,6 +284,17 @@ router.put('/submissions/:submissionId/grade', authMiddleware, async (req, res) 
         }).lean();
         if (gradedSubs.length < allAssignments.length) return;
 
+        // Idempotency guard: this block re-runs on EVERY grading action once all
+        // assignments happen to be graded (e.g. an instructor re-grading/editing a
+        // mark later), not just the one action that first completes the course.
+        // Without this check it would re-stamp completedAt and re-send the
+        // "Course Completed!" notification on every subsequent regrade.
+        const existingEnrollment = await Enrollment.findOne(
+          { courseId: sub.courseId, userId: sub.studentId },
+          { isCompleted: 1 },
+        ).lean();
+        if (existingEnrollment?.isCompleted) return;
+
         // Check passing: all assignments must meet passingMarks
         const assignmentMap = {};
         allAssignments.forEach(a => { assignmentMap[a._id.toString()] = a; });

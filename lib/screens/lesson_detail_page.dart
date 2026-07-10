@@ -85,8 +85,9 @@ class _LessonDetailPageState extends State<LessonDetailPage> with SingleTickerPr
     final meetingLink = widget.lesson['meetingLink']?.toString() ?? '';
     final meetingId = widget.lesson['meetingId']?.toString() ?? '';
     final meetingPassword = widget.lesson['meetingPassword']?.toString() ?? '';
-    final platform = widget.lesson['platform']?.toString() ?? 'zoom';
-    final scheduledAt = widget.lesson['scheduledAt']?.toString();
+    final liveSessionDateTime = widget.lesson['liveSessionDateTime']?.toString() ?? '';
+    final liveSessionNote = widget.lesson['liveSessionNote']?.toString() ?? '';
+    final scheduledAt = widget.lesson['scheduledAt']?.toString() ?? (liveSessionDateTime.isNotEmpty ? liveSessionDateTime : null);
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
@@ -149,20 +150,19 @@ class _LessonDetailPageState extends State<LessonDetailPage> with SingleTickerPr
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Row(children: [
-                                    Text('Live Session',
-                                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Colors.orange.shade900)),
-                                    const SizedBox(width: 8),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                      decoration: BoxDecoration(color: Colors.red, borderRadius: BorderRadius.circular(4)),
-                                      child: const Text('LIVE', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w800)),
-                                    ),
-                                  ]),
+                                  Text('Live Session',
+                                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Colors.orange.shade900)),
                                   if (scheduledAt != null) ...[
                                     const SizedBox(height: 4),
                                     Text(
                                       _formatScheduledAt(scheduledAt),
+                                      style: TextStyle(fontSize: 12, color: Colors.orange.shade700),
+                                    ),
+                                  ],
+                                  if (liveSessionNote.isNotEmpty) ...[
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      liveSessionNote,
                                       style: TextStyle(fontSize: 12, color: Colors.orange.shade700),
                                     ),
                                   ],
@@ -171,21 +171,11 @@ class _LessonDetailPageState extends State<LessonDetailPage> with SingleTickerPr
                             ),
                           ],
                         ),
-                        const SizedBox(height: 12),
 
-                        // Platform badge
-                        Row(children: [
-                          _platformIcon(platform),
-                          const SizedBox(width: 6),
-                          Text(
-                            _platformName(platform),
-                            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.orange.shade800),
-                          ),
-                        ]),
-
-                        // Meeting ID & Password
+                        // Meeting ID & Password — only shown when this lesson actually
+                        // carries an external meeting link (legacy Zoom/Meet embed path).
                         if (meetingId.isNotEmpty) ...[
-                          const SizedBox(height: 8),
+                          const SizedBox(height: 12),
                           _infoRow(Icons.tag_rounded, 'Meeting ID', meetingId),
                         ],
                         if (meetingPassword.isNotEmpty) ...[
@@ -195,24 +185,30 @@ class _LessonDetailPageState extends State<LessonDetailPage> with SingleTickerPr
 
                         const SizedBox(height: 14),
 
-                        // Join Button
-                        SizedBox(
-                          width: double.infinity,
-                          child: ElevatedButton.icon(
-                            onPressed: meetingLink.isNotEmpty
-                                ? () => _launchUrl(meetingLink)
-                                : null,
-                            icon: const Icon(Icons.video_call_rounded, size: 20),
-                            label: Text(meetingLink.isNotEmpty ? 'Join Session' : 'Link not available yet'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.red.shade600,
-                              foregroundColor: Colors.white,
-                              disabledBackgroundColor: Colors.grey.shade300,
-                              padding: const EdgeInsets.symmetric(vertical: 14),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        if (meetingLink.isNotEmpty)
+                          SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton.icon(
+                              onPressed: () => _launchUrl(meetingLink),
+                              icon: const Icon(Icons.video_call_rounded, size: 20),
+                              label: const Text('Join Session'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.red.shade600,
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(vertical: 14),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                              ),
                             ),
+                          )
+                        else
+                          // The real, correctly-scheduled session lives under Course
+                          // Content (backed by the LiveSession model) — this legacy
+                          // per-lesson meetingLink field is rarely populated, so point
+                          // students there instead of showing a permanently-dead button.
+                          Text(
+                            'Join this session from Course Content when it goes live.',
+                            style: TextStyle(fontSize: 12, color: Colors.orange.shade800, fontStyle: FontStyle.italic),
                           ),
-                        ),
                       ],
                     ),
                   ),
@@ -384,28 +380,6 @@ class _LessonDetailPageState extends State<LessonDetailPage> with SingleTickerPr
           const SnackBar(content: Text('Could not open URL'), backgroundColor: Colors.red),
         );
       }
-    }
-  }
-
-  Widget _platformIcon(String platform) {
-    switch (platform.toLowerCase()) {
-      case 'zoom':
-        return const Icon(Icons.video_camera_front_rounded, color: Color(0xFF2D8CFF), size: 18);
-      case 'meet':
-        return const Icon(Icons.videocam_rounded, color: Color(0xFF00897B), size: 18);
-      case 'teams':
-        return const Icon(Icons.groups_rounded, color: Color(0xFF6264A7), size: 18);
-      default:
-        return const Icon(Icons.link_rounded, color: Colors.orange, size: 18);
-    }
-  }
-
-  String _platformName(String platform) {
-    switch (platform.toLowerCase()) {
-      case 'zoom': return 'Zoom Meeting';
-      case 'meet': return 'Google Meet';
-      case 'teams': return 'Microsoft Teams';
-      default: return 'Custom Link';
     }
   }
 

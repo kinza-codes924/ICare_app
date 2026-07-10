@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:icare/models/user.dart';
 import 'package:icare/providers/auth_provider.dart';
-import 'package:icare/screens/lms_document_upload.dart';
+import 'package:icare/screens/classroom_course_view.dart';
 import 'package:icare/screens/select_payment_method.dart';
 import 'package:icare/services/api_service.dart';
 import 'package:icare/utils/shared_pref.dart';
@@ -186,18 +186,27 @@ class _LmsPurchaseFlowState extends ConsumerState<LmsPurchaseFlow> {
   Future<void> _handlePaymentSuccess(BuildContext callerContext, {String? voucherCode}) async {
     try {
       // Enroll user in course
-      await _api.post('/courses/enrollments', {
+      final res = await _api.post('/courses/enrollments', {
         'courseId': widget.course['_id'],
         if (voucherCode != null && voucherCode.isNotEmpty) 'voucherCode': voucherCode,
       });
 
-      // Navigate to document upload
+      // Go straight to the course classroom — a normal course purchase should
+      // never require a separate identity/document verification gate before
+      // granting access to content the student already paid for. That gate
+      // (LmsDocumentUpload → LmsLimitedDashboard) is a purpose-built LMS
+      // credential-verification feature meant for courses that explicitly
+      // require it, not a blanket step for every enrollment.
       if (callerContext.mounted) {
+        final enrollment = res.data is Map ? res.data['enrollment'] : null;
+        final enrollmentId = enrollment is Map ? enrollment['_id']?.toString() : null;
         Navigator.pushReplacement(
           callerContext,
           MaterialPageRoute(
-            builder: (_) => LmsDocumentUpload(
-              courseId: widget.course['_id'],
+            builder: (_) => ClassroomCourseView(
+              course: widget.course,
+              enrollmentId: enrollmentId,
+              isInstructor: false,
             ),
           ),
         );

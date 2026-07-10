@@ -6,6 +6,7 @@ const { authMiddleware } = require('../middleware/auth');
 const Quiz = require('../models/Quiz');
 const QuizAttempt = require('../models/QuizAttempt');
 const Enrollment = require('../models/Enrollment');
+const { recheckModuleCompletion } = require('../utils/courseProgress');
 
 function toId(id) {
   try { return new mongoose.Types.ObjectId(id); } catch { return null; }
@@ -206,6 +207,20 @@ router.post('/:id/submit', authMiddleware, async (req, res) => {
       attemptNumber: previousAttempts + 1,
       timeSpent
     });
+
+    // A passed quiz can be the last remaining requirement for its module (and
+    // in turn the whole course) — re-check completion the same way finishing
+    // a lesson does, so the module unlock/certificate flow doesn't stay stuck
+    // waiting on a lesson-completion action that will never come.
+    if (passed && quiz.moduleId) {
+      try {
+        const enrollment = await Enrollment.findOne({ courseId: quiz.courseId, userId: studentId });
+        if (enrollment) {
+          await recheckModuleCompletion(enrollment, quiz.moduleId);
+          await enrollment.save();
+        }
+      } catch (_) { /* non-blocking — quiz result already recorded */ }
+    }
 
     // Return with correct answers if allowed
     let result = attempt.toObject();
