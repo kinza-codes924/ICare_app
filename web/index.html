@@ -97,29 +97,28 @@
     #lms-grid-container.lms-spotlight-active .lms-remote-tile {
       aspect-ratio: auto !important;
     }
-    /* Main (spotlight) tile takes a FIXED 70% share of the container — the
-       client-specified split: 70% shared screen / 30% participant tiles.
+    /* Main (spotlight) tile: on phones it takes all the height left over
+       by the fixed thumbnail strip below (~75-80%); on desktop the media
+       query below pins the client-specified 70/30 side-by-side split.
        The .lms-ratio-90 modifier (manually expanding a tile by clicking
-       it) bumps that to 90/10 — "full screen" that still keeps people
+       it) gives it 90/10 — "full screen" that still keeps people
        visible alongside, per the client's Meet reference. */
     #lms-grid-container.lms-spotlight-active .lms-spotlight-tile {
-      flex: 0 0 70% !important;
+      flex: 1 1 auto !important;
       order: -1 !important;
       min-height: 0 !important;
       width: 100% !important;
     }
-    #lms-grid-container.lms-spotlight-active.lms-ratio-90 .lms-spotlight-tile {
-      flex: 0 0 90% !important;
-    }
-    /* Thumbnail strip (mobile/narrow default): the remaining 30% (10% in
-       ratio-90) as a horizontally scrollable row so every participant tile
-       stays fully visible no matter how many students are in the call.
-       Overridden below by the >=900px media query for the desktop
-       right-sidebar arrangement — this block MUST come first so the media
-       query (same specificity) wins on wide viewports per cascade order. */
+    /* Thumbnail strip (mobile/narrow default): a FIXED-height, neat,
+       horizontally scrollable row of video-shaped thumbnails — a
+       percentage height here made the strip absurdly tall on phones
+       (30% of a portrait screen) with stretched, distorted tiles.
+       Overridden below by the pointer:fine+wide media query for the
+       desktop right-sidebar arrangement — this block MUST come first so
+       the media query (same specificity) wins per cascade order. */
     #lms-grid-container.lms-spotlight-active .lms-thumbnail-strip {
       order: 1 !important;
-      flex: 1 1 30% !important;
+      flex: 0 0 clamp(90px, 16vh, 140px) !important;
       display: flex !important;
       flex-direction: row !important;
       gap: 4px !important;
@@ -128,13 +127,19 @@
       padding-top: 4px !important;
       min-height: 0 !important;
     }
+    #lms-grid-container.lms-spotlight-active.lms-ratio-90 .lms-thumbnail-strip {
+      flex: 0 0 clamp(64px, 10vh, 96px) !important;
+    }
     #lms-grid-container.lms-spotlight-active .lms-remote-tile:not(.lms-spotlight-tile) {
-      flex: 0 0 clamp(96px, 30vw, 200px) !important;
-      width: clamp(96px, 30vw, 200px) !important;
+      flex: 0 0 clamp(130px, 36vw, 220px) !important;
+      width: clamp(130px, 36vw, 220px) !important;
       height: calc(100% - 4px) !important;
       min-height: 0 !important;
     }
-    @media (min-width: 900px) {
+    /* Desktop split — gated on pointer:fine so a phone in "Desktop site"
+       mode (wide layout viewport but a touch pointer) still gets the
+       mobile stacked layout: every phone must look the same. */
+    @media (min-width: 900px) and (pointer: fine) {
       #lms-grid-container.lms-spotlight-active {
         flex-direction: row !important;
       }
@@ -147,6 +152,7 @@
          referenced) instead of one narrow single-file column — more people
          stay visible at once and each tile keeps a sensible video shape. */
       #lms-grid-container.lms-spotlight-active .lms-thumbnail-strip {
+        flex: 0 0 30% !important; /* the client-specified 70/30 split */
         flex-direction: row !important;
         flex-wrap: wrap !important;
         align-content: flex-start !important;
@@ -154,6 +160,9 @@
         overflow-y: auto !important;
         padding-top: 0 !important;
         padding-left: 4px !important;
+      }
+      #lms-grid-container.lms-spotlight-active.lms-ratio-90 .lms-thumbnail-strip {
+        flex: 0 0 10% !important; /* manual expand: 90/10 */
       }
       #lms-grid-container.lms-spotlight-active .lms-remote-tile:not(.lms-spotlight-tile) {
         flex: 0 0 calc(50% - 2px) !important;

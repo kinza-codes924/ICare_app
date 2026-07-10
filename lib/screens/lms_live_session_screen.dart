@@ -989,9 +989,15 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
     );
   }
 
-  /// Video area with the consultation-style translucent overlays stacked on
-  /// top: info pills (top-left) and floating controls (bottom-center).
+  /// Video area with the consultation-style translucent overlays: info
+  /// pills (top-left) and the control bar at the bottom. The video area
+  /// STOPS above the controls (bottom inset) instead of running the full
+  /// height — otherwise the thumbnail strip / bottom grid row renders
+  /// underneath the floating buttons and the two visibly overlap (this is
+  /// exactly what the client's mobile screenshots showed).
   Widget _buildVideoWithOverlays() {
+    final isMobile = MediaQuery.of(context).size.width < 600;
+    final controlsReserve = _permissionsEnabled ? (isMobile ? 168.0 : 128.0) : 0.0;
     return Stack(
       children: [
         // Tap a participant tile to expand it to a 90/10 split (tap again
@@ -999,7 +1005,8 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
         // on the DOM tiles — so we hit-test the tile rects in JS using the
         // tap's viewport coordinates. Overlay buttons above this layer win
         // the gesture arena, so this only fires for bare video-area taps.
-        Positioned.fill(
+        Positioned(
+          top: 0, left: 0, right: 0, bottom: controlsReserve,
           child: GestureDetector(
             behavior: HitTestBehavior.translucent,
             onTapUp: (details) {
@@ -1017,7 +1024,17 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
         // _buildVideoArea pins to its own top-right corner.
         Positioned(top: 12, left: 12, right: 110, child: _buildTopOverlay()),
         if (_permissionsEnabled)
-          Positioned(bottom: 20, left: 0, right: 0, child: _buildFloatingControls()),
+          Positioned(
+            bottom: 0, left: 0, right: 0,
+            height: controlsReserve,
+            child: Align(
+              alignment: Alignment.bottomCenter,
+              child: Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: _buildFloatingControls(),
+              ),
+            ),
+          ),
       ],
     );
   }
