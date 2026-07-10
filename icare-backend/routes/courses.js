@@ -497,7 +497,9 @@ router.get('/:id', authMiddleware, async (req, res) => {
 });
 
 // POST /api/courses — create course (instructor)
-// Create LiveSession docs for any lessons that have a liveSessionDateTime
+// Create LiveSession docs for any lessons that have a liveSessionDateTime.
+// IMPORTANT: `modules` must be the SAVED course.modules (real Mongoose
+// subdocument _ids), not the raw request body — see the two call sites.
 async function syncLiveSessions(courseId, instructorId, modules) {
   if (!Array.isArray(modules)) return;
   for (const mod of modules) {
@@ -507,16 +509,17 @@ async function syncLiveSessions(courseId, instructorId, modules) {
       if (isNaN(scheduledAt)) continue;
       const lessonId = lesson._id?.toString() || lesson.id?.toString() || null;
       const modId = mod._id?.toString() || mod.id?.toString() || null;
+      if (!lessonId || !modId) continue; // no stable id to link against — skip rather than fall back to a title match that can never resolve client-side
       // Upsert by courseId + linkedLessonId so we don't create duplicates on edit
-      const filter = { courseId: toId(courseId), linkedLessonId: lessonId || lesson.title };
+      const filter = { courseId: toId(courseId), linkedLessonId: lessonId };
       const update = {
         $set: {
           courseId: toId(courseId),
           instructorId: toId(instructorId),
           title: lesson.liveSessionNote?.trim() || `Live: ${lesson.title || 'Session'}`,
           scheduledAt,
-          linkedLessonId: lessonId || lesson.title,
-          linkedModuleId: modId || mod.title,
+          linkedLessonId: lessonId,
+          linkedModuleId: modId,
           status: 'scheduled',
         },
         $setOnInsert: { duration: 60, maxParticipants: 100, isRecorded: true },
@@ -530,7 +533,14 @@ router.post('/', authMiddleware, async (req, res) => {
   try {
     await connectMongoDB();
     const course = await Course.create({ ...req.body, instructor_id: toId(req.user.id) });
-    await syncLiveSessions(course._id, req.user.id, req.body.modules);
+    // Use course.modules (the saved document), NOT req.body.modules (the raw
+    // client payload) — Mongoose only assigns each module/lesson subdocument
+    // its real _id once it's actually saved. syncLiveSessions links a live
+    // session to its module via that _id (linkedModuleId); passing the raw
+    // body meant every module was still missing an _id at this point, so the
+    // link silently fell back to the module's title and could never match
+    // when the Course Content screen later looked up sessions by module._id.
+    await syncLiveSessions(course._id, req.user.id, course.modules);
     res.status(201).json({ success: true, course });
   } catch (e) {
     res.status(500).json({ success: false, message: e.message });
@@ -543,7 +553,9 @@ router.put('/:id', authMiddleware, async (req, res) => {
     await connectMongoDB();
     const course = await Course.findByIdAndUpdate(toId(req.params.id), { $set: req.body }, { new: true });
     if (!course) return res.status(404).json({ success: false, message: 'Not found' });
-    await syncLiveSessions(course._id, req.user.id, req.body.modules);
+    // Same reasoning as POST / above — use the saved course.modules (real
+    // subdocument _ids) rather than the raw req.body.modules.
+    await syncLiveSessions(course._id, req.user.id, course.modules);
     res.json({ success: true, course });
   } catch (e) {
     res.status(500).json({ success: false, message: e.message });

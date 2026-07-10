@@ -74,9 +74,6 @@ class _LmsPublicCatalogState extends State<LmsPublicCatalog> {
   void _applyFilters() {
     setState(() {
       _filteredCourses = _courses.where((course) {
-        // Only show the CRP course
-        final title = (course['title'] ?? '').toString().toLowerCase();
-        if (!title.contains('certificate in research') && !title.contains('crp')) return false;
         // Audience filter from navigation param
         if (widget.audienceFilter != null && widget.audienceFilter!.isNotEmpty) {
           final courseAudience = (course['targetAudience'] ?? 'Patient').toString().toLowerCase();
