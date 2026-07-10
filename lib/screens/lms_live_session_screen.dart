@@ -1003,14 +1003,20 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
         // Tap a participant tile to expand it to a 90/10 split (tap again
         // to restore the grid). Taps land on Flutter's glass pane — never
         // on the DOM tiles — so we hit-test the tile rects in JS using the
-        // tap's viewport coordinates. Overlay buttons above this layer win
-        // the gesture arena, so this only fires for bare video-area taps.
+        // tap's viewport coordinates. Nested GestureDetectors don't
+        // exclude each other for plain taps in Flutter, so the Fit/Fill
+        // and fullscreen buttons _buildVideoArea pins to this same box's
+        // top-right corner would ALSO trigger this handler underneath
+        // them — explicitly ignore taps landing in that reserved corner.
         Positioned(
           top: 0, left: 0, right: 0, bottom: controlsReserve,
           child: GestureDetector(
             behavior: HitTestBehavior.translucent,
             onTapUp: (details) {
               if (!kIsWeb || !_permissionsEnabled) return;
+              final width = MediaQuery.of(context).size.width;
+              final local = details.localPosition;
+              if (local.dy <= 50 && local.dx >= width - 110) return;
               final uid = lmsTileAtPoint(
                 details.globalPosition.dx,
                 details.globalPosition.dy,
