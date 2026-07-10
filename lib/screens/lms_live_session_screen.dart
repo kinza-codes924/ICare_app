@@ -85,6 +85,11 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
   String _currentUserId = '';
   String _instructorName = ''; // populated from session doc for student view
   String _sessionDocId = ''; // actual MongoDB _id of the LiveSession document
+  // backend userId -> Agora uid, refreshed every sync — the only reliable
+  // way to know which video tile belongs to which person (see
+  // _syncSessionState). Used by both the web tile-naming path and the
+  // native-mobile _buildRemoteVideoTile fallback below.
+  Map<String, String> _userIdToAgoraUid = {};
   Timer? _sessionTimer;
   Timer? _syncTimer; // polls backend for chat/participants/raised hands
   Timer? _heartbeatTimer; // instructor-only: keeps session alive on backend
@@ -387,6 +392,7 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
           userIdToAgoraUid[uid] = agoraUid;
         }
       }
+      _userIdToAgoraUid = userIdToAgoraUid;
 
       // Waiting room students (instructor sees these)
       final waiting = (session['waitingStudents'] as List?) ?? [];
@@ -617,6 +623,16 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
         if (mounted && !_joined) {
           setState(() { _joined = true; _loading = false; });
           _startSessionTimer();
+        }
+        // Report the Agora uid we were just assigned — see the web overlay
+        // tap handler for why (naming tiles by list-position instead of
+        // this real mapping is what mislabeled tiles / made them look like
+        // they vanished when a new participant joined).
+        if (_sessionDocId.isNotEmpty) {
+          final myUid = lmsGetLocalUid();
+          if (myUid.isNotEmpty) {
+            _lms.setMyAgoraUid(sessionId: _sessionDocId, agoraUid: myUid);
+          }
         }
       },
       onRemote: (uid, joined) {
@@ -1444,13 +1460,20 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
   }
 
   Widget _buildRemoteVideoTile(int uid) {
-    // Resolve participant name by position in remote-UID list
+    // Resolve participant name via the real userId->agoraUid mapping (see
+    // _userIdToAgoraUid / set-my-uid) — NOT by position in the remote-UID
+    // list, which silently mislabeled tiles whenever Agora's join order
+    // didn't match the backend participants list's order (it usually
+    // doesn't, since Agora assigns uids randomly and independently).
     final remoteParticipants = _participants
         .where((p) => p['id'] != _currentUserId)
         .toList();
-    final uidIndex = _remoteUids.indexOf(uid);
-    final participantName = uidIndex >= 0 && uidIndex < remoteParticipants.length
-        ? remoteParticipants[uidIndex]['name']?.toString() ?? 'Student'
+    final matchedParticipant = remoteParticipants.cast<Map<String, dynamic>?>().firstWhere(
+          (p) => _userIdToAgoraUid[p?['id']?.toString() ?? ''] == uid.toString(),
+          orElse: () => null,
+        );
+    final participantName = matchedParticipant != null
+        ? (matchedParticipant['name']?.toString() ?? 'Student')
         : (widget.isInstructor
             ? 'Student'
             : (_instructorName.isNotEmpty ? _instructorName : 'Instructor'));

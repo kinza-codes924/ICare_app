@@ -67,24 +67,37 @@
       position: absolute; bottom: 6px; left: 6px;
       background: rgba(0,0,0,0.6); color: #fff; font-size: 12px; font-weight: 600;
       padding: 2px 8px; border-radius: 4px; z-index: 10; pointer-events: none;
+      max-width: calc(100% - 12px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     }
-    /* Screen-share spotlight (Zoom-style): the sharing participant's
+    /* The local self-preview box is much smaller than a grid tile (clamp()
+       84-130px wide) — the standard 12px/8px padded label would overflow
+       or dominate it, so scale the label down specifically inside that box. */
+    #lms-agora-local .lms-tile-name {
+      font-size: 9px; padding: 1px 5px; bottom: 3px; left: 3px;
+    }
+    /* Screen-share spotlight (Google Meet style): the sharing participant's
        EXISTING tile grows to fill nearly the whole area; every other
-       participant keeps a fixed-size tile in a horizontally SCROLLABLE
-       strip below it — never shrunk to the point of disappearing, and
-       never clipped by the container height regardless of headcount
-       (5, 15, 20+ students all stay reachable via horizontal scroll).
-       Deliberately reuses the same tile <div> that's already playing video
-       the whole time (just resized via CSS/class toggle) instead of moving
-       video into a new container — an earlier "big main view" attempt did
-       that (played the track into a separate, previously-hidden element)
-       and caused blank/stuck shared screens. #lms-grid-container carries
-       inline display:grid set once from Dart, so overriding it needs
-       !important same as the rest of this stylesheet's grid overrides. */
+       participant keeps a fixed-size tile in a SCROLLABLE strip — never
+       shrunk to the point of disappearing, and never clipped by the
+       container regardless of headcount (5, 15, 20+ students all stay
+       reachable via scroll). Deliberately reuses the same tile <div> that's
+       already playing video the whole time (just resized via CSS/class
+       toggle) instead of moving video into a new container — an earlier
+       "big main view" attempt did that (played the track into a separate,
+       previously-hidden element) and caused blank/stuck shared screens.
+       #lms-grid-container carries inline display:grid set once from Dart,
+       so overriding it needs !important same as the rest of this
+       stylesheet's grid overrides.
+
+       Layout direction: mobile/narrow viewports stack the strip BELOW the
+       main content (matches how people naturally hold/scroll a phone);
+       desktop-width viewports (>=900px) instead put the strip as a RIGHT
+       COLUMN next to the shared screen — the "Main Area (Left/Center) +
+       Participant Sidebar (Right Column on Desktop)" arrangement. */
     #lms-grid-container.lms-spotlight-active {
       display: flex !important;
       flex-direction: column !important;
-      overflow-y: hidden !important;
+      overflow: hidden !important;
     }
     #lms-grid-container.lms-spotlight-active .lms-remote-tile {
       aspect-ratio: auto !important;
@@ -95,13 +108,19 @@
       min-height: 0 !important;
       width: 100% !important;
     }
-    /* Thumbnail strip: fixed height, horizontally scrollable so every
-       participant tile stays fully visible (and clickable) no matter how
-       many students are in the call — this is the piece that was missing
-       before, which let tiles overflow off-screen and "disappear". */
+    /* Thumbnail strip (mobile/narrow default): fixed height, horizontally
+       scrollable so every participant tile stays fully visible (and
+       clickable) no matter how many students are in the call — this is the
+       piece that was missing before, which let tiles overflow off-screen
+       and "disappear". Sized with clamp() so it (and each thumbnail below)
+       shrinks on narrow viewports instead of eating a fixed,
+       disproportionate chunk of a phone screen. Overridden below by the
+       >=900px media query for the desktop right-column arrangement — this
+       block MUST come first so the media query (same specificity) wins on
+       wide viewports per normal CSS cascade order. */
     #lms-grid-container.lms-spotlight-active .lms-thumbnail-strip {
       order: 1 !important;
-      flex: 0 0 96px !important;
+      flex: 0 0 clamp(64px, 14vh, 96px) !important;
       display: flex !important;
       flex-direction: row !important;
       gap: 4px !important;
@@ -110,9 +129,31 @@
       padding-top: 4px !important;
     }
     #lms-grid-container.lms-spotlight-active .lms-remote-tile:not(.lms-spotlight-tile) {
-      flex: 0 0 128px !important;
-      width: 128px !important;
-      height: 96px !important;
+      flex: 0 0 clamp(88px, 24vw, 128px) !important;
+      width: clamp(88px, 24vw, 128px) !important;
+      height: clamp(64px, 14vh, 96px) !important;
+    }
+    @media (min-width: 900px) {
+      #lms-grid-container.lms-spotlight-active {
+        flex-direction: row !important;
+      }
+      #lms-grid-container.lms-spotlight-active .lms-spotlight-tile {
+        width: auto !important;
+        height: 100% !important;
+      }
+      #lms-grid-container.lms-spotlight-active .lms-thumbnail-strip {
+        flex-direction: column !important;
+        flex: 0 0 clamp(160px, 20vw, 220px) !important;
+        overflow-x: hidden !important;
+        overflow-y: auto !important;
+        padding-top: 0 !important;
+        padding-left: 4px !important;
+      }
+      #lms-grid-container.lms-spotlight-active .lms-remote-tile:not(.lms-spotlight-tile) {
+        width: 100% !important;
+        height: clamp(90px, 12vh, 130px) !important;
+        flex: 0 0 clamp(90px, 12vh, 130px) !important;
+      }
     }
   </style>
 </head>
@@ -679,8 +720,14 @@
       }
       var count = grid.children.length;
       // Scale columns with participant count instead of capping at a fixed
-      // number, so grids with 20+ students still lay out sensibly.
-      var cols = count <= 1 ? 1 : count <= 4 ? 2 : count <= 9 ? 3 : count <= 16 ? 4 : 5;
+      // number, so grids with 20+ students still lay out sensibly. On
+      // narrow (mobile) viewports, cap at 2 columns regardless of count —
+      // more than that makes each tile too small to show a recognizable
+      // face, whereas extra rows (scrollable) stay usable.
+      var isNarrow = window.innerWidth < 600;
+      var cols = isNarrow
+        ? (count <= 1 ? 1 : 2)
+        : (count <= 1 ? 1 : count <= 4 ? 2 : count <= 9 ? 3 : count <= 16 ? 4 : 5);
       grid.style.gridTemplateColumns = 'repeat(' + cols + ', 1fr)';
       window._lmsReplayGridTiles();
     };

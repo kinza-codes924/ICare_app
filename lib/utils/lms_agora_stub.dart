@@ -5,6 +5,7 @@ import 'package:permission_handler/permission_handler.dart';
 
 RtcEngine? _engine;
 String _channelId = '';
+int _localUid = 0;
 void Function(int uid, bool joined)? _onRemoteCb;
 void Function()? _onJoinedCb;
 
@@ -40,6 +41,7 @@ Future<void> lmsJoinChannel(
     _engine!.registerEventHandler(
       RtcEngineEventHandler(
         onJoinChannelSuccess: (connection, elapsed) {
+          _localUid = connection.localUid ?? 0;
           _onJoinedCb?.call();
         },
         onUserJoined: (connection, remoteUid, elapsed) {
@@ -112,7 +114,7 @@ Future<void> lmsEnableMediaAndPublish() async {}
 Future<void> lmsStudentEnableAudio() async {}
 
 Future<String> lmsToggleScreenShare() async => 'unsupported';
-String lmsGetLocalUid() => '';
+String lmsGetLocalUid() => _localUid > 0 ? _localUid.toString() : '';
 void lmsApplyRemoteScreenShare(String sharingUid) {}
 void lmsRequestFullscreen() {}
 void lmsExitFullscreen() {}

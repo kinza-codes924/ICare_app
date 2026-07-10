@@ -152,14 +152,17 @@ String registerLmsVideoView() {
       grid.style.boxSizing = 'border-box';
       container.appendChild(grid);
 
-      // Local video — small preview pinned to bottom-right corner
+      // Local video — small preview pinned to bottom-right corner. Sized
+      // with clamp() so it shrinks on narrow/mobile viewports instead of
+      // staying a fixed 130x98 that can crowd or overlap other UI on small
+      // screens (16:9-ish box: width scales 84px-130px, height follows).
       final local = web.document.createElement('div') as web.HTMLDivElement;
       local.id = 'lms-agora-local';
       local.style.position = 'absolute';
       local.style.bottom = '8px';
       local.style.right = '8px';
-      local.style.width = '130px';
-      local.style.height = '98px';
+      local.style.width = 'clamp(84px, 22vw, 130px)';
+      local.style.height = 'clamp(63px, 16.5vw, 98px)';
       local.style.background = '#000';
       local.style.borderRadius = '8px';
       local.style.overflow = 'hidden';
@@ -167,21 +170,16 @@ String registerLmsVideoView() {
       local.style.border = '2px solid rgba(255,255,255,0.2)';
       container.appendChild(local);
 
-      // Local name label
+      // Local name label lives INSIDE the preview box itself (bottom-left,
+      // like every remote tile's .lms-tile-name) instead of as a separate
+      // absolutely-positioned sibling anchored to the same corner — the old
+      // standalone #lms-local-name div sat at the same bottom-right corner
+      // as this box and rendered directly on top of it/its video.
       final localName = web.document.createElement('div') as web.HTMLDivElement;
       localName.id = 'lms-local-name';
-      localName.style.position = 'absolute';
-      localName.style.bottom = '12px';
-      localName.style.right = '12px';
-      localName.style.background = 'rgba(0,0,0,0.6)';
-      localName.style.color = '#fff';
-      localName.style.fontSize = '9px';
-      localName.style.fontWeight = '600';
-      localName.style.padding = '2px 5px';
-      localName.style.borderRadius = '3px';
-      localName.style.zIndex = '25';
+      localName.className = 'lms-tile-name';
       localName.style.display = 'none';
-      container.appendChild(localName);
+      local.appendChild(localName);
 
       return container;
     });
