@@ -76,7 +76,11 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
       ..style.display = 'block'
       ..style.backgroundColor = '#000'
       ..setAttribute('playsinline', 'true')
-      ..setAttribute('preload', 'metadata');
+      // 'auto' (not 'metadata') is required for the Infinity-duration
+      // workaround below to actually resolve — Chrome only computes the
+      // real duration of a MediaRecorder WebM once enough of the file's
+      // tail is fetched, which 'metadata' alone does not guarantee.
+      ..setAttribute('preload', 'auto');
 
     final seekBar = html.InputElement(type: 'range')
       ..min = '0'
@@ -175,26 +179,6 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
       return h > 0 ? '$h:$mm:$ss' : '$mm:$ss';
     }
 
-    // Chrome-recorded WebM (MediaRecorder output — how LMS session
-    // recordings are produced) often ships with duration = Infinity in its
-    // metadata header. The browser only computes the real duration once you
-    // seek near the end, so on load we force a seek to a huge timestamp and
-    // immediately back to 0 — the standard workaround for this Chromium bug.
-    bool durationFixed = false;
-    void fixDurationIfNeeded() {
-      if (durationFixed) return;
-      final d = video.duration;
-      if (d.isInfinite || d.isNaN) {
-        video.currentTime = 1e101;
-        video.onTimeUpdate.first.then((_) {
-          video.currentTime = 0;
-          durationFixed = true;
-        });
-      } else {
-        durationFixed = true;
-      }
-    }
-
     num effectiveDuration() {
       final d = video.duration;
       return (d.isFinite && !d.isNaN) ? d : 0;
@@ -204,11 +188,51 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
       timeLabel.text = '${fmt(video.currentTime)} / ${fmt(effectiveDuration())}';
     }
 
+    // Chrome-recorded WebM (MediaRecorder output — how LMS session
+    // recordings are produced) ships with duration = Infinity in its
+    // metadata header because the container has no fixed-length index.
+    // Chrome only resolves the real duration once it has actually fetched
+    // the tail of the file, which a seek to a huge timestamp forces. This
+    // is retried from multiple lifecycle events (not just loadedmetadata)
+    // and via 'seeked' (which fires reliably once the seek settles, unlike
+    // relying on a single 'timeupdate') because a single attempt can miss
+    // if the network hasn't buffered enough yet.
+    bool durationFixed = false;
+    bool fixInFlight = false;
+    void fixDurationIfNeeded() {
+      if (durationFixed || fixInFlight) return;
+      final d = video.duration;
+      if (d.isFinite && !d.isNaN && d > 0) {
+        durationFixed = true;
+        return;
+      }
+      fixInFlight = true;
+      late final StreamSubscription sub;
+      sub = video.onSeeked.listen((_) {
+        sub.cancel();
+        fixInFlight = false;
+        final resolved = video.duration;
+        if (resolved.isFinite && !resolved.isNaN && resolved > 0) {
+          durationFixed = true;
+        }
+        video.currentTime = 0;
+        updateTimeLabel();
+      });
+      video.currentTime = 1e101;
+    }
+
     video.onLoadedMetadata.listen((_) {
       fixDurationIfNeeded();
       updateTimeLabel();
     });
-    video.onDurationChange.listen((_) => updateTimeLabel());
+    video.onDurationChange.listen((_) {
+      fixDurationIfNeeded();
+      updateTimeLabel();
+    });
+    video.onCanPlay.listen((_) {
+      fixDurationIfNeeded();
+      updateTimeLabel();
+    });
 
     video.onTimeUpdate.listen((_) {
       if (!seeking) {
