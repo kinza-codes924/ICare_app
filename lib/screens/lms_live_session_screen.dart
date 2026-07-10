@@ -1372,7 +1372,7 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
           _buildSelfVideoTile(isLarge: true)
         else if (_remoteUids.length == 1)
           // 1 remote user — full screen remote view
-          SizedBox.expand(child: _buildRemoteVideoTile(_remoteUids[0]))
+          SizedBox.expand(child: _buildRemoteVideoTile(_remoteUids[0], key: ValueKey(_remoteUids[0])))
         else
           // Multiple remote users — grid
           _buildVideoGrid(),
@@ -1430,7 +1430,16 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
         childAspectRatio: 4 / 3,
       ),
       itemCount: _remoteUids.length,
-      itemBuilder: (context, i) => _buildRemoteVideoTile(_remoteUids[i]),
+      // ValueKey(uid) — without a per-uid key, GridView.builder matches grid
+      // cells by position, not by participant. As students join/leave and
+      // the list reorders, Flutter reuses an existing cell's Element for a
+      // different uid, but the native Agora video surface bound to that
+      // Element (mobile-only; web renders via JS/DOM, not this widget) isn't
+      // always torn down and rebound in step — so two participants' camera
+      // feeds briefly render stacked in the same tile. Keying by uid forces
+      // Flutter to create/dispose a distinct Element (and native view) per
+      // participant instead of reusing one across different uids.
+      itemBuilder: (context, i) => _buildRemoteVideoTile(_remoteUids[i], key: ValueKey(_remoteUids[i])),
     );
   }
 
@@ -1503,7 +1512,7 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
     );
   }
 
-  Widget _buildRemoteVideoTile(int uid) {
+  Widget _buildRemoteVideoTile(int uid, {Key? key}) {
     // Resolve participant name via the real userId->agoraUid mapping (see
     // _userIdToAgoraUid / set-my-uid) — NOT by position in the remote-UID
     // list, which silently mislabeled tiles whenever Agora's join order
@@ -1523,6 +1532,7 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
             : (_instructorName.isNotEmpty ? _instructorName : 'Instructor'));
 
     return Container(
+      key: key,
       decoration: BoxDecoration(
         color: const Color(0xFF2D3748),
         borderRadius: BorderRadius.circular(8),
