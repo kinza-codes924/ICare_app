@@ -623,6 +623,30 @@ class LmsService {
     } catch (_) {}
   }
 
+  // Reports the Agora uid this device was assigned for this call, so other
+  // participants can map "which video tile" to "which person" reliably
+  // instead of guessing by list order.
+  Future<void> setMyAgoraUid({
+    required String sessionId,
+    required String agoraUid,
+  }) async {
+    try {
+      await _api.post('/live-sessions/$sessionId/set-my-uid', {'agoraUid': agoraUid});
+    } catch (_) {}
+  }
+
+  // Instructor: unenroll a student from the course (deletes the enrollment).
+  Future<void> removeStudentFromCourse({
+    required String courseId,
+    required String studentId,
+  }) async {
+    final response = await _api.delete('/courses/$courseId/students/$studentId');
+    final data = response.data;
+    if (data is Map && data['success'] != true) {
+      throw Exception(data['message'] ?? 'Failed to remove student');
+    }
+  }
+
   Future<Map<String, dynamic>> admitStudent({
     required String sessionId,
     required String studentId,

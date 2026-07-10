@@ -21,6 +21,13 @@ class _DoctorNotificationsState extends State<DoctorNotifications> {
   final NotificationService _notificationService = NotificationService();
   List<Map<String, dynamic>> _notifications = [];
   bool _isLoading = true;
+  String _filter = 'all'; // 'all' | 'unread' | a notification type
+
+  List<Map<String, dynamic>> get _filteredNotifications {
+    if (_filter == 'all') return _notifications;
+    if (_filter == 'unread') return _notifications.where((n) => !n['read']).toList();
+    return _notifications.where((n) => n['type'] == _filter).toList();
+  }
 
   @override
   void initState() {
@@ -276,6 +283,27 @@ class _DoctorNotificationsState extends State<DoctorNotifications> {
                         ),
                         const SizedBox(height: 24),
                       ],
+                      if (_notifications.isNotEmpty) ...[
+                        SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: Row(
+                            children: [
+                              _buildFilterChip('all', 'All'),
+                              const SizedBox(width: 8),
+                              _buildFilterChip('unread', 'Unread'),
+                              const SizedBox(width: 8),
+                              _buildFilterChip('appointment', 'Appointments'),
+                              const SizedBox(width: 8),
+                              _buildFilterChip('reminder', 'Reminders'),
+                              const SizedBox(width: 8),
+                              _buildFilterChip('review', 'Reviews'),
+                              const SizedBox(width: 8),
+                              _buildFilterChip('general', 'General'),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                      ],
                       if (_notifications.isEmpty)
                         Container(
                           padding: const EdgeInsets.all(48),
@@ -313,10 +341,19 @@ class _DoctorNotificationsState extends State<DoctorNotifications> {
                             ),
                           ),
                         )
+                      else if (_filteredNotifications.isEmpty)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 32),
+                          child: Center(
+                            child: Text(
+                              'No notifications match this filter',
+                              style: TextStyle(color: Colors.grey.shade500, fontSize: 14),
+                            ),
+                          ),
+                        )
                       else
-                        ..._notifications.map(
-                          (notification) =>
-                              _buildNotificationCard(notification),
+                        ..._filteredNotifications.asMap().entries.map(
+                          (entry) => _buildNotificationCard(entry.value, entry.key + 1),
                         ),
                     ],
                   ),
@@ -326,7 +363,24 @@ class _DoctorNotificationsState extends State<DoctorNotifications> {
     );
   }
 
-  Widget _buildNotificationCard(Map<String, dynamic> notification) {
+  Widget _buildFilterChip(String value, String label) {
+    final selected = _filter == value;
+    return ChoiceChip(
+      label: Text(label),
+      selected: selected,
+      onSelected: (_) => setState(() => _filter = value),
+      selectedColor: const Color(0xFF6366F1).withValues(alpha: 0.15),
+      labelStyle: TextStyle(
+        color: selected ? const Color(0xFF6366F1) : const Color(0xFF64748B),
+        fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+        fontSize: 13,
+      ),
+      side: BorderSide(color: selected ? const Color(0xFF6366F1) : const Color(0xFFE2E8F0)),
+      backgroundColor: Colors.white,
+    );
+  }
+
+  Widget _buildNotificationCard(Map<String, dynamic> notification, int number) {
     final isRead = notification['read'] as bool;
     final color = notification['color'] as Color;
     final time = notification['time'] as DateTime;
@@ -377,13 +431,33 @@ class _DoctorNotificationsState extends State<DoctorNotifications> {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(notification['icon'], color: color, size: 24),
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(notification['icon'], color: color, size: 24),
+                ),
+                Positioned(
+                  top: -6,
+                  left: -6,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF0F172A),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      '$number',
+                      style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                ),
+              ],
             ),
             const SizedBox(width: 16),
             Expanded(

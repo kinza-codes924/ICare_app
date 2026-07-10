@@ -56,6 +56,12 @@ external void _lmsSetVideoFitJS(JSString mode);
 @JS('lmsSetTileName')
 external void _lmsSetTileNameJS(JSNumber uid, JSString name);
 
+@JS('lmsTileAtPoint')
+external JSString _lmsTileAtPointJS(JSNumber x, JSNumber y);
+
+@JS('lmsToggleTileExpand')
+external void _lmsToggleTileExpandJS(JSString uid);
+
 // appId and token fetched by caller from AgoraService
 Future<void> lmsJoinChannel(String roomName, String appId, String token, bool isInstructor) async {
   await _lmsAgoraJoinJS(appId.toJS, roomName.toJS, token.toJS, 0.toJS, isInstructor.toJS).toDart;
@@ -92,6 +98,14 @@ void lmsSetParticipantNames(String localName, String remoteName) =>
     _lmsSetParticipantNamesJS(localName.toJS, remoteName.toJS);
 void lmsSetVideoFit(String mode) => _lmsSetVideoFitJS(mode.toJS);
 void lmsSetTileName(int uid, String name) => _lmsSetTileNameJS(uid.toJS, name.toJS);
+
+/// Hit-tests the remote video tiles against a viewport point — returns the
+/// uid of the tile under (x, y) or '' if none. Needed because pointer events
+/// land on Flutter's glass pane, never on the DOM tiles themselves.
+String lmsTileAtPoint(double x, double y) => _lmsTileAtPointJS(x.toJS, y.toJS).toDart;
+
+/// Manually expand/collapse a tile to a 90/10 split (tap-to-expand).
+void lmsToggleTileExpand(String uid) => _lmsToggleTileExpandJS(uid.toJS);
 
 void lmsListenForScreenShareEnded(void Function() callback) {
   web.window.addEventListener('lms-screen-share-ended', ((web.Event _) {
@@ -152,14 +166,20 @@ String registerLmsVideoView() {
       grid.style.boxSizing = 'border-box';
       container.appendChild(grid);
 
-      // Local video — small preview pinned to bottom-right corner
+      // Local video — small preview pinned to the TOP-right corner (same
+      // placement as the doctor↔patient consultation screen), below the
+      // Fit/Fill + fullscreen buttons Flutter overlays at the very top.
+      // The bottom edge now belongs to the floating call controls, so the
+      // preview can't live there anymore without colliding with them on
+      // narrow screens. Sized with clamp() so it shrinks on mobile
+      // viewports (16:9-ish box: width scales 84px-130px, height follows).
       final local = web.document.createElement('div') as web.HTMLDivElement;
       local.id = 'lms-agora-local';
       local.style.position = 'absolute';
-      local.style.bottom = '8px';
+      local.style.top = '48px';
       local.style.right = '8px';
-      local.style.width = '130px';
-      local.style.height = '98px';
+      local.style.width = 'clamp(84px, 22vw, 130px)';
+      local.style.height = 'clamp(63px, 16.5vw, 98px)';
       local.style.background = '#000';
       local.style.borderRadius = '8px';
       local.style.overflow = 'hidden';
@@ -167,21 +187,16 @@ String registerLmsVideoView() {
       local.style.border = '2px solid rgba(255,255,255,0.2)';
       container.appendChild(local);
 
-      // Local name label
+      // Local name label lives INSIDE the preview box itself (bottom-left,
+      // like every remote tile's .lms-tile-name) instead of as a separate
+      // absolutely-positioned sibling anchored to the same corner — the old
+      // standalone #lms-local-name div sat at the same bottom-right corner
+      // as this box and rendered directly on top of it/its video.
       final localName = web.document.createElement('div') as web.HTMLDivElement;
       localName.id = 'lms-local-name';
-      localName.style.position = 'absolute';
-      localName.style.bottom = '12px';
-      localName.style.right = '12px';
-      localName.style.background = 'rgba(0,0,0,0.6)';
-      localName.style.color = '#fff';
-      localName.style.fontSize = '9px';
-      localName.style.fontWeight = '600';
-      localName.style.padding = '2px 5px';
-      localName.style.borderRadius = '3px';
-      localName.style.zIndex = '25';
+      localName.className = 'lms-tile-name';
       localName.style.display = 'none';
-      container.appendChild(localName);
+      local.appendChild(localName);
 
       return container;
     });

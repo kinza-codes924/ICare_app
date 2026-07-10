@@ -23,6 +23,9 @@ const enrollmentSchema = new mongoose.Schema({
   isCompleted: { type: Boolean, default: false },
   completedAt: { type: Date },
   certificateUrl: { type: String },
+  // Payment/voucher tracking — set when a voucher was applied at checkout
+  voucherCode: { type: String, default: null },
+  amountPaid: { type: Number, default: null },
 }, { timestamps: true });
 
 // One enrollment per user per course

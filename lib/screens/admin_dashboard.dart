@@ -674,6 +674,33 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
                             ),
                           ],
                         ),
+                        if (user['isExistingAccount'] == true &&
+                            List<String>.from(user['roles'] ?? []).isNotEmpty) ...[
+                          const SizedBox(height: 8),
+                          Wrap(
+                            spacing: 6,
+                            runSpacing: 6,
+                            children: List<String>.from(user['roles'] ?? [])
+                                .where((r) => r != user['role'])
+                                .map((r) => Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: Colors.amber.shade100,
+                                        borderRadius: BorderRadius.circular(20),
+                                        border: Border.all(color: Colors.amber.shade400),
+                                      ),
+                                      child: Row(mainAxisSize: MainAxisSize.min, children: [
+                                        Icon(Icons.verified_rounded, size: 12, color: Colors.amber.shade800),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          'Already approved as $r',
+                                          style: TextStyle(color: Colors.amber.shade900, fontWeight: FontWeight.w700, fontSize: 11),
+                                        ),
+                                      ]),
+                                    ))
+                                .toList(),
+                          ),
+                        ],
                         if (user['verificationDetails'] != null) ...[
                           const SizedBox(height: 12),
                           Container(

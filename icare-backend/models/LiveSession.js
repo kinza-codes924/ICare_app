@@ -56,6 +56,16 @@ const liveSessionSchema = new mongoose.Schema({
   // other participants poll this to switch to the big-main-view layout.
   // null/empty means nobody is sharing.
   screenSharingUid: { type: String, default: null },
+  // Maps each participant's backend User to the Agora numeric uid Agora
+  // assigned them for THIS call (uid:0 join means Agora picks a random one
+  // server-side — there is no formula from userId to uid, so without this
+  // explicit report/lookup the client has no reliable way to know which
+  // remote video tile belongs to which participant). Each participant
+  // reports their own uid right after joining via POST /:id/set-my-uid.
+  participantUids: [{
+    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    agoraUid: String,
+  }],
 }, { timestamps: true });
 
 module.exports = mongoose.models.LiveSession || mongoose.model('LiveSession', liveSessionSchema);

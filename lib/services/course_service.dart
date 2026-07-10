@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:icare/models/course.dart';
 import 'package:icare/services/api_service.dart';
@@ -141,17 +142,36 @@ class CourseService {
   }
 
   // Buy/Enroll in a course
-  Future<Map<String, dynamic>> buyCourse(String courseId) async {
+  Future<Map<String, dynamic>> buyCourse(String courseId, {String? voucherCode}) async {
     try {
       debugPrint('Attempting to buy course: $courseId');
       final response = await _apiService.post('/students/courses/enrollments', {
         'courseId': courseId,
+        if (voucherCode != null && voucherCode.isNotEmpty) 'voucherCode': voucherCode,
       });
       debugPrint('Buy course response: ${response.data}');
       return response.data;
     } catch (e) {
       debugPrint('Error buying course: $e');
       rethrow;
+    }
+  }
+
+  // Validate a voucher code before checkout — does NOT redeem it.
+  Future<Map<String, dynamic>> validateVoucher(String code, String? courseId) async {
+    try {
+      final response = await _apiService.post('/vouchers/validate', {
+        'code': code,
+        if (courseId != null) 'courseId': courseId,
+      });
+      final data = response.data;
+      if (data is Map && data['success'] == true) {
+        return Map<String, dynamic>.from(data);
+      }
+      throw Exception(data is Map ? (data['message'] ?? 'Invalid voucher') : 'Invalid voucher');
+    } on DioException catch (e) {
+      final msg = e.response?.data is Map ? e.response?.data['message'] : null;
+      throw Exception(msg ?? 'Invalid voucher code');
     }
   }
 

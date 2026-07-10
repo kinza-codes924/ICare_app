@@ -12,6 +12,9 @@ import 'package:icare/screens/lms_live_session_screen.dart';
 import 'package:icare/screens/instructor_create_assignment_screen.dart';
 import 'package:icare/screens/instructor_create_quiz_screen.dart';
 import 'package:icare/screens/instructor_quiz_attempts_screen.dart';
+import 'package:icare/screens/instructor_course_analytics_screen.dart';
+import 'package:icare/screens/instructor_student_progress_screen.dart';
+import 'package:icare/screens/instructor_voucher_screen.dart';
 import 'package:icare/widgets/video_player_widget.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -37,6 +40,7 @@ class InstructorCourseContentScreenState extends State<InstructorCourseContentSc
   bool _isLoading = true;
   CertificateTemplate _certificateTemplate = CertificateTemplate.classic;
   String _courseType = 'self-paced';
+  bool _isFreeDisplay = false;
 
   // Standalone assignments, quizzes, sessions (created outside modules)
   List<dynamic> _assignments = [];
@@ -62,6 +66,7 @@ class InstructorCourseContentScreenState extends State<InstructorCourseContentSc
         setState(() {
           _course = (results[0] as Map)['course'];
           _courseType = _course?['courseType']?.toString() ?? 'self-paced';
+          _isFreeDisplay = _course?['isFree'] == true;
           _assignments = results[1] as List;
           _quizzes = results[2] as List;
           _liveSessions = results[3] as List;
@@ -204,6 +209,26 @@ class InstructorCourseContentScreenState extends State<InstructorCourseContentSc
         );
       }
     } catch (_) {}
+  }
+
+  // Worst-case fallback for vouchers: display the course as "Free" without
+  // changing its real price — e.g. while a voucher rollout is still being
+  // finalized. Toggled independently of the actual `price` field.
+  Future<void> _toggleFreeDisplay(bool value) async {
+    setState(() => _isFreeDisplay = value);
+    try {
+      await _lmsService.updateCourse(widget.courseId, {'isFree': value});
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(value ? 'Course now shows as Free to students' : 'Course now shows its real price'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (_) {
+      if (mounted) setState(() => _isFreeDisplay = !value);
+    }
   }
 
   void _showEditThumbnail() {
@@ -497,7 +522,7 @@ class InstructorCourseContentScreenState extends State<InstructorCourseContentSc
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              'Course Content',
+              'Course Settings',
               style: TextStyle(
                 color: Color(0xFF0F172A),
                 fontWeight: FontWeight.w800,
@@ -514,52 +539,226 @@ class InstructorCourseContentScreenState extends State<InstructorCourseContentSc
             ),
           ],
         ),
-        actions: [
-          // Edit Thumbnail
-          IconButton(
-            icon: const Icon(Icons.image_outlined, color: Color(0xFF6366F1)),
-            tooltip: 'Edit Thumbnail',
-            onPressed: _showEditThumbnail,
-          ),
-          // Certificate template picker
-          IconButton(
-            icon: const Icon(Icons.workspace_premium_rounded, color: Color(0xFFD4AF37)),
-            tooltip: 'Certificate Template',
-            onPressed: () {
-              Navigator.push(context, MaterialPageRoute(
-                builder: (_) => CertificateTemplateSelectorScreen(
-                  courseTitle: _course?['title'] ?? 'Course',
-                  instructorName: _course?['instructor']?['name'] ?? 'Instructor',
+      ),
+      // Course Settings is settings-only — modules, Go Live, and Add Module
+      // all live in the Course Content tab (_buildEmbeddedBody) to avoid
+      // duplicating the modules list in two places.
+      body: _buildSettingsBody(),
+    );
+  }
+
+  Widget _buildSettingsBody() {
+    final width = MediaQuery.of(context).size.width;
+    final crossCount = width > 1000 ? 3 : (width > 650 ? 2 : 1);
+    return RefreshIndicator(
+      onRefresh: _loadCourse,
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(20),
+        child: GridView.count(
+          crossAxisCount: crossCount,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          crossAxisSpacing: 16,
+          mainAxisSpacing: 16,
+          childAspectRatio: 1.7,
+          children: [
+            _buildSettingsCard(
+              icon: Icons.image_outlined,
+              color: const Color(0xFF6366F1),
+              title: 'Thumbnail',
+              rows: const ['Change the course cover image'],
+              onTap: _showEditThumbnail,
+            ),
+            _buildSettingsCard(
+              icon: Icons.workspace_premium_rounded,
+              color: const Color(0xFFD4AF37),
+              title: 'Certificate Template',
+              rows: ['Template: ${_certificateTemplate.name}'],
+              onTap: () {
+                Navigator.push(context, MaterialPageRoute(
+                  builder: (_) => CertificateTemplateSelectorScreen(
+                    courseTitle: _course?['title'] ?? 'Course',
+                    instructorName: _course?['instructor']?['name'] ?? 'Instructor',
+                    courseId: widget.courseId,
+                    currentTemplate: _certificateTemplate,
+                    certificateReleased: _course?['certificateReleased'] == true,
+                    onSelect: (t) => setState(() => _certificateTemplate = t),
+                  ),
+                )).then((_) => _loadCourse());
+              },
+            ),
+            _buildSettingsCard(
+              icon: _courseType == 'pragmatic' ? Icons.timeline_rounded : Icons.self_improvement_rounded,
+              color: _courseType == 'pragmatic' ? const Color(0xFF6366F1) : const Color(0xFF10B981),
+              title: 'Course Type',
+              rows: [_courseType == 'pragmatic' ? 'Pragmatic (Timeline)' : 'Self-paced'],
+              onTap: _showCourseTypeDialog,
+            ),
+            _buildSettingsCard(
+              icon: _isFreeDisplay ? Icons.money_off_rounded : Icons.sell_outlined,
+              color: const Color(0xFFF59E0B),
+              title: 'Pricing Display',
+              rows: [_isFreeDisplay ? 'Showing as: Free' : 'Showing real price'],
+              onTap: () => _toggleFreeDisplay(!_isFreeDisplay),
+            ),
+            _buildSettingsCard(
+              icon: Icons.people_outline_rounded,
+              color: const Color(0xFF0EA5E9),
+              title: 'Students & Progress',
+              rows: const ['View enrolled students and their progress'],
+              onTap: () => Navigator.push(context, MaterialPageRoute(
+                builder: (_) => InstructorStudentProgressScreen(
                   courseId: widget.courseId,
-                  currentTemplate: _certificateTemplate,
-                  certificateReleased: _course?['certificateReleased'] == true,
-                  onSelect: (t) => setState(() => _certificateTemplate = t),
+                  courseTitle: _course?['title']?.toString() ?? 'Course',
                 ),
-              )).then((_) => _loadCourse()); // reload course to get updated certificateReleased
-            },
-          ),
-          // Course Type badge
-          GestureDetector(
-            onTap: _showCourseTypeDialog,
-            child: Container(
-              margin: const EdgeInsets.symmetric(vertical: 8),
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              decoration: BoxDecoration(
-                color: _courseType == 'pragmatic' ? const Color(0xFF6366F1).withValues(alpha: 0.1) : const Color(0xFF10B981).withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: _courseType == 'pragmatic' ? const Color(0xFF6366F1).withValues(alpha: 0.3) : const Color(0xFF10B981).withValues(alpha: 0.3)),
-              ),
-              child: Row(mainAxisSize: MainAxisSize.min, children: [
-                Icon(_courseType == 'pragmatic' ? Icons.timeline_rounded : Icons.self_improvement_rounded,
-                    size: 14, color: _courseType == 'pragmatic' ? const Color(0xFF6366F1) : const Color(0xFF10B981)),
-                const SizedBox(width: 5),
-                Text(_courseType == 'pragmatic' ? 'Pragmatic' : 'Self-paced',
-                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: _courseType == 'pragmatic' ? const Color(0xFF6366F1) : const Color(0xFF10B981))),
-              ]),
+              )),
+            ),
+            _buildSettingsCard(
+              icon: Icons.analytics_outlined,
+              color: const Color(0xFF8B5CF6),
+              title: 'Analytics',
+              rows: const ['Engagement, completion, and quiz stats'],
+              onTap: () => Navigator.push(context, MaterialPageRoute(
+                builder: (_) => InstructorCourseAnalyticsScreen(
+                  courseId: widget.courseId,
+                  courseTitle: _course?['title']?.toString() ?? 'Course',
+                ),
+              )),
+            ),
+            _buildSettingsCard(
+              icon: Icons.confirmation_number_outlined,
+              color: const Color(0xFFEF4444),
+              title: 'Discount Vouchers',
+              rows: const ['Create and manage enrollment vouchers'],
+              onTap: () => Navigator.push(context, MaterialPageRoute(
+                builder: (_) => const InstructorVoucherScreen(),
+              )),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSettingsCard({
+    required IconData icon,
+    required Color color,
+    required String title,
+    required List<String> rows,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(14),
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: const Color(0xFFE2E8F0)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(10)),
+                  child: Icon(icon, color: color, size: 20),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(title, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: Color(0xFF0F172A))),
+                ),
+                const Icon(Icons.chevron_right_rounded, color: Color(0xFF94A3B8), size: 18),
+              ],
+            ),
+            const SizedBox(height: 10),
+            ...rows.map((r) => Padding(
+                  padding: const EdgeInsets.only(bottom: 3),
+                  child: Text(r, style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)), overflow: TextOverflow.ellipsis),
+                )),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmbeddedBody(List<Map<String, dynamic>> modules) {
+    final hasContent = modules.isNotEmpty || _assignments.isNotEmpty ||
+        _quizzes.isNotEmpty || _liveSessions.isNotEmpty;
+
+    final items = <Widget>[];
+
+    if (!hasContent) {
+      items.add(_buildEmptyState());
+    } else {
+      // Modules
+      for (int i = 0; i < modules.length; i++) {
+        items.add(_buildModuleCard(modules[i], i));
+      }
+
+      // Live Sessions not linked to any module — kept flat for backward
+      // compatibility with sessions created before module-linking existed.
+      final unlinkedSessions = _liveSessions.where((s) {
+        final linked = (s as Map)['linkedModuleId']?.toString();
+        return linked == null || linked.isEmpty || !modules.any((m) => m['_id']?.toString() == linked);
+      }).toList();
+      if (unlinkedSessions.isNotEmpty) {
+        items.add(_buildSectionHeader(Icons.live_tv_rounded, 'Live Sessions', Colors.red));
+        for (final s in unlinkedSessions) {
+          items.add(_buildStandaloneSessionTile(s));
+        }
+      }
+
+      // Assignments section
+      if (_assignments.isNotEmpty) {
+        items.add(_buildSectionHeader(Icons.assignment_rounded, 'Assignments', const Color(0xFF6366F1)));
+        for (final a in _assignments) {
+          items.add(_buildStandaloneAssignmentTile(a));
+        }
+      }
+
+      // Quizzes section
+      if (_quizzes.isNotEmpty) {
+        items.add(_buildSectionHeader(Icons.quiz_rounded, 'Quizzes', const Color(0xFFF59E0B)));
+        for (final q in _quizzes) {
+          items.add(_buildStandaloneQuizTile(q));
+        }
+      }
+    }
+
+    return Column(
+      children: [
+        _buildContentHeader(),
+        Expanded(
+          child: RefreshIndicator(
+            onRefresh: _loadCourse,
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 96),
+              children: items,
             ),
           ),
-          const SizedBox(width: 4),
-          // Go Live button
+        ),
+      ],
+    );
+  }
+
+  Widget _buildContentHeader() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              _course?['title']?.toString() ?? 'Course Content',
+              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          const SizedBox(width: 8),
           ElevatedButton.icon(
             onPressed: _startLiveClass,
             icon: const Icon(Icons.live_tv_rounded, size: 16),
@@ -579,63 +778,6 @@ class InstructorCourseContentScreenState extends State<InstructorCourseContentSc
             onPressed: _addModule,
           ),
         ],
-      ),
-      body: modules.isEmpty
-          ? _buildEmptyState()
-          : RefreshIndicator(
-              onRefresh: _loadCourse,
-              child: ListView.builder(
-                padding: const EdgeInsets.all(16),
-                itemCount: modules.length,
-                itemBuilder: (context, index) {
-                  return _buildModuleCard(modules[index], index);
-                },
-              ),
-            ),
-    );
-  }
-
-  Widget _buildEmbeddedBody(List<Map<String, dynamic>> modules) {
-    final hasContent = modules.isNotEmpty || _assignments.isNotEmpty ||
-        _quizzes.isNotEmpty || _liveSessions.isNotEmpty;
-    if (!hasContent) return _buildEmptyState();
-
-    final items = <Widget>[];
-
-    // Modules
-    for (int i = 0; i < modules.length; i++) {
-      items.add(_buildModuleCard(modules[i], i));
-    }
-
-    // Live Sessions section
-    if (_liveSessions.isNotEmpty) {
-      items.add(_buildSectionHeader(Icons.live_tv_rounded, 'Live Sessions', Colors.red));
-      for (final s in _liveSessions) {
-        items.add(_buildStandaloneSessionTile(s));
-      }
-    }
-
-    // Assignments section
-    if (_assignments.isNotEmpty) {
-      items.add(_buildSectionHeader(Icons.assignment_rounded, 'Assignments', const Color(0xFF6366F1)));
-      for (final a in _assignments) {
-        items.add(_buildStandaloneAssignmentTile(a));
-      }
-    }
-
-    // Quizzes section
-    if (_quizzes.isNotEmpty) {
-      items.add(_buildSectionHeader(Icons.quiz_rounded, 'Quizzes', const Color(0xFFF59E0B)));
-      for (final q in _quizzes) {
-        items.add(_buildStandaloneQuizTile(q));
-      }
-    }
-
-    return RefreshIndicator(
-      onRefresh: _loadCourse,
-      child: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
-        children: items,
       ),
     );
   }
@@ -899,6 +1041,8 @@ class InstructorCourseContentScreenState extends State<InstructorCourseContentSc
 
   Widget _buildModuleCard(Map<String, dynamic> module, int index) {
     final lessons = List<Map<String, dynamic>>.from(module['lessons'] ?? []);
+    final moduleId = module['_id']?.toString();
+    final linkedSessions = _liveSessions.where((s) => (s as Map)['linkedModuleId']?.toString() == moduleId).toList();
     final title = module['title'] ?? 'Module ${index + 1}';
     final description = module['description'] ?? '';
     final completions = List<Map<String, dynamic>>.from(module['completions'] ?? []);
@@ -1049,6 +1193,13 @@ class InstructorCourseContentScreenState extends State<InstructorCourseContentSc
                 final lesson = entry.value;
                 return _buildLessonItem(lesson, lessonIndex);
               }),
+            if (linkedSessions.isNotEmpty) ...[
+              const Padding(
+                padding: EdgeInsets.only(top: 4, bottom: 6),
+                child: Text('Live Sessions', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF64748B))),
+              ),
+              ...linkedSessions.map((s) => _buildStandaloneSessionTile(s)),
+            ],
             Padding(
               padding: const EdgeInsets.only(bottom: 8),
               child: OutlinedButton.icon(

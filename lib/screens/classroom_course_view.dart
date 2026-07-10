@@ -3028,14 +3028,57 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
               final name = (s['user'] as Map?)?['name']?.toString() ??
                   s['name']?.toString() ??
                   'Student';
-              return _personRow(name, isTeacher: false);
+              final studentId = ((s['user'] as Map?)?['_id'] ?? s['_id'])?.toString() ?? '';
+              return _personRow(
+                name,
+                isTeacher: false,
+                studentId: studentId,
+                onRemoveStudent: widget.isInstructor && studentId.isNotEmpty
+                    ? () => _confirmRemoveStudent(studentId, name)
+                    : null,
+              );
             }),
         ],
       ),
     );
   }
 
-  Widget _personRow(String name, {required bool isTeacher, String? roleLabel, bool isLead = false, VoidCallback? onRemove}) {
+  Future<void> _confirmRemoveStudent(String studentId, String name) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Remove Student'),
+        content: Text('Remove "$name" from this course? They will lose access to the course content and their enrollment will be deleted.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Remove'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    try {
+      await _lms.removeStudentFromCourse(courseId: _courseId, studentId: studentId);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('"$name" removed from the course'), backgroundColor: Colors.green),
+        );
+        _loadPeople();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not remove student: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
+  Widget _personRow(String name, {required bool isTeacher, String? roleLabel, bool isLead = false, VoidCallback? onRemove, String? studentId, VoidCallback? onRemoveStudent}) {
     final avatarColor = isTeacher
         ? (isLead ? const Color(0xFF9334E6) : const Color(0xFF1A73E8))
         : Colors.grey.shade300;
@@ -3091,13 +3134,30 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
                 tooltip: 'Remove co-teacher',
               ),
           ] else if (!isTeacher)
-            IconButton(
+            PopupMenuButton<String>(
               icon: const Icon(Icons.more_vert_rounded,
                   size: 18, color: Color(0xFF70757A)),
-              onPressed: () {},
               padding: EdgeInsets.zero,
-              constraints:
-                  const BoxConstraints(minWidth: 32, minHeight: 32),
+              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+              itemBuilder: (_) => [
+                if (onRemoveStudent != null)
+                  const PopupMenuItem(
+                    value: 'remove',
+                    child: Row(children: [
+                      Icon(Icons.person_remove_outlined, size: 18, color: Colors.red),
+                      SizedBox(width: 10),
+                      Text('Remove from course', style: TextStyle(color: Colors.red)),
+                    ]),
+                  )
+                else
+                  const PopupMenuItem(
+                    enabled: false,
+                    child: Text('No actions available'),
+                  ),
+              ],
+              onSelected: (v) {
+                if (v == 'remove') onRemoveStudent?.call();
+              },
             ),
         ],
       ),

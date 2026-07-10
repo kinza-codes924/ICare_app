@@ -183,11 +183,12 @@ class _LmsPurchaseFlowState extends ConsumerState<LmsPurchaseFlow> {
   // (and mounted) at this point — LmsPurchaseFlow was already replaced by
   // it via pushReplacement, so navigation must happen using the caller's
   // context, not this widget's own (already-disposed) context.
-  Future<void> _handlePaymentSuccess(BuildContext callerContext) async {
+  Future<void> _handlePaymentSuccess(BuildContext callerContext, {String? voucherCode}) async {
     try {
       // Enroll user in course
       await _api.post('/courses/enrollments', {
         'courseId': widget.course['_id'],
+        if (voucherCode != null && voucherCode.isNotEmpty) 'voucherCode': voucherCode,
       });
 
       // Navigate to document upload

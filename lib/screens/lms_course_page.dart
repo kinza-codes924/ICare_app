@@ -12,6 +12,7 @@ import 'package:icare/screens/lesson_detail_page.dart';
 import 'package:icare/screens/certificate_templates_screen.dart';
 import 'package:icare/screens/assignment_submit_screen.dart';
 import 'package:icare/screens/quiz_take_screen.dart';
+import 'package:icare/screens/student_course_settings_screen.dart';
 import 'package:icare/widgets/video_player_widget.dart';
 import 'package:intl/intl.dart';
 
@@ -19,12 +20,14 @@ class LmsCoursePage extends StatefulWidget {
   final Map<String, dynamic> course;
   final String? enrollmentId;
   final bool isInstructor;
+  final int initialTabIndex;
 
   const LmsCoursePage({
     super.key,
     required this.course,
     this.enrollmentId,
     this.isInstructor = false,
+    this.initialTabIndex = 0,
   });
 
   @override
@@ -41,7 +44,7 @@ class _LmsCoursePageState extends State<LmsCoursePage> with SingleTickerProvider
   @override
   void initState() {
     super.initState();
-    _tabs = TabController(length: 6, vsync: this);
+    _tabs = TabController(length: 6, vsync: this, initialIndex: widget.initialTabIndex.clamp(0, 5));
     // Refresh attendance tab every time it becomes the active tab
     _tabs.addListener(() {
       if (_tabs.index == 4 && !_tabs.indexIsChanging) {
@@ -65,6 +68,16 @@ class _LmsCoursePageState extends State<LmsCoursePage> with SingleTickerProvider
             pinned: true,
             backgroundColor: color,
             leading: const CustomBackButton(color: Colors.white),
+            actions: [
+              if (!widget.isInstructor)
+                IconButton(
+                  icon: const Icon(Icons.settings_outlined, color: Colors.white),
+                  tooltip: 'Course Settings',
+                  onPressed: () => Navigator.push(context, MaterialPageRoute(
+                    builder: (_) => StudentCourseSettingsScreen(course: widget.course, enrollmentId: widget.enrollmentId),
+                  )),
+                ),
+            ],
             flexibleSpace: FlexibleSpaceBar(
               background: Container(
                 decoration: BoxDecoration(

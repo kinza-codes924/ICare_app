@@ -7,7 +7,10 @@ const { authMiddleware: auth } = require('../middleware/auth');
 const voucherSchema = new mongoose.Schema({
   code:           { type: String, required: true, unique: true, uppercase: true, trim: true },
   instructorId:   { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-  discount:       { type: Number, required: true, min: 1, max: 100 }, // percent
+  // percent: discount is 1-100 (%). flat: discount is a fixed currency amount off.
+  discountType:   { type: String, enum: ['percent', 'flat'], default: 'percent' },
+  discount:       { type: Number, required: true, min: 1 }, // percent (1-100) or flat amount, per discountType
+  serviceType:    { type: String, enum: ['course'], default: 'course' }, // future: consultation/lab/pharmacy
   courseId:       { type: mongoose.Schema.Types.ObjectId, ref: 'Course', default: null }, // null = any course
   usedBy:         { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
   usedAt:         { type: Date, default: null },
@@ -16,6 +19,16 @@ const voucherSchema = new mongoose.Schema({
 });
 
 const Voucher = mongoose.models.Voucher || mongoose.model('Voucher', voucherSchema);
+
+// Compute the final price after applying a voucher's discount to a base price.
+function applyVoucherDiscount(voucher, basePrice) {
+  const price = Number(basePrice) || 0;
+  if (voucher.discountType === 'flat') {
+    return Math.max(0, price - Number(voucher.discount));
+  }
+  const pct = Math.min(100, Math.max(0, Number(voucher.discount)));
+  return Math.max(0, Math.round(price - (price * pct) / 100));
+}
 
 // ─── GET /api/vouchers — instructor: list own vouchers ────────────────────────
 router.get('/', auth, async (req, res) => {
@@ -32,13 +45,18 @@ router.get('/', auth, async (req, res) => {
 // ─── POST /api/vouchers — instructor creates a voucher ────────────────────────
 router.post('/', auth, async (req, res) => {
   try {
-    const { code, discount, courseId, expiresAt } = req.body;
+    const { code, discount, discountType, courseId, expiresAt } = req.body;
     if (!code || !discount) return res.status(400).json({ success: false, message: 'code and discount are required' });
+    if (discountType === 'percent' && Number(discount) > 100) {
+      return res.status(400).json({ success: false, message: 'Percent discount cannot exceed 100' });
+    }
 
     const voucher = await Voucher.create({
       code: code.trim().toUpperCase(),
       instructorId: req.user.id,
+      discountType: discountType === 'flat' ? 'flat' : 'percent',
       discount: Number(discount),
+      serviceType: 'course',
       courseId: courseId || null,
       expiresAt: expiresAt ? new Date(expiresAt) : null,
     });
@@ -76,7 +94,12 @@ router.post('/validate', auth, async (req, res) => {
       return res.status(400).json({ success: false, message: 'Voucher is not valid for this course' });
     }
 
-    res.json({ success: true, discount: voucher.discount, voucherId: voucher._id });
+    res.json({
+      success: true,
+      discount: voucher.discount,
+      discountType: voucher.discountType,
+      voucherId: voucher._id,
+    });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
@@ -100,10 +123,12 @@ router.post('/redeem', auth, async (req, res) => {
     voucher.usedAt = new Date();
     await voucher.save();
 
-    res.json({ success: true, discount: voucher.discount });
+    res.json({ success: true, discount: voucher.discount, discountType: voucher.discountType });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
 });
 
 module.exports = router;
+module.exports.Voucher = Voucher;
+module.exports.applyVoucherDiscount = applyVoucherDiscount;

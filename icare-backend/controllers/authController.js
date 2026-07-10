@@ -84,6 +84,26 @@ const register = async (req, res) => {
       $or: [{ email: email.toLowerCase() }, { username }],
     });
     if (existing) {
+      // Same email, different role, and the existing account is already
+      // approved (e.g. an approved doctor now applying as a student via
+      // Work-With-Us or normal signup) — instead of hard-rejecting, request
+      // the new role on the SAME account via the existing multi-role system.
+      // Admin still explicitly approves it from the pending-users list.
+      const existingRoles = new Set([existing.role, ...(existing.roles || [])]);
+      const alreadyHasRole = existingRoles.has(role);
+      const alreadyPending = (existing.pendingRoles || []).includes(role);
+
+      if (existing.email?.toLowerCase() === email.toLowerCase() && existing.is_approved === true && !alreadyHasRole) {
+        if (!alreadyPending) {
+          await User.findByIdAndUpdate(existing._id, { $addToSet: { pendingRoles: role } });
+        }
+        return res.status(200).json({
+          success: true,
+          message: 'You already have an approved account with this email. Your request for a new role has been sent to admin for approval — you\'ll be notified once approved.',
+          pendingRoleRequest: true,
+        });
+      }
+
       return res.status(400).json({ success: false, message: 'User with this email or username already exists' });
     }
 
