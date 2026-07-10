@@ -1452,13 +1452,20 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
         borderRadius: BorderRadius.circular(isLarge ? 0 : 8),
         border: isLarge ? null : Border.all(color: Colors.white24, width: 1),
       ),
+      clipBehavior: Clip.antiAlias,
       child: Stack(
         fit: StackFit.expand,
         children: [
           if (kIsWeb && _cameraOn && _cameraViewName != null)
             HtmlElementView(viewType: _cameraViewName!)
           else if (!kIsWeb && _cameraOn)
-            lmsGetLocalVideoWidget(_cameraViewName)
+            RepaintBoundary(
+              key: const ValueKey('agora-self-tile'),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(isLarge ? 0 : 8),
+                child: lmsGetLocalVideoWidget(_cameraViewName),
+              ),
+            )
           else
             Center(
               child: Column(
@@ -1537,11 +1544,26 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
         color: const Color(0xFF2D3748),
         borderRadius: BorderRadius.circular(8),
       ),
+      // clipBehavior + the RepaintBoundary/ClipRRect around the native Agora
+      // view below give each tile its own compositing layer with a hard
+      // clip. Without this, when the grid relayouts fast (e.g. the instant
+      // the instructor starts/stops screen-share, which changes the tile
+      // count/positions on mobile), two native SurfaceTexture layers can
+      // briefly paint at overlapping screen positions before the platform
+      // view catches up — visually looking like two participants' video
+      // feeds crammed into one box.
+      clipBehavior: Clip.antiAlias,
       child: Stack(
         fit: StackFit.expand,
         children: [
           if (!kIsWeb)
-            lmsGetRemoteVideoWidget(uid, 'lms_${widget.courseId}')
+            RepaintBoundary(
+              key: ValueKey('agora-tile-$uid'),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: lmsGetRemoteVideoWidget(uid, 'lms_${widget.courseId}'),
+              ),
+            )
           else
             // Web video is rendered inside lms-grid-container by JS —
             // this tile is only shown on mobile; web uses HtmlElementView grid.
