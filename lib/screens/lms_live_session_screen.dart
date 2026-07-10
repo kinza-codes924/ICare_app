@@ -1366,20 +1366,32 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
 
     return Stack(
       children: [
-        // Video area
+        // Video area — each branch keyed distinctly so a mid-transition
+        // change in _remoteUids.length (e.g. exactly when screen-share
+        // toggles) can never let Flutter reconcile one branch's Element
+        // into another's, which is the other half of the local-preview/
+        // remote-tile identity bleed described above.
         if (_remoteUids.isEmpty)
           // No remote users — show self full-screen
-          _buildSelfVideoTile(isLarge: true)
+          KeyedSubtree(key: const ValueKey('video-area-self-fullscreen'), child: _buildSelfVideoTile(isLarge: true))
         else if (_remoteUids.length == 1)
           // 1 remote user — full screen remote view
-          SizedBox.expand(child: _buildRemoteVideoTile(_remoteUids[0], key: ValueKey(_remoteUids[0])))
+          KeyedSubtree(
+            key: ValueKey('video-area-single-${_remoteUids[0]}'),
+            child: SizedBox.expand(child: _buildRemoteVideoTile(_remoteUids[0], key: ValueKey(_remoteUids[0]))),
+          )
         else
           // Multiple remote users — grid
-          _buildVideoGrid(),
+          KeyedSubtree(key: const ValueKey('video-area-grid'), child: _buildVideoGrid()),
 
-        // Self preview (small corner, when others present)
+        // Self preview (small corner, when others present) — kept on its own
+        // Positioned layer in this outer Stack, never inside the remote
+        // GridView.builder loop, and keyed so a screen-share state toggle
+        // (which changes _remoteUids-driven layout above) can never cause
+        // Flutter to conflate this Element with a remote participant's tile.
         if (_remoteUids.isNotEmpty)
           Positioned(
+            key: const ValueKey('self-preview-corner'),
             right: 12,
             bottom: 12,
             child: _buildSelfVideoTile(isLarge: false),
