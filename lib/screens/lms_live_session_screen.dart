@@ -925,27 +925,49 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
                             _buildVideoWithOverlays(),
                             if (_chatOpen || _participantsOpen)
                               Positioned.fill(
-                                child: Container(
-                                  color: Colors.black54,
-                                  child: Align(
-                                    alignment: Alignment.bottomCenter,
-                                    child: Container(
-                                      height: constraints.maxHeight * 0.65,
-                                      decoration: const BoxDecoration(
-                                        color: Color(0xFF252D3D),
-                                        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-                                      ),
-                                      child: Column(children: [
-                                        const SizedBox(height: 6),
-                                        Container(
-                                          width: 40, height: 4,
-                                          decoration: BoxDecoration(
-                                            color: Colors.white38,
-                                            borderRadius: BorderRadius.circular(2),
+                                child: GestureDetector(
+                                  // Tap the dark backdrop (anywhere outside the
+                                  // sheet itself) to dismiss — previously there
+                                  // was no way to close this panel at all on
+                                  // mobile: no close button, no backdrop tap,
+                                  // no drag-to-dismiss, so once opened it stayed
+                                  // stuck open over the video permanently.
+                                  onTap: () => setState(() { _chatOpen = false; _participantsOpen = false; }),
+                                  child: Container(
+                                    color: Colors.black54,
+                                    child: Align(
+                                      alignment: Alignment.bottomCenter,
+                                      child: GestureDetector(
+                                        // Swallow taps on the sheet so they don't
+                                        // fall through to the backdrop above.
+                                        onTap: () {},
+                                        onVerticalDragUpdate: (details) {
+                                          // Drag the handle/sheet down far enough
+                                          // and it closes, like a real bottom sheet.
+                                          if (details.primaryDelta != null && details.primaryDelta! > 12) {
+                                            setState(() { _chatOpen = false; _participantsOpen = false; });
+                                          }
+                                        },
+                                        child: Container(
+                                          width: double.infinity,
+                                          height: constraints.maxHeight * 0.65,
+                                          decoration: const BoxDecoration(
+                                            color: Color(0xFF252D3D),
+                                            borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
                                           ),
+                                          child: Column(children: [
+                                            const SizedBox(height: 6),
+                                            Container(
+                                              width: 40, height: 4,
+                                              decoration: BoxDecoration(
+                                                color: Colors.white38,
+                                                borderRadius: BorderRadius.circular(2),
+                                              ),
+                                            ),
+                                            Expanded(child: _buildSidePanel(showCloseButton: true, fullWidth: true)),
+                                          ]),
                                         ),
-                                        Expanded(child: _buildSidePanel()),
-                                      ]),
+                                      ),
                                     ),
                                   ),
                                 ),
@@ -1649,22 +1671,34 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
     );
   }
 
-  Widget _buildSidePanel() {
+  Widget _buildSidePanel({bool showCloseButton = false, bool fullWidth = false}) {
     return Container(
-      width: 300,
+      width: fullWidth ? double.infinity : 300,
       color: const Color(0xFF252D3D),
       child: Column(
         children: [
           // Panel tabs
-          TabBar(
-            controller: _panelTab,
-            indicatorColor: AppColors.primaryColor,
-            labelColor: Colors.white,
-            unselectedLabelColor: Colors.white54,
-            tabs: const [
-              Tab(text: 'Chat'),
-              Tab(text: 'People'),
-              Tab(text: 'Polls'),
+          Row(
+            children: [
+              Expanded(
+                child: TabBar(
+                  controller: _panelTab,
+                  indicatorColor: AppColors.primaryColor,
+                  labelColor: Colors.white,
+                  unselectedLabelColor: Colors.white54,
+                  tabs: const [
+                    Tab(text: 'Chat'),
+                    Tab(text: 'People'),
+                    Tab(text: 'Polls'),
+                  ],
+                ),
+              ),
+              if (showCloseButton)
+                IconButton(
+                  icon: const Icon(Icons.close_rounded, color: Colors.white70, size: 22),
+                  tooltip: 'Close',
+                  onPressed: () => setState(() { _chatOpen = false; _participantsOpen = false; }),
+                ),
             ],
           ),
           Expanded(
