@@ -1412,6 +1412,16 @@
       try {
         if (window._lmsLocalAudio) { window._lmsLocalAudio.stop(); window._lmsLocalAudio.close(); window._lmsLocalAudio = null; }
         if (window._lmsLocalVideo) { window._lmsLocalVideo.stop(); window._lmsLocalVideo.close(); window._lmsLocalVideo = null; }
+        // If the presenter ends/leaves the session while still screen-sharing,
+        // the capture MediaStreamTrack was never stopped here — it's tied to
+        // the browser tab, not the Flutter route, so the native "sharing a
+        // window" bar kept showing even after navigating away to the
+        // dashboard. Stop it the same way the other local tracks are.
+        if (window._lmsScreenTrack) {
+          try { window._lmsScreenTrack.stop(); window._lmsScreenTrack.close(); } catch(_) {}
+          window._lmsScreenTrack = null;
+        }
+        window._lmsScreenSharing = false;
         if (window._lmsAgoraClient) { await window._lmsAgoraClient.leave(); window._lmsAgoraClient = null; }
         var h = document.getElementById('lms-jitsi-host');
         if (h && h.parentNode === document.body) h.remove();
