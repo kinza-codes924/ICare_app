@@ -902,69 +902,65 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
       );
     }
 
+    // Consultation-style layout (matches the doctor↔patient video call):
+    // the video fills the ENTIRE screen — no solid top/bottom bars eating
+    // vertical space — and every control floats over it as a translucent
+    // overlay (name/timer pills top-left, circular mic/cam/share/end plus
+    // pill-shaped Chat/People/Polls/Whiteboard buttons bottom-center).
     return Scaffold(
-      backgroundColor: Colors.transparent,
+      backgroundColor: Colors.black,
       body: SafeArea(
         child: Stack(
           children: [
-            // Dark background
-            Container(color: _videoFullscreen ? const Color(0xFF0A0E1A) : const Color(0xFF1C2333)),
-            Column(
-              children: [
-                if (!_videoFullscreen) _buildTopBar(),
-                Expanded(
-                  child: _videoFullscreen
-                      // Fullscreen: video fills the full Expanded area, no panel
-                      ? _buildVideoArea(showFullscreenBtn: false)
-                      : LayoutBuilder(
-                          builder: (ctx, constraints) {
-                            final isMobile = constraints.maxWidth < 600;
-                            if (isMobile) {
-                              return Stack(
-                                children: [
-                                  _buildVideoArea(),
-                                  if (_chatOpen || _participantsOpen)
-                                    Positioned.fill(
-                                      child: Container(
-                                        color: Colors.black54,
-                                        child: Align(
-                                          alignment: Alignment.bottomCenter,
-                                          child: Container(
-                                            height: constraints.maxHeight * 0.65,
-                                            decoration: const BoxDecoration(
-                                              color: Color(0xFF252D3D),
-                                              borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-                                            ),
-                                            child: Column(children: [
-                                              const SizedBox(height: 6),
-                                              Container(
-                                                width: 40, height: 4,
-                                                decoration: BoxDecoration(
-                                                  color: Colors.white38,
-                                                  borderRadius: BorderRadius.circular(2),
-                                                ),
-                                              ),
-                                              Expanded(child: _buildSidePanel()),
-                                            ]),
+            Container(color: const Color(0xFF0A0E1A)),
+            _videoFullscreen
+                // Fullscreen: video only, no overlays except the exit button
+                ? _buildVideoArea(showFullscreenBtn: false)
+                : LayoutBuilder(
+                    builder: (ctx, constraints) {
+                      final isMobile = constraints.maxWidth < 600;
+                      if (isMobile) {
+                        return Stack(
+                          children: [
+                            _buildVideoWithOverlays(),
+                            if (_chatOpen || _participantsOpen)
+                              Positioned.fill(
+                                child: Container(
+                                  color: Colors.black54,
+                                  child: Align(
+                                    alignment: Alignment.bottomCenter,
+                                    child: Container(
+                                      height: constraints.maxHeight * 0.65,
+                                      decoration: const BoxDecoration(
+                                        color: Color(0xFF252D3D),
+                                        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+                                      ),
+                                      child: Column(children: [
+                                        const SizedBox(height: 6),
+                                        Container(
+                                          width: 40, height: 4,
+                                          decoration: BoxDecoration(
+                                            color: Colors.white38,
+                                            borderRadius: BorderRadius.circular(2),
                                           ),
                                         ),
-                                      ),
+                                        Expanded(child: _buildSidePanel()),
+                                      ]),
                                     ),
-                                ],
-                              );
-                            }
-                            return Row(
-                              children: [
-                                Expanded(child: _buildVideoArea()),
-                                if (_chatOpen || _participantsOpen) _buildSidePanel(),
-                              ],
-                            );
-                          },
-                        ),
-                ),
-                if (!_videoFullscreen) _buildBottomBar(),
-              ],
-            ),
+                                  ),
+                                ),
+                              ),
+                          ],
+                        );
+                      }
+                      return Row(
+                        children: [
+                          Expanded(child: _buildVideoWithOverlays()),
+                          if (_chatOpen || _participantsOpen) _buildSidePanel(),
+                        ],
+                      );
+                    },
+                  ),
             // Fullscreen exit button — overlaid on top, no Scaffold swap needed
             if (_videoFullscreen)
               Positioned(
@@ -985,7 +981,7 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
                   ),
                 ),
               ),
-            // Whiteboard overlay — covers video area, bottom bar stays visible
+            // Whiteboard overlay — covers video area, floating controls stay visible
             if (_whiteboardOpen) _buildWhiteboardOverlay(),
           ],
         ),
@@ -993,10 +989,27 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
     );
   }
 
+  /// Video area with the consultation-style translucent overlays stacked on
+  /// top: info pills (top-left) and floating controls (bottom-center).
+  Widget _buildVideoWithOverlays() {
+    return Stack(
+      children: [
+        Positioned.fill(child: _buildVideoArea()),
+        // right:110 leaves room for the Fit/Fill + fullscreen buttons that
+        // _buildVideoArea pins to its own top-right corner.
+        Positioned(top: 12, left: 12, right: 110, child: _buildTopOverlay()),
+        if (_permissionsEnabled)
+          Positioned(bottom: 20, left: 0, right: 0, child: _buildFloatingControls()),
+      ],
+    );
+  }
+
   Widget _buildWhiteboardOverlay() {
     final canDraw = widget.isInstructor || _wbPermissions.contains(_currentUserId);
-    final bottomBarH = _wbFullscreen ? 0.0 : (MediaQuery.of(context).size.width < 600 ? 100.0 : 70.0);
-    final topBarH = _wbFullscreen ? 0.0 : (_videoFullscreen ? 0.0 : 52.0);
+    // No solid bars anymore — the controls float over the video's bottom
+    // ~130px, so the whiteboard stops above them (unless fullscreened).
+    final bottomBarH = _wbFullscreen ? 0.0 : 130.0;
+    const topBarH = 0.0;
     return Positioned(
       top: topBarH,
       left: 0, right: 0,
@@ -1064,65 +1077,60 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
     );
   }
 
-  Widget _buildTopBar() {
-    return Container(
-      height: 52,
-      color: const Color(0xFF252D3D),
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Row(
-        children: [
-          // Timer + Live indicator
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            decoration: BoxDecoration(
-              color: Colors.red,
-              borderRadius: BorderRadius.circular(4),
-            ),
-            child: const Text('● LIVE', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700)),
+  /// Translucent info pills floating over the top of the video — replaces
+  /// the old solid 52px top bar so the video keeps the full height.
+  Widget _buildTopOverlay() {
+    Widget pill(Widget child, {Color? bg}) => Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          decoration: BoxDecoration(
+            color: bg ?? Colors.black54,
+            borderRadius: BorderRadius.circular(20),
           ),
-          const SizedBox(width: 10),
-          Text(
-            _timerText,
-            style: const TextStyle(color: Colors.white70, fontSize: 14, fontFamily: 'monospace'),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Text(
-              widget.sessionTitle,
-              style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600),
-              overflow: TextOverflow.ellipsis,
+          child: child,
+        );
+
+    return Wrap(
+      spacing: 8,
+      runSpacing: 6,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        pill(
+          const Text('● LIVE',
+              style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700)),
+          bg: Colors.red.withValues(alpha: 0.85),
+        ),
+        pill(Row(mainAxisSize: MainAxisSize.min, children: [
+          const Icon(Icons.timer_rounded, color: Colors.white70, size: 14),
+          const SizedBox(width: 4),
+          Text(_timerText,
+              style: const TextStyle(color: Colors.white, fontSize: 13, fontFamily: 'monospace')),
+        ])),
+        pill(Text(
+          widget.sessionTitle,
+          style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
+          overflow: TextOverflow.ellipsis,
+        )),
+        pill(Row(mainAxisSize: MainAxisSize.min, children: [
+          const Icon(Icons.people_rounded, color: Colors.white70, size: 14),
+          const SizedBox(width: 4),
+          Text('${_participants.length}',
+              style: const TextStyle(color: Colors.white, fontSize: 13)),
+        ])),
+        if (widget.isInstructor)
+          GestureDetector(
+            onTap: _toggleRecording,
+            child: pill(
+              Row(mainAxisSize: MainAxisSize.min, children: [
+                Icon(_isRecording ? Icons.stop_circle_rounded : Icons.fiber_manual_record_rounded,
+                    color: Colors.white, size: 14),
+                const SizedBox(width: 4),
+                Text(_isRecording ? 'Stop REC' : 'Record',
+                    style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w700)),
+              ]),
+              bg: _isRecording ? Colors.red.withValues(alpha: 0.85) : Colors.black54,
             ),
           ),
-          // Participant count
-          Row(children: [
-            const Icon(Icons.people_rounded, color: Colors.white54, size: 18),
-            const SizedBox(width: 4),
-            Text('${_participants.length}', style: const TextStyle(color: Colors.white54, fontSize: 13)),
-          ]),
-          const SizedBox(width: 10),
-          // Recording button (instructor only)
-          if (widget.isInstructor)
-            GestureDetector(
-              onTap: _toggleRecording,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                decoration: BoxDecoration(
-                  color: _isRecording ? Colors.red : Colors.white24,
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Row(mainAxisSize: MainAxisSize.min, children: [
-                  Icon(_isRecording ? Icons.stop_circle_rounded : Icons.fiber_manual_record_rounded,
-                      color: Colors.white, size: 14),
-                  const SizedBox(width: 4),
-                  Text(_isRecording ? 'Stop REC' : 'Record',
-                      style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w700)),
-                ]),
-              ),
-            ),
-          const SizedBox(width: 8),
-          const Icon(Icons.lock_rounded, color: Colors.white54, size: 18),
-        ],
-      ),
+      ],
     );
   }
 
@@ -1152,10 +1160,11 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
               ),
             ),
 
-          // Fit/Fill toggle — top-left corner (visible when permissions enabled)
+          // Fit/Fill toggle — top-right, next to the fullscreen button (the
+          // top-left corner now carries the translucent info pills)
           if (showFullscreenBtn && _permissionsEnabled)
             Positioned(
-              top: 8, left: 8,
+              top: 8, right: 52,
               child: GestureDetector(
                 onTap: () {
                   final next = !_videoFitCover;
@@ -1931,214 +1940,208 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
     );
   }
 
-  Widget _buildBottomBar() {
+  /// Floating consultation-style controls over the bottom of the video:
+  /// a row of translucent pill buttons (Chat, People, Polls, Whiteboard,
+  /// Raise Hand) above the main circular buttons (mic, camera, screen
+  /// share, red End) — same visual language as the doctor↔patient call.
+  Widget _buildFloatingControls() {
     final isMobile = MediaQuery.of(context).size.width < 600;
 
-    final micBtn = _controlBtn(
-      icon: _micOn ? Icons.mic_rounded : Icons.mic_off_rounded,
-      label: _micOn ? 'Mute' : 'Unmute',
-      color: _micOn ? Colors.white : Colors.red,
-      onTap: _toggleMic,
-    );
-    final camBtn = _controlBtn(
-      icon: _cameraOn ? Icons.videocam_rounded : Icons.videocam_off_rounded,
-      label: _cameraOn ? 'Stop Video' : 'Start Video',
-      color: _cameraOn ? Colors.white : Colors.red,
-      onTap: _toggleCamera,
-    );
-    final chatBtn = _controlBtn(
-      icon: Icons.chat_bubble_outline_rounded,
-      label: 'Chat',
-      color: _chatOpen ? AppColors.primaryColor : Colors.white,
-      onTap: () {
-        setState(() {
-          _chatOpen = !_chatOpen;
-          _participantsOpen = false;
-          if (_chatOpen) _panelTab.animateTo(0);
-        });
-        if (kIsWeb) lmsSetPanelWidth(_chatOpen);
-      },
-      badge: _chatMessages.isNotEmpty ? '${_chatMessages.length}' : null,
-    );
-    final peopleBtn = _controlBtn(
-      icon: Icons.people_rounded,
-      label: 'People',
-      color: _participantsOpen ? AppColors.primaryColor : Colors.white,
-      onTap: () {
-        setState(() {
-          _participantsOpen = !_participantsOpen;
-          _chatOpen = _participantsOpen;
-          if (_participantsOpen) _panelTab.animateTo(1);
-        });
-        if (kIsWeb) lmsSetPanelWidth(_participantsOpen);
-      },
-    );
-    final handBtn = !widget.isInstructor
-        ? _controlBtn(
-            icon: Icons.back_hand_rounded,
-            label: _handRaised ? 'Lower Hand' : 'Raise Hand',
-            color: _handRaised ? Colors.amber : Colors.white,
-            onTap: _toggleHand,
-          )
-        : null;
-    final pollsBtn = widget.isInstructor
-        ? _controlBtn(
-            icon: Icons.poll_rounded,
-            label: 'Polls',
-            color: Colors.white,
-            onTap: () {
-              setState(() {
-                _chatOpen = true;
-                _participantsOpen = false;
-                _panelTab.animateTo(2);
-              });
-              if (kIsWeb) lmsSetPanelWidth(true);
-            },
-          )
-        : null;
-    final wbBtn = _controlBtn(
-      icon: Icons.draw_rounded,
-      label: 'Whiteboard',
-      color: _whiteboardOpen ? const Color(0xFF10B981) : Colors.white,
-      onTap: () {
-        final next = !_whiteboardOpen;
-        setState(() {
-          _whiteboardOpen = next;
-          if (!next) _wbFullscreen = false;
-        });
-        // Instructor's toggle is synced so students auto-open/close
-        if (widget.isInstructor && _sessionDocId.isNotEmpty) {
-          _lms.updateSession(_sessionDocId, {'whiteboardOpen': next});
-        }
-      },
-    );
-    final screenShareBtn = kIsWeb
-        ? _controlBtn(
-            icon: _screenSharing ? Icons.stop_screen_share_rounded : Icons.screen_share_rounded,
-            label: _screenSharing ? 'Stop Share' : 'Share Screen',
-            color: _screenSharing ? Colors.orange : Colors.white,
-            onTap: _toggleScreenShare,
-          )
-        : null;
-    final endBtn = GestureDetector(
-      onTap: _endSession,
-      child: Container(
-        padding: EdgeInsets.symmetric(
-          horizontal: isMobile ? 16 : 20,
-          vertical: isMobile ? 8 : 10,
-        ),
-        decoration: BoxDecoration(color: Colors.red, borderRadius: BorderRadius.circular(8)),
-        child: Text(
-          widget.isInstructor ? 'End' : 'Leave',
-          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 14),
-        ),
+    final pillButtons = <Widget>[
+      _pillBtn(
+        icon: Icons.chat_bubble_outline_rounded,
+        label: 'Chat',
+        active: _chatOpen && !_participantsOpen,
+        badge: _chatMessages.isNotEmpty ? '${_chatMessages.length}' : null,
+        onTap: () {
+          setState(() {
+            _chatOpen = !_chatOpen;
+            _participantsOpen = false;
+            if (_chatOpen) _panelTab.animateTo(0);
+          });
+          if (kIsWeb) lmsSetPanelWidth(_chatOpen);
+        },
       ),
-    );
+      _pillBtn(
+        icon: Icons.people_rounded,
+        label: 'People',
+        active: _participantsOpen,
+        onTap: () {
+          setState(() {
+            _participantsOpen = !_participantsOpen;
+            _chatOpen = _participantsOpen;
+            if (_participantsOpen) _panelTab.animateTo(1);
+          });
+          if (kIsWeb) lmsSetPanelWidth(_participantsOpen);
+        },
+      ),
+      if (widget.isInstructor)
+        _pillBtn(
+          icon: Icons.poll_rounded,
+          label: 'Polls',
+          active: false,
+          onTap: () {
+            setState(() {
+              _chatOpen = true;
+              _participantsOpen = false;
+              _panelTab.animateTo(2);
+            });
+            if (kIsWeb) lmsSetPanelWidth(true);
+          },
+        ),
+      if (!widget.isInstructor)
+        _pillBtn(
+          icon: Icons.back_hand_rounded,
+          label: _handRaised ? 'Lower Hand' : 'Raise Hand',
+          active: _handRaised,
+          onTap: _toggleHand,
+        ),
+      _pillBtn(
+        icon: Icons.draw_rounded,
+        label: 'Whiteboard',
+        active: _whiteboardOpen,
+        onTap: () {
+          final next = !_whiteboardOpen;
+          setState(() {
+            _whiteboardOpen = next;
+            if (!next) _wbFullscreen = false;
+          });
+          // Instructor's toggle is synced so students auto-open/close
+          if (widget.isInstructor && _sessionDocId.isNotEmpty) {
+            _lms.updateSession(_sessionDocId, {'whiteboardOpen': next});
+          }
+        },
+      ),
+    ];
 
-    if (isMobile) {
-      // 2-row mobile layout — no overflow
-      return Container(
-        color: const Color(0xFF252D3D),
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Wrap(
+          alignment: WrapAlignment.center,
+          spacing: 8,
+          runSpacing: 6,
+          children: pillButtons,
+        ),
+        const SizedBox(height: 14),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // Row 1: all control buttons
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                micBtn,
-                camBtn,
-                if (screenShareBtn != null) screenShareBtn,
-                if (handBtn != null) handBtn,
-                chatBtn,
-                peopleBtn,
-                if (pollsBtn != null) pollsBtn,
-                wbBtn,
-              ],
+            _circleBtn(
+              icon: _micOn ? Icons.mic_rounded : Icons.mic_off_rounded,
+              color: _micOn ? Colors.white : Colors.red,
+              bg: Colors.white24,
+              tooltip: _micOn ? 'Mute' : 'Unmute',
+              onTap: _toggleMic,
             ),
-            const SizedBox(height: 6),
-            // Row 2: end/leave full-width
-            SizedBox(
-              width: double.infinity,
-              child: GestureDetector(
-                onTap: _endSession,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(vertical: 10),
-                  decoration: BoxDecoration(color: Colors.red, borderRadius: BorderRadius.circular(8)),
-                  child: Center(
-                    child: Text(
-                      widget.isInstructor ? 'End Session for All' : 'Leave Session',
-                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 14),
-                    ),
-                  ),
-                ),
+            const SizedBox(width: 14),
+            _circleBtn(
+              icon: _cameraOn ? Icons.videocam_rounded : Icons.videocam_off_rounded,
+              color: _cameraOn ? Colors.white : Colors.red,
+              bg: Colors.white24,
+              tooltip: _cameraOn ? 'Stop Video' : 'Start Video',
+              onTap: _toggleCamera,
+            ),
+            if (kIsWeb) ...[
+              const SizedBox(width: 14),
+              _circleBtn(
+                icon: _screenSharing ? Icons.stop_screen_share_rounded : Icons.screen_share_rounded,
+                color: Colors.white,
+                bg: _screenSharing ? Colors.orange : Colors.white24,
+                tooltip: _screenSharing ? 'Stop Share' : 'Share Screen',
+                onTap: _toggleScreenShare,
               ),
+            ],
+            const SizedBox(width: 14),
+            _circleBtn(
+              icon: Icons.call_end_rounded,
+              color: Colors.white,
+              bg: Colors.red,
+              size: isMobile ? 56 : 62,
+              tooltip: widget.isInstructor ? 'End Session for All' : 'Leave Session',
+              onTap: _endSession,
             ),
           ],
         ),
-      );
-    }
+      ],
+    );
+  }
 
-    // Desktop / tablet: original single-row layout
-    return Container(
-      height: 70,
-      color: const Color(0xFF252D3D),
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          micBtn,
-          const SizedBox(width: 8),
-          camBtn,
-          const SizedBox(width: 8),
-          if (screenShareBtn != null) ...[screenShareBtn, const SizedBox(width: 8)],
-          if (handBtn != null) ...[handBtn, const SizedBox(width: 8)],
-          chatBtn,
-          const SizedBox(width: 8),
-          peopleBtn,
-          const SizedBox(width: 8),
-          if (pollsBtn != null) ...[pollsBtn, const SizedBox(width: 8)],
-          wbBtn,
-          const SizedBox(width: 8),
-          const Spacer(),
-          endBtn,
-        ],
+  Widget _circleBtn({
+    required IconData icon,
+    required Color color,
+    required Color bg,
+    required VoidCallback onTap,
+    double size = 48,
+    String? tooltip,
+  }) {
+    return Tooltip(
+      message: tooltip ?? '',
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          width: size,
+          height: size,
+          decoration: BoxDecoration(color: bg, shape: BoxShape.circle),
+          child: Icon(icon, color: color, size: size * 0.45),
+        ),
       ),
     );
   }
 
-  Widget _controlBtn({
+  Widget _pillBtn({
     required IconData icon,
     required String label,
-    required Color color,
+    required bool active,
     required VoidCallback onTap,
     String? badge,
   }) {
     return GestureDetector(
       onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-          Stack(
-            clipBehavior: Clip.none,
-            children: [
-              Icon(icon, color: color, size: 22),
-              if (badge != null)
-                Positioned(
-                  top: -6,
-                  right: -6,
-                  child: Container(
-                    padding: const EdgeInsets.all(3),
-                    decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
-                    child: Text(badge, style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w700)),
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            decoration: BoxDecoration(
+              color: active
+                  ? AppColors.primaryColor.withValues(alpha: 0.35)
+                  : Colors.black45,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: active ? AppColors.primaryColor : Colors.transparent,
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(icon, color: active ? Colors.white : Colors.white70, size: 16),
+                const SizedBox(width: 6),
+                Text(label,
+                    style: TextStyle(
+                        color: active ? Colors.white : Colors.white70,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600)),
+              ],
+            ),
+          ),
+          if (badge != null)
+            Positioned(
+              top: -6,
+              right: -6,
+              child: Container(
+                padding: const EdgeInsets.all(4),
+                decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
+                constraints: const BoxConstraints(minWidth: 18, minHeight: 18),
+                child: Center(
+                  child: Text(
+                    badge,
+                    style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w700),
                   ),
                 ),
-            ],
-          ),
-          const SizedBox(height: 2),
-          Text(label, style: TextStyle(color: color.withValues(alpha: 0.8), fontSize: 10)),
-        ]),
+              ),
+            ),
+        ],
       ),
     );
   }

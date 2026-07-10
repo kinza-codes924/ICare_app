@@ -152,14 +152,17 @@ String registerLmsVideoView() {
       grid.style.boxSizing = 'border-box';
       container.appendChild(grid);
 
-      // Local video — small preview pinned to bottom-right corner. Sized
-      // with clamp() so it shrinks on narrow/mobile viewports instead of
-      // staying a fixed 130x98 that can crowd or overlap other UI on small
-      // screens (16:9-ish box: width scales 84px-130px, height follows).
+      // Local video — small preview pinned to the TOP-right corner (same
+      // placement as the doctor↔patient consultation screen), below the
+      // Fit/Fill + fullscreen buttons Flutter overlays at the very top.
+      // The bottom edge now belongs to the floating call controls, so the
+      // preview can't live there anymore without colliding with them on
+      // narrow screens. Sized with clamp() so it shrinks on mobile
+      // viewports (16:9-ish box: width scales 84px-130px, height follows).
       final local = web.document.createElement('div') as web.HTMLDivElement;
       local.id = 'lms-agora-local';
       local.style.position = 'absolute';
-      local.style.bottom = '8px';
+      local.style.top = '48px';
       local.style.right = '8px';
       local.style.width = 'clamp(84px, 22vw, 130px)';
       local.style.height = 'clamp(63px, 16.5vw, 98px)';
