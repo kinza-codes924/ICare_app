@@ -70,6 +70,29 @@
     #lms-agora-local .lms-tile-name {
       font-size: 9px; padding: 1px 5px; bottom: 3px; left: 3px;
     }
+    /* While a spotlight/share layout is active, the participant sidebar
+       occupies the top-right region — the self-preview normally pinned
+       there would float ON TOP of the sidebar tiles and make them look
+       misaligned/unequal (exactly the client's screenshot). Move it to
+       the bottom-left corner of the share area for the duration. */
+    #lms-jitsi-host:has(#lms-grid-container.lms-spotlight-active) #lms-agora-local {
+      top: auto !important;
+      bottom: 8px !important;
+      left: 8px !important;
+      right: auto !important;
+    }
+    /* Meet-style expand hint on the big share/spotlight tile — tapping the
+       tile toggles 90/10 "fullscreen". The glyph is purely visual
+       (pointer-events:none); the actual tap is handled by Flutter's
+       coordinate hit-test into lmsToggleTileExpand. */
+    #lms-grid-container.lms-spotlight-active .lms-spotlight-tile::after {
+      content: '⛶';
+      position: absolute; top: 8px; right: 8px;
+      color: #fff; background: rgba(0,0,0,0.55);
+      border-radius: 6px; padding: 2px 9px;
+      font-size: 17px; line-height: 1.4;
+      z-index: 11; pointer-events: none;
+    }
     /* Screen-share spotlight (Google Meet style): the sharing participant's
        EXISTING tile grows to fill nearly the whole area; every other
        participant keeps a fixed-size tile in a SCROLLABLE strip — never
@@ -1252,11 +1275,21 @@
 
     // Manually expand a tile to a 90/10 split (click again to restore the
     // proportional grid) — the "full screen but people stay visible"
-    // behavior from the client's Meet reference. No-op while a screen
-    // share is active (the share owns the layout at 70/30).
+    // behavior from the client's Meet reference. While a screen share is
+    // active the share owns the layout at 70/30, but tapping the big share
+    // tile itself toggles its Meet-style "fullscreen" (90/10) — matching
+    // the expand affordance Meet puts on the presentation tile.
     window.lmsToggleTileExpand = function(uid) {
       try {
-        if (window._lmsShareActive) return;
+        if (window._lmsShareActive) {
+          var sGrid = document.getElementById('lms-grid-container');
+          var sTile = document.getElementById('lms-tile-' + uid);
+          if (sGrid && sTile && sTile.classList.contains('lms-spotlight-tile')) {
+            sGrid.classList.toggle('lms-ratio-90');
+            window._lmsReplayGridTiles();
+          }
+          return;
+        }
         var grid = document.getElementById('lms-grid-container');
         var tile = document.getElementById('lms-tile-' + uid);
         if (!grid || !tile) return;

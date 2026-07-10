@@ -1080,7 +1080,13 @@ class _LmsLessonForm {
         if (videoUrl != null && videoUrl!.isNotEmpty) 'videoUrl': videoUrl,
         if (documentUrl != null && documentUrl!.isNotEmpty) 'documentUrl': documentUrl,
         if (documentName != null) 'documentName': documentName,
-        if (liveSessionDateTime != null) 'liveSessionDateTime': liveSessionDateTime!.toIso8601String(),
+        // .toUtc() is required: liveSessionDateTime is built from local date/time
+        // pickers, so a bare .toIso8601String() has no timezone marker and the
+        // backend's `new Date(...)` would parse it in the SERVER's timezone
+        // (UTC on Vercel) instead of the instructor's — silently shifting the
+        // displayed time by several hours. Converting to UTC first makes the
+        // string carry an explicit 'Z', so the same instant survives the round trip.
+        if (liveSessionDateTime != null) 'liveSessionDateTime': liveSessionDateTime!.toUtc().toIso8601String(),
         if (liveNoteCtrl.text.trim().isNotEmpty) 'liveSessionNote': liveNoteCtrl.text.trim(),
       };
 
