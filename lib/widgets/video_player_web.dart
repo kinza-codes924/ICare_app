@@ -1,5 +1,5 @@
-// ignore: avoid_web_libraries_in_flutter
 import 'dart:async';
+// ignore: avoid_web_libraries_in_flutter
 import 'dart:html' as html;
 // ignore: avoid_web_libraries_in_flutter
 import 'dart:ui_web' as ui_web;
@@ -15,14 +15,6 @@ class VideoPlayerWidget extends StatefulWidget {
 
 class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
   late final String _viewType;
-  html.VideoElement? _video;
-
-  bool _isDirect = false;
-  bool _playing = false;
-  bool _showControls = true;
-  Duration _position = Duration.zero;
-  Duration _duration = Duration.zero;
-  Timer? _hideTimer;
 
   static bool _isDirectVideo(String url) {
     final lower = url.toLowerCase();
@@ -38,45 +30,10 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
   @override
   void initState() {
     super.initState();
-    _isDirect = _isDirectVideo(widget.videoUrl);
     _viewType = 'video-${widget.videoUrl.hashCode}-${DateTime.now().microsecondsSinceEpoch}';
     ui_web.platformViewRegistry.registerViewFactory(_viewType, (int id) {
-      if (_isDirect) {
-        // Native controls are disabled on purpose: Flutter web's platform-view
-        // compositor intercepts/re-dispatches pointer events on top of the
-        // HTML layer, which makes dragging the browser's built-in scrubber
-        // stutter or fail. A Flutter-side Slider (below) drives currentTime
-        // directly instead, so there's only one system handling the drag.
-        final el = html.VideoElement()
-          ..src = widget.videoUrl
-          ..controls = false
-          ..style.width = '100%'
-          ..style.height = '100%'
-          ..style.backgroundColor = '#000'
-          ..setAttribute('playsinline', 'true')
-          ..setAttribute('preload', 'metadata');
-        _video = el;
-        el.onLoadedMetadata.listen((_) {
-          if (!mounted) return;
-          setState(() => _duration = Duration(milliseconds: (el.duration * 1000).round()));
-        });
-        el.onTimeUpdate.listen((_) {
-          if (!mounted) return;
-          setState(() => _position = Duration(milliseconds: (el.currentTime * 1000).round()));
-        });
-        el.onPlay.listen((_) {
-          if (!mounted) return;
-          setState(() => _playing = true);
-        });
-        el.onPause.listen((_) {
-          if (!mounted) return;
-          setState(() => _playing = false);
-        });
-        el.onEnded.listen((_) {
-          if (!mounted) return;
-          setState(() => _playing = false);
-        });
-        return el;
+      if (_isDirectVideo(widget.videoUrl)) {
+        return _buildDirectPlayer(widget.videoUrl);
       } else {
         // iframe for YouTube/Vimeo embeds
         return html.IFrameElement()
@@ -89,6 +46,238 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
               'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share');
       }
     });
+  }
+
+  // Everything below is plain DOM, built once per view factory call and
+  // wired up with vanilla JS-interop event listeners.
+  //
+  // Why not Flutter widgets for the controls? Flutter web always composites
+  // an HtmlElementView (a platform view / native <video>) ABOVE the rest of
+  // the Flutter widget tree, so any Flutter Positioned/Slider drawn "on top"
+  // of the video in a Stack is actually rendered underneath it and never
+  // receives pointer events or shows up visually — that's why the previous
+  // attempt's seek bar never appeared. The fix is to build the whole control
+  // bar (seek bar, play/pause, mute, fullscreen) as sibling DOM nodes inside
+  // the SAME html.DivElement as the <video>, so they live in the same
+  // compositing layer and stack correctly with CSS.
+  html.Element _buildDirectPlayer(String url) {
+    final container = html.DivElement()
+      ..style.position = 'relative'
+      ..style.width = '100%'
+      ..style.height = '100%'
+      ..style.backgroundColor = '#000'
+      ..style.overflow = 'hidden';
+
+    final video = html.VideoElement()
+      ..src = url
+      ..controls = false
+      ..style.width = '100%'
+      ..style.height = '100%'
+      ..style.display = 'block'
+      ..style.backgroundColor = '#000'
+      ..setAttribute('playsinline', 'true')
+      ..setAttribute('preload', 'metadata');
+
+    final seekBar = html.InputElement(type: 'range')
+      ..min = '0'
+      ..max = '1000'
+      ..value = '0'
+      ..style.width = '100%'
+      ..style.height = '18px'
+      ..style.margin = '0'
+      ..style.cursor = 'pointer';
+    seekBar.style.setProperty('accent-color', '#0036BC');
+
+    final timeLabel = html.SpanElement()
+      ..text = '0:00 / 0:00'
+      ..style.color = '#fff'
+      ..style.fontSize = '12px'
+      ..style.fontFamily = 'inherit'
+      ..style.marginLeft = '4px';
+
+    final playBtn = html.ButtonElement()
+      ..innerHtml = _iconSvg('play')
+      ..style.background = 'transparent'
+      ..style.border = 'none'
+      ..style.cursor = 'pointer'
+      ..style.padding = '4px'
+      ..style.display = 'flex'
+      ..style.alignItems = 'center';
+
+    final muteBtn = html.ButtonElement()
+      ..innerHtml = _iconSvg('volume')
+      ..style.background = 'transparent'
+      ..style.border = 'none'
+      ..style.cursor = 'pointer'
+      ..style.padding = '4px'
+      ..style.display = 'flex'
+      ..style.alignItems = 'center';
+
+    final fullscreenBtn = html.ButtonElement()
+      ..innerHtml = _iconSvg('fullscreen')
+      ..style.background = 'transparent'
+      ..style.border = 'none'
+      ..style.cursor = 'pointer'
+      ..style.padding = '4px'
+      ..style.marginLeft = 'auto'
+      ..style.display = 'flex'
+      ..style.alignItems = 'center';
+
+    final buttonRow = html.DivElement()
+      ..style.display = 'flex'
+      ..style.alignItems = 'center'
+      ..style.padding = '0 10px 8px 6px'
+      ..append(playBtn)
+      ..append(muteBtn)
+      ..append(timeLabel)
+      ..append(html.DivElement()..style.flex = '1')
+      ..append(fullscreenBtn);
+
+    final controlsBar = html.DivElement()
+      ..style.position = 'absolute'
+      ..style.left = '0'
+      ..style.right = '0'
+      ..style.bottom = '0'
+      ..style.background =
+          'linear-gradient(to top, rgba(0,0,0,0.85), rgba(0,0,0,0.55) 60%, transparent)'
+      ..style.paddingTop = '20px'
+      ..style.transition = 'opacity 0.2s ease'
+      ..style.opacity = '1'
+      ..append(seekBar)
+      ..append(buttonRow);
+
+    container..append(video)..append(controlsBar);
+
+    bool seeking = false;
+    Timer? hideTimer;
+
+    void showControls() {
+      controlsBar.style.opacity = '1';
+    }
+
+    void scheduleHide() {
+      hideTimer?.cancel();
+      hideTimer = Timer(const Duration(seconds: 3), () {
+        if (!video.paused) {
+          controlsBar.style.opacity = '0';
+        }
+      });
+    }
+
+    String fmt(num seconds) {
+      if (seconds.isNaN || seconds.isInfinite) return '0:00';
+      final total = seconds.round();
+      final h = total ~/ 3600;
+      final m = (total % 3600) ~/ 60;
+      final s = total % 60;
+      final mm = h > 0 ? m.toString().padLeft(2, '0') : m.toString();
+      final ss = s.toString().padLeft(2, '0');
+      return h > 0 ? '$h:$mm:$ss' : '$mm:$ss';
+    }
+
+    void updateTimeLabel() {
+      timeLabel.text = '${fmt(video.currentTime)} / ${fmt(video.duration)}';
+    }
+
+    video.onLoadedMetadata.listen((_) => updateTimeLabel());
+
+    video.onTimeUpdate.listen((_) {
+      if (!seeking) {
+        final dur = video.duration;
+        if (dur > 0 && !dur.isNaN) {
+          seekBar.valueAsNumber = (video.currentTime / dur) * 1000;
+        }
+      }
+      updateTimeLabel();
+    });
+
+    video.onPlay.listen((_) {
+      playBtn.innerHtml = _iconSvg('pause');
+      scheduleHide();
+    });
+    video.onPause.listen((_) {
+      playBtn.innerHtml = _iconSvg('play');
+      showControls();
+      hideTimer?.cancel();
+    });
+    video.onEnded.listen((_) {
+      playBtn.innerHtml = _iconSvg('play');
+      showControls();
+      hideTimer?.cancel();
+    });
+
+    playBtn.onClick.listen((_) {
+      if (video.paused) {
+        video.play();
+      } else {
+        video.pause();
+      }
+    });
+
+    muteBtn.onClick.listen((_) {
+      video.muted = !video.muted;
+      muteBtn.innerHtml = _iconSvg(video.muted ? 'muted' : 'volume');
+    });
+
+    seekBar.onInput.listen((_) {
+      seeking = true;
+      final dur = video.duration;
+      if (dur > 0 && !dur.isNaN) {
+        final target = (seekBar.valueAsNumber ?? 0) / 1000 * dur;
+        timeLabel.text = '${fmt(target)} / ${fmt(dur)}';
+      }
+      showControls();
+      hideTimer?.cancel();
+    });
+    seekBar.onChange.listen((_) {
+      final dur = video.duration;
+      if (dur > 0 && !dur.isNaN) {
+        video.currentTime = (seekBar.valueAsNumber ?? 0) / 1000 * dur;
+      }
+      seeking = false;
+      if (!video.paused) scheduleHide();
+    });
+
+    fullscreenBtn.onClick.listen((_) {
+      if (html.document.fullscreenElement == null) {
+        container.requestFullscreen();
+      } else {
+        html.document.exitFullscreen();
+      }
+    });
+
+    container.onMouseMove.listen((_) {
+      showControls();
+      if (!video.paused) scheduleHide();
+    });
+    container.onClick.listen((event) {
+      // Ignore clicks that originated on the controls bar itself.
+      if (controlsBar.contains(event.target as html.Node?)) return;
+      if (video.paused) {
+        video.play();
+      } else {
+        video.pause();
+      }
+    });
+
+    return container;
+  }
+
+  static String _iconSvg(String kind) {
+    switch (kind) {
+      case 'play':
+        return '<svg width="26" height="26" viewBox="0 0 24 24" fill="white"><path d="M8 5v14l11-7z"/></svg>';
+      case 'pause':
+        return '<svg width="26" height="26" viewBox="0 0 24 24" fill="white"><path d="M6 5h4v14H6zm8 0h4v14h-4z"/></svg>';
+      case 'volume':
+        return '<svg width="22" height="22" viewBox="0 0 24 24" fill="white"><path d="M3 10v4h4l5 5V5L7 10H3zm13.5 2A4.5 4.5 0 0 0 14 7.97v8.05A4.5 4.5 0 0 0 16.5 12z"/></svg>';
+      case 'muted':
+        return '<svg width="22" height="22" viewBox="0 0 24 24" fill="white"><path d="M16.5 12A4.5 4.5 0 0 0 14 7.97v2.21l2.45 2.45c.03-.2.05-.42.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51A8.796 8.796 0 0 0 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06a8.99 8.99 0 0 0 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/></svg>';
+      case 'fullscreen':
+        return '<svg width="20" height="20" viewBox="0 0 24 24" fill="white"><path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/></svg>';
+      default:
+        return '';
+    }
   }
 
   static String _toEmbedUrl(String url) {
@@ -104,121 +293,6 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
     return url;
   }
 
-  void _togglePlay() {
-    final v = _video;
-    if (v == null) return;
-    if (v.paused) {
-      v.play();
-    } else {
-      v.pause();
-    }
-  }
-
-  void _seekTo(double seconds) {
-    final v = _video;
-    if (v == null) return;
-    v.currentTime = seconds;
-    setState(() => _position = Duration(milliseconds: (seconds * 1000).round()));
-  }
-
-  void _bumpAutoHide() {
-    _hideTimer?.cancel();
-    _hideTimer = Timer(const Duration(seconds: 3), () {
-      if (mounted && _playing) setState(() => _showControls = false);
-    });
-  }
-
-  String _fmt(Duration d) {
-    final h = d.inHours;
-    final m = d.inMinutes.remainder(60).toString().padLeft(2, '0');
-    final s = d.inSeconds.remainder(60).toString().padLeft(2, '0');
-    return h > 0 ? '$h:$m:$s' : '$m:$s';
-  }
-
   @override
-  void dispose() {
-    _hideTimer?.cancel();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final view = HtmlElementView(viewType: _viewType);
-    if (!_isDirect) return view;
-
-    final durMs = _duration.inMilliseconds;
-    final posMs = _position.inMilliseconds.clamp(0, durMs == 0 ? 0 : durMs);
-
-    return GestureDetector(
-      onTap: () {
-        setState(() => _showControls = !_showControls);
-        if (_showControls) _bumpAutoHide();
-      },
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          view,
-          if (_showControls)
-            Positioned(
-              left: 0,
-              right: 0,
-              bottom: 0,
-              child: Container(
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [Colors.transparent, Colors.black87],
-                  ),
-                ),
-                padding: const EdgeInsets.only(top: 24),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    SliderTheme(
-                      data: SliderTheme.of(context).copyWith(
-                        trackHeight: 3,
-                        thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
-                        overlayShape: const RoundSliderOverlayShape(overlayRadius: 14),
-                        activeTrackColor: const Color(0xFF0036BC),
-                        inactiveTrackColor: Colors.white24,
-                        thumbColor: const Color(0xFF0036BC),
-                      ),
-                      child: Slider(
-                        min: 0,
-                        max: durMs > 0 ? durMs.toDouble() : 1,
-                        value: posMs.toDouble(),
-                        onChangeStart: (_) => _hideTimer?.cancel(),
-                        onChanged: (v) => setState(() => _position = Duration(milliseconds: v.round())),
-                        onChangeEnd: (v) {
-                          _seekTo(v / 1000);
-                          _bumpAutoHide();
-                        },
-                      ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
-                      child: Row(
-                        children: [
-                          IconButton(
-                            icon: Icon(_playing ? Icons.pause_rounded : Icons.play_arrow_rounded,
-                                color: Colors.white, size: 28),
-                            onPressed: () {
-                              _togglePlay();
-                              _bumpAutoHide();
-                            },
-                          ),
-                          Text('${_fmt(_position)} / ${_fmt(_duration)}',
-                              style: const TextStyle(color: Colors.white, fontSize: 12)),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
+  Widget build(BuildContext context) => HtmlElementView(viewType: _viewType);
 }
