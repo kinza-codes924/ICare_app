@@ -1348,23 +1348,37 @@
         st.id = 'lms-agora-fit-override';
         document.head.appendChild(st);
       }
+      // Fit/Fill only ever applies to CAMERA tiles. The shared-screen
+      // spotlight tile (remote or the presenter's own) always carries
+      // .lms-spotlight-tile and must stay full-size/uncropped ('contain')
+      // regardless of this toggle — presentation content (slides/text)
+      // should never shrink or get cover-cropped just because someone
+      // clicked Fit/Fill. Excluding it here, plus skipping it in the
+      // replay loop below, is what keeps it pinned to 'contain'.
       st.textContent =
-        '.lms-remote-tile > div, .lms-remote-tile video, ' +
+        '.lms-remote-tile:not(.lms-spotlight-tile) > div, .lms-remote-tile:not(.lms-spotlight-tile) video, ' +
         '#lms-agora-local > div, #lms-agora-local video {' +
-        'object-fit: ' + mode + ' !important; }';
+        'object-fit: ' + mode + ' !important; }' +
+        '.lms-spotlight-tile > div, .lms-spotlight-tile video {' +
+        'object-fit: contain !important; }';
       if (window._lmsAgoraClient) {
         window._lmsAgoraClient.remoteUsers.forEach(function(u) {
           if (!u.videoTrack) return;
+          var tile = document.getElementById('lms-tile-' + u.uid);
+          if (tile && tile.classList.contains('lms-spotlight-tile')) return; // share tile stays 'contain'
           var vd = document.getElementById('lms-tile-' + u.uid + '-video');
           if (vd) { try { vd.innerHTML = ''; u.videoTrack.play(vd.id, { fit: mode }); } catch(_) {} }
         });
       }
-      // Local self-preview (own camera or screen-share PiP) — same fit toggle,
-      // previously hardcoded to 'cover' regardless of the user's selection.
+      // The presenter's own big screen tile (if currently sharing) also
+      // stays 'contain' — never re-played with the user's Fit/Fill choice.
+      // The small corner self-preview (#lms-agora-local) always shows the
+      // live CAMERA (never the screen track, even mid-share — see the
+      // "camera vanished during share" fix), so it's the only thing here
+      // that legitimately follows the Fit/Fill toggle.
       var ld = document.getElementById('lms-agora-local');
-      var localTrack = (window._lmsScreenSharing && window._lmsScreenTrack) ? window._lmsScreenTrack : window._lmsLocalVideo;
-      if (ld && localTrack) {
-        try { ld.innerHTML = ''; localTrack.play('lms-agora-local', { fit: mode }); } catch(_) {}
+      if (ld && window._lmsLocalVideo) {
+        try { ld.innerHTML = ''; window._lmsLocalVideo.play('lms-agora-local', { fit: mode }); } catch(_) {}
       }
     };
 
@@ -1410,22 +1424,30 @@
     // every fullscreen toggle (this was the one call site missing it).
     window.lmsRefreshVideoLayout = function() {
       try {
+        // Corner self-preview always shows the live camera, never the
+        // screen track (see the "camera vanished during share" fix) —
+        // the presenter's shared screen has its own big spotlight tile.
         var ld = document.getElementById('lms-agora-local');
-        if (ld) {
-          if (window._lmsScreenSharing && window._lmsScreenTrack) {
-            try { ld.innerHTML = ''; window._lmsScreenTrack.play('lms-agora-local', { fit: window._lmsVideoFit || 'cover' }); } catch(_) {}
-          } else if (window._lmsLocalVideo) {
-            try { ld.innerHTML = ''; window._lmsLocalVideo.play('lms-agora-local', { fit: window._lmsVideoFit || 'cover' }); } catch(_) {}
-          }
+        if (ld && window._lmsLocalVideo) {
+          try { ld.innerHTML = ''; window._lmsLocalVideo.play('lms-agora-local', { fit: window._lmsVideoFit || 'cover' }); } catch(_) {}
         }
         if (window._lmsAgoraClient) {
           window._lmsAgoraClient.remoteUsers.forEach(function(u) {
             if (u.videoTrack) {
               var vd = document.getElementById('lms-tile-' + u.uid + '-video');
               if (!vd) { window._lmsGetOrCreateTile(u.uid); vd = document.getElementById('lms-tile-' + u.uid + '-video'); }
-              if (vd) { try { vd.innerHTML = ''; u.videoTrack.play(vd.id, { fit: window._lmsVideoFit || 'cover' }); } catch(_) {} }
+              // Spotlight/share tile always stays 'contain', unaffected by
+              // the user's Fit/Fill choice — same rule as lmsSetVideoFit.
+              var tile = document.getElementById('lms-tile-' + u.uid);
+              var isShareSpot = tile && tile.classList.contains('lms-spotlight-tile');
+              if (vd) { try { vd.innerHTML = ''; u.videoTrack.play(vd.id, { fit: isShareSpot ? 'contain' : (window._lmsVideoFit || 'cover') }); } catch(_) {} }
             }
           });
+        }
+        // The presenter's own big screen tile (if sharing) — always 'contain'.
+        if (window._lmsScreenSharing && window._lmsScreenTrack) {
+          var lsd = document.getElementById('lms-tile-local-screen-video');
+          if (lsd) { try { lsd.innerHTML = ''; window._lmsScreenTrack.play(lsd.id, { fit: 'contain' }); } catch(_) {} }
         }
       } catch(e) { console.warn('lmsRefreshVideoLayout error:', e); }
     };
