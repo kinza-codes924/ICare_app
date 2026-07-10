@@ -77,17 +77,6 @@
     #lms-agora-local .lms-tile-name {
       font-size: 9px; padding: 1px 5px; bottom: 3px; left: 3px;
     }
-    /* While a spotlight/share layout is active, the participant sidebar
-       occupies the top-right region — the self-preview normally pinned
-       there would float ON TOP of the sidebar tiles and make them look
-       misaligned/unequal (exactly the client's screenshot). Move it to
-       the bottom-left corner of the share area for the duration. */
-    #lms-jitsi-host:has(#lms-grid-container.lms-spotlight-active) #lms-agora-local {
-      top: auto !important;
-      bottom: 8px !important;
-      left: 8px !important;
-      right: auto !important;
-    }
     /* Meet-style expand hint on the big share/spotlight tile — tapping the
        tile toggles 90/10 "fullscreen". The glyph is purely visual
        (pointer-events:none); the actual tap is handled by Flutter's
@@ -170,6 +159,21 @@
        mode (wide layout viewport but a touch pointer) still gets the
        mobile stacked layout: every phone must look the same. */
     @media (min-width: 900px) and (pointer: fine) {
+      /* While a spotlight/share layout is active, the participant sidebar
+         occupies the top-right region on DESKTOP only — the self-preview
+         normally pinned there would float ON TOP of the sidebar tiles.
+         Move it to the bottom-left corner of the share area for the
+         duration. Scoped to this desktop media query specifically: on
+         mobile the thumbnail strip sits at the BOTTOM instead (see the
+         unscoped mobile rules above), so applying this unconditionally
+         made the self-preview collide with the instructor's tile down
+         there instead of the sidebar it was meant to dodge. */
+      #lms-jitsi-host:has(#lms-grid-container.lms-spotlight-active) #lms-agora-local {
+        top: auto !important;
+        bottom: 8px !important;
+        left: 8px !important;
+        right: auto !important;
+      }
       #lms-grid-container.lms-spotlight-active {
         flex-direction: row !important;
       }
