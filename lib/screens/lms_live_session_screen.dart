@@ -1364,40 +1364,67 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
       );
     }
 
+    // ── Mobile-only layout (non-web) ────────────────────────────────────────
+    // The local camera preview is placed on its OWN isolated Positioned layer
+    // inside this Stack — it is NEVER part of the remote-participants branch.
+    // When screen-sharing toggles, only the remote area branch re-renders;
+    // the local preview widget retains its identity because:
+    //   1. It lives at a fixed Stack slot (always the last non-conditional child)
+    //   2. It carries a const ValueKey that survives every setState
+    //   3. lmsGetLocalVideoWidget() reuses _localController (cached in stub)
+    //      so the underlying AgoraVideoView/SurfaceTexture is never torn down
+    //      during a layout change triggered by _screenSharing toggling.
+    //
+    // Remote branches are mutually exclusive via KeyedSubtree — Flutter must
+    // fully dispose + recreate whichever branch changes, preventing any
+    // Element from being silently reused for a different uid (which is what
+    // caused the local preview to visually "bleed" into a remote tile slot).
+
     return Stack(
       children: [
-        // Video area — each branch keyed distinctly so a mid-transition
-        // change in _remoteUids.length (e.g. exactly when screen-share
-        // toggles) can never let Flutter reconcile one branch's Element
-        // into another's, which is the other half of the local-preview/
-        // remote-tile identity bleed described above.
+        // ── Remote area (ALL remote-uid branches) ───────────────────────
+        // Local uid (0 / self) is NEVER present in _remoteUids, so none of
+        // these branches can ever include the local preview stream.
         if (_remoteUids.isEmpty)
-          // No remote users — show self full-screen
-          KeyedSubtree(key: const ValueKey('video-area-self-fullscreen'), child: _buildSelfVideoTile(isLarge: true))
-        else if (_remoteUids.length == 1)
-          // 1 remote user — full screen remote view
+          // No remote users — show self full-screen as the main content
           KeyedSubtree(
-            key: ValueKey('video-area-single-${_remoteUids[0]}'),
-            child: SizedBox.expand(child: _buildRemoteVideoTile(_remoteUids[0], key: ValueKey(_remoteUids[0]))),
+            key: const ValueKey('mobile-video-no-remote'),
+            child: _buildSelfVideoTile(isLarge: true),
+          )
+        else if (_remoteUids.length == 1)
+          // One remote participant — show their stream full-screen
+          KeyedSubtree(
+            key: ValueKey('mobile-video-single-remote-${_remoteUids[0]}'),
+            child: SizedBox.expand(
+              child: _buildRemoteVideoTile(
+                _remoteUids[0],
+                key: ValueKey('remote-tile-${_remoteUids[0]}'),
+              ),
+            ),
           )
         else
-          // Multiple remote users — grid
-          KeyedSubtree(key: const ValueKey('video-area-grid'), child: _buildVideoGrid()),
+          // Multiple remote participants — responsive grid
+          KeyedSubtree(
+            key: ValueKey('mobile-video-grid-${_remoteUids.length}'),
+            child: _buildVideoGrid(),
+          ),
 
-        // Self preview (small corner, when others present) — kept on its own
-        // Positioned layer in this outer Stack, never inside the remote
-        // GridView.builder loop, and keyed so a screen-share state toggle
-        // (which changes _remoteUids-driven layout above) can never cause
-        // Flutter to conflate this Element with a remote participant's tile.
+        // ── LOCAL PREVIEW — completely decoupled from remote area ────────
+        // This Positioned widget lives on a separate Stack layer that is
+        // always present whenever there are remote users. Its const key
+        // guarantees Flutter never confuses it with any remote tile element,
+        // regardless of how many times _screenSharing, _remoteUids, or any
+        // other state variable changes. It is intentionally placed AFTER all
+        // remote branches in the children list so it paints on top.
         if (_remoteUids.isNotEmpty)
           Positioned(
-            key: const ValueKey('self-preview-corner'),
+            key: const ValueKey('mobile-local-preview-float'),
             right: 12,
             bottom: 12,
             child: _buildSelfVideoTile(isLarge: false),
           ),
 
-        // Raised hand notifications
+        // ── Raised-hand notification banner ─────────────────────────────
         if (_raisedHands.isNotEmpty)
           Positioned(
             top: 12,
@@ -1429,10 +1456,13 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
   }
 
   Widget _buildVideoGrid() {
-    // Scales with participant count (no fixed cap) so sessions with 20+
-    // students still lay out sensibly instead of cramming into 3 columns.
-    final count = _remoteUids.length;
+    // Build a copy of remote UIDs for this render pass. This list must
+    // ONLY contain remote UIDs — the local user (uid=0) is never in
+    // _remoteUids, but we filter defensively here as well.
+    final remoteOnly = _remoteUids.where((uid) => uid != 0).toList();
+    final count = remoteOnly.length;
     final cols = count <= 4 ? 2 : count <= 9 ? 3 : count <= 16 ? 4 : 5;
+
     return GridView.builder(
       padding: const EdgeInsets.all(8),
       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
@@ -1441,17 +1471,20 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
         mainAxisSpacing: 8,
         childAspectRatio: 4 / 3,
       ),
-      itemCount: _remoteUids.length,
-      // ValueKey(uid) — without a per-uid key, GridView.builder matches grid
-      // cells by position, not by participant. As students join/leave and
-      // the list reorders, Flutter reuses an existing cell's Element for a
-      // different uid, but the native Agora video surface bound to that
-      // Element (mobile-only; web renders via JS/DOM, not this widget) isn't
-      // always torn down and rebound in step — so two participants' camera
-      // feeds briefly render stacked in the same tile. Keying by uid forces
-      // Flutter to create/dispose a distinct Element (and native view) per
-      // participant instead of reusing one across different uids.
-      itemBuilder: (context, i) => _buildRemoteVideoTile(_remoteUids[i], key: ValueKey(_remoteUids[i])),
+      itemCount: remoteOnly.length,
+      // Strict per-uid ValueKey: Flutter must create/dispose a distinct
+      // Element (and native Agora SurfaceTexture) per participant instead
+      // of reusing one across different uids when the list reorders. This
+      // is the primary guard against two participants' feeds appearing in
+      // the same tile slot during a layout transition (e.g. screen-share
+      // toggle changing participant count or grid column count).
+      itemBuilder: (context, i) {
+        final uid = remoteOnly[i];
+        return _buildRemoteVideoTile(
+          uid,
+          key: ValueKey('grid-remote-tile-$uid'),
+        );
+      },
     );
   }
 
@@ -1472,7 +1505,11 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
             HtmlElementView(viewType: _cameraViewName!)
           else if (!kIsWeb && _cameraOn)
             RepaintBoundary(
-              key: const ValueKey('agora-self-tile'),
+              // Immutable key: this widget's identity must survive every
+              // setState, including screen-sharing state transitions, so the
+              // underlying AgoraVideoView (and its native SurfaceTexture) is
+              // never torn down or confused with a remote participant's tile.
+              key: const ValueKey('mobile-local-self-repaint'),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(isLarge ? 0 : 8),
                 child: lmsGetLocalVideoWidget(_cameraViewName),
@@ -1570,7 +1607,12 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
         children: [
           if (!kIsWeb)
             RepaintBoundary(
-              key: ValueKey('agora-tile-$uid'),
+              // Per-uid immutable key — ensures the compositing layer for
+              // this participant's native SurfaceTexture is never shared
+              // with or reused for a different participant's tile, even
+              // during fast layout transitions (e.g. screen-share toggle
+              // that changes grid geometry).
+              key: ValueKey('mobile-remote-repaint-$uid'),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(8),
                 child: lmsGetRemoteVideoWidget(uid, 'lms_${widget.courseId}'),
