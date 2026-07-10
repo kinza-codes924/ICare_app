@@ -1017,6 +1017,85 @@
     window._lmsScreenTrack = null;
     window._lmsScreenSharing = false;
     window._lmsScreenBusy = false;
+    window._lmsCompositeTrack = null;
+
+    // Composites the screen capture + a small camera PiP bubble onto one
+    // <canvas>, then publishes THAT single canvas stream as the one video
+    // track Agora allows per uid — so remote viewers see the presenter's
+    // camera and shared screen together, without needing a second Agora
+    // client/uid (the earlier "dual-client" attempt at exactly this used a
+    // second connection and made screen-sharing itself unreliable; this
+    // avoids that failure mode entirely since there's still only one
+    // published track). Returns null (falls back to screen-only) if the
+    // camera isn't available/on.
+    window._lmsStartCameraScreenComposite = function(screenTrack, cameraTrack) {
+      try {
+        if (!cameraTrack) return null;
+        var screenVideoEl = document.createElement('video');
+        screenVideoEl.muted = true; screenVideoEl.playsInline = true; screenVideoEl.autoplay = true;
+        screenVideoEl.srcObject = new MediaStream([screenTrack]);
+        var cameraVideoEl = document.createElement('video');
+        cameraVideoEl.muted = true; cameraVideoEl.playsInline = true; cameraVideoEl.autoplay = true;
+        cameraVideoEl.srcObject = new MediaStream([cameraTrack]);
+        screenVideoEl.play().catch(function(){});
+        cameraVideoEl.play().catch(function(){});
+
+        var canvas = document.createElement('canvas');
+        canvas.width = 1280; canvas.height = 720;
+        var ctx = canvas.getContext('2d');
+
+        function draw() {
+          if (screenVideoEl.videoWidth && (canvas.width !== screenVideoEl.videoWidth || canvas.height !== screenVideoEl.videoHeight)) {
+            canvas.width = screenVideoEl.videoWidth;
+            canvas.height = screenVideoEl.videoHeight;
+          }
+          ctx.fillStyle = '#000';
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+          if (screenVideoEl.readyState >= 2) {
+            ctx.drawImage(screenVideoEl, 0, 0, canvas.width, canvas.height);
+          }
+          // Camera PiP bubble — bottom-right rounded rectangle, ~18% width.
+          if (cameraVideoEl.readyState >= 2 && cameraVideoEl.videoWidth) {
+            var pipW = canvas.width * 0.18;
+            var pipH = pipW * (cameraVideoEl.videoHeight / cameraVideoEl.videoWidth);
+            var pad = canvas.width * 0.02;
+            var x = canvas.width - pipW - pad;
+            var y = canvas.height - pipH - pad;
+            var r = 12;
+            ctx.save();
+            ctx.beginPath();
+            ctx.moveTo(x + r, y);
+            ctx.arcTo(x + pipW, y, x + pipW, y + pipH, r);
+            ctx.arcTo(x + pipW, y + pipH, x, y + pipH, r);
+            ctx.arcTo(x, y + pipH, x, y, r);
+            ctx.arcTo(x, y, x + pipW, y, r);
+            ctx.closePath();
+            ctx.clip();
+            ctx.drawImage(cameraVideoEl, x, y, pipW, pipH);
+            ctx.restore();
+            ctx.strokeStyle = 'rgba(255,255,255,0.6)';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+          }
+          window._lmsCompositeRAF = requestAnimationFrame(draw);
+        }
+        draw();
+
+        var canvasTrack = canvas.captureStream(30).getVideoTracks()[0];
+        return {
+          agoraTrack: AgoraRTC.createCustomVideoTrack({ mediaStreamTrack: canvasTrack }),
+          stop: function() {
+            try { cancelAnimationFrame(window._lmsCompositeRAF); } catch(_) {}
+            try { screenVideoEl.pause(); screenVideoEl.srcObject = null; } catch(_) {}
+            try { cameraVideoEl.pause(); cameraVideoEl.srcObject = null; } catch(_) {}
+            try { canvasTrack.stop(); } catch(_) {}
+          }
+        };
+      } catch(e) {
+        console.warn('LMS composite error:', e.message || String(e));
+        return null;
+      }
+    };
 
     // Screen-share plays into the same small self-preview corner box used
     // for the camera (#lms-agora-local) — it's treated as just another
@@ -1048,9 +1127,17 @@
       window._lmsScreenBusy = true;
       try {
         if (window._lmsScreenSharing && window._lmsScreenTrack) {
-          // Stop screen sharing — switch back to camera
+          // Stop screen sharing — switch back to camera. Unpublish whichever
+          // track actually went out (the composited canvas track if the
+          // camera was on, otherwise the raw screen track).
+          var publishedTrack = window._lmsComposite ? window._lmsComposite.agoraTrack : window._lmsScreenTrack;
           if (window._lmsAgoraClient) {
-            try { await window._lmsAgoraClient.unpublish([window._lmsScreenTrack]); } catch(_) {}
+            try { await window._lmsAgoraClient.unpublish([publishedTrack]); } catch(_) {}
+          }
+          if (window._lmsComposite) {
+            try { window._lmsComposite.stop(); } catch(_) {}
+            try { publishedTrack.stop(); publishedTrack.close(); } catch(_) {}
+            window._lmsComposite = null;
           }
           try { window._lmsScreenTrack.stop(); window._lmsScreenTrack.close(); } catch(_) {}
           window._lmsScreenTrack = null;
@@ -1114,8 +1201,29 @@
           if (window._lmsLocalVideo && window._lmsAgoraClient) {
             try { await window._lmsAgoraClient.unpublish([window._lmsLocalVideo]); } catch(_) {}
           }
+          // If the camera is currently on, composite it as a small PiP bubble
+          // onto the screen capture and publish THAT single combined track —
+          // Agora only allows one video track per uid, so this is what lets
+          // remote viewers see the presenter's camera and shared screen at
+          // the same time without a second connection (see
+          // _lmsStartCameraScreenComposite above for why that's safer than
+          // the earlier dual-client attempt at this same feature).
+          window._lmsComposite = null;
+          var publishTrack = window._lmsScreenTrack;
+          try {
+            var camMst = (window._lmsLocalVideo && typeof window._lmsLocalVideo.getMediaStreamTrack === 'function')
+              ? window._lmsLocalVideo.getMediaStreamTrack() : null;
+            if (camMst && camMst.enabled && camMst.readyState === 'live') {
+              var screenMst = window._lmsScreenTrack.getMediaStreamTrack();
+              var composite = window._lmsStartCameraScreenComposite(screenMst, camMst);
+              if (composite) {
+                window._lmsComposite = composite;
+                publishTrack = composite.agoraTrack;
+              }
+            }
+          } catch(_) {}
           if (window._lmsAgoraClient) {
-            await window._lmsAgoraClient.publish([window._lmsScreenTrack]);
+            await window._lmsAgoraClient.publish([publishTrack]);
           }
           // Leave the small corner preview (#lms-agora-local) alone — it's
           // already playing the live camera track (from lmsLocalPreview),
@@ -1417,6 +1525,10 @@
         // the browser tab, not the Flutter route, so the native "sharing a
         // window" bar kept showing even after navigating away to the
         // dashboard. Stop it the same way the other local tracks are.
+        if (window._lmsComposite) {
+          try { window._lmsComposite.stop(); } catch(_) {}
+          window._lmsComposite = null;
+        }
         if (window._lmsScreenTrack) {
           try { window._lmsScreenTrack.stop(); window._lmsScreenTrack.close(); } catch(_) {}
           window._lmsScreenTrack = null;
