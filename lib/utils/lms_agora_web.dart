@@ -56,6 +56,12 @@ external void _lmsSetVideoFitJS(JSString mode);
 @JS('lmsSetTileName')
 external void _lmsSetTileNameJS(JSNumber uid, JSString name);
 
+@JS('lmsTileAtPoint')
+external JSString _lmsTileAtPointJS(JSNumber x, JSNumber y);
+
+@JS('lmsToggleTileExpand')
+external void _lmsToggleTileExpandJS(JSString uid);
+
 // appId and token fetched by caller from AgoraService
 Future<void> lmsJoinChannel(String roomName, String appId, String token, bool isInstructor) async {
   await _lmsAgoraJoinJS(appId.toJS, roomName.toJS, token.toJS, 0.toJS, isInstructor.toJS).toDart;
@@ -92,6 +98,14 @@ void lmsSetParticipantNames(String localName, String remoteName) =>
     _lmsSetParticipantNamesJS(localName.toJS, remoteName.toJS);
 void lmsSetVideoFit(String mode) => _lmsSetVideoFitJS(mode.toJS);
 void lmsSetTileName(int uid, String name) => _lmsSetTileNameJS(uid.toJS, name.toJS);
+
+/// Hit-tests the remote video tiles against a viewport point — returns the
+/// uid of the tile under (x, y) or '' if none. Needed because pointer events
+/// land on Flutter's glass pane, never on the DOM tiles themselves.
+String lmsTileAtPoint(double x, double y) => _lmsTileAtPointJS(x.toJS, y.toJS).toDart;
+
+/// Manually expand/collapse a tile to a 90/10 split (tap-to-expand).
+void lmsToggleTileExpand(String uid) => _lmsToggleTileExpandJS(uid.toJS);
 
 void lmsListenForScreenShareEnded(void Function() callback) {
   web.window.addEventListener('lms-screen-share-ended', ((web.Event _) {

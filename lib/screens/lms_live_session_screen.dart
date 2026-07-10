@@ -994,7 +994,25 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
   Widget _buildVideoWithOverlays() {
     return Stack(
       children: [
-        Positioned.fill(child: _buildVideoArea()),
+        // Tap a participant tile to expand it to a 90/10 split (tap again
+        // to restore the grid). Taps land on Flutter's glass pane — never
+        // on the DOM tiles — so we hit-test the tile rects in JS using the
+        // tap's viewport coordinates. Overlay buttons above this layer win
+        // the gesture arena, so this only fires for bare video-area taps.
+        Positioned.fill(
+          child: GestureDetector(
+            behavior: HitTestBehavior.translucent,
+            onTapUp: (details) {
+              if (!kIsWeb || !_permissionsEnabled) return;
+              final uid = lmsTileAtPoint(
+                details.globalPosition.dx,
+                details.globalPosition.dy,
+              );
+              if (uid.isNotEmpty) lmsToggleTileExpand(uid);
+            },
+            child: _buildVideoArea(),
+          ),
+        ),
         // right:110 leaves room for the Fit/Fill + fullscreen buttons that
         // _buildVideoArea pins to its own top-right corner.
         Positioned(top: 12, left: 12, right: 110, child: _buildTopOverlay()),

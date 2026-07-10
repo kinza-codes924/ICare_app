@@ -102,36 +102,42 @@
     #lms-grid-container.lms-spotlight-active .lms-remote-tile {
       aspect-ratio: auto !important;
     }
+    /* Main (spotlight) tile takes a FIXED 70% share of the container — the
+       client-specified split: 70% shared screen / 30% participant tiles.
+       The .lms-ratio-90 modifier (manually expanding a tile by clicking
+       it) bumps that to 90/10 — "full screen" that still keeps people
+       visible alongside, per the client's Meet reference. */
     #lms-grid-container.lms-spotlight-active .lms-spotlight-tile {
-      flex: 1 1 auto !important;
+      flex: 0 0 70% !important;
       order: -1 !important;
       min-height: 0 !important;
       width: 100% !important;
     }
-    /* Thumbnail strip (mobile/narrow default): fixed height, horizontally
-       scrollable so every participant tile stays fully visible (and
-       clickable) no matter how many students are in the call — this is the
-       piece that was missing before, which let tiles overflow off-screen
-       and "disappear". Sized with clamp() so it (and each thumbnail below)
-       shrinks on narrow viewports instead of eating a fixed,
-       disproportionate chunk of a phone screen. Overridden below by the
-       >=900px media query for the desktop right-column arrangement — this
-       block MUST come first so the media query (same specificity) wins on
-       wide viewports per normal CSS cascade order. */
+    #lms-grid-container.lms-spotlight-active.lms-ratio-90 .lms-spotlight-tile {
+      flex: 0 0 90% !important;
+    }
+    /* Thumbnail strip (mobile/narrow default): the remaining 30% (10% in
+       ratio-90) as a horizontally scrollable row so every participant tile
+       stays fully visible no matter how many students are in the call.
+       Overridden below by the >=900px media query for the desktop
+       right-sidebar arrangement — this block MUST come first so the media
+       query (same specificity) wins on wide viewports per cascade order. */
     #lms-grid-container.lms-spotlight-active .lms-thumbnail-strip {
       order: 1 !important;
-      flex: 0 0 clamp(64px, 14vh, 96px) !important;
+      flex: 1 1 30% !important;
       display: flex !important;
       flex-direction: row !important;
       gap: 4px !important;
       overflow-x: auto !important;
       overflow-y: hidden !important;
       padding-top: 4px !important;
+      min-height: 0 !important;
     }
     #lms-grid-container.lms-spotlight-active .lms-remote-tile:not(.lms-spotlight-tile) {
-      flex: 0 0 clamp(88px, 24vw, 128px) !important;
-      width: clamp(88px, 24vw, 128px) !important;
-      height: clamp(64px, 14vh, 96px) !important;
+      flex: 0 0 clamp(96px, 30vw, 200px) !important;
+      width: clamp(96px, 30vw, 200px) !important;
+      height: calc(100% - 4px) !important;
+      min-height: 0 !important;
     }
     @media (min-width: 900px) {
       #lms-grid-container.lms-spotlight-active {
@@ -141,18 +147,29 @@
         width: auto !important;
         height: 100% !important;
       }
+      /* Desktop sidebar: the 30% column holds a WRAPPING 2-across mini
+         grid of proportional tiles (matches the Meet screenshot the client
+         referenced) instead of one narrow single-file column — more people
+         stay visible at once and each tile keeps a sensible video shape. */
       #lms-grid-container.lms-spotlight-active .lms-thumbnail-strip {
-        flex-direction: column !important;
-        flex: 0 0 clamp(160px, 20vw, 220px) !important;
+        flex-direction: row !important;
+        flex-wrap: wrap !important;
+        align-content: flex-start !important;
         overflow-x: hidden !important;
         overflow-y: auto !important;
         padding-top: 0 !important;
         padding-left: 4px !important;
       }
       #lms-grid-container.lms-spotlight-active .lms-remote-tile:not(.lms-spotlight-tile) {
+        flex: 0 0 calc(50% - 2px) !important;
+        width: calc(50% - 2px) !important;
+        height: auto !important;
+        aspect-ratio: 16 / 10 !important;
+      }
+      /* In 90/10 the sidebar is too narrow for two columns — stack single file */
+      #lms-grid-container.lms-spotlight-active.lms-ratio-90 .lms-remote-tile:not(.lms-spotlight-tile) {
+        flex: 0 0 100% !important;
         width: 100% !important;
-        height: clamp(90px, 12vh, 130px) !important;
-        flex: 0 0 clamp(90px, 12vh, 130px) !important;
       }
     }
   </style>
@@ -1071,6 +1088,14 @@
       strip.remove();
     };
 
+    // True while a REMOTE screen-share spotlight is active — manual
+    // tile-expansion (lmsToggleTileExpand) is disabled during a share
+    // because the shared screen owns the layout.
+    window._lmsShareActive = false;
+    // uid of a tile the user manually expanded by clicking it (90/10
+    // split) — survives the 2s poll's "nobody is sharing" clear branch.
+    window._lmsManualExpandUid = null;
+
     window.lmsApplyRemoteScreenShare = function(sharingUid) {
       try {
         var grid = document.getElementById('lms-grid-container');
@@ -1078,10 +1103,14 @@
         var myUid = window.lmsGetLocalUid();
         // Nobody remote is sharing, or it's our own uid (self-share shows
         // via our own small corner preview, handled in lmsToggleScreenShare) —
-        // clear any active spotlight.
+        // clear any active SHARE spotlight, but leave a manually-expanded
+        // tile (user clicked it) alone: that's user intent, not share state.
         if (!sharingUid || sharingUid === myUid) {
+          window._lmsShareActive = false;
+          if (window._lmsManualExpandUid) return;
           if (grid.classList.contains('lms-spotlight-active')) {
             grid.classList.remove('lms-spotlight-active');
+            grid.classList.remove('lms-ratio-90');
             var prevTile = grid.querySelector('.lms-spotlight-tile');
             if (prevTile) prevTile.classList.remove('lms-spotlight-tile');
             window._lmsDissolveThumbStrip(grid);
@@ -1091,6 +1120,11 @@
         }
         var tile = document.getElementById('lms-tile-' + sharingUid);
         if (!tile) return; // sharer's tile not created yet — next poll tick retries
+        window._lmsShareActive = true;
+        // A screen share takes precedence over any manual expansion — drop
+        // the manual state and the 90/10 ratio so the share gets its 70/30.
+        window._lmsManualExpandUid = null;
+        grid.classList.remove('lms-ratio-90');
         if (tile.classList.contains('lms-spotlight-tile') && grid.classList.contains('lms-spotlight-active')) return;
         var other = grid.querySelector('.lms-spotlight-tile');
         if (other && other !== tile) other.classList.remove('lms-spotlight-tile');
@@ -1104,6 +1138,63 @@
         });
         window._lmsReplayGridTiles();
       } catch(e) { console.warn('lmsApplyRemoteScreenShare error:', e); }
+    };
+
+    // Returns the uid of the remote tile under viewport point (x, y), or ''.
+    // Used by Flutter's tap handler: pointer events land on Flutter's glass
+    // pane (raised above the video by lmsRaiseFlutterLayer so buttons work),
+    // so DOM click listeners on tiles never fire — instead Flutter forwards
+    // the tap coordinates here and we hit-test the tile rects manually.
+    window.lmsTileAtPoint = function(x, y) {
+      try {
+        var tiles = document.querySelectorAll('.lms-remote-tile');
+        for (var i = 0; i < tiles.length; i++) {
+          var r = tiles[i].getBoundingClientRect();
+          if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) {
+            return tiles[i].id.replace('lms-tile-', '');
+          }
+        }
+      } catch(_) {}
+      return '';
+    };
+
+    // Manually expand a tile to a 90/10 split (click again to restore the
+    // proportional grid) — the "full screen but people stay visible"
+    // behavior from the client's Meet reference. No-op while a screen
+    // share is active (the share owns the layout at 70/30).
+    window.lmsToggleTileExpand = function(uid) {
+      try {
+        if (window._lmsShareActive) return;
+        var grid = document.getElementById('lms-grid-container');
+        var tile = document.getElementById('lms-tile-' + uid);
+        if (!grid || !tile) return;
+        if (window._lmsManualExpandUid === String(uid)) {
+          // Collapse back to the normal proportional grid
+          window._lmsManualExpandUid = null;
+          grid.classList.remove('lms-spotlight-active');
+          grid.classList.remove('lms-ratio-90');
+          tile.classList.remove('lms-spotlight-tile');
+          window._lmsDissolveThumbStrip(grid);
+          window._lmsUpdateGridLayout();
+          return;
+        }
+        window._lmsManualExpandUid = String(uid);
+        var other = grid.querySelector('.lms-spotlight-tile');
+        if (other && other !== tile) other.classList.remove('lms-spotlight-tile');
+        // If the previous spotlight tile is sitting in the strip, pull the
+        // newly-expanded one out of it before re-filling the strip.
+        grid.classList.add('lms-spotlight-active');
+        grid.classList.add('lms-ratio-90');
+        tile.classList.add('lms-spotlight-tile');
+        if (tile.parentElement && tile.parentElement.classList.contains('lms-thumbnail-strip')) {
+          grid.appendChild(tile);
+        }
+        var strip = window._lmsGetOrCreateThumbStrip(grid);
+        Array.prototype.forEach.call(grid.querySelectorAll('.lms-remote-tile'), function(t) {
+          if (t !== tile && t.parentElement !== strip) strip.appendChild(t);
+        });
+        window._lmsReplayGridTiles();
+      } catch(e) { console.warn('lmsToggleTileExpand error:', e); }
     };
 
     window.lmsSetParticipantNames = function(localName, remoteName) {

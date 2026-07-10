@@ -115,6 +115,8 @@ Future<void> lmsStudentEnableAudio() async {}
 
 Future<String> lmsToggleScreenShare() async => 'unsupported';
 String lmsGetLocalUid() => _localUid > 0 ? _localUid.toString() : '';
+String lmsTileAtPoint(double x, double y) => '';
+void lmsToggleTileExpand(String uid) {}
 void lmsApplyRemoteScreenShare(String sharingUid) {}
 void lmsRequestFullscreen() {}
 void lmsExitFullscreen() {}
