@@ -75,11 +75,25 @@
        there would float ON TOP of the sidebar tiles and make them look
        misaligned/unequal (exactly the client's screenshot). Move it to
        the bottom-left corner of the share area for the duration. */
-    #lms-jitsi-host:has(#lms-grid-container.lms-spotlight-active) #lms-agora-local {
-      top: auto !important;
-      bottom: 8px !important;
-      left: 8px !important;
-      right: auto !important;
+    /* Desktop only (matches the >=900px + pointer:fine gate the spotlight
+       sidebar itself uses below): move the self-preview to the bottom-left
+       of the spotlight tile, since the participant strip is a RIGHT column
+       there and the bottom-left is clear.
+       On mobile/narrow viewports this rule must NOT apply — the spotlight
+       thumbnail strip is a BOTTOM row there (order:1, see below), and
+       bottom:8px/left:8px would land the self-preview directly on top of
+       whichever remote student's tile is first in that row (this is
+       exactly what the client's screenshots showed: their own small
+       preview box visually fused with a random student's tile the instant
+       screen-share started). Leaving #lms-agora-local at its default
+       top-right placement keeps it clear of the strip on mobile. */
+    @media (min-width: 900px) and (pointer: fine) {
+      #lms-jitsi-host:has(#lms-grid-container.lms-spotlight-active) #lms-agora-local {
+        top: auto !important;
+        bottom: 8px !important;
+        left: 8px !important;
+        right: auto !important;
+      }
     }
     /* Meet-style expand hint on the big share/spotlight tile — tapping the
        tile toggles 90/10 "fullscreen". The glyph is purely visual
