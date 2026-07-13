@@ -78,10 +78,11 @@
     ];
 
     // Stripped-down button set for doctor/patient consultations
+    // (no screen share, tile view, raise hand, recording, whiteboard, stats,
+    //  shortcuts, shared video/audio, select-background, toggle-camera)
     var _CONSULTATION_TOOLBAR_BUTTONS = [
       'microphone', 'camera', 'fullscreen', 'fodeviceselection',
       'hangup', 'chat', 'settings', 'videoquality', 'filmstrip',
-      'videobackgroundblur', 'toggle-camera', 'select-background',
       'noise-suppression', 'help'
     ];
 
@@ -112,9 +113,6 @@
     var _consultChatChannel = null;
     var _consultSenderName = null;
 
-    // Paperclip SVG icon for the file-share toolbar button
-    var _UPLOAD_SVG = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>';
-    var _UPLOAD_ICON = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(_UPLOAD_SVG)));
 
     // Load our self-hosted server's external_api.js script once
     function _loadJitsiApi(cb) {
@@ -133,6 +131,7 @@
       try { if (_jitsiApi) { _jitsiApi.dispose(); _jitsiApi = null; } } catch(_) {}
       try { var cc = document.getElementById('jitsi-container'); if (cc) cc.innerHTML = ''; } catch(_) {}
       try { window.dispatchEvent(new CustomEvent('jitsiEnded', { detail: { reason: reason } })); } catch(_) {}
+      _hideConsultFileBtn();
     }
 
     window.jitsiJoin = function(roomName, displayName, audioOnly, jwt, subject, authToken, chatChannelName) {
@@ -159,6 +158,13 @@
               _jitsiRemoteLeft = false;
               _jitsiClosed = false;
 
+              // For audio-only calls remove camera + videoquality buttons
+              var consultToolbar = (audioOnly === true)
+                ? _CONSULTATION_TOOLBAR_BUTTONS.filter(function(b) {
+                    return b !== 'camera' && b !== 'videoquality';
+                  })
+                : _CONSULTATION_TOOLBAR_BUTTONS;
+
               _jitsiApi = new JitsiMeetExternalAPI(_JITSI_DOMAIN, {
                 roomName: roomName,
                 jwt: jwt || undefined,
@@ -172,16 +178,13 @@
                   enableClosePage: false,
                   disableDeepLinking: true,
                   disableInviteFunctions: true,
-                  toolbarButtons: _CONSULTATION_TOOLBAR_BUTTONS,
+                  toolbarButtons: consultToolbar,
                   filmstrip: { disableResizable: false },
                   startWithAudioMuted: false,
                   startWithVideoMuted: audioOnly === true,
+                  // subject set per-user locally (not via executeCommand which broadcasts to all)
                   subject: subject || 'iCare Consultation',
-                  customToolbarButtons: [{
-                    icon: _UPLOAD_ICON,
-                    id: 'file-upload',
-                    text: 'Share File',
-                  }],
+                  disabledNotifications: ['notify.moderator'],
                   // NOTE: enableUserRolesBasedOnToken intentionally omitted — it makes
                   // the client assume moderator status merely from HAVING a valid JWT,
                   // regardless of the token's actual moderator:true/false claim. Real
@@ -203,15 +206,9 @@
                 _jitsiRemoteLeft = true;
                 console.log('Jitsi: participant left');
               });
-              _jitsiApi.on('customToolbarButtonPressed', function(e) {
-                if (e.key === 'file-upload') _handleConsultationFileUpload();
-              });
-              // Set subject via command once joined (backup for constructor option)
-              _jitsiApi.on('videoConferenceJoined', function() {
-                try { _jitsiApi.executeCommand('subject', subject || 'iCare Consultation'); } catch(_) {}
-              });
 
               setTimeout(window.raiseFlutterLayer, 1200);
+              _showConsultFileBtn();
               console.log('Jitsi: joining room', roomName, 'as', displayName, '| subject:', subject);
               resolve('ok');
             } catch(e) {
@@ -224,54 +221,52 @@
       });
     };
 
-    function _handleConsultationFileUpload() {
-      var input = document.createElement('input');
-      input.type = 'file';
-      input.accept = 'image/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv';
-      input.style.display = 'none';
-      document.body.appendChild(input);
+    // ── Consultation floating file-share button ──────────────────────────────
+    // Lives OUTSIDE the Jitsi iframe so clicking it has same-origin user
+    // gesture context (allows opening a native file picker reliably).
+    function _showConsultFileBtn() {
+      var el = document.getElementById('consult-file-btn');
+      if (el) el.style.display = 'flex';
+    }
+    function _hideConsultFileBtn() {
+      var el = document.getElementById('consult-file-btn');
+      if (el) el.style.display = 'none';
+    }
 
-      input.onchange = function(e) {
+    // Handle file once selected via the floating button
+    document.addEventListener('DOMContentLoaded', function() {
+      var inp = document.getElementById('consult-file-input');
+      if (!inp) return;
+      inp.addEventListener('change', function(e) {
         var file = e.target.files && e.target.files[0];
-        try { document.body.removeChild(input); } catch(_) {}
+        inp.value = '';
         if (!file) return;
-
         var reader = new FileReader();
         reader.onload = function(re) {
           var dataUrl = re.target.result;
           var isImage = /\.(png|jpg|jpeg|gif|webp|bmp)$/i.test(file.name);
-          var msgText = isImage
-            ? 'img:' + dataUrl
-            : 'doc:' + file.name + ':' + dataUrl;
+          var msgText = isImage ? 'img:' + dataUrl : 'doc:' + file.name + ':' + dataUrl;
 
-          var token = _consultAuthToken || localStorage.getItem('flutter.token');
-          if (!token || !_consultChatChannel) {
-            console.warn('Consultation file upload: missing auth or channel');
-            return;
+          // Notify in Jitsi chat (text only — base64 too large to relay)
+          if (_jitsiApi) {
+            try { _jitsiApi.executeCommand('sendChatMessage', '📎 ' + file.name + ' (shared to consultation chat)'); } catch(_) {}
           }
 
+          // Send actual file data to our backend call-chat
+          var token = _consultAuthToken || localStorage.getItem('flutter.token');
+          if (!token || !_consultChatChannel) {
+            console.warn('Consult file upload: missing auth/channel'); return;
+          }
           fetch('https://icare-backend-inky.vercel.app/api/call-chat/send', {
             method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': 'Bearer ' + token,
-            },
-            body: JSON.stringify({
-              channelName: _consultChatChannel,
-              sender: _consultSenderName || 'User',
-              text: msgText,
-            }),
-          }).then(function(r) {
-            console.log('Consultation file shared, status:', r.status, file.name);
-          }).catch(function(err) {
-            console.warn('Consultation file upload failed:', err);
-          });
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+            body: JSON.stringify({ channelName: _consultChatChannel, sender: _consultSenderName || 'User', text: msgText }),
+          }).then(function(r) { console.log('Consult file sent, status:', r.status); })
+            .catch(function(err) { console.warn('Consult file send failed:', err); });
         };
         reader.readAsDataURL(file);
-      };
-
-      input.click();
-    }
+      });
+    });
 
     window.jitsiLeave = function() {
       return new Promise(function(resolve) {
@@ -282,6 +277,7 @@
         } catch(_) {}
         _jitsiRemoteJoined = false;
         _jitsiRemoteLeft = false;
+        _hideConsultFileBtn();
         resolve();
       });
     };
@@ -555,6 +551,29 @@
 
     // Recording is handled entirely by Jibri (server-side) — no client-side MediaRecorder needed.
   </script>
+
+  <!-- Consultation file-share button — sits OUTSIDE Jitsi iframe so the
+       native file picker works (same-origin user gesture). Hidden by default;
+       shown/hidden via _showConsultFileBtn / _hideConsultFileBtn. -->
+  <div id="consult-file-btn" style="
+    display:none; position:fixed; bottom:80px; left:16px; z-index:99998;
+    align-items:center;
+  ">
+    <label for="consult-file-input" style="
+      display:flex; align-items:center; gap:8px;
+      padding:10px 18px;
+      background:rgba(15,23,42,0.92); border:1px solid rgba(99,102,241,0.6);
+      border-radius:10px; cursor:pointer; color:#e2e8f0; font-size:13px;
+      font-family:system-ui,sans-serif; backdrop-filter:blur(6px);
+      box-shadow:0 4px 12px rgba(0,0,0,0.4);
+      user-select:none;
+    ">
+      📎 Share File
+    </label>
+    <input id="consult-file-input" type="file"
+      accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv"
+      style="display:none;">
+  </div>
 
 </body>
 </html>

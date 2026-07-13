@@ -31,7 +31,7 @@ class ConsultationMessage {
       message: json['message'] ?? '',
       attachmentUrl: json['attachmentUrl'],
       timestamp: json['timestamp'] != null
-          ? DateTime.parse(json['timestamp'])
+          ? DateTime.parse(json['timestamp']).toLocal()
           : DateTime.now(),
       isSystemMessage: json['isSystemMessage'] ?? false,
     );
