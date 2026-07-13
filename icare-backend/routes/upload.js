@@ -4,6 +4,7 @@ const crypto = require('crypto');
 const multer = require('multer');
 const { v2: cloudinary } = require('cloudinary');
 const { put, head } = require('@vercel/blob');
+const { handleUpload } = require('@vercel/blob/client');
 const { authMiddleware: protect } = require('../middleware/auth');
 
 // Use memory storage — Cloudinary uploads from buffer (Vercel-safe, no disk writes)
@@ -327,18 +328,56 @@ router.get('/doc-stream', async (req, res) => {
   }
 });
 
-// POST /api/upload/blob-doc — upload quiz/assignment document to Vercel Blob
-// Returns a public URL with zero delivery restrictions (no CDN signing needed).
+// POST /api/upload/blob-handle — Vercel Blob client-side upload handler
+// Phase 1 (blob.generate-client-token): returns a short-lived client token so Flutter
+//   can PUT the file directly to Vercel Blob storage (bypasses the 4.5 MB Vercel function limit).
+// Phase 2 (blob.upload-completed): completion callback from Flutter after the PUT succeeds.
+router.post('/blob-handle', protect, express.json({ limit: '1mb' }), async (req, res) => {
+  try {
+    const jsonResponse = await handleUpload({
+      body: req.body,
+      request: {
+        headers: {
+          get: (name) => req.headers[name.toLowerCase()] ?? null,
+        },
+      },
+      onBeforeGenerateToken: async (pathname) => ({
+        access: 'public',
+        allowedContentTypes: [
+          'application/pdf',
+          'application/msword',
+          'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+          'application/vnd.ms-powerpoint',
+          'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+          'application/vnd.ms-excel',
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          'text/plain',
+          'application/octet-stream',
+        ],
+        maximumSizeInBytes: 50 * 1024 * 1024,
+        addRandomSuffix: true,
+      }),
+      onUploadCompleted: async ({ blob }) => {
+        console.log(`blob-handle: upload completed → ${blob.url}`);
+      },
+    });
+    return res.json(jsonResponse);
+  } catch (e) {
+    console.error('blob-handle error:', e);
+    return res.status(400).json({ error: e.message });
+  }
+});
+
+// POST /api/upload/blob-doc — upload quiz/assignment document to Vercel Blob (server-side, ≤4.5 MB)
+// For larger files use /blob-handle (client-side upload path).
 router.post('/blob-doc', protect, docUpload.single('file'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ success: false, message: 'No file provided' });
     const safeName = req.file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_');
     const blobPath = `quiz/docs/${Date.now()}-${safeName}`;
 
-    // @vercel/blob uses OIDC auth automatically when running on Vercel (BLOB_STORE_ID is set).
-    // No manual token check needed.
     const blob = await put(blobPath, req.file.buffer, {
-      access: 'private',
+      access: 'public',
       contentType: req.file.mimetype,
       addRandomSuffix: false,
     });
