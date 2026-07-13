@@ -4,7 +4,7 @@
 import 'dart:async';
 
 class ConsultationTimer {
-  static const Duration minDuration = Duration(minutes: 15);
+  static const Duration minDuration = Duration(minutes: 10);
   static Duration maxDuration = Duration(minutes: 30); // Admin can change this
   static const Duration warningBeforeEnd = Duration(minutes: 2);
 
@@ -126,7 +126,7 @@ class ConsultationTimer {
       final remaining = minDuration - _elapsed;
       final minutes = remaining.inMinutes;
       final seconds = remaining.inSeconds % 60;
-      return 'Consultation must be at least 15 minutes long. ${minutes}m ${seconds}s remaining.';
+      return 'Consultation must be at least 10 minutes long. ${minutes}m ${seconds}s remaining.';
     }
     return null;
   }

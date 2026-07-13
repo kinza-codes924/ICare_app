@@ -1,10 +1,14 @@
 const express = require('express');
 const router = express.Router();
 const mongoose = require('mongoose');
+const multer = require('multer');
 const { connectMongoDB } = require('../config/mongodb');
 const { authMiddleware } = require('../middleware/auth');
 const LiveSession = require('../models/LiveSession');
 const Enrollment = require('../models/Enrollment');
+const cloudinary = require('../config/cloudinary');
+
+const jibriUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 2 * 1024 * 1024 * 1024 } });
 
 function toId(id) {
   try { return new mongoose.Types.ObjectId(id); } catch { return null; }
@@ -59,8 +63,25 @@ router.get('/course/:courseId', authMiddleware, async (req, res) => {
   try {
     await connectMongoDB();
 
-    const sessions = await LiveSession.find({ 
-      courseId: toId(req.params.courseId) 
+    // Opportunistic cleanup: a 'live' session that never received a graceful
+    // end signal (server crash, instructor closing the tab, etc) stays 'live'
+    // forever unless something happens to poll /active for it afterwards.
+    const staleHeartbeatThreshold = new Date(Date.now() - 5 * 60 * 1000);
+    const threeHoursAgo = new Date(Date.now() - 3 * 60 * 60 * 1000);
+    await LiveSession.updateMany(
+      {
+        courseId: toId(req.params.courseId),
+        status: 'live',
+        $or: [
+          { instructorHeartbeat: { $lt: staleHeartbeatThreshold } },
+          { instructorHeartbeat: null, createdAt: { $lt: threeHoursAgo } },
+        ],
+      },
+      { status: 'ended' }
+    ).catch(() => {});
+
+    const sessions = await LiveSession.find({
+      courseId: toId(req.params.courseId)
     })
     .populate('instructorId', 'name username')
     .sort({ scheduledAt: 1 })
@@ -1289,6 +1310,70 @@ router.put('/:id/whiteboard/permission', authMiddleware, async (req, res) => {
     }
     res.json({ success: true });
   } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+// POST /live-sessions/jibri-recording-complete — called by Jibri finalize script on droplet.
+// Accepts JSON {sessionId, url} (Vercel Blob) OR multipart file (legacy Cloudinary path).
+router.post('/jibri-recording-complete', jibriUpload.single('file'), async (req, res) => {
+  try {
+    const secret = (req.headers['x-jibri-secret'] || '').trim();
+    const expected = (process.env.JIBRI_UPLOAD_SECRET || '').trim();
+    if (!secret || !expected || secret !== expected) {
+      return res.status(401).json({ success: false, message: 'Invalid or missing secret' });
+    }
+    const sessionId = req.body.sessionId;
+    if (!sessionId) {
+      return res.status(400).json({ success: false, message: 'sessionId is required' });
+    }
+    if (!req.file && !req.body.url) {
+      return res.status(400).json({ success: false, message: 'file or url is required' });
+    }
+
+    await connectMongoDB();
+    const session = await LiveSession.findById(toId(sessionId));
+    if (!session) return res.status(404).json({ success: false, message: 'Session not found' });
+
+    let finalUrl;
+    if (req.body.url) {
+      finalUrl = (req.body.url + '').trim();
+    } else {
+      const uploadResult = await new Promise((resolve, reject) => {
+        const stream = cloudinary.uploader.upload_stream(
+          { resource_type: 'video', folder: 'icare/lms-recordings' },
+          (err, result) => (err ? reject(err) : resolve(result))
+        );
+        stream.end(req.file.buffer);
+      });
+      finalUrl = uploadResult.secure_url;
+    }
+
+    if (!session.recordings) session.recordings = [];
+    session.recordings.push({ url: finalUrl, createdAt: new Date() });
+    session.recordingUrl = finalUrl;
+    session.isRecorded = true;
+    await session.save();
+
+    if (session.linkedLessonId || session.lessonId) {
+      const lId = session.linkedLessonId || session.lessonId;
+      try {
+        const Course = require('../models/Course');
+        await Course.updateOne(
+          { _id: session.courseId },
+          { $set: {
+            'modules.$[].lessons.$[lesson].videoUrl': finalUrl,
+            'modules.$[].lessons.$[lesson].recordingAvailable': true,
+          }},
+          { arrayFilters: [{ 'lesson._id': toId(lId) }] }
+        );
+      } catch (_) {}
+    }
+
+    console.log(`Jibri recording saved for session ${sessionId}: ${finalUrl}`);
+    res.json({ success: true, url: finalUrl });
+  } catch (e) {
+    console.error('jibri-recording-complete error:', e.message);
     res.status(500).json({ success: false, message: e.message });
   }
 });

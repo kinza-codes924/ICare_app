@@ -52,6 +52,7 @@ const gamificationRoutes = require('./routes/gamification');
 const reviewsRoutes = require('./routes/reviews');
 const vouchersRoutes = require('./routes/vouchers');
 const faqsRoutes = require('./routes/faqs');
+const jitsiTokenRoutes = require('./routes/jitsi-token');
 
 const app = express();
 
@@ -191,6 +192,7 @@ app.use('/api/gamification', gamificationRoutes);
 app.use('/api/reviews', reviewsRoutes);
 app.use('/api/vouchers', vouchersRoutes);
 app.use('/api/faqs', faqsRoutes);
+app.use('/api/jitsi', jitsiTokenRoutes);
 
 // Serve uploaded files (only in non-serverless environments)
 if (!process.env.VERCEL) {

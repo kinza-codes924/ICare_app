@@ -1,4 +1,4 @@
-// Web video call — Agora Web SDK via dart:js_interop
+// Web video call — Jitsi Meet External API via dart:js_interop
 import 'dart:async';
 import 'dart:convert';
 import 'dart:js_interop';
@@ -10,7 +10,6 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:web/web.dart' as web;
 import 'package:shared_preferences/shared_preferences.dart';
-import '../services/agora_service.dart';
 import '../services/api_service.dart';
 import '../models/appointment_detail.dart';
 import '../services/appointment_service.dart';
@@ -22,25 +21,28 @@ import '../services/consultation_service.dart';
 import '../utils/shared_pref.dart';
 import '../widgets/rating_dialog.dart';
 
-// JS interop
-@JS('agoraJoin')
-external JSPromise<JSString> _agoraJoin(
-    JSString appId, JSString channel, JSString token, JSNumber uid, JSBoolean audioOnly);
+// JS interop — Jitsi Meet External API
+// jitsiJoin and jitsiLeave now return Promises (handled via JSPromise)
+@JS('jitsiJoin')
+external JSPromise<JSString> _jitsiJoin(JSString room, JSString displayName, JSBoolean audioOnly, JSString jwt, JSString subject, JSString authToken, JSString chatChannel);
 
-@JS('agoraLeave')
-external JSPromise<JSAny?> _agoraLeave();
+@JS('jitsiLeave')
+external JSPromise<JSAny?> _jitsiLeave();
 
-@JS('agoraMuteMic')
-external void _agoraMuteMic(JSBoolean mute);
+@JS('jitsiMuteMic')
+external void _jitsiMuteMic(JSBoolean mute);
 
-@JS('agoraMuteCam')
-external void _agoraMuteCam(JSBoolean mute);
+@JS('jitsiMuteCam')
+external void _jitsiMuteCam(JSBoolean mute);
 
-@JS('agoraIsRemoteJoined')
-external bool _agoraIsRemoteJoined();
+@JS('jitsiIsRemoteJoined')
+external bool _jitsiIsRemoteJoined();
 
-@JS('agoraIsRemoteLeft')
-external bool _agoraIsRemoteLeft();
+@JS('jitsiIsRemoteLeft')
+external bool _jitsiIsRemoteLeft();
+
+@JS('jitsiIsClosed')
+external bool _jitsiIsClosed();
 
 class VideoCall extends StatefulWidget {
   final String channelName;
@@ -92,6 +94,7 @@ class _VideoCallWebState extends State<VideoCall> {
   Timer? _remoteJoinPoller;
   Timer? _declinePoller;
   Timer? _remoteLeftPoller;
+  Timer? _closedPoller; // detects Jitsi hangup so this screen can close
 
   // Side panel state
   bool _showChat = false;
@@ -148,7 +151,34 @@ class _VideoCallWebState extends State<VideoCall> {
     // Register beforeunload handler so closing the browser marks appointment completed
     _registerBeforeUnload();
     _initRole();
-    _startNoAnswerTimer();
+    // Jitsi's own UI handles ringing/joining — watch for its hangup button
+    _startClosedPoller();
+  }
+
+  /// Poll the JS flag set when the user presses Jitsi's own hangup button.
+  /// Jitsi's UI is the only call UI now, so this is how the screen closes.
+  void _startClosedPoller() {
+    _closedPoller = Timer.periodic(const Duration(seconds: 1), (_) async {
+      if (!mounted) return;
+      bool closed = false;
+      try { closed = _jitsiIsClosed(); } catch (_) {}
+      if (!closed) return;
+      _closedPoller?.cancel();
+
+      // Keep consultation rejoinable from the chat screen
+      if (widget.appointmentId != null && widget.appointmentId!.isNotEmpty) {
+        try {
+          await AppointmentService().updateAppointmentStatus(
+            appointmentId: widget.appointmentId!,
+            status: 'in_progress',
+          );
+        } catch (_) {}
+      }
+      if (mounted) {
+        widget.onCallEnded?.call();
+        Navigator.pop(context);
+      }
+    });
   }
 
   Future<void> _syncTimerFromSharedPrefs() async {
@@ -211,7 +241,7 @@ class _VideoCallWebState extends State<VideoCall> {
           _declinePoller?.cancel();
           _noAnswerTimer?.cancel();
           if (!mounted) return;
-          try { _agoraLeave(); } catch (_) {}
+          try { _jitsiLeave(); } catch (_) {}
           if (!mounted) return;
           _showDeclinedDialog();
         }
@@ -227,7 +257,7 @@ class _VideoCallWebState extends State<VideoCall> {
     _remoteLeftPoller = Timer.periodic(const Duration(seconds: 2), (_) async {
       if (!mounted || !_remoteJoined) return; // only poll after connected
       try {
-        final remoteLeft = _agoraIsRemoteLeft();
+        final remoteLeft = _jitsiIsRemoteLeft();
         if (remoteLeft) {
           _remoteLeftPoller?.cancel();
           if (!mounted) return;
@@ -279,7 +309,7 @@ class _VideoCallWebState extends State<VideoCall> {
     _remoteJoinPoller = Timer.periodic(const Duration(seconds: 2), (_) {
       if (!mounted) return;
       try {
-        final remoteJoined = _agoraIsRemoteJoined();
+        final remoteJoined = _jitsiIsRemoteJoined();
         if (remoteJoined && !_remoteJoined) {
           _noAnswerTimer?.cancel(); // cancel "not answered" — someone joined!
           setState(() => _remoteJoined = true);
@@ -295,7 +325,7 @@ class _VideoCallWebState extends State<VideoCall> {
       // _remoteJoined = patient joined Agora; if still false after 15s → declined/no answer
       if (_remoteJoined) return;
       _noAnswerTimer?.cancel();
-      try { _agoraLeave(); } catch (_) {}
+      try { _jitsiLeave(); } catch (_) {}
       if (!mounted) return;
       // Capture navigator BEFORE dialog opens
       final nav = Navigator.of(context);
@@ -372,7 +402,7 @@ class _VideoCallWebState extends State<VideoCall> {
         final status = appt?['status']?.toString() ?? '';
         if ((status == 'completed' || status == 'ended') && mounted) {
           _statusPollTimer?.cancel();
-          try { await _agoraLeave().toDart; } catch (_) {}
+          try { await _jitsiLeave().toDart; } catch (_) {}
           if (mounted) _showConsultationEndedDialog();
         }
       } catch (_) {
@@ -389,7 +419,7 @@ class _VideoCallWebState extends State<VideoCall> {
               (match['status'] == 'completed' || match['status'] == 'ended') &&
               mounted) {
             _statusPollTimer?.cancel();
-            try { await _agoraLeave().toDart; } catch (_) {}
+            try { await _jitsiLeave().toDart; } catch (_) {}
             if (mounted) _showConsultationEndedDialog();
           }
         } catch (_) {
@@ -448,26 +478,8 @@ class _VideoCallWebState extends State<VideoCall> {
 
   void _startSessionTimer() {
     _sessionTimer = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (mounted) {
-        setState(() => _sessionSeconds++);
-        // At exactly 15 minutes — show a non-blocking notification
-        if (_sessionSeconds == 900) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: const Row(
-                children: [
-                  Icon(Icons.timer_rounded, color: Colors.white, size: 18),
-                  SizedBox(width: 10),
-                  Text('15 minutes reached — consultation continues until you end it'),
-                ],
-              ),
-              backgroundColor: Colors.orange.shade700,
-              duration: const Duration(seconds: 5),
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
-        }
-      }
+      if (!mounted) return;
+      _sessionSeconds++;
     });
   }
 
@@ -671,27 +683,14 @@ class _VideoCallWebState extends State<VideoCall> {
     if (widget.appointmentId == null || widget.appointmentId!.isEmpty) return;
     try {
       final api = ApiService();
-
-      // Use the direct endpoint — list endpoint doesn't populate patient/doctor
-      Map<String, dynamic>? apptJson;
-      try {
-        final directRes = await api.get('/appointments/${widget.appointmentId}');
-        apptJson = (directRes.data['appointment'] ?? directRes.data) as Map<String, dynamic>?;
-      } catch (_) {}
-
-      // Fallback to list endpoint if direct call fails
-      if (apptJson == null) {
-        final response = await api.get('/appointments/getAppointments');
-        final appts = response.data['appointments'] as List? ?? [];
-        final match = appts.firstWhere(
-          (a) => (a['_id'] ?? a['id'])?.toString() == widget.appointmentId,
-          orElse: () => null,
-        );
-        if (match == null) throw Exception('Appointment not found');
-        apptJson = match as Map<String, dynamic>;
-      }
-
-      final appointment = AppointmentDetail.fromJson(apptJson);
+      final response = await api.get('/appointments/getAppointments');
+      final appts = response.data['appointments'] as List? ?? [];
+      final match = appts.firstWhere(
+        (a) => (a['_id'] ?? a['id'])?.toString() == widget.appointmentId,
+        orElse: () => null,
+      );
+      if (match == null) throw Exception('Appointment not found');
+      final appointment = AppointmentDetail.fromJson(match);
 
       // Use consultationId only if it is a valid MongoDB ObjectId.
       // The channelName (e.g. "connect_now_...") is NOT a valid ObjectId and
@@ -733,21 +732,12 @@ class _VideoCallWebState extends State<VideoCall> {
       }
 
       if (!mounted) return;
-
-      // Fetch existing history to pre-fill the form if it was saved before
-      final consultService = ConsultationService();
-      final existingHistory = await consultService.getHistoryByConsultation(consultationId);
-      final existingHistoryId = existingHistory?['_id']?.toString();
-
-      if (!mounted) return;
       await Navigator.push(
         context,
         MaterialPageRoute(
           builder: (_) => PatientHistoryFormScreen(
             appointment: appointment,
             consultationId: consultationId!,
-            existingHistoryId: existingHistoryId,
-            initialData: existingHistory,
           ),
         ),
       );
@@ -776,109 +766,72 @@ class _VideoCallWebState extends State<VideoCall> {
         container.style.background = '#0A1628';
         container.style.position = 'relative';
 
-        final remote =
-            web.document.createElement('div') as web.HTMLDivElement;
-        remote.id = 'agora-remote';
-        remote.style.width = '100%';
-        remote.style.height = '100%';
-        remote.style.background = '#0A1628';
-        container.appendChild(remote);
-
-        final local = web.document.createElement('div') as web.HTMLDivElement;
-        local.id = 'agora-local';
-        local.style.position = 'absolute';
-        local.style.top = '16px';
-        local.style.right = '16px';
-        local.style.width = '110px';
-        local.style.height = '160px';
-        local.style.borderRadius = '12px';
-        local.style.overflow = 'hidden';
-        local.style.background = '#1E293B';
-        local.style.zIndex = '10';
-        container.appendChild(local);
+        // Use a unique container ID per registration so JS can find it
+        // The JS jitsiJoin dynamically creates containers using IDs like "jitsi-container-{timestamp}"
+        // We match that pattern so JS can find it by scanning for containers on the page
+        // No need to set a fixed id here - JS will create its own container
+        final jitsiDiv = web.document.createElement('div') as web.HTMLDivElement;
+        jitsiDiv.id = 'jitsi-container';
+        jitsiDiv.style.width = '100%';
+        jitsiDiv.style.height = '100%';
+        container.appendChild(jitsiDiv);
 
         return container;
       });
     } catch (_) {}
   }
 
+  Future<String?> _fetchJitsiToken(String room) async {
+    try {
+      final response = await ApiService().post('/jitsi/token', {'room': room});
+      return response.data['token']?.toString();
+    } catch (e) {
+      debugPrint('Jitsi token fetch error: $e');
+      return null;
+    }
+  }
+
   Future<void> _joinCall() async {
     try {
-      final tokenData = await AgoraService().getToken(
-        channelName: widget.channelName,
-        uid: 0,
-      );
+      // Jitsi room name: alphanumeric only, prefixed with 'icare'
+      final raw = widget.channelName.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '');
+      final roomName = 'icare${raw.substring(0, raw.length.clamp(0, 50))}';
+      final displayName = widget.currentUserName.isNotEmpty ? widget.currentUserName : 'User';
 
-      if (tokenData['success'] != true) {
-        if (mounted) {
-          setState(() {
-            _error = tokenData['message'] ?? 'Failed to get Agora token';
-            _loading = false;
-          });
-        }
-        return;
-      }
+      // Moderator status is decided server-side (doctor = moderator, patient
+      // = not) so a patient can never end up moderator just by joining first.
+      final jwt = await _fetchJitsiToken(roomName);
+      final authToken = await SharedPref().getToken() ?? '';
+      final subject = widget.remoteUserName.isNotEmpty
+          ? 'Consultation with ${widget.remoteUserName}'
+          : 'iCare Consultation';
 
-      final token = tokenData['data']['token'] as String;
-      final appId = tokenData['data']['appId'] as String;
-
-      final result = await _agoraJoin(
-        appId.toJS,
-        widget.channelName.toJS,
-        token.toJS,
-        0.toJS,
+      final result = await _jitsiJoin(
+        roomName.toJS,
+        displayName.toJS,
         widget.isAudioOnly.toJS,
+        (jwt ?? '').toJS,
+        subject.toJS,
+        authToken.toJS,
+        widget.channelName.toJS,
       ).toDart;
 
       final resultStr = result.toDart;
       if (resultStr.startsWith('error:')) {
-        // Non-fatal: show warning but still allow video call to proceed
-        // (other party may still be able to connect)
-        debugPrint('⚠️ Agora join warning: $resultStr');
-        if (mounted) { _noAnswerTimer?.cancel(); setState(() { _joined = true; _loading = false; }); }
-      } else {
-        if (mounted) { _noAnswerTimer?.cancel(); setState(() { _joined = true; _loading = false; }); }
+        debugPrint('⚠️ Jitsi join warning: $resultStr');
+      }
+      if (mounted) {
+        setState(() { _joined = true; _loading = false; });
       }
     } catch (e) {
       if (mounted) setState(() { _error = e.toString(); _loading = false; });
     }
   }
 
-  /// Doctor: switch from audio-only call to video call
+  /// Doctor: switch from audio-only to video — just unmute camera in Jitsi
   Future<void> _convertToVideo() async {
-    // 1. Leave Agora audio channel FIRST
-    _sessionTimer?.cancel();
-    _remoteJoinPoller?.cancel();
-    try { await _agoraLeave().toDart; } catch (_) {}
-
-    // 2. Send video call invitation to patient
-    if (widget.patientId != null && widget.patientId!.isNotEmpty) {
-      try {
-        await CallService().initiateCall(
-          receiverId: widget.patientId!,
-          channelName: widget.channelName,
-          callerName: widget.currentUserName,
-          callType: 'video',
-        );
-      } catch (_) {}
-    }
-    if (!mounted) return;
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(
-        builder: (_) => VideoCall(
-          channelName: widget.channelName,
-          remoteUserName: widget.remoteUserName,
-          isAudioOnly: false,
-          currentUserId: widget.currentUserId,
-          currentUserName: widget.currentUserName,
-          appointmentId: widget.appointmentId,
-          patientId: widget.patientId,
-          consultationId: widget.consultationId,
-          consultationElapsedSeconds: _sessionSeconds, // keep same timer
-        ),
-      ),
-    );
+    try { _jitsiMuteCam(false.toJS); } catch (_) {}
+    if (mounted) setState(() => _camOff = false);
   }
 
   /// Red button — leave video but keep consultation "in progress"
@@ -910,7 +863,7 @@ class _VideoCallWebState extends State<VideoCall> {
     );
     if (confirm != true) return;
 
-    try { await _agoraLeave().toDart; } catch (_) {}
+    try { await _jitsiLeave().toDart; } catch (_) {}
 
     // Mark appointment as in_progress so patient can rejoin
     if (widget.appointmentId != null && widget.appointmentId!.isNotEmpty) {
@@ -935,7 +888,7 @@ class _VideoCallWebState extends State<VideoCall> {
     if (widget.appointmentId == null || widget.appointmentId!.isEmpty) {
       // No appointment ID - just leave the call (for quick calls)
       try { await CallService().endCall(widget.channelName); } catch (_) {}
-      try { await _agoraLeave().toDart; } catch (_) {}
+      try { await _jitsiLeave().toDart; } catch (_) {}
       if (mounted) Navigator.pop(context);
       return;
     }
@@ -980,7 +933,7 @@ class _VideoCallWebState extends State<VideoCall> {
           status: 'completed',
         );
       } catch (_) {}
-      try { await _agoraLeave().toDart; } catch (_) {}
+      try { await _jitsiLeave().toDart; } catch (_) {}
       if (mounted) html.window.location.href = '/dashboard';
       return;
     }
@@ -988,7 +941,7 @@ class _VideoCallWebState extends State<VideoCall> {
     // Doctor ending consultation — leave video and go back to chat screen
     try {
       // Leave video call first
-      try { await _agoraLeave().toDart; } catch (_) {}
+      try { await _jitsiLeave().toDart; } catch (_) {}
 
       if (!mounted) return;
 
@@ -1010,14 +963,14 @@ class _VideoCallWebState extends State<VideoCall> {
   /// Mute mic ONLY — does NOT affect camera
   void _toggleMic() {
     _micMuted = !_micMuted;
-    try { _agoraMuteMic(_micMuted.toJS); } catch (_) {}
+    try { _jitsiMuteMic(_micMuted.toJS); } catch (_) {}
     if (mounted) setState(() {});
   }
 
   /// Toggle camera ONLY — does NOT affect mic
   void _toggleCam() {
     _camOff = !_camOff;
-    try { _agoraMuteCam(_camOff.toJS); } catch (_) {}
+    try { _jitsiMuteCam(_camOff.toJS); } catch (_) {}
     if (mounted) setState(() {});
   }
 
@@ -1167,261 +1120,37 @@ class _VideoCallWebState extends State<VideoCall> {
     _remoteJoinPoller?.cancel();
     _declinePoller?.cancel();
     _remoteLeftPoller?.cancel();
+    _closedPoller?.cancel();
     _chatController.dispose();
     _chatScroll.dispose();
     _doctorNotesController.dispose();
-    try { _agoraLeave(); } catch (_) {}
+    try { _jitsiLeave(); } catch (_) {}
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     if (_error != null) return _buildError();
-    if (widget.isAudioOnly) return _buildAudioCallUI();
+    // Jitsi provides the full call UI (ringing, mic/cam, chat, hangup).
+    // No Flutter overlays — just the Jitsi iframe filling the screen.
     return Scaffold(
       backgroundColor: Colors.black,
-      body: Row(
+      body: Stack(
         children: [
-          // ── Main video area ──────────────────────────────────────────
-          Expanded(
-            child: Stack(
-              children: [
-                SizedBox.expand(child: HtmlElementView(viewType: _viewId)),
-
-                // Loading overlay (joining Agora)
-                if (_loading)
-                  Container(
-                    color: const Color(0xFF0A1628),
-                    child: const Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          CircularProgressIndicator(color: Colors.white),
-                          SizedBox(height: 20),
-                          Text('Connecting...',
-                              style: TextStyle(color: Colors.white70)),
-                        ],
-                      ),
-                    ),
-                  ),
-
-                // Ringing overlay — joined Agora but waiting for remote user
-                if (!_loading && _joined && !_remoteJoined)
-                  Container(
-                    color: const Color(0xFF0A1628).withValues(alpha: 0.92),
-                    child: Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Container(
-                            width: 100, height: 100,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: Colors.white12,
-                              border: Border.all(color: Colors.orangeAccent, width: 3),
-                            ),
-                            child: Center(
-                              child: Text(
-                                widget.remoteUserName.isNotEmpty ? widget.remoteUserName[0].toUpperCase() : '?',
-                                style: const TextStyle(fontSize: 42, color: Colors.white, fontWeight: FontWeight.bold),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 20),
-                          Text(_remoteDisplayName, style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w700)),
-                          const SizedBox(height: 8),
-                          const Text('Ringing... waiting for answer', style: TextStyle(color: Colors.orangeAccent, fontSize: 14)),
-                          const SizedBox(height: 32),
-                          ElevatedButton.icon(
-                            onPressed: _leaveVideo,
-                            icon: const Icon(Icons.call_end_rounded),
-                            label: const Text('Cancel'),
-                            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30))),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-
-                // Top bar: remote name + session timer
-                if (_joined)
-                  Positioned(
-                    top: 16,
-                    left: 16,
-                    child: Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 6),
-                          decoration: BoxDecoration(
-                            color: Colors.black54,
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Text(_remoteDisplayName,
-                              style: const TextStyle(
-                                  color: Colors.white, fontSize: 14)),
-                        ),
-                        const SizedBox(width: 10),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 10, vertical: 6),
-                          decoration: BoxDecoration(
-                            color: _sessionSeconds >= 900
-                                ? Colors.orange.withValues(alpha: 0.8)
-                                : Colors.black45,
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Row(
-                            children: [
-                              const Icon(Icons.timer_rounded,
-                                  color: Colors.white70, size: 14),
-                              const SizedBox(width: 4),
-                              Text(_sessionTimeStr,
-                                  style: const TextStyle(
-                                      color: Colors.white, fontSize: 13)),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                // Bottom controls
-                Positioned(
-                  bottom: 32,
-                  left: 0,
-                  right: 0,
-                  child: Column(
-                    children: [
-                      // Side action buttons row
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          if (_isDoctor) ...[
-                          _sideBtn(
-                            icon: Icons.note_alt_rounded,
-                            label: "Doctor's Notes",
-                            active: _showDoctorNotes,
-                            badgeCount: 0,
-                            onTap: () => setState(() {
-                              _showDoctorNotes = !_showDoctorNotes;
-                              if (_showDoctorNotes) {
-                                _showChat = false;
-                                _showHistory = false;
-                                _showPastConsultations = false;
-                              }
-                            }),
-                          ),
-                          const SizedBox(width: 10),
-                          _sideBtn(
-                            icon: Icons.history_rounded,
-                            label: 'Past Consultations',
-                            active: _showPastConsultations,
-                            badgeCount: 0,
-                            onTap: () {
-                              setState(() {
-                                _showPastConsultations = !_showPastConsultations;
-                                if (_showPastConsultations) {
-                                  _showChat = false;
-                                  _showHistory = false;
-                                  _showDoctorNotes = false;
-                                }
-                              });
-                              if (_showPastConsultations && !_pastConsultationsLoaded && !_pastConsultationsLoading) {
-                                _loadPastConsultations();
-                              }
-                            },
-                          ),
-                          const SizedBox(width: 10),
-                          ],
-                          _sideBtn(
-                            icon: Icons.chat_bubble_outline_rounded,
-                            label: 'Chat',
-                            active: _showChat,
-                            badgeCount: _unreadChatCount,
-                            onTap: () => setState(() {
-                              _showChat = !_showChat;
-                              if (_showChat) {
-                                _showHistory = false;
-                                _showDoctorNotes = false;
-                                _showPastConsultations = false;
-                                _unreadChatCount = 0;
-                              }
-                            }),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                      // Main controls row
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          _controlBtn(
-                            icon: _micMuted
-                                ? Icons.mic_off_rounded
-                                : Icons.mic_rounded,
-                            color: _micMuted ? Colors.grey : Colors.white,
-                            bg: Colors.white24,
-                            onTap: _toggleMic,
-                            tooltip: _micMuted ? 'Unmute' : 'Mute',
-                          ),
-                          const SizedBox(width: 16),
-                          // Red button — leave video only (can rejoin)
-                          _controlBtn(
-                            icon: Icons.call_end_rounded,
-                            color: Colors.white,
-                            bg: Colors.red,
-                            onTap: _leaveVideo,
-                            size: 64,
-                            tooltip: 'Leave Video',
-                          ),
-                          const SizedBox(width: 16),
-                          if (!widget.isAudioOnly)
-                            _controlBtn(
-                              icon: _camOff
-                                  ? Icons.videocam_off_rounded
-                                  : Icons.videocam_rounded,
-                              color: _camOff ? Colors.grey : Colors.white,
-                              bg: Colors.white24,
-                              onTap: _toggleCam,
-                              tooltip: _camOff ? 'Start Camera' : 'Stop Camera',
-                            ),
-                          const SizedBox(width: 16),
-                          // Purple button — end consultation permanently
-                          _controlBtn(
-                            icon: Icons.videocam_off_rounded,
-                            color: Colors.white,
-                            bg: const Color(0xFF7C3AED),
-                            onTap: _endConsultation,
-                            size: 56,
-                            tooltip: 'End Consultation',
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      const Text(
-                        'Red = Leave Video  •  Purple = End Consultation',
-                        style: TextStyle(color: Colors.white38, fontSize: 11),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          // ── Side panel ───────────────────────────────────────────────
-          if (_showChat || _showHistory || _showDoctorNotes || _showPastConsultations)
+          Positioned.fill(child: HtmlElementView(viewType: _viewId)),
+          if (_loading)
             Container(
-              width: 340,
-              color: const Color(0xFF0F172A),
-              child: _showChat
-                  ? _buildChatPanel()
-                  : _showDoctorNotes
-                      ? _buildDoctorNotesPanel()
-                      : _showPastConsultations
-                          ? _buildPastConsultationsPanel()
-                          : _buildHistoryPanel(),
+              color: const Color(0xFF0A1628),
+              child: const Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    CircularProgressIndicator(color: Colors.white),
+                    SizedBox(height: 20),
+                    Text('Connecting...', style: TextStyle(color: Colors.white70)),
+                  ],
+                ),
+              ),
             ),
         ],
       ),

@@ -237,6 +237,16 @@ class LmsService {
     return response.data;
   }
 
+  Future<Map<String, dynamic>> getAssignment(String assignmentId) async {
+    final response = await _api.get('/lms/assignments/$assignmentId');
+    return response.data;
+  }
+
+  Future<Map<String, dynamic>> updateAssignment(String assignmentId, Map<String, dynamic> data) async {
+    final response = await _api.put('/lms/assignments/$assignmentId', data);
+    return response.data;
+  }
+
   Future<List<dynamic>> getSubmissions(String assignmentId) async {
     final response = await _api.get('/lms/assignments/$assignmentId/submissions');
     return response.data['submissions'] ?? [];
@@ -1135,5 +1145,22 @@ class LmsService {
   Future<List<dynamic>> getMyAssessmentQuizzes() async {
     final response = await _api.get('/quizzes/my');
     return response.data['quizAttempts'] ?? [];
+  }
+
+  // ── Jitsi JWT token ────────────────────────────────────────────────────────
+  Future<String?> getJitsiToken({
+    required String room,
+    String? sessionId,
+    String? displayName,
+  }) async {
+    try {
+      final body = <String, dynamic>{'room': room};
+      if (sessionId != null && sessionId.isNotEmpty) body['sessionId'] = sessionId;
+      if (displayName != null && displayName.isNotEmpty) body['displayName'] = displayName;
+      final response = await _api.post('/jitsi/token', body);
+      return response.data['token'] as String?;
+    } catch (e) {
+      return null;
+    }
   }
 }

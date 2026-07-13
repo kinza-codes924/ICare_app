@@ -1,11 +1,10 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
-import 'package:icare/services/agora_service.dart';
+import 'package:go_router/go_router.dart';
 import 'package:icare/services/lms_service.dart';
 import 'package:icare/utils/shared_pref.dart';
 import 'package:icare/utils/theme.dart';
-import 'package:icare/widgets/whiteboard_widget.dart';
 import '../utils/lms_agora_stub.dart'
     if (dart.library.js_interop) '../utils/lms_agora_web.dart';
 
@@ -46,16 +45,14 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
   String? _error;
   final List<int> _remoteUids = [];
 
-  bool _permissionsEnabled = false; // shows "tap to enable" overlay for BOTH roles
+  // Show "Enable Camera & Mic" button until user explicitly grants permission via a tap.
+  // This ensures getUserMedia is called from a real user gesture (Chrome requirement).
+  bool _permissionsEnabled = false;
 
   // UI State
   bool _chatOpen = false;
   bool _participantsOpen = false;
   bool _handRaised = false;
-  bool _isRecording = false;
-  bool _screenSharing = false;
-  bool _videoFullscreen = false;
-  bool _videoFitCover = true; // true=cover(fill), false=contain(fit)
   late TabController _panelTab;
 
   // Chat — synced with backend
@@ -71,28 +68,14 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
   final List<Map<String, dynamic>> _participants = [];
   final List<String> _raisedHands = [];
 
-  // Whiteboard
-  bool _whiteboardOpen = false;
-  List<WbStroke> _wbStrokes = [];
-  List<String> _wbPermissions = [];
-  Timer? _wbTimer;
-  final Set<String> _localStrokeIds = {}; // optimistic strokes not yet confirmed by backend
-  bool _wbFullscreen = false;
-  bool _lastWbOpenFlag = false; // last backend whiteboardOpen — edge-trigger for students
-
   // Session info
   String _currentUserName = 'You';
   String _currentUserId = '';
-  String _instructorName = ''; // populated from session doc for student view
   String _sessionDocId = ''; // actual MongoDB _id of the LiveSession document
-  // backend userId -> Agora uid, refreshed every sync — the only reliable
-  // way to know which video tile belongs to which person (see
-  // _syncSessionState). Used by both the web tile-naming path and the
-  // native-mobile _buildRemoteVideoTile fallback below.
-  Map<String, String> _userIdToAgoraUid = {};
   Timer? _sessionTimer;
   Timer? _syncTimer; // polls backend for chat/participants/raised hands
   Timer? _heartbeatTimer; // instructor-only: keeps session alive on backend
+  Timer? _closedPoller; // web: detects Jitsi hangup so this screen can close
   int _sessionSeconds = 0;
 
   final LmsService _lms = LmsService();
@@ -102,23 +85,7 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
     super.initState();
     _panelTab = TabController(length: 3, vsync: this);
     LmsLiveSessionScreen.activeCourseId = widget.courseId; // stop popup
-    // Both instructor and student must tap to unblock Chrome getUserMedia/autoplay
-    _permissionsEnabled = false;
     _initSession();
-    lmsListenForScreenShareEnded(() {
-      if (mounted) setState(() => _screenSharing = false);
-    });
-    // Web: JS fires CustomEvents when remote participants join/leave per-UID tiles
-    if (kIsWeb) {
-      lmsListenForRemoteJoined((uid) {
-        if (mounted) setState(() {
-          if (!_remoteUids.contains(uid)) _remoteUids.add(uid);
-        });
-      });
-      lmsListenForRemoteLeft((uid) {
-        if (mounted) setState(() => _remoteUids.remove(uid));
-      });
-    }
   }
 
   @override
@@ -126,93 +93,13 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
     _sessionTimer?.cancel();
     _syncTimer?.cancel();
     _heartbeatTimer?.cancel();
-    _wbTimer?.cancel();
+    _closedPoller?.cancel();
     _chatCtrl.dispose();
     _chatScroll.dispose();
     _panelTab.dispose();
     LmsLiveSessionScreen.activeCourseId = null; // allow popup again after leaving
     lmsLeaveChannel();
     super.dispose();
-  }
-
-  // ── Whiteboard helpers ───────────────────────────────────────────────────────
-  void _startWbPolling() {
-    _fetchWb();
-    _wbTimer = Timer.periodic(const Duration(seconds: 2), (_) {
-      if (mounted) _fetchWb();
-    });
-  }
-
-  Future<void> _fetchWb() async {
-    if (_sessionDocId.isEmpty || !mounted) return;
-    try {
-      final data = await _lms.getWhiteboard(_sessionDocId);
-      final backendStrokes = (data['strokes'] as List? ?? [])
-          .map((s) => WbStroke.fromJson(Map<String, dynamic>.from(s as Map)))
-          .toList();
-      final perms = (data['permissions'] as List? ?? []).map((e) => e.toString()).toList();
-      final wbOpenFlag = data['whiteboardOpen'] == true;
-      if (!mounted) return;
-      setState(() {
-        // Remove confirmed strokes from local pending set
-        final backendIds = backendStrokes.map((s) => s.id).toSet();
-        _localStrokeIds.removeWhere((id) => backendIds.contains(id));
-        // Merge: backend strokes + any still-pending local strokes
-        if (_localStrokeIds.isNotEmpty) {
-          final localOnly = _wbStrokes.where((s) => _localStrokeIds.contains(s.id)).toList();
-          _wbStrokes = [...backendStrokes, ...localOnly];
-        } else {
-          _wbStrokes = backendStrokes;
-        }
-        _wbPermissions = perms;
-        // Students follow the instructor's whiteboard state (edge-triggered so
-        // a student can still close/reopen manually between changes)
-        if (!widget.isInstructor && wbOpenFlag != _lastWbOpenFlag) {
-          _whiteboardOpen = wbOpenFlag;
-          if (!wbOpenFlag) _wbFullscreen = false;
-        }
-        _lastWbOpenFlag = wbOpenFlag;
-      });
-    } catch (_) {}
-  }
-
-  Future<void> _wbStrokeAdded(WbStroke stroke) async {
-    // Optimistic: show immediately, mark as pending
-    setState(() {
-      _wbStrokes = [..._wbStrokes, stroke];
-      _localStrokeIds.add(stroke.id);
-    });
-    await _lms.addWhiteboardStroke(_sessionDocId, stroke.toJson());
-  }
-
-  Future<void> _wbUndo() async {
-    // Remove last local stroke instantly
-    if (_wbStrokes.isNotEmpty) {
-      final last = _wbStrokes.last;
-      setState(() {
-        _wbStrokes = _wbStrokes.sublist(0, _wbStrokes.length - 1);
-        _localStrokeIds.remove(last.id);
-      });
-    }
-    await _lms.undoWhiteboardStroke(_sessionDocId);
-  }
-
-  Future<void> _wbClear() async {
-    setState(() { _wbStrokes = []; _localStrokeIds.clear(); });
-    await _lms.clearWhiteboard(_sessionDocId);
-  }
-
-  Future<void> _wbPermissionChanged(String userId, bool grant) async {
-    // Optimistic update: reflect the change immediately so the 2-second
-    // whiteboard poll doesn't flip the toggle back before the PUT completes.
-    setState(() {
-      if (grant) {
-        if (!_wbPermissions.contains(userId)) _wbPermissions = [..._wbPermissions, userId];
-      } else {
-        _wbPermissions = _wbPermissions.where((id) => id != userId).toList();
-      }
-    });
-    await _lms.setWhiteboardPermission(_sessionDocId, userId, grant: grant);
   }
 
   Future<void> _initSession() async {
@@ -261,10 +148,6 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
       // Step 3: Join the session (registers attendance)
       if (_sessionDocId.isNotEmpty && _sessionDocId != widget.courseId) {
         await _lms.joinLiveSession(_sessionDocId);
-        // Feature 4: record join timestamp for students
-        if (!widget.isInstructor) {
-          _lms.recordLiveSessionJoin(_sessionDocId).catchError((_) {});
-        }
       }
 
       // Step 4: Start web camera (uses _sessionDocId for Agora room name)
@@ -272,45 +155,13 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
 
       // Step 5: Start polling for real-time sync
       _startSyncPolling();
-      _startWbPolling();
 
-      // Instructor always starts with a clean whiteboard (no leftovers from prior sessions)
-      if (widget.isInstructor && _sessionDocId.isNotEmpty) {
-        _lms.clearWhiteboard(_sessionDocId).catchError((_) {});
-        _lms.updateSession(_sessionDocId, {'whiteboardOpen': false}).catchError((_) => <String, dynamic>{});
-        if (mounted) setState(() { _wbStrokes = []; _localStrokeIds.clear(); });
-      }
+      // Step 6: Watch for the user pressing Jitsi's hangup button (web)
+      _startClosedPoller();
 
       await _initVideoSession();
     } catch (e) {
       if (mounted) setState(() { _error = e.toString(); _loading = false; });
-    }
-  }
-
-  Future<void> _toggleRecording() async {
-    if (!kIsWeb) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Recording is only available on web'), duration: Duration(seconds: 2)),
-      );
-      return;
-    }
-    if (!_isRecording) {
-      lmsStartRecording();
-      if (mounted) setState(() => _isRecording = true);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Recording started'), backgroundColor: Colors.red, duration: Duration(seconds: 2)),
-      );
-    } else {
-      final token = await SharedPref().getToken();
-      lmsStopRecordingAndUpload(
-        _sessionDocId,
-        'https://icare-backend-inky.vercel.app/api',
-        token ?? '',
-      );
-      if (mounted) setState(() => _isRecording = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Recording stopped — uploading to LMS...'), backgroundColor: Colors.green, duration: Duration(seconds: 3)),
-      );
     }
   }
 
@@ -326,73 +177,25 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
       final session = data['session'];
       if (session == null || !mounted) return;
 
-      // If session ended by instructor, kick student out automatically
+      // Student: if the instructor ended the session, leave automatically.
+      // The 15s guard avoids kicking a student who joined a moment before
+      // the instructor's isLive flag propagated.
       if (!widget.isInstructor) {
-        final status = session['status']?.toString() ?? '';
-        if (status == 'ended' || status == 'completed') {
-          lmsLeaveChannel();
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-              content: Text('The instructor has ended the session.'),
-              backgroundColor: Colors.red,
-              duration: Duration(seconds: 4),
-            ));
-            Navigator.pop(context);
-          }
+        final ended = session['status'] == 'ended' ||
+            (session['isLive'] == false && _sessionSeconds > 15);
+        if (ended) {
+          _finishSession();
           return;
         }
       }
-
-      // Extract instructor name from session document (for student label)
-      final instrMap = session['instructor'] as Map? ??
-          session['createdBy'] as Map? ??
-          session['instructorId'] as Map? ??
-          {};
-      final instrName = (session['instructorName'] as String?) ??
-          instrMap['name']?.toString() ??
-          instrMap['username']?.toString() ??
-          '';
 
       // Update participants from attendees
       final attendees = (session['attendees'] as List?) ?? [];
       final newParticipants = attendees.map<Map<String, dynamic>>((a) => {
         'name': a['name'] ?? a['username'] ?? 'Participant',
         'id': a['_id']?.toString() ?? '',
-        'userId': a['_id']?.toString() ?? '', // needed by whiteboard permission sheet
         'isInstructor': false,
       }).toList();
-
-      // The instructor is deliberately excluded from `attendees` on the
-      // backend (attendees is students-only), so without adding them here
-      // explicitly a student would have no participant entry at all for
-      // the instructor's uid to resolve against below.
-      final instructorId = instrMap['_id']?.toString() ?? '';
-      if (instructorId.isNotEmpty && instructorId != _currentUserId) {
-        newParticipants.add({
-          'name': instrName.isNotEmpty ? instrName : 'Instructor',
-          'id': instructorId,
-          'userId': instructorId,
-          'isInstructor': true,
-        });
-      }
-
-      // backend userId -> Agora uid, reported by each participant right
-      // after they join (see set-my-uid). This is the ONLY reliable way to
-      // know which video tile belongs to which person — Agora assigns uids
-      // randomly (uid:0 join), so there is no formula linking them to a
-      // userId, and matching by list-order position (what this used to do)
-      // silently mislabels tiles whenever the two lists' orders differ.
-      final uidEntries = (session['participantUids'] as List?) ?? [];
-      final Map<String, String> userIdToAgoraUid = {};
-      for (final e in uidEntries) {
-        if (e is! Map) continue;
-        final uid = e['userId']?.toString();
-        final agoraUid = e['agoraUid']?.toString();
-        if (uid != null && agoraUid != null && agoraUid.isNotEmpty) {
-          userIdToAgoraUid[uid] = agoraUid;
-        }
-      }
-      _userIdToAgoraUid = userIdToAgoraUid;
 
       // Waiting room students (instructor sees these)
       final waiting = (session['waitingStudents'] as List?) ?? [];
@@ -444,7 +247,6 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
         final prevWaitingCount = _waitingStudents.length;
 
         setState(() {
-          if (instrName.isNotEmpty) _instructorName = instrName;
           _participants.clear();
           // Add self first
           _participants.add({'name': '$_currentUserName (You)', 'isInstructor': widget.isInstructor, 'id': _currentUserId});
@@ -462,45 +264,6 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
             _waitingStudents = [];
           }
         });
-
-        // Update name labels on the web video tiles — matched by the actual
-        // Agora uid each participant reported (userIdToAgoraUid), never by
-        // list position. A tile whose uid hasn't been reported yet (report
-        // call still in flight, or an older cached build that never calls
-        // set-my-uid) keeps its last-known/placeholder name rather than
-        // being mislabeled with whichever participant happens to share the
-        // same index this poll tick.
-        if (kIsWeb) {
-          lmsSetParticipantNames('$_currentUserName (You)', '');
-          final remoteParticipants = _participants
-              .where((p) => p['id'] != _currentUserId)
-              .toList();
-          // Reverse lookup: agoraUid -> participant, built once per sync.
-          final Map<String, Map<String, dynamic>> agoraUidToParticipant = {};
-          for (final p in remoteParticipants) {
-            final uid = userIdToAgoraUid[p['id']?.toString() ?? ''];
-            if (uid != null) agoraUidToParticipant[uid] = p;
-          }
-          for (final remoteUid in _remoteUids) {
-            final participant = agoraUidToParticipant[remoteUid.toString()];
-            if (participant != null) {
-              final isInstr = participant['isInstructor'] == true;
-              final baseName = participant['name']?.toString() ?? 'Participant';
-              lmsSetTileName(remoteUid, isInstr ? '$baseName (Host)' : baseName);
-            }
-            // No match yet for this uid — leave the tile's existing label
-            // alone instead of guessing; the next poll (2s later) will
-            // usually have the mapping by then.
-          }
-
-          // Whoever is screen-sharing (per the backend flag) gets their
-          // existing grid tile enlarged into a spotlight view for every
-          // OTHER participant; no-op if nobody is sharing or if it's our
-          // own uid (self-share is already shown via the local corner
-          // preview, handled directly by _toggleScreenShare).
-          final sharingUid = session['screenSharingUid']?.toString() ?? '';
-          lmsApplyRemoteScreenShare(sharingUid);
-        }
 
         // Notify instructor of new join request — compare against PRE-setState count
         if (mounted && widget.isInstructor && waitingNames.length > prevWaitingCount) {
@@ -554,18 +317,30 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
       if (mounted) setState(() => _cameraViewName = viewId);
 
       final sessionRoom = _sessionDocId.isNotEmpty ? _sessionDocId : widget.sessionId;
-      final roomName = 'icare${sessionRoom.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '').substring(0, sessionRoom.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '').length.clamp(0, 20))}';
-      _agoraRoomName = roomName;
+      // Full sessionId (not truncated) so Jibri's finalize script can strip
+      // the 'icare' prefix and recover the exact MongoDB _id losslessly.
+      final roomName = 'icare${sessionRoom.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '')}';
 
-      // Pre-fetch the token in the background. The actual Agora join (which also
-      // creates mic+cam tracks and publishes, like the doctor/patient call) happens
-      // in the overlay tap handler so everything runs inside the user gesture.
-      _agoraTokenFetch = () async {
-        final tokenData = await AgoraService().getToken(channelName: roomName, uid: 0);
-        _agoraToken = tokenData['data']?['token'] as String? ?? '';
-        _agoraAppId = tokenData['data']?['appId'] as String? ?? '';
-        debugPrint('LMS token pre-fetched for room=$roomName');
-      }();
+      // Fetch a JWT that only grants moderator if the backend verifies this
+      // user is really the session's instructor — never trust the client's
+      // own isInstructor flag for that, or a student could self-promote.
+      final jwt = await _lms.getJitsiToken(
+        room: roomName,
+        sessionId: _sessionDocId.isNotEmpty ? _sessionDocId : null,
+        displayName: _currentUserName,
+      );
+
+      // Join Jitsi after the platform view is in the DOM
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        Future.delayed(const Duration(milliseconds: 400), () {
+          try {
+            lmsJoinChannel(roomName, _currentUserName, widget.isInstructor, jwt: jwt ?? '', subject: widget.sessionTitle);
+            debugPrint('LMS Jitsi join: room=$roomName');
+          } catch (e) {
+            debugPrint('LMS Jitsi join error: $e');
+          }
+        });
+      });
     } catch (e) {
       debugPrint('LMS Jitsi init error: $e');
     }
@@ -573,39 +348,50 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
 
   String? _cameraViewName;
 
-  // Agora join params — pre-fetched in _initWebCamera, used on overlay tap
-  String? _agoraRoomName;
-  String? _agoraAppId;
-  String? _agoraToken;
-  Future<void>? _agoraTokenFetch;
-  bool _joining = false;
-
   Future<void> _notifyStudents() async {
-    try {
-      // Mark session as LIVE — backend returns the fresh session ID (may differ from widget.sessionId
-      // if widget.sessionId was a courseId placeholder or a stale session).
-      debugPrint('✅ _notifyStudents: calling setSessionLive(courseId=${widget.courseId}, _sessionDocId=$_sessionDocId)');
-      final freshSessionId = await _lms.setSessionLive(
-        courseId: widget.courseId,
-        isLive: true,
-        title: widget.sessionTitle,
-        sessionId: _sessionDocId.isNotEmpty && _sessionDocId != widget.courseId ? _sessionDocId : null,
-      );
-      debugPrint('✅ Session marked LIVE: freshSessionId=$freshSessionId, _sessionDocId=$_sessionDocId');
-      // Update _sessionDocId so Agora room name and join/sync use the real session
-      if (freshSessionId != null && freshSessionId.isNotEmpty) {
-        _sessionDocId = freshSessionId;
+    // Mark session as LIVE — retry up to 3 times because a cold backend/DB can
+    // silently fail; without this students never see the session as live.
+    String? freshSessionId;
+    for (int attempt = 0; attempt < 3; attempt++) {
+      try {
+        freshSessionId = await _lms.setSessionLive(
+          courseId: widget.courseId,
+          isLive: true,
+          title: widget.sessionTitle,
+          sessionId: _sessionDocId.isNotEmpty && _sessionDocId != widget.courseId ? _sessionDocId : null,
+        );
+        if (freshSessionId != null && freshSessionId.isNotEmpty) break;
+      } catch (e) {
+        debugPrint('setSessionLive attempt ${attempt + 1} failed: $e');
       }
-      debugPrint('✅ _notifyStudents: calling startLiveSessionNotify(sessionId=$_sessionDocId)');
+      await Future.delayed(const Duration(seconds: 3));
+    }
+
+    if (freshSessionId != null && freshSessionId.isNotEmpty) {
+      _sessionDocId = freshSessionId;
+      debugPrint('✅ Session marked LIVE: $_sessionDocId');
+    } else {
+      debugPrint('❌ Could not mark session live — students will not see it!');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Warning: could not notify students — session may not appear as live. Check your connection.'),
+            backgroundColor: Colors.orange,
+            duration: Duration(seconds: 6),
+          ),
+        );
+      }
+    }
+
+    try {
       await _lms.startLiveSessionNotify(
         courseId: widget.courseId,
         sessionId: _sessionDocId,
         instructorName: _currentUserName,
         sessionTitle: widget.sessionTitle,
       );
-      debugPrint('✅ _notifyStudents: notifications sent successfully');
     } catch (e) {
-      debugPrint('❌ _notifyStudents FAILED: $e');
+      debugPrint('Notify students error: $e');
     }
   }
 
@@ -617,42 +403,24 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
       return;
     }
 
-    // Mobile: real Agora RTC via lms_agora_stub.dart
+    // Mobile: lmsJoinChannel (stub) opens Jitsi in external browser
     lmsSetCallbacks(
       onJoined: () {
         if (mounted && !_joined) {
           setState(() { _joined = true; _loading = false; });
           _startSessionTimer();
         }
-        // Report the Agora uid we were just assigned — see the web overlay
-        // tap handler for why (naming tiles by list-position instead of
-        // this real mapping is what mislabeled tiles / made them look like
-        // they vanished when a new participant joined).
-        if (_sessionDocId.isNotEmpty) {
-          final myUid = lmsGetLocalUid();
-          if (myUid.isNotEmpty) {
-            _lms.setMyAgoraUid(sessionId: _sessionDocId, agoraUid: myUid);
-          }
-        }
-      },
-      onRemote: (uid, joined) {
-        if (!mounted) return;
-        setState(() {
-          if (joined) {
-            if (!_remoteUids.contains(uid)) _remoteUids.add(uid);
-          } else {
-            _remoteUids.remove(uid);
-          }
-        });
       },
     );
 
     final sessionRoom = _sessionDocId.isNotEmpty ? _sessionDocId : widget.sessionId;
-    final roomName = 'icare${sessionRoom.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '').substring(0, sessionRoom.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '').length.clamp(0, 20))}';
-    final tokenData = await AgoraService().getToken(channelName: roomName, uid: 0);
-    final agoraToken = tokenData['data']?['token'] as String? ?? '';
-    final agoraAppId = tokenData['data']?['appId'] as String? ?? '';
-    await lmsJoinChannel(roomName, agoraAppId, agoraToken, widget.isInstructor);
+    final roomName = 'icare${sessionRoom.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '')}';
+    final jwt = await _lms.getJitsiToken(
+      room: roomName,
+      sessionId: _sessionDocId.isNotEmpty ? _sessionDocId : null,
+      displayName: _currentUserName,
+    );
+    await lmsJoinChannel(roomName, _currentUserName, widget.isInstructor, jwt: jwt ?? '', subject: widget.sessionTitle);
 
     // Fallback: mark joined after 2s
     await Future.delayed(const Duration(seconds: 2));
@@ -664,19 +432,21 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
 
   void _startSessionTimer() {
     _sessionTimer = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (mounted) setState(() => _sessionSeconds++);
+      _sessionSeconds++;
+      // Web fullscreen shows only the Jitsi iframe (no timer UI) — skip setState
+      // so HtmlElementView isn't rebuilt every second (causes jank on mobile).
+      if (mounted && !(kIsWeb && _cameraViewName != null)) setState(() {});
     });
-    // Instructor heartbeat — tells backend the session is still active
+    // Instructor heartbeat — tells backend the session is still active.
+    // 15s (not 30s) gives more margin against browser tab-throttling of
+    // Timer.periodic when the instructor's tab is backgrounded — a slow
+    // heartbeat previously caused the backend to mark live sessions 'ended'
+    // while the instructor was still connected.
     if (widget.isInstructor && _sessionDocId.isNotEmpty) {
-      debugPrint('💓 Sending initial heartbeat for session $_sessionDocId');
       _lms.sendHeartbeat(_sessionDocId); // send immediately
-      _heartbeatTimer = Timer.periodic(const Duration(seconds: 30), (_) {
-        debugPrint('💓 Sending heartbeat for session $_sessionDocId');
-        if (mounted && _sessionDocId.isNotEmpty) _lms.sendHeartbeat(_sessionDocId);
+      _heartbeatTimer = Timer.periodic(const Duration(seconds: 15), (_) {
+        if (_sessionDocId.isNotEmpty) _lms.sendHeartbeat(_sessionDocId);
       });
-      debugPrint('💓 Heartbeat timer started (every 30s) for session $_sessionDocId');
-    } else {
-      debugPrint('💓 No heartbeat started: isInstructor=${widget.isInstructor}, _sessionDocId=$_sessionDocId');
     }
   }
 
@@ -705,46 +475,6 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
     setState(() {});
   }
 
-  // Guards against rapid double-taps on the screen-share button invoking
-  // lmsToggleScreenShare() twice concurrently — the JS side also has its
-  // own busy-guard (window._lmsScreenBusy) as the authoritative lock, but
-  // disabling the button here means a double-tap never even reaches JS.
-  bool _screenShareBusy = false;
-
-  Future<void> _toggleScreenShare() async {
-    if (_screenShareBusy) return;
-    setState(() => _screenShareBusy = true);
-    try {
-      final result = await lmsToggleScreenShare();
-      if (mounted) {
-        setState(() {
-          if (result == 'screen') {
-            _screenSharing = true;
-          } else if (result == 'camera') {
-            _screenSharing = false;
-          } else if (result == 'unsupported') {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Screen sharing is only supported on web'), backgroundColor: Colors.orange),
-            );
-          } else if (result.startsWith('error')) {
-            _screenSharing = false;
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Could not share screen — please allow screen sharing permission'), backgroundColor: Colors.red),
-            );
-          }
-        });
-      }
-      // Broadcast who's sharing (or clear it) so other participants' poll
-      // picks it up and spotlights the sharer's tile.
-      if (kIsWeb && _sessionDocId.isNotEmpty && (result == 'screen' || result == 'camera')) {
-        final uid = result == 'screen' ? lmsGetLocalUid() : null;
-        await _lms.setScreenSharingUid(sessionId: _sessionDocId, uid: uid);
-      }
-    } catch (_) {
-    } finally {
-      if (mounted) setState(() => _screenShareBusy = false);
-    }
-  }
 
   void _toggleHand() {
     setState(() => _handRaised = !_handRaised);
@@ -791,6 +521,73 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
     });
   }
 
+  /// Web: poll the JS flag set when the user presses Jitsi's own hangup button.
+  /// Jitsi's UI is the only call UI now, so this is how the screen closes.
+  void _startClosedPoller() {
+    if (!kIsWeb) return;
+    _closedPoller = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!mounted) return;
+      if (lmsIsSessionClosed()) {
+        _closedPoller?.cancel();
+        _finishSession();
+      }
+    });
+  }
+
+  /// Ends/leaves the session on the backend and closes this screen.
+  /// Same as _endSession but without the confirmation dialog (Jitsi already
+  /// confirmed the hangup).
+  bool _finishing = false;
+
+  Future<void> _finishSession() async {
+    if (_finishing) return; // sync poll + closed poller can both trigger this
+    _finishing = true;
+    _syncTimer?.cancel();
+    _sessionTimer?.cancel();
+    _closedPoller?.cancel();
+    _heartbeatTimer?.cancel();
+
+    // Show "saving" overlay instead of the (now dead) Jitsi iframe
+    if (mounted) setState(() {});
+
+    if (kIsWeb && widget.isInstructor) {
+      // Jibri only finalizes + uploads once it gets an explicit stop
+      // command — disposing the Jitsi iframe (lmsLeaveChannel, below) does
+      // NOT stop it, it just keeps recording forever server-side with
+      // nothing ever reaching Classwork. Send stop and give it a moment to
+      // actually reach Jibri over XMPP before tearing down the connection.
+      lmsStopRecording();
+      await Future.delayed(const Duration(seconds: 2));
+    }
+
+    lmsLeaveChannel();
+
+    if (_sessionDocId.isNotEmpty && _sessionDocId != widget.courseId) {
+      try { await _lms.leaveLiveSession(_sessionDocId); } catch (_) {}
+    }
+
+    if (widget.isInstructor) {
+      if (_sessionDocId.isNotEmpty && _sessionDocId != widget.courseId) {
+        try {
+          await _lms.endAndSaveSession(
+            sessionId: _sessionDocId,
+            lessonId: widget.lessonId,
+            moduleId: widget.moduleId,
+          );
+        } catch (_) {}
+      }
+      try { await _lms.setSessionLive(courseId: widget.courseId, isLive: false); } catch (_) {}
+    }
+
+    // Hard reload on web: SPA navigation after disposing the Jitsi platform
+    // view leaves the page blank/stuck. A full reload guarantees clean state.
+    if (kIsWeb) {
+      lmsHardRedirect('/dashboard');
+    } else if (mounted) {
+      context.go('/dashboard');
+    }
+  }
+
   Future<void> _endSession() async {
     final confirm = await showDialog<bool>(
       context: context,
@@ -810,53 +607,7 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
       ),
     );
     if (confirm == true && mounted) {
-      // Clear the screen-share flag if we were the active sharer, so other
-      // participants' next poll drops the stale spotlight.
-      if (kIsWeb && _screenSharing && _sessionDocId.isNotEmpty) {
-        _lms.setScreenSharingUid(sessionId: _sessionDocId, uid: null).catchError((_) {});
-      }
-      // Stop recording while Agora tracks are still alive
-      if (widget.isInstructor && kIsWeb && _sessionDocId.isNotEmpty) {
-        final token = await SharedPref().getToken();
-        lmsStopRecordingAndUpload(
-          _sessionDocId,
-          'https://icare-backend-inky.vercel.app/api',
-          token ?? '',
-        );
-      }
-
-      lmsLeaveChannel();
-
-      // Navigate immediately — never block on backend calls
-      final sessionId = _sessionDocId;
-      final lessonId = widget.lessonId;
-      final moduleId = widget.moduleId;
-      final courseId = widget.courseId;
-      final isInstructor = widget.isInstructor;
-      final chatSnapshot = List<Map<String, dynamic>>.from(_chatMessages);
-
-      if (mounted) Navigator.pop(context);
-
-      // Background cleanup — fire and forget
-      Future(() async {
-        if (sessionId.isNotEmpty && sessionId != courseId) {
-          _lms.leaveLiveSession(sessionId).catchError((_) {});
-          if (!isInstructor) {
-            _lms.recordLiveSessionLeave(sessionId).catchError((_) {});
-          }
-        }
-        if (isInstructor) {
-          if (sessionId.isNotEmpty && sessionId != courseId) {
-            _lms.endAndSaveSession(
-              sessionId: sessionId,
-              lessonId: lessonId,
-              moduleId: moduleId,
-              chatMessages: chatSnapshot,
-            ).catchError((_) => <String, dynamic>{});
-          }
-          _lms.setSessionLive(courseId: courseId, isLive: false).catchError((_) => null);
-        }
-      });
+      await _finishSession();
     }
   }
 
@@ -902,72 +653,81 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
       );
     }
 
-    // Consultation-style layout (matches the doctor↔patient video call):
-    // the video fills the ENTIRE screen — no solid top/bottom bars eating
-    // vertical space — and every control floats over it as a translucent
-    // overlay (name/timer pills top-left, circular mic/cam/share/end plus
-    // pill-shaped Chat/People/Polls/Whiteboard buttons bottom-center).
+    // Session ending: brief transition screen before the hard redirect to
+    // /dashboard. For the instructor, this covers the short wait while the
+    // stop-recording command reaches Jibri server-side.
+    if (_finishing) {
+      return Scaffold(
+        backgroundColor: const Color(0xFF1C2333),
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const CircularProgressIndicator(color: Colors.white),
+              const SizedBox(height: 20),
+              Text(
+                kIsWeb && widget.isInstructor ? 'Saving recording...' : 'Leaving session...',
+                style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // Web: full-screen Jitsi — Jitsi's own UI provides mic/cam/chat/polls/
+    // raise-hand/hangup, so no custom Flutter bars are needed. A small "REC"
+    // badge is overlaid so recording status is visible inside the meeting
+    // itself, rather than only via the browser's native screen-share bar.
+    if (kIsWeb && _cameraViewName != null) {
+      return Scaffold(
+        backgroundColor: const Color(0xFF1C2333),
+        body: SizedBox.expand(child: HtmlElementView(viewType: _cameraViewName!)),
+      );
+    }
+
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: Colors.transparent,
       body: SafeArea(
         child: Stack(
           children: [
-            Container(color: const Color(0xFF0A0E1A)),
-            _videoFullscreen
-                // Fullscreen: video only, no overlays except the exit button
-                ? _buildVideoArea(showFullscreenBtn: false)
-                : LayoutBuilder(
+            // Dark background behind everything
+            Container(color: const Color(0xFF1C2333)),
+            Column(
+              children: [
+                _buildTopBar(),
+                Expanded(
+                  child: LayoutBuilder(
                     builder: (ctx, constraints) {
                       final isMobile = constraints.maxWidth < 600;
                       if (isMobile) {
+                        // Mobile: side panel slides up as overlay (Stack), video stays full-width
                         return Stack(
                           children: [
-                            _buildVideoWithOverlays(),
+                            _buildVideoArea(),
                             if (_chatOpen || _participantsOpen)
                               Positioned.fill(
-                                child: GestureDetector(
-                                  // Tap the dark backdrop (anywhere outside the
-                                  // sheet itself) to dismiss — previously there
-                                  // was no way to close this panel at all on
-                                  // mobile: no close button, no backdrop tap,
-                                  // no drag-to-dismiss, so once opened it stayed
-                                  // stuck open over the video permanently.
-                                  onTap: () => setState(() { _chatOpen = false; _participantsOpen = false; }),
-                                  child: Container(
-                                    color: Colors.black54,
-                                    child: Align(
-                                      alignment: Alignment.bottomCenter,
-                                      child: GestureDetector(
-                                        // Swallow taps on the sheet so they don't
-                                        // fall through to the backdrop above.
-                                        onTap: () {},
-                                        onVerticalDragUpdate: (details) {
-                                          // Drag the handle/sheet down far enough
-                                          // and it closes, like a real bottom sheet.
-                                          if (details.primaryDelta != null && details.primaryDelta! > 12) {
-                                            setState(() { _chatOpen = false; _participantsOpen = false; });
-                                          }
-                                        },
-                                        child: Container(
-                                          width: double.infinity,
-                                          height: constraints.maxHeight * 0.65,
-                                          decoration: const BoxDecoration(
-                                            color: Color(0xFF252D3D),
-                                            borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-                                          ),
-                                          child: Column(children: [
-                                            const SizedBox(height: 6),
-                                            Container(
-                                              width: 40, height: 4,
-                                              decoration: BoxDecoration(
-                                                color: Colors.white38,
-                                                borderRadius: BorderRadius.circular(2),
-                                              ),
-                                            ),
-                                            Expanded(child: _buildSidePanel(showCloseButton: true, fullWidth: true)),
-                                          ]),
-                                        ),
+                                child: Container(
+                                  color: Colors.black54,
+                                  child: Align(
+                                    alignment: Alignment.bottomCenter,
+                                    child: Container(
+                                      height: constraints.maxHeight * 0.65,
+                                      decoration: const BoxDecoration(
+                                        color: Color(0xFF252D3D),
+                                        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
                                       ),
+                                      child: Column(children: [
+                                        const SizedBox(height: 6),
+                                        Container(
+                                          width: 40, height: 4,
+                                          decoration: BoxDecoration(
+                                            color: Colors.white38,
+                                            borderRadius: BorderRadius.circular(2),
+                                          ),
+                                        ),
+                                        Expanded(child: _buildSidePanel()),
+                                      ]),
                                     ),
                                   ),
                                 ),
@@ -977,221 +737,65 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
                       }
                       return Row(
                         children: [
-                          Expanded(child: _buildVideoWithOverlays()),
+                          Expanded(child: _buildVideoArea()),
                           if (_chatOpen || _participantsOpen) _buildSidePanel(),
                         ],
                       );
                     },
                   ),
-            // Fullscreen exit button — overlaid on top, no Scaffold swap needed
-            if (_videoFullscreen)
-              Positioned(
-                top: 8,
-                right: 12,
-                child: GestureDetector(
-                  onTap: () {
-                    setState(() => _videoFullscreen = false);
-                    Future.delayed(const Duration(milliseconds: 150), lmsRefreshVideoLayout);
-                  },
-                  child: Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: Colors.black.withValues(alpha: 0.6),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: const Icon(Icons.fullscreen_exit_rounded, color: Colors.white, size: 26),
-                  ),
                 ),
-              ),
-            // Whiteboard overlay — covers video area, floating controls stay visible
-            if (_whiteboardOpen) _buildWhiteboardOverlay(),
+                _buildBottomBar(),
+              ],
+            ),
           ],
         ),
       ),
     );
   }
 
-  /// Video area with the consultation-style translucent overlays: info
-  /// pills (top-left) and the control bar at the bottom. The video area
-  /// STOPS above the controls (bottom inset) instead of running the full
-  /// height — otherwise the thumbnail strip / bottom grid row renders
-  /// underneath the floating buttons and the two visibly overlap (this is
-  /// exactly what the client's mobile screenshots showed).
-  Widget _buildVideoWithOverlays() {
-    final isMobile = MediaQuery.of(context).size.width < 600;
-    final controlsReserve = _permissionsEnabled ? (isMobile ? 168.0 : 128.0) : 0.0;
-    return Stack(
-      children: [
-        // Tap a participant tile to expand it to a 90/10 split (tap again
-        // to restore the grid). Taps land on Flutter's glass pane — never
-        // on the DOM tiles — so we hit-test the tile rects in JS using the
-        // tap's viewport coordinates. Overlay buttons above this layer win
-        // the gesture arena, so this only fires for bare video-area taps.
-        Positioned(
-          top: 0, left: 0, right: 0, bottom: controlsReserve,
-          child: GestureDetector(
-            behavior: HitTestBehavior.translucent,
-            onTapUp: (details) {
-              if (!kIsWeb || !_permissionsEnabled) return;
-              final uid = lmsTileAtPoint(
-                details.globalPosition.dx,
-                details.globalPosition.dy,
-              );
-              if (uid.isNotEmpty) lmsToggleTileExpand(uid);
-            },
-            child: _buildVideoArea(),
-          ),
-        ),
-        // right:110 leaves room for the Fit/Fill + fullscreen buttons that
-        // _buildVideoArea pins to its own top-right corner.
-        Positioned(top: 12, left: 12, right: 110, child: _buildTopOverlay()),
-        if (_permissionsEnabled)
-          Positioned(
-            bottom: 0, left: 0, right: 0,
-            height: controlsReserve,
-            child: Align(
-              alignment: Alignment.bottomCenter,
-              child: Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: _buildFloatingControls(),
-              ),
-            ),
-          ),
-      ],
-    );
-  }
-
-  Widget _buildWhiteboardOverlay() {
-    final canDraw = widget.isInstructor || _wbPermissions.contains(_currentUserId);
-    // No solid bars anymore — the controls float over the video's bottom
-    // ~130px, so the whiteboard stops above them (unless fullscreened).
-    final bottomBarH = _wbFullscreen ? 0.0 : 130.0;
-    const topBarH = 0.0;
-    return Positioned(
-      top: topBarH,
-      left: 0, right: 0,
-      bottom: bottomBarH,
-      child: Material(
-        color: Colors.white,
-        child: Column(children: [
-          // Whiteboard title bar
+  Widget _buildTopBar() {
+    return Container(
+      height: 52,
+      color: const Color(0xFF252D3D),
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Row(
+        children: [
+          // Timer + Live indicator
           Container(
-            height: 40,
-            color: const Color(0xFF0B2D6E),
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            child: Row(children: [
-              const Icon(Icons.draw_rounded, color: Colors.white, size: 16),
-              const SizedBox(width: 8),
-              const Expanded(
-                child: Text('Whiteboard', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 14)),
-              ),
-              if (!canDraw)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                  decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(10)),
-                  child: const Text('View Only', style: TextStyle(color: Colors.white70, fontSize: 11)),
-                ),
-              const SizedBox(width: 8),
-              // Fullscreen toggle
-              GestureDetector(
-                onTap: () => setState(() => _wbFullscreen = !_wbFullscreen),
-                child: Container(
-                  padding: const EdgeInsets.all(4),
-                  decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(6)),
-                  child: Icon(
-                    _wbFullscreen ? Icons.fullscreen_exit_rounded : Icons.fullscreen_rounded,
-                    color: Colors.white, size: 18,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 6),
-              GestureDetector(
-                onTap: () => setState(() { _whiteboardOpen = false; _wbFullscreen = false; }),
-                child: Container(
-                  padding: const EdgeInsets.all(4),
-                  decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(6)),
-                  child: const Icon(Icons.close_rounded, color: Colors.white, size: 18),
-                ),
-              ),
-            ]),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: Colors.red,
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: const Text('● LIVE', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700)),
           ),
-          // Whiteboard canvas
+          const SizedBox(width: 10),
+          Text(
+            _timerText,
+            style: const TextStyle(color: Colors.white70, fontSize: 14, fontFamily: 'monospace'),
+          ),
+          const SizedBox(width: 16),
           Expanded(
-            child: WhiteboardWidget(
-              isEditable: canDraw,
-              strokes: _wbStrokes,
-              currentUserId: _currentUserId,
-              onStrokeAdded: canDraw ? _wbStrokeAdded : null,
-              onUndo: canDraw ? _wbUndo : null,
-              onClear: widget.isInstructor ? _wbClear : null,
-              attendees: _participants,
-              permissionedUserIds: _wbPermissions,
-              onPermissionChanged: widget.isInstructor ? _wbPermissionChanged : null,
+            child: Text(
+              widget.sessionTitle,
+              style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600),
+              overflow: TextOverflow.ellipsis,
             ),
           ),
-        ]),
+          // Participant count
+          Row(children: [
+            const Icon(Icons.people_rounded, color: Colors.white54, size: 18),
+            const SizedBox(width: 4),
+            Text('${_participants.length}', style: const TextStyle(color: Colors.white54, fontSize: 13)),
+          ]),
+          const SizedBox(width: 8),
+          const Icon(Icons.lock_rounded, color: Colors.white54, size: 18),
+        ],
       ),
     );
   }
 
-  /// Translucent info pills floating over the top of the video — replaces
-  /// the old solid 52px top bar so the video keeps the full height.
-  Widget _buildTopOverlay() {
-    Widget pill(Widget child, {Color? bg}) => Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-          decoration: BoxDecoration(
-            color: bg ?? Colors.black54,
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: child,
-        );
-
-    return Wrap(
-      spacing: 8,
-      runSpacing: 6,
-      crossAxisAlignment: WrapCrossAlignment.center,
-      children: [
-        pill(
-          const Text('● LIVE',
-              style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700)),
-          bg: Colors.red.withValues(alpha: 0.85),
-        ),
-        pill(Row(mainAxisSize: MainAxisSize.min, children: [
-          const Icon(Icons.timer_rounded, color: Colors.white70, size: 14),
-          const SizedBox(width: 4),
-          Text(_timerText,
-              style: const TextStyle(color: Colors.white, fontSize: 13, fontFamily: 'monospace')),
-        ])),
-        pill(Text(
-          widget.sessionTitle,
-          style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
-          overflow: TextOverflow.ellipsis,
-        )),
-        pill(Row(mainAxisSize: MainAxisSize.min, children: [
-          const Icon(Icons.people_rounded, color: Colors.white70, size: 14),
-          const SizedBox(width: 4),
-          Text('${_participants.length}',
-              style: const TextStyle(color: Colors.white, fontSize: 13)),
-        ])),
-        if (widget.isInstructor)
-          GestureDetector(
-            onTap: _toggleRecording,
-            child: pill(
-              Row(mainAxisSize: MainAxisSize.min, children: [
-                Icon(_isRecording ? Icons.stop_circle_rounded : Icons.fiber_manual_record_rounded,
-                    color: Colors.white, size: 14),
-                const SizedBox(width: 4),
-                Text(_isRecording ? 'Stop REC' : 'Record',
-                    style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w700)),
-              ]),
-              bg: _isRecording ? Colors.red.withValues(alpha: 0.85) : Colors.black54,
-            ),
-          ),
-      ],
-    );
-  }
-
-  Widget _buildVideoArea({bool showFullscreenBtn = true}) {
+  Widget _buildVideoArea() {
     // On web: use HtmlElementView (same as working doctor-patient call)
     // platformViewRegistry creates divs IN Flutter's layout — buttons work naturally
     if (kIsWeb && _cameraViewName != null) {
@@ -1200,84 +804,28 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
           // Video platform view — contains lms-local-video + lms-remote-main
           SizedBox.expand(child: HtmlElementView(viewType: _cameraViewName!)),
 
-          // Fullscreen button — top-right corner
-          if (showFullscreenBtn && _permissionsEnabled)
-            Positioned(
-              top: 8, right: 8,
-              child: GestureDetector(
-                onTap: () {
-                  setState(() => _videoFullscreen = true);
-                  Future.delayed(const Duration(milliseconds: 150), lmsRefreshVideoLayout);
-                },
-                child: Container(
-                  padding: const EdgeInsets.all(6),
-                  decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.55), borderRadius: BorderRadius.circular(6)),
-                  child: const Icon(Icons.fullscreen_rounded, color: Colors.white, size: 22),
-                ),
-              ),
-            ),
-
-          // Fit/Fill toggle — top-right, next to the fullscreen button (the
-          // top-left corner now carries the translucent info pills)
-          if (showFullscreenBtn && _permissionsEnabled)
-            Positioned(
-              top: 8, right: 52,
-              child: GestureDetector(
-                onTap: () {
-                  final next = !_videoFitCover;
-                  setState(() => _videoFitCover = next);
-                  if (kIsWeb) lmsSetVideoFit(next ? 'cover' : 'contain');
-                },
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-                  decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.55), borderRadius: BorderRadius.circular(6)),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        _videoFitCover ? Icons.fit_screen_rounded : Icons.crop_free_rounded,
-                        color: Colors.white, size: 16,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        _videoFitCover ? 'Fill' : 'Fit',
-                        style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-
           // "Enable Camera & Mic" overlay — must be tapped to satisfy Chrome's
           // getUserMedia user-gesture requirement. Disappears after first tap.
           if (!_permissionsEnabled)
             Positioned.fill(
               child: Container(
-                color: Colors.black.withValues(alpha: 0.80),
+                color: Colors.black.withValues(alpha: 0.75),
                 child: Center(
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(
-                        widget.isInstructor ? Icons.videocam_rounded : Icons.volume_up_rounded,
-                        color: Colors.white, size: 56,
-                      ),
+                      const Icon(Icons.mic_rounded, color: Colors.white, size: 56),
                       const SizedBox(height: 16),
-                      Text(
-                        widget.isInstructor
-                            ? 'Tap to enable your\nCamera & Microphone'
-                            : 'Tap to join the live session',
+                      const Text(
+                        'Tap to enable your\nCamera & Microphone',
                         textAlign: TextAlign.center,
-                        style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w700),
+                        style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w700),
                       ),
                       const SizedBox(height: 8),
-                      Text(
-                        widget.isInstructor
-                            ? 'Chrome requires a tap before\nmicrophone access is allowed.'
-                            : 'Click below to enable your mic & camera\nso instructor can hear you too.',
+                      const Text(
+                        'Chrome requires a tap before\nmicrophone access is allowed.',
                         textAlign: TextAlign.center,
-                        style: const TextStyle(color: Colors.white60, fontSize: 13),
+                        style: TextStyle(color: Colors.white60, fontSize: 13),
                       ),
                       const SizedBox(height: 24),
                       ElevatedButton.icon(
@@ -1287,62 +835,13 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
                           padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                         ),
-                        onPressed: _joining ? null : () async {
-                          if (kIsWeb) {
-                            setState(() => _joining = true);
-                            try {
-                              // Wait for the pre-fetched token (usually already done)
-                              try {
-                                if (_agoraTokenFetch != null) await _agoraTokenFetch;
-                              } catch (_) {}
-                              // Fallback: re-fetch if the background fetch failed
-                              if ((_agoraAppId ?? '').isEmpty && (_agoraRoomName ?? '').isNotEmpty) {
-                                final tokenData = await AgoraService()
-                                    .getToken(channelName: _agoraRoomName!, uid: 0);
-                                _agoraToken = tokenData['data']?['token'] as String? ?? '';
-                                _agoraAppId = tokenData['data']?['appId'] as String? ?? '';
-                              }
-                              // One-shot: join channel + create mic/cam + publish,
-                              // exactly like the working doctor/patient agoraJoin.
-                              await lmsJoinChannel(
-                                _agoraRoomName ?? '',
-                                _agoraAppId ?? '',
-                                _agoraToken ?? '',
-                                widget.isInstructor,
-                              );
-                              debugPrint('LMS joined+published room=$_agoraRoomName');
-                              // Report the Agora uid we were just assigned so
-                              // other participants' next poll can label our
-                              // tile with the correct name instead of
-                              // guessing by list order (which produced wrong
-                              // names on tiles and tiles vanishing when a new
-                              // participant joined).
-                              if (_sessionDocId.isNotEmpty) {
-                                final myUid = lmsGetLocalUid();
-                                if (myUid.isNotEmpty) {
-                                  _lms.setMyAgoraUid(sessionId: _sessionDocId, agoraUid: myUid);
-                                }
-                              }
-                              // Recording auto-starts in JS 3s after instructor joins
-                              if (widget.isInstructor) {
-                                Future.delayed(const Duration(seconds: 4), () {
-                                  if (mounted) setState(() => _isRecording = true);
-                                });
-                              }
-                            } catch (e) {
-                              debugPrint('LMS join error: $e');
-                            }
-                          }
+                        onPressed: () async {
+                          if (kIsWeb) await lmsEnableMediaAndPublish();
                           if (mounted) setState(() => _permissionsEnabled = true);
                         },
-                        icon: Icon(
-                          widget.isInstructor ? Icons.videocam_rounded : Icons.mic_rounded,
-                          size: 24,
-                        ),
-                        label: Text(
-                          widget.isInstructor ? 'Enable Camera & Mic' : 'Join Live Session',
-                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
-                        ),
+                        icon: const Icon(Icons.videocam_rounded, size: 24),
+                        label: const Text('Enable Camera & Mic',
+                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
                       ),
                     ],
                   ),
@@ -1360,16 +859,8 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
                 child: Row(children: [
                   const Text('✋', style: TextStyle(fontSize: 16)),
                   const SizedBox(width: 8),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text('${_raisedHands.length} hand(s) raised',
-                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 13)),
-                      Text(_raisedHands.join(', '),
-                          style: const TextStyle(color: Colors.white, fontSize: 12)),
-                    ],
-                  ),
+                  Text('${_raisedHands.length} hand(s) raised',
+                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
                 ]),
               ),
             ),
@@ -1386,67 +877,22 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
       );
     }
 
-    // ── Mobile-only layout (non-web) ────────────────────────────────────────
-    // The local camera preview is placed on its OWN isolated Positioned layer
-    // inside this Stack — it is NEVER part of the remote-participants branch.
-    // When screen-sharing toggles, only the remote area branch re-renders;
-    // the local preview widget retains its identity because:
-    //   1. It lives at a fixed Stack slot (always the last non-conditional child)
-    //   2. It carries a const ValueKey that survives every setState
-    //   3. lmsGetLocalVideoWidget() reuses _localController (cached in stub)
-    //      so the underlying AgoraVideoView/SurfaceTexture is never torn down
-    //      during a layout change triggered by _screenSharing toggling.
-    //
-    // Remote branches are mutually exclusive via KeyedSubtree — Flutter must
-    // fully dispose + recreate whichever branch changes, preventing any
-    // Element from being silently reused for a different uid (which is what
-    // caused the local preview to visually "bleed" into a remote tile slot).
-
     return Stack(
       children: [
-        // ── Remote area (ALL remote-uid branches) ───────────────────────
-        // Local uid (0 / self) is NEVER present in _remoteUids, so none of
-        // these branches can ever include the local preview stream.
-        if (_remoteUids.isEmpty)
-          // No remote users — show self full-screen as the main content
-          KeyedSubtree(
-            key: const ValueKey('mobile-video-no-remote'),
-            child: _buildSelfVideoTile(isLarge: true),
-          )
-        else if (_remoteUids.length == 1)
-          // One remote participant — show their stream full-screen
-          KeyedSubtree(
-            key: ValueKey('mobile-video-single-remote-${_remoteUids[0]}'),
-            child: SizedBox.expand(
-              child: _buildRemoteVideoTile(
-                _remoteUids[0],
-                key: ValueKey('remote-tile-${_remoteUids[0]}'),
-              ),
-            ),
-          )
-        else
-          // Multiple remote participants — responsive grid
-          KeyedSubtree(
-            key: ValueKey('mobile-video-grid-${_remoteUids.length}'),
-            child: _buildVideoGrid(),
-          ),
+        // Video grid (mobile / fallback)
+        _remoteUids.isEmpty
+            ? _buildSelfVideoTile(isLarge: true)
+            : _buildVideoGrid(),
 
-        // ── LOCAL PREVIEW — completely decoupled from remote area ────────
-        // This Positioned widget lives on a separate Stack layer that is
-        // always present whenever there are remote users. Its const key
-        // guarantees Flutter never confuses it with any remote tile element,
-        // regardless of how many times _screenSharing, _remoteUids, or any
-        // other state variable changes. It is intentionally placed AFTER all
-        // remote branches in the children list so it paints on top.
+        // Self preview (small, when others present)
         if (_remoteUids.isNotEmpty)
           Positioned(
-            key: const ValueKey('mobile-local-preview-float'),
             right: 12,
             bottom: 12,
             child: _buildSelfVideoTile(isLarge: false),
           ),
 
-        // ── Raised-hand notification banner ─────────────────────────────
+        // Raised hand notifications
         if (_raisedHands.isNotEmpty)
           Positioned(
             top: 12,
@@ -1460,16 +906,8 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
               child: Row(children: [
                 const Text('✋', style: TextStyle(fontSize: 16)),
                 const SizedBox(width: 8),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text('${_raisedHands.length} hand(s) raised',
-                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 13)),
-                    Text(_raisedHands.join(', '),
-                        style: const TextStyle(color: Colors.white, fontSize: 12)),
-                  ],
-                ),
+                Text('${_raisedHands.length} hand(s) raised',
+                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
               ]),
             ),
           ),
@@ -1478,34 +916,17 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
   }
 
   Widget _buildVideoGrid() {
-    // Build a copy of remote UIDs for this render pass. This list must
-    // ONLY contain remote UIDs — the local user (uid=0) is never in
-    // _remoteUids, but we filter defensively here as well.
-    final remoteOnly = _remoteUids.where((uid) => uid != 0).toList();
-    final count = remoteOnly.length;
-    final cols = count <= 4 ? 2 : count <= 9 ? 3 : count <= 16 ? 4 : 5;
-
     return GridView.builder(
       padding: const EdgeInsets.all(8),
       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: cols,
+        crossAxisCount: _remoteUids.length <= 1 ? 2 : _remoteUids.length <= 3 ? 2 : 3,
         crossAxisSpacing: 8,
         mainAxisSpacing: 8,
-        childAspectRatio: 4 / 3,
+        childAspectRatio: 16 / 9,
       ),
-      itemCount: remoteOnly.length,
-      // Strict per-uid ValueKey: Flutter must create/dispose a distinct
-      // Element (and native Agora SurfaceTexture) per participant instead
-      // of reusing one across different uids when the list reorders. This
-      // is the primary guard against two participants' feeds appearing in
-      // the same tile slot during a layout transition (e.g. screen-share
-      // toggle changing participant count or grid column count).
+      itemCount: _remoteUids.length,
       itemBuilder: (context, i) {
-        final uid = remoteOnly[i];
-        return _buildRemoteVideoTile(
-          uid,
-          key: ValueKey('grid-remote-tile-$uid'),
-        );
+        return _buildRemoteVideoTile(_remoteUids[i]);
       },
     );
   }
@@ -1519,24 +940,13 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
         borderRadius: BorderRadius.circular(isLarge ? 0 : 8),
         border: isLarge ? null : Border.all(color: Colors.white24, width: 1),
       ),
-      clipBehavior: Clip.antiAlias,
       child: Stack(
         fit: StackFit.expand,
         children: [
           if (kIsWeb && _cameraOn && _cameraViewName != null)
             HtmlElementView(viewType: _cameraViewName!)
           else if (!kIsWeb && _cameraOn)
-            RepaintBoundary(
-              // Immutable key: this widget's identity must survive every
-              // setState, including screen-sharing state transitions, so the
-              // underlying AgoraVideoView (and its native SurfaceTexture) is
-              // never torn down or confused with a remote participant's tile.
-              key: const ValueKey('mobile-local-self-repaint'),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(isLarge ? 0 : 8),
-                child: lmsGetLocalVideoWidget(_cameraViewName),
-              ),
-            )
+            lmsGetLocalVideoWidget(_cameraViewName)
           else
             Center(
               child: Column(
@@ -1590,68 +1000,29 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
     );
   }
 
-  Widget _buildRemoteVideoTile(int uid, {Key? key}) {
-    // Resolve participant name via the real userId->agoraUid mapping (see
-    // _userIdToAgoraUid / set-my-uid) — NOT by position in the remote-UID
-    // list, which silently mislabeled tiles whenever Agora's join order
-    // didn't match the backend participants list's order (it usually
-    // doesn't, since Agora assigns uids randomly and independently).
-    final remoteParticipants = _participants
-        .where((p) => p['id'] != _currentUserId)
-        .toList();
-    final matchedParticipant = remoteParticipants.cast<Map<String, dynamic>?>().firstWhere(
-          (p) => _userIdToAgoraUid[p?['id']?.toString() ?? ''] == uid.toString(),
-          orElse: () => null,
-        );
-    final participantName = matchedParticipant != null
-        ? (matchedParticipant['name']?.toString() ?? 'Student')
-        : (widget.isInstructor
-            ? 'Student'
-            : (_instructorName.isNotEmpty ? _instructorName : 'Instructor'));
-
+  Widget _buildRemoteVideoTile(int uid) {
     return Container(
-      key: key,
       decoration: BoxDecoration(
         color: const Color(0xFF2D3748),
         borderRadius: BorderRadius.circular(8),
       ),
-      // clipBehavior + the RepaintBoundary/ClipRRect around the native Agora
-      // view below give each tile its own compositing layer with a hard
-      // clip. Without this, when the grid relayouts fast (e.g. the instant
-      // the instructor starts/stops screen-share, which changes the tile
-      // count/positions on mobile), two native SurfaceTexture layers can
-      // briefly paint at overlapping screen positions before the platform
-      // view catches up — visually looking like two participants' video
-      // feeds crammed into one box.
-      clipBehavior: Clip.antiAlias,
       child: Stack(
         fit: StackFit.expand,
         children: [
           if (!kIsWeb)
-            RepaintBoundary(
-              // Per-uid immutable key — ensures the compositing layer for
-              // this participant's native SurfaceTexture is never shared
-              // with or reused for a different participant's tile, even
-              // during fast layout transitions (e.g. screen-share toggle
-              // that changes grid geometry).
-              key: ValueKey('mobile-remote-repaint-$uid'),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: lmsGetRemoteVideoWidget(uid, 'lms_${widget.courseId}'),
-              ),
-            )
+            lmsGetRemoteVideoWidget(uid, 'lms_${widget.courseId}')
           else
-            // Web video is rendered inside lms-grid-container by JS —
-            // this tile is only shown on mobile; web uses HtmlElementView grid.
             Center(
-              child: CircleAvatar(
-                radius: 30,
-                backgroundColor: Colors.blueGrey,
-                child: Text(
-                  participantName.isNotEmpty ? participantName[0].toUpperCase() : '?',
-                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
+              child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                CircleAvatar(
+                  radius: 30,
+                  backgroundColor: Colors.blueGrey,
+                  child: Text('${uid % 100}',
+                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
                 ),
-              ),
+                const SizedBox(height: 8),
+                const Text('Participant', style: TextStyle(color: Colors.white70, fontSize: 12)),
+              ]),
             ),
           Positioned(
             bottom: 6,
@@ -1659,10 +1030,10 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
               decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(4)),
-              child: Row(mainAxisSize: MainAxisSize.min, children: [
-                const Icon(Icons.mic_rounded, size: 12, color: Colors.white),
-                const SizedBox(width: 4),
-                Text(participantName, style: const TextStyle(color: Colors.white, fontSize: 11)),
+              child: const Row(mainAxisSize: MainAxisSize.min, children: [
+                Icon(Icons.mic_rounded, size: 12, color: Colors.white),
+                SizedBox(width: 4),
+                Text('Student', style: TextStyle(color: Colors.white, fontSize: 11)),
               ]),
             ),
           ),
@@ -1671,34 +1042,22 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
     );
   }
 
-  Widget _buildSidePanel({bool showCloseButton = false, bool fullWidth = false}) {
+  Widget _buildSidePanel() {
     return Container(
-      width: fullWidth ? double.infinity : 300,
+      width: 300,
       color: const Color(0xFF252D3D),
       child: Column(
         children: [
           // Panel tabs
-          Row(
-            children: [
-              Expanded(
-                child: TabBar(
-                  controller: _panelTab,
-                  indicatorColor: AppColors.primaryColor,
-                  labelColor: Colors.white,
-                  unselectedLabelColor: Colors.white54,
-                  tabs: const [
-                    Tab(text: 'Chat'),
-                    Tab(text: 'People'),
-                    Tab(text: 'Polls'),
-                  ],
-                ),
-              ),
-              if (showCloseButton)
-                IconButton(
-                  icon: const Icon(Icons.close_rounded, color: Colors.white70, size: 22),
-                  tooltip: 'Close',
-                  onPressed: () => setState(() { _chatOpen = false; _participantsOpen = false; }),
-                ),
+          TabBar(
+            controller: _panelTab,
+            indicatorColor: AppColors.primaryColor,
+            labelColor: Colors.white,
+            unselectedLabelColor: Colors.white54,
+            tabs: const [
+              Tab(text: 'Chat'),
+              Tab(text: 'People'),
+              Tab(text: 'Polls'),
             ],
           ),
           Expanded(
@@ -2095,208 +1454,185 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
     );
   }
 
-  /// Floating consultation-style controls over the bottom of the video:
-  /// a row of translucent pill buttons (Chat, People, Polls, Whiteboard,
-  /// Raise Hand) above the main circular buttons (mic, camera, screen
-  /// share, red End) — same visual language as the doctor↔patient call.
-  Widget _buildFloatingControls() {
+  Widget _buildBottomBar() {
     final isMobile = MediaQuery.of(context).size.width < 600;
 
-    final pillButtons = <Widget>[
-      _pillBtn(
-        icon: Icons.chat_bubble_outline_rounded,
-        label: 'Chat',
-        active: _chatOpen && !_participantsOpen,
-        badge: _chatMessages.isNotEmpty ? '${_chatMessages.length}' : null,
-        onTap: () {
-          setState(() {
-            _chatOpen = !_chatOpen;
-            _participantsOpen = false;
-            if (_chatOpen) _panelTab.animateTo(0);
-          });
-          if (kIsWeb) lmsSetPanelWidth(_chatOpen);
-        },
-      ),
-      _pillBtn(
-        icon: Icons.people_rounded,
-        label: 'People',
-        active: _participantsOpen,
-        onTap: () {
-          setState(() {
-            _participantsOpen = !_participantsOpen;
-            _chatOpen = _participantsOpen;
-            if (_participantsOpen) _panelTab.animateTo(1);
-          });
-          if (kIsWeb) lmsSetPanelWidth(_participantsOpen);
-        },
-      ),
-      if (widget.isInstructor)
-        _pillBtn(
-          icon: Icons.poll_rounded,
-          label: 'Polls',
-          active: false,
-          onTap: () {
-            setState(() {
-              _chatOpen = true;
-              _participantsOpen = false;
-              _panelTab.animateTo(2);
-            });
-            if (kIsWeb) lmsSetPanelWidth(true);
-          },
+    final micBtn = _controlBtn(
+      icon: _micOn ? Icons.mic_rounded : Icons.mic_off_rounded,
+      label: _micOn ? 'Mute' : 'Unmute',
+      color: _micOn ? Colors.white : Colors.red,
+      onTap: _toggleMic,
+    );
+    final camBtn = _controlBtn(
+      icon: _cameraOn ? Icons.videocam_rounded : Icons.videocam_off_rounded,
+      label: _cameraOn ? 'Stop Video' : 'Start Video',
+      color: _cameraOn ? Colors.white : Colors.red,
+      onTap: _toggleCamera,
+    );
+    final chatBtn = _controlBtn(
+      icon: Icons.chat_bubble_outline_rounded,
+      label: 'Chat',
+      color: _chatOpen ? AppColors.primaryColor : Colors.white,
+      onTap: () {
+        setState(() {
+          _chatOpen = !_chatOpen;
+          _participantsOpen = false;
+          if (_chatOpen) _panelTab.animateTo(0);
+        });
+        if (kIsWeb) lmsSetPanelWidth(_chatOpen);
+      },
+      badge: _chatMessages.isNotEmpty ? '${_chatMessages.length}' : null,
+    );
+    final peopleBtn = _controlBtn(
+      icon: Icons.people_rounded,
+      label: 'People',
+      color: _participantsOpen ? AppColors.primaryColor : Colors.white,
+      onTap: () {
+        setState(() {
+          _participantsOpen = !_participantsOpen;
+          _chatOpen = _participantsOpen;
+          if (_participantsOpen) _panelTab.animateTo(1);
+        });
+        if (kIsWeb) lmsSetPanelWidth(_participantsOpen);
+      },
+    );
+    final handBtn = !widget.isInstructor
+        ? _controlBtn(
+            icon: Icons.back_hand_rounded,
+            label: _handRaised ? 'Lower Hand' : 'Raise Hand',
+            color: _handRaised ? Colors.amber : Colors.white,
+            onTap: _toggleHand,
+          )
+        : null;
+    final pollsBtn = widget.isInstructor
+        ? _controlBtn(
+            icon: Icons.poll_rounded,
+            label: 'Polls',
+            color: Colors.white,
+            onTap: () {
+              setState(() {
+                _chatOpen = true;
+                _participantsOpen = false;
+                _panelTab.animateTo(2);
+              });
+              if (kIsWeb) lmsSetPanelWidth(true);
+            },
+          )
+        : null;
+    final endBtn = GestureDetector(
+      onTap: _endSession,
+      child: Container(
+        padding: EdgeInsets.symmetric(
+          horizontal: isMobile ? 16 : 20,
+          vertical: isMobile ? 8 : 10,
         ),
-      if (!widget.isInstructor)
-        _pillBtn(
-          icon: Icons.back_hand_rounded,
-          label: _handRaised ? 'Lower Hand' : 'Raise Hand',
-          active: _handRaised,
-          onTap: _toggleHand,
+        decoration: BoxDecoration(color: Colors.red, borderRadius: BorderRadius.circular(8)),
+        child: Text(
+          widget.isInstructor ? 'End' : 'Leave',
+          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 14),
         ),
-      _pillBtn(
-        icon: Icons.draw_rounded,
-        label: 'Whiteboard',
-        active: _whiteboardOpen,
-        onTap: () {
-          final next = !_whiteboardOpen;
-          setState(() {
-            _whiteboardOpen = next;
-            if (!next) _wbFullscreen = false;
-          });
-          // Instructor's toggle is synced so students auto-open/close
-          if (widget.isInstructor && _sessionDocId.isNotEmpty) {
-            _lms.updateSession(_sessionDocId, {'whiteboardOpen': next});
-          }
-        },
       ),
-    ];
+    );
 
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Wrap(
-          alignment: WrapAlignment.center,
-          spacing: 8,
-          runSpacing: 6,
-          children: pillButtons,
-        ),
-        const SizedBox(height: 14),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
+    if (isMobile) {
+      // 2-row mobile layout — no overflow
+      return Container(
+        color: const Color(0xFF252D3D),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            _circleBtn(
-              icon: _micOn ? Icons.mic_rounded : Icons.mic_off_rounded,
-              color: _micOn ? Colors.white : Colors.red,
-              bg: Colors.white24,
-              tooltip: _micOn ? 'Mute' : 'Unmute',
-              onTap: _toggleMic,
+            // Row 1: all control buttons
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                micBtn,
+                camBtn,
+                if (handBtn != null) handBtn,
+                chatBtn,
+                peopleBtn,
+                if (pollsBtn != null) pollsBtn,
+              ],
             ),
-            const SizedBox(width: 14),
-            _circleBtn(
-              icon: _cameraOn ? Icons.videocam_rounded : Icons.videocam_off_rounded,
-              color: _cameraOn ? Colors.white : Colors.red,
-              bg: Colors.white24,
-              tooltip: _cameraOn ? 'Stop Video' : 'Start Video',
-              onTap: _toggleCamera,
-            ),
-            if (kIsWeb) ...[
-              const SizedBox(width: 14),
-              _circleBtn(
-                icon: _screenSharing ? Icons.stop_screen_share_rounded : Icons.screen_share_rounded,
-                color: Colors.white,
-                bg: _screenSharing ? Colors.orange : Colors.white24,
-                tooltip: _screenSharing ? 'Stop Share' : 'Share Screen',
-                onTap: _toggleScreenShare,
+            const SizedBox(height: 6),
+            // Row 2: end/leave full-width
+            SizedBox(
+              width: double.infinity,
+              child: GestureDetector(
+                onTap: _endSession,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  decoration: BoxDecoration(color: Colors.red, borderRadius: BorderRadius.circular(8)),
+                  child: Center(
+                    child: Text(
+                      widget.isInstructor ? 'End Session for All' : 'Leave Session',
+                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 14),
+                    ),
+                  ),
+                ),
               ),
-            ],
-            const SizedBox(width: 14),
-            _circleBtn(
-              icon: Icons.call_end_rounded,
-              color: Colors.white,
-              bg: Colors.red,
-              size: isMobile ? 56 : 62,
-              tooltip: widget.isInstructor ? 'End Session for All' : 'Leave Session',
-              onTap: _endSession,
             ),
           ],
         ),
-      ],
-    );
-  }
+      );
+    }
 
-  Widget _circleBtn({
-    required IconData icon,
-    required Color color,
-    required Color bg,
-    required VoidCallback onTap,
-    double size = 48,
-    String? tooltip,
-  }) {
-    return Tooltip(
-      message: tooltip ?? '',
-      child: GestureDetector(
-        onTap: onTap,
-        child: Container(
-          width: size,
-          height: size,
-          decoration: BoxDecoration(color: bg, shape: BoxShape.circle),
-          child: Icon(icon, color: color, size: size * 0.45),
-        ),
+    // Desktop / tablet: original single-row layout
+    return Container(
+      height: 70,
+      color: const Color(0xFF252D3D),
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          micBtn,
+          const SizedBox(width: 8),
+          camBtn,
+          const SizedBox(width: 8),
+          if (handBtn != null) ...[handBtn, const SizedBox(width: 8)],
+          chatBtn,
+          const SizedBox(width: 8),
+          peopleBtn,
+          const SizedBox(width: 8),
+          if (pollsBtn != null) ...[pollsBtn, const SizedBox(width: 8)],
+          const Spacer(),
+          endBtn,
+        ],
       ),
     );
   }
 
-  Widget _pillBtn({
+  Widget _controlBtn({
     required IconData icon,
     required String label,
-    required bool active,
+    required Color color,
     required VoidCallback onTap,
     String? badge,
   }) {
     return GestureDetector(
       onTap: onTap,
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-            decoration: BoxDecoration(
-              color: active
-                  ? AppColors.primaryColor.withValues(alpha: 0.35)
-                  : Colors.black45,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(
-                color: active ? AppColors.primaryColor : Colors.transparent,
-              ),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(icon, color: active ? Colors.white : Colors.white70, size: 16),
-                const SizedBox(width: 6),
-                Text(label,
-                    style: TextStyle(
-                        color: active ? Colors.white : Colors.white70,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600)),
-              ],
-            ),
-          ),
-          if (badge != null)
-            Positioned(
-              top: -6,
-              right: -6,
-              child: Container(
-                padding: const EdgeInsets.all(4),
-                decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
-                constraints: const BoxConstraints(minWidth: 18, minHeight: 18),
-                child: Center(
-                  child: Text(
-                    badge,
-                    style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w700),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+          Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Icon(icon, color: color, size: 22),
+              if (badge != null)
+                Positioned(
+                  top: -6,
+                  right: -6,
+                  child: Container(
+                    padding: const EdgeInsets.all(3),
+                    decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
+                    child: Text(badge, style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w700)),
                   ),
                 ),
-              ),
-            ),
-        ],
+            ],
+          ),
+          const SizedBox(height: 2),
+          Text(label, style: TextStyle(color: color.withValues(alpha: 0.8), fontSize: 10)),
+        ]),
       ),
     );
   }
