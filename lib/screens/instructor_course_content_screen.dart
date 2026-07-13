@@ -1,4 +1,5 @@
-﻿import 'package:flutter/material.dart';
+﻿import 'dart:convert';
+import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:dio/dio.dart';
 import 'package:icare/screens/certificate_templates_screen.dart';
@@ -111,6 +112,9 @@ class InstructorCourseContentScreenState extends State<InstructorCourseContentSc
       final modules = List<Map<String, dynamic>>.from(_course?['modules'] ?? []);
       modules.add(result);
 
+      // Optimistic update so the new module appears immediately in the UI
+      if (mounted) setState(() { _course = { ...?_course, 'modules': modules }; });
+
       try {
         await _lmsService.updateCourse(widget.courseId, {'modules': modules});
         _loadCourse();
@@ -138,6 +142,11 @@ class InstructorCourseContentScreenState extends State<InstructorCourseContentSc
 
     if (result != null) {
       modules[index] = result;
+
+      // Optimistic update — lesson tiles immediately reflect the new documentUrl/videoUrl
+      // so the instructor can preview the uploaded content without waiting for _loadCourse.
+      if (mounted) setState(() { _course = { ...?_course, 'modules': modules }; });
+
       try {
         await _lmsService.updateCourse(widget.courseId, {'modules': modules});
         _loadCourse();
@@ -1894,63 +1903,116 @@ class _LessonDialogState extends State<_LessonDialog> {
     }
   }
 
+  // Returns MIME type for common document extensions
+  String _docContentType(String filename) {
+    final ext = filename.split('.').last.toLowerCase();
+    return const {
+      'pdf':  'application/pdf',
+      'doc':  'application/msword',
+      'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'ppt':  'application/vnd.ms-powerpoint',
+      'pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+      'xls':  'application/vnd.ms-excel',
+      'xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'txt':  'text/plain',
+    }[ext] ?? 'application/octet-stream';
+  }
+
+  // Extracts the Vercel Blob store ID from a client token (JWT payload → payload.storeId).
+  String? _extractBlobStoreId(String clientToken) {
+    try {
+      final parts = clientToken.split('.');
+      if (parts.length < 2) return null;
+      String padded = parts[1].replaceAll('-', '+').replaceAll('_', '/');
+      while (padded.length % 4 != 0) { padded += '='; }
+      final decoded = jsonDecode(utf8.decode(base64Decode(padded))) as Map<String, dynamic>;
+      return decoded['payload']?['storeId']?.toString();
+    } catch (_) {
+      return null;
+    }
+  }
+
   Future<void> _uploadDocument() async {
     try {
-      final result = await FilePicker.platform.pickFiles(
+      final picked = await FilePicker.platform.pickFiles(
         type: FileType.custom,
         allowedExtensions: ['pdf', 'doc', 'docx', 'ppt', 'pptx', 'xls', 'xlsx', 'txt'],
         allowMultiple: false,
         withData: true,
       );
-      if (result == null || result.files.isEmpty) return;
-      final file = result.files.first;
+      if (picked == null || picked.files.isEmpty) return;
+      final file = picked.files.first;
       if (file.bytes == null) return;
 
       setState(() { _uploadingDocument = true; _uploadDocProgress = 0; });
 
-      // Use Cloudinary raw upload (same pattern as video) — bypasses Vercel's 4.5MB
-      // body limit and avoids any Vercel Blob configuration dependency.
-      final signRes = await ApiService().get('/upload/sign?folder=icare/lesson-docs&resource_type=raw');
-      final signature = signRes.data['signature']?.toString() ?? '';
-      final timestamp = signRes.data['timestamp']?.toString() ?? '';
-      final apiKey = signRes.data['api_key']?.toString() ?? '';
-      final cloudName = signRes.data['cloud_name']?.toString() ?? 'dzlcnyxgb';
-      final folder = signRes.data['folder']?.toString() ?? 'icare/lesson-docs';
+      final safeName = file.name.replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '_');
+      final pathname = 'lesson-docs/$safeName';
+      final contentType = _docContentType(file.name);
 
-      if (signature.isEmpty) throw Exception('Could not get upload signature from server');
-
-      final dio2 = Dio();
-      final formData = FormData.fromMap({
-        'file': MultipartFile.fromBytes(file.bytes!, filename: file.name),
-        'signature': signature,
-        'timestamp': timestamp,
-        'api_key': apiKey,
-        'folder': folder,
+      // ── Step 1: Get a short-lived Vercel Blob client token from our backend ──
+      final tokenRes = await ApiService().post('/upload/blob-handle', {
+        'type': 'blob.generate-client-token',
+        'payload': {
+          'pathname': pathname,
+          'callbackUrl': 'https://icare-backend-inky.vercel.app/api/upload/blob-handle',
+          'multipart': false,
+        },
       });
-      final response = await dio2.post(
-        'https://api.cloudinary.com/v1_1/$cloudName/raw/upload',
-        data: formData,
-        options: Options(validateStatus: (s) => s != null && s < 600),
+      final clientToken = tokenRes.data['clientToken']?.toString() ?? '';
+      if (clientToken.isEmpty) throw Exception('Could not get upload token from server');
+
+      // ── Step 2: PUT file directly to Vercel Blob API (bypasses 4.5 MB limit) ──
+      final storeId = _extractBlobStoreId(clientToken);
+      final dio2 = Dio();
+      final blobRes = await dio2.put(
+        'https://vercel.com/api/blob/?pathname=${Uri.encodeComponent(pathname)}',
+        data: file.bytes,
+        options: Options(
+          headers: {
+            'Authorization': 'Bearer $clientToken',
+            if (storeId != null) 'x-vercel-blob-store-id': storeId,
+            'x-api-version': '12',
+            'content-length': '${file.bytes!.length}',
+          },
+          contentType: contentType,
+          validateStatus: (s) => s != null && s < 600,
+        ),
         onSendProgress: (sent, total) {
           if (total > 0 && mounted) setState(() => _uploadDocProgress = sent / total);
         },
       );
 
-      if (response.statusCode == 200 && response.data['secure_url'] != null) {
-        setState(() {
-          _documentUrl = response.data['secure_url'] as String;
-          _documentName = file.name;
+      if (blobRes.statusCode != 200) {
+        final msg = blobRes.data is Map
+            ? (blobRes.data['error'] ?? 'Upload failed (${blobRes.statusCode})')
+            : 'Upload failed (${blobRes.statusCode})';
+        throw Exception(msg);
+      }
+
+      final blobUrl = blobRes.data['url']?.toString() ?? blobRes.data['downloadUrl']?.toString() ?? '';
+      if (blobUrl.isEmpty) throw Exception('No URL returned by Vercel Blob');
+
+      setState(() {
+        _documentUrl = blobUrl;
+        _documentName = file.name;
+      });
+
+      // ── Step 3: Notify backend that upload completed (best-effort) ──
+      try {
+        await ApiService().post('/upload/blob-handle', {
+          'type': 'blob.upload-completed',
+          'payload': {
+            'blob': { 'url': blobUrl, 'pathname': pathname },
+            'tokenPayload': null,
+          },
         });
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('✅ Document uploaded successfully!'), backgroundColor: Colors.green),
-          );
-        }
-      } else {
-        final errMsg = response.data is Map
-            ? (response.data['error']?['message'] ?? response.data['message'] ?? 'Upload failed (${response.statusCode})')
-            : 'Upload failed (${response.statusCode})';
-        throw Exception(errMsg);
+      } catch (_) {}
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('✅ Document uploaded successfully!'), backgroundColor: Colors.green),
+        );
       }
     } catch (e) {
       if (mounted) {
@@ -2401,21 +2463,25 @@ class _LessonPreviewScreen extends StatelessWidget {
             tooltip: 'Close',
             onPressed: () => Navigator.pop(context),
           ),
-          title: Text(title,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 16)),
-          actions: [
-            Container(
-              margin: const EdgeInsets.only(right: 12),
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.2),
-                borderRadius: BorderRadius.circular(20),
+          title: Row(
+            children: [
+              Expanded(
+                child: Text(title,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 16)),
               ),
-              child: Text(typeLabel,
-                  style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600)),
-            ),
-          ],
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(typeLabel,
+                    style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600)),
+              ),
+            ],
+          ),
         ),
         body: SingleChildScrollView(
           child: Column(

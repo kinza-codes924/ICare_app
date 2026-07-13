@@ -21,8 +21,8 @@ class _DocPreviewDialogState extends State<DocPreviewDialog> {
     super.initState();
     _viewId = 'doc-preview-${DateTime.now().microsecondsSinceEpoch}';
     ui_web.platformViewRegistry.registerViewFactory(_viewId, (int id) {
-      // blob-download proxy and direct URLs → Chrome's built-in PDF viewer (direct iframe).
-      // doc-stream proxy (Cloudinary, unreliable) → Google Docs Viewer as fallback.
+      // Public Vercel Blob and blob-download proxy → direct iframe (Chrome built-in viewer).
+      // Cloudinary doc-stream proxy → Google Docs Viewer (Cloudinary CDN isn't iframe-friendly).
       final useGoogleViewer = widget.proxyUrl.contains('doc-stream');
       final src = useGoogleViewer
           ? 'https://docs.google.com/viewer?url=${Uri.encodeComponent(widget.proxyUrl)}&embedded=true'

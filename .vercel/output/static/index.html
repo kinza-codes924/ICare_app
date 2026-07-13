@@ -45,8 +45,13 @@
       object-fit: cover; display: block;
     }
     /* LMS multi-participant grid tiles */
-    #lms-grid-container { display: grid; grid-template-columns: 1fr; gap: 4px; padding: 4px; box-sizing: border-box; width: 100%; height: 100%; }
-    .lms-remote-tile { position: relative; background: #1a2234; border-radius: 8px; overflow: hidden; min-height: 80px; }
+    /* The actual track sizes (columns/rows, in exact pixels) are computed
+       by _lmsUpdateGridLayout in JS — Google Meet style: the largest 16:9
+       tile that fits for the current participant count, centered. These
+       CSS values are only the pre-layout fallback. No min-height: it would
+       fight the computed row height and reintroduce overflow. */
+    #lms-grid-container { display: grid; grid-template-columns: 1fr; grid-auto-rows: 1fr; gap: 4px; padding: 4px; box-sizing: border-box; width: 100%; height: 100%; overflow-y: auto; }
+    .lms-remote-tile { position: relative; background: #1a2234; border-radius: 8px; overflow: hidden; }
     .lms-remote-tile > div { position: absolute !important; inset: 0; }
     .lms-remote-tile video {
       position: absolute !important; inset: 0;
@@ -57,6 +62,156 @@
       position: absolute; bottom: 6px; left: 6px;
       background: rgba(0,0,0,0.6); color: #fff; font-size: 12px; font-weight: 600;
       padding: 2px 8px; border-radius: 4px; z-index: 10; pointer-events: none;
+      max-width: calc(100% - 12px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    /* The local self-preview box is much smaller than a grid tile (clamp()
+       84-130px wide) — the standard 12px/8px padded label would overflow
+       or dominate it, so scale the label down specifically inside that box. */
+    #lms-agora-local .lms-tile-name {
+      font-size: 9px; padding: 1px 5px; bottom: 3px; left: 3px;
+    }
+    /* While a spotlight/share layout is active, the participant sidebar
+       occupies the top-right region — the self-preview normally pinned
+       there would float ON TOP of the sidebar tiles and make them look
+       misaligned/unequal (exactly the client's screenshot). Move it to
+       the bottom-left corner of the share area for the duration. */
+    /* Desktop only (matches the >=900px + pointer:fine gate the spotlight
+       sidebar itself uses below): move the self-preview to the bottom-left
+       of the spotlight tile, since the participant strip is a RIGHT column
+       there and the bottom-left is clear.
+       On mobile/narrow viewports this rule must NOT apply — the spotlight
+       thumbnail strip is a BOTTOM row there (order:1, see below), and
+       bottom:8px/left:8px would land the self-preview directly on top of
+       whichever remote student's tile is first in that row (this is
+       exactly what the client's screenshots showed: their own small
+       preview box visually fused with a random student's tile the instant
+       screen-share started). Leaving #lms-agora-local at its default
+       top-right placement keeps it clear of the strip on mobile. */
+    @media (min-width: 900px) and (pointer: fine) {
+      #lms-jitsi-host:has(#lms-grid-container.lms-spotlight-active) #lms-agora-local {
+        top: auto !important;
+        bottom: 8px !important;
+        left: 8px !important;
+        right: auto !important;
+      }
+    }
+    /* Meet-style expand hint on the big share/spotlight tile — tapping the
+       tile toggles 90/10 "fullscreen". The glyph is purely visual
+       (pointer-events:none); the actual tap is handled by Flutter's
+       coordinate hit-test into lmsToggleTileExpand. */
+    #lms-grid-container.lms-spotlight-active .lms-spotlight-tile::after {
+      content: '⛶';
+      position: absolute; top: 8px; right: 8px;
+      color: #fff; background: rgba(0,0,0,0.55);
+      border-radius: 6px; padding: 2px 9px;
+      font-size: 17px; line-height: 1.4;
+      z-index: 11; pointer-events: none;
+    }
+    /* Screen-share spotlight (Google Meet style): the sharing participant's
+       EXISTING tile grows to fill nearly the whole area; every other
+       participant keeps a fixed-size tile in a SCROLLABLE strip — never
+       shrunk to the point of disappearing, and never clipped by the
+       container regardless of headcount (5, 15, 20+ students all stay
+       reachable via scroll). Deliberately reuses the same tile <div> that's
+       already playing video the whole time (just resized via CSS/class
+       toggle) instead of moving video into a new container — an earlier
+       "big main view" attempt did that (played the track into a separate,
+       previously-hidden element) and caused blank/stuck shared screens.
+       #lms-grid-container carries inline display:grid set once from Dart,
+       so overriding it needs !important same as the rest of this
+       stylesheet's grid overrides.
+
+       Layout direction: mobile/narrow viewports stack the strip BELOW the
+       main content (matches how people naturally hold/scroll a phone);
+       desktop-width viewports (>=900px) instead put the strip as a RIGHT
+       COLUMN next to the shared screen — the "Main Area (Left/Center) +
+       Participant Sidebar (Right Column on Desktop)" arrangement. */
+    #lms-grid-container.lms-spotlight-active {
+      display: flex !important;
+      flex-direction: column !important;
+      overflow: hidden !important;
+    }
+    #lms-grid-container.lms-spotlight-active .lms-remote-tile {
+      aspect-ratio: auto !important;
+    }
+    /* Main (spotlight) tile: on phones it takes all the height left over
+       by the fixed thumbnail strip below (~75-80%); on desktop the media
+       query below pins the client-specified 70/30 side-by-side split.
+       The .lms-ratio-90 modifier (manually expanding a tile by clicking
+       it) gives it 90/10 — "full screen" that still keeps people
+       visible alongside, per the client's Meet reference. */
+    #lms-grid-container.lms-spotlight-active .lms-spotlight-tile {
+      flex: 1 1 auto !important;
+      order: -1 !important;
+      min-height: 0 !important;
+      width: 100% !important;
+    }
+    /* Thumbnail strip (mobile/narrow default): a FIXED-height, neat,
+       horizontally scrollable row of video-shaped thumbnails — a
+       percentage height here made the strip absurdly tall on phones
+       (30% of a portrait screen) with stretched, distorted tiles.
+       Overridden below by the pointer:fine+wide media query for the
+       desktop right-sidebar arrangement — this block MUST come first so
+       the media query (same specificity) wins per cascade order. */
+    #lms-grid-container.lms-spotlight-active .lms-thumbnail-strip {
+      order: 1 !important;
+      flex: 0 0 clamp(90px, 16vh, 140px) !important;
+      display: flex !important;
+      flex-direction: row !important;
+      gap: 4px !important;
+      overflow-x: auto !important;
+      overflow-y: hidden !important;
+      padding-top: 4px !important;
+      min-height: 0 !important;
+    }
+    #lms-grid-container.lms-spotlight-active.lms-ratio-90 .lms-thumbnail-strip {
+      flex: 0 0 clamp(64px, 10vh, 96px) !important;
+    }
+    #lms-grid-container.lms-spotlight-active .lms-remote-tile:not(.lms-spotlight-tile) {
+      flex: 0 0 clamp(130px, 36vw, 220px) !important;
+      width: clamp(130px, 36vw, 220px) !important;
+      height: calc(100% - 4px) !important;
+      min-height: 0 !important;
+    }
+    /* Desktop split — gated on pointer:fine so a phone in "Desktop site"
+       mode (wide layout viewport but a touch pointer) still gets the
+       mobile stacked layout: every phone must look the same. */
+    @media (min-width: 900px) and (pointer: fine) {
+      #lms-grid-container.lms-spotlight-active {
+        flex-direction: row !important;
+      }
+      #lms-grid-container.lms-spotlight-active .lms-spotlight-tile {
+        width: auto !important;
+        height: 100% !important;
+      }
+      /* Desktop sidebar: the 30% column holds a WRAPPING 2-across mini
+         grid of proportional tiles (matches the Meet screenshot the client
+         referenced) instead of one narrow single-file column — more people
+         stay visible at once and each tile keeps a sensible video shape. */
+      #lms-grid-container.lms-spotlight-active .lms-thumbnail-strip {
+        flex: 0 0 30% !important; /* the client-specified 70/30 split */
+        flex-direction: row !important;
+        flex-wrap: wrap !important;
+        align-content: flex-start !important;
+        overflow-x: hidden !important;
+        overflow-y: auto !important;
+        padding-top: 0 !important;
+        padding-left: 4px !important;
+      }
+      #lms-grid-container.lms-spotlight-active.lms-ratio-90 .lms-thumbnail-strip {
+        flex: 0 0 10% !important; /* manual expand: 90/10 */
+      }
+      #lms-grid-container.lms-spotlight-active .lms-remote-tile:not(.lms-spotlight-tile) {
+        flex: 0 0 calc(50% - 2px) !important;
+        width: calc(50% - 2px) !important;
+        height: auto !important;
+        aspect-ratio: 16 / 10 !important;
+      }
+      /* In 90/10 the sidebar is too narrow for two columns — stack single file */
+      #lms-grid-container.lms-spotlight-active.lms-ratio-90 .lms-remote-tile:not(.lms-spotlight-tile) {
+        flex: 0 0 100% !important;
+        width: 100% !important;
+      }
     }
   </style>
 </head>
@@ -490,11 +645,16 @@
               console.log('LMS media: remote audio playing uid', u.uid);
             } catch(e) { console.warn('LMS media: remote audio play error:', e.message); }
           }
-          if (u.videoTrack) {
+          // Skip video if lmsPlayIntoTile is already mid-play for this uid
+          // (e.g. this is a late-joiner and the "subscribe to anyone already
+          // in channel" loop just started playing it moments ago) — clearing
+          // and re-playing the same div here would race that in-flight play
+          // and could leave the tile transiently blank.
+          if (u.videoTrack && !(window._lmsPlayInFlight && window._lmsPlayInFlight[u.uid])) {
             try {
               var vd = document.getElementById('lms-tile-' + u.uid + '-video');
               if (!vd) { window._lmsGetOrCreateTile(u.uid); vd = document.getElementById('lms-tile-' + u.uid + '-video'); }
-              if (vd) { vd.innerHTML = ''; u.videoTrack.play(vd.id); }
+              if (vd) { vd.innerHTML = ''; u.videoTrack.play(vd.id, { fit: window._lmsVideoFit || 'cover' }); }
             } catch(_) {}
           }
         });
@@ -530,7 +690,7 @@
           retries = retries || 0;
           var d = document.getElementById('lms-agora-local');
           if (d && window._lmsLocalVideo) {
-            try { window._lmsLocalVideo.play('lms-agora-local'); } catch(_) {}
+            try { window._lmsLocalVideo.play('lms-agora-local', { fit: window._lmsVideoFit || 'cover' }); } catch(_) {}
           } else if (retries < 15) {
             setTimeout(function() { lmsLocalPreview(retries + 1); }, 300);
           }
@@ -569,7 +729,14 @@
       nameEl.id = tileId + '-name';
       nameEl.className = 'lms-tile-name';
       tile.appendChild(nameEl);
-      grid.appendChild(tile);
+      // If a spotlight is already active when a new participant joins, put
+      // their tile straight into the thumbnail strip so it doesn't briefly
+      // render full-size in the spotlight area before the next poll tick.
+      if (grid.classList.contains('lms-spotlight-active')) {
+        window._lmsGetOrCreateThumbStrip(grid).appendChild(tile);
+      } else {
+        grid.appendChild(tile);
+      }
       window._lmsUpdateGridLayout();
       window.dispatchEvent(new CustomEvent('lms-remote-joined', { detail: String(uid) }));
       return tile;
@@ -581,13 +748,83 @@
       window.dispatchEvent(new CustomEvent('lms-remote-left', { detail: String(uid) }));
     };
 
+    // Every grid resize reflows every tile's box size. Agora's internal
+    // <video>/<canvas> element doesn't always pick up on that reflow (it can
+    // be left sized against the pre-reflow box), which is what makes tiles
+    // go blank after a resize. Re-playing each already-subscribed remote
+    // track a beat later forces Agora to re-measure the (now correctly
+    // sized) container. Shared by column-count changes and spotlight
+    // toggling — both resize existing tiles without recreating them.
+    window._lmsReplayGridTiles = function() {
+      setTimeout(function() {
+        if (window._lmsAgoraClient) {
+          window._lmsAgoraClient.remoteUsers.forEach(function(u) {
+            if (!u.videoTrack) return;
+            var vd = document.getElementById('lms-tile-' + u.uid + '-video');
+            if (!vd) return;
+            // A spotlighted SCREEN share must never be cropped — play it
+            // with 'contain' (full content, letterboxed) regardless of the
+            // user's Fit/Fill choice, which only applies to camera tiles.
+            var tile = document.getElementById('lms-tile-' + u.uid);
+            var isShareSpot = window._lmsShareActive && tile && tile.classList.contains('lms-spotlight-tile');
+            try { u.videoTrack.play(vd.id, { fit: isShareSpot ? 'contain' : (window._lmsVideoFit || 'cover') }); } catch(_) {}
+          });
+        }
+        // The sharer's own screen tile isn't a remote user — replay it too
+        if (window._lmsScreenSharing && window._lmsScreenTrack) {
+          var lsd = document.getElementById('lms-tile-local-screen-video');
+          if (lsd) { try { window._lmsScreenTrack.play(lsd.id, { fit: 'contain' }); } catch(_) {} }
+        }
+      }, 120);
+    };
+
+    // Google Meet-style proportional layout: for the current participant
+    // count and container size, try every possible column count and pick
+    // the one that yields the LARGEST 16:9 tile that still fits — then set
+    // exact pixel track sizes and center the whole block. Tiles therefore
+    // shrink smoothly as more people join (5 → big, 50 → small, 100 →
+    // smaller) and always keep a video-shaped aspect instead of stretching
+    // to fill leftover container height.
     window._lmsUpdateGridLayout = function() {
       var grid = document.getElementById('lms-grid-container');
       if (!grid) return;
-      var count = grid.children.length;
-      var cols = count <= 1 ? 1 : count <= 4 ? 2 : 3;
-      grid.style.gridTemplateColumns = 'repeat(' + cols + ', 1fr)';
+      // While a spotlight is active the container is in flex mode (see
+      // .lms-spotlight-active CSS) — the grid inline styles below would be
+      // inert, so just refresh the video elements and bail.
+      if (grid.classList.contains('lms-spotlight-active')) {
+        window._lmsReplayGridTiles();
+        return;
+      }
+      var tiles = grid.querySelectorAll('.lms-remote-tile');
+      var count = tiles.length;
+      if (count === 0) return;
+      var gap = 4, pad = 8; // matches the CSS gap/padding
+      var W = grid.clientWidth - pad, H = grid.clientHeight - pad;
+      if (W <= 0 || H <= 0) return;
+      var AR = 16 / 9;
+      var best = { area: 0, cols: 1, tw: W, th: H };
+      for (var cols = 1; cols <= count; cols++) {
+        var rows = Math.ceil(count / cols);
+        var cellW = (W - gap * (cols - 1)) / cols;
+        var cellH = (H - gap * (rows - 1)) / rows;
+        // Largest 16:9 box that fits in this cell
+        var tw = Math.min(cellW, cellH * AR);
+        var th = tw / AR;
+        if (tw * th > best.area) best = { area: tw * th, cols: cols, tw: tw, th: th };
+      }
+      grid.style.gridTemplateColumns = 'repeat(' + best.cols + ', ' + Math.floor(best.tw) + 'px)';
+      grid.style.gridAutoRows = Math.floor(best.th) + 'px';
+      grid.style.justifyContent = 'center';
+      grid.style.alignContent = 'center';
+      window._lmsReplayGridTiles();
     };
+
+    // Re-run the proportional layout whenever the window resizes — the
+    // pixel-exact track sizes above are only correct for the size they
+    // were computed against.
+    window.addEventListener('resize', function() {
+      try { window._lmsUpdateGridLayout(); } catch(_) {}
+    });
 
     window.lmsSetTileName = function(uid, name) {
       var el = document.getElementById('lms-tile-' + uid + '-name');
@@ -601,6 +838,11 @@
 
     window.lmsAgoraJoin = async function(appId, channel, token, uid, isInstructor) {
       try {
+        // Stashed so lmsToggleScreenShare can open a second client on the
+        // same app/channel for the screen track without re-deriving them.
+        window._lmsJoinAppId = appId;
+        window._lmsJoinChannel = channel;
+
         // Clean up previous session
         if (window._lmsLocalAudio) { try { window._lmsLocalAudio.stop(); window._lmsLocalAudio.close(); } catch(_){} window._lmsLocalAudio = null; }
         if (window._lmsLocalVideo) { try { window._lmsLocalVideo.stop(); window._lmsLocalVideo.close(); } catch(_){} window._lmsLocalVideo = null; }
@@ -621,26 +863,52 @@
 
         window._lmsAgoraClient = AgoraRTC.createClient({ mode: 'rtc', codec: 'vp8' });
 
+        // uids currently mid-play via lmsPlayIntoTile — checked by
+        // _lmsEnsureMediaPublished's own remote-video resume step so the
+        // two don't both clear+replay the same tile div around the same
+        // time (a race that could leave a tile transiently blank right
+        // after join).
+        window._lmsPlayInFlight = window._lmsPlayInFlight || {};
+
         // ── Helper: play remote video into per-UID tile with retry ──────────
-        async function lmsPlayIntoTile(uid, videoTrack, retries) {
+        function lmsPlayIntoTile(uid, videoTrack, retries) {
           retries = retries || 0;
+          window._lmsPlayInFlight[uid] = true;
           var tile = window._lmsGetOrCreateTile(uid);
           var videoDiv = tile ? document.getElementById('lms-tile-' + uid + '-video') : null;
           if (videoDiv) {
             try {
               videoDiv.innerHTML = '';
-              videoTrack.play(videoDiv.id);
+              // Agora's player crops to its OWN internal canvas using this
+              // fit mode — our CSS object-fit override on the outer <video>
+              // element only resizes that already-cropped canvas, it can't
+              // undo the crop. Without passing `fit` here Agora defaults to
+              // 'cover' regardless of the CSS, which is why "Fit" mode still
+              // looked zoomed/cropped instead of showing the full frame.
+              videoTrack.play(videoDiv.id, { fit: window._lmsVideoFit || 'cover' });
               console.log('LMS: remote video playing uid=' + uid + ' (attempt ' + retries + ')');
+              // Verify Agora actually attached a rendering element (canvas/video)
+              // into the tile — under rapid concurrent joins this can silently
+              // no-op. If nothing landed, retry once the DOM has settled.
+              setTimeout(function() {
+                if (videoDiv.childElementCount === 0 && retries < 8) {
+                  lmsPlayIntoTile(uid, videoTrack, retries + 1);
+                } else {
+                  delete window._lmsPlayInFlight[uid];
+                }
+              }, 400);
             } catch(e) {
               console.warn('LMS remote video play error uid=' + uid + ':', e.message);
-              if (retries < 5) setTimeout(function() { lmsPlayIntoTile(uid, videoTrack, retries + 1); }, 500);
+              if (retries < 8) setTimeout(function() { lmsPlayIntoTile(uid, videoTrack, retries + 1); }, 400);
+              else delete window._lmsPlayInFlight[uid];
             }
           } else {
-            if (retries < 20) {
+            if (retries < 30) {
               console.warn('lms-grid-container not ready for uid=' + uid + ', retry ' + retries);
-              setTimeout(function() { lmsPlayIntoTile(uid, videoTrack, retries + 1); }, 300);
+              setTimeout(function() { lmsPlayIntoTile(uid, videoTrack, retries + 1); }, 250);
             } else {
               console.error('lms-grid-container never appeared for uid=' + uid);
+              delete window._lmsPlayInFlight[uid];
             }
           }
         }
@@ -751,8 +1019,36 @@
 
     window._lmsScreenTrack = null;
     window._lmsScreenSharing = false;
+    window._lmsScreenBusy = false;
 
+    // Screen-share plays into the same small self-preview corner box used
+    // for the camera (#lms-agora-local) — it's treated as just another
+    // video source for that slot, not a separate big-view layout. Other
+    // participants see it the same way they see any camera: as a normal
+    // tile in #lms-grid-container via the regular user-published/
+    // lmsPlayIntoTile path, no special-casing needed. This is deliberately
+    // the simple, proven-stable behavior — an earlier "big main view +
+    // sidebar" layout (and, before that, a dual-Agora-client attempt to
+    // keep the camera tile alive during a share) both made screen-sharing
+    // itself unreliable in practice (blank/stuck sharing), so this was
+    // reverted back to what was known to work.
+    //
+    // Reentrancy: this function is reachable from TWO independent triggers
+    // that can fire almost simultaneously — the in-app toggle button AND
+    // the browser's native "Stop sharing" bar (via the track-ended handler
+    // below). Without a busy-guard, two concurrent calls race on the same
+    // mutable globals (_lmsScreenTrack/_lmsScreenSharing/_lmsLocalVideo):
+    // one call's catch-block can null out a track the other call is still
+    // mid-publish with, which is what caused "sometimes the camera vanishes,
+    // sometimes the remote video vanishes" — nondeterministic depending on
+    // how the two promise chains interleaved. A second call while one is
+    // already in flight now just no-ops instead of racing.
     window.lmsToggleScreenShare = async function() {
+      if (window._lmsScreenBusy) {
+        console.log('LMS: screen-share toggle already in progress — ignoring');
+        return window._lmsScreenSharing ? 'screen' : 'camera';
+      }
+      window._lmsScreenBusy = true;
       try {
         if (window._lmsScreenSharing && window._lmsScreenTrack) {
           // Stop screen sharing — switch back to camera
@@ -762,15 +1058,39 @@
           try { window._lmsScreenTrack.stop(); window._lmsScreenTrack.close(); } catch(_) {}
           window._lmsScreenTrack = null;
           window._lmsScreenSharing = false;
+          // Mobile Chrome sometimes force-rotates to landscape while
+          // getDisplayMedia() is capturing and doesn't revert it on its
+          // own — release any orientation lock we took and let the OS
+          // sensor take back over so the page returns to portrait.
+          try {
+            if (screen.orientation && screen.orientation.unlock) screen.orientation.unlock();
+          } catch(_) {}
           // Re-publish camera
           if (window._lmsLocalVideo && window._lmsAgoraClient) {
             try {
               await window._lmsLocalVideo.setEnabled(true);
               await window._lmsAgoraClient.publish([window._lmsLocalVideo]);
               var ld = document.getElementById('lms-agora-local');
-              if (ld) { ld.innerHTML = ''; window._lmsLocalVideo.play('lms-agora-local'); }
+              if (ld) { ld.innerHTML = ''; window._lmsLocalVideo.play('lms-agora-local', { fit: window._lmsVideoFit || 'cover' }); }
             } catch(_) {}
           }
+          // Point the recording back at the live camera track
+          if (window._lmsRebindRecordLocal) { try { window._lmsRebindRecordLocal(); } catch(_) {} }
+          // Tear down the sharer's own 70/30 spotlight: remove the local
+          // screen tile and restore the proportional grid.
+          try {
+            var eGrid = document.getElementById('lms-grid-container');
+            var eTile = document.getElementById('lms-tile-local-screen');
+            if (eTile) eTile.remove();
+            if (eGrid && eGrid.classList.contains('lms-spotlight-active')) {
+              eGrid.classList.remove('lms-spotlight-active');
+              eGrid.classList.remove('lms-ratio-90');
+              var eSpot = eGrid.querySelector('.lms-spotlight-tile');
+              if (eSpot) eSpot.classList.remove('lms-spotlight-tile');
+              window._lmsDissolveThumbStrip(eGrid);
+              window._lmsUpdateGridLayout();
+            }
+          } catch(_) {}
           return 'camera';
         } else {
           // Start screen sharing
@@ -784,6 +1104,15 @@
               optimizationMode: 'detail'
             }
           }, 'disable');
+          // Best-effort: ask to stay in portrait. Only actually works while
+          // fullscreen on most mobile browsers, so this is allowed to fail
+          // silently — the real fix is the unlock() call on stop, above,
+          // which recovers from whatever rotation the capture itself forced.
+          try {
+            if (screen.orientation && screen.orientation.lock) {
+              await screen.orientation.lock('portrait').catch(function(){});
+            }
+          } catch(_) {}
           // Unpublish camera
           if (window._lmsLocalVideo && window._lmsAgoraClient) {
             try { await window._lmsAgoraClient.unpublish([window._lmsLocalVideo]); } catch(_) {}
@@ -793,8 +1122,47 @@
           }
           // Local preview
           var ld2 = document.getElementById('lms-agora-local');
-          if (ld2) { ld2.innerHTML = ''; window._lmsScreenTrack.play('lms-agora-local'); }
+          if (ld2) { ld2.innerHTML = ''; window._lmsScreenTrack.play('lms-agora-local', { fit: window._lmsVideoFit || 'cover' }); }
           window._lmsScreenSharing = true;
+          // Show the sharer THEIR OWN shared screen at the 70/30 split too
+          // (a dedicated grid tile that gets the spotlight), instead of only
+          // the tiny corner preview — without this, the person sharing sees
+          // no layout change at all and assumes screen-share "didn't work",
+          // while every remote participant does get the 70/30 view.
+          try {
+            var sGrid = document.getElementById('lms-grid-container');
+            if (sGrid) {
+              var lt = document.getElementById('lms-tile-local-screen');
+              if (!lt) {
+                lt = document.createElement('div');
+                lt.id = 'lms-tile-local-screen';
+                lt.className = 'lms-remote-tile';
+                var lv = document.createElement('div');
+                lv.id = 'lms-tile-local-screen-video';
+                lt.appendChild(lv);
+                var lname = document.createElement('div');
+                lname.className = 'lms-tile-name';
+                lname.textContent = 'Your screen (presenting)';
+                lt.appendChild(lname);
+              }
+              sGrid.appendChild(lt);
+              sGrid.classList.add('lms-spotlight-active');
+              sGrid.classList.remove('lms-ratio-90');
+              var prevSpot = sGrid.querySelector('.lms-spotlight-tile');
+              if (prevSpot && prevSpot !== lt) prevSpot.classList.remove('lms-spotlight-tile');
+              lt.classList.add('lms-spotlight-tile');
+              var sStrip = window._lmsGetOrCreateThumbStrip(sGrid);
+              Array.prototype.forEach.call(sGrid.querySelectorAll('.lms-remote-tile'), function(t) {
+                if (t !== lt && t.parentElement !== sStrip) sStrip.appendChild(t);
+              });
+              // Screen content must never be cropped — always 'contain'
+              window._lmsScreenTrack.play('lms-tile-local-screen-video', { fit: 'contain' });
+              window._lmsReplayGridTiles();
+            }
+          } catch(_) {}
+          // Point the recording at the live screen track so it captures the
+          // real screen (not a frozen camera frame).
+          if (window._lmsRebindRecordLocal) { try { window._lmsRebindRecordLocal(); } catch(_) {} }
           // If user stops via browser native UI button
           window._lmsScreenTrack.on('track-ended', async function() {
             if (window._lmsScreenSharing) {
@@ -809,7 +1177,163 @@
         window._lmsScreenSharing = false;
         window._lmsScreenTrack = null;
         return 'error:' + (e.message || String(e));
+      } finally {
+        window._lmsScreenBusy = false;
       }
+    };
+
+    window.lmsGetLocalUid = function() {
+      return window._lmsAgoraClient ? String(window._lmsAgoraClient.uid || '') : '';
+    };
+
+    // Called on Dart's 2s poll cycle with the session's current
+    // screenSharingUid (or '' if nobody is sharing). If that uid has an
+    // existing grid tile, enlarge it into a spotlight view via CSS classes
+    // — the tile keeps playing the same video it already was, nothing is
+    // moved or replayed into a new container, which is what made the
+    // earlier big-view layout unreliable (see .lms-spotlight-active above).
+    // Moves every non-spotlight .lms-remote-tile into a single scrollable
+    // strip <div> so they lay out as a horizontal row (see .lms-thumbnail-strip
+    // CSS) instead of overflowing the container vertically and running off
+    // screen once there are more than a couple of participants.
+    window._lmsGetOrCreateThumbStrip = function(grid) {
+      var strip = grid.querySelector('.lms-thumbnail-strip');
+      if (!strip) {
+        strip = document.createElement('div');
+        strip.className = 'lms-thumbnail-strip';
+        grid.appendChild(strip);
+      }
+      return strip;
+    };
+
+    // Reverses _lmsGetOrCreateThumbStrip: moves every tile back out of the
+    // strip as direct children of the grid, then removes the (now-empty)
+    // strip, restoring the plain grid layout.
+    window._lmsDissolveThumbStrip = function(grid) {
+      var strip = grid.querySelector('.lms-thumbnail-strip');
+      if (!strip) return;
+      while (strip.firstChild) { grid.appendChild(strip.firstChild); }
+      strip.remove();
+    };
+
+    // True while a REMOTE screen-share spotlight is active — manual
+    // tile-expansion (lmsToggleTileExpand) is disabled during a share
+    // because the shared screen owns the layout.
+    window._lmsShareActive = false;
+    // uid of a tile the user manually expanded by clicking it (90/10
+    // split) — survives the 2s poll's "nobody is sharing" clear branch.
+    window._lmsManualExpandUid = null;
+
+    window.lmsApplyRemoteScreenShare = function(sharingUid) {
+      try {
+        var grid = document.getElementById('lms-grid-container');
+        if (!grid) return;
+        var myUid = window.lmsGetLocalUid();
+        // Nobody remote is sharing, or it's our own uid — our own share's
+        // 70/30 layout is owned by lmsToggleScreenShare (local screen tile),
+        // so the poll must leave it alone. Likewise leave a manually
+        // expanded tile (user clicked it) alone: that's user intent.
+        if (!sharingUid || sharingUid === myUid) {
+          window._lmsShareActive = window._lmsScreenSharing === true;
+          if (window._lmsScreenSharing) return; // own share owns the layout
+          if (window._lmsManualExpandUid) return;
+          if (grid.classList.contains('lms-spotlight-active')) {
+            grid.classList.remove('lms-spotlight-active');
+            grid.classList.remove('lms-ratio-90');
+            var prevTile = grid.querySelector('.lms-spotlight-tile');
+            if (prevTile) prevTile.classList.remove('lms-spotlight-tile');
+            window._lmsDissolveThumbStrip(grid);
+            window._lmsUpdateGridLayout();
+          }
+          return;
+        }
+        var tile = document.getElementById('lms-tile-' + sharingUid);
+        if (!tile) return; // sharer's tile not created yet — next poll tick retries
+        window._lmsShareActive = true;
+        // A screen share takes precedence over any manual expansion — drop
+        // the manual state and the 90/10 ratio so the share gets its 70/30.
+        window._lmsManualExpandUid = null;
+        grid.classList.remove('lms-ratio-90');
+        if (tile.classList.contains('lms-spotlight-tile') && grid.classList.contains('lms-spotlight-active')) return;
+        var other = grid.querySelector('.lms-spotlight-tile');
+        if (other && other !== tile) other.classList.remove('lms-spotlight-tile');
+        tile.classList.add('lms-spotlight-tile');
+        grid.classList.add('lms-spotlight-active');
+        // Move every OTHER tile into the scrollable thumbnail strip so none
+        // of them get clipped/hidden regardless of participant count.
+        var strip = window._lmsGetOrCreateThumbStrip(grid);
+        Array.prototype.forEach.call(grid.querySelectorAll('.lms-remote-tile'), function(t) {
+          if (t !== tile && t.parentElement !== strip) strip.appendChild(t);
+        });
+        window._lmsReplayGridTiles();
+      } catch(e) { console.warn('lmsApplyRemoteScreenShare error:', e); }
+    };
+
+    // Returns the uid of the remote tile under viewport point (x, y), or ''.
+    // Used by Flutter's tap handler: pointer events land on Flutter's glass
+    // pane (raised above the video by lmsRaiseFlutterLayer so buttons work),
+    // so DOM click listeners on tiles never fire — instead Flutter forwards
+    // the tap coordinates here and we hit-test the tile rects manually.
+    window.lmsTileAtPoint = function(x, y) {
+      try {
+        var tiles = document.querySelectorAll('.lms-remote-tile');
+        for (var i = 0; i < tiles.length; i++) {
+          var r = tiles[i].getBoundingClientRect();
+          if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) {
+            return tiles[i].id.replace('lms-tile-', '');
+          }
+        }
+      } catch(_) {}
+      return '';
+    };
+
+    // Manually expand a tile to a 90/10 split (click again to restore the
+    // proportional grid) — the "full screen but people stay visible"
+    // behavior from the client's Meet reference. While a screen share is
+    // active the share owns the layout at 70/30, but tapping the big share
+    // tile itself toggles its Meet-style "fullscreen" (90/10) — matching
+    // the expand affordance Meet puts on the presentation tile.
+    window.lmsToggleTileExpand = function(uid) {
+      try {
+        if (window._lmsShareActive) {
+          var sGrid = document.getElementById('lms-grid-container');
+          var sTile = document.getElementById('lms-tile-' + uid);
+          if (sGrid && sTile && sTile.classList.contains('lms-spotlight-tile')) {
+            sGrid.classList.toggle('lms-ratio-90');
+            window._lmsReplayGridTiles();
+          }
+          return;
+        }
+        var grid = document.getElementById('lms-grid-container');
+        var tile = document.getElementById('lms-tile-' + uid);
+        if (!grid || !tile) return;
+        if (window._lmsManualExpandUid === String(uid)) {
+          // Collapse back to the normal proportional grid
+          window._lmsManualExpandUid = null;
+          grid.classList.remove('lms-spotlight-active');
+          grid.classList.remove('lms-ratio-90');
+          tile.classList.remove('lms-spotlight-tile');
+          window._lmsDissolveThumbStrip(grid);
+          window._lmsUpdateGridLayout();
+          return;
+        }
+        window._lmsManualExpandUid = String(uid);
+        var other = grid.querySelector('.lms-spotlight-tile');
+        if (other && other !== tile) other.classList.remove('lms-spotlight-tile');
+        // If the previous spotlight tile is sitting in the strip, pull the
+        // newly-expanded one out of it before re-filling the strip.
+        grid.classList.add('lms-spotlight-active');
+        grid.classList.add('lms-ratio-90');
+        tile.classList.add('lms-spotlight-tile');
+        if (tile.parentElement && tile.parentElement.classList.contains('lms-thumbnail-strip')) {
+          grid.appendChild(tile);
+        }
+        var strip = window._lmsGetOrCreateThumbStrip(grid);
+        Array.prototype.forEach.call(grid.querySelectorAll('.lms-remote-tile'), function(t) {
+          if (t !== tile && t.parentElement !== strip) strip.appendChild(t);
+        });
+        window._lmsReplayGridTiles();
+      } catch(e) { console.warn('lmsToggleTileExpand error:', e); }
     };
 
     window.lmsSetParticipantNames = function(localName, remoteName) {
@@ -818,7 +1342,12 @@
       // Per-tile remote names are set via lmsSetTileName(uid, name)
     };
 
-    // Toggle video fit: 'cover' fills rectangle (no black bars), 'contain' shows full content
+    // Toggle video fit: 'cover' fills rectangle (no black bars), 'contain' shows full content.
+    // The CSS override alone only resizes Agora's own internal canvas — it
+    // doesn't change what Agora cropped when it first rendered the frame —
+    // so every currently-playing remote tile has to be re-played with the
+    // new `fit` value passed directly to Agora for the toggle to actually
+    // change what's visible (see lmsPlayIntoTile for the same fix on join).
     window._lmsVideoFit = 'cover';
     window.lmsSetVideoFit = function(mode) {
       window._lmsVideoFit = mode;
@@ -829,8 +1358,23 @@
         document.head.appendChild(st);
       }
       st.textContent =
-        '.lms-remote-tile > div, .lms-remote-tile video {' +
+        '.lms-remote-tile > div, .lms-remote-tile video, ' +
+        '#lms-agora-local > div, #lms-agora-local video {' +
         'object-fit: ' + mode + ' !important; }';
+      if (window._lmsAgoraClient) {
+        window._lmsAgoraClient.remoteUsers.forEach(function(u) {
+          if (!u.videoTrack) return;
+          var vd = document.getElementById('lms-tile-' + u.uid + '-video');
+          if (vd) { try { vd.innerHTML = ''; u.videoTrack.play(vd.id, { fit: mode }); } catch(_) {} }
+        });
+      }
+      // Local self-preview (own camera or screen-share PiP) — same fit toggle,
+      // previously hardcoded to 'cover' regardless of the user's selection.
+      var ld = document.getElementById('lms-agora-local');
+      var localTrack = (window._lmsScreenSharing && window._lmsScreenTrack) ? window._lmsScreenTrack : window._lmsLocalVideo;
+      if (ld && localTrack) {
+        try { ld.innerHTML = ''; localTrack.play('lms-agora-local', { fit: mode }); } catch(_) {}
+      }
     };
 
     window.lmsRequestFullscreen = function() {
@@ -869,15 +1413,18 @@
     window.lmsSetPanelWidth = function(panelOpen) {};
 
     // Called from Dart when entering/exiting fullscreen so Agora replays
-    // video tracks into the (now resized) container divs.
+    // video tracks into the (now resized) container divs. Every play() call
+    // below MUST pass { fit: window._lmsVideoFit } — omitting it makes Agora
+    // default to 'cover', silently discarding the user's "Fit" selection on
+    // every fullscreen toggle (this was the one call site missing it).
     window.lmsRefreshVideoLayout = function() {
       try {
         var ld = document.getElementById('lms-agora-local');
         if (ld) {
           if (window._lmsScreenSharing && window._lmsScreenTrack) {
-            try { ld.innerHTML = ''; window._lmsScreenTrack.play('lms-agora-local'); } catch(_) {}
+            try { ld.innerHTML = ''; window._lmsScreenTrack.play('lms-agora-local', { fit: window._lmsVideoFit || 'cover' }); } catch(_) {}
           } else if (window._lmsLocalVideo) {
-            try { ld.innerHTML = ''; window._lmsLocalVideo.play('lms-agora-local'); } catch(_) {}
+            try { ld.innerHTML = ''; window._lmsLocalVideo.play('lms-agora-local', { fit: window._lmsVideoFit || 'cover' }); } catch(_) {}
           }
         }
         if (window._lmsAgoraClient) {
@@ -885,7 +1432,7 @@
             if (u.videoTrack) {
               var vd = document.getElementById('lms-tile-' + u.uid + '-video');
               if (!vd) { window._lmsGetOrCreateTile(u.uid); vd = document.getElementById('lms-tile-' + u.uid + '-video'); }
-              if (vd) { try { vd.innerHTML = ''; u.videoTrack.play(vd.id); } catch(_) {} }
+              if (vd) { try { vd.innerHTML = ''; u.videoTrack.play(vd.id, { fit: window._lmsVideoFit || 'cover' }); } catch(_) {} }
             }
           });
         }
@@ -909,12 +1456,24 @@
         var localVid = document.createElement('video');
         localVid.autoplay = true; localVid.muted = true; localVid.playsInline = true;
         _hiddenStyle(localVid);
-        if (window._lmsLocalVideo) {
-          var ls = new MediaStream();
-          try { ls.addTrack(window._lmsLocalVideo.getMediaStreamTrack()); } catch(_) {}
-          localVid.srcObject = ls;
-        }
         document.body.appendChild(localVid);
+
+        // Bind the recording's local video element to whichever track is the
+        // instructor's active local video — screen track while sharing, camera
+        // otherwise. Exposed so lmsToggleScreenShare can re-bind on switch.
+        window._lmsRebindRecordLocal = function() {
+          var srcTrack = (window._lmsScreenSharing && window._lmsScreenTrack)
+            ? window._lmsScreenTrack
+            : window._lmsLocalVideo;
+          if (!srcTrack || !localVid) return;
+          try {
+            var s = new MediaStream();
+            s.addTrack(srcTrack.getMediaStreamTrack());
+            localVid.srcObject = s;
+            localVid.play().catch(function(){});
+          } catch(_) {}
+        };
+        window._lmsRebindRecordLocal();
 
         var remoteVid = null;
         var remoteUsers = window._lmsAgoraClient ? window._lmsAgoraClient.remoteUsers : [];
@@ -931,7 +1490,8 @@
         localVid.play().catch(function(){});
 
         // ── Canvas composite ─────────────────────────────────────────────
-        var W = 1280, H = 720;
+        // 1080p so shared screen content (text/slides) stays legible.
+        var W = 1920, H = 1080;
         var canvas = document.createElement('canvas');
         canvas.width = W; canvas.height = H;
         var ctx = canvas.getContext('2d');
@@ -939,33 +1499,74 @@
         window._lmsRecordLocalVid = localVid;
         window._lmsRecordRemoteVid = remoteVid;
 
+        // Draw a source video into a target rect preserving aspect ratio
+        // (letterboxed) so screen content is never stretched/squeezed.
+        var drawFit = function(vid, dx, dy, dw, dh) {
+          var vw = vid.videoWidth, vh = vid.videoHeight;
+          if (!vw || !vh) return;
+          var scale = Math.min(dw / vw, dh / vh);
+          var w = vw * scale, h = vh * scale;
+          ctx.drawImage(vid, dx + (dw - w) / 2, dy + (dh - h) / 2, w, h);
+        };
+
         var drawFrame = function() {
           if (!window._lmsRecorder || window._lmsRecorder.state !== 'recording') return;
           ctx.fillStyle = '#111';
           ctx.fillRect(0, 0, W, H);
           var hasRemote = remoteVid && remoteVid.readyState >= 2 && remoteVid.videoWidth > 0;
           var hasLocal  = localVid  && localVid.readyState  >= 2 && localVid.videoWidth  > 0;
-          if (hasRemote && hasLocal) {
-            ctx.drawImage(remoteVid, 0,   0, W/2, H);   // student  — left
-            ctx.drawImage(localVid,  W/2, 0, W/2, H);   // instructor — right
+          if (window._lmsScreenSharing && hasLocal) {
+            // Screen share: fill the whole frame with the shared screen
+            // (aspect-preserved), camera goes to a small PiP corner.
+            drawFit(localVid, 0, 0, W, H);
+            if (hasRemote) {
+              var pipW = W * 0.22, pipH = pipW * 9 / 16;
+              ctx.fillStyle = '#000';
+              ctx.fillRect(W - pipW - 12, H - pipH - 12, pipW, pipH);
+              drawFit(remoteVid, W - pipW - 12, H - pipH - 12, pipW, pipH);
+            }
+          } else if (hasRemote && hasLocal) {
+            drawFit(remoteVid, 0,   0, W/2, H);   // student  — left
+            drawFit(localVid,  W/2, 0, W/2, H);   // instructor — right
           } else if (hasLocal) {
-            ctx.drawImage(localVid, 0, 0, W, H);
+            drawFit(localVid, 0, 0, W, H);
           } else if (hasRemote) {
-            ctx.drawImage(remoteVid, 0, 0, W, H);
+            drawFit(remoteVid, 0, 0, W, H);
           }
-          requestAnimationFrame(drawFrame);
         };
-        // Start drawing after delay — DOM-attached video needs time to decode first frame
-        setTimeout(drawFrame, 1500);
+        // Start drawing after delay — DOM-attached video needs time to decode first frame.
+        // Uses setInterval (not requestAnimationFrame) because browsers throttle/
+        // pause rAF entirely when the tab is backgrounded or minimized — which is
+        // exactly when instructors tend to switch away during a live session —
+        // causing the recording to drop frames and look choppy. setInterval is
+        // only clamped to a minimum delay in background tabs, so it keeps drawing
+        // at a steady (if occasionally slightly slower) rate instead of stalling.
+        setTimeout(function() {
+          window._lmsRecordDrawTimer = setInterval(drawFrame, 1000 / 30);
+        }, 1500);
 
         // ── MediaRecorder from canvas stream + mixed audio ───────────────
-        var canvasStream = canvas.captureStream(24);
+        // 30fps for smooth motion; matches Agora screen-share frameRate.
+        var canvasStream = canvas.captureStream(30);
 
         // Mix local mic + all remote audio tracks via Web Audio API
         try {
           var audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-          // Resume in case browser suspended the context (autoplay policy)
-          if (audioCtx.state === 'suspended') { audioCtx.resume(); }
+          // Resume in case browser suspended the context (autoplay policy) —
+          // MUST be awaited: connecting sources before the context is truly
+          // 'running' produces a silent destination track (recording plays
+          // back with no sound even though a track exists).
+          if (audioCtx.state === 'suspended') {
+            try { await audioCtx.resume(); } catch(_) {}
+          }
+          // If the mic track isn't ready yet (race with Agora publish flow,
+          // e.g. recording auto-starts 3s after join), wait briefly and retry
+          // instead of silently recording with no local audio at all.
+          if (!window._lmsLocalAudio) {
+            for (var waitTry = 0; waitTry < 10 && !window._lmsLocalAudio; waitTry++) {
+              await new Promise(function(r) { setTimeout(r, 300); });
+            }
+          }
           var dest = audioCtx.createMediaStreamDestination();
           var audioSourceCount = 0;
           if (window._lmsLocalAudio) {
@@ -974,6 +1575,8 @@
               audioCtx.createMediaStreamSource(localStream).connect(dest);
               audioSourceCount++;
             } catch(ae) { console.warn('LMS rec: local audio mix error:', ae.message); }
+          } else {
+            console.warn('LMS rec: local mic track still unavailable after wait — recording will have no local audio');
           }
           if (window._lmsAgoraClient) {
             window._lmsAgoraClient.remoteUsers.forEach(function(u) {
@@ -989,8 +1592,13 @@
           var mixedTrack = dest.stream.getAudioTracks()[0];
           if (mixedTrack) {
             canvasStream.addTrack(mixedTrack);
-            console.log('LMS: mixed ' + audioSourceCount + ' audio source(s) into recording');
+            console.log('LMS: mixed ' + audioSourceCount + ' audio source(s) into recording, audioCtx.state=' + audioCtx.state);
+          } else {
+            console.warn('LMS rec: no mixed audio track produced — recording will be silent');
           }
+          // Keep a handle so we can verify/resume if the context gets
+          // suspended again mid-recording (some browsers do this on tab blur).
+          window._lmsRecordAudioCtx = audioCtx;
         } catch(audioErr) {
           // Fallback: local only
           if (window._lmsLocalAudio) {
@@ -1017,7 +1625,8 @@
           'video/webm'
         ].find(function(t) { return MediaRecorder.isTypeSupported(t); }) || 'video/webm';
 
-        window._lmsRecorder = new MediaRecorder(canvasStream, { mimeType: mimeType, videoBitsPerSecond: 1200000, audioBitsPerSecond: 128000 });
+        // 4 Mbps @ 1080p keeps shared-screen text crisp without huge files.
+        window._lmsRecorder = new MediaRecorder(canvasStream, { mimeType: mimeType, videoBitsPerSecond: 4000000, audioBitsPerSecond: 128000 });
         window._lmsRecorder.ondataavailable = function(e) {
           if (e.data && e.data.size > 0) window._lmsChunks.push(e.data);
         };
@@ -1034,9 +1643,15 @@
 
       var doSave = async function() {
         // Clean up canvas recording helpers
+        if (window._lmsRecordDrawTimer) { clearInterval(window._lmsRecordDrawTimer); window._lmsRecordDrawTimer = null; }
         if (window._lmsRecordLocalVid) { try { window._lmsRecordLocalVid.pause(); window._lmsRecordLocalVid.srcObject = null; if (window._lmsRecordLocalVid.parentNode) window._lmsRecordLocalVid.parentNode.removeChild(window._lmsRecordLocalVid); } catch(_){} window._lmsRecordLocalVid = null; }
         if (window._lmsRecordRemoteVid) { try { window._lmsRecordRemoteVid.pause(); window._lmsRecordRemoteVid.srcObject = null; if (window._lmsRecordRemoteVid.parentNode) window._lmsRecordRemoteVid.parentNode.removeChild(window._lmsRecordRemoteVid); } catch(_){} window._lmsRecordRemoteVid = null; }
         window._lmsRecordCanvas = null;
+        window._lmsRebindRecordLocal = null;
+        if (window._lmsRecordAudioCtx) {
+          try { window._lmsRecordAudioCtx.close(); } catch(_) {}
+          window._lmsRecordAudioCtx = null;
+        }
         if (window._lmsStream) {
           window._lmsStream.getTracks().forEach(function(t) { t.stop(); });
           window._lmsStream = null;

@@ -196,6 +196,11 @@ class AttachmentViewer extends StatelessWidget {
       if (original.contains('res.cloudinary.com')) {
         return '${ApiConstants.baseUrl}/upload/doc-stream?url=$encoded&token=$t';
       }
+      // Public Vercel Blob URLs (.public.blob.vercel-storage.com) are directly accessible
+      // via CDN — no proxy needed. Only private blob URLs need the blob-download proxy.
+      if (original.contains('.public.blob.vercel-storage.com')) {
+        return original;
+      }
       if (original.contains('blob.vercel-storage.com')) {
         return '${ApiConstants.baseUrl}/upload/blob-download?url=$encoded&token=$t';
       }
