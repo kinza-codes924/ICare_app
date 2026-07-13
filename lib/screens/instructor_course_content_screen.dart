@@ -1,12 +1,9 @@
 ﻿import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:dio/dio.dart';
 import 'package:icare/screens/certificate_templates_screen.dart';
 import 'package:icare/services/lms_service.dart';
 import 'package:icare/services/api_service.dart';
-import 'package:icare/utils/api_constants.dart';
-import 'package:icare/utils/shared_pref.dart';
 import 'package:icare/utils/theme.dart';
 import 'package:icare/screens/lms_live_session_screen.dart';
 import 'package:icare/screens/instructor_create_assignment_screen.dart';
@@ -1850,8 +1847,10 @@ class _LessonDialogState extends State<_LessonDialog> {
   final _durationController = TextEditingController();
   final _unlockDaysController = TextEditingController();
   bool _uploadingVideo = false;
+  double _uploadVideoProgress = 0;
   String? _uploadedVideoUrl;
   bool _uploadingDocument = false;
+  double _uploadDocProgress = 0;
   String? _documentUrl;
   String? _documentName;
   String _lessonType = 'content'; // 'content' or 'live'
@@ -1932,9 +1931,9 @@ class _LessonDialogState extends State<_LessonDialog> {
       final file = result.files.first;
       if (file.bytes == null) return;
 
-      setState(() => _uploadingVideo = true);
+      setState(() { _uploadingVideo = true; _uploadVideoProgress = 0; });
       // Step 1: Get signed upload params from backend
-      final signRes = await ApiService().get('/upload/sign?folder=icare/lessons');
+      final signRes = await ApiService().get('/upload/sign?folder=icare/lessons&resource_type=video');
       final signature = signRes.data['signature']?.toString() ?? '';
       final timestamp = signRes.data['timestamp']?.toString() ?? '';
       final apiKey = signRes.data['api_key']?.toString() ?? '';
@@ -1943,7 +1942,7 @@ class _LessonDialogState extends State<_LessonDialog> {
 
       if (signature.isEmpty) throw Exception('Could not get upload signature from server');
 
-      // Step 2: Upload directly to Cloudinary using signed params (bypasses Vercel 4.5MB limit)
+      // Step 2: Upload directly to Cloudinary (bypasses Vercel 4.5MB limit)
       final dio2 = Dio();
       final formData = FormData.fromMap({
         'file': MultipartFile.fromBytes(file.bytes!, filename: file.name),
@@ -1953,9 +1952,12 @@ class _LessonDialogState extends State<_LessonDialog> {
         'folder': folder,
       });
       final response = await dio2.post(
-        'https://api.cloudinary.com/v1_1/$cloudName/auto/upload',
+        'https://api.cloudinary.com/v1_1/$cloudName/video/upload',
         data: formData,
         options: Options(validateStatus: (s) => s != null && s < 600),
+        onSendProgress: (sent, total) {
+          if (total > 0 && mounted) setState(() => _uploadVideoProgress = sent / total);
+        },
       );
       if (response.statusCode == 200 && response.data['secure_url'] != null) {
         final url = response.data['secure_url'] as String;
@@ -1981,7 +1983,7 @@ class _LessonDialogState extends State<_LessonDialog> {
         );
       }
     } finally {
-      if (mounted) setState(() => _uploadingVideo = false);
+      if (mounted) setState(() { _uploadingVideo = false; _uploadVideoProgress = 0; });
     }
   }
 
@@ -1997,21 +1999,39 @@ class _LessonDialogState extends State<_LessonDialog> {
       final file = result.files.first;
       if (file.bytes == null) return;
 
-      setState(() => _uploadingDocument = true);
-      final token = await SharedPref().getToken() ?? '';
-      final res = await Dio().post(
-        '${ApiConstants.baseUrl}/upload/blob-doc',
-        data: FormData.fromMap({
-          'file': MultipartFile.fromBytes(file.bytes!, filename: file.name),
-        }),
-        options: Options(
-          headers: {'Authorization': 'Bearer $token'},
-          validateStatus: (s) => s != null && s < 600,
-        ),
+      setState(() { _uploadingDocument = true; _uploadDocProgress = 0; });
+
+      // Use Cloudinary raw upload (same pattern as video) — bypasses Vercel's 4.5MB
+      // body limit and avoids any Vercel Blob configuration dependency.
+      final signRes = await ApiService().get('/upload/sign?folder=icare/lesson-docs&resource_type=raw');
+      final signature = signRes.data['signature']?.toString() ?? '';
+      final timestamp = signRes.data['timestamp']?.toString() ?? '';
+      final apiKey = signRes.data['api_key']?.toString() ?? '';
+      final cloudName = signRes.data['cloud_name']?.toString() ?? 'dzlcnyxgb';
+      final folder = signRes.data['folder']?.toString() ?? 'icare/lesson-docs';
+
+      if (signature.isEmpty) throw Exception('Could not get upload signature from server');
+
+      final dio2 = Dio();
+      final formData = FormData.fromMap({
+        'file': MultipartFile.fromBytes(file.bytes!, filename: file.name),
+        'signature': signature,
+        'timestamp': timestamp,
+        'api_key': apiKey,
+        'folder': folder,
+      });
+      final response = await dio2.post(
+        'https://api.cloudinary.com/v1_1/$cloudName/raw/upload',
+        data: formData,
+        options: Options(validateStatus: (s) => s != null && s < 600),
+        onSendProgress: (sent, total) {
+          if (total > 0 && mounted) setState(() => _uploadDocProgress = sent / total);
+        },
       );
-      if (res.statusCode == 200 && res.data['success'] == true && res.data['url'] != null) {
+
+      if (response.statusCode == 200 && response.data['secure_url'] != null) {
         setState(() {
-          _documentUrl = res.data['url'] as String;
+          _documentUrl = response.data['secure_url'] as String;
           _documentName = file.name;
         });
         if (mounted) {
@@ -2020,7 +2040,10 @@ class _LessonDialogState extends State<_LessonDialog> {
           );
         }
       } else {
-        throw Exception(res.data?['message'] ?? 'Upload failed (${res.statusCode})');
+        final errMsg = response.data is Map
+            ? (response.data['error']?['message'] ?? response.data['message'] ?? 'Upload failed (${response.statusCode})')
+            : 'Upload failed (${response.statusCode})';
+        throw Exception(errMsg);
       }
     } catch (e) {
       if (mounted) {
@@ -2029,7 +2052,7 @@ class _LessonDialogState extends State<_LessonDialog> {
         );
       }
     } finally {
-      if (mounted) setState(() => _uploadingDocument = false);
+      if (mounted) setState(() { _uploadingDocument = false; _uploadDocProgress = 0; });
     }
   }
 
@@ -2149,18 +2172,36 @@ class _LessonDialogState extends State<_LessonDialog> {
                     SizedBox(
                       width: double.infinity,
                       child: _uploadingVideo
-                          ? const Center(child: Padding(
-                              padding: EdgeInsets.all(12),
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
+                          ? Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 8),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  SizedBox(width: 18, height: 18,
-                                      child: CircularProgressIndicator(strokeWidth: 2)),
-                                  SizedBox(width: 10),
-                                  Text('Uploading video...', style: TextStyle(fontSize: 13, color: Color(0xFF64748B))),
+                                  Row(
+                                    children: [
+                                      const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF1A73E8))),
+                                      const SizedBox(width: 10),
+                                      Text(
+                                        _uploadVideoProgress > 0
+                                            ? 'Uploading video... ${(_uploadVideoProgress * 100).toStringAsFixed(0)}%'
+                                            : 'Preparing upload...',
+                                        style: const TextStyle(fontSize: 13, color: Color(0xFF64748B)),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 6),
+                                  ClipRRect(
+                                    borderRadius: BorderRadius.circular(4),
+                                    child: LinearProgressIndicator(
+                                      value: _uploadVideoProgress > 0 ? _uploadVideoProgress : null,
+                                      backgroundColor: const Color(0xFFE2E8F0),
+                                      color: const Color(0xFF1A73E8),
+                                      minHeight: 4,
+                                    ),
+                                  ),
                                 ],
                               ),
-                            ))
+                            )
                           : OutlinedButton.icon(
                               onPressed: _uploadVideo,
                               icon: const Icon(Icons.upload_rounded, size: 16),
@@ -2272,17 +2313,36 @@ class _LessonDialogState extends State<_LessonDialog> {
                     SizedBox(
                       width: double.infinity,
                       child: _uploadingDocument
-                          ? const Center(child: Padding(
-                              padding: EdgeInsets.all(12),
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
+                          ? Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 8),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)),
-                                  SizedBox(width: 10),
-                                  Text('Uploading document...', style: TextStyle(fontSize: 13, color: Color(0xFF64748B))),
+                                  Row(
+                                    children: [
+                                      const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF6366F1))),
+                                      const SizedBox(width: 10),
+                                      Text(
+                                        _uploadDocProgress > 0
+                                            ? 'Uploading document... ${(_uploadDocProgress * 100).toStringAsFixed(0)}%'
+                                            : 'Preparing upload...',
+                                        style: const TextStyle(fontSize: 13, color: Color(0xFF64748B)),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 6),
+                                  ClipRRect(
+                                    borderRadius: BorderRadius.circular(4),
+                                    child: LinearProgressIndicator(
+                                      value: _uploadDocProgress > 0 ? _uploadDocProgress : null,
+                                      backgroundColor: const Color(0xFFE2E8F0),
+                                      color: const Color(0xFF6366F1),
+                                      minHeight: 4,
+                                    ),
+                                  ),
                                 ],
                               ),
-                            ))
+                            )
                           : OutlinedButton.icon(
                               onPressed: _uploadDocument,
                               icon: const Icon(Icons.upload_file_rounded, size: 16),

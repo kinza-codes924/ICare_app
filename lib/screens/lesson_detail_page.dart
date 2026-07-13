@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:icare/services/lms_service.dart';
 import 'package:icare/utils/theme.dart';
+import 'package:icare/widgets/attachment_viewer.dart';
 import 'package:icare/widgets/back_button.dart';
 import 'package:icare/widgets/lesson_notes_editor.dart';
 import 'package:icare/widgets/video_player_widget.dart';
@@ -213,50 +214,15 @@ class _LessonDetailPageState extends State<LessonDetailPage> with SingleTickerPr
                     ),
                   ),
 
-                // Document Section
+                // Document Section — uses AttachmentViewer which proxies Cloudinary/Blob
+                // URLs correctly and shows a full-screen PDF/doc preview on tap.
                 if (documentUrl != null && documentUrl.isNotEmpty)
                   Container(
                     margin: const EdgeInsets.only(bottom: 16),
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                      boxShadow: [
-                        BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 6),
-                      ],
-                    ),
-                    child: Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: AppColors.primaryColor.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: const Icon(Icons.description_rounded, color: AppColors.primaryColor, size: 24),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                'Lesson Document',
-                                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                'PDF or Document',
-                                style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-                              ),
-                            ],
-                          ),
-                        ),
-                        IconButton(
-                          onPressed: () => _launchUrl(documentUrl),
-                          icon: const Icon(Icons.open_in_new, color: AppColors.primaryColor),
-                        ),
-                      ],
+                    child: AttachmentViewer(
+                      url: documentUrl,
+                      name: widget.lesson['documentName']?.toString() ?? 'Lesson Document',
+                      label: 'Tap to preview document',
                     ),
                   ),
 
