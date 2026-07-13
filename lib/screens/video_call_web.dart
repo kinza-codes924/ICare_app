@@ -796,12 +796,23 @@ class _VideoCallWebState extends State<VideoCall> {
       // Jitsi room name: alphanumeric only, prefixed with 'icare'
       final raw = widget.channelName.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '');
       final roomName = 'icare${raw.substring(0, raw.length.clamp(0, 50))}';
-      final displayName = widget.currentUserName.isNotEmpty ? widget.currentUserName : 'User';
+      var displayName = widget.currentUserName.isNotEmpty ? widget.currentUserName : 'User';
 
       // Moderator status is decided server-side (doctor = moderator, patient
       // = not) so a patient can never end up moderator just by joining first.
       final jwt = await _fetchJitsiToken(roomName);
       final authToken = await SharedPref().getToken() ?? '';
+
+      // If widget.currentUserName is empty or the placeholder 'User', try to
+      // resolve the real name from SharedPreferences (handles incoming-call path
+      // where the caller screen may not have the name yet).
+      if (displayName == 'User' || displayName.isEmpty) {
+        final userData = await SharedPref().getUserData();
+        if (userData != null && userData.name.isNotEmpty) {
+          displayName = userData.name;
+        }
+      }
+
       final subject = widget.remoteUserName.isNotEmpty
           ? 'Consultation with ${widget.remoteUserName}'
           : 'iCare Consultation';

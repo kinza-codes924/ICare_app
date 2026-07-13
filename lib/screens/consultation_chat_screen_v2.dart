@@ -362,9 +362,13 @@ class _ConsultationChatScreenV2State extends State<ConsultationChatScreenV2> {
     }
 
     final channelName = _consultationId ?? widget.appointment?.id ?? 'consultation';
+    // For patients who joined via call notification, appointment may be null —
+    // fall back to the remoteUserName passed into this screen (the caller's name).
     final remoteUserName = widget.isDoctor
-        ? widget.appointment?.patient?.name ?? 'Patient'
-        : 'Dr. ${widget.appointment?.doctor?.name ?? 'Doctor'}';
+        ? (widget.appointment?.patient?.name ?? widget.remoteUserName ?? 'Patient')
+        : (widget.appointment?.doctor?.name != null
+            ? 'Dr. ${widget.appointment!.doctor!.name}'
+            : (widget.remoteUserName ?? 'Dr. Doctor'));
 
     // Send ring signal to the other party via call signaling backend
     final callService = CallService();
