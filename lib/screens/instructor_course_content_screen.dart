@@ -1,5 +1,4 @@
-﻿import 'dart:convert';
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:dio/dio.dart';
 import 'package:icare/screens/certificate_templates_screen.dart';
@@ -980,7 +979,13 @@ class InstructorCourseContentScreenState extends State<InstructorCourseContentSc
     final isPublished = quiz['isPublished'] == true;
     final id = quiz['_id']?.toString() ?? '';
 
-    return Container(
+    return GestureDetector(
+      onTap: id.isNotEmpty ? () => showDialog(
+        context: context,
+        barrierDismissible: true,
+        builder: (_) => _QuizPreviewDialog(quizId: id),
+      ) : null,
+      child: Container(
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -1043,7 +1048,7 @@ class InstructorCourseContentScreenState extends State<InstructorCourseContentSc
           child: const Icon(Icons.delete_outline_rounded, color: Colors.red, size: 20),
         ),
       ]),
-    );
+    ));
   }
 
   Widget _buildModuleCard(Map<String, dynamic> module, int index) {
@@ -1427,6 +1432,29 @@ class InstructorCourseContentScreenState extends State<InstructorCourseContentSc
   }
 
   void _showLessonDetail(Map<String, dynamic> lesson) {
+    final ltype = lesson['type']?.toString() ?? 'content';
+    if (ltype == 'assignment') {
+      final assignmentId = lesson['_id']?.toString();
+      if (assignmentId != null) {
+        showDialog(
+          context: context,
+          barrierDismissible: true,
+          builder: (_) => _AssignmentPreviewDialog(assignmentId: assignmentId),
+        );
+        return;
+      }
+    }
+    if (ltype == 'quiz') {
+      final quizId = lesson['_id']?.toString();
+      if (quizId != null) {
+        showDialog(
+          context: context,
+          barrierDismissible: true,
+          builder: (_) => _QuizPreviewDialog(quizId: quizId),
+        );
+        return;
+      }
+    }
     showDialog(
       context: context,
       barrierDismissible: true,
@@ -1838,14 +1866,17 @@ class _LessonDialogState extends State<_LessonDialog> {
 
   Future<void> _uploadVideo() async {
     try {
+      // withReadStream avoids loading the entire video into RAM — essential for
+      // large files (30-min recordings can be 1 GB+) where fromBytes() OOMs.
       final result = await FilePicker.platform.pickFiles(
         type: FileType.video,
         allowMultiple: false,
-        withData: true,
+        withData: false,
+        withReadStream: true,
       );
       if (result == null || result.files.isEmpty) return;
       final file = result.files.first;
-      if (file.bytes == null) return;
+      if (file.readStream == null) return;
 
       setState(() { _uploadingVideo = true; _uploadVideoProgress = 0; });
       // Step 1: Get signed upload params from backend
@@ -1858,10 +1889,15 @@ class _LessonDialogState extends State<_LessonDialog> {
 
       if (signature.isEmpty) throw Exception('Could not get upload signature from server');
 
-      // Step 2: Upload directly to Cloudinary (bypasses Vercel 4.5MB limit)
+      // Step 2: Stream directly to Cloudinary (bypasses Vercel 4.5MB limit and
+      // avoids loading the whole video into browser memory)
       final dio2 = Dio();
       final formData = FormData.fromMap({
-        'file': MultipartFile.fromBytes(file.bytes!, filename: file.name),
+        'file': MultipartFile.fromStream(
+          () => file.readStream!,
+          file.size,
+          filename: file.name,
+        ),
         'signature': signature,
         'timestamp': timestamp,
         'api_key': apiKey,
@@ -1903,35 +1939,6 @@ class _LessonDialogState extends State<_LessonDialog> {
     }
   }
 
-  // Returns MIME type for common document extensions
-  String _docContentType(String filename) {
-    final ext = filename.split('.').last.toLowerCase();
-    return const {
-      'pdf':  'application/pdf',
-      'doc':  'application/msword',
-      'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      'ppt':  'application/vnd.ms-powerpoint',
-      'pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-      'xls':  'application/vnd.ms-excel',
-      'xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      'txt':  'text/plain',
-    }[ext] ?? 'application/octet-stream';
-  }
-
-  // Extracts the Vercel Blob store ID from a client token (JWT payload → payload.storeId).
-  String? _extractBlobStoreId(String clientToken) {
-    try {
-      final parts = clientToken.split('.');
-      if (parts.length < 2) return null;
-      String padded = parts[1].replaceAll('-', '+').replaceAll('_', '/');
-      while (padded.length % 4 != 0) { padded += '='; }
-      final decoded = jsonDecode(utf8.decode(base64Decode(padded))) as Map<String, dynamic>;
-      return decoded['payload']?['storeId']?.toString();
-    } catch (_) {
-      return null;
-    }
-  }
-
   Future<void> _uploadDocument() async {
     try {
       final picked = await FilePicker.platform.pickFiles(
@@ -1946,68 +1953,46 @@ class _LessonDialogState extends State<_LessonDialog> {
 
       setState(() { _uploadingDocument = true; _uploadDocProgress = 0; });
 
-      final safeName = file.name.replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '_');
-      final pathname = 'lesson-docs/$safeName';
-      final contentType = _docContentType(file.name);
+      // Step 1: get Cloudinary signature for a raw (document) upload
+      final signRes = await ApiService().get('/upload/sign?resource_type=raw&folder=icare/lesson-docs');
+      final signature = signRes.data['signature']?.toString() ?? '';
+      final timestamp  = signRes.data['timestamp']?.toString() ?? '';
+      final apiKey     = signRes.data['api_key']?.toString() ?? '';
+      final cloudName  = signRes.data['cloud_name']?.toString() ?? 'dzlcnyxgb';
+      final folder     = signRes.data['folder']?.toString() ?? 'icare/lesson-docs';
+      if (signature.isEmpty) throw Exception('Could not get upload signature from server');
 
-      // ── Step 1: Get a short-lived Vercel Blob client token from our backend ──
-      final tokenRes = await ApiService().post('/upload/blob-handle', {
-        'type': 'blob.generate-client-token',
-        'payload': {
-          'pathname': pathname,
-          'callbackUrl': 'https://icare-backend-inky.vercel.app/api/upload/blob-handle',
-          'multipart': false,
-        },
-      });
-      final clientToken = tokenRes.data['clientToken']?.toString() ?? '';
-      if (clientToken.isEmpty) throw Exception('Could not get upload token from server');
-
-      // ── Step 2: PUT file directly to Vercel Blob API (bypasses 4.5 MB limit) ──
-      final storeId = _extractBlobStoreId(clientToken);
+      // Step 2: upload directly to Cloudinary raw endpoint — no CORS issues,
+      // no Vercel size limit, no private-store errors
       final dio2 = Dio();
-      final blobRes = await dio2.put(
-        'https://vercel.com/api/blob/?pathname=${Uri.encodeComponent(pathname)}',
-        data: file.bytes,
-        options: Options(
-          headers: {
-            'Authorization': 'Bearer $clientToken',
-            if (storeId != null) 'x-vercel-blob-store-id': storeId,
-            'x-api-version': '12',
-            'content-length': '${file.bytes!.length}',
-          },
-          contentType: contentType,
-          validateStatus: (s) => s != null && s < 600,
-        ),
+      final res = await dio2.post(
+        'https://api.cloudinary.com/v1_1/$cloudName/raw/upload',
+        data: FormData.fromMap({
+          'file': MultipartFile.fromBytes(file.bytes!, filename: file.name),
+          'signature': signature,
+          'timestamp': timestamp,
+          'api_key': apiKey,
+          'folder': folder,
+        }),
+        options: Options(validateStatus: (s) => s != null && s < 600),
         onSendProgress: (sent, total) {
           if (total > 0 && mounted) setState(() => _uploadDocProgress = sent / total);
         },
       );
 
-      if (blobRes.statusCode != 200) {
-        final msg = blobRes.data is Map
-            ? (blobRes.data['error'] ?? 'Upload failed (${blobRes.statusCode})')
-            : 'Upload failed (${blobRes.statusCode})';
+      if (res.statusCode != 200 || res.data['secure_url'] == null) {
+        final msg = res.data is Map
+            ? (res.data['error']?['message'] ?? res.data['message'] ?? 'Upload failed (${res.statusCode})')
+            : 'Upload failed (${res.statusCode})';
         throw Exception(msg);
       }
 
-      final blobUrl = blobRes.data['url']?.toString() ?? blobRes.data['downloadUrl']?.toString() ?? '';
-      if (blobUrl.isEmpty) throw Exception('No URL returned by Vercel Blob');
+      final docUrl = res.data['secure_url'] as String;
 
       setState(() {
-        _documentUrl = blobUrl;
+        _documentUrl = docUrl;
         _documentName = file.name;
       });
-
-      // ── Step 3: Notify backend that upload completed (best-effort) ──
-      try {
-        await ApiService().post('/upload/blob-handle', {
-          'type': 'blob.upload-completed',
-          'payload': {
-            'blob': { 'url': blobUrl, 'pathname': pathname },
-            'tokenPayload': null,
-          },
-        });
-      } catch (_) {}
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -2570,6 +2555,375 @@ class _LessonPreviewScreen extends StatelessWidget {
       ),
     );
   }
+}
+
+// Read-only assignment preview shown when instructor taps an assignment tile.
+// Edit mode is still accessible via the module's lesson edit button.
+class _AssignmentPreviewDialog extends StatefulWidget {
+  final String assignmentId;
+  const _AssignmentPreviewDialog({required this.assignmentId});
+
+  @override
+  State<_AssignmentPreviewDialog> createState() => _AssignmentPreviewDialogState();
+}
+
+class _AssignmentPreviewDialogState extends State<_AssignmentPreviewDialog> {
+  final LmsService _lmsService = LmsService();
+  bool _loading = true;
+  Map<String, dynamic> _a = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _fetch();
+  }
+
+  Future<void> _fetch() async {
+    try {
+      final res = await _lmsService.getAssignment(widget.assignmentId);
+      if (mounted) setState(() { _a = Map<String, dynamic>.from(res['assignment'] ?? {}); _loading = false; });
+    } catch (_) {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final title       = _a['title']?.toString() ?? '';
+    final description = _a['description']?.toString() ?? '';
+    final instructions = _a['instructions']?.toString() ?? '';
+    final totalMarks  = (_a['totalMarks'] as num?)?.toInt() ?? 100;
+    final subType     = _a['submissionType']?.toString() ?? 'file';
+    final attachUrl   = _a['attachmentUrl']?.toString();
+    final attachName  = _a['attachmentName']?.toString() ?? 'Attachment';
+    final isPublished = _a['isPublished'] == true;
+    DateTime? dueDate;
+    if (_a['dueDate'] != null) dueDate = DateTime.tryParse(_a['dueDate'].toString());
+
+    String formatDate(DateTime d) {
+      final months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+      final h = d.hour > 12 ? d.hour - 12 : (d.hour == 0 ? 12 : d.hour);
+      final ampm = d.hour >= 12 ? 'PM' : 'AM';
+      final mm = d.minute.toString().padLeft(2, '0');
+      return '${d.day} ${months[d.month - 1]} ${d.year}  $h:$mm $ampm';
+    }
+
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 560),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          // Header
+          Container(
+            padding: const EdgeInsets.fromLTRB(20, 20, 12, 16),
+            decoration: BoxDecoration(
+              color: const Color(0xFF0036BC).withValues(alpha: 0.06),
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+            ),
+            child: Row(children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(color: const Color(0xFF0036BC).withValues(alpha: 0.12), borderRadius: BorderRadius.circular(10)),
+                child: const Icon(Icons.assignment_rounded, color: Color(0xFF0036BC), size: 22),
+              ),
+              const SizedBox(width: 12),
+              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                const Text('Assignment', style: TextStyle(fontSize: 11, color: Color(0xFF64748B), fontWeight: FontWeight.w500)),
+                _loading
+                    ? const SizedBox(height: 16, width: 160, child: LinearProgressIndicator())
+                    : Text(title.isEmpty ? '(No title)' : title,
+                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Color(0xFF0F172A))),
+              ])),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: isPublished ? const Color(0xFFECFDF5) : const Color(0xFFFFF7ED),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(isPublished ? 'Published' : 'Draft',
+                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600,
+                        color: isPublished ? const Color(0xFF059669) : const Color(0xFFD97706))),
+              ),
+              const SizedBox(width: 4),
+              IconButton(icon: const Icon(Icons.close_rounded), onPressed: () => Navigator.pop(context)),
+            ]),
+          ),
+
+          if (_loading)
+            const Padding(padding: EdgeInsets.all(40), child: CircularProgressIndicator())
+          else
+            Flexible(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(20),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  // Stats row
+                  Row(children: [
+                    _statChip(Icons.star_rounded, '$totalMarks marks', const Color(0xFF7C3AED), const Color(0xFFF5F3FF)),
+                    const SizedBox(width: 8),
+                    _statChip(
+                      subType == 'text' ? Icons.text_fields_rounded : subType == 'both' ? Icons.layers_rounded : Icons.upload_file_rounded,
+                      subType == 'text' ? 'Text only' : subType == 'both' ? 'File + Text' : 'File upload',
+                      const Color(0xFF0284C7), const Color(0xFFE0F2FE),
+                    ),
+                    if (dueDate != null) ...[
+                      const SizedBox(width: 8),
+                      _statChip(Icons.calendar_today_rounded, formatDate(dueDate), const Color(0xFFDC2626), const Color(0xFFFEF2F2)),
+                    ],
+                  ]),
+                  const SizedBox(height: 16),
+
+                  if (description.isNotEmpty) ...[
+                    const Text('Description', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF64748B), letterSpacing: 0.5)),
+                    const SizedBox(height: 6),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(color: const Color(0xFFF8FAFC), borderRadius: BorderRadius.circular(10)),
+                      child: Text(description, style: const TextStyle(fontSize: 13, color: Color(0xFF334155), height: 1.5)),
+                    ),
+                    const SizedBox(height: 16),
+                  ],
+
+                  if (instructions.isNotEmpty) ...[
+                    const Text('Instructions', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF64748B), letterSpacing: 0.5)),
+                    const SizedBox(height: 6),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFFBEB),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: const Color(0xFFFDE68A)),
+                      ),
+                      child: Text(instructions, style: const TextStyle(fontSize: 13, color: Color(0xFF92400E), height: 1.5)),
+                    ),
+                    const SizedBox(height: 16),
+                  ],
+
+                  if (attachUrl != null && attachUrl.isNotEmpty) ...[
+                    const Text('Attachment', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF64748B), letterSpacing: 0.5)),
+                    const SizedBox(height: 6),
+                    AttachmentViewer(url: attachUrl, name: attachName),
+                  ],
+                ]),
+              ),
+            ),
+        ]),
+      ),
+    );
+  }
+
+  Widget _statChip(IconData icon, String label, Color fg, Color bg) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+    decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(8)),
+    child: Row(mainAxisSize: MainAxisSize.min, children: [
+      Icon(icon, size: 13, color: fg),
+      const SizedBox(width: 5),
+      Text(label, style: TextStyle(fontSize: 11, color: fg, fontWeight: FontWeight.w600)),
+    ]),
+  );
+}
+
+// Read-only quiz preview for instructors — shows all questions with correct answers highlighted.
+class _QuizPreviewDialog extends StatefulWidget {
+  final String quizId;
+  const _QuizPreviewDialog({required this.quizId});
+
+  @override
+  State<_QuizPreviewDialog> createState() => _QuizPreviewDialogState();
+}
+
+class _QuizPreviewDialogState extends State<_QuizPreviewDialog> {
+  final LmsService _lmsService = LmsService();
+  bool _loading = true;
+  Map<String, dynamic> _q = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _fetch();
+  }
+
+  Future<void> _fetch() async {
+    try {
+      final res = await _lmsService.getQuiz(widget.quizId);
+      if (mounted) setState(() { _q = Map<String, dynamic>.from(res['quiz'] ?? {}); _loading = false; });
+    } catch (_) {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final title       = _q['title']?.toString() ?? '';
+    final description = _q['description']?.toString() ?? '';
+    final timeLimit   = (_q['timeLimit'] as num?)?.toInt() ?? 0;
+    final passingScore = (_q['passingScore'] as num?)?.toInt() ?? 0;
+    final maxAttempts = (_q['maxAttempts'] as num?)?.toInt() ?? 3;
+    final showAnswers = _q['showCorrectAnswers'] == true;
+    final isPublished = _q['isPublished'] == true;
+    final questions   = List<Map<String, dynamic>>.from(_q['questions'] ?? []);
+
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 600),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          // Header
+          Container(
+            padding: const EdgeInsets.fromLTRB(20, 20, 12, 16),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF59E0B).withValues(alpha: 0.08),
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+            ),
+            child: Row(children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(color: const Color(0xFFF59E0B).withValues(alpha: 0.15), borderRadius: BorderRadius.circular(10)),
+                child: const Icon(Icons.quiz_rounded, color: Color(0xFFF59E0B), size: 22),
+              ),
+              const SizedBox(width: 12),
+              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                const Text('Quiz', style: TextStyle(fontSize: 11, color: Color(0xFF64748B), fontWeight: FontWeight.w500)),
+                _loading
+                    ? const SizedBox(height: 16, width: 160, child: LinearProgressIndicator())
+                    : Text(title.isEmpty ? '(No title)' : title,
+                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Color(0xFF0F172A))),
+              ])),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: isPublished ? const Color(0xFFECFDF5) : const Color(0xFFFFF7ED),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(isPublished ? 'Published' : 'Draft',
+                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600,
+                        color: isPublished ? const Color(0xFF059669) : const Color(0xFFD97706))),
+              ),
+              const SizedBox(width: 4),
+              IconButton(icon: const Icon(Icons.close_rounded), onPressed: () => Navigator.pop(context)),
+            ]),
+          ),
+
+          if (_loading)
+            const Padding(padding: EdgeInsets.all(40), child: CircularProgressIndicator())
+          else
+            Flexible(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(20),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  // Stats chips
+                  Wrap(spacing: 8, runSpacing: 8, children: [
+                    if (timeLimit > 0) _qChip(Icons.timer_rounded, '$timeLimit min', const Color(0xFF0284C7), const Color(0xFFE0F2FE)),
+                    if (passingScore > 0) _qChip(Icons.verified_rounded, 'Pass: $passingScore%', const Color(0xFF059669), const Color(0xFFECFDF5)),
+                    _qChip(Icons.help_outline_rounded, '${questions.length} question${questions.length == 1 ? '' : 's'}', const Color(0xFF7C3AED), const Color(0xFFF5F3FF)),
+                    _qChip(Icons.refresh_rounded, '$maxAttempts attempt${maxAttempts == 1 ? '' : 's'}', const Color(0xFFD97706), const Color(0xFFFFF7ED)),
+                    if (showAnswers) _qChip(Icons.check_circle_outline_rounded, 'Shows answers', const Color(0xFF10B981), const Color(0xFFECFDF5)),
+                  ]),
+                  if (description.isNotEmpty) ...[
+                    const SizedBox(height: 16),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(color: const Color(0xFFF8FAFC), borderRadius: BorderRadius.circular(10)),
+                      child: Text(description, style: const TextStyle(fontSize: 13, color: Color(0xFF334155), height: 1.5)),
+                    ),
+                  ],
+                  if (questions.isNotEmpty) ...[
+                    const SizedBox(height: 20),
+                    const Text('Questions', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF64748B), letterSpacing: 0.5)),
+                    const SizedBox(height: 10),
+                    ...questions.asMap().entries.map((e) => _buildQuestionCard(e.key + 1, e.value)),
+                  ] else ...[
+                    const SizedBox(height: 24),
+                    const Center(child: Text('No questions added yet.', style: TextStyle(color: Color(0xFF94A3B8)))),
+                  ],
+                ]),
+              ),
+            ),
+        ]),
+      ),
+    );
+  }
+
+  Widget _buildQuestionCard(int qNum, Map<String, dynamic> q) {
+    final text    = q['question']?.toString() ?? q['text']?.toString() ?? '';
+    final options = List<String>.from(q['options'] ?? []);
+    final correct = q['correctAnswer']?.toString() ?? q['answer']?.toString() ?? '';
+    final points  = (q['points'] as num?)?.toInt() ?? 1;
+    final explanation = q['explanation']?.toString() ?? '';
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 4, offset: const Offset(0, 2))],
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            decoration: BoxDecoration(color: const Color(0xFFF59E0B).withValues(alpha: 0.15), borderRadius: BorderRadius.circular(6)),
+            child: Text('Q$qNum', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Color(0xFFF59E0B))),
+          ),
+          const SizedBox(width: 10),
+          Expanded(child: Text(text, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF0F172A), height: 1.4))),
+          const SizedBox(width: 8),
+          Text('$points pt${points == 1 ? '' : 's'}', style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8))),
+        ]),
+        if (options.isNotEmpty) ...[
+          const SizedBox(height: 10),
+          ...options.map((opt) {
+            final isCorrect = opt == correct;
+            return Container(
+              margin: const EdgeInsets.only(bottom: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: isCorrect ? const Color(0xFFECFDF5) : const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: isCorrect ? const Color(0xFF10B981) : const Color(0xFFE2E8F0), width: isCorrect ? 1.5 : 1),
+              ),
+              child: Row(children: [
+                Icon(isCorrect ? Icons.check_circle_rounded : Icons.circle_outlined,
+                    size: 16, color: isCorrect ? const Color(0xFF10B981) : const Color(0xFFCBD5E1)),
+                const SizedBox(width: 8),
+                Expanded(child: Text(opt, style: TextStyle(fontSize: 13, color: isCorrect ? const Color(0xFF059669) : const Color(0xFF334155), fontWeight: isCorrect ? FontWeight.w600 : FontWeight.normal))),
+              ]),
+            );
+          }),
+        ],
+        if (explanation.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(color: const Color(0xFFFFFBEB), borderRadius: BorderRadius.circular(8)),
+            child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              const Icon(Icons.lightbulb_outline_rounded, size: 14, color: Color(0xFFF59E0B)),
+              const SizedBox(width: 6),
+              Expanded(child: Text(explanation, style: const TextStyle(fontSize: 12, color: Color(0xFF92400E), height: 1.4))),
+            ]),
+          ),
+        ],
+      ]),
+    );
+  }
+
+  Widget _qChip(IconData icon, String label, Color fg, Color bg) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+    decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(8)),
+    child: Row(mainAxisSize: MainAxisSize.min, children: [
+      Icon(icon, size: 13, color: fg),
+      const SizedBox(width: 5),
+      Text(label, style: TextStyle(fontSize: 11, color: fg, fontWeight: FontWeight.w600)),
+    ]),
+  );
 }
 
 class _RecordingDialog extends StatefulWidget {

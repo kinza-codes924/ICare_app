@@ -100,25 +100,24 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
       ..style.marginLeft = '4px';
 
     final playBtn = html.ButtonElement()
-      ..innerHtml = _iconSvg('play')
       ..style.background = 'transparent'
       ..style.border = 'none'
       ..style.cursor = 'pointer'
       ..style.padding = '4px'
       ..style.display = 'flex'
       ..style.alignItems = 'center';
+    _setIcon(playBtn, 'play');
 
     final muteBtn = html.ButtonElement()
-      ..innerHtml = _iconSvg('volume')
       ..style.background = 'transparent'
       ..style.border = 'none'
       ..style.cursor = 'pointer'
       ..style.padding = '4px'
       ..style.display = 'flex'
       ..style.alignItems = 'center';
+    _setIcon(muteBtn, 'volume');
 
     final fullscreenBtn = html.ButtonElement()
-      ..innerHtml = _iconSvg('fullscreen')
       ..style.background = 'transparent'
       ..style.border = 'none'
       ..style.cursor = 'pointer'
@@ -126,6 +125,7 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
       ..style.marginLeft = 'auto'
       ..style.display = 'flex'
       ..style.alignItems = 'center';
+    _setIcon(fullscreenBtn, 'fullscreen');
 
     final buttonRow = html.DivElement()
       ..style.display = 'flex'
@@ -155,11 +155,21 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
       ..text = '@keyframes _vpspin{to{transform:rotate(360deg)}}';
     html.document.head?.append(spinStyle);
     final spinner = html.DivElement()
-      ..style.cssText = 'position:absolute;inset:0;display:flex;align-items:center;'
-          'justify-content:center;background:#000;pointer-events:none;';
-    spinner.innerHtml =
-        '<div style="width:44px;height:44px;border:3px solid rgba(255,255,255,0.2);'
-        'border-top-color:#fff;border-radius:50%;animation:_vpspin 0.7s linear infinite"></div>';
+      ..style.position = 'absolute'
+      ..style.setProperty('inset', '0')
+      ..style.display = 'flex'
+      ..style.alignItems = 'center'
+      ..style.justifyContent = 'center'
+      ..style.background = '#000'
+      ..style.pointerEvents = 'none';
+    final spinRing = html.DivElement()
+      ..style.width = '44px'
+      ..style.height = '44px'
+      ..style.borderRadius = '50%';
+    spinRing.style.setProperty('border', '3px solid rgba(255,255,255,0.2)');
+    spinRing.style.setProperty('border-top-color', '#fff');
+    spinRing.style.setProperty('animation', '_vpspin 0.7s linear infinite');
+    spinner.append(spinRing);
 
     container..append(video)..append(spinner)..append(controlsBar);
 
@@ -260,16 +270,16 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
     });
 
     video.onPlay.listen((_) {
-      playBtn.innerHtml = _iconSvg('pause');
+      _setIcon(playBtn, 'pause');
       scheduleHide();
     });
     video.onPause.listen((_) {
-      playBtn.innerHtml = _iconSvg('play');
+      _setIcon(playBtn, 'play');
       showControls();
       hideTimer?.cancel();
     });
     video.onEnded.listen((_) {
-      playBtn.innerHtml = _iconSvg('play');
+      _setIcon(playBtn, 'play');
       showControls();
       hideTimer?.cancel();
     });
@@ -284,7 +294,7 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
 
     muteBtn.onClick.listen((_) {
       video.muted = !video.muted;
-      muteBtn.innerHtml = _iconSvg(video.muted ? 'muted' : 'volume');
+      _setIcon(muteBtn, video.muted ? 'muted' : 'volume');
     });
 
     seekBar.onInput.listen((_) {
@@ -314,7 +324,20 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
       }
     });
 
+    // Update icon when the user exits fullscreen via Esc or browser UI
+    html.document.onFullscreenChange.listen((_) {
+      final isFs = html.document.fullscreenElement != null;
+      _setIcon(fullscreenBtn, isFs ? 'exit_fullscreen' : 'fullscreen');
+      // Keep controls visible when entering/exiting fullscreen
+      showControls();
+      if (!video.paused) scheduleHide();
+    });
+
     container.onMouseMove.listen((_) {
+      showControls();
+      if (!video.paused) scheduleHide();
+    });
+    container.onTouchStart.listen((_) {
       showControls();
       if (!video.paused) scheduleHide();
     });
@@ -331,21 +354,51 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
     return container;
   }
 
-  static String _iconSvg(String kind) {
+  // Build an SVG icon node using DOM API instead of innerHTML so Flutter web's
+  // TrustedTypes CSP (which strips <svg>/<path> injected via innerHTML) is
+  // bypassed — createElementNS is always allowed.
+  static void _setIcon(html.Element btn, String kind) {
+    btn.children.clear();
+    final node = _svgNode(kind);
+    if (node != null) btn.append(node);
+  }
+
+  static html.Element? _svgNode(String kind) {
+    String pathD;
+    int size;
     switch (kind) {
       case 'play':
-        return '<svg width="26" height="26" viewBox="0 0 24 24" fill="white"><path d="M8 5v14l11-7z"/></svg>';
+        pathD = 'M8 5v14l11-7z';
+        size = 26;
       case 'pause':
-        return '<svg width="26" height="26" viewBox="0 0 24 24" fill="white"><path d="M6 5h4v14H6zm8 0h4v14h-4z"/></svg>';
+        pathD = 'M6 5h4v14H6zm8 0h4v14h-4z';
+        size = 26;
       case 'volume':
-        return '<svg width="22" height="22" viewBox="0 0 24 24" fill="white"><path d="M3 10v4h4l5 5V5L7 10H3zm13.5 2A4.5 4.5 0 0 0 14 7.97v8.05A4.5 4.5 0 0 0 16.5 12z"/></svg>';
+        pathD = 'M3 10v4h4l5 5V5L7 10H3zm13.5 2A4.5 4.5 0 0 0 14 7.97v8.05A4.5 4.5 0 0 0 16.5 12z';
+        size = 22;
       case 'muted':
-        return '<svg width="22" height="22" viewBox="0 0 24 24" fill="white"><path d="M16.5 12A4.5 4.5 0 0 0 14 7.97v2.21l2.45 2.45c.03-.2.05-.42.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51A8.796 8.796 0 0 0 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06a8.99 8.99 0 0 0 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/></svg>';
+        pathD = 'M16.5 12A4.5 4.5 0 0 0 14 7.97v2.21l2.45 2.45c.03-.2.05-.42.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51A8.796 8.796 0 0 0 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06a8.99 8.99 0 0 0 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z';
+        size = 22;
       case 'fullscreen':
-        return '<svg width="20" height="20" viewBox="0 0 24 24" fill="white"><path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/></svg>';
+        pathD = 'M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z';
+        size = 20;
+      case 'exit_fullscreen':
+        pathD = 'M5 16h3v3h2v-5H5v2zm3-8H5v2h5V5H8v3zm6 11h2v-3h3v-2h-5v5zm2-11V5h-2v5h5V8h-3z';
+        size = 20;
       default:
-        return '';
+        return null;
     }
+    const ns = 'http://www.w3.org/2000/svg';
+    final svg = html.document.createElementNS(ns, 'svg');
+    svg.setAttribute('width', '$size');
+    svg.setAttribute('height', '$size');
+    svg.setAttribute('viewBox', '0 0 24 24');
+    svg.style.display = 'block';
+    final path = html.document.createElementNS(ns, 'path');
+    path.setAttribute('d', pathD);
+    path.setAttribute('fill', 'white');
+    svg.append(path);
+    return svg;
   }
 
   static String _toEmbedUrl(String url) {

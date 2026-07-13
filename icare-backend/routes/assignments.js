@@ -30,10 +30,11 @@ function uploadBuffer(buffer, folder) {
 router.post('/', authMiddleware, async (req, res) => {
   try {
     await connectMongoDB();
-    const { courseId, title, description, dueDate, totalMarks, passingMarks, attachmentUrl, attachmentName } = req.body;
+    const { courseId, title, description, instructions, submissionType, dueDate, totalMarks, passingMarks, attachmentUrl, attachmentName } = req.body;
     if (!courseId || !title) return res.status(400).json({ success: false, message: 'courseId and title required' });
     const a = await Assignment.create({
-      courseId, title, description, dueDate,
+      courseId, title, description, instructions: instructions || '', submissionType: submissionType || 'file',
+      dueDate,
       totalMarks: totalMarks || 100,
       passingMarks: passingMarks || 50,
       instructorId: req.user.id,
@@ -484,5 +485,41 @@ async function handleSendReminders(req, res) {
 }
 router.get('/send-reminders', handleSendReminders);
 router.post('/send-reminders', handleSendReminders);
+
+// ── Get single assignment by ID ──────────────────────────────────────────────
+router.get('/:assignmentId', authMiddleware, async (req, res) => {
+  try {
+    await connectMongoDB();
+    const a = await Assignment.findById(req.params.assignmentId).lean();
+    if (!a) return res.status(404).json({ success: false, message: 'Assignment not found' });
+    res.json({ success: true, assignment: a });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+// ── Update assignment ────────────────────────────────────────────────────────
+router.put('/:assignmentId', authMiddleware, async (req, res) => {
+  try {
+    await connectMongoDB();
+    const { title, description, instructions, submissionType, dueDate, totalMarks, passingMarks, isPublished, attachmentUrl, attachmentName } = req.body;
+    const update = {};
+    if (title !== undefined)         update.title         = title;
+    if (description !== undefined)   update.description   = description;
+    if (instructions !== undefined)  update.instructions  = instructions;
+    if (submissionType !== undefined) update.submissionType = submissionType;
+    if (dueDate !== undefined)       update.dueDate       = dueDate;
+    if (totalMarks !== undefined)    update.totalMarks    = totalMarks;
+    if (passingMarks !== undefined)  update.passingMarks  = passingMarks;
+    if (isPublished !== undefined)   update.isPublished   = isPublished;
+    if (attachmentUrl !== undefined) update.attachmentUrl = attachmentUrl;
+    if (attachmentName !== undefined) update.attachmentName = attachmentName;
+    const a = await Assignment.findByIdAndUpdate(req.params.assignmentId, { $set: update }, { new: true, lean: true });
+    if (!a) return res.status(404).json({ success: false, message: 'Assignment not found' });
+    res.json({ success: true, assignment: a });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
 
 module.exports = router;

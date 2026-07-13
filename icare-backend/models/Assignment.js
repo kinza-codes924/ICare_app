@@ -8,6 +8,8 @@ const assignmentSchema = new mongoose.Schema({
   dueDate:      { type: Date },
   totalMarks:   { type: Number, default: 100 },
   passingMarks: { type: Number, default: 50 },
+  instructions:   { type: String, default: '' },
+  submissionType: { type: String, default: 'file' },
   attachmentUrl:  { type: String },
   attachmentName: { type: String },
   isPublished:  { type: Boolean, default: true },

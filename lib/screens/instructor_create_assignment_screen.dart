@@ -65,15 +65,36 @@ class _InstructorCreateAssignmentScreenState extends State<InstructorCreateAssig
     super.dispose();
   }
 
-  Future<String?> _blobUpload(Uint8List bytes, String filename) async {
+  Future<String?> _cloudinaryRawUpload(Uint8List bytes, String filename) async {
     final token = await SharedPref().getToken() ?? '';
-    final res = await Dio().post(
-      '${ApiConstants.baseUrl}/upload/blob-doc',
-      data: FormData.fromMap({'file': MultipartFile.fromBytes(bytes, filename: filename)}),
+    // Step 1: get Cloudinary signature for a raw (document) upload
+    final signRes = await Dio().get(
+      '${ApiConstants.baseUrl}/upload/sign',
+      queryParameters: {'resource_type': 'raw', 'folder': 'icare/assignment-docs'},
       options: Options(headers: {'Authorization': 'Bearer $token'}, validateStatus: (s) => s != null && s < 600),
     );
-    if (res.statusCode == 200 && res.data['success'] == true && res.data['url'] != null) {
-      return res.data['url'] as String;
+    if (signRes.statusCode != 200) throw Exception('Could not get upload signature');
+    final signature = signRes.data['signature']?.toString() ?? '';
+    final timestamp  = signRes.data['timestamp']?.toString() ?? '';
+    final apiKey     = signRes.data['api_key']?.toString() ?? '';
+    final cloudName  = signRes.data['cloud_name']?.toString() ?? 'dzlcnyxgb';
+    final folder     = signRes.data['folder']?.toString() ?? 'icare/assignment-docs';
+    if (signature.isEmpty) throw Exception('Empty signature from server');
+
+    // Step 2: upload directly to Cloudinary — no CORS, no private-store errors
+    final res = await Dio().post(
+      'https://api.cloudinary.com/v1_1/$cloudName/raw/upload',
+      data: FormData.fromMap({
+        'file': MultipartFile.fromBytes(bytes, filename: filename),
+        'signature': signature,
+        'timestamp': timestamp,
+        'api_key': apiKey,
+        'folder': folder,
+      }),
+      options: Options(validateStatus: (s) => s != null && s < 600),
+    );
+    if (res.statusCode == 200 && res.data['secure_url'] != null) {
+      return res.data['secure_url'] as String;
     }
     throw Exception('Upload failed: ${res.data}');
   }
@@ -88,7 +109,7 @@ class _InstructorCreateAssignmentScreenState extends State<InstructorCreateAssig
       if (result == null || result.files.isEmpty || result.files.first.bytes == null) return;
       final file = result.files.first;
       setState(() => _uploadingAttachment = true);
-      final url = await _blobUpload(file.bytes!, file.name);
+      final url = await _cloudinaryRawUpload(file.bytes!, file.name);
       if (mounted) setState(() { _attachmentUrl = url; _attachmentName = file.name; _uploadingAttachment = false; });
     } catch (e) {
       if (mounted) {
@@ -114,13 +135,25 @@ class _InstructorCreateAssignmentScreenState extends State<InstructorCreateAssig
   Future<void> _loadAssignment() async {
     setState(() => _isLoading = true);
     try {
-      // TODO: Implement get assignment by ID
-      // For now, just set loading to false
-      setState(() => _isLoading = false);
-    } catch (e) {
+      final data = await _lmsService.getAssignment(widget.assignmentId!);
+      final a = (data['assignment'] as Map<String, dynamic>?) ?? {};
       if (mounted) {
-        setState(() => _isLoading = false);
+        setState(() {
+          _titleController.text       = a['title']?.toString() ?? '';
+          _descriptionController.text = a['description']?.toString() ?? '';
+          _instructionsController.text = a['instructions']?.toString() ?? '';
+          _totalMarks   = (a['totalMarks'] as num?)?.toInt() ?? 100;
+          _isPublished  = a['isPublished'] == true;
+          _submissionType = a['submissionType']?.toString() ?? 'file';
+          _attachmentUrl  = a['attachmentUrl']?.toString();
+          _attachmentName = a['attachmentName']?.toString();
+          final rawDate = a['dueDate'];
+          if (rawDate != null) _dueDate = DateTime.tryParse(rawDate.toString());
+          _isLoading = false;
+        });
       }
+    } catch (e) {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -155,7 +188,8 @@ class _InstructorCreateAssignmentScreenState extends State<InstructorCreateAssig
   Future<void> _saveAssignment() async {
     if (!_formKey.currentState!.validate()) return;
 
-    if (_selectedCourseId == null) {
+    final isEditing = widget.assignmentId != null;
+    if (!isEditing && (_selectedCourseId == null || (_selectedCourseId?.isEmpty ?? true))) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please select a course')),
       );
@@ -165,8 +199,8 @@ class _InstructorCreateAssignmentScreenState extends State<InstructorCreateAssig
     setState(() => _isSubmitting = true);
 
     try {
-      final assignmentData = {
-        'courseId': _selectedCourseId,
+      final data = {
+        if (!isEditing && _selectedCourseId != null) 'courseId': _selectedCourseId,
         'title': _titleController.text,
         'description': _descriptionController.text,
         'instructions': _instructionsController.text,
@@ -174,17 +208,26 @@ class _InstructorCreateAssignmentScreenState extends State<InstructorCreateAssig
         'totalMarks': _totalMarks,
         'isPublished': _isPublished,
         'submissionType': _submissionType,
-        if (_attachmentUrl != null) 'attachmentUrl': _attachmentUrl,
-        if (_attachmentName != null) 'attachmentName': _attachmentName,
+        'attachmentUrl': _attachmentUrl,
+        'attachmentName': _attachmentName,
       };
 
-      final created = await _lmsService.createAssignment(assignmentData);
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Assignment created successfully!')),
-        );
-        Navigator.pop(context, created['assignment'] ?? created);
+      if (isEditing) {
+        final updated = await _lmsService.updateAssignment(widget.assignmentId!, data);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Assignment updated!'), backgroundColor: Colors.green),
+          );
+          Navigator.pop(context, updated['assignment'] ?? updated);
+        }
+      } else {
+        final created = await _lmsService.createAssignment(data);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Assignment created!'), backgroundColor: Colors.green),
+          );
+          Navigator.pop(context, created['assignment'] ?? created);
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -193,9 +236,7 @@ class _InstructorCreateAssignmentScreenState extends State<InstructorCreateAssig
         );
       }
     } finally {
-      if (mounted) {
-        setState(() => _isSubmitting = false);
-      }
+      if (mounted) setState(() => _isSubmitting = false);
     }
   }
 
@@ -233,7 +274,7 @@ class _InstructorCreateAssignmentScreenState extends State<InstructorCreateAssig
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
                 : const Icon(Icons.check),
-            label: const Text('Create'),
+            label: Text(widget.assignmentId != null ? 'Save' : 'Create'),
             style: TextButton.styleFrom(
               foregroundColor: AppColors.primaryColor,
             ),

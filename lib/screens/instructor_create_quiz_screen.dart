@@ -4,8 +4,6 @@ import 'package:file_picker/file_picker.dart';
 import 'package:dio/dio.dart';
 import 'package:icare/services/lms_service.dart';
 import 'package:icare/services/api_service.dart';
-import 'package:icare/utils/api_constants.dart';
-import 'package:icare/utils/shared_pref.dart';
 import 'package:icare/utils/theme.dart';
 
 /// Quiz Creation Screen - Google Classroom style
@@ -665,26 +663,6 @@ class _QuestionDialogState extends State<_QuestionDialog> {
     }
   }
 
-  // Upload document to Vercel Blob (publicly accessible, no CDN restrictions)
-  Future<String?> _blobUpload(Uint8List bytes, String filename) async {
-    final token = await SharedPref().getToken() ?? '';
-    final formData = FormData.fromMap({
-      'file': MultipartFile.fromBytes(bytes, filename: filename),
-    });
-    final res = await Dio().post(
-      '${ApiConstants.baseUrl}/upload/blob-doc',
-      data: formData,
-      options: Options(
-        headers: {'Authorization': 'Bearer $token'},
-        validateStatus: (s) => s != null && s < 600,
-      ),
-    );
-    if (res.statusCode == 200 && res.data['success'] == true && res.data['url'] != null) {
-      return res.data['url'] as String;
-    }
-    throw Exception('Blob upload failed (${res.statusCode}): ${res.data}');
-  }
-
   Future<void> _pickDocument() async {
     try {
       final result = await FilePicker.platform.pickFiles(
@@ -695,7 +673,10 @@ class _QuestionDialogState extends State<_QuestionDialog> {
       if (result == null || result.files.isEmpty || result.files.first.bytes == null) return;
       final file = result.files.first;
       setState(() => _uploadingDoc = true);
-      final url = await _blobUpload(file.bytes!, file.name);
+      // Reuse the existing Cloudinary helper with resource_type=raw — the
+      // blob-doc endpoint used here before targeted a private Vercel Blob store
+      // which rejected public-access uploads with a 500 error.
+      final url = await _cloudinaryUpload(file.bytes!, file.name, 'icare/quiz/docs', 'raw');
       if (mounted) setState(() { _documentUrl = url; _documentName = file.name; _uploadingDoc = false; });
     } catch (e) {
       if (mounted) { setState(() => _uploadingDoc = false); ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Upload failed: $e'), backgroundColor: Colors.red)); }

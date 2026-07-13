@@ -12,9 +12,10 @@ const liveSessionSchema = new mongoose.Schema({
   meetingId: String,
   meetingPassword: String,
   recordingUrl: String,
+  recordings: [{ url: String, createdAt: { type: Date, default: Date.now } }],
   status: {
     type: String,
-    enum: ['scheduled', 'live', 'completed', 'cancelled'],
+    enum: ['scheduled', 'live', 'completed', 'cancelled', 'ended', 'rescheduled'],
     default: 'scheduled'
   },
   attendees: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
