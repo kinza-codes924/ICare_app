@@ -1418,105 +1418,12 @@ class InstructorCourseContentScreenState extends State<InstructorCourseContentSc
   }
 
   void _showLessonDetail(Map<String, dynamic> lesson) {
-    final title = lesson['title']?.toString() ?? 'Lesson';
-    final lessonType = lesson['type']?.toString() ?? 'content';
-    final content = lesson['content']?.toString() ?? '';
-    final videoUrl = lesson['videoUrl']?.toString() ?? '';
-    final documentUrl = lesson['documentUrl']?.toString() ?? '';
-    final documentName = lesson['documentName']?.toString();
-    final duration = lesson['duration']?.toString() ?? '';
-    final isAssignment = lessonType == 'assignment';
-    final isQuiz = lessonType == 'quiz';
-
-    showModalBottomSheet(
+    showDialog(
       context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (ctx) => DraggableScrollableSheet(
-        expand: false,
-        initialChildSize: 0.55,
-        maxChildSize: 0.9,
-        minChildSize: 0.3,
-        builder: (_, ctrl) => SingleChildScrollView(
-          controller: ctrl,
-          padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Center(child: Container(width: 40, height: 4, margin: const EdgeInsets.only(bottom: 16),
-              decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2)))),
-            Row(children: [
-              Icon(isAssignment ? Icons.assignment_rounded : isQuiz ? Icons.quiz_rounded : Icons.article_outlined,
-                color: isAssignment ? const Color(0xFF6366F1) : isQuiz ? const Color(0xFFF59E0B) : const Color(0xFF10B981), size: 22),
-              const SizedBox(width: 10),
-              Expanded(child: Text(title, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)))),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: (isAssignment ? const Color(0xFF6366F1) : isQuiz ? const Color(0xFFF59E0B) : const Color(0xFF10B981)).withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Text(isAssignment ? 'Assignment' : isQuiz ? 'Quiz' : 'Content',
-                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700,
-                    color: isAssignment ? const Color(0xFF6366F1) : isQuiz ? const Color(0xFFF59E0B) : const Color(0xFF10B981))),
-              ),
-            ]),
-            const SizedBox(height: 16),
-            const Divider(),
-            const SizedBox(height: 12),
-            if (duration.isNotEmpty && duration != '0') ...[
-              _detailRow(Icons.timer_outlined, 'Duration', '$duration min'),
-              const SizedBox(height: 10),
-            ],
-            if (videoUrl.isNotEmpty) ...[
-              const Text('Video', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF64748B))),
-              const SizedBox(height: 6),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(10),
-                child: SizedBox(
-                  height: 220,
-                  width: double.infinity,
-                  child: VideoPlayerWidget(videoUrl: videoUrl),
-                ),
-              ),
-              const SizedBox(height: 14),
-            ],
-            if (documentUrl.isNotEmpty) ...[
-              const Text('Document', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF64748B))),
-              const SizedBox(height: 6),
-              AttachmentViewer(url: documentUrl, name: documentName),
-              const SizedBox(height: 14),
-            ],
-            if (content.isNotEmpty) ...[
-              const Text('Content', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF64748B))),
-              const SizedBox(height: 6),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(color: const Color(0xFFF8FAFC), borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: const Color(0xFFE2E8F0))),
-                child: Text(content, style: const TextStyle(fontSize: 14, color: Color(0xFF0F172A), height: 1.5)),
-              ),
-              const SizedBox(height: 10),
-            ],
-            if (content.isEmpty && videoUrl.isEmpty && documentUrl.isEmpty)
-              Center(child: Padding(
-                padding: const EdgeInsets.only(top: 20),
-                child: Text('No content added yet.', style: TextStyle(color: Colors.grey[500], fontSize: 14)),
-              )),
-          ]),
-        ),
-      ),
+      barrierDismissible: true,
+      builder: (_) => _LessonPreviewScreen(lesson: lesson),
     );
   }
-
-  Widget _detailRow(IconData icon, String label, String value) => Row(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Icon(icon, size: 16, color: const Color(0xFF64748B)),
-      const SizedBox(width: 8),
-      Text('$label: ', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF64748B))),
-      Expanded(child: Text(value, style: const TextStyle(fontSize: 13, color: Color(0xFF0F172A)))),
-    ],
-  );
 
   void _openRecording(dynamic lesson) {
     final url = lesson['recordingUrl']?.toString() ?? '';
@@ -2455,6 +2362,146 @@ class _LessonDialogState extends State<_LessonDialog> {
           child: const Text('Save Lesson'),
         ),
       ],
+    );
+  }
+}
+
+// Full-screen lesson preview for instructors — replaces the old bottom sheet
+// so the video takes the full viewport width and the document/content below
+// is always visible without hidden-below-fold surprises.
+class _LessonPreviewScreen extends StatelessWidget {
+  final Map<String, dynamic> lesson;
+  const _LessonPreviewScreen({required this.lesson});
+
+  @override
+  Widget build(BuildContext context) {
+    final title       = lesson['title']?.toString() ?? 'Lesson';
+    final lessonType  = lesson['type']?.toString() ?? 'content';
+    final videoUrl    = lesson['videoUrl']?.toString() ?? '';
+    final documentUrl = lesson['documentUrl']?.toString() ?? '';
+    final documentName = lesson['documentName']?.toString() ?? 'Document';
+    final content     = lesson['content']?.toString() ?? '';
+    final duration    = lesson['duration']?.toString() ?? '';
+    final isAssignment = lessonType == 'assignment';
+    final isQuiz       = lessonType == 'quiz';
+    final typeColor = isAssignment ? const Color(0xFF6366F1)
+        : isQuiz ? const Color(0xFFF59E0B)
+        : const Color(0xFF10B981);
+    final typeLabel = isAssignment ? 'Assignment' : isQuiz ? 'Quiz' : 'Content';
+
+    return Dialog.fullscreen(
+      child: Scaffold(
+        backgroundColor: const Color(0xFFF8FAFC),
+        appBar: AppBar(
+          backgroundColor: AppColors.primaryColor,
+          foregroundColor: Colors.white,
+          elevation: 0,
+          leading: IconButton(
+            icon: const Icon(Icons.close_rounded),
+            tooltip: 'Close',
+            onPressed: () => Navigator.pop(context),
+          ),
+          title: Text(title,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 16)),
+          actions: [
+            Container(
+              margin: const EdgeInsets.only(right: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.2),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Text(typeLabel,
+                  style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600)),
+            ),
+          ],
+        ),
+        body: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // ── Full-width video (black letterbox background) ──────────
+              if (videoUrl.isNotEmpty)
+                Container(
+                  color: Colors.black,
+                  width: double.infinity,
+                  child: AspectRatio(
+                    aspectRatio: 16 / 9,
+                    child: VideoPlayerWidget(videoUrl: videoUrl),
+                  ),
+                ),
+
+              // ── Meta row (duration + type chip) ───────────────────────
+              if (duration.isNotEmpty && duration != '0')
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+                  child: Row(children: [
+                    Icon(Icons.timer_outlined, size: 16, color: typeColor),
+                    const SizedBox(width: 6),
+                    Text('$duration min', style: TextStyle(fontSize: 13, color: typeColor, fontWeight: FontWeight.w600)),
+                  ]),
+                ),
+
+              // ── Document ──────────────────────────────────────────────
+              if (documentUrl.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Document',
+                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF64748B))),
+                      const SizedBox(height: 8),
+                      AttachmentViewer(url: documentUrl, name: documentName, label: 'Tap to preview'),
+                    ],
+                  ),
+                ),
+
+              // ── Lesson notes / text content ───────────────────────────
+              if (content.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Lesson Notes',
+                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF64748B))),
+                      const SizedBox(height: 8),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0xFFE2E8F0)),
+                        ),
+                        child: Text(content,
+                            style: const TextStyle(fontSize: 14, color: Color(0xFF0F172A), height: 1.6)),
+                      ),
+                    ],
+                  ),
+                ),
+
+              // ── Empty state ───────────────────────────────────────────
+              if (videoUrl.isEmpty && documentUrl.isEmpty && content.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(top: 60),
+                  child: Center(
+                    child: Column(mainAxisSize: MainAxisSize.min, children: [
+                      Icon(Icons.inbox_rounded, size: 48, color: Colors.grey.shade300),
+                      const SizedBox(height: 12),
+                      Text('No content added yet.',
+                          style: TextStyle(color: Colors.grey.shade400, fontSize: 15)),
+                    ]),
+                  ),
+                ),
+
+              const SizedBox(height: 32),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

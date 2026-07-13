@@ -150,7 +150,20 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
       ..append(seekBar)
       ..append(buttonRow);
 
-    container..append(video)..append(controlsBar);
+    // Loading spinner — shows while video is buffering, hides on canplay
+    final spinStyle = html.StyleElement()
+      ..text = '@keyframes _vpspin{to{transform:rotate(360deg)}}';
+    html.document.head?.append(spinStyle);
+    final spinner = html.DivElement()
+      ..style.cssText = 'position:absolute;inset:0;display:flex;align-items:center;'
+          'justify-content:center;background:#000;pointer-events:none;';
+    spinner.innerHtml =
+        '<div style="width:44px;height:44px;border:3px solid rgba(255,255,255,0.2);'
+        'border-top-color:#fff;border-radius:50%;animation:_vpspin 0.7s linear infinite"></div>';
+
+    container..append(video)..append(spinner)..append(controlsBar);
+
+    void hideSpinner() => spinner.style.display = 'none';
 
     bool seeking = false;
     Timer? hideTimer;
@@ -222,6 +235,7 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
     }
 
     video.onLoadedMetadata.listen((_) {
+      hideSpinner();
       fixDurationIfNeeded();
       updateTimeLabel();
     });
@@ -230,6 +244,7 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
       updateTimeLabel();
     });
     video.onCanPlay.listen((_) {
+      hideSpinner();
       fixDurationIfNeeded();
       updateTimeLabel();
     });
