@@ -730,18 +730,27 @@ class _GlowingViewAllButtonState extends State<_GlowingViewAllButton> with Singl
   Widget build(BuildContext context) {
     return AnimatedBuilder(
       animation: _glow,
-      builder: (_, _) => GestureDetector(
-        onTap: widget.onTap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(colors: [widget.color, widget.color.withValues(alpha: 0.8)]),
-            borderRadius: BorderRadius.circular(12),
-            boxShadow: [BoxShadow(color: widget.color.withValues(alpha: 0.4), blurRadius: _glow.value, spreadRadius: 1)],
+      // Animating blurRadius forces Skia to recompute the shadow's blurred
+      // geometry every frame — expensive on mobile GPUs and a real
+      // contributor to first-paint jank. blurRadius/spreadRadius are now
+      // fixed; only the shadow's alpha (a cheap compositing multiply)
+      // animates, keeping the same pulsing look.
+      builder: (_, child) {
+        final t = ((_glow.value - 4.0) / 12.0).clamp(0.0, 1.0);
+        return GestureDetector(
+          onTap: widget.onTap,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(colors: [widget.color, widget.color.withValues(alpha: 0.8)]),
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [BoxShadow(color: widget.color.withValues(alpha: 0.2 + 0.3 * t), blurRadius: 10, spreadRadius: 1)],
+            ),
+            child: child,
           ),
-          child: Text(widget.label, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 14)),
-        ),
-      ),
+        );
+      },
+      child: Text(widget.label, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 14)),
     );
   }
 }
@@ -1830,8 +1839,13 @@ class _BannerState extends State<_Banner> with SingleTickerProviderStateMixin {
                         // Connect button (white filled)
                         AnimatedBuilder(
                           animation: _pulseAnimation,
+                          // spreadRadius/blurRadius are fixed — only alpha
+                          // animates. Animating shadow geometry every frame
+                          // is expensive on mobile GPUs and was a real
+                          // contributor to jank on first paint (this button
+                          // is above the fold on the landing page).
                           builder: (context, child) {
-                            final g = (_pulseAnimation.value - 1.0) / 0.06;
+                            final g = ((_pulseAnimation.value - 1.0) / 0.06).clamp(0.0, 1.0);
                             return Container(
                               decoration: BoxDecoration(
                                 borderRadius: BorderRadius.circular(12),
@@ -1839,7 +1853,7 @@ class _BannerState extends State<_Banner> with SingleTickerProviderStateMixin {
                                   BoxShadow(
                                     color: Colors.white.withValues(alpha: 0.4 * g),
                                     blurRadius: 18,
-                                    spreadRadius: 3 * g,
+                                    spreadRadius: 1.5,
                                   ),
                                 ],
                               ),

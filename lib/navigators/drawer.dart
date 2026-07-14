@@ -580,6 +580,14 @@ class _CustomDrawerState extends ConsumerState<CustomDrawer> {
 
                       _drawerActionItem(
                         context,
+                        'Payments & Revenue',
+                        const Color(0xFF0036BC),
+                        Icons.payments_outlined,
+                        () => context.push('/admin/payments'),
+                      ),
+
+                      _drawerActionItem(
+                        context,
                         'Settings',
                         const Color(0xFF64748B),
                         Icons.settings_outlined,
