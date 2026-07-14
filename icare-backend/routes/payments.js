@@ -286,7 +286,9 @@ router.get('/:id/verify', authMiddleware, async (req, res) => {
     if (!payment.safepayTracker) return res.json({ success: true, status: payment.status, fulfilled: false });
 
     const report = await safepayGet(`/reporter/api/v1/payments/${payment.safepayTracker}`);
-    const trackerData = report?.data?.tracker;
+    // Reporter returns the tracker object DIRECTLY in data (no data.tracker
+    // nesting) — verified against the live sandbox response.
+    const trackerData = report?.data?.tracker || report?.data;
     const state = trackerData?.state;
     await plog({ paymentId: payment._id, tracker: payment.safepayTracker, userId: payment.userId, step: 'VERIFY_RESULT', message: `state=${state}` });
 

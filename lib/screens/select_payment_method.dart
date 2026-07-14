@@ -247,8 +247,11 @@ class _SelectPaymentMethodState extends State<SelectPaymentMethod> {
       type: 'course',
       refId: widget.courseId!,
       voucherCode: _appliedVoucherCode,
-      redirectUrl: kIsWeb ? Uri.base.origin : null,
-      cancelUrl: kIsWeb ? Uri.base.origin : null,
+      // Send the checkout tab somewhere real after payment — the bare origin
+      // ("/?tracker=...") has no go_router route and showed Page Not Found.
+      // Fulfillment itself happens via this screen's polling + the webhook.
+      redirectUrl: kIsWeb ? '${Uri.base.origin}/dashboard' : null,
+      cancelUrl: kIsWeb ? '${Uri.base.origin}/dashboard' : null,
     );
 
     // 100%-voucher / free — no gateway involved, enroll directly.

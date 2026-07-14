@@ -162,6 +162,9 @@ final routerProvider = Provider<GoRouter>((ref) {
       return null;
     },
     routes: [
+      // Bare "/" (e.g. payment-gateway redirects with ?tracker=... params)
+      // must never 404 — send it home; logged-in users bounce to /dashboard.
+      GoRoute(path: '/', redirect: (_, _) => '/home'),
       GoRoute(path: '/splash', builder: (_, _) => const SplashScreen()),
       GoRoute(path: '/home', builder: (_, _) => const PublicHome()),
       GoRoute(path: '/login', builder: (_, _) => const LoginScreen()),
