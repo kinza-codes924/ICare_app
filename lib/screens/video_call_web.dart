@@ -781,9 +781,13 @@ class _VideoCallWebState extends State<VideoCall> {
     } catch (_) {}
   }
 
-  Future<String?> _fetchJitsiToken(String room) async {
+  Future<String?> _fetchJitsiToken(String room, String displayName) async {
     try {
-      final response = await ApiService().post('/jitsi/token', {'room': room});
+      // displayName MUST be sent here: with JWT auth Jitsi shows the name
+      // from the token's context.user.name, which overrides userInfo — the
+      // app auth JWT carries no name, so without this the tiles say "User".
+      final response = await ApiService()
+          .post('/jitsi/token', {'room': room, 'displayName': displayName});
       return response.data['token']?.toString();
     } catch (e) {
       debugPrint('Jitsi token fetch error: $e');
@@ -798,20 +802,21 @@ class _VideoCallWebState extends State<VideoCall> {
       final roomName = 'icare${raw.substring(0, raw.length.clamp(0, 50))}';
       var displayName = widget.currentUserName.isNotEmpty ? widget.currentUserName : 'User';
 
-      // Moderator status is decided server-side (doctor = moderator, patient
-      // = not) so a patient can never end up moderator just by joining first.
-      final jwt = await _fetchJitsiToken(roomName);
-      final authToken = await SharedPref().getToken() ?? '';
-
-      // If widget.currentUserName is empty or the placeholder 'User', try to
-      // resolve the real name from SharedPreferences (handles incoming-call path
-      // where the caller screen may not have the name yet).
+      // Resolve the real name BEFORE fetching the Jitsi token — the token
+      // embeds the display name, and that embedded name is what appears on
+      // the video tiles (handles incoming-call path where the caller screen
+      // may not have the name yet).
       if (displayName == 'User' || displayName.isEmpty) {
         final userData = await SharedPref().getUserData();
         if (userData != null && userData.name.isNotEmpty) {
           displayName = userData.name;
         }
       }
+
+      // Moderator status is decided server-side (doctor = moderator, patient
+      // = not) so a patient can never end up moderator just by joining first.
+      final jwt = await _fetchJitsiToken(roomName, displayName);
+      final authToken = await SharedPref().getToken() ?? '';
 
       final subject = widget.remoteUserName.isNotEmpty
           ? 'Consultation with ${widget.remoteUserName}'

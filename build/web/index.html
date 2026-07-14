@@ -112,6 +112,57 @@
     var _consultAuthToken = null;
     var _consultChatChannel = null;
     var _consultSenderName = null;
+    var _consultSubject = null;
+    var _consultFilePoller = null;
+    var _consultFileCursor = 0;
+
+    // Push a message INTO the Jitsi iframe (icare-custom.js listens on the other side)
+    function _postToJitsi(msg) {
+      try {
+        if (!_jitsiApi) return;
+        var ifr = _jitsiApi.getIFrame();
+        if (ifr && ifr.contentWindow) {
+          ifr.contentWindow.postMessage(msg, 'https://' + _JITSI_DOMAIN);
+        }
+      } catch(_) {}
+    }
+
+    // Poll the call-chat API and forward file messages (img:/doc: payloads)
+    // into the Jitsi iframe so both parties see shared files in the
+    // "File Upload" tab.  Also re-pushes the per-user consultation title so
+    // icare-custom.js can override the subject text even if it loads late.
+    function _startConsultFilePoller() {
+      _stopConsultFilePoller();
+      _consultFileCursor = 0;
+      _consultFilePoller = setInterval(function() {
+        if (!_jitsiApi) return;
+        if (_consultSubject) _postToJitsi({ type: 'icare-subject', text: _consultSubject });
+        var token = _consultAuthToken || localStorage.getItem('flutter.token');
+        if (!token || !_consultChatChannel) return;
+        fetch('https://icare-backend-inky.vercel.app/api/call-chat/messages/'
+              + encodeURIComponent(_consultChatChannel) + '?since=' + _consultFileCursor, {
+          headers: { 'Authorization': 'Bearer ' + token },
+        }).then(function(r) { return r.json(); })
+          .then(function(j) {
+            var msgs = (j && j.messages) || [];
+            if (!msgs.length) return;
+            var files = [];
+            msgs.forEach(function(m) {
+              var t = (m.text || '') + '';
+              var ts = Date.parse(m.createdAt || '') || 0;
+              if (ts > _consultFileCursor) _consultFileCursor = ts;
+              if (t.indexOf('img:') === 0 || t.indexOf('doc:') === 0) {
+                files.push({ sender: m.sender || 'User', text: t, ts: ts });
+              }
+            });
+            if (files.length) _postToJitsi({ type: 'icare-file-list', files: files });
+          }).catch(function(){});
+      }, 4000);
+    }
+
+    function _stopConsultFilePoller() {
+      if (_consultFilePoller) { clearInterval(_consultFilePoller); _consultFilePoller = null; }
+    }
 
 
     // Load our self-hosted server's external_api.js script once
@@ -127,6 +178,7 @@
     function _onJitsiClosed(reason) {
       if (_jitsiClosed) return;
       _jitsiClosed = true;
+      _stopConsultFilePoller();
       console.log('Jitsi: closed event', reason);
       try { if (_jitsiApi) { _jitsiApi.dispose(); _jitsiApi = null; } } catch(_) {}
       try { var cc = document.getElementById('jitsi-container'); if (cc) cc.innerHTML = ''; } catch(_) {}
@@ -138,6 +190,7 @@
       _consultAuthToken = authToken || localStorage.getItem('flutter.token') || null;
       _consultChatChannel = chatChannelName || roomName;
       _consultSenderName = displayName || 'User';
+      _consultSubject = subject || null;
 
       return new Promise(function(resolve) {
         var checkContainer = function(retries) {
@@ -181,8 +234,11 @@
                   filmstrip: { disableResizable: false },
                   startWithAudioMuted: false,
                   startWithVideoMuted: audioOnly === true,
-                  // subject set per-user locally (not via executeCommand which broadcasts to all)
-                  subject: subject || 'iCare Consultation',
+                  // localSubject is per-user and never broadcast.  Plain `subject`
+                  // must NOT be used here: the doctor is the room moderator, so
+                  // their subject would propagate via XMPP to every participant
+                  // and overwrite the patient's title with the doctor's one.
+                  localSubject: subject || 'iCare Consultation',
                   disabledNotifications: ['notify.moderator'],
                   // NOTE: enableUserRolesBasedOnToken intentionally omitted — it makes
                   // the client assume moderator status merely from HAVING a valid JWT,
@@ -206,6 +262,7 @@
                 console.log('Jitsi: participant left');
               });
 
+              _startConsultFilePoller();
               setTimeout(window.raiseFlutterLayer, 1200);
               console.log('Jitsi: joining room', roomName, 'as', displayName, '| subject:', subject);
               resolve('ok');
@@ -241,6 +298,7 @@
 
     window.jitsiLeave = function() {
       return new Promise(function(resolve) {
+        _stopConsultFilePoller();
         try { if (_jitsiApi) { _jitsiApi.dispose(); _jitsiApi = null; } } catch(_) {}
         try {
           var c = document.getElementById('jitsi-container');
