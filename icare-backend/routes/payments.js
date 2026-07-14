@@ -400,9 +400,13 @@ router.post('/create', authMiddleware, async (req, res) => {
     // may be a fresh tab with no in-memory app state) can look up exactly
     // this payment and route accordingly, instead of only showing a generic
     // "go to dashboard" message.
+    // MUST be a path segment, not a query param — Safepay appends its own
+    // "?tracker=..." to this URL blindly (verified against the live
+    // sandbox: it does NOT check for an existing "?" first), which would
+    // mangle "...?pid=xxx?tracker=yyy" into one unparsable query string.
     const withPid = (url) => {
       if (!url) return '';
-      return `${url}${url.includes('?') ? '&' : '?'}pid=${payment._id}`;
+      return `${url.replace(/\/+$/, '')}/${payment._id}`;
     };
     const params = new URLSearchParams({
       tracker,

@@ -154,7 +154,12 @@ final routerProvider = Provider<GoRouter>((ref) {
         // /lms/catalog, /lms/course/*, /verify, and the legal pages remain
         // accessible to everyone regardless of login state.
         const alwaysAccessible = ['/lms/catalog', '/verify', '/privacypolicy', '/terms', '/refund-policy', '/about-us', '/help', '/payment-success', '/payment-cancelled'];
-        if (isPublic && path != '/splash' && !alwaysAccessible.contains(path) &&
+        // Prefix match (not exact) — /payment-success/<pid> carries our own
+        // payment id as a path segment and must stay reachable for logged-in
+        // users too, otherwise they get bounced to /dashboard before the
+        // screen even mounts.
+        final isAlwaysAccessible = alwaysAccessible.any((p) => path == p || path.startsWith('$p/'));
+        if (isPublic && path != '/splash' && !isAlwaysAccessible &&
             !path.startsWith('/lms/course')) {
           return '/dashboard';
         }
@@ -168,6 +173,19 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/', redirect: (_, _) => '/home'),
       // Safepay sends the checkout tab here after payment — a clear
       // confirmation instead of a one-second flash + dashboard redirect.
+      // Our payment id travels as a PATH segment (/payment-success/<pid>),
+      // not a query param — Safepay appends its own "?tracker=..." to this
+      // URL blindly (without checking for an existing "?"), which mangles
+      // a query-param pid into an unparsable "?pid=xxx?tracker=yyy" mess.
+      GoRoute(
+        path: '/payment-success/:pid',
+        builder: (_, state) => PaymentSuccessScreen(paymentId: state.pathParameters['pid']),
+      ),
+      GoRoute(
+        path: '/payment-cancelled/:pid',
+        builder: (_, state) => PaymentSuccessScreen(cancelled: true, paymentId: state.pathParameters['pid']),
+      ),
+      // Fallback for any old links without the pid segment.
       GoRoute(
         path: '/payment-success',
         builder: (_, state) => PaymentSuccessScreen(paymentId: state.uri.queryParameters['pid']),
