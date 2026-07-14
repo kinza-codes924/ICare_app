@@ -13,6 +13,8 @@ const appointmentSchema = new mongoose.Schema({
     enum: ['pending', 'confirmed', 'completed', 'cancelled', 'in_progress', 'missed'],
     default: 'pending',
   },
+  // Set to 'paid' by the payments flow once the consultation fee clears.
+  paymentStatus: { type: String, enum: ['unpaid', 'paid'], default: 'unpaid' },
   // Patient rating after completed consultation (optional)
   rating: { type: Number, min: 1, max: 5 },
   ratingComment: { type: String, default: '' },

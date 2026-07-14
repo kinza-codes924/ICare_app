@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 import 'package:icare/screens/lab_booking_details.dart';
 import 'package:icare/utils/error_handler.dart';
 import 'package:icare/screens/lab_result_entry_screen.dart';
+import 'package:icare/services/payment_service.dart';
 
 class LabBookingsManagement extends StatefulWidget {
   final String? initialFilter;
@@ -114,6 +115,142 @@ class _LabBookingsManagementState extends State<LabBookingsManagement>
       setState(() => _isLoading = false);
       if (mounted) {
         ErrorHandler.showSnackBar(context, e, onRetry: _loadBookings);
+      }
+    }
+  }
+
+  /// Payment banner for a booking that hasn't reached sample collection:
+  /// paid → green chip; cash pending → collect button; online pending → note.
+  Widget _buildPaymentBanner(Map<String, dynamic> booking) {
+    final method = booking['paymentMethod']?.toString();
+    final payStatus = booking['paymentStatus']?.toString() ?? 'unpaid';
+    final price = _calcPrice(booking);
+
+    if (payStatus == 'paid') {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: const Color(0xFFECFDF5),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: const Color(0xFFA7F3D0)),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.verified_rounded, size: 15, color: Color(0xFF059669)),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                method == 'cash' ? 'Cash collected — PKR $price received' : 'Paid online — PKR $price received',
+                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF059669)),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (method == 'cash') {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: const Color(0xFFFFF7ED),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: const Color(0xFFFED7AA)),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.payments_outlined, size: 15, color: Color(0xFFEA580C)),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Cash payment pending — collect PKR $price before taking the sample',
+                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFFEA580C)),
+              ),
+            ),
+            const SizedBox(width: 8),
+            ElevatedButton.icon(
+              onPressed: () => _markCashCollected(booking),
+              icon: const Icon(Icons.price_check_rounded, size: 16),
+              label: const Text('Cash Collected', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF059669),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                elevation: 0,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFF7ED),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: const Color(0xFFFED7AA)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.payments_outlined, size: 15, color: Color(0xFFEA580C)),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              method == 'safepay'
+                  ? 'Online payment pending — patient has not paid yet'
+                  : 'Payment must be received before sample collection',
+              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFFEA580C)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _markCashCollected(Map<String, dynamic> booking) async {
+    final price = _calcPrice(booking);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Confirm Cash Collection'),
+        content: Text(
+          'Confirm that you have received PKR $price in cash for this test? '
+          'This will unlock sample collection.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Back')),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF059669), foregroundColor: Colors.white),
+            child: const Text('Yes, Cash Received'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    try {
+      await PaymentService().markCashCollectedByRef(
+        type: 'lab',
+        refId: booking['_id'].toString(),
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Cash collection confirmed — sample collection unlocked'),
+            backgroundColor: Colors.green,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+      _loadBookings();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not confirm: $e'), backgroundColor: Colors.red),
+        );
       }
     }
   }
@@ -1363,26 +1500,7 @@ class _LabBookingsManagementState extends State<LabBookingsManagement>
             ),
             if (['pending', 'confirmed', 'accepted'].contains(status.toLowerCase())) ...[
               const SizedBox(height: 10),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFFF7ED),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: const Color(0xFFFED7AA)),
-                ),
-                child: const Row(
-                  children: [
-                    Icon(Icons.payments_outlined, size: 15, color: Color(0xFFEA580C)),
-                    SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Payment must be received before sample collection',
-                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFFEA580C)),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+              _buildPaymentBanner(booking),
             ],
             Wrap(
               spacing: 4,

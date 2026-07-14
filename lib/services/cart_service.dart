@@ -60,14 +60,16 @@ class CartService {
     }
   }
 
-  // Checkout
+  // Checkout — paymentMethod: 'cash' (cash on delivery) | 'card' (Safepay)
   Future<Map<String, dynamic>> checkout({
     required String deliveryAddress,
     String? pharmacyId,
+    String paymentMethod = 'cash',
   }) async {
     try {
       final response = await _apiService.post('/cart/checkout', {
         'deliveryAddress': deliveryAddress,
+        'paymentMethod': paymentMethod,
         if (pharmacyId != null) 'pharmacyId': pharmacyId,
       });
       return response.data;

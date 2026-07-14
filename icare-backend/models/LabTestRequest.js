@@ -37,6 +37,10 @@ const labTestRequestSchema = new mongoose.Schema({
   report_notes: String,
   medical_record_id: String,
   doctor_id: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  // Payment tracking — payment must clear (card or cash collected) BEFORE
+  // the lab proceeds to sample collection.
+  paymentMethod: { type: String, enum: ['safepay', 'cash', null], default: null },
+  paymentStatus: { type: String, enum: ['unpaid', 'cash_pending', 'paid'], default: 'unpaid' },
 }, { timestamps: true, strict: false });
 
 module.exports = mongoose.models.LabTestRequest || mongoose.model('LabTestRequest', labTestRequestSchema);

@@ -453,6 +453,27 @@ router.put('/bookings/:bookingId', authMiddleware, async (req, res) => {
       return res.status(400).json({ success: false, message: 'No fields to update' });
     }
 
+    // ── Payment gate: no sample collection / processing / results until the
+    //    payment has cleared (card paid or cash marked collected). Only
+    //    applies to bookings that went through the payment flow
+    //    (paymentMethod set) — legacy and lab walk-in bookings are exempt.
+    const GATED_STATUSES = ['sample_collected', 'processing', 'awaiting_reports', 'reporting_done', 'completed'];
+    if (update.status && GATED_STATUSES.includes(update.status)) {
+      const existing = await LabTestRequest.findById(toId(req.params.bookingId))
+        .select('paymentStatus paymentMethod price').lean();
+      const price = Number(existing?.price) || 0;
+      if (price > 0 && existing?.paymentMethod && existing?.paymentStatus !== 'paid') {
+        const hint = existing.paymentMethod === 'cash'
+          ? 'Mark the cash as collected first.'
+          : 'The patient has not completed the online payment yet.';
+        return res.status(402).json({
+          success: false,
+          code: 'PAYMENT_REQUIRED',
+          message: `Payment pending — ${hint}`,
+        });
+      }
+    }
+
     const booking = await LabTestRequest.findOneAndUpdate(
       { _id: toId(req.params.bookingId), $or: [{ patient_id: userId }, { lab_id: userId }] },
       { $set: update },

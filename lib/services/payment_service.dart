@@ -20,6 +20,7 @@ class PaymentService {
   Future<Map<String, dynamic>> createPayment({
     required String type, // 'course' | 'appointment' | 'lab' | 'pharmacy'
     required String refId,
+    String method = 'safepay', // 'safepay' | 'cash' (lab collection / pharmacy COD)
     String? voucherCode,
     String? redirectUrl,
     String? cancelUrl,
@@ -27,9 +28,59 @@ class PaymentService {
     final response = await _api.post('/payments/create', {
       'type': type,
       'refId': refId,
+      'method': method,
       if (voucherCode != null && voucherCode.isNotEmpty) 'voucherCode': voucherCode,
       if (redirectUrl != null) 'redirectUrl': redirectUrl,
       if (cancelUrl != null) 'cancelUrl': cancelUrl,
+    });
+    return Map<String, dynamic>.from(response.data as Map);
+  }
+
+  /// Payee (lab/pharmacy) confirms cash was received — fulfills the payment.
+  Future<Map<String, dynamic>> markCashCollected(String paymentId) async {
+    final response = await _api.post('/payments/$paymentId/cash-collected', {});
+    return Map<String, dynamic>.from(response.data as Map);
+  }
+
+  /// Same, but looked up by booking/order id (lab & pharmacy screens).
+  Future<Map<String, dynamic>> markCashCollectedByRef({
+    required String type, // 'lab' | 'pharmacy'
+    required String refId,
+  }) async {
+    final response = await _api.post('/payments/cash-collected-by-ref', {
+      'type': type,
+      'refId': refId,
+    });
+    return Map<String, dynamic>.from(response.data as Map);
+  }
+
+  /// Payee's cash payments still awaiting collection.
+  Future<List<Map<String, dynamic>>> pendingCash() async {
+    final response = await _api.get('/payments/pending-cash');
+    final list = (response.data['payments'] as List?) ?? [];
+    return list.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+  }
+
+  /// Admin revenue report with filters.
+  Future<Map<String, dynamic>> adminReport({
+    String? type,
+    String? payeeId,
+    String? method,
+    String? status,
+    DateTime? from,
+    DateTime? to,
+    double? minAmount,
+    double? maxAmount,
+  }) async {
+    final response = await _api.get('/payments/report', queryParameters: {
+      if (type != null && type.isNotEmpty) 'type': type,
+      if (payeeId != null && payeeId.isNotEmpty) 'payeeId': payeeId,
+      if (method != null && method.isNotEmpty) 'method': method,
+      if (status != null && status.isNotEmpty) 'status': status,
+      if (from != null) 'from': from.toIso8601String(),
+      if (to != null) 'to': to.toIso8601String(),
+      if (minAmount != null) 'minAmount': minAmount.toString(),
+      if (maxAmount != null) 'maxAmount': maxAmount.toString(),
     });
     return Map<String, dynamic>.from(response.data as Map);
   }

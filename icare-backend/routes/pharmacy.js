@@ -688,6 +688,31 @@ router.post('/orders', authMiddleware, async (req, res) => {
 });
 
 // ─── UPDATE ORDER STATUS ──────────────────────────────────────────────────────
+// COD settlement: when a cash-on-delivery order is delivered, the rider has
+// collected the cash — mark the Payment record paid so it lands in the
+// admin revenue report and the order shows as paid.
+async function _settleCodOnDelivery(order, byUserId) {
+  try {
+    if (!order || order.paymentMethod !== 'cash' || order.paymentStatus === 'paid') return;
+    const Payment = require('../models/Payment');
+    const payment = await Payment.findOne({ type: 'pharmacy', refId: order._id, method: 'cash' })
+      .sort({ createdAt: -1 });
+    if (payment && payment.status !== 'paid') {
+      payment.status = 'paid';
+      payment.paidAt = new Date();
+      payment.cashCollectedAt = new Date();
+      payment.cashCollectedBy = byUserId || null;
+      payment.fulfilled = true;
+      payment.fulfilledAt = new Date();
+      await payment.save();
+    }
+    await PharmacyOrder.findByIdAndUpdate(order._id, { paymentStatus: 'paid' });
+    console.log(`[COD] order ${order.order_number || order._id} cash settled on delivery`);
+  } catch (e) {
+    console.error('[COD] settle error:', e.message);
+  }
+}
+
 router.put('/update_order_status/:id', authMiddleware, async (req, res) => {
   try {
     await connectMongoDB();
@@ -725,7 +750,10 @@ router.put('/update_order_status/:id', authMiddleware, async (req, res) => {
     if (notifPayload && order.patient_id && String(order.patient_id) !== String(userId)) {
       sendToUser(order.patient_id, { ...notifPayload, data: { orderId: String(order._id), type: notifPayload.type } }).catch(() => {});
     }
-    if (status === 'delivered' || status === 'completed') _sendDeliveredEmail(order);
+    if (status === 'delivered' || status === 'completed') {
+      _sendDeliveredEmail(order);
+      _settleCodOnDelivery(order, userId);
+    }
 
     res.json({ success: true, message: 'Order updated successfully', order: { ...order.toObject(), _id: order._id.toString() } });
   } catch (err) {
@@ -771,7 +799,10 @@ router.put('/orders/:id', authMiddleware, async (req, res) => {
     if (notifPayload2 && order.patient_id && String(order.patient_id) !== String(userId)) {
       sendToUser(order.patient_id, { ...notifPayload2, data: { orderId: String(order._id), type: notifPayload2.type } }).catch(() => {});
     }
-    if (status === 'delivered' || status === 'completed') _sendDeliveredEmail(order);
+    if (status === 'delivered' || status === 'completed') {
+      _sendDeliveredEmail(order);
+      _settleCodOnDelivery(order, userId);
+    }
 
     res.json({ success: true, message: 'Order updated', order: { ...order.toObject(), _id: order._id.toString() } });
   } catch (err) {

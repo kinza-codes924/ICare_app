@@ -32,6 +32,9 @@ const pharmacyOrderSchema = new mongoose.Schema({
   medicines:       { type: String, default: '' },
   deliveryOption:  { type: String, enum: ['pickup', 'delivery'], default: 'pickup' },
   notes:           { type: String, default: '' },
+  // Payment tracking — set by the payments flow (Safepay or cash on delivery)
+  paymentMethod:   { type: String, enum: ['safepay', 'cash', null], default: null },
+  paymentStatus:   { type: String, enum: ['unpaid', 'cash_pending', 'paid'], default: 'unpaid' },
 }, { timestamps: true });
 
 // ── Self-healing: drop the stale unique index on orderNumber that causes

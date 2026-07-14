@@ -1,9 +1,12 @@
 import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:easy_localization/easy_localization.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:icare/screens/login.dart';
 import 'package:icare/services/cart_service.dart';
+import 'package:icare/services/payment_service.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:icare/utils/shared_pref.dart';
 import 'package:icare/utils/theme.dart';
 import 'package:icare/widgets/back_button.dart';
@@ -736,12 +739,22 @@ class _CheckoutScreenState extends State<_CheckoutScreen> {
     setState(() => _isPlacing = true);
 
     final address = '${_addressCtrl.text.trim()}, ${_cityCtrl.text.trim()}';
+    final isCash = _paymentMethod.toLowerCase().contains('cash');
 
     try {
-      final result = await widget.cartService.checkout(deliveryAddress: address);
+      final result = await widget.cartService.checkout(
+        deliveryAddress: address,
+        paymentMethod: isCash ? 'cash' : 'card',
+      );
       if (mounted) {
         if (result['success'] == true) {
-          _showOrderSuccess();
+          final orderId = result['order']?['_id']?.toString();
+          if (!isCash && orderId != null) {
+            // Card / Wallet / GPay — open Safepay checkout and wait for it.
+            await _payOnlineForOrder(orderId);
+          } else {
+            _showOrderSuccess();
+          }
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -770,6 +783,87 @@ class _CheckoutScreenState extends State<_CheckoutScreen> {
       }
     } finally {
       if (mounted) setState(() => _isPlacing = false);
+    }
+  }
+
+  /// Safepay flow for a just-created pharmacy order: open the hosted
+  /// checkout, show a waiting dialog, poll until the backend confirms.
+  Future<void> _payOnlineForOrder(String orderId) async {
+    bool cancelled = false;
+    try {
+      final create = await PaymentService().createPayment(
+        type: 'pharmacy',
+        refId: orderId,
+        redirectUrl: kIsWeb ? '${Uri.base.origin}/dashboard' : null,
+        cancelUrl: kIsWeb ? '${Uri.base.origin}/dashboard' : null,
+      );
+      if (create['free'] == true) {
+        if (mounted) _showOrderSuccess();
+        return;
+      }
+      final checkoutUrl = create['checkoutUrl']?.toString();
+      final paymentId = create['paymentId']?.toString();
+      if (checkoutUrl == null || paymentId == null) {
+        throw Exception('Payment gateway did not return a checkout link');
+      }
+
+      await launchUrl(Uri.parse(checkoutUrl), mode: LaunchMode.externalApplication);
+      if (!mounted) return;
+
+      // Waiting dialog while the user pays in the Safepay tab
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const CircularProgressIndicator(),
+              const SizedBox(height: 20),
+              Text(
+                'Complete your payment in the Safepay tab — this screen will update automatically.'.tr(),
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 13.5, color: Color(0xFF64748B), height: 1.5),
+              ),
+              const SizedBox(height: 12),
+              TextButton(
+                onPressed: () { cancelled = true; Navigator.pop(ctx); },
+                child: Text('Cancel'.tr()),
+              ),
+            ],
+          ),
+        ),
+      );
+
+      final paid = await PaymentService().pollUntilPaid(
+        paymentId,
+        isCancelled: () => cancelled || !mounted,
+      );
+
+      if (!mounted) return;
+      if (!cancelled) Navigator.of(context, rootNavigator: true).pop(); // close waiting dialog
+
+      if (paid) {
+        _showOrderSuccess();
+      } else if (!cancelled) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Payment was not completed. Your order is saved — the pharmacy will contact you, or you can reorder and pay again.'.tr(),
+            ),
+            backgroundColor: Colors.orange,
+            duration: const Duration(seconds: 6),
+          ),
+        );
+        Navigator.pop(context, true);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Payment error: $e'), backgroundColor: Colors.red),
+        );
+      }
     }
   }
 
@@ -1067,10 +1161,10 @@ class _CheckoutScreenState extends State<_CheckoutScreen> {
   }
 
   Widget _buildPaymentMethod() {
-    // Only Cash on Delivery and Credit/Debit Card
+    // Home delivery: pay cash to the rider, or pay online via Safepay
     final methods = [
       {'label': 'Cash on Delivery'.tr(), 'icon': Icons.money_rounded, 'color': const Color(0xFF10B981)},
-      {'label': 'Credit / Debit Card'.tr(), 'icon': Icons.credit_card_rounded, 'color': const Color(0xFF3B82F6)},
+      {'label': 'Card / Wallet / GPay'.tr(), 'icon': Icons.credit_card_rounded, 'color': const Color(0xFF3B82F6)},
     ];
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,

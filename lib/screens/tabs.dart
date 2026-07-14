@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:icare/widgets/whatsapp_button.dart';
 import 'package:icare/screens/admin_dashboard.dart';
+import 'package:icare/screens/admin_payments_screen.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_size_matters/flutter_size_matters.dart';
 import 'package:icare/navigators/bottom_tab_bar.dart';
@@ -1345,6 +1346,18 @@ class _WebSidebarState extends ConsumerState<_WebSidebar> {
                       Navigator.of(context).push(
                         MaterialPageRoute(
                           builder: (ctx) => const AnalyticsDashboardScreen(),
+                        ),
+                      );
+                    },
+                  ),
+                  _buildExtraNavItem(
+                    context,
+                    Icons.payments_outlined,
+                    'Payments & Revenue',
+                    () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (ctx) => const AdminPaymentsScreen(),
                         ),
                       );
                     },

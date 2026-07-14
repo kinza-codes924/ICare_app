@@ -74,8 +74,8 @@ import 'package:icare/screens/student_lms_dashboard.dart';
 import 'package:icare/screens/certificates_screen.dart';
 import 'package:icare/screens/assessments_screen.dart';
 import 'package:icare/screens/admin_lms_payments_screen.dart';
+import 'package:icare/screens/admin_payments_screen.dart';
 import 'package:icare/screens/about_us.dart';
-import 'package:icare/screens/help_and_support.dart';
 import 'package:icare/utils/shared_pref.dart';
 import 'package:icare/utils/app_keys.dart';
 
@@ -214,6 +214,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(path: '/admin/verifications', builder: (_, _) => const AdminVerificationPanel()),
       GoRoute(path: '/admin/lms-payments', builder: (_, _) => const AdminLmsPaymentsScreen()),
+      GoRoute(path: '/admin/payments', builder: (_, _) => const AdminPaymentsScreen()),
 
       // Shared / cross-role routes
       GoRoute(path: '/tasks', builder: (_, _) => const TaskScreen()),

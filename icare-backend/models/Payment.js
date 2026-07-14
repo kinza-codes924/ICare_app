@@ -11,10 +11,23 @@ const paymentSchema = new mongoose.Schema({
   type: { type: String, enum: ['course', 'appointment', 'lab', 'pharmacy'], required: true },
   refId: { type: mongoose.Schema.Types.ObjectId, required: true }, // courseId / appointmentId / labBookingId / orderId
 
+  // Who receives the money — instructor (course), doctor (appointment),
+  // lab (lab test) or pharmacy (order). Powers the admin per-entity report.
+  payeeId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null, index: true },
+
+  // How the payment is made: Safepay gateway (card/wallet/GPay) or cash
+  // (lab: cash at collection; pharmacy: cash on delivery). Cash payments are
+  // fulfilled when staff marks the cash as collected.
+  method: { type: String, enum: ['safepay', 'cash'], default: 'safepay', index: true },
+  cashCollectedAt: { type: Date, default: null },
+  cashCollectedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+
   // Money — server-calculated. amount is in the lowest denomination sent to Safepay (paisa NOT used; Safepay PKR uses rupees x100? -> we store both)
   currency: { type: String, default: 'PKR' },
-  amount: { type: Number, required: true },        // rupees (display value)
+  amount: { type: Number, required: true },        // rupees actually charged (after discount)
   amountLowest: { type: Number, required: true },  // value sent to Safepay (lowest denomination)
+  originalAmount: { type: Number, default: null }, // rupees before discount (null = no discount)
+  discountAmount: { type: Number, default: 0 },    // originalAmount - amount
 
   // Voucher applied at creation time (discount already reflected in amount)
   voucherCode: { type: String, default: null },

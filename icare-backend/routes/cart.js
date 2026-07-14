@@ -226,6 +226,8 @@ router.post('/checkout', authMiddleware, async (req, res) => {
     if (!userId) return res.status(400).json({ success: false, message: 'Invalid user ID in token' });
 
     const { deliveryAddress, pharmacyId } = req.body;
+    // 'cash' = cash on delivery (home delivery), 'card' = Safepay online
+    const paymentMethod = req.body.paymentMethod === 'cash' ? 'cash' : 'card';
     if (!deliveryAddress || !String(deliveryAddress).trim()) {
       return res.status(400).json({ success: false, message: 'Delivery address is required' });
     }
@@ -296,13 +298,41 @@ router.post('/checkout', authMiddleware, async (req, res) => {
       total_amount:     totalAmount + deliveryFee,
       delivery_fee:     deliveryFee,
       delivery_address: String(deliveryAddress).trim(),
+      deliveryOption:   'delivery',
       status:           'pending',
       order_number:     `ORD-${Date.now()}-${Math.random().toString(36).substr(2,5).toUpperCase()}`,
       items:            orderItems,
+      paymentMethod:    paymentMethod === 'cash' ? 'cash' : 'safepay',
+      paymentStatus:    paymentMethod === 'cash' ? 'cash_pending' : 'unpaid',
       ...(prescriptionId ? { prescription_id: prescriptionId } : {}),
     };
 
     const order = await PharmacyOrder.create(orderPayload);
+
+    // Cash on delivery: record the pending cash payment so it shows up in the
+    // admin revenue report and the pharmacy can mark it collected on delivery.
+    if (paymentMethod === 'cash') {
+      try {
+        const Payment = require('../models/Payment');
+        await Payment.create({
+          userId,
+          type: 'pharmacy',
+          refId: order._id,
+          payeeId: resolvedPharmacyId || null,
+          method: 'cash',
+          currency: 'PKR',
+          amount: order.total_amount,
+          amountLowest: Math.round(order.total_amount * 100),
+          originalAmount: order.total_amount,
+          discountAmount: 0,
+          safepayTracker: `cash_${order._id.toString()}`,
+          status: 'pending',
+          notes: `Pharmacy order ${order.order_number} (cash on delivery)`,
+        });
+      } catch (e) {
+        console.error('COD payment record error:', e.message);
+      }
+    }
 
     // 5. Decrement stock (best-effort, never block the response)
     for (const item of cartItems) {

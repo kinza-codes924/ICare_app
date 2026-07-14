@@ -25,6 +25,11 @@ const Payment = require('../models/Payment');
 const PaymentLog = require('../models/PaymentLog');
 const Course = require('../models/Course');
 const Enrollment = require('../models/Enrollment');
+const Appointment = require('../models/Appointment');
+const DoctorProfile = require('../models/DoctorProfile');
+const LabTestRequest = require('../models/LabTestRequest');
+const PharmacyOrder = require('../models/PharmacyOrder');
+const User = require('../models/User');
 const { Voucher, applyVoucherDiscount } = require('./vouchers');
 
 // ─── Config helpers ───────────────────────────────────────────────────────────
@@ -84,12 +89,15 @@ async function safepayGet(path) {
 }
 
 // ─── Server-side amount calculation per payment type ──────────────────────────
-// Returns { amount (PKR rupees), description, voucherCode } or throws.
+// Returns { amount, originalAmount, payeeId, description, voucherCode } or throws.
+// payeeId = who receives the money (instructor/doctor/lab/pharmacy) — powers
+// the admin per-entity revenue report.
 async function calculateAmount({ type, refId, voucherCode, userId }) {
   if (type === 'course') {
     const course = await Course.findById(refId).lean();
     if (!course) throw new Error('Course not found');
-    let amount = course.isFree ? 0 : (course.discountedPrice || course.price || 0);
+    const original = course.isFree ? 0 : (course.discountedPrice || course.price || 0);
+    let amount = original;
     let appliedVoucher = null;
     if (voucherCode) {
       const voucher = await Voucher.findOne({ code: String(voucherCode).trim().toUpperCase() });
@@ -102,9 +110,58 @@ async function calculateAmount({ type, refId, voucherCode, userId }) {
       amount = applyVoucherDiscount(voucher, course.price || 0);
       appliedVoucher = voucher.code;
     }
-    return { amount: Math.max(0, Number(amount) || 0), description: `Course: ${course.title || refId}`, voucherCode: appliedVoucher };
+    return {
+      amount: Math.max(0, Number(amount) || 0),
+      originalAmount: Math.max(0, Number(original) || 0),
+      payeeId: course.instructor_id || null,
+      description: `Course: ${course.title || refId}`,
+      voucherCode: appliedVoucher,
+    };
   }
-  // Future: appointment / lab / pharmacy amount calculation goes here.
+
+  if (type === 'appointment') {
+    const appt = await Appointment.findById(refId).lean();
+    if (!appt) throw new Error('Appointment not found');
+    if (appt.patient_id?.toString() !== String(userId)) throw new Error('Not your appointment');
+    if (appt.paymentStatus === 'paid') throw new Error('This appointment is already paid');
+    const profile = await DoctorProfile.findOne({ user_id: appt.doctor_id }).lean();
+    const fee = Number(profile?.consultation_fee) || 0;
+    return {
+      amount: fee, originalAmount: fee,
+      payeeId: appt.doctor_id || null,
+      description: 'Doctor consultation fee',
+      voucherCode: null,
+    };
+  }
+
+  if (type === 'lab') {
+    const booking = await LabTestRequest.findById(refId).lean();
+    if (!booking) throw new Error('Lab booking not found');
+    if (booking.patient_id?.toString() !== String(userId)) throw new Error('Not your booking');
+    if (booking.paymentStatus === 'paid') throw new Error('This booking is already paid');
+    const price = Number(booking.price) || 0;
+    return {
+      amount: price, originalAmount: price,
+      payeeId: booking.lab_id || null,
+      description: `Lab test: ${booking.test_type || refId}`,
+      voucherCode: null,
+    };
+  }
+
+  if (type === 'pharmacy') {
+    const order = await PharmacyOrder.findById(refId).lean();
+    if (!order) throw new Error('Order not found');
+    if (order.patient_id?.toString() !== String(userId)) throw new Error('Not your order');
+    if (order.paymentStatus === 'paid') throw new Error('This order is already paid');
+    const total = (Number(order.total_amount) || 0) + (Number(order.delivery_fee) || 0);
+    return {
+      amount: total, originalAmount: total,
+      payeeId: order.pharmacy_id || null,
+      description: `Pharmacy order ${order.order_number || refId}`,
+      voucherCode: null,
+    };
+  }
+
   throw new Error(`Payment type '${type}' not supported yet`);
 }
 
@@ -149,6 +206,44 @@ async function fulfillPayment(payment) {
     return { enrollment };
   }
 
+  if (payment.type === 'appointment') {
+    await Appointment.findByIdAndUpdate(payment.refId, {
+      paymentStatus: 'paid',
+      status: 'confirmed',
+    });
+    payment.fulfilled = true;
+    payment.fulfilledAt = new Date();
+    await payment.save();
+    await plog({ paymentId: payment._id, tracker: payment.safepayTracker, userId: payment.userId, step: 'FULFILLED', message: `Appointment ${payment.refId} confirmed & marked paid` });
+    return {};
+  }
+
+  if (payment.type === 'lab') {
+    await LabTestRequest.findByIdAndUpdate(payment.refId, {
+      paymentStatus: 'paid',
+      paymentMethod: payment.method,
+      status: 'confirmed',
+    });
+    payment.fulfilled = true;
+    payment.fulfilledAt = new Date();
+    await payment.save();
+    await plog({ paymentId: payment._id, tracker: payment.safepayTracker, userId: payment.userId, step: 'FULFILLED', message: `Lab booking ${payment.refId} confirmed & marked paid` });
+    return {};
+  }
+
+  if (payment.type === 'pharmacy') {
+    await PharmacyOrder.findByIdAndUpdate(payment.refId, {
+      paymentStatus: 'paid',
+      paymentMethod: payment.method,
+      status: 'confirmed',
+    });
+    payment.fulfilled = true;
+    payment.fulfilledAt = new Date();
+    await payment.save();
+    await plog({ paymentId: payment._id, tracker: payment.safepayTracker, userId: payment.userId, step: 'FULFILLED', message: `Pharmacy order ${payment.refId} confirmed & marked paid` });
+    return {};
+  }
+
   throw new Error(`No fulfillment handler for type '${payment.type}'`);
 }
 
@@ -180,27 +275,35 @@ async function markPaidAndFulfill(payment, safepayData, source) {
 }
 
 // ─── POST /api/payments/create ────────────────────────────────────────────────
-// Body: { type: 'course', refId, voucherCode?, redirectUrl, cancelUrl }
+// Body: { type: 'course'|'appointment'|'lab'|'pharmacy', refId, voucherCode?,
+//         method?: 'safepay'|'cash', redirectUrl, cancelUrl }
+// method 'cash' (lab: cash at collection / pharmacy: cash on delivery) skips
+// the gateway; staff later confirms via POST /:id/cash-collected.
 router.post('/create', authMiddleware, async (req, res) => {
   let payment = null;
   try {
     await connectMongoDB();
     const { type, refId, voucherCode, redirectUrl, cancelUrl } = req.body;
+    const method = req.body.method === 'cash' ? 'cash' : 'safepay';
     const userId = toId(req.user.id);
 
     if (!type || !refId) return res.status(400).json({ success: false, message: 'type and refId required' });
     const rId = toId(refId);
     if (!rId) return res.status(400).json({ success: false, message: 'Invalid refId' });
-    if (!process.env.SAFEPAY_API_KEY || !process.env.SAFEPAY_SECRET_KEY) {
+    if (method === 'cash' && !['lab', 'pharmacy'].includes(type)) {
+      return res.status(400).json({ success: false, message: 'Cash payment is only available for lab tests and pharmacy orders' });
+    }
+    if (method === 'safepay' && (!process.env.SAFEPAY_API_KEY || !process.env.SAFEPAY_SECRET_KEY)) {
       await plog({ userId, step: 'ERROR', level: 'ERROR', message: 'SAFEPAY keys not configured in env' });
       return res.status(500).json({ success: false, message: 'Payment gateway not configured' });
     }
 
-    await plog({ userId, step: 'PAYMENT_CREATE_REQUESTED', payload: { type, refId, voucherCode: voucherCode || null } });
+    await plog({ userId, step: 'PAYMENT_CREATE_REQUESTED', payload: { type, refId, method, voucherCode: voucherCode || null } });
 
     // 1. Server-side amount
-    const { amount, description, voucherCode: appliedVoucher } = await calculateAmount({ type, refId: rId, voucherCode, userId });
-    await plog({ userId, step: 'AMOUNT_CALCULATED', message: `${description} = PKR ${amount}` });
+    const { amount, originalAmount, payeeId, description, voucherCode: appliedVoucher } =
+      await calculateAmount({ type, refId: rId, voucherCode, userId });
+    await plog({ userId, step: 'AMOUNT_CALCULATED', message: `${description} = PKR ${amount} (original ${originalAmount})` });
 
     // Free (or 100% voucher) — no gateway needed; client should call the normal endpoint.
     if (amount <= 0) {
@@ -208,11 +311,33 @@ router.post('/create', authMiddleware, async (req, res) => {
     }
 
     const amountLowest = Math.round(amount * 100); // PKR lowest denomination
+    const discountAmount = Math.max(0, (Number(originalAmount) || amount) - amount);
+
+    // ── CASH: record the pending payment + flag the booking/order ────────────
+    if (method === 'cash') {
+      payment = await Payment.create({
+        userId, type, refId: rId, payeeId: payeeId || null,
+        method: 'cash',
+        currency: 'PKR', amount, amountLowest,
+        originalAmount: originalAmount ?? amount, discountAmount,
+        voucherCode: appliedVoucher || null,
+        safepayTracker: `cash_${new mongoose.Types.ObjectId().toString()}`,
+        safepayEnvironment: null,
+        status: 'pending',
+        notes: `${description} (cash)`,
+      });
+      const Model = type === 'lab' ? LabTestRequest : PharmacyOrder;
+      await Model.findByIdAndUpdate(rId, { paymentMethod: 'cash', paymentStatus: 'cash_pending' });
+      await plog({ paymentId: payment._id, userId, step: 'STATUS_CHANGED', message: `cash payment registered — awaiting collection (${type})` });
+      return res.json({ success: true, cash: true, paymentId: payment._id, amount, currency: 'PKR' });
+    }
 
     // 2. Create local Payment record first (audit trail even if Safepay call fails)
     payment = await Payment.create({
-      userId, type, refId: rId,
+      userId, type, refId: rId, payeeId: payeeId || null,
+      method: 'safepay',
       currency: 'PKR', amount, amountLowest,
+      originalAmount: originalAmount ?? amount, discountAmount,
       voucherCode: appliedVoucher || null,
       safepayEnvironment: SAFEPAY_ENV(),
       status: 'created',
@@ -366,6 +491,186 @@ router.post('/webhook', async (req, res) => {
     console.error('[SAFEPAY][ERROR][WEBHOOK]', e);
     await plog({ step: 'ERROR', level: 'ERROR', message: `webhook: ${e.message}` });
     res.status(500).json({ success: false });
+  }
+});
+
+// ─── POST /api/payments/:id/cash-collected ────────────────────────────────────
+// Lab/pharmacy staff (the payee) or an admin confirms the cash was received.
+// This is the fulfillment trigger for cash payments — labs must do this
+// BEFORE moving a booking to sample collection.
+router.post('/:id/cash-collected', authMiddleware, async (req, res) => {
+  try {
+    await connectMongoDB();
+    const payment = await Payment.findById(toId(req.params.id));
+    if (!payment) return res.status(404).json({ success: false, message: 'Payment not found' });
+    if (payment.method !== 'cash') {
+      return res.status(400).json({ success: false, message: 'Not a cash payment' });
+    }
+    const isAdmin = (req.user.role || '').toLowerCase() === 'admin';
+    const isPayee = payment.payeeId && payment.payeeId.toString() === String(req.user.id);
+    if (!isAdmin && !isPayee) {
+      await plog({ paymentId: payment._id, userId: toId(req.user.id), step: 'ERROR', level: 'ALERT', message: 'cash-collected attempted by non-payee' });
+      return res.status(403).json({ success: false, message: 'Only the receiving lab/pharmacy can confirm cash collection' });
+    }
+    if (payment.status === 'paid' && payment.fulfilled) {
+      return res.json({ success: true, status: 'paid', message: 'Already collected' });
+    }
+
+    payment.status = 'paid';
+    payment.paidAt = new Date();
+    payment.cashCollectedAt = new Date();
+    payment.cashCollectedBy = toId(req.user.id);
+    await payment.save();
+    await plog({ paymentId: payment._id, userId: toId(req.user.id), step: 'STATUS_CHANGED', message: `-> paid (cash collected by ${req.user.id})` });
+    await fulfillPayment(payment);
+
+    res.json({ success: true, status: 'paid', paymentId: payment._id });
+  } catch (e) {
+    console.error('cash-collected error:', e.message);
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+// ─── POST /api/payments/cash-collected-by-ref ─────────────────────────────────
+// Same as /:id/cash-collected but looked up by { type, refId } — lab/pharmacy
+// screens have the booking/order id, not the payment id.
+router.post('/cash-collected-by-ref', authMiddleware, async (req, res) => {
+  try {
+    await connectMongoDB();
+    const { type, refId } = req.body;
+    if (!type || !refId) return res.status(400).json({ success: false, message: 'type and refId required' });
+    const payment = await Payment.findOne({
+      type, refId: toId(refId), method: 'cash',
+    }).sort({ createdAt: -1 });
+    if (!payment) return res.status(404).json({ success: false, message: 'No cash payment found for this booking' });
+
+    const isAdmin = (req.user.role || '').toLowerCase() === 'admin';
+    const isPayee = payment.payeeId && payment.payeeId.toString() === String(req.user.id);
+    if (!isAdmin && !isPayee) {
+      return res.status(403).json({ success: false, message: 'Only the receiving lab/pharmacy can confirm cash collection' });
+    }
+    if (payment.status === 'paid' && payment.fulfilled) {
+      return res.json({ success: true, status: 'paid', message: 'Already collected' });
+    }
+
+    payment.status = 'paid';
+    payment.paidAt = new Date();
+    payment.cashCollectedAt = new Date();
+    payment.cashCollectedBy = toId(req.user.id);
+    await payment.save();
+    await plog({ paymentId: payment._id, userId: toId(req.user.id), step: 'STATUS_CHANGED', message: `-> paid (cash collected via by-ref by ${req.user.id})` });
+    await fulfillPayment(payment);
+
+    res.json({ success: true, status: 'paid', paymentId: payment._id });
+  } catch (e) {
+    console.error('cash-collected-by-ref error:', e.message);
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+// ─── GET /api/payments/pending-cash — payee's cash payments awaiting collection
+// Lab/pharmacy dashboards call this to show "Cash Collected" buttons.
+router.get('/pending-cash', authMiddleware, async (req, res) => {
+  try {
+    await connectMongoDB();
+    const payments = await Payment.find({
+      payeeId: toId(req.user.id),
+      method: 'cash',
+      status: 'pending',
+    }).sort({ createdAt: -1 }).limit(200).lean();
+    res.json({ success: true, payments });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+// ─── GET /api/payments/report — admin revenue report ─────────────────────────
+// Query: ?type=course|appointment|lab|pharmacy & payeeId= & status=paid &
+//        from=ISO & to=ISO & minAmount= & maxAmount=
+// Returns the filtered payment list (with payer/payee names) PLUS per-payee
+// totals so admin can see "is pharmacy/doctor/lab/instructor ke kitne paise".
+router.get('/report', authMiddleware, roleMiddleware('admin'), async (req, res) => {
+  try {
+    await connectMongoDB();
+    const q = {};
+    if (req.query.type) q.type = req.query.type;
+    if (req.query.payeeId) q.payeeId = toId(req.query.payeeId);
+    if (req.query.method) q.method = req.query.method;
+    q.status = req.query.status || 'paid'; // default: only money actually received
+    if (req.query.status === 'all') delete q.status;
+    if (req.query.from || req.query.to) {
+      q.createdAt = {};
+      if (req.query.from) q.createdAt.$gte = new Date(req.query.from);
+      if (req.query.to) q.createdAt.$lte = new Date(req.query.to);
+    }
+    if (req.query.minAmount || req.query.maxAmount) {
+      q.amount = {};
+      if (req.query.minAmount) q.amount.$gte = Number(req.query.minAmount);
+      if (req.query.maxAmount) q.amount.$lte = Number(req.query.maxAmount);
+    }
+
+    const limit = Math.min(Number(req.query.limit) || 300, 1000);
+    const payments = await Payment.find(q).sort({ createdAt: -1 }).limit(limit).lean();
+
+    // Resolve payer + payee names in one query each
+    const userIds = [...new Set(payments.flatMap(p => [p.userId, p.payeeId].filter(Boolean).map(String)))];
+    const users = await User.find({ _id: { $in: userIds.map(toId).filter(Boolean) } })
+      .select('name username email role').lean();
+    const uMap = {};
+    users.forEach(u => { uMap[u._id.toString()] = u; });
+
+    const list = payments.map(p => ({
+      ...p,
+      payerName: uMap[p.userId?.toString()]?.name || uMap[p.userId?.toString()]?.username || null,
+      payeeName: uMap[p.payeeId?.toString()]?.name || uMap[p.payeeId?.toString()]?.username || null,
+      payeeRole: uMap[p.payeeId?.toString()]?.role || null,
+    }));
+
+    // Per-payee totals (aggregation over the SAME filter, not just the page)
+    const totalsAgg = await Payment.aggregate([
+      { $match: { ...q, payeeId: q.payeeId || { $ne: null } } },
+      { $group: {
+          _id: { payeeId: '$payeeId', type: '$type' },
+          totalAmount: { $sum: '$amount' },
+          totalDiscount: { $sum: '$discountAmount' },
+          count: { $sum: 1 },
+      } },
+      { $sort: { totalAmount: -1 } },
+      { $limit: 200 },
+    ]);
+    const payeeIds = [...new Set(totalsAgg.map(t => t._id.payeeId?.toString()).filter(Boolean))];
+    const payeeUsers = await User.find({ _id: { $in: payeeIds.map(toId).filter(Boolean) } })
+      .select('name username role').lean();
+    const pMap = {};
+    payeeUsers.forEach(u => { pMap[u._id.toString()] = u; });
+    const totals = totalsAgg.map(t => ({
+      payeeId: t._id.payeeId,
+      type: t._id.type,
+      payeeName: pMap[t._id.payeeId?.toString()]?.name || pMap[t._id.payeeId?.toString()]?.username || 'Unknown',
+      payeeRole: pMap[t._id.payeeId?.toString()]?.role || null,
+      totalAmount: t.totalAmount,
+      totalDiscount: t.totalDiscount,
+      count: t.count,
+    }));
+
+    // Grand totals over the filter
+    const grandAgg = await Payment.aggregate([
+      { $match: q },
+      { $group: { _id: null, totalAmount: { $sum: '$amount' }, totalDiscount: { $sum: '$discountAmount' }, count: { $sum: 1 } } },
+    ]);
+    const grand = grandAgg[0] || { totalAmount: 0, totalDiscount: 0, count: 0 };
+
+    res.json({
+      success: true,
+      payments: list,
+      totals,
+      grandTotal: grand.totalAmount,
+      grandDiscount: grand.totalDiscount,
+      grandCount: grand.count,
+    });
+  } catch (e) {
+    console.error('payments report error:', e.message);
+    res.status(500).json({ success: false, message: e.message });
   }
 });
 
