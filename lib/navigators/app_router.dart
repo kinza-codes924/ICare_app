@@ -168,8 +168,14 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/', redirect: (_, _) => '/home'),
       // Safepay sends the checkout tab here after payment — a clear
       // confirmation instead of a one-second flash + dashboard redirect.
-      GoRoute(path: '/payment-success', builder: (_, _) => const PaymentSuccessScreen()),
-      GoRoute(path: '/payment-cancelled', builder: (_, _) => const PaymentSuccessScreen(cancelled: true)),
+      GoRoute(
+        path: '/payment-success',
+        builder: (_, state) => PaymentSuccessScreen(paymentId: state.uri.queryParameters['pid']),
+      ),
+      GoRoute(
+        path: '/payment-cancelled',
+        builder: (_, state) => PaymentSuccessScreen(cancelled: true, paymentId: state.uri.queryParameters['pid']),
+      ),
       GoRoute(path: '/splash', builder: (_, _) => const SplashScreen()),
       GoRoute(path: '/home', builder: (_, _) => const PublicHome()),
       GoRoute(path: '/login', builder: (_, _) => const LoginScreen()),

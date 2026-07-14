@@ -160,4 +160,18 @@ class AppointmentService {
       return null;
     }
   }
+
+  /// Fetch a single appointment by id (used to check paymentStatus while
+  /// polling, and to resolve doctor/patient/channel details after payment).
+  Future<Map<String, dynamic>?> getAppointmentById(String appointmentId) async {
+    try {
+      final response = await _apiService.get('/appointments/$appointmentId');
+      final data = response.data as Map<String, dynamic>;
+      if (data['success'] == true) return data['appointment'] as Map<String, dynamic>?;
+      return null;
+    } catch (e) {
+      debugPrint('❌ Get appointment by id error: $e');
+      return null;
+    }
+  }
 }

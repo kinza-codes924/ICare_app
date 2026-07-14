@@ -3,6 +3,7 @@ const Consultation = require('../models/Consultation');
 const ConsultationMessage = require('../models/ConsultationMessage');
 const EnhancedPrescription = require('../models/EnhancedPrescription');
 const User = require('../models/User');
+const Appointment = require('../models/Appointment');
 const { connectMongoDB } = require('../config/mongodb');
 
 const isValidObjectId = (id) => id && mongoose.Types.ObjectId.isValid(id);
@@ -36,6 +37,23 @@ exports.startConsultation = async (req, res) => {
     const validAppointmentId = isValidObjectId(appointmentId) ? appointmentId : null;
 
     console.log('✅ Validation passed. appointmentId valid:', !!validAppointmentId);
+
+    // Instant "Connect Now" consultations must not start (for either the
+    // doctor or the patient) until the patient's payment is confirmed —
+    // enforced here (not just in the client) so a race between the doctor's
+    // accept flow and the patient's payment flow can never slip through.
+    // Regular scheduled appointments (no connect_now_ channel) are unaffected.
+    let appt = null;
+    if (validAppointmentId) {
+      appt = await Appointment.findById(validAppointmentId).select('channel_name paymentStatus').lean();
+      if (appt?.channel_name?.startsWith('connect_now_') && appt.paymentStatus !== 'paid') {
+        return res.status(402).json({
+          success: false,
+          code: 'PAYMENT_REQUIRED',
+          message: 'Waiting for patient to complete payment before the consultation can start',
+        });
+      }
+    }
 
     // Check if consultation already exists for this appointment
     if (validAppointmentId) {

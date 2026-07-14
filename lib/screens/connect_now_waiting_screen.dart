@@ -115,7 +115,7 @@ class _ConnectNowWaitingScreenState extends State<ConnectNowWaitingScreen>
     if (!mounted) return;
     _countdownTimer?.cancel();
     _pollTimer?.cancel();
-    
+
     final sharedPref = SharedPref();
     final userData = await sharedPref.getUserData();
     final patientName = (userData?.name.trim().isNotEmpty == true) ? userData!.name.trim() : 'Patient';
@@ -123,45 +123,41 @@ class _ConnectNowWaitingScreenState extends State<ConnectNowWaitingScreen>
 
     if (!mounted) return;
 
-    // Show loading
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (_) => const Center(child: CircularProgressIndicator()),
+    // Create minimal appointment detail object for Connect Now
+    final appointment = AppointmentDetail(
+      id: appointmentId.isNotEmpty ? appointmentId : '',
+      patient: User(id: patientId, name: patientName, email: '', phoneNumber: '', role: 'patient'),
+      doctor: User(id: doctorId, name: doctorName, email: '', phoneNumber: '', role: 'doctor'),
+      status: 'confirmed',
+      timeSlot: 'Now',
+      date: DateTime.now(),
+      channelName: channelName,
+      createdAt: DateTime.now(),
+      updatedAt: DateTime.now(),
     );
 
-    try {
-      final consultationService = ConsultationService();
-      
-      // Start consultation with chat-first approach
-      final result = await consultationService.startConsultationV2(
-        appointmentId: appointmentId.isNotEmpty ? appointmentId : '',
-        patientId: patientId,
-        doctorId: doctorId, // Use doctorId from acceptedBy
+    // openChat starts (or resumes, idempotently) the consultation and enters
+    // the chat — called ONLY after payment succeeds, never before. It takes
+    // an explicit context because by the time payment succeeds, THIS screen
+    // has already been replaced by SelectPaymentMethod (pushReplacement
+    // below) — using the outer `context` here would be a defunct context.
+    Future<void> openChat(BuildContext ctx) async {
+      showDialog(
+        context: ctx,
+        barrierDismissible: false,
+        builder: (_) => const Center(child: CircularProgressIndicator()),
       );
-
-      if (!mounted) return;
-      Navigator.pop(context); // Close loading
-
-      if (result['success'] == true) {
-        // Create minimal appointment detail object for Connect Now
-        final appointment = AppointmentDetail(
-          id: appointmentId.isNotEmpty ? appointmentId : '',
-          patient: User(id: patientId, name: patientName, email: '', phoneNumber: '', role: 'patient'),
-          doctor: User(id: doctorId, name: doctorName, email: '', phoneNumber: '', role: 'doctor'),
-          status: 'confirmed',
-          timeSlot: 'Now',
-          date: DateTime.now(),
+      try {
+        final result = await ConsultationService().startConsultationV2(
+          appointmentId: appointmentId.isNotEmpty ? appointmentId : '',
+          patientId: patientId,
+          doctorId: doctorId,
           channelName: channelName,
-          createdAt: DateTime.now(),
-          updatedAt: DateTime.now(),
         );
+        if (!ctx.mounted) return;
+        Navigator.of(ctx).pop(); // close loading
 
-        // openChat takes an explicit context because by the time payment
-        // succeeds, THIS screen has already been replaced by
-        // SelectPaymentMethod (pushReplacement below) — using the outer
-        // `context` here would be a defunct/disposed context by then.
-        void openChat(BuildContext ctx) {
+        if (result['success'] == true) {
           Navigator.of(ctx).pushReplacement(
             MaterialPageRoute(
               builder: (_) => ConsultationChatScreenV2(
@@ -173,54 +169,49 @@ class _ConnectNowWaitingScreenState extends State<ConnectNowWaitingScreen>
               ),
             ),
           );
-        }
-
-        // The connect-now accept endpoint already created a real Appointment
-        // (doctorId now known) — charge the doctor's real consultation fee
-        // for it before the patient enters the chat. Only skip payment in
-        // the rare case the backend couldn't create that Appointment record.
-        if (appointmentId.isEmpty) {
-          openChat(context);
-          return;
-        }
-
-        double fee = 0;
-        try {
-          final profile = await AppointmentService().getDoctorProfile(doctorId);
-          fee = (profile?['consultationFee'] as num?)?.toDouble() ?? 0;
-        } catch (_) {}
-
-        if (!mounted) return;
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(
-            builder: (_) => SelectPaymentMethod(
-              appointmentId: appointmentId,
-              amount: fee,
-              onPaymentSuccess: (successContext, {voucherCode}) => openChat(successContext),
+        } else {
+          ScaffoldMessenger.of(ctx).showSnackBar(
+            SnackBar(
+              content: Text(result['message']?.toString() ?? 'Failed to start consultation'),
+              backgroundColor: Colors.red,
             ),
-          ),
+          );
+        }
+      } catch (e) {
+        if (!ctx.mounted) return;
+        Navigator.of(ctx).pop(); // close loading
+        ScaffoldMessenger.of(ctx).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
         );
-      } else {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(result['message'] ?? 'Failed to start consultation'),
-            backgroundColor: Colors.red,
-          ),
-        );
-        Navigator.of(context).pop();
       }
-    } catch (e) {
-      if (!mounted) return;
-      Navigator.pop(context); // Close loading
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
-      Navigator.of(context).pop();
     }
+
+    // The connect-now accept endpoint already created a real Appointment
+    // (doctorId now known) — charge the doctor's real consultation fee for
+    // it before the patient (or the doctor, gated server-side) can enter the
+    // chat. Only skip payment in the rare case the backend couldn't create
+    // that Appointment record.
+    if (appointmentId.isEmpty) {
+      openChat(context);
+      return;
+    }
+
+    double fee = 0;
+    try {
+      final profile = await AppointmentService().getDoctorProfile(doctorId);
+      fee = (profile?['consultationFee'] as num?)?.toDouble() ?? 0;
+    } catch (_) {}
+
+    if (!mounted) return;
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(
+        builder: (_) => SelectPaymentMethod(
+          appointmentId: appointmentId,
+          amount: fee,
+          onPaymentSuccess: (successContext, {voucherCode}) => openChat(successContext),
+        ),
+      ),
+    );
   }
 
   void _onExpired() {

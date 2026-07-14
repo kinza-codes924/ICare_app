@@ -3,12 +3,213 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/connect_now_service.dart';
 import '../services/consultation_service.dart';
+import '../services/appointment_service.dart';
 import '../utils/shared_pref.dart';
 import '../utils/app_keys.dart';
 import '../utils/connect_now_events.dart';
 import '../screens/consultation_chat_screen_v2.dart';
 import '../models/appointment_detail.dart';
 import '../models/user.dart';
+
+/// Starts (or resumes, idempotently) the Consultation and pushes the
+/// doctor into the live chat. Shared by the immediate-fallback path (no
+/// Appointment record to gate on) and by [_WaitingForPaymentScreen] once
+/// payment is confirmed.
+Future<void> _enterConsultation(
+  BuildContext context, {
+  required String appointmentId,
+  required String patientId,
+  required String patientName,
+  required String doctorId,
+  required String doctorName,
+  required String channelName,
+}) async {
+  final consultResult = await ConsultationService().startConsultationV2(
+    appointmentId: appointmentId,
+    patientId: patientId,
+    doctorId: doctorId,
+    channelName: channelName,
+  );
+
+  if (!context.mounted) return;
+
+  if (consultResult['success'] == true) {
+    final appointment = AppointmentDetail(
+      id: appointmentId,
+      patient: User(id: patientId, name: patientName, email: '', phoneNumber: '', role: 'patient'),
+      doctor: User(id: doctorId, name: doctorName, email: '', phoneNumber: '', role: 'doctor'),
+      status: 'confirmed',
+      timeSlot: 'Now',
+      date: DateTime.now(),
+      channelName: channelName,
+      createdAt: DateTime.now(),
+      updatedAt: DateTime.now(),
+    );
+
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(
+        builder: (_) => _ConsultationWrapper(
+          child: ConsultationChatScreenV2(
+            consultationId: consultResult['consultationId']?.toString(),
+            appointment: appointment,
+            isDoctor: true,
+            currentUserId: doctorId,
+            currentUserName: doctorName,
+          ),
+        ),
+      ),
+    );
+  } else {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(consultResult['message']?.toString() ?? 'Failed to start consultation'),
+        backgroundColor: Colors.red,
+      ),
+    );
+  }
+}
+
+/// Shown to the doctor right after accepting — the consultation (and its
+/// timer) must NOT start until the patient's payment is confirmed, so this
+/// polls the appointment's paymentStatus instead of jumping straight into
+/// the chat screen.
+class _WaitingForPaymentScreen extends StatefulWidget {
+  final String appointmentId;
+  final String patientId;
+  final String patientName;
+  final String doctorId;
+  final String doctorName;
+  final String channelName;
+
+  const _WaitingForPaymentScreen({
+    required this.appointmentId,
+    required this.patientId,
+    required this.patientName,
+    required this.doctorId,
+    required this.doctorName,
+    required this.channelName,
+  });
+
+  @override
+  State<_WaitingForPaymentScreen> createState() => _WaitingForPaymentScreenState();
+}
+
+class _WaitingForPaymentScreenState extends State<_WaitingForPaymentScreen> {
+  final AppointmentService _appointmentService = AppointmentService();
+  Timer? _pollTimer;
+  bool _timedOut = false;
+  bool _entering = false;
+  final _deadline = DateTime.now().add(const Duration(minutes: 5));
+
+  @override
+  void initState() {
+    super.initState();
+    _pollTimer = Timer.periodic(const Duration(seconds: 3), (_) => _checkPaymentStatus());
+  }
+
+  Future<void> _checkPaymentStatus() async {
+    if (!mounted || _entering) return;
+    if (DateTime.now().isAfter(_deadline)) {
+      _pollTimer?.cancel();
+      if (mounted) setState(() => _timedOut = true);
+      return;
+    }
+    final appt = await _appointmentService.getAppointmentById(widget.appointmentId);
+    if (!mounted || _entering) return;
+    if (appt?['paymentStatus'] == 'paid') {
+      _entering = true;
+      _pollTimer?.cancel();
+      await _enterConsultation(
+        context,
+        appointmentId: widget.appointmentId,
+        patientId: widget.patientId,
+        patientName: widget.patientName,
+        doctorId: widget.doctorId,
+        doctorName: widget.doctorName,
+        channelName: widget.channelName,
+      );
+    }
+  }
+
+  void _goBack() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('doctor_in_consultation', false);
+    } catch (_) {}
+    if (mounted) Navigator.of(context).pop();
+  }
+
+  @override
+  void dispose() {
+    _pollTimer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _goBack();
+      },
+      child: Scaffold(
+        backgroundColor: const Color(0xFF0A1628),
+        body: SafeArea(
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(32),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (!_timedOut) ...[
+                    const CircularProgressIndicator(color: Colors.white),
+                    const SizedBox(height: 28),
+                    const Text(
+                      'Waiting for patient to complete payment',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      '${widget.patientName} is completing payment for this consultation. '
+                      'The chat will open automatically once payment is confirmed.',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(color: Colors.white70, fontSize: 14, height: 1.5),
+                    ),
+                  ] else ...[
+                    const Icon(Icons.hourglass_disabled_rounded, color: Colors.orange, size: 56),
+                    const SizedBox(height: 20),
+                    const Text(
+                      'Patient has not completed payment',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 12),
+                    const Text(
+                      'You can go back and continue accepting other requests.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: Colors.white70, fontSize: 14, height: 1.5),
+                    ),
+                  ],
+                  const SizedBox(height: 32),
+                  OutlinedButton(
+                    onPressed: _goBack,
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: Colors.white30),
+                      padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    ),
+                    child: const Text('Go Back', style: TextStyle(color: Colors.white70)),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
 
 /// Wraps the doctor's app and polls for Connect Now requests every 5 seconds.
 class DoctorConnectNowListener extends StatefulWidget {
@@ -177,7 +378,6 @@ class _DoctorConnectNowListenerState extends State<DoctorConnectNowListener> {
               final prefs = await SharedPreferences.getInstance();
               await prefs.setBool('doctor_in_consultation', true);
             } catch (_) {}
-            bool loadingShowing = false;
             try {
               final result = await _service.acceptRequest(requestId);
               final callChannel = result['channelName']?.toString() ?? channelName;
@@ -201,65 +401,39 @@ class _DoctorConnectNowListenerState extends State<DoctorConnectNowListener> {
               // Close request dialog
               if (nav.canPop()) nav.pop();
 
-              // Show loading spinner
-              loadingShowing = true;
-              showDialog(
-                context: nav.context,
-                barrierDismissible: false,
-                builder: (_) => const Center(child: CircularProgressIndicator()),
-              );
-
-              final consultationService = ConsultationService();
-              final consultResult = await consultationService.startConsultationV2(
-                appointmentId: appointmentId,
-                patientId: patientId,
-                doctorId: doctorId,
-                channelName: callChannel,
-              );
-
-              // Close loading spinner
-              if (nav.canPop()) nav.pop();
-              loadingShowing = false;
-
-              if (consultResult['success'] == true) {
-                final appointment = AppointmentDetail(
-                  id: appointmentId.isNotEmpty ? appointmentId : '',
-                  patient: User(id: patientId, name: callPatient, email: '', phoneNumber: '', role: 'patient'),
-                  doctor: User(id: doctorId, name: doctorName, email: '', phoneNumber: '', role: 'doctor'),
-                  status: 'confirmed',
-                  timeSlot: 'Now',
-                  date: DateTime.now(),
+              if (appointmentId.isEmpty) {
+                // Rare fallback: no Appointment record was created, so there's
+                // nothing to gate payment on — preserve the old immediate behavior.
+                await _enterConsultation(
+                  nav.context,
+                  appointmentId: '',
+                  patientId: patientId,
+                  patientName: callPatient,
+                  doctorId: doctorId,
+                  doctorName: doctorName,
                   channelName: callChannel,
-                  createdAt: DateTime.now(),
-                  updatedAt: DateTime.now(),
                 );
-
-                nav.push(
-                  MaterialPageRoute(
-                    builder: (_) => _ConsultationWrapper(
-                      child: ConsultationChatScreenV2(
-                        consultationId: consultResult['consultationId']?.toString(),
-                        appointment: appointment,
-                        isDoctor: true,
-                        currentUserId: doctorId,
-                        currentUserName: doctorName,
-                      ),
-                    ),
-                  ),
-                );
-              } else {
-                ScaffoldMessenger.of(nav.context).showSnackBar(
-                  SnackBar(
-                    content: Text(consultResult['message']?.toString() ?? 'Failed to start consultation'),
-                    backgroundColor: Colors.red,
-                  ),
-                );
+                return;
               }
+
+              // Neither side's consultation/timer should start until the
+              // patient's payment is confirmed — show a waiting screen that
+              // polls the appointment's paymentStatus instead.
+              nav.push(
+                MaterialPageRoute(
+                  builder: (_) => _WaitingForPaymentScreen(
+                    appointmentId: appointmentId,
+                    patientId: patientId,
+                    patientName: callPatient,
+                    doctorId: doctorId,
+                    doctorName: doctorName,
+                    channelName: callChannel,
+                  ),
+                ),
+              );
             } catch (e) {
               debugPrint('❌ Accept failed: $e');
-              // Close any open dialog safely
-              if (loadingShowing && nav.canPop()) nav.pop();
-              if (!loadingShowing && nav.canPop()) nav.pop();
+              if (nav.canPop()) nav.pop();
               ScaffoldMessenger.of(nav.context).showSnackBar(
                 SnackBar(
                   content: Text('Failed to accept: $e'),

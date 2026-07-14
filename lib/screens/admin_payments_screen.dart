@@ -163,12 +163,22 @@ class _AdminPaymentsScreenState extends State<AdminPaymentsScreen> {
         backgroundColor: Colors.white,
         elevation: 0,
         actions: [
-          IconButton(
-            onPressed: _payments.isEmpty ? null : _exportCsv,
-            tooltip: 'Download CSV',
-            icon: const Icon(Icons.download_rounded),
+          Padding(
+            padding: const EdgeInsets.only(right: 4),
+            child: TextButton.icon(
+              onPressed: _payments.isEmpty ? null : _exportCsv,
+              icon: const Icon(Icons.download_rounded, size: 18),
+              label: const Text('Export CSV', style: TextStyle(fontWeight: FontWeight.w700)),
+              style: TextButton.styleFrom(
+                foregroundColor: AppColors.primaryColor,
+                disabledForegroundColor: const Color(0xFFB9C2CF),
+                backgroundColor: const Color(0xFFEFF3FF),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+            ),
           ),
-          IconButton(onPressed: _load, icon: const Icon(Icons.refresh_rounded)),
+          IconButton(onPressed: _load, tooltip: 'Refresh', icon: const Icon(Icons.refresh_rounded)),
           const SizedBox(width: 8),
         ],
       ),

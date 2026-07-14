@@ -37,6 +37,23 @@ const SAFEPAY_ENV = () => (process.env.SAFEPAY_ENV === 'production' ? 'productio
 const SAFEPAY_HOST = () =>
   SAFEPAY_ENV() === 'production' ? 'https://api.getsafepay.com' : 'https://sandbox.api.getsafepay.com';
 
+// Appointment.appointment_date/time are stored as raw 'YYYY-MM-DD'/'HH:MM'
+// strings — format them for admin-facing display (order-details drill-down).
+const formatApptDate = (d) => {
+  if (!d) return null;
+  const parsed = new Date(`${d}T00:00:00`);
+  if (isNaN(parsed.getTime())) return d;
+  return parsed.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+};
+const formatApptTime = (t) => {
+  if (!t) return null;
+  const [h, m] = String(t).split(':').map(Number);
+  if (Number.isNaN(h) || Number.isNaN(m)) return t;
+  const period = h >= 12 ? 'PM' : 'AM';
+  const hour12 = h % 12 === 0 ? 12 : h % 12;
+  return `${hour12}:${String(m).padStart(2, '0')} ${period}`;
+};
+
 const toId = (v) => {
   try { return new mongoose.Types.ObjectId(String(v)); } catch { return null; }
 };
@@ -378,13 +395,22 @@ router.post('/create', authMiddleware, async (req, res) => {
     if (!tbt) throw new Error('Safepay did not return an auth token');
 
     // 5. Hosted Checkout URL
+    // Embed our own payment id on top of whatever redirect/cancel URL the
+    // client passed, so the page Safepay lands the browser back on (which
+    // may be a fresh tab with no in-memory app state) can look up exactly
+    // this payment and route accordingly, instead of only showing a generic
+    // "go to dashboard" message.
+    const withPid = (url) => {
+      if (!url) return '';
+      return `${url}${url.includes('?') ? '&' : '?'}pid=${payment._id}`;
+    };
     const params = new URLSearchParams({
       tracker,
       tbt,
       environment: SAFEPAY_ENV(),
       source: 'hosted',
-      redirect_url: redirectUrl || '',
-      cancel_url: cancelUrl || '',
+      redirect_url: withPid(redirectUrl),
+      cancel_url: withPid(cancelUrl),
     });
     const checkoutUrl = `${SAFEPAY_HOST()}/embedded/?${params.toString()}`;
     await plog({ paymentId: payment._id, tracker, userId, step: 'CHECKOUT_URL_GENERATED' });
@@ -413,9 +439,9 @@ router.get('/:id/verify', authMiddleware, async (req, res) => {
     await plog({ paymentId: payment._id, tracker: payment.safepayTracker, userId: payment.userId, step: 'VERIFY_REQUESTED' });
 
     if (payment.status === 'paid' && payment.fulfilled) {
-      return res.json({ success: true, status: 'paid', fulfilled: true, paymentId: payment._id });
+      return res.json({ success: true, status: 'paid', fulfilled: true, paymentId: payment._id, type: payment.type, refId: payment.refId?.toString() });
     }
-    if (!payment.safepayTracker) return res.json({ success: true, status: payment.status, fulfilled: false });
+    if (!payment.safepayTracker) return res.json({ success: true, status: payment.status, fulfilled: false, paymentId: payment._id, type: payment.type, refId: payment.refId?.toString() });
 
     const report = await safepayGet(`/reporter/api/v1/payments/${payment.safepayTracker}`);
     // Reporter returns the tracker object DIRECTLY in data (no data.tracker
@@ -427,10 +453,10 @@ router.get('/:id/verify', authMiddleware, async (req, res) => {
     if (state === 'TRACKER_ENDED') {
       const r = await markPaidAndFulfill(payment, trackerData, 'verify');
       if (!r.ok) return res.status(409).json({ success: false, message: 'Payment verification failed (amount mismatch). Support has been alerted.' });
-      return res.json({ success: true, status: 'paid', fulfilled: true, paymentId: payment._id });
+      return res.json({ success: true, status: 'paid', fulfilled: true, paymentId: payment._id, type: payment.type, refId: payment.refId?.toString() });
     }
 
-    res.json({ success: true, status: payment.status, safepayState: state, fulfilled: false, paymentId: payment._id });
+    res.json({ success: true, status: payment.status, safepayState: state, fulfilled: false, paymentId: payment._id, type: payment.type, refId: payment.refId?.toString() });
   } catch (e) {
     await plog({ step: 'ERROR', level: 'ERROR', message: `verify: ${e.message}` });
     res.status(500).json({ success: false, message: e.message });
@@ -767,13 +793,16 @@ router.get('/:id/order-details', authMiddleware, roleMiddleware('admin'), async 
           User.findById(appt.patient_id).select('name username phone').lean(),
           User.findById(appt.doctor_id).select('name username').lean(),
         ]);
+        const isInstant = !!appt.channel_name?.startsWith('connect_now_');
         order = {
           patientName: patient?.name || patient?.username || null,
           patientPhone: patient?.phone || null,
           doctorName: doctor?.name || doctor?.username || null,
-          date: appt.appointment_date, time: appt.appointment_time,
-          consultationType: appt.consultation_type, status: appt.status,
-          notes: appt.notes, channelName: appt.channel_name,
+          date: formatApptDate(appt.appointment_date),
+          time: formatApptTime(appt.appointment_time),
+          consultationType: isInstant ? 'Instant Consultation' : (appt.consultation_type || 'Scheduled'),
+          status: appt.status,
+          notes: isInstant ? 'Instant consultation via Connect Now' : (appt.notes || null),
         };
       }
     } else if (payment.type === 'lab') {

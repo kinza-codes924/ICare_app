@@ -80,6 +80,94 @@ class _UpcomingAppointmentsState extends ConsumerState<UpcomingAppointments> {
     );
   }
 
+  /// A live session already exists (doctor started it, or this is a Connect
+  /// Now appointment mid-call) — safe to join directly. A merely scheduled
+  /// appointment for a future date must NOT immediately drop the patient
+  /// into a live chat with a running timer.
+  bool _isJoinableNow(AppointmentDetail appt) {
+    if (appt.status == 'in_progress') return true;
+    final today = DateTime.now();
+    final apptDay = DateTime(appt.date.year, appt.date.month, appt.date.day);
+    final todayDay = DateTime(today.year, today.month, today.day);
+    return !apptDay.isAfter(todayDay);
+  }
+
+  void _onTileTap(AppointmentDetail appt) {
+    if (appt.status == 'in_progress') {
+      _openConsultation(appt);
+      return;
+    }
+    _showAppointmentDetails(appt);
+  }
+
+  void _showAppointmentDetails(AppointmentDetail appt) {
+    final joinable = _isJoinableNow(appt);
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (ctx) => Padding(
+        padding: EdgeInsets.only(
+          left: 24, right: 24, top: 24,
+          bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 40, height: 4,
+                decoration: BoxDecoration(color: const Color(0xFFE2E8F0), borderRadius: BorderRadius.circular(2)),
+              ),
+            ),
+            const SizedBox(height: 20),
+            Text(appt.doctor?.name != null ? 'Dr. ${appt.doctor!.name}' : 'Doctor',
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: _navy)),
+            const SizedBox(height: 4),
+            Text((appt.consultationType ?? 'Consultation').toUpperCase(),
+                style: const TextStyle(fontSize: 11, color: _slate, fontWeight: FontWeight.w700, letterSpacing: 0.4)),
+            const SizedBox(height: 18),
+            Row(children: [
+              const Icon(Icons.calendar_today_rounded, size: 15, color: _slate),
+              const SizedBox(width: 8),
+              Text(DateFormat('EEEE, d MMM yyyy').format(appt.date), style: const TextStyle(fontSize: 13.5, color: _navy, fontWeight: FontWeight.w600)),
+            ]),
+            const SizedBox(height: 10),
+            Row(children: [
+              const Icon(Icons.access_time_rounded, size: 15, color: _slate),
+              const SizedBox(width: 8),
+              Text(appt.timeSlot, style: const TextStyle(fontSize: 13.5, color: _navy, fontWeight: FontWeight.w600)),
+            ]),
+            const SizedBox(height: 26),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: joinable
+                    ? () {
+                        Navigator.of(ctx).pop();
+                        _openConsultation(appt);
+                      }
+                    : null,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primaryColor,
+                  foregroundColor: Colors.white,
+                  disabledBackgroundColor: const Color(0xFFE2E8F0),
+                  disabledForegroundColor: const Color(0xFF94A3B8),
+                  padding: const EdgeInsets.symmetric(vertical: 15),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                ),
+                child: Text(
+                  joinable ? 'Start Consultation' : 'Available on ${DateFormat('d MMM').format(appt.date)}',
+                  style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w800),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final bool isDesktop = Utils.windowWidth(context) > 600;
@@ -322,7 +410,7 @@ class _UpcomingAppointmentsState extends ConsumerState<UpcomingAppointments> {
         boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 10, offset: const Offset(0, 4))],
       ),
       child: InkWell(
-        onTap: () => _openConsultation(appt),
+        onTap: () => _onTileTap(appt),
         borderRadius: BorderRadius.circular(18),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
