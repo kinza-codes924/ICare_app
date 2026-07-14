@@ -807,35 +807,49 @@ class _VideoCallWebState extends State<VideoCall> {
       // the video tiles (handles incoming-call path where the caller screen
       // may not have the name yet).
       if (displayName == 'User' || displayName.isEmpty) {
-        final userData = await SharedPref().getUserData();
-        if (userData != null && userData.name.isNotEmpty) {
-          displayName = userData.name;
-        }
+        try {
+          final userData = await SharedPref().getUserData();
+          if (userData != null && userData.name.isNotEmpty) {
+            displayName = userData.name;
+          }
+        } catch (_) {}
       }
 
       // Moderator status is decided server-side (doctor = moderator, patient
       // = not) so a patient can never end up moderator just by joining first.
       final jwt = await _fetchJitsiToken(roomName, displayName);
-      final authToken = await SharedPref().getToken() ?? '';
+      String authToken = '';
+      try {
+        authToken = await SharedPref().getToken() ?? '';
+      } catch (_) {}
 
       final subject = widget.remoteUserName.isNotEmpty
           ? 'Consultation with ${widget.remoteUserName}'
           : 'iCare Consultation';
 
-      final result = await _jitsiJoin(
-        roomName.toJS,
-        displayName.toJS,
-        widget.isAudioOnly.toJS,
-        (jwt ?? '').toJS,
-        subject.toJS,
-        authToken.toJS,
-        widget.channelName.toJS,
-      ).toDart;
-
-      final resultStr = result.toDart;
-      if (resultStr.startsWith('error:')) {
-        debugPrint('⚠️ Jitsi join warning: $resultStr');
+      // jitsiJoin does all its work synchronously (creates the iframe) and
+      // resolves immediately — the await is only for the status string.  A
+      // stale service worker can serve an index.html whose jitsiJoin doesn't
+      // return a Promise, making .toDart throw a null-check error even though
+      // the join itself succeeded.  So interop failures here are non-fatal.
+      try {
+        final result = await _jitsiJoin(
+          roomName.toJS,
+          displayName.toJS,
+          widget.isAudioOnly.toJS,
+          (jwt ?? '').toJS,
+          subject.toJS,
+          authToken.toJS,
+          widget.channelName.toJS,
+        ).toDart;
+        final resultStr = result.toDart;
+        if (resultStr.startsWith('error:')) {
+          debugPrint('⚠️ Jitsi join warning: $resultStr');
+        }
+      } catch (e) {
+        debugPrint('⚠️ jitsiJoin interop error (join may still succeed): $e');
       }
+
       if (mounted) {
         setState(() { _joined = true; _loading = false; });
       }
