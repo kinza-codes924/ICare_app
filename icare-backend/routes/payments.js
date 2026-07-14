@@ -210,10 +210,14 @@ async function fulfillPayment(payment) {
   }
 
   if (payment.type === 'appointment') {
-    await Appointment.findByIdAndUpdate(payment.refId, {
-      paymentStatus: 'paid',
-      status: 'confirmed',
-    });
+    // Connect Now (instant consultation) creates the Appointment already
+    // 'in_progress' — paying for it must NOT downgrade it back to
+    // 'confirmed' (that status is only for scheduled bookings awaiting
+    // their time slot). Only bump 'pending' -> 'confirmed'.
+    const appt = await Appointment.findById(payment.refId).select('status').lean();
+    const update = { paymentStatus: 'paid' };
+    if (!appt || appt.status === 'pending') update.status = 'confirmed';
+    await Appointment.findByIdAndUpdate(payment.refId, update);
     payment.fulfilled = true;
     payment.fulfilledAt = new Date();
     await payment.save();

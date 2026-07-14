@@ -160,86 +160,162 @@ class _AdminPaymentsScreenState extends State<AdminPaymentsScreen> {
               const Text('Filters',
                   style: TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: _navy)),
               const Spacer(),
-              if (_payeeId != null)
+              // Visible feedback that a filter change is being applied —
+              // without this, tapping a filter on a slow connection looks
+              // like "nothing happened".
+              if (_loading)
+                const SizedBox(
+                  width: 16, height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              if (_payeeId != null) ...[
+                const SizedBox(width: 10),
                 InputChip(
                   label: Text('Recipient: ${_payeeName ?? ''}',
                       style: const TextStyle(fontSize: 12)),
                   onDeleted: () { setState(() { _payeeId = null; _payeeName = null; }); _load(); },
                 ),
+              ],
             ],
           ),
-          const SizedBox(height: 12),
-          Wrap(
-            spacing: 10,
-            runSpacing: 10,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: [
-              _dropdown('Type', _type, const {
-                '': 'All types', 'course': 'Courses', 'appointment': 'Doctor Appointments',
-                'lab': 'Lab Tests', 'pharmacy': 'Pharmacy Orders',
-              }, (v) => setState(() => _type = v)),
-              _dropdown('Method', _method, const {
-                '': 'All methods', 'safepay': 'Online (Card/Wallet)', 'cash': 'Cash',
-              }, (v) => setState(() => _method = v)),
-              _dropdown('Status', _status, const {
-                'paid': 'Paid', 'pending': 'Pending', 'failed': 'Failed', 'all': 'All statuses',
-              }, (v) => setState(() => _status = v)),
-              OutlinedButton.icon(
-                onPressed: () async {
-                  final now = DateTime.now();
-                  final picked = await showDateRangePicker(
-                    context: context,
-                    firstDate: DateTime(now.year - 2),
-                    lastDate: now.add(const Duration(days: 1)),
-                    initialDateRange: _dateRange,
-                  );
-                  if (picked != null) setState(() => _dateRange = picked);
-                },
-                icon: const Icon(Icons.date_range_rounded, size: 17),
-                label: Text(
-                  _dateRange == null
-                      ? 'Date range'
-                      : '${DateFormat('d MMM').format(_dateRange!.start)} – ${DateFormat('d MMM yy').format(_dateRange!.end)}',
-                  style: const TextStyle(fontSize: 13),
+          const SizedBox(height: 14),
+          LayoutBuilder(builder: (context, constraints) {
+            final narrow = constraints.maxWidth < 620;
+            final typeField = _dropdown('Type', _type, const {
+              '': 'All types', 'course': 'Courses', 'appointment': 'Doctor Appointments',
+              'lab': 'Lab Tests', 'pharmacy': 'Pharmacy Orders',
+            }, (v) { setState(() => _type = v); _load(); });
+            final methodField = _dropdown('Method', _method, const {
+              '': 'All methods', 'safepay': 'Online (Card/Wallet)', 'cash': 'Cash',
+            }, (v) { setState(() => _method = v); _load(); });
+            final statusField = _dropdown('Status', _status, const {
+              'paid': 'Paid', 'pending': 'Pending', 'failed': 'Failed', 'all': 'All statuses',
+            }, (v) { setState(() => _status = v); _load(); });
+            final dateField = _dateRangeField();
+
+            if (narrow) {
+              // Mobile: full-width stacked fields — the compact inline Wrap
+              // made dropdowns hard to tap reliably and easy to miss that a
+              // selection actually changed. Applies immediately on change.
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  typeField, const SizedBox(height: 10),
+                  methodField, const SizedBox(height: 10),
+                  statusField, const SizedBox(height: 10),
+                  dateField, const SizedBox(height: 10),
+                  Row(children: [
+                    Expanded(child: _amountField(_minCtrl, 'Min PKR')),
+                    const SizedBox(width: 10),
+                    Expanded(child: _amountField(_maxCtrl, 'Max PKR')),
+                  ]),
+                  const SizedBox(height: 12),
+                  Row(children: [
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: _load,
+                        icon: const Icon(Icons.filter_alt_rounded, size: 17),
+                        label: const Text('Apply'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primaryColor, foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    TextButton(onPressed: _clearFilters, child: const Text('Clear')),
+                  ]),
+                ],
+              );
+            }
+
+            return Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                SizedBox(width: 170, child: typeField),
+                SizedBox(width: 170, child: methodField),
+                SizedBox(width: 140, child: statusField),
+                SizedBox(width: 190, child: dateField),
+                SizedBox(width: 110, child: _amountField(_minCtrl, 'Min PKR')),
+                SizedBox(width: 110, child: _amountField(_maxCtrl, 'Max PKR')),
+                ElevatedButton.icon(
+                  onPressed: _load,
+                  icon: const Icon(Icons.filter_alt_rounded, size: 17),
+                  label: const Text('Apply'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primaryColor, foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                  ),
                 ),
-              ),
-              SizedBox(width: 110, child: _amountField(_minCtrl, 'Min PKR')),
-              SizedBox(width: 110, child: _amountField(_maxCtrl, 'Max PKR')),
-              ElevatedButton.icon(
-                onPressed: _load,
-                icon: const Icon(Icons.filter_alt_rounded, size: 17),
-                label: const Text('Apply'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primaryColor, foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-                ),
-              ),
-              TextButton(onPressed: _clearFilters, child: const Text('Clear')),
-            ],
-          ),
+                TextButton(onPressed: _clearFilters, child: const Text('Clear')),
+              ],
+            );
+          }),
         ],
       ),
     );
   }
 
-  Widget _dropdown(String label, String value, Map<String, String> items, ValueChanged<String> onChanged) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12),
-      decoration: BoxDecoration(
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-        borderRadius: BorderRadius.circular(10),
+  Widget _dateRangeField() {
+    return OutlinedButton.icon(
+      onPressed: () async {
+        final now = DateTime.now();
+        final picked = await showDateRangePicker(
+          context: context,
+          firstDate: DateTime(now.year - 2),
+          lastDate: now.add(const Duration(days: 1)),
+          initialDateRange: _dateRange,
+        );
+        if (picked != null) {
+          setState(() => _dateRange = picked);
+          _load();
+        }
+      },
+      style: OutlinedButton.styleFrom(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+        side: const BorderSide(color: Color(0xFFE2E8F0)),
       ),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<String>(
-          value: value,
-          isDense: true,
-          style: const TextStyle(fontSize: 13, color: _navy),
-          items: items.entries
-              .map((e) => DropdownMenuItem(value: e.key, child: Text(e.value)))
-              .toList(),
-          onChanged: (v) => onChanged(v ?? ''),
+      icon: const Icon(Icons.date_range_rounded, size: 17),
+      label: Text(
+        _dateRange == null
+            ? 'Date range'
+            : '${DateFormat('d MMM').format(_dateRange!.start)} – ${DateFormat('d MMM yy').format(_dateRange!.end)}',
+        style: const TextStyle(fontSize: 13),
+        overflow: TextOverflow.ellipsis,
+      ),
+    );
+  }
+
+  // Full-width Material dropdown (DropdownButtonFormField) instead of a
+  // bare DropdownButton in a Wrap — more reliable hit-testing on mobile web
+  // and gives every filter a clear, consistent tap target with a border.
+  Widget _dropdown(String label, String value, Map<String, String> items, ValueChanged<String> onChanged) {
+    return DropdownButtonFormField<String>(
+      // DropdownButtonFormField only reads initialValue on first build — a
+      // fresh key forces it to re-init whenever the externally-tracked
+      // value changes, otherwise the dropdown UI can visually "stick" on
+      // the old selection after a filter change.
+      key: ValueKey('$label-$value'),
+      initialValue: value,
+      isExpanded: true,
+      style: const TextStyle(fontSize: 13, color: _navy),
+      decoration: InputDecoration(
+        labelText: label,
+        labelStyle: const TextStyle(fontSize: 11, color: _slate),
+        isDense: true,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
         ),
       ),
+      items: items.entries
+          .map((e) => DropdownMenuItem(value: e.key, child: Text(e.value, overflow: TextOverflow.ellipsis)))
+          .toList(),
+      onChanged: (v) => onChanged(v ?? ''),
     );
   }
 
@@ -248,10 +324,11 @@ class _AdminPaymentsScreenState extends State<AdminPaymentsScreen> {
       controller: c,
       keyboardType: TextInputType.number,
       style: const TextStyle(fontSize: 13),
+      onSubmitted: (_) => _load(),
       decoration: InputDecoration(
         hintText: hint,
         isDense: true,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
       ),
     );

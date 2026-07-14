@@ -1,15 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:icare/providers/auth_provider.dart';
-import 'package:icare/screens/add_card.dart';
 import 'package:icare/screens/connect_now_waiting_screen.dart';
 import 'package:icare/services/doctor_service.dart';
 import 'package:icare/utils/theme.dart';
 import 'package:icare/widgets/back_button.dart';
 
 /// Pre-screen shown before "Connect to Doctor Now" waiting screen.
-/// Collects patient details (Myself / Someone else), reason, and certification.
-/// After validation → shows Pay Now bottom sheet → then waiting screen.
+/// Collects patient details (Myself / Someone else), reason, and
+/// certification. Payment happens AFTER a doctor accepts the request (see
+/// ConnectNowWaitingScreen) — only then do we know which doctor, and
+/// therefore their real consultation fee, to charge.
 class ConsultationDetailsScreen extends ConsumerStatefulWidget {
   final String? targetDoctorId;
 
@@ -53,7 +54,7 @@ class _ConsultationDetailsScreenState
     super.dispose();
   }
 
-  void _proceed() {
+  Future<void> _proceed() async {
     if (_nameController.text.trim().isEmpty) {
       _showError('Please enter patient name');
       return;
@@ -66,8 +67,42 @@ class _ConsultationDetailsScreenState
       _showError('Please confirm that all details are correct');
       return;
     }
-    // Show Pay Now popup
-    _showPayNowPopup();
+
+    // Payment happens AFTER a doctor accepts (that's when we know which
+    // doctor — and therefore their real consultation fee) — see
+    // ConnectNowWaitingScreen. Here we only check a doctor is reachable
+    // before starting the search.
+    try {
+      final result = await DoctorService().getAllDoctors();
+      final doctors = (result['doctors'] as List?) ?? [];
+      final anyOnline = doctors.any((d) => d is Map && d['isOnline'] == true);
+      if (!anyOnline && mounted) {
+        showDialog(
+          context: context,
+          builder: (c) => AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: const Row(children: [
+              Icon(Icons.info_outline_rounded, color: Color(0xFF6366F1)),
+              SizedBox(width: 8),
+              Text('No Doctors Available', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+            ]),
+            content: const Text('No doctors are online right now. Please try again later or book an advance appointment.', style: TextStyle(fontSize: 14)),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(c), child: const Text('OK', style: TextStyle(fontWeight: FontWeight.bold))),
+            ],
+          ),
+        );
+        return;
+      }
+    } catch (_) {}
+
+    if (mounted) {
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => ConnectNowWaitingScreen(targetDoctorId: widget.targetDoctorId),
+        ),
+      );
+    }
   }
 
   void _showError(String msg) {
@@ -76,257 +111,6 @@ class _ConsultationDetailsScreenState
         content: Text(msg),
         backgroundColor: Colors.red,
         behavior: SnackBarBehavior.floating,
-      ),
-    );
-  }
-
-  // ── Pay Now Bottom Sheet ──────────────────────────────────────────────────
-  void _showPayNowPopup() {
-    const double amount = 500; // instant consultation fee
-    final List<Map<String, String>> savedCards = [
-      {'type': 'VISA', 'number': '**** **** **** 1313', 'expiry': '08/26'},
-      {'type': 'MasterCard', 'number': '**** **** **** 4242', 'expiry': '12/27'},
-    ];
-    String? selectedCard = savedCards.first['number'];
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setSheet) => Container(
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-          ),
-          padding: EdgeInsets.only(
-            left: 24,
-            right: 24,
-            top: 24,
-            bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
-          ),
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Handle bar
-                Center(
-                  child: Container(
-                    width: 40,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFE2E8F0),
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 20),
-
-                // Title row
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: AppColors.primaryColor.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: const Icon(Icons.payment_rounded,
-                          color: AppColors.primaryColor, size: 22),
-                    ),
-                    const SizedBox(width: 12),
-                    const Text('Pay Now',
-                        style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.w900,
-                            color: Color(0xFF0F172A))),
-                    const Spacer(),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: AppColors.primaryColor.withValues(alpha: 0.08),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: const Text('PKR 500',
-                          style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w800,
-                              color: AppColors.primaryColor)),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 24),
-
-                // Existing Payment Methods
-                const Text('Existing Payment Method',
-                    style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                        color: Color(0xFF64748B))),
-                const SizedBox(height: 12),
-
-                ...savedCards.map((card) {
-                  final isSelected = selectedCard == card['number'];
-                  return GestureDetector(
-                    onTap: () =>
-                        setSheet(() => selectedCard = card['number']),
-                    child: Container(
-                      margin: const EdgeInsets.only(bottom: 10),
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: isSelected
-                            ? AppColors.primaryColor.withValues(alpha: 0.05)
-                            : const Color(0xFFF8FAFC),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: isSelected
-                              ? AppColors.primaryColor
-                              : const Color(0xFFE2E8F0),
-                          width: isSelected ? 2 : 1,
-                        ),
-                      ),
-                      child: Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 10, vertical: 6),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(6),
-                              border: Border.all(
-                                  color: const Color(0xFFE2E8F0)),
-                            ),
-                            child: Text(card['type'] ?? '',
-                                style: const TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w800,
-                                    color: Color(0xFF0F172A))),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(card['number'] ?? '',
-                                    style: const TextStyle(
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w600,
-                                        color: Color(0xFF0F172A),
-                                        letterSpacing: 1)),
-                                Text('Expires ${card['expiry']}',
-                                    style: const TextStyle(
-                                        fontSize: 12,
-                                        color: Color(0xFF94A3B8))),
-                              ],
-                            ),
-                          ),
-                          if (isSelected)
-                            const Icon(Icons.check_circle_rounded,
-                                color: AppColors.primaryColor, size: 20),
-                        ],
-                      ),
-                    ),
-                  );
-                }),
-
-                const SizedBox(height: 8),
-
-                // Add new card
-                GestureDetector(
-                  onTap: () {
-                    Navigator.pop(ctx);
-                    Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => const AddCard()),
-                    );
-                  },
-                  child: Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: AppColors.primaryColor.withValues(alpha: 0.3),
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.add_circle_outline_rounded,
-                            color: AppColors.primaryColor, size: 20),
-                        const SizedBox(width: 10),
-                        Text('Add Card Details',
-                            style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w700,
-                                color: AppColors.primaryColor)),
-                      ],
-                    ),
-                  ),
-                ),
-
-                const SizedBox(height: 24),
-
-                // Pay & Connect button
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: () async {
-                      Navigator.pop(ctx); // close bottom sheet
-                      // Check if any doctor is online before proceeding
-                      try {
-                        final result = await DoctorService().getAllDoctors();
-                        final doctors = (result['doctors'] as List?) ?? [];
-                        final anyOnline = doctors.any((d) {
-                          if (d is Map) return d['isOnline'] == true;
-                          return false;
-                        });
-                        if (!anyOnline && mounted) {
-                          showDialog(
-                            context: context,
-                            builder: (c) => AlertDialog(
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                              title: const Row(children: [
-                                Icon(Icons.info_outline_rounded, color: Color(0xFF6366F1)),
-                                SizedBox(width: 8),
-                                Text('No Doctors Available', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
-                              ]),
-                              content: const Text('No doctors are online right now. Please try again later or book an advance appointment.', style: TextStyle(fontSize: 14)),
-                              actions: [
-                                TextButton(onPressed: () => Navigator.pop(c), child: const Text('OK', style: TextStyle(fontWeight: FontWeight.bold))),
-                              ],
-                            ),
-                          );
-                          return;
-                        }
-                      } catch (_) {}
-                      // Navigate to waiting screen
-                      if (mounted) {
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) => ConnectNowWaitingScreen(targetDoctorId: widget.targetDoctorId),
-                          ),
-                        );
-                      }
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primaryColor,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12)),
-                      elevation: 0,
-                    ),
-                    child: const Text('Pay PKR 500 & Connect',
-                        style: TextStyle(
-                            fontSize: 16, fontWeight: FontWeight.w800)),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
       ),
     );
   }

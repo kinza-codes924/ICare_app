@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:icare/screens/consultation_chat_screen_v2.dart';
+import 'package:icare/screens/select_payment_method.dart';
+import 'package:icare/services/appointment_service.dart';
 import 'package:icare/services/connect_now_service.dart';
 import 'package:icare/services/consultation_service.dart';
 import 'package:icare/utils/shared_pref.dart';
@@ -155,15 +157,46 @@ class _ConnectNowWaitingScreenState extends State<ConnectNowWaitingScreen>
           updatedAt: DateTime.now(),
         );
 
-        // Navigate to chat screen (NOT video directly)
+        // openChat takes an explicit context because by the time payment
+        // succeeds, THIS screen has already been replaced by
+        // SelectPaymentMethod (pushReplacement below) — using the outer
+        // `context` here would be a defunct/disposed context by then.
+        void openChat(BuildContext ctx) {
+          Navigator.of(ctx).pushReplacement(
+            MaterialPageRoute(
+              builder: (_) => ConsultationChatScreenV2(
+                consultationId: result['consultationId'],
+                appointment: appointment,
+                isDoctor: false,
+                currentUserId: patientId,
+                currentUserName: patientName,
+              ),
+            ),
+          );
+        }
+
+        // The connect-now accept endpoint already created a real Appointment
+        // (doctorId now known) — charge the doctor's real consultation fee
+        // for it before the patient enters the chat. Only skip payment in
+        // the rare case the backend couldn't create that Appointment record.
+        if (appointmentId.isEmpty) {
+          openChat(context);
+          return;
+        }
+
+        double fee = 0;
+        try {
+          final profile = await AppointmentService().getDoctorProfile(doctorId);
+          fee = (profile?['consultationFee'] as num?)?.toDouble() ?? 0;
+        } catch (_) {}
+
+        if (!mounted) return;
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(
-            builder: (_) => ConsultationChatScreenV2(
-              consultationId: result['consultationId'],
-              appointment: appointment,
-              isDoctor: false,
-              currentUserId: patientId,
-              currentUserName: patientName,
+            builder: (_) => SelectPaymentMethod(
+              appointmentId: appointmentId,
+              amount: fee,
+              onPaymentSuccess: (successContext, {voucherCode}) => openChat(successContext),
             ),
           ),
         );
