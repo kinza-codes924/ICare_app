@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/connect_now_service.dart';
 import '../services/consultation_service.dart';
@@ -7,7 +8,6 @@ import '../services/appointment_service.dart';
 import '../utils/shared_pref.dart';
 import '../utils/app_keys.dart';
 import '../utils/connect_now_events.dart';
-import '../screens/consultation_chat_screen_v2.dart';
 import '../models/appointment_detail.dart';
 import '../models/user.dart';
 
@@ -46,18 +46,15 @@ Future<void> _enterConsultation(
       updatedAt: DateTime.now(),
     );
 
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(
-        builder: (_) => _ConsultationWrapper(
-          child: ConsultationChatScreenV2(
-            consultationId: consultResult['consultationId']?.toString(),
-            appointment: appointment,
-            isDoctor: true,
-            currentUserId: doctorId,
-            currentUserName: doctorName,
-          ),
-        ),
-      ),
+    final consultationId = consultResult['consultationId']?.toString() ?? appointmentId;
+    context.go(
+      '/consultation/$consultationId',
+      extra: {
+        'appointment': appointment,
+        'isDoctor': true,
+        'currentUserId': doctorId,
+        'currentUserName': doctorName,
+      },
     );
   } else {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -565,28 +562,4 @@ class _ConnectNowRequestDialog extends StatelessWidget {
       ),
     );
   }
-}
-
-/// Wraps VideoCall and clears doctor_in_consultation flag when call ends
-class _ConsultationWrapper extends StatefulWidget {
-  final Widget child;
-  const _ConsultationWrapper({required this.child});
-
-  @override
-  State<_ConsultationWrapper> createState() => _ConsultationWrapperState();
-}
-
-class _ConsultationWrapperState extends State<_ConsultationWrapper> {
-  @override
-  void dispose() {
-    // Clear in-consultation flag when video call screen is disposed
-    SharedPreferences.getInstance().then((prefs) {
-      prefs.setBool('doctor_in_consultation', false);
-      debugPrint('✅ Cleared doctor_in_consultation flag');
-    });
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) => widget.child;
 }

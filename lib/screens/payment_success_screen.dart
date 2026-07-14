@@ -5,7 +5,6 @@ import 'package:icare/utils/shared_pref.dart';
 import 'package:icare/services/payment_service.dart';
 import 'package:icare/services/appointment_service.dart';
 import 'package:icare/services/consultation_service.dart';
-import 'package:icare/screens/consultation_chat_screen_v2.dart';
 import 'package:icare/models/appointment_detail.dart';
 import 'package:icare/models/user.dart';
 
@@ -100,16 +99,15 @@ class _PaymentSuccessScreenState extends State<PaymentSuccessScreen> {
       updatedAt: DateTime.now(),
     );
 
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(
-        builder: (_) => ConsultationChatScreenV2(
-          consultationId: result['consultationId']?.toString(),
-          appointment: appointment,
-          isDoctor: false,
-          currentUserId: patientId,
-          currentUserName: patientName,
-        ),
-      ),
+    final consultationId = result['consultationId']?.toString() ?? appointmentId;
+    context.go(
+      '/consultation/$consultationId',
+      extra: {
+        'appointment': appointment,
+        'isDoctor': false,
+        'currentUserId': patientId,
+        'currentUserName': patientName,
+      },
     );
   }
 

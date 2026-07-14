@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:icare/screens/consultation_chat_screen_v2.dart';
+import 'package:go_router/go_router.dart';
 import 'package:icare/screens/select_payment_method.dart';
 import 'package:icare/services/appointment_service.dart';
 import 'package:icare/services/connect_now_service.dart';
@@ -158,16 +158,15 @@ class _ConnectNowWaitingScreenState extends State<ConnectNowWaitingScreen>
         Navigator.of(ctx).pop(); // close loading
 
         if (result['success'] == true) {
-          Navigator.of(ctx).pushReplacement(
-            MaterialPageRoute(
-              builder: (_) => ConsultationChatScreenV2(
-                consultationId: result['consultationId'],
-                appointment: appointment,
-                isDoctor: false,
-                currentUserId: patientId,
-                currentUserName: patientName,
-              ),
-            ),
+          final consultationId = result['consultationId']?.toString() ?? appointmentId;
+          ctx.go(
+            '/consultation/$consultationId',
+            extra: {
+              'appointment': appointment,
+              'isDoctor': false,
+              'currentUserId': patientId,
+              'currentUserName': patientName,
+            },
           );
         } else {
           ScaffoldMessenger.of(ctx).showSnackBar(

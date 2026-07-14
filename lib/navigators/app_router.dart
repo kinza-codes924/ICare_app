@@ -77,6 +77,8 @@ import 'package:icare/screens/admin_lms_payments_screen.dart';
 import 'package:icare/screens/admin_payments_screen.dart';
 import 'package:icare/screens/payment_success_screen.dart';
 import 'package:icare/screens/about_us.dart';
+import 'package:icare/screens/consultation_chat_screen_v2.dart';
+import 'package:icare/models/appointment_detail.dart';
 import 'package:icare/utils/shared_pref.dart';
 import 'package:icare/utils/app_keys.dart';
 
@@ -193,6 +195,24 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/payment-cancelled',
         builder: (_, state) => PaymentSuccessScreen(cancelled: true, paymentId: state.uri.queryParameters['pid']),
+      ),
+      // A real GoRoute for the live consultation — so the URL bar actually
+      // reflects "you're in a consultation" (instead of staying frozen on
+      // whatever screen navigated here via a raw Navigator.push), and so
+      // the back button has a real router location to fall back to instead
+      // of popping into an empty stack (blank/white screen).
+      GoRoute(
+        path: '/consultation/:consultationId',
+        builder: (_, state) {
+          final extra = state.extra as Map<String, dynamic>?;
+          return ConsultationChatScreenV2(
+            consultationId: state.pathParameters['consultationId'],
+            appointment: extra?['appointment'] as AppointmentDetail?,
+            isDoctor: extra?['isDoctor'] as bool? ?? false,
+            currentUserId: extra?['currentUserId'] as String? ?? '',
+            currentUserName: extra?['currentUserName'] as String? ?? '',
+          );
+        },
       ),
       GoRoute(path: '/splash', builder: (_, _) => const SplashScreen()),
       GoRoute(path: '/home', builder: (_, _) => const PublicHome()),

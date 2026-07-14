@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 class CustomBackButton extends StatelessWidget {
   const CustomBackButton({super.key, this.margin, this.color});
@@ -9,7 +10,15 @@ class CustomBackButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: () {
-        Navigator.of(context).pop();
+        // Screens reached via pushReplacement (e.g. entering a consultation
+        // straight from the Safepay payment-success redirect) can be the
+        // ONLY entry in the stack — popping then has nothing left to show
+        // and renders a blank/white screen. Fall back to the dashboard.
+        if (Navigator.of(context).canPop()) {
+          Navigator.of(context).pop();
+        } else {
+          context.go('/dashboard');
+        }
       },
       child: Container(
         margin: margin ?? EdgeInsets.only(left: 21),
