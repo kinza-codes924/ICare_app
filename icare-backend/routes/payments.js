@@ -652,6 +652,27 @@ router.get('/report', authMiddleware, roleMiddleware('admin'), async (req, res) 
       if (req.query.maxAmount) q.amount.$lte = Number(req.query.maxAmount);
     }
 
+    // Search by recipient name — "Doctor Kamran ko search kar sakoon" — find
+    // matching doctor/lab/pharmacy/instructor users first, then restrict the
+    // payment query to those payeeIds (combined with any other filter above).
+    const searchTerm = (req.query.search || '').trim();
+    if (searchTerm) {
+      const matches = await User.find({
+        role: { $in: ['doctor', 'lab', 'pharmacy', 'instructor'] },
+        $or: [
+          { name: { $regex: searchTerm, $options: 'i' } },
+          { username: { $regex: searchTerm, $options: 'i' } },
+        ],
+      }).select('_id').lean();
+      const matchIds = matches.map(m => m._id);
+      if (matchIds.length === 0) {
+        // No recipient matches this name — short-circuit to an empty result
+        // instead of an unfiltered query.
+        return res.json({ success: true, payments: [], totals: [], grandTotal: 0, grandDiscount: 0, grandCount: 0 });
+      }
+      q.payeeId = req.query.payeeId ? toId(req.query.payeeId) : { $in: matchIds };
+    }
+
     const limit = Math.min(Number(req.query.limit) || 300, 1000);
     const payments = await Payment.find(q).sort({ createdAt: -1 }).limit(limit).lean();
 
@@ -713,6 +734,91 @@ router.get('/report', authMiddleware, roleMiddleware('admin'), async (req, res) 
     });
   } catch (e) {
     console.error('payments report error:', e.message);
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+// ─── GET /api/payments/:id/order-details — full underlying order (admin) ─────
+// "Shopify jaisa" drill-down: resolves the payment's type+refId to the FULL
+// underlying document (course/appointment/lab booking/pharmacy order) with
+// names populated, so admin can verify the payment against real order data
+// without needing role-specific screen access.
+router.get('/:id/order-details', authMiddleware, roleMiddleware('admin'), async (req, res) => {
+  try {
+    await connectMongoDB();
+    const payment = await Payment.findById(toId(req.params.id)).lean();
+    if (!payment) return res.status(404).json({ success: false, message: 'Payment not found' });
+
+    let order = null;
+    if (payment.type === 'course') {
+      const course = await Course.findById(payment.refId).lean();
+      if (course) {
+        const instructor = course.instructor_id ? await User.findById(course.instructor_id).select('name username').lean() : null;
+        order = {
+          title: course.title, description: course.description,
+          price: course.price, discountedPrice: course.discountedPrice, isFree: course.isFree,
+          instructorName: instructor?.name || instructor?.username || null,
+        };
+      }
+    } else if (payment.type === 'appointment') {
+      const appt = await Appointment.findById(payment.refId).lean();
+      if (appt) {
+        const [patient, doctor] = await Promise.all([
+          User.findById(appt.patient_id).select('name username phone').lean(),
+          User.findById(appt.doctor_id).select('name username').lean(),
+        ]);
+        order = {
+          patientName: patient?.name || patient?.username || null,
+          patientPhone: patient?.phone || null,
+          doctorName: doctor?.name || doctor?.username || null,
+          date: appt.appointment_date, time: appt.appointment_time,
+          consultationType: appt.consultation_type, status: appt.status,
+          notes: appt.notes, channelName: appt.channel_name,
+        };
+      }
+    } else if (payment.type === 'lab') {
+      const booking = await LabTestRequest.findById(payment.refId).lean();
+      if (booking) {
+        const [patient, lab] = await Promise.all([
+          User.findById(booking.patient_id).select('name username phone').lean(),
+          User.findById(booking.lab_id).select('name username').lean(),
+        ]);
+        order = {
+          patientName: patient?.name || patient?.username || booking.patient_name_override || null,
+          patientPhone: patient?.phone || booking.patient_phone || null,
+          labName: lab?.name || lab?.username || null,
+          testType: booking.test_type, testDate: booking.test_date,
+          collectionType: booking.collection_type, urgency: booking.urgency,
+          status: booking.status, reportUrl: booking.report_url || null,
+        };
+      }
+    } else if (payment.type === 'pharmacy') {
+      const order_ = await PharmacyOrder.findById(payment.refId).lean();
+      if (order_) {
+        const [patient, pharmacy] = await Promise.all([
+          User.findById(order_.patient_id).select('name username phone').lean(),
+          User.findById(order_.pharmacy_id).select('name username').lean(),
+        ]);
+        order = {
+          patientName: patient?.name || patient?.username || order_.patientName || null,
+          patientPhone: patient?.phone || order_.contact || null,
+          pharmacyName: pharmacy?.name || pharmacy?.username || null,
+          orderNumber: order_.order_number, status: order_.status,
+          deliveryAddress: order_.delivery_address, deliveryOption: order_.deliveryOption,
+          items: (order_.items || []).map(i => ({
+            name: i.product_name, quantity: i.quantity, price: i.price,
+          })),
+          totalAmount: order_.total_amount, deliveryFee: order_.delivery_fee,
+        };
+      }
+    }
+
+    if (!order) {
+      return res.status(404).json({ success: false, message: 'The underlying order record could not be found (it may have been deleted).' });
+    }
+    res.json({ success: true, type: payment.type, order });
+  } catch (e) {
+    console.error('order-details error:', e.message);
     res.status(500).json({ success: false, message: e.message });
   }
 });

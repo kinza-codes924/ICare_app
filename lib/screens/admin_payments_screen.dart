@@ -1,5 +1,7 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:icare/services/payment_service.dart';
+import 'package:icare/utils/csv_downloader.dart';
 import 'package:icare/utils/theme.dart';
 import 'package:icare/widgets/back_button.dart';
 import 'package:intl/intl.dart';
@@ -24,6 +26,8 @@ class _AdminPaymentsScreenState extends State<AdminPaymentsScreen> {
   DateTimeRange? _dateRange;
   final _minCtrl = TextEditingController();
   final _maxCtrl = TextEditingController();
+  final _searchCtrl = TextEditingController();
+  Timer? _searchDebounce;
   String? _payeeId;
   String? _payeeName;
 
@@ -49,6 +53,8 @@ class _AdminPaymentsScreenState extends State<AdminPaymentsScreen> {
   void dispose() {
     _minCtrl.dispose();
     _maxCtrl.dispose();
+    _searchCtrl.dispose();
+    _searchDebounce?.cancel();
     super.dispose();
   }
 
@@ -60,6 +66,7 @@ class _AdminPaymentsScreenState extends State<AdminPaymentsScreen> {
         method: _method.isEmpty ? null : _method,
         status: _status,
         payeeId: _payeeId,
+        search: _searchCtrl.text.trim(),
         from: _dateRange?.start,
         to: _dateRange?.end.add(const Duration(days: 1)),
         minAmount: double.tryParse(_minCtrl.text.trim()),
@@ -89,9 +96,58 @@ class _AdminPaymentsScreenState extends State<AdminPaymentsScreen> {
     setState(() {
       _type = ''; _method = ''; _status = 'paid';
       _dateRange = null; _payeeId = null; _payeeName = null;
-      _minCtrl.clear(); _maxCtrl.clear();
+      _minCtrl.clear(); _maxCtrl.clear(); _searchCtrl.clear();
     });
     _load();
+  }
+
+  void _onSearchChanged(String v) {
+    _searchDebounce?.cancel();
+    // Typing a name is an alternative way to pick a recipient — clear any
+    // exact recipient picked by tapping a "Revenue by Recipient" row so the
+    // two selection methods don't fight each other. setState here also
+    // refreshes the clear (X) button immediately, without waiting for the
+    // debounced reload below.
+    setState(() { _payeeId = null; _payeeName = null; });
+    _searchDebounce = Timer(const Duration(milliseconds: 500), _load);
+  }
+
+  Future<void> _exportCsv() async {
+    if (_payments.isEmpty) return;
+    String esc(String s) => '"${s.replaceAll('"', '""')}"';
+    final rows = <String>[
+      'Date,Type,Payer,Payee,Method,Status,Original Amount,Discount,Total Charged,Reference'
+    ];
+    for (final p in _payments) {
+      final created = DateTime.tryParse(p['createdAt']?.toString() ?? '')?.toLocal();
+      final dateStr = created != null ? DateFormat('yyyy-MM-dd HH:mm').format(created) : '';
+      rows.add([
+        esc(dateStr),
+        esc(p['type']?.toString() ?? ''),
+        esc(p['payerName']?.toString() ?? ''),
+        esc(p['payeeName']?.toString() ?? ''),
+        esc(p['method']?.toString() ?? ''),
+        esc(p['status']?.toString() ?? ''),
+        (p['originalAmount'] as num?)?.toString() ?? '',
+        (p['discountAmount'] as num?)?.toString() ?? '',
+        (p['amount'] as num?)?.toString() ?? '',
+        esc(p['safepayTracker']?.toString() ?? p['_id']?.toString() ?? ''),
+      ].join(','));
+    }
+    final ok = downloadCsv(rows.join('\n'),
+        'icare-payments-${DateFormat('yyyyMMdd-HHmm').format(DateTime.now())}.csv');
+    if (mounted && !ok) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Export is only available on the web version of the app')),
+      );
+    }
+  }
+
+  Future<void> _showOrderDetails(String paymentId, String type) async {
+    showDialog(
+      context: context,
+      builder: (ctx) => _OrderDetailsDialog(paymentService: _service, paymentId: paymentId, type: type),
+    );
   }
 
   String _pkr(num v) => 'PKR ${NumberFormat('#,##0').format(v)}';
@@ -107,6 +163,11 @@ class _AdminPaymentsScreenState extends State<AdminPaymentsScreen> {
         backgroundColor: Colors.white,
         elevation: 0,
         actions: [
+          IconButton(
+            onPressed: _payments.isEmpty ? null : _exportCsv,
+            tooltip: 'Download CSV',
+            icon: const Icon(Icons.download_rounded),
+          ),
           IconButton(onPressed: _load, icon: const Icon(Icons.refresh_rounded)),
           const SizedBox(width: 8),
         ],
@@ -177,6 +238,30 @@ class _AdminPaymentsScreenState extends State<AdminPaymentsScreen> {
                 ),
               ],
             ],
+          ),
+          const SizedBox(height: 14),
+          // Search by recipient name — "Doctor Kamran" / "Production Lab" —
+          // works together with the filters below (type/status/date/amount).
+          TextField(
+            controller: _searchCtrl,
+            onChanged: _onSearchChanged,
+            style: const TextStyle(fontSize: 14),
+            decoration: InputDecoration(
+              hintText: 'Search doctor, lab, pharmacy or instructor by name…',
+              prefixIcon: const Icon(Icons.search_rounded, size: 20),
+              suffixIcon: _searchCtrl.text.isEmpty
+                  ? null
+                  : IconButton(
+                      icon: const Icon(Icons.close_rounded, size: 18),
+                      onPressed: () {
+                        _searchCtrl.clear();
+                        _onSearchChanged('');
+                      },
+                    ),
+              isDense: true,
+              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+            ),
           ),
           const SizedBox(height: 14),
           LayoutBuilder(builder: (context, constraints) {
@@ -405,6 +490,7 @@ class _AdminPaymentsScreenState extends State<AdminPaymentsScreen> {
             final selected = _payeeId == t['payeeId']?.toString();
             return InkWell(
               onTap: () {
+                _searchCtrl.clear();
                 setState(() {
                   _payeeId = t['payeeId']?.toString();
                   _payeeName = t['payeeName']?.toString();
@@ -568,6 +654,20 @@ class _AdminPaymentsScreenState extends State<AdminPaymentsScreen> {
             _detailRow('Cash collected', DateFormat('d MMM yyyy • h:mm a')
                 .format(DateTime.tryParse(p['cashCollectedAt'].toString())?.toLocal() ?? DateTime.now())),
           _detailRow('Reference', p['safepayTracker']?.toString() ?? p['_id']?.toString() ?? '-'),
+          const SizedBox(height: 10),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: OutlinedButton.icon(
+              onPressed: () => _showOrderDetails(p['_id'].toString(), p['type']?.toString() ?? ''),
+              icon: const Icon(Icons.receipt_long_rounded, size: 16),
+              label: const Text('View Full Order Details', style: TextStyle(fontSize: 12.5)),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.primaryColor,
+                side: BorderSide(color: AppColors.primaryColor.withValues(alpha: 0.4)),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -605,6 +705,181 @@ class _AdminPaymentsScreenState extends State<AdminPaymentsScreen> {
         border: Border.all(color: const Color(0xFFEDF2F7)),
       ),
       child: child,
+    );
+  }
+}
+
+/// "Shopify-style" order details drill-down: shows the FULL underlying
+/// record (course / appointment / lab booking / pharmacy order) behind a
+/// payment, fetched fresh from the backend.
+class _OrderDetailsDialog extends StatefulWidget {
+  final PaymentService paymentService;
+  final String paymentId;
+  final String type;
+
+  const _OrderDetailsDialog({
+    required this.paymentService,
+    required this.paymentId,
+    required this.type,
+  });
+
+  @override
+  State<_OrderDetailsDialog> createState() => _OrderDetailsDialogState();
+}
+
+class _OrderDetailsDialogState extends State<_OrderDetailsDialog> {
+  bool _loading = true;
+  String? _error;
+  Map<String, dynamic>? _order;
+
+  static const _navy = Color(0xFF0F172A);
+  static const _slate = Color(0xFF64748B);
+
+  @override
+  void initState() {
+    super.initState();
+    _fetch();
+  }
+
+  Future<void> _fetch() async {
+    try {
+      final res = await widget.paymentService.orderDetails(widget.paymentId);
+      if (!mounted) return;
+      setState(() {
+        _order = Map<String, dynamic>.from(res['order'] as Map? ?? {});
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = e.toString().replaceFirst('Exception: ', '');
+        _loading = false;
+      });
+    }
+  }
+
+  Widget _row(String label, String? value) {
+    if (value == null || value.isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(width: 120, child: Text(label, style: const TextStyle(fontSize: 12, color: _slate))),
+          Expanded(child: Text(value, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: _navy))),
+        ],
+      ),
+    );
+  }
+
+  List<Widget> _buildFields() {
+    final o = _order!;
+    switch (widget.type) {
+      case 'course':
+        return [
+          _row('Course', o['title']?.toString()),
+          _row('Instructor', o['instructorName']?.toString()),
+          _row('List price', o['price'] != null ? 'PKR ${o['price']}' : null),
+          if (o['isFree'] == true) _row('Free course', 'Yes'),
+        ];
+      case 'appointment':
+        return [
+          _row('Patient', o['patientName']?.toString()),
+          _row('Phone', o['patientPhone']?.toString()),
+          _row('Doctor', o['doctorName']?.toString()),
+          _row('Date', o['date']?.toString()),
+          _row('Time', o['time']?.toString()),
+          _row('Consultation type', o['consultationType']?.toString()),
+          _row('Status', o['status']?.toString()),
+          _row('Notes', o['notes']?.toString()),
+        ];
+      case 'lab':
+        return [
+          _row('Patient', o['patientName']?.toString()),
+          _row('Phone', o['patientPhone']?.toString()),
+          _row('Lab', o['labName']?.toString()),
+          _row('Test(s)', o['testType']?.toString()),
+          _row('Test date', o['testDate']?.toString()),
+          _row('Collection type', o['collectionType']?.toString()),
+          _row('Urgency', o['urgency']?.toString()),
+          _row('Status', o['status']?.toString()),
+          if (o['reportUrl'] != null) _row('Report', 'Available'),
+        ];
+      case 'pharmacy':
+        final items = (o['items'] as List?) ?? [];
+        return [
+          _row('Patient', o['patientName']?.toString()),
+          _row('Phone', o['patientPhone']?.toString()),
+          _row('Pharmacy', o['pharmacyName']?.toString()),
+          _row('Order #', o['orderNumber']?.toString()),
+          _row('Status', o['status']?.toString()),
+          _row('Delivery option', o['deliveryOption']?.toString()),
+          _row('Delivery address', o['deliveryAddress']?.toString()),
+          if (items.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            const Text('Items', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: _navy)),
+            const SizedBox(height: 4),
+            ...items.map((i) => Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 2),
+                  child: Row(
+                    children: [
+                      Expanded(child: Text('${i['name'] ?? 'Item'} × ${i['quantity'] ?? 1}',
+                          style: const TextStyle(fontSize: 12.5, color: _navy))),
+                      Text('PKR ${i['price'] ?? 0}', style: const TextStyle(fontSize: 12.5, color: _slate)),
+                    ],
+                  ),
+                )),
+          ],
+          _row('Delivery fee', o['deliveryFee'] != null ? 'PKR ${o['deliveryFee']}' : null),
+        ];
+      default:
+        return [const Text('No details available for this order type.')];
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 440),
+        child: Padding(
+          padding: const EdgeInsets.all(22),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Expanded(
+                    child: Text('Full Order Details',
+                        style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900, color: _navy)),
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(Icons.close_rounded),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              if (_loading)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 30),
+                  child: Center(child: CircularProgressIndicator()),
+                )
+              else if (_error != null)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 20),
+                  child: Text(_error!, style: const TextStyle(color: Colors.red, fontSize: 13)),
+                )
+              else
+                ..._buildFields(),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

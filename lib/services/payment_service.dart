@@ -67,6 +67,7 @@ class PaymentService {
     String? payeeId,
     String? method,
     String? status,
+    String? search, // recipient name (doctor/lab/pharmacy/instructor)
     DateTime? from,
     DateTime? to,
     double? minAmount,
@@ -77,11 +78,19 @@ class PaymentService {
       if (payeeId != null && payeeId.isNotEmpty) 'payeeId': payeeId,
       if (method != null && method.isNotEmpty) 'method': method,
       if (status != null && status.isNotEmpty) 'status': status,
+      if (search != null && search.isNotEmpty) 'search': search,
       if (from != null) 'from': from.toIso8601String(),
       if (to != null) 'to': to.toIso8601String(),
       if (minAmount != null) 'minAmount': minAmount.toString(),
       if (maxAmount != null) 'maxAmount': maxAmount.toString(),
     });
+    return Map<String, dynamic>.from(response.data as Map);
+  }
+
+  /// Admin: full underlying order/booking behind a payment ("Shopify-style"
+  /// order details drill-down).
+  Future<Map<String, dynamic>> orderDetails(String paymentId) async {
+    final response = await _api.get('/payments/$paymentId/order-details');
     return Map<String, dynamic>.from(response.data as Map);
   }
 
