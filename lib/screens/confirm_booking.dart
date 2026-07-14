@@ -1,9 +1,8 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:icare/models/lab_test.dart';
-import 'package:icare/screens/tabs.dart';
+import 'package:icare/screens/select_payment_method.dart';
 import 'package:icare/services/laboratory_service.dart';
-import 'package:icare/utils/theme.dart';
 import 'package:icare/widgets/back_button.dart';
 
 class ConfirmBookingScreen extends StatefulWidget {
@@ -55,10 +54,25 @@ class _ConfirmBookingScreenState extends State<ConfirmBookingScreen> {
         'age': 25,
       };
 
-      await _labService.createBooking(labId, bookingDetails);
+      final booking = await _labService.createBooking(labId, bookingDetails);
+      final bookingId = booking['_id']?.toString();
 
       if (!mounted) return;
-      _showSuccessDialog();
+      if (bookingId == null || bookingId.isEmpty) {
+        throw Exception('Booking created but no booking ID was returned');
+      }
+
+      // Hand off to the real payment screen (Pay Online via Safepay, or
+      // Pay Cash at Collection) — this booking must NOT be treated as paid
+      // until the payment flow actually confirms it.
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (_) => SelectPaymentMethod(
+            labBookingId: bookingId,
+            amount: _totalPrice,
+          ),
+        ),
+      );
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -70,59 +84,6 @@ class _ConfirmBookingScreenState extends State<ConfirmBookingScreen> {
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
-  }
-
-  void _showSuccessDialog() {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(
-              Icons.check_circle_rounded,
-              color: Colors.green,
-              size: 80,
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'Booking Successful!'.tr(),
-              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Your lab test has been booked successfully. You can track it in your profile.'.tr(),
-              textAlign: TextAlign.center,
-              style: const TextStyle(color: Colors.grey),
-            ),
-            const SizedBox(height: 24),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () {
-                  Navigator.of(ctx).pop();
-                  Navigator.of(context).pushAndRemoveUntil(
-                    MaterialPageRoute(builder: (ctx) => const TabsScreen()),
-                    (route) => false,
-                  );
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primaryColor,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                ),
-                child: Text('Go to Home'.tr()),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
   }
 
   @override

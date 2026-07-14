@@ -23,6 +23,9 @@ const authMiddleware = async (req, res, next) => {
 };
 
 const roleMiddleware = (...allowedRoles) => {
+  // Case-insensitive: some accounts (esp. admin) have their role stored/
+  // returned with different casing ('Admin' vs 'admin') than the DB enum.
+  const allowedLower = allowedRoles.map(r => String(r).toLowerCase());
   return (req, res, next) => {
     if (!req.user) {
       return res.status(401).json({
@@ -31,7 +34,7 @@ const roleMiddleware = (...allowedRoles) => {
       });
     }
 
-    if (!allowedRoles.includes(req.user.role)) {
+    if (!allowedLower.includes(String(req.user.role || '').toLowerCase())) {
       return res.status(403).json({
         success: false,
         message: 'Access denied. Insufficient permissions.'
