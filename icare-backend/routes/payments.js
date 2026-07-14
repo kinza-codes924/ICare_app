@@ -96,6 +96,9 @@ async function calculateAmount({ type, refId, voucherCode, userId }) {
   if (type === 'course') {
     const course = await Course.findById(refId).lean();
     if (!course) throw new Error('Course not found');
+    // Never let an already-enrolled user pay again for the same course.
+    const existingEnrollment = await Enrollment.findOne({ userId: toId(userId), courseId: refId }).lean();
+    if (existingEnrollment) throw new Error('Already enrolled in this course');
     const original = course.isFree ? 0 : (course.discountedPrice || course.price || 0);
     let amount = original;
     let appliedVoucher = null;
@@ -564,6 +567,42 @@ router.post('/cash-collected-by-ref', authMiddleware, async (req, res) => {
     res.json({ success: true, status: 'paid', paymentId: payment._id });
   } catch (e) {
     console.error('cash-collected-by-ref error:', e.message);
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+// ─── POST /api/payments/reconcile-mine ────────────────────────────────────────
+// Self-healing: re-checks the logged-in user's recent unresolved Safepay
+// payments directly with Safepay and fulfills any that actually completed.
+// Covers the case where the user paid but closed the polling tab before the
+// app could confirm (and the webhook didn't land).
+router.post('/reconcile-mine', authMiddleware, async (req, res) => {
+  try {
+    await connectMongoDB();
+    const since = new Date(Date.now() - 48 * 60 * 60 * 1000);
+    const pendings = await Payment.find({
+      userId: toId(req.user.id),
+      method: 'safepay',
+      status: { $in: ['created', 'pending'] },
+      safepayTracker: { $ne: null },
+      createdAt: { $gte: since },
+    }).sort({ createdAt: -1 }).limit(10);
+
+    let fulfilled = 0;
+    for (const payment of pendings) {
+      try {
+        const report = await safepayGet(`/reporter/api/v1/payments/${payment.safepayTracker}`);
+        const trackerData = report?.data?.tracker || report?.data;
+        if (trackerData?.state === 'TRACKER_ENDED') {
+          const r = await markPaidAndFulfill(payment, trackerData, 'reconcile');
+          if (r.ok) fulfilled++;
+        }
+      } catch (e) {
+        await plog({ paymentId: payment._id, tracker: payment.safepayTracker, userId: payment.userId, step: 'ERROR', level: 'WARN', message: `reconcile check failed: ${e.message}` });
+      }
+    }
+    res.json({ success: true, checked: pendings.length, fulfilled });
+  } catch (e) {
     res.status(500).json({ success: false, message: e.message });
   }
 });

@@ -116,6 +116,18 @@ class PaymentService {
     return false;
   }
 
+  /// Self-healing: asks the backend to re-check the user's recent unresolved
+  /// Safepay payments and fulfill any that actually completed (e.g. the user
+  /// paid but closed the polling tab). Safe to call on screen loads.
+  Future<int> reconcileMine() async {
+    try {
+      final response = await _api.post('/payments/reconcile-mine', {});
+      return (response.data['fulfilled'] as num?)?.toInt() ?? 0;
+    } catch (_) {
+      return 0;
+    }
+  }
+
   /// User's own payment history.
   Future<List<Map<String, dynamic>>> myPayments() async {
     final response = await _api.get('/payments/my');

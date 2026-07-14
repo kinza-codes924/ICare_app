@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:icare/screens/view_course.dart';
 import 'package:icare/services/course_service.dart';
+import 'package:icare/services/payment_service.dart';
 import 'package:icare/providers/auth_provider.dart';
 import 'package:icare/utils/theme.dart';
 import 'package:icare/widgets/certificates_list.dart';
@@ -37,6 +38,14 @@ class _MyLearningScreenState extends ConsumerState<MyLearningScreen>
 
   Future<void> _loadData() async {
     try {
+      // Self-heal: settle any paid-but-unconfirmed Safepay payments (user
+      // paid, then closed the tab before the app could confirm) so the
+      // course shows up here instead of silently missing.
+      final recovered = await PaymentService().reconcileMine();
+      if (recovered > 0) {
+        debugPrint('Reconciled $recovered pending payment(s) into enrollments');
+      }
+
       final courses = await _courseService.myPurchases();
 
       // Enrollment/payment already grants full course access — document

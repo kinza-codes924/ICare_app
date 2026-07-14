@@ -75,6 +75,7 @@ import 'package:icare/screens/certificates_screen.dart';
 import 'package:icare/screens/assessments_screen.dart';
 import 'package:icare/screens/admin_lms_payments_screen.dart';
 import 'package:icare/screens/admin_payments_screen.dart';
+import 'package:icare/screens/payment_success_screen.dart';
 import 'package:icare/screens/about_us.dart';
 import 'package:icare/utils/shared_pref.dart';
 import 'package:icare/utils/app_keys.dart';
@@ -110,7 +111,7 @@ final _routerNotifierProvider = Provider<_RouterNotifier>((ref) {
 });
 
 /// Public paths that don't require authentication.
-const _publicPaths = ['/home', '/login', '/signup', '/work-with-us', '/splash', '/lms/catalog', '/verify', '/lms/course', '/privacypolicy', '/terms', '/refund-policy', '/about-us', '/help'];
+const _publicPaths = ['/home', '/login', '/signup', '/work-with-us', '/splash', '/lms/catalog', '/verify', '/lms/course', '/privacypolicy', '/terms', '/refund-policy', '/about-us', '/help', '/payment-success', '/payment-cancelled'];
 
 final routerProvider = Provider<GoRouter>((ref) {
   // Trigger auth init as soon as router is created.
@@ -152,7 +153,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         // Logged in visiting any other public route → dashboard.
         // /lms/catalog, /lms/course/*, /verify, and the legal pages remain
         // accessible to everyone regardless of login state.
-        const alwaysAccessible = ['/lms/catalog', '/verify', '/privacypolicy', '/terms', '/refund-policy', '/about-us', '/help'];
+        const alwaysAccessible = ['/lms/catalog', '/verify', '/privacypolicy', '/terms', '/refund-policy', '/about-us', '/help', '/payment-success', '/payment-cancelled'];
         if (isPublic && path != '/splash' && !alwaysAccessible.contains(path) &&
             !path.startsWith('/lms/course')) {
           return '/dashboard';
@@ -165,6 +166,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       // Bare "/" (e.g. payment-gateway redirects with ?tracker=... params)
       // must never 404 — send it home; logged-in users bounce to /dashboard.
       GoRoute(path: '/', redirect: (_, _) => '/home'),
+      // Safepay sends the checkout tab here after payment — a clear
+      // confirmation instead of a one-second flash + dashboard redirect.
+      GoRoute(path: '/payment-success', builder: (_, _) => const PaymentSuccessScreen()),
+      GoRoute(path: '/payment-cancelled', builder: (_, _) => const PaymentSuccessScreen(cancelled: true)),
       GoRoute(path: '/splash', builder: (_, _) => const SplashScreen()),
       GoRoute(path: '/home', builder: (_, _) => const PublicHome()),
       GoRoute(path: '/login', builder: (_, _) => const LoginScreen()),

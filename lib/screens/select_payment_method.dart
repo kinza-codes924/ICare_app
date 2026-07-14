@@ -195,11 +195,11 @@ class _SelectPaymentMethodState extends State<SelectPaymentMethod> {
       type: _paymentType,
       refId: _refId,
       voucherCode: _appliedVoucherCode,
-      // Send the checkout tab somewhere real after payment — the bare origin
-      // ("/?tracker=...") has no go_router route and showed Page Not Found.
-      // Fulfillment itself happens via this screen's polling + the webhook.
-      redirectUrl: kIsWeb ? '${Uri.base.origin}/dashboard' : null,
-      cancelUrl: kIsWeb ? '${Uri.base.origin}/dashboard' : null,
+      // Land the checkout tab on our own confirmation page so the user
+      // clearly sees the payment succeeded (Safepay's own success flash
+      // lasts barely a second before redirecting).
+      redirectUrl: kIsWeb ? '${Uri.base.origin}/payment-success' : null,
+      cancelUrl: kIsWeb ? '${Uri.base.origin}/payment-cancelled' : null,
     );
 
     // 100%-voucher / free — no gateway involved.

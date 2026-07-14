@@ -794,8 +794,8 @@ class _CheckoutScreenState extends State<_CheckoutScreen> {
       final create = await PaymentService().createPayment(
         type: 'pharmacy',
         refId: orderId,
-        redirectUrl: kIsWeb ? '${Uri.base.origin}/dashboard' : null,
-        cancelUrl: kIsWeb ? '${Uri.base.origin}/dashboard' : null,
+        redirectUrl: kIsWeb ? '${Uri.base.origin}/payment-success' : null,
+        cancelUrl: kIsWeb ? '${Uri.base.origin}/payment-cancelled' : null,
       );
       if (create['free'] == true) {
         if (mounted) _showOrderSuccess();
