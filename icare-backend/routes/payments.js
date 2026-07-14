@@ -60,7 +60,9 @@ async function safepayPost(path, body) {
   });
   const json = await res.json().catch(() => ({}));
   if (!res.ok) {
-    const msg = json?.status?.message || json?.message || `Safepay HTTP ${res.status}`;
+    // status.message is just "fail" — the real reason lives in status.errors[]
+    const errors = Array.isArray(json?.status?.errors) ? json.status.errors.join('; ') : '';
+    const msg = errors || json?.status?.message || json?.message || `Safepay HTTP ${res.status}`;
     const err = new Error(msg);
     err.safepay = json;
     throw err;
@@ -224,7 +226,10 @@ router.post('/create', authMiddleware, async (req, res) => {
       mode: 'payment',
       currency: 'PKR',
       amount: amountLowest,
-      metadata: { payment_id: payment._id.toString(), type, ref_id: String(refId) },
+      // NOTE: Safepay only accepts whitelisted metadata keys ("unsupported
+      // meta key ..." otherwise) — order_id is the documented one. It carries
+      // our Payment _id; type/refId live on the Payment record itself.
+      metadata: { order_id: payment._id.toString() },
     });
     const tracker = session?.data?.tracker?.token;
     if (!tracker) throw new Error('Safepay did not return a tracker token');
