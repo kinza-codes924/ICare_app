@@ -1,5 +1,17 @@
 # iCare App (wajahat) — Claude Context
 
+## Project overview
+iCare Virtual Hospital — full healthcare platform (patients, doctors, labs, pharmacies, instructors/students, admin). Flutter app (web + mobile) with Node.js/Express + MongoDB (Mongoose) backend, both deployed on Vercel.
+
+**Major feature areas:** appointments & booking, video consultations (Jitsi, migrated from Agora/Zego), Connect Now (instant doctor connect), chat, prescriptions (v2/enhanced), medical records, patient history, lab tests & lab supplies, pharmacy & product store (cart/orders/invoices), LMS (courses, live sessions, quizzes, assignments, certificates, polls, attendance, lesson notes), community forum, gamification, health trackers/profiles/reminders, clinical audit, admin panel & verification, notifications (FCM), ratings/reviews, vouchers.
+
+## Codebase map
+- **Frontend (Flutter, repo root)**: `lib/screens/` (~258 files), `lib/services/` (~59 API service classes), `lib/models/` (~35), `lib/widgets/` (~62), `lib/utils/` (web/stub platform-split helpers, Jitsi launcher, theme, api_constants), `lib/navigators/` (go_router `app_router.dart`, bottom tabs, drawer), `lib/providers/` (Riverpod: auth, chat, common).
+- **Backend (`icare-backend/`)**: `index.js` entry; `routes/` (~50 route files incl. auth, appointments, consultation-v2, prescription-v2, jitsi-token, live-sessions, courses, labs, pharmacy, admin), `models/` (~45 Mongoose models), plus controllers/services/middleware/config.
+- **Key deps**: frontend — Riverpod, go_router, dio, firebase (core/auth/messaging), easy_localization, agora_rtc_engine + zego (legacy, mobile), pdf/printing, fl_chart. Backend — express 5, mongoose, jsonwebtoken, cloudinary, @vercel/blob, nodemailer, firebase-admin, pdfkit.
+- Fonts: Gilroy. Translations in `assets/translations/`.
+- Root has many status/report `.md` files documenting past fixes (LMS, lab, consultation, etc.).
+
 ## Project info
 - **Frontend**: Flutter Web at https://www.icare.com.co/ (Vercel project: `icare-app`)
 - **Backend**: Node.js/Express at https://icare-backend-inky.vercel.app (Vercel project: `icare-backend`)
@@ -75,14 +87,24 @@ vercel env add JIBRI_UPLOAD_SECRET production
 - Platform view: `lms-jitsi-host` div registered via `ui.platformViewRegistry` for Jitsi iframe
 - After Jitsi ends: `lmsHardRedirect('/dashboard')` (full page reload — SPA navigation breaks Jitsi platform views)
 
+## Safepay payment gateway (added Jul 2026)
+- **Backend**: `routes/payments.js` (create/verify/webhook/my/logs/all), `models/Payment.js` (status: created→pending→paid/failed/expired, `fulfilled` flag = idempotent), `models/PaymentLog.js` (append-only audit trail, level ALERT on signature/amount mismatch).
+- Amount ALWAYS server-calculated (`calculateAmount()` — currently only type `course`; appointment/lab/pharmacy pending). PKR ×100 lowest denomination sent to Safepay.
+- Express Checkout flow: POST `/order/payments/v3/` (session) → POST `/client/passport/v1/token` (tbt) → hosted URL `{host}/embedded/?tracker&tbt&environment&source=hosted&redirect_url&cancel_url`. Auth header: `X-SFPY-MERCHANT-SECRET`.
+- Webhook: HMAC-SHA512 hex of raw body vs `X-SFPY-SIGNATURE` (rawBody captured in index.js express.json verify). Fulfillment (enrollment create + voucher redeem) only on `payment.succeeded`/TRACKER_ENDED + amount match.
+- `routes/courses.js` /enrollments now has a payment gate: paid course without a `paid` Payment → 402 paymentRequired.
+- **Frontend**: `lib/services/payment_service.dart` (createPayment/verifyPayment/pollUntilPaid), `select_payment_method.dart` — course purchases open Safepay hosted checkout (url_launcher) and poll verify; fake card list remains for lab/appointment (not yet migrated).
+- **Env vars needed (icare-backend Vercel)**: `SAFEPAY_API_KEY`, `SAFEPAY_SECRET_KEY`, `SAFEPAY_WEBHOOK_SECRET`, `SAFEPAY_ENV` (sandbox|production). Webhook endpoint to register in Safepay dashboard: `https://icare-backend-inky.vercel.app/api/payments/webhook`.
+
 ## How to deploy
-```powershell
+```bash
+# (Mac — project lives at ~/icare)
 # Backend
-cd D:\ICare_app-wajahat\icare-backend
+cd ~/icare/icare-backend
 vercel deploy --prod
 
 # Frontend
-cd D:\ICare_app-wajahat
+cd ~/icare
 flutter build web --release --no-wasm-dry-run
 # Then patch build/web/flutter_bootstrap.js:
 # change: _flutter.loader.load({ serviceWorkerSettings: {...} });

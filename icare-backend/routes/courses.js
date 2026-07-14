@@ -284,6 +284,25 @@ router.post('/enrollments', authMiddleware, async (req, res) => {
       redeemedVoucher = voucher;
     }
 
+    // ── SAFEPAY PAYMENT GATE ──────────────────────────────────────────────
+    // Paid courses can ONLY be enrolled through a verified Safepay payment.
+    // (Payment fulfillment in routes/payments.js creates the enrollment itself;
+    //  this direct path is only for free courses / 100%-discount vouchers.)
+    if (amountPaid > 0) {
+      const Payment = require('../models/Payment');
+      const paid = await Payment.findOne({
+        userId: uId, type: 'course', refId: cId, status: 'paid',
+      }).lean();
+      if (!paid) {
+        return res.status(402).json({
+          success: false,
+          paymentRequired: true,
+          amount: amountPaid,
+          message: 'Payment required. Create a payment via /api/payments/create first.',
+        });
+      }
+    }
+
     const enrollment = await Enrollment.create({
       userId: uId,
       courseId: cId,

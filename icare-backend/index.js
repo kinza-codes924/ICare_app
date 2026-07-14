@@ -99,7 +99,11 @@ app.use(cors({
   credentials: false,
   optionsSuccessStatus: 204,
 }));
-app.use(express.json({ limit: '10mb' }));
+app.use(express.json({
+  limit: '10mb',
+  // Keep raw body for webhook HMAC signature verification (Safepay etc.)
+  verify: (req, res, buf) => { req.rawBody = buf; },
+}));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Health check
@@ -193,6 +197,7 @@ app.use('/api/reviews', reviewsRoutes);
 app.use('/api/vouchers', vouchersRoutes);
 app.use('/api/faqs', faqsRoutes);
 app.use('/api/jitsi', jitsiTokenRoutes);
+app.use('/api/payments', require('./routes/payments'));
 
 // Serve uploaded files (only in non-serverless environments)
 if (!process.env.VERCEL) {

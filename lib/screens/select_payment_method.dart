@@ -1,12 +1,15 @@
 import 'dart:developer';
 
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_size_matters/flutter_size_matters.dart';
 import 'package:icare/screens/add_card.dart';
 import 'package:icare/screens/tabs.dart';
 import 'package:icare/services/course_service.dart';
 import 'package:icare/services/laboratory_service.dart';
+import 'package:icare/services/payment_service.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:icare/utils/imagePaths.dart';
 import 'package:icare/utils/theme.dart';
 import 'package:icare/widgets/custom_text.dart';
@@ -39,7 +42,10 @@ class SelectPaymentMethod extends StatefulWidget {
 class _SelectPaymentMethodState extends State<SelectPaymentMethod> {
   final _courseService = CourseService();
   final _labService = LaboratoryService();
+  final _paymentService = PaymentService();
   bool _isLoading = false;
+  bool _awaitingGateway = false; // Safepay checkout tab open, polling for result
+  bool _pollCancelled = false;
   String? _selectedMethod = "VISA";
 
   // Voucher state — only relevant when widget.courseId is set
@@ -132,11 +138,10 @@ class _SelectPaymentMethodState extends State<SelectPaymentMethod> {
 
     setState(() => _isLoading = true);
     try {
-      // A voucher that brings the price to 0 skips the fake card-payment
-      // delay entirely — there's nothing to "process."
-      if (_finalAmount > 0) {
-        // Simulate real-world payment processing delay
-        await Future.delayed(const Duration(seconds: 2));
+      // ── COURSE: real Safepay payment ─────────────────────────────────────
+      if (widget.courseId != null && _finalAmount > 0) {
+        await _startSafepayFlow();
+        return;
       }
 
       if (widget.appointmentId != null) {
@@ -232,6 +237,114 @@ class _SelectPaymentMethodState extends State<SelectPaymentMethod> {
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  /// Real Safepay flow for course purchases:
+  /// backend creates the session (amount calculated server-side) → open the
+  /// hosted checkout page → poll the backend until it confirms with Safepay.
+  Future<void> _startSafepayFlow() async {
+    final create = await _paymentService.createPayment(
+      type: 'course',
+      refId: widget.courseId!,
+      voucherCode: _appliedVoucherCode,
+      redirectUrl: kIsWeb ? Uri.base.origin : null,
+      cancelUrl: kIsWeb ? Uri.base.origin : null,
+    );
+
+    // 100%-voucher / free — no gateway involved, enroll directly.
+    if (create['free'] == true) {
+      await _finishCourseSuccess();
+      return;
+    }
+
+    final checkoutUrl = create['checkoutUrl']?.toString();
+    final paymentId = create['paymentId']?.toString();
+    if (checkoutUrl == null || paymentId == null) {
+      throw Exception('Payment gateway did not return a checkout link');
+    }
+
+    // Open Safepay hosted checkout (new tab on web, browser on mobile).
+    await launchUrl(Uri.parse(checkoutUrl), mode: LaunchMode.externalApplication);
+
+    if (!mounted) return;
+    setState(() {
+      _isLoading = false;
+      _awaitingGateway = true;
+      _pollCancelled = false;
+    });
+
+    final paid = await _paymentService.pollUntilPaid(
+      paymentId,
+      isCancelled: () => _pollCancelled || !mounted,
+    );
+
+    if (!mounted) return;
+    setState(() => _awaitingGateway = false);
+
+    if (paid) {
+      await _finishCourseSuccess();
+    } else if (!_pollCancelled) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Payment was not completed. You have not been charged — please try again."),
+          backgroundColor: Colors.red,
+          duration: Duration(seconds: 5),
+        ),
+      );
+    }
+  }
+
+  /// After a confirmed payment (or free enrollment) — hand off to the LMS
+  /// purchase flow if present, otherwise enroll + show the success dialog.
+  Future<void> _finishCourseSuccess() async {
+    if (widget.onPaymentSuccess != null) {
+      // The backend has already created the enrollment on payment fulfillment;
+      // the flow's own enrollment call is idempotent ("Already enrolled").
+      if (mounted) widget.onPaymentSuccess!(context, voucherCode: _appliedVoucherCode);
+      return;
+    }
+    await _courseService.buyCourse(widget.courseId!, voucherCode: _appliedVoucherCode);
+    if (mounted) {
+      _showSuccessDialog(
+        "Course Purchased!",
+        "You have successfully enrolled in the course. You can now start learning.",
+      );
+    }
+  }
+
+  Widget _buildAwaitingGateway() {
+    return Center(
+      child: Container(
+        constraints: const BoxConstraints(maxWidth: 420),
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const CircularProgressIndicator(),
+            const SizedBox(height: 28),
+            const Text(
+              "Complete your payment",
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: Color(0xFF0F172A)),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              "A secure Safepay checkout page has opened. Finish your payment there — this screen will update automatically.",
+              style: TextStyle(fontSize: 14, color: Color(0xFF64748B), height: 1.5),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 28),
+            TextButton(
+              onPressed: () => setState(() {
+                _pollCancelled = true;
+                _awaitingGateway = false;
+              }),
+              child: const Text("Cancel payment"),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   void _showSuccessDialog(String title, String message) {
@@ -349,7 +462,9 @@ class _SelectPaymentMethodState extends State<SelectPaymentMethod> {
           color: AppColors.primary500,
         ),
       ),
-      body: _isLoading
+      body: _awaitingGateway
+          ? _buildAwaitingGateway()
+          : _isLoading
           ? const Center(child: CircularProgressIndicator())
           : Padding(
               padding: EdgeInsets.symmetric(
@@ -487,7 +602,9 @@ class _SelectPaymentMethodState extends State<SelectPaymentMethod> {
           color: AppColors.primaryColor,
         ),
       ),
-      body: _isLoading
+      body: _awaitingGateway
+          ? _buildAwaitingGateway()
+          : _isLoading
           ? const Center(child: CircularProgressIndicator())
           : Center(
               child: Container(
