@@ -8,8 +8,8 @@ import 'package:icare/screens/active_orders.dart';
 import 'package:icare/screens/completed-reports.dart';
 import 'package:icare/screens/filters.dart';
 import 'package:icare/screens/lab_filters.dart';
-import 'package:icare/screens/public_home.dart';
 import 'package:icare/screens/patient_dashboard.dart';
+import 'package:icare/screens/patient_home_dashboard.dart';
 import 'package:icare/screens/pharmacy_home.dart';
 import 'package:icare/screens/profile_edit.dart';
 import 'package:icare/screens/upcoming_appointments.dart';
@@ -2208,10 +2208,10 @@ class DoctorConsultationCard extends StatelessWidget {
   }
 }
 
-// ── Patient logged-in home: same content as public home, no top navbar ────────
+// ── Patient logged-in home: real dashboard (public home page stays separate) ──
 class _PatientPublicHomeContent extends StatelessWidget {
   const _PatientPublicHomeContent();
 
   @override
-  Widget build(BuildContext context) => const PublicHomeBody();
+  Widget build(BuildContext context) => const PatientHomeDashboard();
 }

@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
-import 'package:icare/screens/public_home.dart';
+import 'package:icare/screens/patient_home_dashboard.dart';
 
-/// Patient Dashboard now shows the same public home layout (mobile view)
+/// Patient Dashboard — real logged-in dashboard (quick actions, upcoming
+/// appointment, health tracker, records, rewards). The public marketing
+/// home stays untouched at public_home.dart for logged-out visitors.
 class PatientDashboard extends StatelessWidget {
   const PatientDashboard({super.key});
 
   @override
-  Widget build(BuildContext context) => const PublicHomeBody();
+  Widget build(BuildContext context) => const PatientHomeDashboard();
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
