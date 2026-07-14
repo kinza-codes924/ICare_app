@@ -139,23 +139,38 @@ class _PatientRecordsListScreenState extends State<PatientRecordsListScreen> {
                 ? const Center(child: CircularProgressIndicator())
                 : filteredList.isEmpty
                 ? Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.folder_open_rounded,
-                          size: 64,
-                          color: Colors.grey.shade300,
-                        ),
-                        const SizedBox(height: 16),
-                        const Text(
-                          'No patient records found',
-                          style: TextStyle(
-                            fontSize: 16,
-                            color: Color(0xFF64748B),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 32),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.folder_open_rounded,
+                            size: 64,
+                            color: Colors.grey.shade300,
                           ),
-                        ),
-                      ],
+                          const SizedBox(height: 16),
+                          const Text(
+                            'No medical records yet',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF334155),
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          const Text(
+                            'Records appear here automatically after a completed '
+                            'doctor consultation — nothing to set up.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: Color(0xFF64748B),
+                              height: 1.5,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   )
                 : RefreshIndicator(

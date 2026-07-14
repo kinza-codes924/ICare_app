@@ -62,6 +62,7 @@ async function getAppointments(userId, userRole) {
       doctor_name: dMap[a.doctor_id.toString()]?.username || dMap[a.doctor_id.toString()]?.name,
       doctor_email: dMap[a.doctor_id.toString()]?.email,
       doctor_phone: dMap[a.doctor_id.toString()]?.phone,
+      doctor_profilePicture: dMap[a.doctor_id.toString()]?.profilePicture || null,
       specialization: pMap[a.doctor_id.toString()]?.specialization,
       consultation_fee: pMap[a.doctor_id.toString()]?.consultation_fee,
       channel_name: a.channel_name || '',

@@ -48,20 +48,12 @@ List<Widget> _patientTabs(
       image: ImagePaths.home,
       title: 'home'.tr(),
     ),
+    SizedBox(width: 20),
     CustomTabButton(
       onPressed: () {
         onSelect(1);
       },
       iconColor: currentIndex == 1 ? AppColors.primaryColor : AppColors.grayColor,
-      image: ImagePaths.bookings,
-      title: 'my_learning'.tr(),
-    ),
-    SizedBox(width: 20),
-    CustomTabButton(
-      onPressed: () {
-        onSelect(2);
-      },
-      iconColor: currentIndex == 2 ? AppColors.primaryColor : AppColors.grayColor,
       image: ImagePaths.profile2,
       title: 'profile'.tr(),
     ),

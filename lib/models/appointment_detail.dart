@@ -43,6 +43,8 @@ class AppointmentDetail {
           email: json['doctor_email']?.toString() ?? '',
           phoneNumber: json['doctor_phone']?.toString() ?? '',
           role: 'doctor',
+          profilePicture: json['doctor_profilePicture']?.toString() ??
+              json['doctor_profile_picture']?.toString(),
         );
       } else if (json['doctor'] is String && json['doctor']!.toString().length > 5) {
         // Backend returned doctor as plain string ID

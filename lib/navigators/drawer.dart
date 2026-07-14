@@ -252,17 +252,11 @@ class _CustomDrawerState extends ConsumerState<CustomDrawer> {
         _drawerItem('Book a Lab Test', Icons.science_outlined, () {
           context.push('/patient/book-lab');
         }),
-        _drawerItem('My Learning', Icons.school_outlined, () {
-          context.push('/patient/my-learning');
-        }),
         _drawerItem('Health Journey', Icons.history_outlined, () {
           context.push('/patient/health-journey');
         }),
         _drawerItem('Health Tracker', Icons.monitor_heart_outlined, () {
           context.push('/patient/health-tracker');
-        }),
-        _drawerItem('Emergency Contacts', Icons.contact_emergency_outlined, () {
-          context.push('/patient/emergency-contacts');
         }),
         _drawerItem('Lab Results/Reports', Icons.biotech_outlined, () {
           context.push('/lab/reports');

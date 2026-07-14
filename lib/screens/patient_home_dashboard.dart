@@ -5,11 +5,9 @@ import 'package:icare/models/appointment_detail.dart';
 import 'package:icare/providers/auth_provider.dart';
 import 'package:icare/screens/consultation_details_screen.dart';
 import 'package:icare/screens/doctors_list.dart';
-import 'package:icare/screens/manage_dependents_screen.dart';
 import 'package:icare/screens/patient_lab_orders.dart';
 import 'package:icare/screens/upcoming_appointments.dart';
 import 'package:icare/services/appointment_service.dart';
-import 'package:icare/services/family_service.dart';
 import 'package:icare/services/gamification_service.dart';
 import 'package:icare/services/health_tracker_service.dart';
 import 'package:icare/services/medical_record_service.dart';
@@ -30,11 +28,9 @@ class _PatientHomeDashboardState extends ConsumerState<PatientHomeDashboard> {
   final _trackerService = HealthTrackerService();
   final _gamificationService = GamificationService();
   final _recordService = MedicalRecordService();
-  final _familyService = FamilyService();
 
   List<AppointmentDetail> _appointments = [];
   List<dynamic> _vitals = [];
-  List<dynamic> _dependents = [];
   int _points = 0;
   int _recordsCount = 0;
   bool _loading = true;
@@ -66,9 +62,6 @@ class _PatientHomeDashboardState extends ConsumerState<PatientHomeDashboard> {
       }).catchError((_) {}),
       _recordService.getMyRecords().then((r) {
         if (r['success'] == true) _recordsCount = ((r['records'] as List?) ?? []).length;
-      }).catchError((_) {}),
-      _familyService.getDependents().then((d) {
-        _dependents = d;
       }).catchError((_) {}),
     ]);
     if (mounted) setState(() => _loading = false);
@@ -117,7 +110,7 @@ class _PatientHomeDashboardState extends ConsumerState<PatientHomeDashboard> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _header(name, isDesktop),
+          _header(name),
           const SizedBox(height: 24),
           _quickActions(isDesktop, isTablet),
           const SizedBox(height: 24),
@@ -144,7 +137,7 @@ class _PatientHomeDashboardState extends ConsumerState<PatientHomeDashboard> {
                 const SizedBox(width: 20),
                 Expanded(child: _recentActivityCard()),
                 const SizedBox(width: 20),
-                Expanded(child: _rewardsAndFamilyColumn()),
+                Expanded(child: _rewardsCard()),
               ],
             )
           else ...[
@@ -152,7 +145,7 @@ class _PatientHomeDashboardState extends ConsumerState<PatientHomeDashboard> {
             const SizedBox(height: 20),
             _recentActivityCard(),
             const SizedBox(height: 20),
-            _rewardsAndFamilyColumn(),
+            _rewardsCard(),
           ],
           const SizedBox(height: 32),
         ],
@@ -160,10 +153,10 @@ class _PatientHomeDashboardState extends ConsumerState<PatientHomeDashboard> {
     );
   }
 
-  // ── Header: greeting + emergency ──────────────────────────────────────────
+  // ── Header: greeting ───────────────────────────────────────────────────────
 
-  Widget _header(String name, bool isDesktop) {
-    final greeting = Column(
+  Widget _header(String name) {
+    return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
@@ -187,53 +180,6 @@ class _PatientHomeDashboardState extends ConsumerState<PatientHomeDashboard> {
         ),
       ],
     );
-
-    final emergency = InkWell(
-      onTap: () => context.push('/patient/emergency-contacts'),
-      borderRadius: BorderRadius.circular(18),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-        decoration: BoxDecoration(
-          color: const Color(0xFFFEF2F2),
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: const Color(0xFFFECACA)),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 42,
-              height: 42,
-              decoration: const BoxDecoration(color: Color(0xFFEF4444), shape: BoxShape.circle),
-              child: const Icon(Icons.phone_in_talk_rounded, color: Colors.white, size: 22),
-            ),
-            const SizedBox(width: 14),
-            const Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text('Emergency',
-                    style: TextStyle(
-                        fontSize: 15, fontWeight: FontWeight.w900, color: Color(0xFFDC2626))),
-                SizedBox(height: 2),
-                Text('Need help?', style: TextStyle(fontSize: 12, color: _slate)),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-
-    if (!isDesktop) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [greeting, const SizedBox(height: 16), emergency],
-      );
-    }
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [Expanded(child: greeting), emergency],
-    );
   }
 
   // ── Quick actions grid ─────────────────────────────────────────────────────
@@ -251,19 +197,16 @@ class _PatientHomeDashboardState extends ConsumerState<PatientHomeDashboard> {
           onTap: () => context.push('/patient/pharmacies')),
       _QuickAction('Book\nLab Test', Icons.science_rounded, const Color(0xFF9333EA),
           onTap: () => context.push('/patient/book-lab')),
-      _QuickAction('Health\nRecords', Icons.folder_shared_rounded, const Color(0xFF0891B2),
-          onTap: () => context.push('/patient/records')),
       _QuickAction('Health\nTracker', Icons.monitor_heart_rounded, const Color(0xFFDB2777),
           onTap: () => context.push('/patient/health-tracker')),
-      _QuickAction('My\nLearning', Icons.school_rounded, const Color(0xFFD97706),
-          onTap: () => context.push('/patient/my-learning')),
       _QuickAction('Health\nCommunity', Icons.groups_rounded, const Color(0xFF0D9488),
           onTap: () => context.push('/community')),
       _QuickAction('Medicine\nReminders', Icons.alarm_rounded, const Color(0xFFDC2626),
           onTap: () => context.push('/reminders')),
     ];
 
-    final columns = isDesktop ? 5 : (isTablet ? 4 : 2);
+    // Exactly 8 tiles -> a neat 4x2 grid on tablet/desktop, 2x4 on mobile.
+    final columns = (isDesktop || isTablet) ? 4 : 2;
 
     return _panel(
       title: 'Quick Actions',
@@ -340,16 +283,9 @@ class _PatientHomeDashboardState extends ConsumerState<PatientHomeDashboard> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Container(
-                          width: 52,
-                          height: 52,
-                          decoration: BoxDecoration(
-                            color: _blue.withValues(alpha: 0.08),
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(Icons.person_rounded, color: _blue, size: 30),
-                        ),
+                        _doctorAvatar(appt.doctor?.profilePicture, size: 52),
                         const SizedBox(width: 14),
                         Expanded(
                           child: Column(
@@ -357,12 +293,16 @@ class _PatientHomeDashboardState extends ConsumerState<PatientHomeDashboard> {
                             children: [
                               Text(
                                 appt.doctor?.name != null ? 'Dr. ${appt.doctor!.name}' : 'Doctor',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                                 style: const TextStyle(
                                     fontSize: 16, fontWeight: FontWeight.w900, color: _navy),
                               ),
                               const SizedBox(height: 3),
                               Text(
                                 (appt.consultationType ?? 'Consultation').toUpperCase(),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                                 style: const TextStyle(
                                     fontSize: 11, color: _slate, fontWeight: FontWeight.w700,
                                     letterSpacing: 0.4),
@@ -370,6 +310,7 @@ class _PatientHomeDashboardState extends ConsumerState<PatientHomeDashboard> {
                             ],
                           ),
                         ),
+                        const SizedBox(width: 8),
                         _statusChip(appt.status),
                       ],
                     ),
@@ -416,6 +357,29 @@ class _PatientHomeDashboardState extends ConsumerState<PatientHomeDashboard> {
                     ),
                   ],
                 ),
+    );
+  }
+
+  // Real doctor photo when available; falls back to a generic icon so a
+  // missing/broken image never breaks the card layout (fixed circle size
+  // regardless of how many doctors exist or how long their names are).
+  Widget _doctorAvatar(String? url, {required double size}) {
+    final hasPhoto = url != null && url.isNotEmpty;
+    return ClipOval(
+      child: Container(
+        width: size,
+        height: size,
+        color: _blue.withValues(alpha: 0.08),
+        child: hasPhoto
+            ? Image.network(
+                url,
+                fit: BoxFit.cover,
+                errorBuilder: (_, _, _) => Icon(Icons.person_rounded, color: _blue, size: size * 0.58),
+                loadingBuilder: (context, child, progress) =>
+                    progress == null ? child : Icon(Icons.person_rounded, color: _blue, size: size * 0.58),
+              )
+            : Icon(Icons.person_rounded, color: _blue, size: size * 0.58),
+      ),
     );
   }
 
@@ -654,14 +618,11 @@ class _PatientHomeDashboardState extends ConsumerState<PatientHomeDashboard> {
     );
   }
 
-  // ── Rewards + family column ────────────────────────────────────────────────
+  // ── Rewards ─────────────────────────────────────────────────────────────────
 
-  Widget _rewardsAndFamilyColumn() {
-    return Column(
-      children: [
-        // Rewards & membership
-        InkWell(
-          onTap: () => context.push('/rewards'),
+  Widget _rewardsCard() {
+    return InkWell(
+      onTap: () => context.push('/rewards'),
           borderRadius: BorderRadius.circular(20),
           child: Container(
             width: double.infinity,
@@ -707,69 +668,6 @@ class _PatientHomeDashboardState extends ConsumerState<PatientHomeDashboard> {
               ],
             ),
           ),
-        ),
-        const SizedBox(height: 20),
-        // Family profiles
-        _panel(
-          title: 'Family Profiles',
-          trailing: _viewAll(() => _push(const ManageDependentsScreen()), label: 'Manage'),
-          child: _loading
-              ? const _CardLoader()
-              : Row(
-                  children: [
-                    ..._dependents.take(4).map((d) {
-                      final name = (d is Map ? d['name'] : null)?.toString() ?? '?';
-                      final initials = name.isNotEmpty ? name[0].toUpperCase() : '?';
-                      return Padding(
-                        padding: const EdgeInsets.only(right: 12),
-                        child: Column(
-                          children: [
-                            CircleAvatar(
-                              radius: 22,
-                              backgroundColor: _blue.withValues(alpha: 0.1),
-                              child: Text(initials,
-                                  style: const TextStyle(
-                                      color: _blue, fontWeight: FontWeight.w900, fontSize: 16)),
-                            ),
-                            const SizedBox(height: 6),
-                            SizedBox(
-                              width: 52,
-                              child: Text(
-                                name.split(' ').first,
-                                textAlign: TextAlign.center,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(fontSize: 11, color: _slate),
-                              ),
-                            ),
-                          ],
-                        ),
-                      );
-                    }),
-                    // Add member
-                    InkWell(
-                      onTap: () => _push(const ManageDependentsScreen()),
-                      borderRadius: BorderRadius.circular(30),
-                      child: Column(
-                        children: [
-                          Container(
-                            width: 44,
-                            height: 44,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              border: Border.all(color: const Color(0xFFCBD5E1), width: 1.5),
-                            ),
-                            child: const Icon(Icons.add_rounded, color: _slate, size: 22),
-                          ),
-                          const SizedBox(height: 6),
-                          const Text('Add', style: TextStyle(fontSize: 11, color: _slate)),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-        ),
-      ],
     );
   }
 

@@ -45,7 +45,6 @@ import 'package:icare/screens/help_and_support.dart';
 import 'package:icare/screens/analytics_dashboard_screen.dart';
 import 'package:icare/screens/health_journey_screen.dart';
 import 'package:icare/screens/lifestyle_tracker_screen.dart';
-import 'package:icare/screens/emergency_contacts_screen.dart';
 import 'package:icare/screens/security_audit_log_screen.dart';
 import 'package:icare/screens/certificates_screen.dart';
 import 'package:icare/screens/assessments_screen.dart';
@@ -71,7 +70,6 @@ import 'dart:async';
 import 'package:icare/screens/lms_live_session_screen.dart';
 import 'package:icare/services/lms_service.dart';
 import 'package:icare/services/course_service.dart';
-import 'package:icare/screens/my_learning.dart';
 import 'package:icare/services/notification_service.dart';
 import 'package:icare/services/api_service.dart';
 import 'package:icare/services/auth_service.dart';
@@ -472,11 +470,7 @@ class _TabsScreenState extends ConsumerState<TabsScreen> {
       if (currentIndex == 0) {
         activePage = const HomeScreen();
       } else if (currentIndex == 1) {
-        activePage = const MyLearningScreen();
-      } else if (currentIndex == 2) {
         activePage = isWeb ? ProfileScreen() : const ProfileEditScreen();
-      } else if (currentIndex == 4) {
-        activePage = const MyLearningScreen();
       } else if (currentIndex == 20) {
         activePage = const BookingsHistoryScreen();
       } else if (currentIndex == 21) {
@@ -489,10 +483,6 @@ class _TabsScreenState extends ConsumerState<TabsScreen> {
         activePage = const HealthJourneyScreen();
       } else if (currentIndex == 25) {
         activePage = const LifestyleTrackerScreen();
-      } else if (currentIndex == 26) {
-        activePage = const MyLearningScreen();
-      } else if (currentIndex == 27) {
-        activePage = const EmergencyContactsScreen();
       } else if (currentIndex == 28) {
         activePage = LabReportsScreen();
       } else if (currentIndex == 29) {
@@ -1155,8 +1145,6 @@ class _WebSidebarState extends ConsumerState<_WebSidebar> {
                   ),
                   _buildExtraNavItem(context, Icons.history_outlined, 'Health Journey', () => onSelect(24)),
                   _buildExtraNavItem(context, Icons.monitor_heart_outlined, 'Health Tracker', () => onSelect(25)),
-                  _buildExtraNavItem(context, Icons.school_outlined, 'My Learning', () => onSelect(26)),
-                  _buildExtraNavItem(context, Icons.contact_emergency_outlined, 'Emergency Contacts', () => onSelect(27)),
                   _buildExtraNavItem(context, Icons.biotech_outlined, 'Lab Results/Reports', () => onSelect(28)),
                   _buildExtraNavItem(context, Icons.alarm_outlined, 'Reminders', () => onSelect(29)),
                   _buildExtraNavItem(context, Icons.people_outline_rounded, 'Health Community', () => onSelect(30)),
