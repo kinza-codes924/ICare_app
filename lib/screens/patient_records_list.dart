@@ -33,7 +33,12 @@ class _PatientRecordsListScreenState extends State<PatientRecordsListScreen> {
 
     try {
       debugPrint('📋 Patient Records - Fetching records...');
-      final result = await _service.getDoctorRecords();
+      // This is the PATIENT's own records screen — getDoctorRecords() hits
+      // GET /medical-records/doctor, which filters by { doctor: userId } and
+      // is always empty for a patient account. getMyRecords() is the
+      // role-aware endpoint (filters by { patient: userId } for patients)
+      // and is what the dashboard's own record count already uses.
+      final result = await _service.getMyRecords();
 
       debugPrint('📋 Patient Records - Result success: ${result['success']}');
 

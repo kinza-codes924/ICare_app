@@ -489,8 +489,13 @@ class _PatientHomeDashboardState extends ConsumerState<PatientHomeDashboard> {
 
   Widget _medicalRecordsCard() {
     final rows = <(IconData, Color, String, String, VoidCallback)>[
+      // "Consultations" counts COMPLETED appointments — Upcoming Appointments
+      // only lists confirmed/pending/in_progress ones, so tapping this used
+      // to land on a screen that (correctly) showed none of them. Bookings
+      // History already has a working "Completed" category with this exact
+      // data.
       (Icons.chat_rounded, const Color(0xFF2563EB), 'Consultations',
-          '$_consultationsCount completed', () => _push(const UpcomingAppointments())),
+          '$_consultationsCount completed', () => context.push('/patient/bookings-history')),
       (Icons.description_rounded, const Color(0xFF7C3AED), 'Prescriptions', 'View all',
           () => context.push('/patient/prescriptions')),
       (Icons.science_rounded, const Color(0xFF9333EA), 'Lab Reports', 'View all',
