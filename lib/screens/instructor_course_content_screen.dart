@@ -2442,6 +2442,7 @@ class _LessonPreviewScreen extends StatelessWidget {
     final title       = lesson['title']?.toString() ?? 'Lesson';
     final lessonType  = lesson['type']?.toString() ?? 'content';
     final videoUrl    = lesson['videoUrl']?.toString() ?? '';
+    final driveLink   = lesson['driveLink']?.toString() ?? '';
     final documentUrl = lesson['documentUrl']?.toString() ?? '';
     final documentName = lesson['documentName']?.toString() ?? 'Document';
     final content     = lesson['content']?.toString() ?? '';
@@ -2511,6 +2512,42 @@ class _LessonPreviewScreen extends StatelessWidget {
                   ]),
                 ),
 
+              // ── Google Drive link ────────────────────────────────────
+              if (driveLink.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                  child: InkWell(
+                    onTap: () async {
+                      final uri = Uri.tryParse(driveLink);
+                      if (uri != null && await canLaunchUrl(uri)) {
+                        await launchUrl(uri, mode: LaunchMode.externalApplication);
+                      }
+                    },
+                    borderRadius: BorderRadius.circular(12),
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF0FDF4),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.3)),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.folder_shared_rounded, color: Color(0xFF10B981), size: 22),
+                          const SizedBox(width: 12),
+                          const Expanded(
+                            child: Text('Open in Google Drive',
+                                style: TextStyle(
+                                    fontSize: 14, fontWeight: FontWeight.w700, color: Color(0xFF0F172A))),
+                          ),
+                          const Icon(Icons.open_in_new_rounded, size: 18, color: Color(0xFF10B981)),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+
               // ── Document ──────────────────────────────────────────────
               if (documentUrl.isNotEmpty)
                 Padding(
@@ -2552,7 +2589,7 @@ class _LessonPreviewScreen extends StatelessWidget {
                 ),
 
               // ── Empty state ───────────────────────────────────────────
-              if (videoUrl.isEmpty && documentUrl.isEmpty && content.isEmpty)
+              if (videoUrl.isEmpty && driveLink.isEmpty && documentUrl.isEmpty && content.isEmpty)
                 Padding(
                   padding: const EdgeInsets.only(top: 60),
                   child: Center(
