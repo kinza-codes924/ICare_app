@@ -149,6 +149,11 @@
       _consultFilePoller = setInterval(function() {
         if (!_jitsiApi) return;
         if (_consultSubject) _postToJitsi({ type: 'icare-subject', text: _consultSubject });
+        // Re-sent every tick, not just once at join — icare-custom.js loads
+        // asynchronously inside the iframe, so a single postMessage right
+        // after iframe creation can arrive before its listener exists and be
+        // silently dropped (exactly what happened: _mode never got set).
+        _postToJitsi({ type: 'icare-context', mode: 'consultation' });
         var token = _consultAuthToken || localStorage.getItem('flutter.token');
         if (!token || !_consultChatChannel) return;
         fetch('https://icare-backend-inky.vercel.app/api/call-chat/messages/'
@@ -196,6 +201,9 @@
       _lmsFileCursor = 0;
       _lmsFilePoller = setInterval(function() {
         if (!_lmsJitsiApi) return;
+        // Re-sent every tick — see the matching comment in
+        // _startConsultFilePoller for why a single send-on-join isn't enough.
+        _postToJitsiLms({ type: 'icare-context', mode: 'lms' });
         var token = _lmsAuthToken || localStorage.getItem('flutter.token');
         if (!token || !_lmsChatChannel) return;
         fetch('https://icare-backend-inky.vercel.app/api/call-chat/messages/'
