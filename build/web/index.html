@@ -212,6 +212,7 @@
         }).then(function(r) { return r.json(); })
           .then(function(j) {
             var msgs = (j && j.messages) || [];
+            console.log('[iCare lms-poll] channel=', _lmsChatChannel, 'since=', _lmsFileCursor, 'gotMessages=', msgs.length);
             if (!msgs.length) return;
             var files = [];
             msgs.forEach(function(m) {
@@ -222,6 +223,7 @@
                 files.push({ sender: m.sender || 'User', text: t, ts: ts });
               }
             });
+            console.log('[iCare lms-poll] matched file messages=', files.length);
             if (files.length) _postToJitsiLms({ type: 'icare-file-list', files: files });
           }).catch(function(){});
       }, 4000);
@@ -358,15 +360,20 @@
       var channel = _consultChatChannel || _lmsChatChannel;
       var token = _consultAuthToken || _lmsAuthToken || localStorage.getItem('flutter.token');
       var sender = _consultSenderName || _lmsSenderName || 'User';
+      console.log('[iCare file-upload] received from iframe. channel=', channel, 'hasToken=', !!token, 'sender=', sender, 'bytes=', (msg.data||'').length);
       if (!token || !channel) {
-        console.warn('File upload: missing auth/channel'); return;
+        console.warn('[iCare file-upload] DROPPED — missing auth/channel. consultChannel=', _consultChatChannel, 'lmsChannel=', _lmsChatChannel);
+        return;
       }
       fetch('https://icare-backend-inky.vercel.app/api/call-chat/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
         body: JSON.stringify({ channelName: channel, sender: sender, text: msg.data }),
-      }).then(function(r) { console.log('File sent via iframe, status:', r.status); })
-        .catch(function(err) { console.warn('File send failed:', err); });
+      }).then(function(r) {
+        console.log('[iCare file-upload] send response status:', r.status);
+        return r.json().catch(function(){ return null; });
+      }).then(function(j) { console.log('[iCare file-upload] send response body:', j); })
+        .catch(function(err) { console.warn('[iCare file-upload] send FAILED:', err); });
     });
 
     window.jitsiLeave = function() {
