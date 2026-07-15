@@ -128,6 +128,17 @@
     var _lmsFilePoller = null;
     var _lmsFileCursor = 0;
 
+    // Flutter web's shared_preferences JSON-encodes stored strings, so the
+    // raw localStorage value is the token WRAPPED IN LITERAL DOUBLE QUOTES
+    // ("eyJ..."). Sending that as `Authorization: Bearer "eyJ..."` fails
+    // auth (401) on every call-chat request — which is exactly why LMS file
+    // uploads (which rely on this fallback; consultations get the token
+    // passed explicitly from Dart) were accepted locally but never saved.
+    function _lsToken() {
+      var t = localStorage.getItem('flutter.token');
+      return t ? t.replace(/^"|"$/g, '') : null;
+    }
+
     // Push a message INTO the Jitsi iframe (icare-custom.js listens on the other side)
     function _postToJitsi(msg) {
       try {
@@ -154,7 +165,7 @@
         // after iframe creation can arrive before its listener exists and be
         // silently dropped (exactly what happened: _mode never got set).
         _postToJitsi({ type: 'icare-context', mode: 'consultation' });
-        var token = _consultAuthToken || localStorage.getItem('flutter.token');
+        var token = _consultAuthToken || _lsToken();
         if (!token || !_consultChatChannel) return;
         fetch('https://icare-backend-inky.vercel.app/api/call-chat/messages/'
               + encodeURIComponent(_consultChatChannel) + '?since=' + _consultFileCursor, {
@@ -204,7 +215,7 @@
         // Re-sent every tick — see the matching comment in
         // _startConsultFilePoller for why a single send-on-join isn't enough.
         _postToJitsiLms({ type: 'icare-context', mode: 'lms' });
-        var token = _lmsAuthToken || localStorage.getItem('flutter.token');
+        var token = _lmsAuthToken || _lsToken();
         if (!token || !_lmsChatChannel) return;
         fetch('https://icare-backend-inky.vercel.app/api/call-chat/messages/'
               + encodeURIComponent(_lmsChatChannel) + '?since=' + _lmsFileCursor, {
@@ -256,7 +267,7 @@
 
     window.jitsiJoin = function(roomName, displayName, audioOnly, jwt, subject, authToken, chatChannelName) {
       // Store for consultation file upload
-      _consultAuthToken = authToken || localStorage.getItem('flutter.token') || null;
+      _consultAuthToken = authToken || _lsToken() || null;
       _consultChatChannel = chatChannelName || roomName;
       _consultSenderName = displayName || 'User';
       _consultSubject = subject || null;
@@ -358,7 +369,7 @@
       var msg = e.data;
       if (!msg || msg.type !== 'icare-file-upload') return;
       var channel = _consultChatChannel || _lmsChatChannel;
-      var token = _consultAuthToken || _lmsAuthToken || localStorage.getItem('flutter.token');
+      var token = _consultAuthToken || _lmsAuthToken || _lsToken();
       var sender = _consultSenderName || _lmsSenderName || 'User';
       console.log('[iCare file-upload] received from iframe. channel=', channel, 'hasToken=', !!token, 'sender=', sender, 'bytes=', (msg.data||'').length);
       if (!token || !channel) {
@@ -556,7 +567,7 @@
       // Same file-share wiring the consultation flow already has — this was
       // simply never set for LMS, so shared files had no channel/token to
       // persist to and disappeared right after the local "shared" flash.
-      _lmsAuthToken = localStorage.getItem('flutter.token') || null;
+      _lmsAuthToken = _lsToken() || null;
       _lmsChatChannel = roomName;
       _lmsSenderName = displayName || (isInstructor ? 'Instructor' : 'Student');
 
