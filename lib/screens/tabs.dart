@@ -87,7 +87,8 @@ class _TabsScreenState extends ConsumerState<TabsScreen> {
   Timer? _livePoller;
   Timer? _notifPoller;
   int _notifUnreadCount = 0;
-  int _lastNotifUnread = -1; // -1 = not yet initialised (suppress banner on first load)
+  final Set<String> _shownNotifIds = {}; // banner-shown ids, so a notification never redisplays
+  bool _notifInitialized = false; // suppress banners for pre-existing unread on first load
   OverlayEntry? _bannerEntry;
 
   // Per-course snooze state:
@@ -137,15 +138,31 @@ class _TabsScreenState extends ConsumerState<TabsScreen> {
     try {
       final result = await NotificationService().getNotifications();
       final all = List<Map<String, dynamic>>.from(result['notifications'] ?? []);
-      final unread = all.where((n) => n['isRead'] != true).toList();
-      final count = unread.length;
-      if (mounted) setState(() => _notifUnreadCount = count);
+      // Backend field is `read`, not `isRead` — reading the wrong key here
+      // meant every notification counted as unread forever, so a raw count
+      // delta could tick up again later and redisplay the SAME banner
+      // (e.g. an assignment submission from days ago kept reappearing).
+      final unread = all.where((n) => n['read'] != true).toList();
+      if (mounted) setState(() => _notifUnreadCount = unread.length);
 
-      if (_lastNotifUnread >= 0 && count > _lastNotifUnread && unread.isNotEmpty) {
-        // New notification(s) arrived — show banner for the most recent one
-        _showNotifBanner(unread.first);
+      final newOnes = unread.where((n) {
+        final id = n['_id']?.toString();
+        return id != null && id.isNotEmpty && !_shownNotifIds.contains(id);
+      }).toList();
+
+      if (_notifInitialized && newOnes.isNotEmpty) {
+        // Show + mark read the single most recent genuinely-new one — it
+        // will never be eligible to redisplay again either way.
+        final notif = newOnes.first;
+        _showNotifBanner(notif);
+        final id = notif['_id']?.toString();
+        if (id != null) NotificationService().markAsRead(id).catchError((_) {});
       }
-      _lastNotifUnread = count;
+      for (final n in unread) {
+        final id = n['_id']?.toString();
+        if (id != null) _shownNotifIds.add(id);
+      }
+      _notifInitialized = true;
     } catch (_) {}
   }
 

@@ -342,7 +342,7 @@ router.post('/blob-handle', protect, express.json({ limit: '1mb' }), async (req,
         },
       },
       onBeforeGenerateToken: async (pathname) => ({
-        access: 'public',
+        access: 'private',
         allowedContentTypes: [
           'application/pdf',
           'application/msword',
@@ -377,7 +377,7 @@ router.post('/blob-doc', protect, docUpload.single('file'), async (req, res) => 
     const blobPath = `quiz/docs/${Date.now()}-${safeName}`;
 
     const blob = await put(blobPath, req.file.buffer, {
-      access: 'public',
+      access: 'private',
       contentType: req.file.mimetype,
       addRandomSuffix: false,
     });
