@@ -11,6 +11,7 @@ const lessonSchema = new mongoose.Schema({
   resources: { type: Array, default: [] },
   documentUrl: String,       // attached document
   documentName: String,
+  driveLink: String,         // optional Google Drive link shown alongside the video
   // Timeline for pragmatic courses — days this lesson takes within its module
   unlockAfterDays: { type: Number, default: 0 },
   // Feature 2: live session scheduled for this lesson (reminder only, not auto-start)

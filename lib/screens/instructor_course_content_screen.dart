@@ -1788,6 +1788,7 @@ class _LessonDialogState extends State<_LessonDialog> {
   final _titleController = TextEditingController();
   final _contentController = TextEditingController();
   final _videoUrlController = TextEditingController();
+  final _driveLinkController = TextEditingController();
   final _durationController = TextEditingController();
   final _unlockDaysController = TextEditingController();
   bool _uploadingVideo = false;
@@ -1821,6 +1822,7 @@ class _LessonDialogState extends State<_LessonDialog> {
       _titleController.text = widget.lesson!['title'] ?? '';
       _contentController.text = widget.lesson!['content'] ?? '';
       _videoUrlController.text = widget.lesson!['videoUrl'] ?? '';
+      _driveLinkController.text = widget.lesson!['driveLink'] ?? '';
       _durationController.text = (widget.lesson!['duration'] ?? 15).toString();
       _uploadedVideoUrl = widget.lesson!['videoUrl'];
       _lessonType = widget.lesson!['type']?.toString() ?? 'content';
@@ -1839,6 +1841,7 @@ class _LessonDialogState extends State<_LessonDialog> {
     _titleController.dispose();
     _contentController.dispose();
     _videoUrlController.dispose();
+    _driveLinkController.dispose();
     _durationController.dispose();
     _unlockDaysController.dispose();
     super.dispose();
@@ -2244,6 +2247,19 @@ class _LessonDialogState extends State<_LessonDialog> {
                 ),
               ),
               const SizedBox(height: 14),
+              // ── Google Drive Link (optional, alongside the uploaded video) ──
+              TextField(
+                controller: _driveLinkController,
+                decoration: const InputDecoration(
+                  labelText: 'Google Drive Link (optional)',
+                  hintText: 'https://drive.google.com/...',
+                  border: OutlineInputBorder(),
+                  isDense: true,
+                  prefixIcon: Icon(Icons.folder_shared_rounded, size: 18, color: Color(0xFF10B981)),
+                ),
+                keyboardType: TextInputType.url,
+              ),
+              const SizedBox(height: 14),
               // ── Document Section (Content only) ────────────────────
               Container(
                 padding: const EdgeInsets.all(14),
@@ -2392,6 +2408,7 @@ class _LessonDialogState extends State<_LessonDialog> {
               'title': _titleController.text.trim(),
               'content': _contentController.text.trim(),
               'videoUrl': _lessonType == 'content' ? _videoUrlController.text.trim() : '',
+              'driveLink': _lessonType == 'content' ? _driveLinkController.text.trim() : '',
               'documentUrl': _lessonType == 'content' ? (_documentUrl ?? '') : '',
               'documentName': _lessonType == 'content' ? (_documentName ?? '') : '',
               'duration': int.tryParse(_durationController.text) ?? 15,

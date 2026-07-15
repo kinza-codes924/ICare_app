@@ -113,6 +113,7 @@ class _LessonPlayerState extends State<LessonPlayer> {
     final videoUrl = widget.lesson['videoUrl'] as String? ??
         widget.lesson['video_url'] as String?;
     final hasVideo = videoUrl != null && videoUrl.trim().isNotEmpty;
+    final driveLink = (widget.lesson['driveLink'] as String? ?? '').trim();
     final ytId = hasVideo ? _youtubeId(videoUrl) : null;
     final embeddable = hasVideo && _isEmbeddable(videoUrl);
 
@@ -189,6 +190,34 @@ class _LessonPlayerState extends State<LessonPlayer> {
                           style: const TextStyle(
                               fontSize: 15, color: Color(0xFF475569), height: 1.7)),
                     ),
+                  if (driveLink.isNotEmpty) ...[
+                    const SizedBox(height: 14),
+                    InkWell(
+                      onTap: () => _openExternal(driveLink),
+                      borderRadius: BorderRadius.circular(12),
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF0FDF4),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.3)),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.folder_shared_rounded, color: Color(0xFF10B981), size: 22),
+                            const SizedBox(width: 12),
+                            const Expanded(
+                              child: Text('Open in Google Drive',
+                                  style: TextStyle(
+                                      fontSize: 14, fontWeight: FontWeight.w700, color: Color(0xFF0F172A))),
+                            ),
+                            const Icon(Icons.open_in_new_rounded, size: 18, color: Color(0xFF10B981)),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 20),
                   Row(
                     children: [
