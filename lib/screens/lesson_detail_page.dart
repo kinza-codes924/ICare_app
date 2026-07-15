@@ -80,6 +80,7 @@ class _LessonDetailPageState extends State<LessonDetailPage> with SingleTickerPr
     final lessonTitle = widget.lesson['title'] ?? 'Lesson';
     final lessonType = widget.lesson['type'] ?? 'content';
     final videoUrl = widget.lesson['videoUrl'];
+    final driveLink = (widget.lesson['driveLink']?.toString() ?? '').trim();
     final documentUrl = widget.lesson['documentUrl'];
     final content = widget.lesson['content'] ?? '';
     final lessonId = widget.lesson['_id']?.toString() ?? '';
@@ -211,6 +212,42 @@ class _LessonDetailPageState extends State<LessonDetailPage> with SingleTickerPr
                             style: TextStyle(fontSize: 12, color: Colors.orange.shade800, fontStyle: FontStyle.italic),
                           ),
                       ],
+                    ),
+                  ),
+
+                // Google Drive link (optional, set by the instructor)
+                if (driveLink.isNotEmpty)
+                  Container(
+                    margin: const EdgeInsets.only(bottom: 16),
+                    child: InkWell(
+                      onTap: () async {
+                        final uri = Uri.tryParse(driveLink);
+                        if (uri != null && await canLaunchUrl(uri)) {
+                          await launchUrl(uri, mode: LaunchMode.externalApplication);
+                        }
+                      },
+                      borderRadius: BorderRadius.circular(12),
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF0FDF4),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.3)),
+                        ),
+                        child: const Row(
+                          children: [
+                            Icon(Icons.folder_shared_rounded, color: Color(0xFF10B981), size: 22),
+                            SizedBox(width: 12),
+                            Expanded(
+                              child: Text('Open in Google Drive',
+                                  style: TextStyle(
+                                      fontSize: 14, fontWeight: FontWeight.w700, color: Color(0xFF0F172A))),
+                            ),
+                            Icon(Icons.open_in_new_rounded, size: 18, color: Color(0xFF10B981)),
+                          ],
+                        ),
+                      ),
                     ),
                   ),
 
