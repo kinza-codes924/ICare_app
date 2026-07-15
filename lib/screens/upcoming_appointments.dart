@@ -80,19 +80,10 @@ class _UpcomingAppointmentsState extends ConsumerState<UpcomingAppointments> {
     );
   }
 
-  /// A live session already exists (doctor started it, or this is a Connect
-  /// Now appointment mid-call) — safe to join directly. A merely scheduled
-  /// appointment for a future date must NOT immediately drop the patient
-  /// into a live chat with a running timer.
-  bool _isJoinableNow(AppointmentDetail appt) {
-    if (appt.status == 'in_progress') return true;
-    final today = DateTime.now();
-    final apptDay = DateTime(appt.date.year, appt.date.month, appt.date.day);
-    final todayDay = DateTime(today.year, today.month, today.day);
-    return !apptDay.isAfter(todayDay);
-  }
-
   void _onTileTap(AppointmentDetail appt) {
+    // A patient never "starts" a consultation — that's the doctor's action.
+    // Only join if a session is already actually live; otherwise this is a
+    // plain, view-only details sheet, no action button.
     if (appt.status == 'in_progress') {
       _openConsultation(appt);
       return;
@@ -100,8 +91,25 @@ class _UpcomingAppointmentsState extends ConsumerState<UpcomingAppointments> {
     _showAppointmentDetails(appt);
   }
 
+  Widget _detailRow(IconData icon, String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 15, color: _slate),
+          const SizedBox(width: 10),
+          Text('$label: ', style: const TextStyle(fontSize: 13.5, color: _slate, fontWeight: FontWeight.w600)),
+          Expanded(
+            child: Text(value, style: const TextStyle(fontSize: 13.5, color: _navy, fontWeight: FontWeight.w700)),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _showAppointmentDetails(AppointmentDetail appt) {
-    final joinable = _isJoinableNow(appt);
+    final statusLabel = appt.status == 'confirmed' ? 'Confirmed' : 'Pending';
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
@@ -126,42 +134,16 @@ class _UpcomingAppointmentsState extends ConsumerState<UpcomingAppointments> {
             const SizedBox(height: 4),
             Text((appt.consultationType ?? 'Consultation').toUpperCase(),
                 style: const TextStyle(fontSize: 11, color: _slate, fontWeight: FontWeight.w700, letterSpacing: 0.4)),
-            const SizedBox(height: 18),
-            Row(children: [
-              const Icon(Icons.calendar_today_rounded, size: 15, color: _slate),
-              const SizedBox(width: 8),
-              Text(DateFormat('EEEE, d MMM yyyy').format(appt.date), style: const TextStyle(fontSize: 13.5, color: _navy, fontWeight: FontWeight.w600)),
-            ]),
-            const SizedBox(height: 10),
-            Row(children: [
-              const Icon(Icons.access_time_rounded, size: 15, color: _slate),
-              const SizedBox(width: 8),
-              Text(appt.timeSlot, style: const TextStyle(fontSize: 13.5, color: _navy, fontWeight: FontWeight.w600)),
-            ]),
-            const SizedBox(height: 26),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: joinable
-                    ? () {
-                        Navigator.of(ctx).pop();
-                        _openConsultation(appt);
-                      }
-                    : null,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primaryColor,
-                  foregroundColor: Colors.white,
-                  disabledBackgroundColor: const Color(0xFFE2E8F0),
-                  disabledForegroundColor: const Color(0xFF94A3B8),
-                  padding: const EdgeInsets.symmetric(vertical: 15),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                ),
-                child: Text(
-                  joinable ? 'Start Consultation' : 'Available on ${DateFormat('d MMM').format(appt.date)}',
-                  style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w800),
-                ),
-              ),
+            const SizedBox(height: 20),
+            _detailRow(Icons.calendar_today_rounded, 'Date', DateFormat('EEEE, d MMM yyyy').format(appt.date)),
+            _detailRow(Icons.access_time_rounded, 'Time', appt.timeSlot),
+            _detailRow(Icons.info_outline_rounded, 'Status', statusLabel),
+            const SizedBox(height: 8),
+            Text(
+              'This consultation will open here once your doctor starts the session — you\'ll be notified.',
+              style: const TextStyle(fontSize: 12.5, color: _slate, height: 1.5),
             ),
+            const SizedBox(height: 8),
           ],
         ),
       ),
