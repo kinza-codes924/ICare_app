@@ -116,6 +116,18 @@
     var _consultFilePoller = null;
     var _consultFileCursor = 0;
 
+    // Globals for LMS live-session file upload (mirrors the consultation
+    // ones above — lmsJitsiJoin never set any of this, so files picked in
+    // the LMS "File Upload" panel had nowhere to go: the shared listener at
+    // the bottom always hit the "missing auth/channel" branch and silently
+    // dropped them, which is why they vanished right after the local
+    // "✓ Shared" confirmation).
+    var _lmsAuthToken = null;
+    var _lmsChatChannel = null;
+    var _lmsSenderName = null;
+    var _lmsFilePoller = null;
+    var _lmsFileCursor = 0;
+
     // Push a message INTO the Jitsi iframe (icare-custom.js listens on the other side)
     function _postToJitsi(msg) {
       try {
@@ -162,6 +174,53 @@
 
     function _stopConsultFilePoller() {
       if (_consultFilePoller) { clearInterval(_consultFilePoller); _consultFilePoller = null; }
+    }
+
+    // Push a message into the LMS Jitsi iframe (separate instance from the
+    // consultation one — _lmsJitsiApi, not _jitsiApi).
+    function _postToJitsiLms(msg) {
+      try {
+        if (!_lmsJitsiApi) return;
+        var ifr = _lmsJitsiApi.getIFrame();
+        if (ifr && ifr.contentWindow) {
+          ifr.contentWindow.postMessage(msg, 'https://' + _JITSI_DOMAIN);
+        }
+      } catch(_) {}
+    }
+
+    // Same call-chat polling/relay as the consultation flow, keyed by the
+    // LMS room name instead of a consultation channel — call-chat is a
+    // generic channelName-keyed store, not consultation-specific.
+    function _startLmsFilePoller() {
+      _stopLmsFilePoller();
+      _lmsFileCursor = 0;
+      _lmsFilePoller = setInterval(function() {
+        if (!_lmsJitsiApi) return;
+        var token = _lmsAuthToken || localStorage.getItem('flutter.token');
+        if (!token || !_lmsChatChannel) return;
+        fetch('https://icare-backend-inky.vercel.app/api/call-chat/messages/'
+              + encodeURIComponent(_lmsChatChannel) + '?since=' + _lmsFileCursor, {
+          headers: { 'Authorization': 'Bearer ' + token },
+        }).then(function(r) { return r.json(); })
+          .then(function(j) {
+            var msgs = (j && j.messages) || [];
+            if (!msgs.length) return;
+            var files = [];
+            msgs.forEach(function(m) {
+              var t = (m.text || '') + '';
+              var ts = Date.parse(m.createdAt || '') || 0;
+              if (ts > _lmsFileCursor) _lmsFileCursor = ts;
+              if (t.indexOf('img:') === 0 || t.indexOf('doc:') === 0) {
+                files.push({ sender: m.sender || 'User', text: t, ts: ts });
+              }
+            });
+            if (files.length) _postToJitsiLms({ type: 'icare-file-list', files: files });
+          }).catch(function(){});
+      }, 4000);
+    }
+
+    function _stopLmsFilePoller() {
+      if (_lmsFilePoller) { clearInterval(_lmsFilePoller); _lmsFilePoller = null; }
     }
 
 
@@ -263,6 +322,7 @@
               });
 
               _startConsultFilePoller();
+              _postToJitsi({ type: 'icare-context', mode: 'consultation' });
               setTimeout(window.raiseFlutterLayer, 1200);
               console.log('Jitsi: joining room', roomName, 'as', displayName, '| subject:', subject);
               resolve('ok');
@@ -280,20 +340,25 @@
     // The polls tab inside Jitsi is repurposed as "File Upload" via icare-custom.js
     // on the Jitsi server.  When the user picks a file there, it arrives here as
     // a postMessage from the Jitsi origin and we forward it to the call-chat API.
+    // Only one of the two Jitsi instances (consultation _jitsiApi or LMS
+    // _lmsJitsiApi) is ever active in a tab at a time, so falling back between
+    // the two sets of globals is safe and covers both flows with one listener.
     window.addEventListener('message', function(e) {
       if (e.origin !== 'https://167-99-65-120.nip.io') return;
       var msg = e.data;
       if (!msg || msg.type !== 'icare-file-upload') return;
-      var token = _consultAuthToken || localStorage.getItem('flutter.token');
-      if (!token || !_consultChatChannel) {
-        console.warn('Consult file upload: missing auth/channel'); return;
+      var channel = _consultChatChannel || _lmsChatChannel;
+      var token = _consultAuthToken || _lmsAuthToken || localStorage.getItem('flutter.token');
+      var sender = _consultSenderName || _lmsSenderName || 'User';
+      if (!token || !channel) {
+        console.warn('File upload: missing auth/channel'); return;
       }
       fetch('https://icare-backend-inky.vercel.app/api/call-chat/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
-        body: JSON.stringify({ channelName: _consultChatChannel, sender: _consultSenderName || 'User', text: msg.data }),
-      }).then(function(r) { console.log('Consult file sent via iframe, status:', r.status); })
-        .catch(function(err) { console.warn('Consult file send failed:', err); });
+        body: JSON.stringify({ channelName: channel, sender: sender, text: msg.data }),
+      }).then(function(r) { console.log('File sent via iframe, status:', r.status); })
+        .catch(function(err) { console.warn('File send failed:', err); });
     });
 
     window.jitsiLeave = function() {
@@ -465,6 +530,7 @@
     function _onLmsJitsiClosed(reason) {
       if (_lmsJitsiClosed) return;
       _lmsJitsiClosed = true;
+      _stopLmsFilePoller();
       console.log('LMS Jitsi: closed event', reason);
       try { if (_lmsJitsiApi) { _lmsJitsiApi.dispose(); _lmsJitsiApi = null; } } catch(_) {}
       try { var cc = document.getElementById('lms-jitsi-host'); if (cc) cc.innerHTML = ''; } catch(_) {}
@@ -472,6 +538,13 @@
     }
 
     window.lmsJitsiJoin = function(roomName, displayName, isInstructor, jwt, subject) {
+      // Same file-share wiring the consultation flow already has — this was
+      // simply never set for LMS, so shared files had no channel/token to
+      // persist to and disappeared right after the local "shared" flash.
+      _lmsAuthToken = localStorage.getItem('flutter.token') || null;
+      _lmsChatChannel = roomName;
+      _lmsSenderName = displayName || (isInstructor ? 'Instructor' : 'Student');
+
       var checkContainer = function(retries) {
         retries = retries || 0;
         var container = document.getElementById('lms-jitsi-host');
@@ -540,6 +613,8 @@
             });
           }
 
+          _startLmsFilePoller();
+          _postToJitsiLms({ type: 'icare-context', mode: 'lms' });
           console.log('LMS Jitsi: joining room', roomName, isInstructor ? '(instructor)' : '(student)');
           setTimeout(window.lmsRaiseFlutterLayer, 1200);
         } catch(e) {
