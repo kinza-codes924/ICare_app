@@ -59,10 +59,49 @@ function getDriveClient() {
   return google.drive({ version: 'v3', auth: oauth2Client });
 }
 
-// Uploads a recording buffer to the configured Drive folder. Returns
-// { fileId, webViewLink } on success, or null if Drive isn't configured
-// (caller should treat this as "skip, not an error").
-async function uploadRecordingToDrive(buffer, filename, mimeType = 'video/mp4') {
+// Escapes a string for safe interpolation into a Drive API `q` filter
+// (single quotes and backslashes are the only characters that matter there).
+function escapeForDriveQuery(s) {
+  return String(s).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+}
+
+// Finds (or creates) a subfolder named exactly after the course, directly
+// under the root GOOGLE_DRIVE_FOLDER_ID — so every course gets its own
+// Drive folder, created automatically the first time it records anything,
+// with no manual per-course setup. Callers should cache the returned id
+// (e.g. on the Course document) to avoid a lookup on every upload.
+async function getOrCreateCourseFolder(courseTitle) {
+  if (!isConfigured()) return null;
+  const drive = getDriveClient();
+  const rootId = process.env.GOOGLE_DRIVE_FOLDER_ID;
+  const safeName = escapeForDriveQuery(courseTitle || 'Untitled Course');
+
+  const existing = await drive.files.list({
+    q: `name = '${safeName}' and '${rootId}' in parents and mimeType = 'application/vnd.google-apps.folder' and trashed = false`,
+    fields: 'files(id, name)',
+    spaces: 'drive',
+  });
+  if (existing.data.files && existing.data.files.length > 0) {
+    return existing.data.files[0].id;
+  }
+
+  const created = await drive.files.create({
+    requestBody: {
+      name: courseTitle || 'Untitled Course',
+      mimeType: 'application/vnd.google-apps.folder',
+      parents: [rootId],
+    },
+    fields: 'id',
+  });
+  return created.data.id;
+}
+
+// Uploads a recording buffer to Drive. Returns { fileId, webViewLink } on
+// success, or null if Drive isn't configured (caller should treat this as
+// "skip, not an error"). folderId defaults to the configured root folder
+// if not given — pass the course-specific folder id from
+// getOrCreateCourseFolder() to file it under that course instead.
+async function uploadRecordingToDrive(buffer, filename, mimeType = 'video/mp4', folderId) {
   if (!isConfigured()) return null;
 
   const drive = getDriveClient();
@@ -71,7 +110,7 @@ async function uploadRecordingToDrive(buffer, filename, mimeType = 'video/mp4') 
   const res = await drive.files.create({
     requestBody: {
       name: filename,
-      parents: [process.env.GOOGLE_DRIVE_FOLDER_ID],
+      parents: [folderId || process.env.GOOGLE_DRIVE_FOLDER_ID],
     },
     media: {
       mimeType,
@@ -87,13 +126,13 @@ async function uploadRecordingToDrive(buffer, filename, mimeType = 'video/mp4') 
 // used when the finalize call already uploaded to Cloudinary and we just
 // want a Drive backup copy of the same file, without re-reading the
 // (already-consumed) multipart stream.
-async function backupUrlToDrive(url, filename, mimeType = 'video/mp4') {
+async function backupUrlToDrive(url, filename, mimeType = 'video/mp4', folderId) {
   if (!isConfigured()) return null;
   // Node 18+ (Vercel's runtime) has a built-in global fetch — no extra dependency needed.
   const resp = await fetch(url);
   if (!resp.ok) throw new Error(`Fetch for Drive backup failed: ${resp.status}`);
   const buffer = Buffer.from(await resp.arrayBuffer());
-  return uploadRecordingToDrive(buffer, filename, mimeType);
+  return uploadRecordingToDrive(buffer, filename, mimeType, folderId);
 }
 
-module.exports = { isConfigured, uploadRecordingToDrive, backupUrlToDrive };
+module.exports = { isConfigured, uploadRecordingToDrive, backupUrlToDrive, getOrCreateCourseFolder };

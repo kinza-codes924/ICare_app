@@ -33,6 +33,11 @@ const courseSchema = new mongoose.Schema({
   title: { type: String, required: true },
   description: { type: String, default: '' },
 
+  // Cached Google Drive subfolder id for this course's recordings (created
+  // automatically, named after the course, on first recording) — avoids a
+  // Drive API lookup on every upload.
+  driveFolderId: String,
+
   // Thumbnail — accept both field names
   thumbnail: String,
   thumbnail_url: String,

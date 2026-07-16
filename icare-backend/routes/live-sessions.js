@@ -7,7 +7,7 @@ const { authMiddleware } = require('../middleware/auth');
 const LiveSession = require('../models/LiveSession');
 const Enrollment = require('../models/Enrollment');
 const cloudinary = require('../config/cloudinary');
-const { uploadRecordingToDrive, backupUrlToDrive, isConfigured: driveConfigured } = require('../utils/googleDrive');
+const { uploadRecordingToDrive, backupUrlToDrive, getOrCreateCourseFolder, isConfigured: driveConfigured } = require('../utils/googleDrive');
 
 const jibriUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 2 * 1024 * 1024 * 1024 } });
 
@@ -1313,19 +1313,31 @@ router.post('/jibri-recording-complete', jibriUpload.single('file'), async (req,
     // keeps using finalUrl (Cloudinary/Blob) since large Drive files don't
     // stream reliably in <video>; this just archives a copy for the client.
     // No-ops silently if GOOGLE_DRIVE_* env vars aren't configured yet.
+    // Each course gets its own Drive subfolder (named after the course,
+    // created automatically on first use, cached on the Course document).
     if (driveConfigured()) {
-      const driveFilename = `${session.title || 'recording'}-${sessionId}.mp4`;
-      const driveUpload = req.file
-        ? uploadRecordingToDrive(req.file.buffer, driveFilename)
-        : backupUrlToDrive(finalUrl, driveFilename);
-      driveUpload
-        .then(async (result) => {
+      (async () => {
+        try {
+          const Course = require('../models/Course');
+          const course = await Course.findById(session.courseId).select('title driveFolderId');
+          let folderId = course?.driveFolderId;
+          if (!folderId && course) {
+            folderId = await getOrCreateCourseFolder(course.title);
+            await Course.updateOne({ _id: course._id }, { $set: { driveFolderId: folderId } });
+          }
+
+          const driveFilename = `${session.title || 'recording'}-${sessionId}.mp4`;
+          const result = req.file
+            ? await uploadRecordingToDrive(req.file.buffer, driveFilename, 'video/mp4', folderId)
+            : await backupUrlToDrive(finalUrl, driveFilename, 'video/mp4', folderId);
           if (!result) return;
           session.driveBackupUrl = result.webViewLink;
           await session.save();
           console.log(`Drive backup saved for session ${sessionId}: ${result.webViewLink}`);
-        })
-        .catch((e) => console.error(`Drive backup failed for session ${sessionId}:`, e.message));
+        } catch (e) {
+          console.error(`Drive backup failed for session ${sessionId}:`, e.message);
+        }
+      })();
     }
 
     // Recordings are archived to Google Drive (above) and remain playable
