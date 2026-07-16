@@ -1329,6 +1329,7 @@ router.post('/jibri-recording-complete', jibriUpload.single('file'), async (req,
           // e.g. "abc course - Fundamentals lesson-1 - 16 Jul 2026, 10-13 PM.mp4"
           const dt = new Date();
           const dateStr = dt.toLocaleString('en-US', {
+            timeZone: 'Asia/Karachi',
             day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true,
           }).replace(':', '-');
           const sanitize = (s) => (s || '').replace(/[\\/:*?"<>|]/g, '-').trim();
