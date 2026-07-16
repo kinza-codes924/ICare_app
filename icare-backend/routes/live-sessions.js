@@ -7,6 +7,7 @@ const { authMiddleware } = require('../middleware/auth');
 const LiveSession = require('../models/LiveSession');
 const Enrollment = require('../models/Enrollment');
 const cloudinary = require('../config/cloudinary');
+const { uploadRecordingToDrive, backupUrlToDrive, isConfigured: driveConfigured } = require('../utils/googleDrive');
 
 const jibriUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 2 * 1024 * 1024 * 1024 } });
 
@@ -1354,6 +1355,25 @@ router.post('/jibri-recording-complete', jibriUpload.single('file'), async (req,
     session.recordingUrl = finalUrl;
     session.isRecorded = true;
     await session.save();
+
+    // Google Drive backup (non-blocking, best-effort) — the in-app player
+    // keeps using finalUrl (Cloudinary/Blob) since large Drive files don't
+    // stream reliably in <video>; this just archives a copy for the client.
+    // No-ops silently if GOOGLE_DRIVE_* env vars aren't configured yet.
+    if (driveConfigured()) {
+      const driveFilename = `${session.title || 'recording'}-${sessionId}.mp4`;
+      const driveUpload = req.file
+        ? uploadRecordingToDrive(req.file.buffer, driveFilename)
+        : backupUrlToDrive(finalUrl, driveFilename);
+      driveUpload
+        .then(async (result) => {
+          if (!result) return;
+          session.driveBackupUrl = result.webViewLink;
+          await session.save();
+          console.log(`Drive backup saved for session ${sessionId}: ${result.webViewLink}`);
+        })
+        .catch((e) => console.error(`Drive backup failed for session ${sessionId}:`, e.message));
+    }
 
     if (session.linkedLessonId || session.lessonId) {
       const lId = session.linkedLessonId || session.lessonId;

@@ -13,6 +13,7 @@ const liveSessionSchema = new mongoose.Schema({
   meetingPassword: String,
   recordingUrl: String,
   recordings: [{ url: String, createdAt: { type: Date, default: Date.now } }],
+  driveBackupUrl: String, // Google Drive archival copy (client's own folder) — backup only, not used for in-app playback
   status: {
     type: String,
     enum: ['scheduled', 'live', 'completed', 'cancelled', 'ended', 'rescheduled'],
