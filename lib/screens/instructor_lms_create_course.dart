@@ -573,205 +573,224 @@ class _InstructorLmsCreateCourseScreenState extends State<InstructorLmsCreateCou
                 'Configure course settings and audience',
                 style: TextStyle(color: Color(0xFF64748B)),
               ),
-              const SizedBox(height: 32),
-              
-              DropdownButtonFormField<String>(
-                value: _categories.any((c) => c['value'] == _category) ? _category : (_categories.isNotEmpty ? _categories.first['value']?.toString() : null),
-                decoration: const InputDecoration(
-                  labelText: 'Category',
-                  border: OutlineInputBorder(),
-                ),
-                items: _categories.isNotEmpty
-                    ? _categories.map((c) => DropdownMenuItem(
-                        value: c['value']?.toString() ?? '',
-                        child: _categoryLabel(c['name']?.toString() ?? ''),
-                      )).toList()
-                    : [
-                        const DropdownMenuItem(value: 'HealthProgram', child: Text('Health Program')),
-                        const DropdownMenuItem(value: 'FCPSPart1', child: Text('FCPS Part 1')),
-                        DropdownMenuItem(value: 'Medical Training', child: _categoryLabel('Medical Training')),
-                        const DropdownMenuItem(value: 'Wellness', child: Text('Wellness')),
-                        const DropdownMenuItem(value: 'Nutrition', child: Text('Nutrition')),
-                        const DropdownMenuItem(value: 'Mental Health', child: Text('Mental Health')),
-                      ],
-                onChanged: (value) => setState(() => _category = value!),
-              ),
-              const SizedBox(height: 20),
-              
-              DropdownButtonFormField<String>(
-                initialValue: _targetAudience,
-                decoration: const InputDecoration(
-                  labelText: 'Target Audience',
-                  border: OutlineInputBorder(),
-                ),
-                items: const [
-                  DropdownMenuItem(value: 'Patient', child: Text('Patients')),
-                  DropdownMenuItem(value: 'Doctor', child: Text('Healthcare Professionals')),
-                  DropdownMenuItem(value: 'All', child: Text('Everyone')),
-                ],
-                onChanged: (value) => setState(() => _targetAudience = value!),
-              ),
-              const SizedBox(height: 20),
-              
-              DropdownButtonFormField<String>(
-                initialValue: _difficulty,
-                decoration: const InputDecoration(
-                  labelText: 'Difficulty Level',
-                  border: OutlineInputBorder(),
-                ),
-                items: const [
-                  DropdownMenuItem(value: 'Beginner', child: Text('Beginner')),
-                  DropdownMenuItem(value: 'Intermediate', child: Text('Intermediate')),
-                  DropdownMenuItem(value: 'Advanced', child: Text('Advanced')),
-                ],
-                onChanged: (value) => setState(() => _difficulty = value!),
-              ),
-              const SizedBox(height: 20),
-              
-              const Text(
-                'Course Duration',
-                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF475569)),
-              ),
-              const SizedBox(height: 8),
-              Row(
+              const SizedBox(height: 28),
+
+              // ── CLASSIFICATION SECTION ──
+              _sectionCard(
+                icon: Icons.category_rounded,
+                title: 'Classification',
                 children: [
-                  Expanded(
-                    child: TextFormField(
-                      controller: _durationDaysController,
-                      decoration: const InputDecoration(labelText: 'Days', border: OutlineInputBorder(), suffixText: 'd'),
-                      keyboardType: TextInputType.number,
+                  DropdownButtonFormField<String>(
+                    value: _categories.any((c) => c['value'] == _category) ? _category : (_categories.isNotEmpty ? _categories.first['value']?.toString() : null),
+                    decoration: const InputDecoration(
+                      labelText: 'Category',
+                      border: OutlineInputBorder(),
                     ),
+                    items: _categories.isNotEmpty
+                        ? _categories.map((c) => DropdownMenuItem(
+                            value: c['value']?.toString() ?? '',
+                            child: _categoryLabel(c['name']?.toString() ?? ''),
+                          )).toList()
+                        : [
+                            const DropdownMenuItem(value: 'HealthProgram', child: Text('Health Program')),
+                            const DropdownMenuItem(value: 'FCPSPart1', child: Text('FCPS Part 1')),
+                            DropdownMenuItem(value: 'Medical Training', child: _categoryLabel('Medical Training')),
+                            const DropdownMenuItem(value: 'Wellness', child: Text('Wellness')),
+                            const DropdownMenuItem(value: 'Nutrition', child: Text('Nutrition')),
+                            const DropdownMenuItem(value: 'Mental Health', child: Text('Mental Health')),
+                          ],
+                    onChanged: (value) => setState(() => _category = value!),
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: TextFormField(
-                      controller: _durationWeeksController,
-                      decoration: const InputDecoration(labelText: 'Weeks', border: OutlineInputBorder(), suffixText: 'w'),
-                      keyboardType: TextInputType.number,
+                  const SizedBox(height: 20),
+                  DropdownButtonFormField<String>(
+                    initialValue: _targetAudience,
+                    decoration: const InputDecoration(
+                      labelText: 'Target Audience',
+                      border: OutlineInputBorder(),
                     ),
+                    items: const [
+                      DropdownMenuItem(value: 'Patient', child: Text('Patients')),
+                      DropdownMenuItem(value: 'Doctor', child: Text('Healthcare Professionals')),
+                      DropdownMenuItem(value: 'All', child: Text('Everyone')),
+                    ],
+                    onChanged: (value) => setState(() => _targetAudience = value!),
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: TextFormField(
-                      controller: _durationMonthsController,
-                      decoration: const InputDecoration(labelText: 'Months', border: OutlineInputBorder(), suffixText: 'm'),
-                      keyboardType: TextInputType.number,
+                  const SizedBox(height: 20),
+                  DropdownButtonFormField<String>(
+                    initialValue: _difficulty,
+                    decoration: const InputDecoration(
+                      labelText: 'Difficulty Level',
+                      border: OutlineInputBorder(),
                     ),
+                    items: const [
+                      DropdownMenuItem(value: 'Beginner', child: Text('Beginner')),
+                      DropdownMenuItem(value: 'Intermediate', child: Text('Intermediate')),
+                      DropdownMenuItem(value: 'Advanced', child: Text('Advanced')),
+                    ],
+                    onChanged: (value) => setState(() => _difficulty = value!),
                   ),
                 ],
-              ),
-              const SizedBox(height: 20),
-              // Course Start Date
-              GestureDetector(
-                onTap: () async {
-                  final picked = await showDatePicker(
-                    context: context,
-                    initialDate: _startDate ?? DateTime.now(),
-                    firstDate: DateTime(2020),
-                    lastDate: DateTime(2030),
-                  );
-                  if (picked != null) setState(() => _startDate = picked);
-                },
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
-                  decoration: BoxDecoration(
-                    border: Border.all(color: _startDate != null ? AppColors.primaryColor : const Color(0xFFCBD5E1)),
-                    borderRadius: BorderRadius.circular(4),
-                    color: _startDate != null ? AppColors.primaryColor.withValues(alpha: 0.04) : Colors.white,
-                  ),
-                  child: Row(children: [
-                    Icon(Icons.calendar_today_outlined, size: 18, color: _startDate != null ? AppColors.primaryColor : const Color(0xFF94A3B8)),
-                    const SizedBox(width: 12),
-                    Expanded(child: Text(
-                      _startDate != null
-                          ? 'Start Date: ${_startDate!.day}/${_startDate!.month}/${_startDate!.year}'
-                          : 'Course Start Date (optional)',
-                      style: TextStyle(fontSize: 14, color: _startDate != null ? AppColors.primaryColor : const Color(0xFF94A3B8)),
-                    )),
-                    if (_startDate != null) GestureDetector(
-                      onTap: () => setState(() => _startDate = null),
-                      child: const Icon(Icons.close_rounded, size: 16, color: Colors.red),
-                    ),
-                  ]),
-                ),
-              ),
-              // Auto-calculated end date preview
-              if (_startDate != null) ...[
-                const SizedBox(height: 8),
-                Builder(builder: (context) {
-                  final totalDays = (int.tryParse(_durationDaysController.text) ?? 0) +
-                      (int.tryParse(_durationWeeksController.text) ?? 0) * 7 +
-                      (int.tryParse(_durationMonthsController.text) ?? 0) * 30;
-                  if (totalDays == 0) return const SizedBox.shrink();
-                  final endDate = _startDate!.add(Duration(days: totalDays));
-                  return Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                    decoration: BoxDecoration(color: const Color(0xFFEFF6FF), borderRadius: BorderRadius.circular(8)),
-                    child: Row(children: [
-                      const Icon(Icons.timeline_rounded, size: 16, color: AppColors.primaryColor),
-                      const SizedBox(width: 8),
-                      Text(
-                        'Timeline: ${_startDate!.day}/${_startDate!.month}/${_startDate!.year} → ${endDate.day}/${endDate.month}/${endDate.year} ($totalDays days)',
-                        style: const TextStyle(fontSize: 12, color: AppColors.primaryColor, fontWeight: FontWeight.w500),
-                      ),
-                    ]),
-                  );
-                }),
-              ],
-              const SizedBox(height: 20),
-              
-              // Course type
-              const Text('Course Type', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF475569))),
-              const SizedBox(height: 8),
-              Row(children: [
-                Expanded(child: GestureDetector(
-                  onTap: () => setState(() => _courseType = 'self-paced'),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
-                    decoration: BoxDecoration(
-                      color: _courseType == 'self-paced' ? const Color(0xFF10B981).withValues(alpha: 0.08) : const Color(0xFFF8FAFC),
-                      border: Border.all(color: _courseType == 'self-paced' ? const Color(0xFF10B981) : const Color(0xFFE2E8F0), width: _courseType == 'self-paced' ? 2 : 1),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Column(children: [
-                      Icon(Icons.self_improvement_rounded, color: _courseType == 'self-paced' ? const Color(0xFF10B981) : const Color(0xFF94A3B8), size: 24),
-                      const SizedBox(height: 6),
-                      Text('Self-paced', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: _courseType == 'self-paced' ? const Color(0xFF10B981) : const Color(0xFF64748B))),
-                      const SizedBox(height: 3),
-                      const Text('Student unlocks next module on completion', style: TextStyle(fontSize: 10, color: Color(0xFF94A3B8)), textAlign: TextAlign.center),
-                    ]),
-                  ),
-                )),
-                const SizedBox(width: 12),
-                Expanded(child: GestureDetector(
-                  onTap: () => setState(() => _courseType = 'pragmatic'),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
-                    decoration: BoxDecoration(
-                      color: _courseType == 'pragmatic' ? const Color(0xFF6366F1).withValues(alpha: 0.08) : const Color(0xFFF8FAFC),
-                      border: Border.all(color: _courseType == 'pragmatic' ? const Color(0xFF6366F1) : const Color(0xFFE2E8F0), width: _courseType == 'pragmatic' ? 2 : 1),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Column(children: [
-                      Icon(Icons.timeline_rounded, color: _courseType == 'pragmatic' ? const Color(0xFF6366F1) : const Color(0xFF94A3B8), size: 24),
-                      const SizedBox(height: 6),
-                      Text('Pragmatic', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: _courseType == 'pragmatic' ? const Color(0xFF6366F1) : const Color(0xFF64748B))),
-                      const SizedBox(height: 3),
-                      const Text('Next module unlocks only on scheduled date', style: TextStyle(fontSize: 10, color: Color(0xFF94A3B8)), textAlign: TextAlign.center),
-                    ]),
-                  ),
-                )),
-              ]),
-              const SizedBox(height: 20),
-              SwitchListTile(
-                title: const Text('Publish immediately'),
-                subtitle: const Text('Make this course visible to students'),
-                value: _isPublished,
-                onChanged: (value) => setState(() => _isPublished = value),
-                activeThumbColor: AppColors.primaryColor,
               ),
 
-              const SizedBox(height: 24),
+              const SizedBox(height: 20),
+              // ── SCHEDULE & FORMAT SECTION ──
+              _sectionCard(
+                icon: Icons.schedule_rounded,
+                title: 'Schedule & Format',
+                children: [
+                  const Text(
+                    'Course Duration',
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF475569)),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextFormField(
+                          controller: _durationDaysController,
+                          decoration: const InputDecoration(labelText: 'Days', border: OutlineInputBorder(), suffixText: 'd'),
+                          keyboardType: TextInputType.number,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: TextFormField(
+                          controller: _durationWeeksController,
+                          decoration: const InputDecoration(labelText: 'Weeks', border: OutlineInputBorder(), suffixText: 'w'),
+                          keyboardType: TextInputType.number,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: TextFormField(
+                          controller: _durationMonthsController,
+                          decoration: const InputDecoration(labelText: 'Months', border: OutlineInputBorder(), suffixText: 'm'),
+                          keyboardType: TextInputType.number,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+                  // Course Start Date
+                  GestureDetector(
+                    onTap: () async {
+                      final picked = await showDatePicker(
+                        context: context,
+                        initialDate: _startDate ?? DateTime.now(),
+                        firstDate: DateTime(2020),
+                        lastDate: DateTime(2030),
+                      );
+                      if (picked != null) setState(() => _startDate = picked);
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: _startDate != null ? AppColors.primaryColor : const Color(0xFFCBD5E1)),
+                        borderRadius: BorderRadius.circular(8),
+                        color: _startDate != null ? AppColors.primaryColor.withValues(alpha: 0.04) : const Color(0xFFF8FAFC),
+                      ),
+                      child: Row(children: [
+                        Icon(Icons.calendar_today_outlined, size: 18, color: _startDate != null ? AppColors.primaryColor : const Color(0xFF94A3B8)),
+                        const SizedBox(width: 12),
+                        Expanded(child: Text(
+                          _startDate != null
+                              ? 'Start Date: ${_startDate!.day}/${_startDate!.month}/${_startDate!.year}'
+                              : 'Course Start Date (optional)',
+                          style: TextStyle(fontSize: 14, color: _startDate != null ? AppColors.primaryColor : const Color(0xFF94A3B8)),
+                        )),
+                        if (_startDate != null) GestureDetector(
+                          onTap: () => setState(() => _startDate = null),
+                          child: const Icon(Icons.close_rounded, size: 16, color: Colors.red),
+                        ),
+                      ]),
+                    ),
+                  ),
+                  // Auto-calculated end date preview
+                  if (_startDate != null) ...[
+                    const SizedBox(height: 8),
+                    Builder(builder: (context) {
+                      final totalDays = (int.tryParse(_durationDaysController.text) ?? 0) +
+                          (int.tryParse(_durationWeeksController.text) ?? 0) * 7 +
+                          (int.tryParse(_durationMonthsController.text) ?? 0) * 30;
+                      if (totalDays == 0) return const SizedBox.shrink();
+                      final endDate = _startDate!.add(Duration(days: totalDays));
+                      return Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                        decoration: BoxDecoration(color: const Color(0xFFEFF6FF), borderRadius: BorderRadius.circular(8)),
+                        child: Row(children: [
+                          const Icon(Icons.timeline_rounded, size: 16, color: AppColors.primaryColor),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Timeline: ${_startDate!.day}/${_startDate!.month}/${_startDate!.year} → ${endDate.day}/${endDate.month}/${endDate.year} ($totalDays days)',
+                            style: const TextStyle(fontSize: 12, color: AppColors.primaryColor, fontWeight: FontWeight.w500),
+                          ),
+                        ]),
+                      );
+                    }),
+                  ],
+                  const SizedBox(height: 20),
+
+                  // Course type
+                  const Text('Course Type', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF475569))),
+                  const SizedBox(height: 8),
+                  Row(children: [
+                    Expanded(child: GestureDetector(
+                      onTap: () => setState(() => _courseType = 'self-paced'),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+                        decoration: BoxDecoration(
+                          color: _courseType == 'self-paced' ? const Color(0xFF10B981).withValues(alpha: 0.08) : const Color(0xFFF8FAFC),
+                          border: Border.all(color: _courseType == 'self-paced' ? const Color(0xFF10B981) : const Color(0xFFE2E8F0), width: _courseType == 'self-paced' ? 2 : 1),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Column(children: [
+                          Icon(Icons.self_improvement_rounded, color: _courseType == 'self-paced' ? const Color(0xFF10B981) : const Color(0xFF94A3B8), size: 24),
+                          const SizedBox(height: 6),
+                          Text('Self-paced', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: _courseType == 'self-paced' ? const Color(0xFF10B981) : const Color(0xFF64748B))),
+                          const SizedBox(height: 3),
+                          const Text('Student unlocks next module on completion', style: TextStyle(fontSize: 10, color: Color(0xFF94A3B8)), textAlign: TextAlign.center),
+                        ]),
+                      ),
+                    )),
+                    const SizedBox(width: 12),
+                    Expanded(child: GestureDetector(
+                      onTap: () => setState(() => _courseType = 'pragmatic'),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+                        decoration: BoxDecoration(
+                          color: _courseType == 'pragmatic' ? const Color(0xFF6366F1).withValues(alpha: 0.08) : const Color(0xFFF8FAFC),
+                          border: Border.all(color: _courseType == 'pragmatic' ? const Color(0xFF6366F1) : const Color(0xFFE2E8F0), width: _courseType == 'pragmatic' ? 2 : 1),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Column(children: [
+                          Icon(Icons.timeline_rounded, color: _courseType == 'pragmatic' ? const Color(0xFF6366F1) : const Color(0xFF94A3B8), size: 24),
+                          const SizedBox(height: 6),
+                          Text('Pragmatic', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: _courseType == 'pragmatic' ? const Color(0xFF6366F1) : const Color(0xFF64748B))),
+                          const SizedBox(height: 3),
+                          const Text('Next module unlocks only on scheduled date', style: TextStyle(fontSize: 10, color: Color(0xFF94A3B8)), textAlign: TextAlign.center),
+                        ]),
+                      ),
+                    )),
+                  ]),
+                  const SizedBox(height: 16),
+                  Container(
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                    ),
+                    child: SwitchListTile(
+                      title: const Text('Publish immediately', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                      subtitle: const Text('Make this course visible to students', style: TextStyle(fontSize: 12)),
+                      value: _isPublished,
+                      onChanged: (value) => setState(() => _isPublished = value),
+                      activeThumbColor: AppColors.primaryColor,
+                    ),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 20),
               // ── PRICING SECTION ──
               Container(
                 padding: const EdgeInsets.all(16),
@@ -1038,6 +1057,7 @@ class _InstructorLmsCreateCourseScreenState extends State<InstructorLmsCreateCou
                   ],
                 ),
               ),
+              const SizedBox(height: 24),
             ],
           ),
         ),
@@ -1048,6 +1068,38 @@ class _InstructorLmsCreateCourseScreenState extends State<InstructorLmsCreateCou
   double get _discountedPrice {
     final price = double.tryParse(_priceController.text) ?? 0;
     return price - (price * _discountPercent / 100);
+  }
+
+  // Shared white-card wrapper for each Details-step section — keeps every
+  // group visually consistent (icon + title header, 12px radius, subtle
+  // border/shadow) instead of fields floating loosely on the grey scaffold.
+  Widget _sectionCard({
+    required IconData icon,
+    required String title,
+    required List<Widget> children,
+  }) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 6)],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(children: [
+            Icon(icon, color: AppColors.primaryColor, size: 20),
+            const SizedBox(width: 8),
+            Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Color(0xFF0F172A))),
+          ]),
+          const SizedBox(height: 16),
+          ...children,
+        ],
+      ),
+    );
   }
 
   Widget _buildModulesStep(bool isDesktop) {
