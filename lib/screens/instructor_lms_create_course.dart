@@ -97,6 +97,17 @@ class _InstructorLmsCreateCourseScreenState extends State<InstructorLmsCreateCou
   int _discountPercent = 0;
   final _voucherController = TextEditingController();
 
+  // Early Bird discount
+  bool _earlyBirdEnabled = false;
+  final _earlyBirdAmountController = TextEditingController();
+  String _earlyBirdMode = 'days'; // 'days' | 'date'
+  final _earlyBirdDaysController = TextEditingController();
+  DateTime? _earlyBirdDate;
+
+  // Installment plan
+  bool _installmentPlanEnabled = false;
+  int _installmentCount = 2;
+
   // Modules
   final List<Map<String, dynamic>> _modules = [];
 
@@ -186,14 +197,41 @@ class _InstructorLmsCreateCourseScreenState extends State<InstructorLmsCreateCou
     _pageController.dispose();
     _priceController.dispose();
     _voucherController.dispose();
+    _earlyBirdAmountController.dispose();
+    _earlyBirdDaysController.dispose();
     super.dispose();
   }
 
   Future<void> _submitCourse() async {
     if (!_formKey.currentState!.validate()) return;
-    
+
+    if (!_isFree && _earlyBirdEnabled) {
+      final amt = double.tryParse(_earlyBirdAmountController.text) ?? 0;
+      final price = double.tryParse(_priceController.text) ?? 0;
+      if (amt <= 0) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter an Early Bird discount amount')));
+        return;
+      }
+      if (amt >= price) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Early Bird amount must be less than the course price')));
+        return;
+      }
+      if (_earlyBirdMode == 'days' && (int.tryParse(_earlyBirdDaysController.text) ?? 0) <= 0) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter how many days the Early Bird offer lasts')));
+        return;
+      }
+      if (_earlyBirdMode == 'date' && _earlyBirdDate == null) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Pick an Early Bird deadline date')));
+        return;
+      }
+    }
+    if (!_isFree && _installmentPlanEnabled && (_installmentCount < 2 || _installmentCount > 12)) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Installment count must be between 2 and 12')));
+      return;
+    }
+
     setState(() => _isSubmitting = true);
-    
+
     try {
       final courseData = {
         'title': _titleController.text,
@@ -215,6 +253,13 @@ class _InstructorLmsCreateCourseScreenState extends State<InstructorLmsCreateCou
         if (!_isFree) 'price': double.tryParse(_priceController.text) ?? 0,
         if (!_isFree && _discountPercent > 0) 'discountPercent': _discountPercent,
         if (!_isFree && _discountPercent > 0) 'discountedPrice': _discountedPrice,
+        if (!_isFree && _earlyBirdEnabled) 'earlyBirdEnabled': true,
+        if (!_isFree && _earlyBirdEnabled) 'earlyBirdAmount': double.tryParse(_earlyBirdAmountController.text) ?? 0,
+        if (!_isFree && _earlyBirdEnabled) 'earlyBirdDeadline': (_earlyBirdMode == 'days'
+            ? DateTime.now().add(Duration(days: int.tryParse(_earlyBirdDaysController.text) ?? 0))
+            : (_earlyBirdDate ?? DateTime.now())).toIso8601String(),
+        if (!_isFree && _installmentPlanEnabled) 'installmentPlanEnabled': true,
+        if (!_isFree && _installmentPlanEnabled) 'installmentCount': _installmentCount,
       };
       
       await _lmsService.createCourse(courseData);
@@ -810,6 +855,184 @@ class _InstructorLmsCreateCourseScreenState extends State<InstructorLmsCreateCou
                             ]),
                           ]),
                         ),
+                      ],
+
+                      // ── Early Bird Discount ──
+                      const SizedBox(height: 20),
+                      const Divider(height: 1, color: Color(0xFFE2E8F0)),
+                      const SizedBox(height: 20),
+                      const Text('Early Bird Discount (optional)', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF475569))),
+                      const SizedBox(height: 4),
+                      const Text('A flat PKR amount off the price, active only until a deadline you pick.',
+                          style: TextStyle(fontSize: 11, color: Color(0xFF94A3B8))),
+                      const SizedBox(height: 10),
+                      GestureDetector(
+                        onTap: () => setState(() => _earlyBirdEnabled = !_earlyBirdEnabled),
+                        child: Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: _earlyBirdEnabled ? const Color(0xFFF59E0B).withValues(alpha: 0.08) : const Color(0xFFF8FAFC),
+                            border: Border.all(color: _earlyBirdEnabled ? const Color(0xFFF59E0B) : const Color(0xFFE2E8F0), width: _earlyBirdEnabled ? 2 : 1),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Row(children: [
+                            Icon(Icons.bolt_rounded, color: _earlyBirdEnabled ? const Color(0xFFF59E0B) : const Color(0xFF94A3B8)),
+                            const SizedBox(width: 10),
+                            const Expanded(child: Text('Enable Early Bird discount', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600))),
+                            Switch(
+                              value: _earlyBirdEnabled,
+                              onChanged: (v) => setState(() => _earlyBirdEnabled = v),
+                              activeThumbColor: const Color(0xFFF59E0B),
+                            ),
+                          ]),
+                        ),
+                      ),
+                      if (_earlyBirdEnabled) ...[
+                        const SizedBox(height: 12),
+                        TextFormField(
+                          controller: _earlyBirdAmountController,
+                          keyboardType: TextInputType.number,
+                          decoration: const InputDecoration(
+                            labelText: 'Early Bird discount (flat PKR off)',
+                            hintText: 'e.g. 2000',
+                            border: OutlineInputBorder(),
+                            prefixIcon: Icon(Icons.money_off_rounded),
+                          ),
+                          onChanged: (_) => setState(() {}),
+                        ),
+                        const SizedBox(height: 12),
+                        Row(children: [
+                          Expanded(child: GestureDetector(
+                            onTap: () => setState(() => _earlyBirdMode = 'days'),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+                              decoration: BoxDecoration(
+                                color: _earlyBirdMode == 'days' ? const Color(0xFFF59E0B).withValues(alpha: 0.08) : const Color(0xFFF8FAFC),
+                                border: Border.all(color: _earlyBirdMode == 'days' ? const Color(0xFFF59E0B) : const Color(0xFFE2E8F0), width: _earlyBirdMode == 'days' ? 2 : 1),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text('Days from creation', textAlign: TextAlign.center,
+                                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: _earlyBirdMode == 'days' ? const Color(0xFFF59E0B) : const Color(0xFF64748B))),
+                            ),
+                          )),
+                          const SizedBox(width: 12),
+                          Expanded(child: GestureDetector(
+                            onTap: () => setState(() => _earlyBirdMode = 'date'),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+                              decoration: BoxDecoration(
+                                color: _earlyBirdMode == 'date' ? const Color(0xFFF59E0B).withValues(alpha: 0.08) : const Color(0xFFF8FAFC),
+                                border: Border.all(color: _earlyBirdMode == 'date' ? const Color(0xFFF59E0B) : const Color(0xFFE2E8F0), width: _earlyBirdMode == 'date' ? 2 : 1),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text('Pick a calendar date', textAlign: TextAlign.center,
+                                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: _earlyBirdMode == 'date' ? const Color(0xFFF59E0B) : const Color(0xFF64748B))),
+                            ),
+                          )),
+                        ]),
+                        const SizedBox(height: 12),
+                        if (_earlyBirdMode == 'days')
+                          TextFormField(
+                            controller: _earlyBirdDaysController,
+                            keyboardType: TextInputType.number,
+                            decoration: const InputDecoration(
+                              labelText: 'Days from course creation',
+                              hintText: 'e.g. 7',
+                              border: OutlineInputBorder(),
+                              prefixIcon: Icon(Icons.timer_rounded),
+                            ),
+                          )
+                        else
+                          GestureDetector(
+                            onTap: () async {
+                              final picked = await showDatePicker(
+                                context: context,
+                                initialDate: _earlyBirdDate ?? DateTime.now().add(const Duration(days: 7)),
+                                firstDate: DateTime.now(),
+                                lastDate: DateTime.now().add(const Duration(days: 730)),
+                              );
+                              if (picked != null) setState(() => _earlyBirdDate = picked);
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
+                              decoration: BoxDecoration(
+                                border: Border.all(color: _earlyBirdDate != null ? const Color(0xFFF59E0B) : const Color(0xFFCBD5E1)),
+                                borderRadius: BorderRadius.circular(4),
+                                color: _earlyBirdDate != null ? const Color(0xFFF59E0B).withValues(alpha: 0.04) : Colors.white,
+                              ),
+                              child: Row(children: [
+                                Icon(Icons.calendar_month_rounded, size: 18, color: _earlyBirdDate != null ? const Color(0xFFF59E0B) : const Color(0xFF94A3B8)),
+                                const SizedBox(width: 12),
+                                Text(
+                                  _earlyBirdDate != null
+                                      ? 'Deadline: ${_earlyBirdDate!.day}/${_earlyBirdDate!.month}/${_earlyBirdDate!.year}'
+                                      : 'Pick deadline date',
+                                  style: TextStyle(fontSize: 14, color: _earlyBirdDate != null ? const Color(0xFFF59E0B) : const Color(0xFF94A3B8)),
+                                ),
+                              ]),
+                            ),
+                          ),
+                      ],
+
+                      // ── Installment Plan ──
+                      const SizedBox(height: 20),
+                      const Divider(height: 1, color: Color(0xFFE2E8F0)),
+                      const SizedBox(height: 20),
+                      const Text('Installment Plan (optional)', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF475569))),
+                      const SizedBox(height: 4),
+                      const Text('Let students pay over several months instead of one lump sum. Payments are manual — the student pays each installment separately.',
+                          style: TextStyle(fontSize: 11, color: Color(0xFF94A3B8))),
+                      const SizedBox(height: 10),
+                      GestureDetector(
+                        onTap: () => setState(() => _installmentPlanEnabled = !_installmentPlanEnabled),
+                        child: Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: _installmentPlanEnabled ? const Color(0xFF6366F1).withValues(alpha: 0.08) : const Color(0xFFF8FAFC),
+                            border: Border.all(color: _installmentPlanEnabled ? const Color(0xFF6366F1) : const Color(0xFFE2E8F0), width: _installmentPlanEnabled ? 2 : 1),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Row(children: [
+                            Icon(Icons.calendar_view_month_rounded, color: _installmentPlanEnabled ? const Color(0xFF6366F1) : const Color(0xFF94A3B8)),
+                            const SizedBox(width: 10),
+                            const Expanded(child: Text('Enable installment plan', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600))),
+                            Switch(
+                              value: _installmentPlanEnabled,
+                              onChanged: (v) => setState(() => _installmentPlanEnabled = v),
+                              activeThumbColor: const Color(0xFF6366F1),
+                            ),
+                          ]),
+                        ),
+                      ),
+                      if (_installmentPlanEnabled) ...[
+                        const SizedBox(height: 12),
+                        DropdownButtonFormField<int>(
+                          initialValue: _installmentCount,
+                          decoration: const InputDecoration(
+                            labelText: 'Number of installments',
+                            border: OutlineInputBorder(),
+                            prefixIcon: Icon(Icons.format_list_numbered_rounded),
+                          ),
+                          items: List.generate(11, (i) => i + 2)
+                              .map((n) => DropdownMenuItem(value: n, child: Text('$n installments')))
+                              .toList(),
+                          onChanged: (v) => setState(() => _installmentCount = v!),
+                        ),
+                        const SizedBox(height: 12),
+                        Builder(builder: (_) {
+                          final price = double.tryParse(_priceController.text) ?? 0;
+                          final earlyBirdAmt = _earlyBirdEnabled ? (double.tryParse(_earlyBirdAmountController.text) ?? 0) : 0;
+                          final effective = (price - earlyBirdAmt).clamp(0, double.infinity);
+                          final per = _installmentCount > 0 ? (effective / _installmentCount) : 0;
+                          return Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(color: const Color(0xFFEFF6FF), borderRadius: BorderRadius.circular(8)),
+                            child: Text(
+                              'Illustrative: ~PKR ${per.toStringAsFixed(0)} × $_installmentCount — first installment is due now, each next one 1 month later. The server computes the exact split (any rounding goes onto the last installment).',
+                              style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                            ),
+                          );
+                        }),
                       ],
                     ],
                   ],

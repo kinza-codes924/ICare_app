@@ -26,6 +26,9 @@ class SelectPaymentMethod extends StatefulWidget {
   final String? appointmentId;
   final double? amount;
   final void Function(BuildContext context, {String? voucherCode})? onPaymentSuccess;
+  // Set when this is paying a specific installment on an already-existing
+  // enrollment (installment 2+), not a fresh course purchase.
+  final int? installmentIndex;
 
   const SelectPaymentMethod({
     super.key,
@@ -34,6 +37,7 @@ class SelectPaymentMethod extends StatefulWidget {
     this.appointmentId,
     this.amount,
     this.onPaymentSuccess,
+    this.installmentIndex,
   });
 
   @override
@@ -57,11 +61,13 @@ class _SelectPaymentMethodState extends State<SelectPaymentMethod> {
 
   double get _finalAmount => _discountedAmount ?? (widget.amount ?? 0);
 
-  String get _paymentType => widget.courseId != null
-      ? 'course'
-      : widget.appointmentId != null
-          ? 'appointment'
-          : 'lab';
+  String get _paymentType => widget.installmentIndex != null
+      ? 'course_installment'
+      : widget.courseId != null
+          ? 'course'
+          : widget.appointmentId != null
+              ? 'appointment'
+              : 'lab';
 
   String get _refId =>
       widget.courseId ?? widget.appointmentId ?? widget.labBookingId ?? '';
@@ -113,6 +119,10 @@ class _SelectPaymentMethodState extends State<SelectPaymentMethod> {
         'course' => (
             'Course Purchased!',
             'You have successfully enrolled in the course. You can now start learning.'
+          ),
+        'course_installment' => (
+            'Installment Paid!',
+            'Your payment was received and your course access has been restored (if it was locked).'
           ),
         'appointment' => (
             'Appointment Confirmed!',
@@ -195,6 +205,7 @@ class _SelectPaymentMethodState extends State<SelectPaymentMethod> {
       type: _paymentType,
       refId: _refId,
       voucherCode: _appliedVoucherCode,
+      installmentIndex: widget.installmentIndex,
       // Land the checkout tab on our own confirmation page so the user
       // clearly sees the payment succeeded (Safepay's own success flash
       // lasts barely a second before redirecting).
@@ -247,6 +258,12 @@ class _SelectPaymentMethodState extends State<SelectPaymentMethod> {
 
   /// After a confirmed payment (or free enrollment).
   Future<void> _finishSuccess() async {
+    if (_paymentType == 'course_installment') {
+      // The enrollment already exists — nothing more to create. Just pop
+      // back so the caller (installment schedule screen) can refresh.
+      if (mounted) Navigator.pop(context, true);
+      return;
+    }
     if (_paymentType == 'course') {
       if (widget.onPaymentSuccess != null) {
         // The backend has already created the enrollment on payment

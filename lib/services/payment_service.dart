@@ -18,12 +18,13 @@ class PaymentService {
   ///  { free: true }                                      → nothing to pay
   ///  { free: false, paymentId, checkoutUrl, amount, tracker } → open checkoutUrl
   Future<Map<String, dynamic>> createPayment({
-    required String type, // 'course' | 'appointment' | 'lab' | 'pharmacy'
+    required String type, // 'course' | 'appointment' | 'lab' | 'pharmacy' | 'course_installment'
     required String refId,
     String method = 'safepay', // 'safepay' | 'cash' (lab collection / pharmacy COD)
     String? voucherCode,
     String? redirectUrl,
     String? cancelUrl,
+    int? installmentIndex, // required when type == 'course_installment'
   }) async {
     final response = await _api.post('/payments/create', {
       'type': type,
@@ -32,6 +33,7 @@ class PaymentService {
       if (voucherCode != null && voucherCode.isNotEmpty) 'voucherCode': voucherCode,
       if (redirectUrl != null) 'redirectUrl': redirectUrl,
       if (cancelUrl != null) 'cancelUrl': cancelUrl,
+      if (installmentIndex != null) 'installmentIndex': installmentIndex,
     });
     return Map<String, dynamic>.from(response.data as Map);
   }

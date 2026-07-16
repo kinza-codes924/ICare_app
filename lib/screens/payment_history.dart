@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:icare/services/api_service.dart';
-import 'package:icare/services/course_service.dart';
 import 'package:icare/services/laboratory_service.dart';
 import 'package:icare/services/order_service.dart';
+import 'package:icare/services/payment_service.dart';
 import 'package:icare/widgets/back_button.dart';
 import 'package:intl/intl.dart';
 
@@ -41,20 +41,26 @@ class _PaymentHistoryScreenState extends State<PaymentHistoryScreen> {
     final rows = <Map<String, dynamic>>[];
     try {
       if (_isStudent) {
-        // Course purchases
-        final enrollments = await CourseService().myPurchases();
-        for (final e in enrollments) {
-          final course = e['course'];
-          if (course is! Map) continue;
-          final price = (course['price'] is num) ? (course['price'] as num).toDouble() : 0.0;
+        // Course purchases + installment payments — the real Payment ledger,
+        // which already models multiple rows per course (one per installment).
+        final payments = await PaymentService().myPayments();
+        for (final p in payments) {
+          final type = p['type']?.toString();
+          if (type != 'course' && type != 'course_installment') continue;
+          final amount = (p['amount'] is num) ? (p['amount'] as num).toDouble() : 0.0;
+          final status = (p['status'] ?? '').toString();
           rows.add({
-            'title': course['title'] ?? course['name'] ?? 'Course',
-            'subtitle': 'Course enrollment',
+            'title': p['displayLabel']?.toString() ?? 'Course',
+            'subtitle': type == 'course_installment' ? 'Installment payment' : 'Course enrollment',
             'icon': Icons.school_rounded,
             'color': const Color(0xFF6366F1),
-            'amount': price,
-            'date': _parseDate(e['createdAt'] ?? e['enrolledAt']),
-            'status': price > 0 ? 'Paid' : 'Free',
+            'amount': amount,
+            'date': _parseDate(p['paidAt'] ?? p['createdAt']),
+            'status': status == 'paid'
+                ? 'Paid'
+                : (status == 'failed' || status == 'cancelled' || status == 'expired'
+                    ? 'Cancelled'
+                    : 'Pending'),
           });
         }
       } else {

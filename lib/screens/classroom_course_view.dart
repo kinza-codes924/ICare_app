@@ -14,6 +14,7 @@ import 'package:icare/screens/doctor_notifications.dart';
 import 'package:icare/screens/instructor_assignments_list_screen.dart';
 import 'package:icare/services/lms_service.dart';
 import 'package:icare/screens/lms_live_session_screen.dart';
+import 'package:icare/screens/installment_schedule_screen.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -58,6 +59,9 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
   List<dynamic> _modules = [];
   bool _loadingModules = true;
   String _courseType = 'self-paced';
+  String? _lockReason;
+  bool _installmentPlanEnabled = false;
+  List<dynamic> _installments = [];
 
   // Key to reach embedded course content screen's add-module action
   final _embeddedContentKey = GlobalKey<_EmbeddedCourseContentState>();
@@ -236,6 +240,9 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
       if (mounted) setState(() {
         _modules = List<dynamic>.from(mods);
         _courseType = (course is Map ? course['courseType']?.toString() : null) ?? 'self-paced';
+        _lockReason = course is Map ? course['lockReason']?.toString() : null;
+        _installmentPlanEnabled = (course is Map ? course['installmentPlanEnabled'] as bool? : null) ?? false;
+        _installments = (course is Map ? course['installments'] as List? : null) ?? [];
         // Also update assignments/quizzes/sessions for Course Content tab
         if (results[1] is List) _assignments = results[1] as List;
         if (results[2] is List) _quizzes = results[2] as List;
@@ -1269,6 +1276,72 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
       child: ListView(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
         children: [
+          // Installment lock / status banner — shown above everything else so
+          // a locked student immediately understands why content is hidden.
+          if (_lockReason == 'installment_overdue') ...[
+            GestureDetector(
+              onTap: () => Navigator.push(context, MaterialPageRoute(
+                builder: (_) => InstallmentScheduleScreen(courseId: _courseId, courseTitle: _courseTitle),
+              )).then((_) => _loadModules()),
+              child: Container(
+                margin: const EdgeInsets.only(bottom: 16),
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFDC2626),
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [BoxShadow(color: const Color(0xFFDC2626).withValues(alpha: 0.3), blurRadius: 12, offset: const Offset(0, 4))],
+                ),
+                child: Row(children: [
+                  const Icon(Icons.lock_rounded, color: Colors.white, size: 24),
+                  const SizedBox(width: 12),
+                  const Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text('COURSE LOCKED', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 1)),
+                    Text('Installment overdue — pay now to unlock', style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w700)),
+                  ])),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(8)),
+                    child: const Text('PAY NOW', style: TextStyle(color: Color(0xFFDC2626), fontSize: 12, fontWeight: FontWeight.w800)),
+                  ),
+                ]),
+              ),
+            ),
+          ] else if (_installmentPlanEnabled && _installments.isNotEmpty) ...[
+            Builder(builder: (_) {
+              final total = _installments.length;
+              final nextPending = _installments.firstWhere(
+                (i) => i['status'] != 'paid',
+                orElse: () => null,
+              );
+              if (nextPending == null) return const SizedBox.shrink();
+              final idx = nextPending['index'];
+              final due = DateTime.tryParse(nextPending['dueDate']?.toString() ?? '');
+              final dueStr = due != null ? DateFormat('d MMM').format(due) : '';
+              return GestureDetector(
+                onTap: () => Navigator.push(context, MaterialPageRoute(
+                  builder: (_) => InstallmentScheduleScreen(courseId: _courseId, courseTitle: _courseTitle),
+                )).then((_) => _loadModules()),
+                child: Container(
+                  margin: const EdgeInsets.only(bottom: 16),
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEFF6FF),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: const Color(0xFFBFDBFE)),
+                  ),
+                  child: Row(children: [
+                    const Icon(Icons.calendar_view_month_rounded, color: Color(0xFF6366F1), size: 18),
+                    const SizedBox(width: 10),
+                    Expanded(child: Text(
+                      'Installment plan: installment $idx of $total${dueStr.isNotEmpty ? ' — due $dueStr' : ''}',
+                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF334155)),
+                    )),
+                    const Text('View schedule', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF6366F1))),
+                  ]),
+                ),
+              );
+            }),
+          ],
           // Live session banner — gated on _isSessionLive (polled every 5s),
           // not on the unpolled _sessions list, so it appears/disappears in
           // sync with the Stream tab's banner and the FAB.
