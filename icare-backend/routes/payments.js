@@ -30,7 +30,10 @@ const DoctorProfile = require('../models/DoctorProfile');
 const LabTestRequest = require('../models/LabTestRequest');
 const PharmacyOrder = require('../models/PharmacyOrder');
 const User = require('../models/User');
+const Notification = require('../models/Notification');
+const { sendEmail } = require('../utils/email');
 const { Voucher, applyVoucherDiscount } = require('./vouchers');
+const { computeEffectivePrice, buildInstallmentSchedule } = require('../utils/installments');
 
 // ─── Config helpers ───────────────────────────────────────────────────────────
 const SAFEPAY_ENV = () => (process.env.SAFEPAY_ENV === 'production' ? 'production' : 'sandbox');
@@ -109,14 +112,14 @@ async function safepayGet(path) {
 // Returns { amount, originalAmount, payeeId, description, voucherCode } or throws.
 // payeeId = who receives the money (instructor/doctor/lab/pharmacy) — powers
 // the admin per-entity revenue report.
-async function calculateAmount({ type, refId, voucherCode, userId }) {
+async function calculateAmount({ type, refId, voucherCode, userId, installmentIndex }) {
   if (type === 'course') {
     const course = await Course.findById(refId).lean();
     if (!course) throw new Error('Course not found');
     // Never let an already-enrolled user pay again for the same course.
     const existingEnrollment = await Enrollment.findOne({ userId: toId(userId), courseId: refId }).lean();
     if (existingEnrollment) throw new Error('Already enrolled in this course');
-    const original = course.isFree ? 0 : (course.discountedPrice || course.price || 0);
+    const original = computeEffectivePrice(course);
     let amount = original;
     let appliedVoucher = null;
     if (voucherCode) {
@@ -130,12 +133,37 @@ async function calculateAmount({ type, refId, voucherCode, userId }) {
       amount = applyVoucherDiscount(voucher, course.price || 0);
       appliedVoucher = voucher.code;
     }
+    // Installment-enabled courses: "purchase" always means "pay installment 1"
+    // — the full schedule (with its own rounding-safe split) is generated at
+    // fulfillment time, not here.
+    if (course.installmentPlanEnabled && course.installmentCount >= 2 && !voucherCode) {
+      amount = Math.floor(amount / course.installmentCount);
+    }
     return {
       amount: Math.max(0, Number(amount) || 0),
       originalAmount: Math.max(0, Number(original) || 0),
       payeeId: course.instructor_id || null,
       description: `Course: ${course.title || refId}`,
       voucherCode: appliedVoucher,
+    };
+  }
+
+  if (type === 'course_installment') {
+    const course = await Course.findById(refId).lean();
+    if (!course) throw new Error('Course not found');
+    const enrollment = await Enrollment.findOne({ userId: toId(userId), courseId: refId });
+    if (!enrollment) throw new Error('No enrollment found for this course');
+    if (!enrollment.installmentPlanEnabled) throw new Error('This course does not have an installment plan');
+    const idx = Number(installmentIndex);
+    const inst = enrollment.installments.find((i) => i.index === idx);
+    if (!inst) throw new Error('Invalid installment index');
+    if (inst.status === 'paid') throw new Error('This installment is already paid');
+    return {
+      amount: Math.max(0, Number(inst.amount) || 0),
+      originalAmount: Math.max(0, Number(inst.amount) || 0),
+      payeeId: course.instructor_id || null,
+      description: `Course: ${course.title || refId} — Installment ${idx} of ${enrollment.installments.length}`,
+      voucherCode: null,
     };
   }
 
@@ -218,11 +246,75 @@ async function fulfillPayment(payment) {
       }
     }
 
+    // Installment-enabled courses: generate the full N-row schedule now that
+    // installment 1 (this payment) has actually cleared. Guarded by
+    // installments.length so a duplicate webhook fulfillment never
+    // regenerates it (idempotent).
+    if (enrollment && (!enrollment.installments || enrollment.installments.length === 0)) {
+      const course = await Course.findById(payment.refId).lean();
+      if (course?.installmentPlanEnabled && course.installmentCount >= 2 && !payment.voucherCode) {
+        const totalAmount = computeEffectivePrice(course);
+        enrollment.installmentPlanEnabled = true;
+        enrollment.installments = buildInstallmentSchedule({
+          totalAmount,
+          count: course.installmentCount,
+          firstDueDate: new Date(),
+          firstPaymentId: payment._id,
+        });
+        await enrollment.save();
+      }
+    }
+
     payment.fulfilled = true;
     payment.fulfilledAt = new Date();
     payment.fulfillmentRef = enrollment?._id || null;
     await payment.save();
     await plog({ paymentId: payment._id, tracker: payment.safepayTracker, userId: payment.userId, step: 'FULFILLED', message: `Enrollment ${enrollment?._id} created for course ${payment.refId}` });
+    return { enrollment };
+  }
+
+  if (payment.type === 'course_installment') {
+    const enrollment = await Enrollment.findOne({ userId: payment.userId, courseId: payment.refId });
+    if (!enrollment) {
+      await plog({ paymentId: payment._id, tracker: payment.safepayTracker, userId: payment.userId, step: 'FULFILL_ERROR', level: 'ALERT', message: `No enrollment found for installment payment, course ${payment.refId}` });
+      throw new Error('No enrollment found for installment payment');
+    }
+    const inst = enrollment.installments.find((i) => i.index === payment.installmentIndex);
+    if (inst) {
+      inst.status = 'paid';
+      inst.paidAt = new Date();
+      inst.paymentId = payment._id;
+    }
+    const wasLocked = enrollment.installmentLocked;
+    if (wasLocked) {
+      enrollment.installmentLocked = false;
+      enrollment.installmentLockedAt = null;
+    }
+    await enrollment.save();
+
+    payment.fulfilled = true;
+    payment.fulfilledAt = new Date();
+    payment.fulfillmentRef = enrollment._id;
+    await payment.save();
+    await plog({ paymentId: payment._id, tracker: payment.safepayTracker, userId: payment.userId, step: 'FULFILLED', message: `Installment ${payment.installmentIndex} paid for course ${payment.refId}` });
+
+    if (wasLocked) {
+      const course = await Course.findById(payment.refId).select('title').lean();
+      const student = await User.findById(payment.userId).select('email name').lean();
+      Notification.create({
+        userId: payment.userId, type: 'payment',
+        title: 'Course Unlocked',
+        message: `Your access to "${course?.title || 'your course'}" has been restored — installment ${payment.installmentIndex} is now paid.`,
+        data: { subType: 'installment_paid', courseId: payment.refId, installmentIndex: payment.installmentIndex },
+      }).catch(() => {});
+      if (student?.email) {
+        sendEmail({
+          to: student.email,
+          subject: `Course unlocked — ${course?.title || 'installment paid'}`,
+          html: `<p>Hi ${student.name || 'Student'},</p><p>Installment ${payment.installmentIndex} for <b>${course?.title || ''}</b> has been received and your course access is restored.</p>`,
+        }).catch(() => {});
+      }
+    }
     return { enrollment };
   }
 
@@ -307,7 +399,7 @@ router.post('/create', authMiddleware, async (req, res) => {
   let payment = null;
   try {
     await connectMongoDB();
-    const { type, refId, voucherCode, redirectUrl, cancelUrl } = req.body;
+    const { type, refId, voucherCode, redirectUrl, cancelUrl, installmentIndex } = req.body;
     const method = req.body.method === 'cash' ? 'cash' : 'safepay';
     const userId = toId(req.user.id);
 
@@ -321,12 +413,15 @@ router.post('/create', authMiddleware, async (req, res) => {
       await plog({ userId, step: 'ERROR', level: 'ERROR', message: 'SAFEPAY keys not configured in env' });
       return res.status(500).json({ success: false, message: 'Payment gateway not configured' });
     }
+    if (type === 'course_installment' && !(Number.isInteger(Number(installmentIndex)) && Number(installmentIndex) >= 1)) {
+      return res.status(400).json({ success: false, message: 'installmentIndex is required for course_installment payments' });
+    }
 
     await plog({ userId, step: 'PAYMENT_CREATE_REQUESTED', payload: { type, refId, method, voucherCode: voucherCode || null } });
 
     // 1. Server-side amount
     const { amount, originalAmount, payeeId, description, voucherCode: appliedVoucher } =
-      await calculateAmount({ type, refId: rId, voucherCode, userId });
+      await calculateAmount({ type, refId: rId, voucherCode, userId, installmentIndex: Number(installmentIndex) || undefined });
     await plog({ userId, step: 'AMOUNT_CALCULATED', message: `${description} = PKR ${amount} (original ${originalAmount})` });
 
     // Free (or 100% voucher) — no gateway needed; client should call the normal endpoint.
@@ -363,6 +458,7 @@ router.post('/create', authMiddleware, async (req, res) => {
       currency: 'PKR', amount, amountLowest,
       originalAmount: originalAmount ?? amount, discountAmount,
       voucherCode: appliedVoucher || null,
+      installmentIndex: type === 'course_installment' ? Number(installmentIndex) : null,
       safepayEnvironment: SAFEPAY_ENV(),
       status: 'created',
       notes: description,
@@ -861,7 +957,34 @@ router.get('/my', authMiddleware, async (req, res) => {
   try {
     await connectMongoDB();
     const payments = await Payment.find({ userId: toId(req.user.id) }).sort({ createdAt: -1 }).limit(100).lean();
-    res.json({ success: true, payments });
+
+    const courseRefIds = [...new Set(
+      payments.filter((p) => p.type === 'course' || p.type === 'course_installment').map((p) => p.refId?.toString())
+    )].filter(Boolean);
+    const [courses, enrollments] = await Promise.all([
+      Course.find({ _id: { $in: courseRefIds } }).select('title').lean(),
+      Enrollment.find({ userId: toId(req.user.id), courseId: { $in: courseRefIds } }).select('courseId installments').lean(),
+    ]);
+    const titleById = {};
+    courses.forEach((c) => { titleById[c._id.toString()] = c.title; });
+    const installmentCountById = {};
+    enrollments.forEach((e) => { installmentCountById[e.courseId.toString()] = e.installments?.length || 0; });
+
+    const enriched = payments.map((p) => {
+      let displayLabel = p.notes;
+      const courseTitle = titleById[p.refId?.toString()];
+      if (courseTitle) {
+        if (p.type === 'course_installment') {
+          const total = installmentCountById[p.refId?.toString()];
+          displayLabel = `${courseTitle} — Installment ${p.installmentIndex}${total ? ` of ${total}` : ''}`;
+        } else if (p.type === 'course') {
+          displayLabel = courseTitle;
+        }
+      }
+      return { ...p, displayLabel };
+    });
+
+    res.json({ success: true, payments: enriched });
   } catch (e) {
     res.status(500).json({ success: false, message: e.message });
   }

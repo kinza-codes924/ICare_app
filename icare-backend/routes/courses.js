@@ -14,6 +14,7 @@ const LiveSession = require('../models/LiveSession');
 const CourseReview = require('../models/CourseReview');
 const { Voucher, applyVoucherDiscount } = require('./vouchers');
 const { recheckModuleCompletion } = require('../utils/courseProgress');
+const { computeEffectivePrice, isEarlyBirdActive } = require('../utils/installments');
 
 function toId(id) {
   try { return new mongoose.Types.ObjectId(id); } catch { return null; }
@@ -487,6 +488,20 @@ router.get('/:id', authMiddleware, async (req, res) => {
       return res.json({ success: true, course: { ...course, modules: [], enrollmentId: null, locked: true } });
     }
 
+    // Soft lock: an installment became overdue past its grace period. Content
+    // is hidden exactly like the "never enrolled" case, but progress/the
+    // enrollment itself is untouched, and a distinct lockReason lets the UI
+    // show "pay now to unlock" instead of "buy this course".
+    if (enrollment?.installmentLocked && !isOwner) {
+      return res.json({
+        success: true,
+        course: {
+          ...course, modules: [], enrollmentId: enrollment._id.toString(),
+          locked: true, lockReason: 'installment_overdue',
+        },
+      });
+    }
+
     course.modules = (course.modules || []).map((mod, idx) => {
       let isLocked = false;
       let unlockDate = null;
@@ -510,11 +525,33 @@ router.get('/:id', authMiddleware, async (req, res) => {
 
     course.enrollmentId = enrollment?._id?.toString() || null;
     course.completedModuleIds = [...completedModuleIds];
+    course.installmentPlanEnabled = enrollment?.installmentPlanEnabled || false;
+    course.installments = enrollment?.installments || [];
+    course.installmentLocked = enrollment?.installmentLocked || false;
+    course.effectivePrice = computeEffectivePrice(course);
+    course.earlyBirdActive = isEarlyBirdActive(course);
     res.json({ success: true, course });
   } catch (e) {
     res.status(500).json({ success: false, message: e.message });
   }
 });
+
+// Shared validation for the Early Bird + Installment fields on create/update.
+// Returns an error message string, or null if valid.
+function validatePricingFields(body) {
+  if (body.earlyBirdEnabled) {
+    const amount = Number(body.earlyBirdAmount);
+    const price = Number(body.discountedPrice || body.price || 0);
+    if (!(amount > 0)) return 'Early Bird amount must be greater than 0';
+    if (!body.earlyBirdDeadline) return 'Early Bird deadline is required';
+    if (amount >= price) return 'Early Bird amount must be less than the course price';
+  }
+  if (body.installmentPlanEnabled) {
+    const n = Number(body.installmentCount);
+    if (!Number.isInteger(n) || n < 2 || n > 12) return 'Installment count must be between 2 and 12';
+  }
+  return null;
+}
 
 // POST /api/courses — create course (instructor)
 // Create LiveSession docs for any lessons that have a liveSessionDateTime.
@@ -552,6 +589,8 @@ async function syncLiveSessions(courseId, instructorId, modules) {
 router.post('/', authMiddleware, async (req, res) => {
   try {
     await connectMongoDB();
+    const pricingError = validatePricingFields(req.body);
+    if (pricingError) return res.status(400).json({ success: false, message: pricingError });
     const course = await Course.create({ ...req.body, instructor_id: toId(req.user.id) });
     // Use course.modules (the saved document), NOT req.body.modules (the raw
     // client payload) — Mongoose only assigns each module/lesson subdocument
@@ -571,6 +610,8 @@ router.post('/', authMiddleware, async (req, res) => {
 router.put('/:id', authMiddleware, async (req, res) => {
   try {
     await connectMongoDB();
+    const pricingError = validatePricingFields(req.body);
+    if (pricingError) return res.status(400).json({ success: false, message: pricingError });
     const course = await Course.findByIdAndUpdate(toId(req.params.id), { $set: req.body }, { new: true });
     if (!course) return res.status(404).json({ success: false, message: 'Not found' });
     // Same reasoning as POST / above — use the saved course.modules (real

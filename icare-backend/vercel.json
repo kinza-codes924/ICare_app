@@ -48,6 +48,10 @@
     {
       "path": "/api/appointments/send-reminders",
       "schedule": "*/10 * * * *"
+    },
+    {
+      "path": "/api/lms/installments/process",
+      "schedule": "0 9 * * *"
     }
   ],
   "env": {

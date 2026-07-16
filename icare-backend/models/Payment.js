@@ -8,8 +8,12 @@ const paymentSchema = new mongoose.Schema({
   userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
 
   // What is being paid for
-  type: { type: String, enum: ['course', 'appointment', 'lab', 'pharmacy'], required: true },
+  type: { type: String, enum: ['course', 'appointment', 'lab', 'pharmacy', 'course_installment'], required: true },
   refId: { type: mongoose.Schema.Types.ObjectId, required: true }, // courseId / appointmentId / labBookingId / orderId
+
+  // Only set when type === 'course_installment' — which installment (1-based)
+  // this payment is for. The Enrollment already has one for this course.
+  installmentIndex: { type: Number, default: null },
 
   // Who receives the money — instructor (course), doctor (appointment),
   // lab (lab test) or pharmacy (order). Powers the admin per-entity report.

@@ -94,6 +94,18 @@ const courseSchema = new mongoose.Schema({
   isFree: { type: Boolean, default: false },
   discountPercent: { type: Number, default: 0 },
   discountedPrice: { type: Number, default: 0 },
+
+  // Early Bird: flat PKR amount off (not percent), active only until earlyBirdDeadline.
+  // Applied on top of discountedPrice at payment/schedule time — never persisted as
+  // a second "discounted" field, to avoid double-discount ambiguity.
+  earlyBirdEnabled: { type: Boolean, default: false },
+  earlyBirdAmount: { type: Number, default: 0 },
+  earlyBirdDeadline: { type: Date, default: null },
+
+  // Installment plan: manual per-payment, no saved-card auto-charge. First
+  // installment is the purchase itself; each next one is due 1 calendar month later.
+  installmentPlanEnabled: { type: Boolean, default: false },
+  installmentCount: { type: Number, default: 0 },
 }, { timestamps: true });
 
 // No pre-save hooks — sync logic is handled in route handlers
