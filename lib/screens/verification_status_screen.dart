@@ -9,11 +9,17 @@ import 'package:icare/screens/account_activated_screen.dart';
 class VerificationStatusScreen extends StatefulWidget {
   final String role;
   final String applicantName;
+  // Token returned at registration — this applicant isn't "logged in" via
+  // the normal flow (unapproved accounts aren't meant to have an active
+  // session), so it's passed explicitly here rather than relying on
+  // SharedPref, which never had a token to persist in the first place.
+  final String? token;
 
   const VerificationStatusScreen({
     super.key,
     required this.role,
     required this.applicantName,
+    this.token,
   });
 
   @override
@@ -46,10 +52,22 @@ class _VerificationStatusScreenState extends State<VerificationStatusScreen> {
   Future<void> _refreshStatus({bool silent = false}) async {
     if (!silent) setState(() => _isRefreshing = true);
 
+    // Nothing to poll without a token — this applicant has no active
+    // session, so an untargeted request would silently 401 forever and the
+    // screen would never detect approval (the bug this fixes).
+    if (widget.token == null || widget.token!.isEmpty) {
+      if (!silent && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please check back later, or contact support to confirm your status.')),
+        );
+      }
+      return;
+    }
+
     try {
       // Check approval status from backend
       final api = ApiService();
-      final response = await api.get('/auth/profile');
+      final response = await api.get('/auth/profile', token: widget.token);
       if (response.statusCode == 200) {
         final user = response.data;
         final isApproved = user['isApproved'] == true || user['is_approved'] == true;

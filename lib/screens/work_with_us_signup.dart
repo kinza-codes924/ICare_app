@@ -561,6 +561,7 @@ class _WorkWithUsSignupState extends State<WorkWithUsSignup> {
               builder: (_) => VerificationStatusScreen(
                 role: _selectedRole!,
                 applicantName: capturedName,
+                token: regToken,
               ),
             ),
           );
