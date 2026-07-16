@@ -822,52 +822,40 @@ class InstructorCourseContentScreenState extends State<InstructorCourseContentSc
     final title = session['title']?.toString() ?? 'Live Session';
     final status = session['status']?.toString() ?? 'scheduled';
     final scheduledAt = session['scheduledAt']?.toString() ?? session['liveSessionDateTime']?.toString() ?? '';
-    final recordingUrl = session['recordingUrl']?.toString() ?? '';
-    final hasRecording = recordingUrl.isNotEmpty;
     final isLive = status == 'live';
     final isEnded = status == 'ended' || status == 'completed';
     final id = session['_id']?.toString() ?? '';
+    // Recordings now archive to Google Drive only — no in-app playback for
+    // ended sessions here anymore, so this card just shows the session
+    // happened, without a "Play" action.
 
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: hasRecording ? const Color(0xFFECFDF5) : const Color(0xFFFFF7ED),
+        color: isEnded ? const Color(0xFFF1F5F9) : const Color(0xFFFFF7ED),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: hasRecording ? const Color(0xFF10B981).withValues(alpha: 0.4) : const Color(0xFFFB923C).withValues(alpha: 0.4)),
+        border: Border.all(color: isEnded ? const Color(0xFF94A3B8).withValues(alpha: 0.3) : const Color(0xFFFB923C).withValues(alpha: 0.4)),
       ),
       child: Row(children: [
         Container(
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
-            color: (hasRecording ? const Color(0xFF10B981) : Colors.red).withValues(alpha: 0.1),
+            color: (isEnded ? const Color(0xFF64748B) : Colors.red).withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(6),
           ),
           child: Icon(
-            hasRecording ? Icons.play_circle_rounded : Icons.live_tv_rounded,
-            size: 20, color: hasRecording ? const Color(0xFF10B981) : Colors.red,
+            isEnded ? Icons.check_circle_outline_rounded : Icons.live_tv_rounded,
+            size: 20, color: isEnded ? const Color(0xFF64748B) : Colors.red,
           ),
         ),
         const SizedBox(width: 12),
         Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF0F172A))),
           if (scheduledAt.isNotEmpty)
-            Text(_fmtDate(scheduledAt), style: TextStyle(fontSize: 12, color: hasRecording ? const Color(0xFF10B981) : const Color(0xFFF59E0B))),
+            Text(_fmtDate(scheduledAt), style: TextStyle(fontSize: 12, color: isEnded ? const Color(0xFF64748B) : const Color(0xFFF59E0B))),
         ])),
-        if (hasRecording)
-          GestureDetector(
-            onTap: () => _openRecording(session),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              decoration: BoxDecoration(color: const Color(0xFF10B981), borderRadius: BorderRadius.circular(8)),
-              child: const Row(mainAxisSize: MainAxisSize.min, children: [
-                Icon(Icons.play_arrow_rounded, color: Colors.white, size: 16),
-                SizedBox(width: 4),
-                Text('Play', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700)),
-              ]),
-            ),
-          )
-        else if (isEnded)
+        if (isEnded)
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
             decoration: BoxDecoration(color: Colors.grey[200], borderRadius: BorderRadius.circular(8)),

@@ -14,7 +14,6 @@ import 'package:icare/screens/doctor_notifications.dart';
 import 'package:icare/screens/instructor_assignments_list_screen.dart';
 import 'package:icare/services/lms_service.dart';
 import 'package:icare/screens/lms_live_session_screen.dart';
-import 'package:icare/widgets/video_player_widget.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -1461,48 +1460,39 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
     final status = session['status']?.toString() ?? 'scheduled';
     final scheduledAt = session['scheduledAt']?.toString() ?? '';
     final recordingUrl = session['recordingUrl']?.toString() ?? '';
-    final hasRecording = recordingUrl.isNotEmpty;
     final isEnded = status == 'ended' || status == 'completed';
     final id = session['_id']?.toString() ?? '';
+    // Recordings now archive to Google Drive only — no in-app "Watch"
+    // action here anymore; ended sessions just open the transcript sheet.
 
     return GestureDetector(
-      onTap: hasRecording ? () => _showCompletedSessionOptions(id, title, recordingUrl) : null,
+      onTap: isEnded ? () => _showCompletedSessionOptions(id, title, recordingUrl) : null,
       child: Container(
         margin: const EdgeInsets.only(bottom: 8),
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: hasRecording ? const Color(0xFFECFDF5) : const Color(0xFFFFF7ED),
+          color: isEnded ? const Color(0xFFF1F5F9) : const Color(0xFFFFF7ED),
           borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: hasRecording ? const Color(0xFF10B981).withValues(alpha: 0.4) : const Color(0xFFFB923C).withValues(alpha: 0.4)),
+          border: Border.all(color: isEnded ? const Color(0xFF94A3B8).withValues(alpha: 0.3) : const Color(0xFFFB923C).withValues(alpha: 0.4)),
         ),
         child: Row(children: [
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: (hasRecording ? const Color(0xFF10B981) : Colors.red).withValues(alpha: 0.1),
+              color: (isEnded ? const Color(0xFF64748B) : Colors.red).withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(6),
             ),
-            child: Icon(hasRecording ? Icons.play_circle_rounded : Icons.live_tv_rounded,
-              size: 20, color: hasRecording ? const Color(0xFF10B981) : Colors.red),
+            child: Icon(isEnded ? Icons.check_circle_outline_rounded : Icons.live_tv_rounded,
+              size: 20, color: isEnded ? const Color(0xFF64748B) : Colors.red),
           ),
           const SizedBox(width: 12),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF0F172A))),
             if (scheduledAt.isNotEmpty)
               Text(_fmtSessionDate(scheduledAt),
-                style: TextStyle(fontSize: 12, color: hasRecording ? const Color(0xFF10B981) : const Color(0xFFF59E0B))),
+                style: TextStyle(fontSize: 12, color: isEnded ? const Color(0xFF64748B) : const Color(0xFFF59E0B))),
           ])),
-          if (hasRecording)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              decoration: BoxDecoration(color: const Color(0xFF10B981), borderRadius: BorderRadius.circular(8)),
-              child: const Row(mainAxisSize: MainAxisSize.min, children: [
-                Icon(Icons.play_arrow_rounded, color: Colors.white, size: 16),
-                SizedBox(width: 4),
-                Text('Watch', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700)),
-              ]),
-            )
-          else if (isEnded)
+          if (isEnded)
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               decoration: BoxDecoration(color: Colors.grey[200], borderRadius: BorderRadius.circular(8)),
@@ -2022,18 +2012,6 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
                           color: sessionStatus == 'scheduled' ? const Color(0xFF1A73E8) : const Color(0xFF70757A),
                         ),
                       ),
-                      if ((data['recordingUrl']?.toString() ?? '').isNotEmpty) ...[
-                        const SizedBox(width: 6),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF1A73E8),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: const Text('▶ REC',
-                              style: TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w900)),
-                        ),
-                      ],
                     ]),
                 ],
               ),
@@ -2133,40 +2111,6 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
     }
   }
 
-  void _openVideoPlayer(String url) {
-    if (url.isEmpty) return;
-    showDialog(
-      context: context,
-      barrierDismissible: true,
-      builder: (ctx) => Dialog(
-        backgroundColor: Colors.transparent,
-        insetPadding: const EdgeInsets.all(12),
-        child: Stack(
-          children: [
-            AspectRatio(
-              aspectRatio: 16 / 9,
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: VideoPlayerWidget(videoUrl: url),
-              ),
-            ),
-            Positioned(
-              top: 6, right: 6,
-              child: GestureDetector(
-                onTap: () => Navigator.of(ctx).pop(),
-                child: Container(
-                  padding: const EdgeInsets.all(6),
-                  decoration: const BoxDecoration(color: Colors.black54, shape: BoxShape.circle),
-                  child: const Icon(Icons.close, color: Colors.white, size: 20),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   void _showCompletedSessionOptions(String sessionId, String title, String recordingUrl) {
     showModalBottomSheet(
       context: context,
@@ -2189,32 +2133,8 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
             ),
             const SizedBox(height: 4),
             const Divider(),
-            if (recordingUrl.isNotEmpty)
-              ListTile(
-                leading: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(color: const Color(0xFFE8F0FE), shape: BoxShape.circle),
-                  child: const Icon(Icons.play_circle_filled_rounded, color: Color(0xFF1A73E8), size: 22),
-                ),
-                title: const Text('Watch Recording', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
-                subtitle: const Text('Full session video recording', style: TextStyle(fontSize: 12)),
-                onTap: () {
-                  Navigator.pop(context);
-                  _openVideoPlayer(recordingUrl);
-                },
-              )
-            else
-              ListTile(
-                leading: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(color: Colors.grey.shade100, shape: BoxShape.circle),
-                  child: Icon(Icons.videocam_off_outlined, color: Colors.grey.shade400, size: 22),
-                ),
-                title: Text('No Recording Available',
-                    style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: Colors.grey.shade500)),
-                subtitle: const Text('Recording was not saved for this session', style: TextStyle(fontSize: 12)),
-                enabled: false,
-              ),
+            // Recordings now archive to Google Drive only — no in-app
+            // playback option here anymore ("Watch Recording" removed).
             if (widget.isInstructor && recordingUrl.isNotEmpty)
               ListTile(
                 leading: Container(
@@ -2443,19 +2363,8 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
                   ));
                 },
               ),
-            // Session — Watch Recording (completed sessions with recording)
-            if (type == 'session' &&
-                (data['status'] == 'completed' || data['status'] == 'ended') &&
-                (data['recordingUrl']?.toString() ?? '').isNotEmpty)
-              ListTile(
-                leading: const Icon(Icons.play_circle_filled_rounded, color: Color(0xFF1A73E8)),
-                title: const Text('Watch Recording', style: TextStyle(fontWeight: FontWeight.w700)),
-                subtitle: const Text('Full session video recording'),
-                onTap: () {
-                  Navigator.pop(context);
-                  _openVideoPlayer(data['recordingUrl']?.toString() ?? '');
-                },
-              ),
+            // Recordings now archive to Google Drive only — no in-app
+            // "Watch Recording" option here anymore.
             // Session — Delete Recording (instructor only)
             if (type == 'session' && widget.isInstructor &&
                 (data['status'] == 'completed' || data['status'] == 'ended') &&
