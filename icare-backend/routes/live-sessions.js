@@ -467,22 +467,10 @@ router.post('/:id/complete', authMiddleware, async (req, res) => {
     if (recordingUrl) session.recordingUrl = recordingUrl;
     await session.save();
 
-    // Auto-save recording to linked lesson
-    if (recordingUrl && session.linkedLessonId && session.linkedModuleId) {
-      const Course = require('../models/Course');
-      const course = await Course.findById(session.courseId);
-
-      if (course) {
-        const module = course.modules.id(session.linkedModuleId);
-        if (module) {
-          const lesson = module.lessons.id(session.linkedLessonId);
-          if (lesson) {
-            lesson.videoUrl = recordingUrl;
-            await course.save();
-          }
-        }
-      }
-    }
+    // Recordings are archived to Google Drive (see jibri-recording-complete)
+    // and remain playable from the Live Sessions list via recordingUrl —
+    // they're intentionally no longer auto-attached as a Course Content
+    // lesson's video.
 
     res.json({ success: true, session });
   } catch (e) {
@@ -875,28 +863,9 @@ router.post('/:id/recording/stop', authMiddleware, async (req, res) => {
     session.recordingSid = undefined;
     await session.save();
 
-    // If session is linked to a lesson, save recording URL there too
-    if (recordingUrl && (session.linkedLessonId || session.lessonId)) {
-      const lId = session.linkedLessonId || session.lessonId;
-      try {
-        const Course = require('../models/Course');
-        const course = await Course.findById(session.courseId);
-        if (course) {
-          let updated = false;
-          course.modules = course.modules.map(mod => ({
-            ...mod.toObject(),
-            lessons: mod.lessons.map(lesson => {
-              if (lesson._id?.toString() === lId) {
-                updated = true;
-                return { ...lesson.toObject(), videoUrl: recordingUrl, recordingAvailable: true };
-              }
-              return lesson;
-            }),
-          }));
-          if (updated) await course.save();
-        }
-      } catch (_) {}
-    }
+    // Recordings are archived to Google Drive and remain playable from the
+    // Live Sessions list via recordingUrl — intentionally no longer
+    // auto-attached as a Course Content lesson's video (legacy Agora path).
 
     res.json({
       success: true,
@@ -1035,25 +1004,9 @@ router.patch('/:id/set-recording-url', authMiddleware, async (req, res) => {
     );
     if (!session) return res.status(404).json({ success: false, message: 'Session not found' });
 
-    // Also update linked lesson if any — atomic positional update (see note
-    // in /end-and-save above) so this can't race with that route's write to
-    // the same Course document.
-    if (session.linkedLessonId || session.lessonId) {
-      const lId = session.linkedLessonId || session.lessonId;
-      try {
-        const Course = require('../models/Course');
-        await Course.updateOne(
-          { _id: session.courseId },
-          {
-            $set: {
-              'modules.$[].lessons.$[lesson].videoUrl': recordingUrl,
-              'modules.$[].lessons.$[lesson].recordingAvailable': true,
-            },
-          },
-          { arrayFilters: [{ 'lesson._id': toId(lId) }] }
-        );
-      } catch (_) {}
-    }
+    // Recordings are archived to Google Drive and remain playable from the
+    // Live Sessions list via recordingUrl — intentionally no longer
+    // auto-attached as a Course Content lesson's video.
 
     res.json({ success: true, recordingUrl });
   } catch (e) {
@@ -1375,20 +1328,10 @@ router.post('/jibri-recording-complete', jibriUpload.single('file'), async (req,
         .catch((e) => console.error(`Drive backup failed for session ${sessionId}:`, e.message));
     }
 
-    if (session.linkedLessonId || session.lessonId) {
-      const lId = session.linkedLessonId || session.lessonId;
-      try {
-        const Course = require('../models/Course');
-        await Course.updateOne(
-          { _id: session.courseId },
-          { $set: {
-            'modules.$[].lessons.$[lesson].videoUrl': finalUrl,
-            'modules.$[].lessons.$[lesson].recordingAvailable': true,
-          }},
-          { arrayFilters: [{ 'lesson._id': toId(lId) }] }
-        );
-      } catch (_) {}
-    }
+    // Recordings are archived to Google Drive (above) and remain playable
+    // from the Live Sessions list via recordingUrl — per the client's
+    // request, they're intentionally no longer auto-attached as a Course
+    // Content lesson's video.
 
     console.log(`Jibri recording saved for session ${sessionId}: ${finalUrl}`);
     res.json({ success: true, url: finalUrl });
