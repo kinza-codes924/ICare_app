@@ -39,6 +39,8 @@ const { computeEffectivePrice, buildInstallmentSchedule } = require('../utils/in
 const SAFEPAY_ENV = () => (process.env.SAFEPAY_ENV === 'production' ? 'production' : 'sandbox');
 const SAFEPAY_HOST = () =>
   SAFEPAY_ENV() === 'production' ? 'https://api.getsafepay.com' : 'https://sandbox.api.getsafepay.com';
+const SAFEPAY_CHECKOUT_HOST = () =>
+  SAFEPAY_ENV() === 'production' ? 'https://getsafepay.com' : 'https://sandbox.api.getsafepay.com';
 
 // Appointment.appointment_date/time are stored as raw 'YYYY-MM-DD'/'HH:MM'
 // strings — format them for admin-facing display (order-details drill-down).
@@ -512,7 +514,7 @@ router.post('/create', authMiddleware, async (req, res) => {
       redirect_url: withPid(redirectUrl),
       cancel_url: withPid(cancelUrl),
     });
-    const checkoutUrl = `${SAFEPAY_HOST()}/embedded/?${params.toString()}`;
+    const checkoutUrl = `${SAFEPAY_CHECKOUT_HOST()}/embedded/?${params.toString()}`;
     await plog({ paymentId: payment._id, tracker, userId, step: 'CHECKOUT_URL_GENERATED' });
 
     res.json({ success: true, free: false, paymentId: payment._id, tracker, amount, currency: 'PKR', checkoutUrl });

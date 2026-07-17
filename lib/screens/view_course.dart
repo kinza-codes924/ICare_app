@@ -111,8 +111,11 @@ class _ViewCourseState extends ConsumerState<ViewCourse> {
   Future<void> _enrollInCourse(String courseId) async {
     if (_isPurchasing) return;
     final course = widget.courseData ?? {};
-    final price = course['discountedPrice'] ?? course['price'] ?? course['cost'] ?? 0;
-    final amount = (price is num) ? price.toDouble() : double.tryParse(price.toString()) ?? 0.0;
+    final rawPrice = course['price'] ?? course['cost'] ?? 0;
+    final rawDiscounted = course['discountedPrice'];
+    final basePrice = (rawPrice is num) ? rawPrice.toDouble() : double.tryParse(rawPrice.toString()) ?? 0.0;
+    final discountedPrice = (rawDiscounted is num && rawDiscounted > 0) ? rawDiscounted.toDouble() : null;
+    final amount = discountedPrice ?? basePrice;
 
     // Free courses (real $0 price, or instructor's "Free" display toggle) → enroll directly without payment
     if (amount <= 0 || course['isFree'] == true) {

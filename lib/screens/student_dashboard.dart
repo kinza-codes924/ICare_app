@@ -311,9 +311,10 @@ class _StudentDashboardState extends ConsumerState<StudentDashboard> {
                       ),
                       const SizedBox(height: 14),
                       ..._recentCourses.map((enrollment) {
-                        final course =
-                            (enrollment['course'] ?? {})
-                                as Map<String, dynamic>;
+                        final rawCourse = enrollment['course'];
+                        final course = (rawCourse is Map)
+                            ? Map<String, dynamic>.from(rawCourse)
+                            : <String, dynamic>{};
                         final progressData = enrollment['progress'];
                         int progress = 0;
                         if (progressData is int) {
