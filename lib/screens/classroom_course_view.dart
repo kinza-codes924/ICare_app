@@ -1533,10 +1533,10 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
     final status = session['status']?.toString() ?? 'scheduled';
     final scheduledAt = session['scheduledAt']?.toString() ?? '';
     final recordingUrl = session['recordingUrl']?.toString() ?? '';
+    final meetingLink = session['meetingLink']?.toString() ?? '';
     final isEnded = status == 'ended' || status == 'completed';
     final id = session['_id']?.toString() ?? '';
-    // Recordings now archive to Google Drive only — no in-app "Watch"
-    // action here anymore; ended sessions just open the transcript sheet.
+    final hasMeetLink = meetingLink.isNotEmpty && meetingLink.startsWith('http');
 
     return GestureDetector(
       onTap: isEnded ? () => _showCompletedSessionOptions(id, title, recordingUrl) : null,
@@ -1548,35 +1548,61 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
           borderRadius: BorderRadius.circular(10),
           border: Border.all(color: isEnded ? const Color(0xFF94A3B8).withValues(alpha: 0.3) : const Color(0xFFFB923C).withValues(alpha: 0.4)),
         ),
-        child: Row(children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: (isEnded ? const Color(0xFF64748B) : Colors.red).withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(6),
-            ),
-            child: Icon(isEnded ? Icons.check_circle_outline_rounded : Icons.live_tv_rounded,
-              size: 20, color: isEnded ? const Color(0xFF64748B) : Colors.red),
-          ),
-          const SizedBox(width: 12),
-          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF0F172A))),
-            if (scheduledAt.isNotEmpty)
-              Text(_fmtSessionDate(scheduledAt),
-                style: TextStyle(fontSize: 12, color: isEnded ? const Color(0xFF64748B) : const Color(0xFFF59E0B))),
-          ])),
-          if (isEnded)
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              decoration: BoxDecoration(color: Colors.grey[200], borderRadius: BorderRadius.circular(8)),
-              child: const Text('Ended', style: TextStyle(color: Colors.black45, fontSize: 12, fontWeight: FontWeight.w600)),
-            )
-          else
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              decoration: BoxDecoration(color: Colors.blue[50], borderRadius: BorderRadius.circular(8)),
-              child: const Text('Upcoming', style: TextStyle(color: Color(0xFF1A73E8), fontSize: 12, fontWeight: FontWeight.w600)),
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: (isEnded ? const Color(0xFF64748B) : Colors.red).withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Icon(isEnded ? Icons.check_circle_outline_rounded : Icons.live_tv_rounded,
+                size: 20, color: isEnded ? const Color(0xFF64748B) : Colors.red),
             ),
+            const SizedBox(width: 12),
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF0F172A))),
+              if (scheduledAt.isNotEmpty)
+                Text(_fmtSessionDate(scheduledAt),
+                  style: TextStyle(fontSize: 12, color: isEnded ? const Color(0xFF64748B) : const Color(0xFFF59E0B))),
+            ])),
+            if (isEnded)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(color: Colors.grey[200], borderRadius: BorderRadius.circular(8)),
+                child: const Text('Ended', style: TextStyle(color: Colors.black45, fontSize: 12, fontWeight: FontWeight.w600)),
+              )
+            else
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(color: Colors.blue[50], borderRadius: BorderRadius.circular(8)),
+                child: const Text('Upcoming', style: TextStyle(color: Color(0xFF1A73E8), fontSize: 12, fontWeight: FontWeight.w600)),
+              ),
+          ]),
+          if (hasMeetLink) ...[
+            const SizedBox(height: 10),
+            GestureDetector(
+              onTap: () async {
+                final uri = Uri.tryParse(meetingLink);
+                if (uri != null) await launchUrl(uri, mode: LaunchMode.externalApplication);
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1A73E8).withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: const Color(0xFF1A73E8).withValues(alpha: 0.3)),
+                ),
+                child: const Row(children: [
+                  Icon(Icons.video_call_rounded, color: Color(0xFF1A73E8), size: 18),
+                  SizedBox(width: 8),
+                  Text('Join via Google Meet', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF1A73E8))),
+                  Spacer(),
+                  Icon(Icons.open_in_new_rounded, color: Color(0xFF1A73E8), size: 16),
+                ]),
+              ),
+            ),
+          ],
         ]),
       ),
     );
@@ -2410,12 +2436,26 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
   void _showClassworkMenu(String type, Map data) {
     final id = data['_id']?.toString() ?? '';
     final title = data['title']?.toString() ?? type;
+    final meetingLink = data['meetingLink']?.toString() ?? '';
+    final hasMeetLink = meetingLink.isNotEmpty && meetingLink.startsWith('http');
     showModalBottomSheet(
       context: context,
       builder: (_) => SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            // Session — Google Meet link (both instructor and student, if set)
+            if (type == 'session' && hasMeetLink)
+              ListTile(
+                leading: const Icon(Icons.video_call_rounded, color: Color(0xFF1A73E8)),
+                title: const Text('Join via Google Meet', style: TextStyle(fontWeight: FontWeight.w700, color: Color(0xFF1A73E8))),
+                subtitle: Text(meetingLink, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12)),
+                onTap: () async {
+                  Navigator.pop(context);
+                  final uri = Uri.tryParse(meetingLink);
+                  if (uri != null) await launchUrl(uri, mode: LaunchMode.externalApplication);
+                },
+              ),
             // Session — Start button (instructor)
             if (type == 'session')
               ListTile(

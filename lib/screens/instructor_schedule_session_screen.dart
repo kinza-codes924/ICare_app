@@ -351,6 +351,68 @@ class _InstructorScheduleSessionScreenState extends State<InstructorScheduleSess
 
               const SizedBox(height: 24),
 
+              // Google Meet Link Card
+              _buildCard(
+                title: 'Google Meet Link (Optional)',
+                icon: Icons.video_call_rounded,
+                children: [
+                  TextFormField(
+                    controller: _meetingLinkController,
+                    decoration: InputDecoration(
+                      labelText: 'Google Meet Link',
+                      hintText: 'https://meet.google.com/xxx-xxxx-xxx',
+                      border: const OutlineInputBorder(),
+                      prefixIcon: Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: Image.network(
+                          'https://www.gstatic.com/meet/google_meet_horizontal_wordmark_2020q4_400x400.png',
+                          height: 20,
+                          errorBuilder: (_, __, ___) => const Icon(Icons.video_call, color: Color(0xFF1A73E8)),
+                        ),
+                      ),
+                      suffixIcon: _meetingLinkController.text.isNotEmpty
+                          ? IconButton(
+                              icon: const Icon(Icons.clear),
+                              onPressed: () => setState(() => _meetingLinkController.clear()),
+                            )
+                          : null,
+                    ),
+                    keyboardType: TextInputType.url,
+                    onChanged: (_) => setState(() {}),
+                    validator: (value) {
+                      if (value == null || value.isEmpty) return null;
+                      if (!value.startsWith('https://meet.google.com/') &&
+                          !value.startsWith('http://meet.google.com/')) {
+                        return 'Please enter a valid Google Meet link';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF0F7FF),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Row(
+                      children: [
+                        Icon(Icons.info_outline, color: Color(0xFF1A73E8), size: 18),
+                        SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            'Students and you can click this link to join the Google Meet directly from the course classwork tab.',
+                            style: TextStyle(fontSize: 12, color: Color(0xFF1A73E8)),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 24),
+
               // Session Platform Info
               Container(
                 padding: const EdgeInsets.all(16),
