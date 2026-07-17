@@ -563,11 +563,10 @@
       try { window.dispatchEvent(new CustomEvent('lmsJitsiEnded', { detail: { reason: reason } })); } catch(_) {}
     }
 
-    window.lmsJitsiJoin = function(roomName, displayName, isInstructor, jwt, subject) {
-      // Same file-share wiring the consultation flow already has — this was
-      // simply never set for LMS, so shared files had no channel/token to
-      // persist to and disappeared right after the local "shared" flash.
-      _lmsAuthToken = _lsToken() || null;
+    window.lmsJitsiJoin = function(roomName, displayName, isInstructor, jwt, subject, authToken) {
+      // authToken passed directly from Dart (most reliable); fall back to
+      // localStorage only if Dart didn't supply it.
+      _lmsAuthToken = (authToken && authToken.length > 10) ? authToken : (_lsToken() || null);
       _lmsChatChannel = roomName;
       _lmsSenderName = displayName || (isInstructor ? 'Instructor' : 'Student');
 

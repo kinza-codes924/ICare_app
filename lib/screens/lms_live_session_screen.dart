@@ -331,10 +331,11 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
       );
 
       // Join Jitsi after the platform view is in the DOM
+      final authToken = await SharedPref().getToken() ?? '';
       WidgetsBinding.instance.addPostFrameCallback((_) async {
         Future.delayed(const Duration(milliseconds: 400), () {
           try {
-            lmsJoinChannel(roomName, _currentUserName, widget.isInstructor, jwt: jwt ?? '', subject: widget.sessionTitle);
+            lmsJoinChannel(roomName, _currentUserName, widget.isInstructor, jwt: jwt ?? '', subject: widget.sessionTitle, authToken: authToken);
             debugPrint('LMS Jitsi join: room=$roomName');
           } catch (e) {
             debugPrint('LMS Jitsi join error: $e');

@@ -9,7 +9,7 @@ void lmsSetCallbacks({void Function(int, bool)? onRemote, void Function()? onJoi
   _onJoined = onJoined;
 }
 
-Future<void> lmsJoinChannel(String roomName, String displayName, bool isInstructor, {String jwt = '', String subject = ''}) async {
+Future<void> lmsJoinChannel(String roomName, String displayName, bool isInstructor, {String jwt = '', String subject = '', String authToken = ''}) async {
   try {
     final url = Uri.parse('https://167-99-65-120.nip.io/$roomName');
     await launchUrl(url, mode: LaunchMode.externalApplication);
