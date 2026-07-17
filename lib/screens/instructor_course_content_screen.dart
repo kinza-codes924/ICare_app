@@ -432,7 +432,11 @@ class InstructorCourseContentScreenState extends State<InstructorCourseContentSc
     final meetingLink = lesson['meetingLink']?.toString() ?? '';
     final meetingId = lesson['meetingId']?.toString() ?? '';
     final meetingPassword = lesson['meetingPassword']?.toString() ?? '';
-    final platform = lesson['platform']?.toString() ?? 'zoom';
+    // Auto-detect platform from the link — don't show "ZOOM" when a Google Meet link is set
+    String platform = lesson['platform']?.toString() ?? 'zoom';
+    if (meetingLink.contains('meet.google.com')) platform = 'Google Meet';
+    else if (meetingLink.contains('zoom.us')) platform = 'Zoom';
+    else if (meetingLink.contains('teams.microsoft.com')) platform = 'Microsoft Teams';
 
     if (meetingLink.isEmpty) {
       // No external link → launch iCare native live session
@@ -463,7 +467,7 @@ class InstructorCourseContentScreenState extends State<InstructorCourseContentSc
         content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
           const Text('Share these details with students:', style: TextStyle(fontSize: 13, color: Color(0xFF64748B))),
           const SizedBox(height: 12),
-          _infoTile('Platform', platform.toUpperCase()),
+          _infoTile('Platform', platform),
           if (meetingId.isNotEmpty) _infoTile('Meeting ID', meetingId),
           if (meetingPassword.isNotEmpty) _infoTile('Password', meetingPassword),
           _infoTile('Link', meetingLink, overflow: true),

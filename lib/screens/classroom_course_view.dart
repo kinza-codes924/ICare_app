@@ -2360,7 +2360,10 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
     final meetingLink = data['meetingLink']?.toString() ?? '';
     final meetingId = data['meetingId']?.toString() ?? '';
     final meetingPassword = data['meetingPassword']?.toString() ?? '';
-    final platform = data['platform']?.toString() ?? 'zoom';
+    String platform = data['platform']?.toString() ?? 'zoom';
+    if (meetingLink.contains('meet.google.com')) platform = 'meet';
+    else if (meetingLink.contains('zoom.us')) platform = 'zoom';
+    else if (meetingLink.contains('teams.microsoft.com')) platform = 'teams';
     final title = data['title']?.toString() ?? 'Live Session';
 
     if (meetingLink.isEmpty) {
