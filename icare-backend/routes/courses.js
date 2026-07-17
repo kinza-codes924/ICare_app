@@ -578,6 +578,7 @@ async function syncLiveSessions(courseId, instructorId, modules) {
           linkedLessonId: lessonId,
           linkedModuleId: modId,
           status: 'scheduled',
+          ...(lesson.meetingLink ? { meetingLink: lesson.meetingLink } : {}),
         },
         $setOnInsert: { duration: 60, maxParticipants: 100, isRecorded: true },
       };

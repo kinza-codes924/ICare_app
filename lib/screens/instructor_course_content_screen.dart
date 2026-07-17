@@ -1779,6 +1779,7 @@ class _LessonDialogState extends State<_LessonDialog> {
   final _driveLinkController = TextEditingController();
   final _durationController = TextEditingController();
   final _unlockDaysController = TextEditingController();
+  final _meetingLinkController = TextEditingController();
   bool _uploadingVideo = false;
   double _uploadVideoProgress = 0;
   String? _uploadedVideoUrl;
@@ -1817,6 +1818,7 @@ class _LessonDialogState extends State<_LessonDialog> {
       _documentUrl = widget.lesson!['documentUrl']?.toString();
       _documentName = widget.lesson!['documentName']?.toString();
       _unlockDaysController.text = (widget.lesson!['unlockAfterDays'] ?? 0).toString();
+      _meetingLinkController.text = widget.lesson!['meetingLink']?.toString() ?? '';
     } else {
       _lessonType = widget.defaultType;
       _durationController.text = '15';
@@ -1832,6 +1834,7 @@ class _LessonDialogState extends State<_LessonDialog> {
     _driveLinkController.dispose();
     _durationController.dispose();
     _unlockDaysController.dispose();
+    _meetingLinkController.dispose();
     super.dispose();
   }
 
@@ -2084,6 +2087,27 @@ class _LessonDialogState extends State<_LessonDialog> {
                     SizedBox(width: 8),
                     Expanded(child: Text('Live session will be auto-recorded. Video + chat will be saved to this lesson automatically.', style: TextStyle(fontSize: 11, color: Color(0xFF92400E)))),
                   ]),
+                ),
+                const SizedBox(height: 14),
+                // Google Meet link field
+                TextField(
+                  controller: _meetingLinkController,
+                  decoration: const InputDecoration(
+                    labelText: 'Google Meet Link (Optional)',
+                    hintText: 'https://meet.google.com/xxx-xxxx-xxx',
+                    border: OutlineInputBorder(),
+                    isDense: true,
+                    prefixIcon: Icon(Icons.video_call_rounded, color: Color(0xFF1A73E8)),
+                  ),
+                  keyboardType: TextInputType.url,
+                ),
+                const SizedBox(height: 6),
+                const Padding(
+                  padding: EdgeInsets.only(left: 4),
+                  child: Text(
+                    'Students can click this link to join the Google Meet from the classwork tab.',
+                    style: TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                  ),
                 ),
                 const SizedBox(height: 14),
               ],
@@ -2405,6 +2429,8 @@ class _LessonDialogState extends State<_LessonDialog> {
               'type': _lessonType,
               if (scheduledAt != null) 'scheduledAt': scheduledAt,
               'autoRecord': _lessonType == 'live',
+              if (_lessonType == 'live' && _meetingLinkController.text.trim().isNotEmpty)
+                'meetingLink': _meetingLinkController.text.trim(),
             });
             Navigator.pop(context);
           },
