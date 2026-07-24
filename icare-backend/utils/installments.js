@@ -38,37 +38,31 @@ function isEarlyBirdActive(course) {
   );
 }
 
-// Generates the N-row installment schedule. Installment 1 is pre-marked
-// 'paid' (it IS the purchase); installments 2..count start 'pending', each
-// due exactly 1 calendar month after the previous one. The last installment
-// absorbs any rounding remainder so the sum always equals totalAmount exactly.
-function buildInstallmentSchedule({ totalAmount, count, firstDueDate, firstPaymentId }) {
-  const n = Math.max(2, Math.floor(count));
-  const perInstallment = Math.floor(totalAmount / n);
-  const schedule = [];
-  let dueDate = new Date(firstDueDate);
-  let allocated = 0;
+// Generates the installment schedule for an enrollment from the course's
+// instructor-defined plan. Each plan row is {amount, daysAfterEnrollment};
+// row 1 (daysAfterEnrollment 0) IS the purchase and is pre-marked 'paid',
+// rows 2..N start 'pending' and are due enrollmentDate + daysAfterEnrollment.
+function buildInstallmentSchedule({ plan, enrollmentDate, firstPaymentId }) {
+  const rows = Array.isArray(plan) ? plan : [];
+  const start = new Date(enrollmentDate);
 
-  for (let index = 1; index <= n; index++) {
-    const isLast = index === n;
-    const amount = isLast ? totalAmount - allocated : perInstallment;
-    allocated += amount;
+  return rows.map((row, i) => {
+    const index = i + 1;
+    const days = Math.max(0, Math.floor(row.daysAfterEnrollment || 0));
+    const dueDate = new Date(start);
+    dueDate.setDate(dueDate.getDate() + days);
 
-    schedule.push({
+    return {
       index,
-      amount,
-      dueDate: new Date(dueDate),
+      amount: Number(row.amount) || 0,
+      dueDate,
       status: index === 1 ? 'paid' : 'pending',
       paidAt: index === 1 ? new Date() : null,
       paymentId: index === 1 ? firstPaymentId || null : null,
       dueReminderSentAt: null,
       overdueLockNotifiedAt: null,
-    });
-
-    dueDate = addOneCalendarMonth(dueDate);
-  }
-
-  return schedule;
+    };
+  });
 }
 
 module.exports = {

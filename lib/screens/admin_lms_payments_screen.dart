@@ -253,8 +253,60 @@ class _AdminLmsPaymentsScreenState extends State<AdminLmsPaymentsScreen> {
               style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Color(0xFF0F172A))),
           const SizedBox(height: 2),
           Text(dateLabel, style: const TextStyle(fontSize: 10, color: Color(0xFF94A3B8))),
+          // Installment lock/unlock — only for installment-plan enrollments.
+          if (e['installmentPlanEnabled'] == true) ...[
+            const SizedBox(height: 6),
+            _lockButton(e),
+          ],
         ]),
       ]),
     );
+  }
+
+  Widget _lockButton(dynamic e) {
+    final locked = e['installmentLocked'] == true;
+    final id = e['_id']?.toString() ?? '';
+    return SizedBox(
+      height: 28,
+      child: OutlinedButton.icon(
+        onPressed: id.isEmpty ? null : () => _toggleLock(id, !locked),
+        icon: Icon(locked ? Icons.lock_open_rounded : Icons.lock_rounded,
+            size: 14, color: locked ? const Color(0xFF10B981) : const Color(0xFFEF4444)),
+        label: Text(locked ? 'Unlock' : 'Lock',
+            style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                color: locked ? const Color(0xFF10B981) : const Color(0xFFEF4444))),
+        style: OutlinedButton.styleFrom(
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+          side: BorderSide(
+              color: locked ? const Color(0xFF10B981) : const Color(0xFFEF4444)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _toggleLock(String enrollmentId, bool lock) async {
+    try {
+      await _api.post(
+          '/courses/admin/enrollment/$enrollmentId/${lock ? "lock" : "unlock"}', {});
+      // Reflect the change locally without a full refetch.
+      setState(() {
+        final idx = _enrollments.indexWhere((e) => e['_id']?.toString() == enrollmentId);
+        if (idx != -1) _enrollments[idx]['installmentLocked'] = lock;
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(lock ? 'Course locked' : 'Course unlocked'),
+          backgroundColor: lock ? const Color(0xFFEF4444) : const Color(0xFF10B981),
+        ));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Failed: $e'), backgroundColor: Colors.red));
+      }
+    }
   }
 }

@@ -9,7 +9,7 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black">
   <meta name="apple-mobile-web-app-title" content="iCare">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval' https: http: data: blob:; img-src 'self' data: https: http: blob:; frame-src 'self' https://167-99-65-120.nip.io https://icare-backend-inky.vercel.app https://docs.google.com; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://167-99-65-120.nip.io https://cdn.jsdelivr.net https://www.gstatic.com https://accounts.google.com; connect-src 'self' https: http: wss: data:; worker-src 'self' blob: https://www.gstatic.com;">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval' https: http: data: blob:; img-src 'self' data: https: http: blob:; frame-src 'self' https://vh.itserver.biz https://icare-backend-inky.vercel.app https://docs.google.com; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://vh.itserver.biz https://cdn.jsdelivr.net https://www.gstatic.com https://accounts.google.com; connect-src 'self' https: http: wss: data:; worker-src 'self' blob: https://www.gstatic.com;">
   <link rel="apple-touch-icon" href="icons/Icon-192.png">
   <link rel="icon" type="image/png" href="favicon.png"/>
   <title>iCare</title>
@@ -60,7 +60,7 @@
     };
 
     // ── Jitsi Meet helpers — Doctor/Patient Consultation (self-hosted Jitsi) ──
-    var _JITSI_DOMAIN = '167-99-65-120.nip.io';
+    var _JITSI_DOMAIN = 'vh.itserver.biz';
     var _jitsiRemoteJoined = false;
     var _jitsiRemoteLeft = false;
     var _jitsiClosed = false;
@@ -69,7 +69,7 @@
     // Full button set — used by LMS live sessions
     var _JITSI_TOOLBAR_BUTTONS = [
       'microphone', 'camera', 'desktop', 'embedmeeting',
-      'fullscreen', 'fodeviceselection', 'hangup', 'profile', 'chat',
+      'fullscreen', 'fodeviceselection', 'hangup', 'profile', 'chat', 'polls',
       'recording', 'etherpad', 'shareaudio',
       'settings', 'raisehand', 'videoquality', 'filmstrip',
       'stats', 'shortcuts', 'tileview', 'videobackgroundblur',
@@ -80,9 +80,12 @@
     // Stripped-down button set for doctor/patient consultations
     // (no screen share, tile view, raise hand, recording, whiteboard, stats,
     //  shortcuts, shared video/audio, select-background, toggle-camera)
+    // 'polls' IS included here even though the consultation flow doesn't use
+    // polls — icare-custom.js repurposes the Polls tab itself into "File
+    // Upload" for consultations, so the tab must exist for that hijack to work.
     var _CONSULTATION_TOOLBAR_BUTTONS = [
       'microphone', 'camera', 'fullscreen', 'fodeviceselection',
-      'hangup', 'chat', 'settings', 'videoquality', 'filmstrip',
+      'hangup', 'chat', 'polls', 'settings', 'videoquality', 'filmstrip',
       'noise-suppression', 'help'
     ];
 
@@ -365,7 +368,7 @@
     // _lmsJitsiApi) is ever active in a tab at a time, so falling back between
     // the two sets of globals is safe and covers both flows with one listener.
     window.addEventListener('message', function(e) {
-      if (e.origin !== 'https://167-99-65-120.nip.io') return;
+      if (e.origin !== 'https://vh.itserver.biz') return;
       var msg = e.data;
       if (!msg || msg.type !== 'icare-file-upload') return;
       var channel = _consultChatChannel || _lmsChatChannel;

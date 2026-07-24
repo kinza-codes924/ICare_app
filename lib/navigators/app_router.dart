@@ -10,6 +10,10 @@ import 'package:icare/screens/signup.dart';
 import 'package:icare/screens/splash.dart';
 import 'package:icare/screens/tabs.dart';
 import 'package:icare/screens/doctor_appointments.dart';
+import 'package:icare/screens/doctor_dashboard.dart';
+import 'package:icare/screens/student_profile_setup.dart';
+import 'package:icare/screens/admin_dashboard.dart';
+import 'package:icare/screens/profile.dart';
 import 'package:icare/screens/work_with_us_signup.dart';
 import 'package:icare/screens/lms_public_catalog.dart';
 import 'package:icare/screens/admin_verification_panel.dart';
@@ -208,6 +212,26 @@ final routerProvider = Provider<GoRouter>((ref) {
             !path.startsWith('/lms/course')) {
           return '/dashboard';
         }
+
+        // Role guard — a logged-in user who types (or is deep-linked to)
+        // another role's module gets bounced to their own home via /dashboard.
+        // Only the role-prefixed module areas are gated; shared routes
+        // (/settings, /help, /community, /chat, etc.) are open to everyone.
+        final role = auth.userRole;
+        const rolePrefixes = {
+          'Doctor': '/doctor/',
+          'Patient': '/patient/',
+          'Student': '/student/',
+          'Instructor': '/instructor/',
+          'Laboratory': '/lab/',
+          'Pharmacy': '/pharmacy/',
+          'Admin': '/admin/',
+        };
+        for (final entry in rolePrefixes.entries) {
+          if (path.startsWith(entry.value) && role != entry.key) {
+            return '/dashboard';
+          }
+        }
       }
 
       return null;
@@ -273,18 +297,26 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/privacypolicy', builder: (_, _) => const PrivacyPolicy()),
       GoRoute(path: '/terms', builder: (_, _) => const TermsAndConditions()),
       GoRoute(path: '/refund-policy', builder: (_, _) => const RefundPolicy()),
+      // Legacy /dashboard — bookmarks & old links land here. Redirect to the
+      // role's real home so it never shows a URL-less shared screen again.
       GoRoute(
         path: '/dashboard',
-        builder: (_, state) {
+        redirect: (context, state) {
+          final role = ref.read(authProvider).userRole;
           final adminTab = state.uri.queryParameters['adminTab'];
-          return TabsScreen(initialAdminTab: adminTab);
+          return switch (role) {
+            'Doctor' => '/doctor/dashboard',
+            'Patient' => '/patient/home',
+            'Student' => '/student/dashboard',
+            'Instructor' => '/instructor/dashboard',
+            'Laboratory' => '/lab/dashboard',
+            'Pharmacy' => '/pharmacy/dashboard',
+            'Admin' => adminTab != null ? '/admin/dashboard?adminTab=$adminTab' : '/admin/dashboard',
+            _ => '/patient/home',
+          };
         },
       ),
       GoRoute(path: '/verify-otp', builder: (_, _) => const OtpVerificationScreen()),
-      GoRoute(path: '/doctor/appointments', builder: (_, state) {
-        final filter = state.uri.queryParameters['filter'] ?? 'all';
-        return DoctorAppointmentsScreen(initialFilter: filter);
-      }),
       GoRoute(
         path: '/lms/catalog',
         builder: (_, state) {
@@ -318,12 +350,9 @@ final routerProvider = Provider<GoRouter>((ref) {
       // Shared / cross-role routes
       GoRoute(path: '/tasks', builder: (_, _) => const TaskScreen()),
       GoRoute(path: '/bookings', builder: (_, _) => const BookingsScreen()),
-      GoRoute(path: '/reminders', builder: (_, _) => const ReminderList()),
-      GoRoute(path: '/help', builder: (_, _) => const HelpAndSupport()),
       GoRoute(path: '/about-us', builder: (_, _) => const AboutUs()),
       GoRoute(path: '/wallet', builder: (_, _) => const WalletScreen()),
       GoRoute(path: '/courses', builder: (_, _) => const Courses()),
-      GoRoute(path: '/settings', builder: (_, _) => const SettingsScreen()),
       GoRoute(path: '/payment-invoices', builder: (_, _) => const PaymentInvoices()),
       GoRoute(path: '/change-password', builder: (_, _) => const ChangePassword()),
       GoRoute(path: '/notification-settings', builder: (_, _) => const NotificationSettings()),
@@ -335,88 +364,122 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/rewards/game', builder: (_, _) => const StarClickGame()),
       GoRoute(path: '/walkthrough', builder: (_, _) => const Walkthrough()),
 
-      // Laboratory routes
-      GoRoute(path: '/lab/dashboard', builder: (_, _) => const LaboratoryDashboard()),
-      GoRoute(
-        path: '/lab/bookings',
-        builder: (_, state) {
-          final title = state.uri.queryParameters['title'];
-          final filter = state.uri.queryParameters['filter'];
-          return LabBookingsManagement(title: title, initialFilter: filter);
+      // ── Logged-in shell: sidebar/bottom-nav stays put, only the inner
+      // screen changes with the URL (see TabsScreen). ──────────────────
+      ShellRoute(
+        builder: (context, state, child) {
+          final adminTab = state.uri.queryParameters['adminTab'];
+          return TabsScreen(initialAdminTab: adminTab, child: child);
         },
+        routes: [
+          // Shared sidebar targets (must stay inside the shell)
+          GoRoute(path: '/settings', builder: (_, _) => const SettingsScreen()),
+          GoRoute(path: '/help', builder: (_, _) => const HelpAndSupport()),
+          GoRoute(path: '/reminders', builder: (_, _) => const ReminderList()),
+          GoRoute(path: '/community', builder: (_, _) => const HealthCommunityScreen()),
+          GoRoute(path: '/rewards', builder: (_, _) => const GamificationScreen()),
+          GoRoute(path: '/doctor/appointments', builder: (_, state) {
+            final filter = state.uri.queryParameters['filter'] ?? 'all';
+            return DoctorAppointmentsScreen(initialFilter: filter);
+          }),
+          // Missing role-home / sidebar targets (added for URL routing)
+          GoRoute(path: '/doctor/dashboard', builder: (_, _) => const DoctorDashboard()),
+          GoRoute(path: '/patient/lab-reports', builder: (_, _) => LabReportsScreen()),
+          GoRoute(path: '/lab/invoices', builder: (_, _) => const PaymentInvoices()),
+          GoRoute(path: '/pharmacy/invoices', builder: (_, _) => const PaymentInvoices(isPharmacy: true)),
+          GoRoute(path: '/student/courses', builder: (_, _) => Courses()),
+          GoRoute(path: '/student/browse', builder: (_, _) => const Courses(browse: true)),
+          GoRoute(path: '/student/profile', builder: (_, _) => const StudentProfileSetup()),
+          // Laboratory routes
+          GoRoute(path: '/lab/dashboard', builder: (_, _) => const LaboratoryDashboard()),
+          GoRoute(
+            path: '/lab/bookings',
+            builder: (_, state) {
+              final title = state.uri.queryParameters['title'];
+              final filter = state.uri.queryParameters['filter'];
+              return LabBookingsManagement(title: title, initialFilter: filter);
+            },
+          ),
+          GoRoute(path: '/lab/reports', builder: (_, _) => const LabReportsScreen()),
+          GoRoute(path: '/lab/tests', builder: (_, _) => const LabTestsManagement()),
+          GoRoute(path: '/lab/analytics', builder: (_, _) => const LabAnalytics()),
+
+          // Patient routes
+          GoRoute(path: '/patient/bookings-history', builder: (_, _) => const BookingsHistoryScreen()),
+          GoRoute(path: '/patient/prescriptions', builder: (_, _) => const PatientPrescriptions()),
+          GoRoute(path: '/patient/pharmacies', builder: (_, _) => const PharmaciesScreen()),
+          GoRoute(path: '/patient/book-lab', builder: (_, _) => const PatientBookLabFlow()),
+          GoRoute(path: '/patient/my-learning', builder: (_, _) => const MyLearningScreen()),
+          GoRoute(path: '/patient/health-journey', builder: (_, _) => const HealthJourneyScreen()),
+          GoRoute(path: '/patient/health-tracker', builder: (_, _) => const LifestyleTrackerScreen()),
+          GoRoute(path: '/patient/emergency-contacts', builder: (_, _) => const EmergencyContactsScreen()),
+          GoRoute(path: '/patient/records', builder: (_, _) => const PatientRecordsListScreen()),
+          GoRoute(path: '/patient/profile', builder: (_, _) => const PatientProfile()),
+          GoRoute(path: '/patient/home', builder: (_, _) => const PatientHomeDashboard()),
+          GoRoute(path: '/patient/medical-records', builder: (_, _) => const PatientMedicalRecords()),
+          GoRoute(path: '/patient/lab-orders', builder: (_, _) => const PatientLabOrdersScreen()),
+          GoRoute(path: '/patient/addresses', builder: (_, _) => const PatientAddressesScreen()),
+          GoRoute(path: '/community/forum', builder: (_, _) => const CommunityForumScreen()),
+
+          // Doctor routes
+          GoRoute(path: '/doctor/schedule', builder: (_, _) => const DoctorScheduleCalendar()),
+          GoRoute(path: '/doctor/analytics', builder: (_, _) => const DoctorAnalytics()),
+          GoRoute(path: '/doctor/availability', builder: (_, _) => const DoctorAvailability()),
+          GoRoute(path: '/doctor/notifications', builder: (_, _) => const DoctorNotifications()),
+          GoRoute(path: '/doctor/revenue', builder: (_, _) => const DoctorRevenueAnalyticsScreen()),
+
+          // Pharmacy routes
+          GoRoute(path: '/pharmacy/dashboard', builder: (_, _) => const PharmacistDashboard()),
+          GoRoute(path: '/pharmacy/orders', builder: (_, _) => const PharmacyOrders()),
+          GoRoute(path: '/pharmacy/inventory', builder: (_, _) => const PharmacyInventory()),
+          GoRoute(path: '/pharmacy/analytics', builder: (_, _) => const PharmacyAnalytics()),
+          GoRoute(path: '/pharmacy/home', builder: (_, _) => const PharmacyHome()),
+          GoRoute(path: '/pharmacy/management', builder: (_, _) => const PharmacyManagementScreen()),
+          GoRoute(path: '/pharmacy/profile-setup', builder: (_, _) => const PharmacyProfileSetup()),
+          GoRoute(path: '/pharmacy/filter', builder: (_, _) => const PharmacyFilterScreen()),
+          GoRoute(path: '/pharmacy/product', builder: (_, _) => const ProductDetailsScreen()),
+          GoRoute(path: '/pharmacy/my-orders', builder: (_, _) => const MyOrdersScreen()),
+          GoRoute(path: '/pharmacy/active-orders', builder: (_, _) => const ActiveOrdersScreen()),
+
+          // Lab routes (additional)
+          GoRoute(path: '/lab/profile-setup', builder: (_, _) => const LabProfileSetup()),
+          GoRoute(path: '/lab/list', builder: (_, _) => const LaboratoriesScreen()),
+          GoRoute(path: '/lab/appointments', builder: (_, _) => const LabAppointments()),
+          GoRoute(path: '/lab/filters', builder: (_, _) => const LabFilters()),
+          GoRoute(path: '/lab/supplies', builder: (_, _) => const LabSuppliesManagement()),
+          GoRoute(path: '/lab/settings', builder: (_, _) => const LabSettingsScreen()),
+          GoRoute(path: '/lab/tests-directory', builder: (_, _) => const LabTestsDirectoryScreen()),
+
+          // Instructor (non-LMS-content) routes
+          GoRoute(path: '/instructor/dashboard', builder: (_, _) => InstructorDashboardScreen()),
+          GoRoute(path: '/instructor/manage-courses', builder: (_, _) => InstructorCoursesManagementScreen()),
+          GoRoute(path: '/instructor/learners', builder: (_, _) => InstructorLearnersScreen()),
+          GoRoute(path: '/instructor/precautions', builder: (_, _) => InstructorPrecautionsManagementScreen()),
+          GoRoute(path: '/instructor/analytics', builder: (_, _) => InstructorAnalytics()),
+          GoRoute(path: '/instructor/profile-setup', builder: (_, _) => InstructorProfileSetupScreen()),
+          GoRoute(path: '/instructor/lms-home', builder: (_, _) => const InstructorLmsScreen()),
+          GoRoute(path: '/instructor/assigned-learners', builder: (_, _) => const InstructorAssignedLearners()),
+          GoRoute(path: '/instructor/earnings', builder: (_, _) => const InstructorEarningsScreen()),
+          GoRoute(path: '/instructor/vouchers', builder: (_, _) => const InstructorVoucherScreen()),
+          GoRoute(path: '/instructor/qa-center', builder: (_, _) => const InstructorQACenterScreen()),
+          GoRoute(path: '/instructor/resources', builder: (_, _) => const ResourceLibraryScreen()),
+
+          // Student routes
+          GoRoute(path: '/student/dashboard', builder: (_, _) => const StudentDashboard()),
+          GoRoute(path: '/student/classroom', builder: (_, _) => const StudentLmsDashboard()),
+          GoRoute(path: '/student/certificates', builder: (_, _) => const CertificatesScreen()),
+          GoRoute(path: '/student/assessments', builder: (_, _) => const AssessmentsScreen()),
+
+          // Admin
+          GoRoute(
+            path: '/admin/dashboard',
+            builder: (_, state) => AdminDashboard(
+              initialTab: state.uri.queryParameters['adminTab'] ?? 'Pending',
+            ),
+          ),
+          GoRoute(path: '/admin/profile', builder: (_, _) => ProfileScreen()),
+        ],
       ),
-      GoRoute(path: '/lab/reports', builder: (_, _) => const LabReportsScreen()),
-      GoRoute(path: '/lab/tests', builder: (_, _) => const LabTestsManagement()),
-      GoRoute(path: '/lab/analytics', builder: (_, _) => const LabAnalytics()),
-
-      // Patient routes
-      GoRoute(path: '/patient/bookings-history', builder: (_, _) => const BookingsHistoryScreen()),
-      GoRoute(path: '/patient/prescriptions', builder: (_, _) => const PatientPrescriptions()),
-      GoRoute(path: '/patient/pharmacies', builder: (_, _) => const PharmaciesScreen()),
-      GoRoute(path: '/patient/book-lab', builder: (_, _) => const PatientBookLabFlow()),
-      GoRoute(path: '/patient/my-learning', builder: (_, _) => const MyLearningScreen()),
-      GoRoute(path: '/patient/health-journey', builder: (_, _) => const HealthJourneyScreen()),
-      GoRoute(path: '/patient/health-tracker', builder: (_, _) => const LifestyleTrackerScreen()),
-      GoRoute(path: '/patient/emergency-contacts', builder: (_, _) => const EmergencyContactsScreen()),
-      GoRoute(path: '/patient/records', builder: (_, _) => const PatientRecordsListScreen()),
-      GoRoute(path: '/patient/profile', builder: (_, _) => const PatientProfile()),
-      GoRoute(path: '/patient/home', builder: (_, _) => const PatientHomeDashboard()),
-      GoRoute(path: '/patient/medical-records', builder: (_, _) => const PatientMedicalRecords()),
-      GoRoute(path: '/patient/lab-orders', builder: (_, _) => const PatientLabOrdersScreen()),
-      GoRoute(path: '/patient/addresses', builder: (_, _) => const PatientAddressesScreen()),
-      GoRoute(path: '/community', builder: (_, _) => const HealthCommunityScreen()),
-      GoRoute(path: '/community/forum', builder: (_, _) => const CommunityForumScreen()),
-      GoRoute(path: '/rewards', builder: (_, _) => const GamificationScreen()),
-
-      // Doctor routes
-      GoRoute(path: '/doctor/schedule', builder: (_, _) => const DoctorScheduleCalendar()),
-      GoRoute(path: '/doctor/analytics', builder: (_, _) => const DoctorAnalytics()),
-      GoRoute(path: '/doctor/availability', builder: (_, _) => const DoctorAvailability()),
-      GoRoute(path: '/doctor/notifications', builder: (_, _) => const DoctorNotifications()),
-      GoRoute(path: '/doctor/revenue', builder: (_, _) => const DoctorRevenueAnalyticsScreen()),
-
-      // Pharmacy routes
-      GoRoute(path: '/pharmacy/dashboard', builder: (_, _) => const PharmacistDashboard()),
-      GoRoute(path: '/pharmacy/orders', builder: (_, _) => const PharmacyOrders()),
-      GoRoute(path: '/pharmacy/inventory', builder: (_, _) => const PharmacyInventory()),
-      GoRoute(path: '/pharmacy/analytics', builder: (_, _) => const PharmacyAnalytics()),
-      GoRoute(path: '/pharmacy/home', builder: (_, _) => const PharmacyHome()),
-      GoRoute(path: '/pharmacy/management', builder: (_, _) => const PharmacyManagementScreen()),
-      GoRoute(path: '/pharmacy/profile-setup', builder: (_, _) => const PharmacyProfileSetup()),
-      GoRoute(path: '/pharmacy/filter', builder: (_, _) => const PharmacyFilterScreen()),
-      GoRoute(path: '/pharmacy/product', builder: (_, _) => const ProductDetailsScreen()),
-      GoRoute(path: '/pharmacy/my-orders', builder: (_, _) => const MyOrdersScreen()),
-      GoRoute(path: '/pharmacy/active-orders', builder: (_, _) => const ActiveOrdersScreen()),
-
-      // Lab routes (additional)
-      GoRoute(path: '/lab/profile-setup', builder: (_, _) => const LabProfileSetup()),
-      GoRoute(path: '/lab/list', builder: (_, _) => const LaboratoriesScreen()),
-      GoRoute(path: '/lab/appointments', builder: (_, _) => const LabAppointments()),
-      GoRoute(path: '/lab/filters', builder: (_, _) => const LabFilters()),
-      GoRoute(path: '/lab/supplies', builder: (_, _) => const LabSuppliesManagement()),
-      GoRoute(path: '/lab/settings', builder: (_, _) => const LabSettingsScreen()),
-      GoRoute(path: '/lab/tests-directory', builder: (_, _) => const LabTestsDirectoryScreen()),
-
-      // Instructor (non-LMS-content) routes
-      GoRoute(path: '/instructor/dashboard', builder: (_, _) => InstructorDashboardScreen()),
-      GoRoute(path: '/instructor/manage-courses', builder: (_, _) => InstructorCoursesManagementScreen()),
-      GoRoute(path: '/instructor/learners', builder: (_, _) => InstructorLearnersScreen()),
-      GoRoute(path: '/instructor/precautions', builder: (_, _) => InstructorPrecautionsManagementScreen()),
-      GoRoute(path: '/instructor/analytics', builder: (_, _) => InstructorAnalytics()),
-      GoRoute(path: '/instructor/profile-setup', builder: (_, _) => InstructorProfileSetupScreen()),
-      GoRoute(path: '/instructor/lms-home', builder: (_, _) => const InstructorLmsScreen()),
-      GoRoute(path: '/instructor/assigned-learners', builder: (_, _) => const InstructorAssignedLearners()),
-      GoRoute(path: '/instructor/earnings', builder: (_, _) => const InstructorEarningsScreen()),
-      GoRoute(path: '/instructor/vouchers', builder: (_, _) => const InstructorVoucherScreen()),
-      GoRoute(path: '/instructor/qa-center', builder: (_, _) => const InstructorQACenterScreen()),
-      GoRoute(path: '/instructor/resources', builder: (_, _) => const ResourceLibraryScreen()),
-
-      // Student routes
-      GoRoute(path: '/student/dashboard', builder: (_, _) => const StudentDashboard()),
-      GoRoute(path: '/student/classroom', builder: (_, _) => const StudentLmsDashboard()),
-      GoRoute(path: '/student/certificates', builder: (_, _) => const CertificatesScreen()),
-      GoRoute(path: '/student/assessments', builder: (_, _) => const AssessmentsScreen()),
-
       // Instructor LMS Routes
       GoRoute(path: '/instructor/lms', builder: (_, _) => const InstructorLmsDashboard()),
       GoRoute(path: '/instructor/lms/feedback', builder: (_, _) => const InstructorFeedbackScreen()),

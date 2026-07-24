@@ -1,4 +1,5 @@
 import 'dart:developer';
+import 'package:go_router/go_router.dart';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
@@ -359,11 +360,7 @@ class _SelectPaymentMethodState extends State<SelectPaymentMethod> {
                 child: ElevatedButton(
                   onPressed: () {
                     Navigator.pop(ctx);
-                    Navigator.pushAndRemoveUntil(
-                      context,
-                      MaterialPageRoute(builder: (context) => const TabsScreen()),
-                      (route) => false,
-                    );
+                    context.go('/dashboard');
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primaryColor,

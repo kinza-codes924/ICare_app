@@ -719,6 +719,8 @@ router.get('/lms/enrollments', authMiddleware, adminOnly, async (req, res) => {
       course: courseMap[e.courseId?.toString()] || { title: 'Unknown Course' },
       progress: e.progress,
       completed: e.progress?.completed || false,
+      installmentPlanEnabled: e.installmentPlanEnabled || false,
+      installmentLocked: e.installmentLocked || false,
     }));
 
     res.json({ success: true, enrollments: result, total, page, pages: Math.ceil(total / limit) });

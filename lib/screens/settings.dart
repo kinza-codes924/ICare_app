@@ -3177,10 +3177,10 @@ class _ProfileEditCardState extends ConsumerState<_ProfileEditCard> {
               // ── VIEW MODE ────────────────────────────────────────────────
               if (!_editMode) ...[
                 _viewRow(Icons.person_outline_rounded,       'Full Name',    name),
-                _viewRow(Icons.phone_outlined,               'Phone',        phone,             verified: u?.isPhoneVerified),
+                _viewRow(Icons.phone_outlined,               'Phone',        phone),
                 _viewRow(Icons.cake_rounded,                 'Age',          age),
                 _viewRow(Icons.wc_rounded,                   'Gender',       gender),
-                _viewRow(Icons.email_outlined,               'Email',        u?.email ?? 'Not set', verified: u?.isEmailVerified),
+                _viewRow(Icons.email_outlined,               'Email',        u?.email ?? 'Not set'),
                 _viewRow(Icons.location_on_outlined,         'Address',      address),
               ],
 

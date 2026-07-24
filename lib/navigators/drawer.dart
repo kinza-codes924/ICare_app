@@ -195,10 +195,10 @@ class _CustomDrawerState extends ConsumerState<CustomDrawer> {
         context.push('/bookings');
       }),
       _drawerItem('Reminders', Icons.alarm_outlined, () {
-        context.push('/reminders');
+        context.go('/reminders');
       }),
       _drawerItem('Help & Support', Icons.help_outline_rounded, () {
-        context.push('/help');
+        context.go('/help');
       }),
       _drawerItem('Wallet', Icons.account_balance_wallet_outlined, () {
         context.push('/wallet');
@@ -211,184 +211,184 @@ class _CustomDrawerState extends ConsumerState<CustomDrawer> {
     if (selectedRole == "Laboratory") {
       drawerItems = [
         _drawerItem('Dashboard', Icons.dashboard_outlined, () {
-          context.push('/lab/dashboard');
+          context.go('/lab/dashboard');
         }),
         _drawerItem('New Requests', Icons.pending_actions_outlined, () {
-          context.push('/lab/bookings?title=New%20Requests&filter=pending');
+          context.go('/lab/bookings?title=New%20Requests&filter=pending');
         }),
         _drawerItem('Records', Icons.folder_copy_outlined, () {
-          context.push('/lab/reports');
+          context.go('/lab/reports');
         }),
         _drawerItem('Orders', Icons.list_alt_outlined, () {
-          context.push('/lab/bookings');
+          context.go('/lab/bookings');
         }),
         _drawerItem('Test Catalog', Icons.science_outlined, () {
-          context.push('/lab/tests');
+          context.go('/lab/tests');
         }),
         _drawerItem('Invoices', Icons.receipt_long_outlined, () {
           context.push('/payment-invoices');
         }),
         _drawerItem('Analytics', Icons.analytics_outlined, () {
-          context.push('/lab/analytics');
+          context.go('/lab/analytics');
         }),
         _drawerItem('Settings', Icons.settings_outlined, () {
-          context.push('/settings');
+          context.go('/settings');
         }),
         _drawerItem('iCare Lab Support', Icons.headset_mic_rounded, () {
-          context.push('/help');
+          context.go('/help');
         }),
       ];
     } else if (selectedRole == "Patient") {
       drawerItems = [
         _drawerItem('My Appointments', Icons.calendar_month_outlined, () {
-          context.push('/patient/bookings-history');
+          context.go('/patient/bookings-history');
         }),
         _drawerItem('My Prescriptions', Icons.medication_liquid_outlined, () {
-          context.push('/patient/prescriptions');
+          context.go('/patient/prescriptions');
         }),
         _drawerItem('Order Medicines', Icons.medication_outlined, () {
-          context.push('/patient/pharmacies');
+          context.go('/patient/pharmacies');
         }),
         _drawerItem('Book a Lab Test', Icons.science_outlined, () {
-          context.push('/patient/book-lab');
+          context.go('/patient/book-lab');
         }),
         _drawerItem('Health Journey', Icons.history_outlined, () {
-          context.push('/patient/health-journey');
+          context.go('/patient/health-journey');
         }),
         _drawerItem('Health Tracker', Icons.monitor_heart_outlined, () {
-          context.push('/patient/health-tracker');
+          context.go('/patient/health-tracker');
         }),
         _drawerItem('Lab Results/Reports', Icons.biotech_outlined, () {
-          context.push('/lab/reports');
+          context.go('/lab/reports');
         }),
         _drawerItem('Reminders', Icons.alarm_outlined, () {
-          context.push('/reminders');
+          context.go('/reminders');
         }),
         _drawerItem('Health Community', Icons.people_outline_rounded, () {
-          context.push('/community');
+          context.go('/community');
         }),
         _drawerItem('Achievements & Rewards', Icons.emoji_events_outlined, () {
-          context.push('/rewards');
+          context.go('/rewards');
         }),
         _drawerItem('Settings', Icons.settings_outlined, () {
-          context.push('/settings');
+          context.go('/settings');
         }),
       ];
     } else if (selectedRole == "Doctor") {
       drawerItems = [
         _drawerItem('My Appointments', Icons.calendar_month_outlined, () {
-          context.push('/doctor/appointments');
+          context.go('/doctor/appointments');
         }),
         _drawerItem('Patient Records', Icons.folder_shared_outlined, () {
-          context.push('/patient/records');
+          context.go('/patient/records');
         }),
         _drawerItem('My Schedule', Icons.schedule_outlined, () {
-          context.push('/doctor/schedule');
+          context.go('/doctor/schedule');
         }),
         _drawerItem('Analytics', Icons.analytics_outlined, () {
-          context.push('/doctor/analytics');
+          context.go('/doctor/analytics');
         }),
         _drawerItem('Health Community', Icons.people_outline_rounded, () {
-          context.push('/community');
+          context.go('/community');
         }),
         _drawerItem('Availability', Icons.event_available_outlined, () {
-          context.push('/doctor/availability');
+          context.go('/doctor/availability');
         }),
         _drawerItem('Notifications', Icons.notifications_outlined, () {
-          context.push('/doctor/notifications');
+          context.go('/doctor/notifications');
         }),
         _drawerItem('Help & Support', Icons.help_outline_rounded, () {
-          context.push('/help');
+          context.go('/help');
         }),
         _drawerItem('Settings', Icons.settings_outlined, () {
-          context.push('/settings');
+          context.go('/settings');
         }),
       ];
     } else if (selectedRole == "Pharmacy") {
       drawerItems = [
         _drawerItem('Dashboard', Icons.dashboard_outlined, () {
-          context.push('/pharmacy/dashboard');
+          context.go('/pharmacy/dashboard');
         }),
         _drawerItem('Awaiting Fulfillment', Icons.pending_actions_outlined, () {
-          context.push('/pharmacy/orders');
+          context.go('/pharmacy/orders');
         }),
         _drawerItem('Orders', Icons.receipt_long_outlined, () {
-          context.push('/pharmacy/orders');
+          context.go('/pharmacy/orders');
         }),
         _drawerItem('Inventory', Icons.inventory_outlined, () {
-          context.push('/pharmacy/inventory');
+          context.go('/pharmacy/inventory');
         }),
         _drawerItem('Payment Invoices', Icons.receipt_long_outlined, () {
           context.push('/payment-invoices');
         }),
         _drawerItem('Analytics', Icons.analytics_outlined, () {
-          context.push('/pharmacy/analytics');
+          context.go('/pharmacy/analytics');
         }),
         _drawerItem('Settings', Icons.settings_outlined, () {
-          context.push('/settings');
+          context.go('/settings');
         }),
         _drawerItem('iCare Pharmacist Support', Icons.headset_mic_rounded, () {
-          context.push('/help');
+          context.go('/help');
         }),
       ];
     } else if (selectedRole == "Instructor") {
       drawerItems = [
         _drawerItem('Dashboard', Icons.dashboard_outlined, () {
-          context.push('/instructor/dashboard');
+          context.go('/instructor/dashboard');
         }),
         _drawerItem('iCare Classroom', Icons.class_rounded, () {
-          context.push('/instructor/lms');
+          context.go('/instructor/lms');
         }),
         _drawerItem('Manage Courses', Icons.library_books_outlined, () {
-          context.push('/instructor/manage-courses');
+          context.go('/instructor/manage-courses');
         }),
         _drawerItem('Assigned Learners', Icons.group_outlined, () {
-          context.push('/instructor/learners');
+          context.go('/instructor/learners');
         }),
         _drawerItem('Student Feedback', Icons.rate_review_outlined, () {
-          context.push('/instructor/lms/feedback');
+          context.go('/instructor/lms/feedback');
         }),
         _drawerItem('Health Precautions', Icons.health_and_safety_outlined, () {
-          context.push('/instructor/precautions');
+          context.go('/instructor/precautions');
         }),
         _drawerItem('Educational Analytics', Icons.analytics_outlined, () {
-          context.push('/instructor/analytics');
+          context.go('/instructor/analytics');
         }),
         _drawerItem('Profile Setup', Icons.person_outlined, () {
-          context.push('/instructor/profile-setup');
+          context.go('/instructor/profile-setup');
         }),
         _drawerItem('Help & Support', Icons.help_outline_rounded, () {
-          context.push('/help');
+          context.go('/help');
         }),
         _drawerItem('Settings', Icons.settings_outlined, () {
-          context.push('/settings');
+          context.go('/settings');
         }),
       ];
     } else if (selectedRole == "Student") {
       drawerItems = [
         _drawerItem('Learning Dashboard', Icons.dashboard_outlined, () {
-          context.push('/student/dashboard');
+          context.go('/student/dashboard');
         }),
         _drawerItem('My Courses', Icons.school_outlined, () {
           context.push('/courses');
         }),
         _drawerItem('Open Classroom', Icons.class_outlined, () {
-          context.push('/student/classroom');
+          context.go('/student/classroom');
         }),
         _drawerItem('Browse Courses', Icons.travel_explore_outlined, () {
           context.push('/lms/catalog');
         }),
         _drawerItem('My Certificates', Icons.workspace_premium_outlined, () {
-          context.push('/student/certificates');
+          context.go('/student/certificates');
         }),
         _drawerItem('Assessments', Icons.task_alt_outlined, () {
-          context.push('/student/assessments');
+          context.go('/student/assessments');
         }),
         _drawerItem('Help & Support', Icons.help_outline_rounded, () {
-          context.push('/help');
+          context.go('/help');
         }),
         _drawerItem('Settings', Icons.settings_outlined, () {
-          context.push('/settings');
+          context.go('/settings');
         }),
       ];
     } else if (selectedRole == 'Admin') {
@@ -425,7 +425,7 @@ class _CustomDrawerState extends ConsumerState<CustomDrawer> {
                   children: [
                     if (selectedRole != 'Admin') ...[
                       _drawerItem('Home', Icons.home_outlined, () {
-                        context.push('/dashboard');
+                        context.go('/dashboard');
                       }, isActive: true),
 
                       const Padding(
@@ -458,14 +458,14 @@ class _CustomDrawerState extends ConsumerState<CustomDrawer> {
                           'New Requests',
                           const Color(0xFF6366F1),
                           Icons.pending_actions_outlined,
-                          () => context.push('/lab/bookings?title=New%20Requests&filter=pending'),
+                          () => context.go('/lab/bookings?title=New%20Requests&filter=pending'),
                         ),
                         _drawerActionItem(
                           context,
                           'Records',
                           const Color(0xFF0EA5E9),
                           Icons.folder_copy_outlined,
-                          () => context.push('/lab/reports'),
+                          () => context.go('/lab/reports'),
                         ),
                       ] else if (selectedRole == 'Instructor') ...[
                         _drawerActionItem(
@@ -585,7 +585,7 @@ class _CustomDrawerState extends ConsumerState<CustomDrawer> {
                         'Settings',
                         const Color(0xFF64748B),
                         Icons.settings_outlined,
-                        () => context.push('/settings'),
+                        () => context.go('/settings'),
                       ),
 
                       const Padding(

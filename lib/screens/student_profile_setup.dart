@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:go_router/go_router.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -161,9 +162,7 @@ class _StudentProfileSetupState extends ConsumerState<StudentProfileSetup>
             behavior: SnackBarBehavior.floating,
           ),
         );
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (ctx) => const TabsScreen()),
-        );
+        context.go('/dashboard');
       }
     } catch (e) {
       if (mounted) {

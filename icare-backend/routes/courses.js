@@ -547,8 +547,33 @@ function validatePricingFields(body) {
     if (amount >= price) return 'Early Bird amount must be less than the course price';
   }
   if (body.installmentPlanEnabled) {
-    const n = Number(body.installmentCount);
-    if (!Number.isInteger(n) || n < 2 || n > 12) return 'Installment count must be between 2 and 12';
+    const plan = body.installmentPlan;
+    if (!Array.isArray(plan) || plan.length < 2) {
+      return 'Add at least 2 installments';
+    }
+    // Effective price = discounted/base minus early-bird flat amount (mirrors
+    // computeEffectivePrice) — the installments must sum to exactly this.
+    const base = Number(body.discountedPrice || body.price || 0);
+    const eb = body.earlyBirdEnabled ? Number(body.earlyBirdAmount || 0) : 0;
+    const effective = Math.max(0, base - eb);
+
+    let sum = 0;
+    let prevDays = -1;
+    for (let i = 0; i < plan.length; i++) {
+      const amt = Number(plan[i]?.amount);
+      const days = Number(plan[i]?.daysAfterEnrollment);
+      if (!(amt > 0)) return `Installment ${i + 1}: amount must be greater than 0`;
+      if (i === 0 && days !== 0) return 'First installment must be due on enrollment (0 days)';
+      if (!Number.isInteger(days) || days < 0) return `Installment ${i + 1}: invalid days`;
+      if (i > 0 && days <= prevDays) {
+        return `Installment ${i + 1}: days must be greater than the previous installment`;
+      }
+      prevDays = days;
+      sum += amt;
+    }
+    if (Math.round(sum) !== Math.round(effective)) {
+      return `Installment amounts must total PKR ${Math.round(effective)} (currently PKR ${Math.round(sum)})`;
+    }
   }
   return null;
 }
@@ -942,5 +967,46 @@ router.get('/reviews/my-courses', authMiddleware, async (req, res) => {
     res.status(500).json({ success: false, message: e.message });
   }
 });
+
+// ── Admin: manually lock / unlock a student's installment course ──────────────
+// Lets an admin override the automatic installment lock (e.g. after a student
+// pays out-of-band, or to freeze access). Progress/enrollment untouched — only
+// the installmentLocked flag flips, exactly like the cron auto-lock.
+async function setEnrollmentLock(req, res, locked) {
+  try {
+    await connectMongoDB();
+    if ((req.user.role || '').toLowerCase() !== 'admin') {
+      return res.status(403).json({ success: false, message: 'Admin only' });
+    }
+    const enrollment = await Enrollment.findById(req.params.id);
+    if (!enrollment) return res.status(404).json({ success: false, message: 'Enrollment not found' });
+
+    enrollment.installmentLocked = locked;
+    enrollment.installmentLockedAt = locked ? new Date() : null;
+    await enrollment.save();
+
+    // Notify the student either way.
+    try {
+      const Notification = require('../models/Notification');
+      const course = await Course.findById(enrollment.courseId).select('title').lean();
+      await Notification.create({
+        userId: enrollment.userId,
+        type: 'payment',
+        title: locked ? 'Course Locked' : 'Course Unlocked',
+        message: locked
+          ? `Your access to "${course?.title || 'your course'}" has been paused by the admin.`
+          : `Your access to "${course?.title || 'your course'}" has been restored by the admin.`,
+        data: { subType: locked ? 'admin_locked' : 'admin_unlocked', courseId: enrollment.courseId, enrollmentId: enrollment._id },
+      });
+    } catch (_) {}
+
+    res.json({ success: true, installmentLocked: enrollment.installmentLocked });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+}
+
+router.post('/admin/enrollment/:id/lock', authMiddleware, (req, res) => setEnrollmentLock(req, res, true));
+router.post('/admin/enrollment/:id/unlock', authMiddleware, (req, res) => setEnrollmentLock(req, res, false));
 
 module.exports = router;

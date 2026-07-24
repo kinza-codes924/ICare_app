@@ -47,7 +47,7 @@ router.post('/token', authMiddleware, async (req, res) => {
     const payload = {
       iss: appId,
       aud: appId,
-      sub: '167-99-65-120.nip.io',
+      sub: 'vh.itserver.biz',
       room,
       nbf: now - 10,
       exp: now + 7200, // 2-hour token

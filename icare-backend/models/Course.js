@@ -102,10 +102,16 @@ const courseSchema = new mongoose.Schema({
   earlyBirdAmount: { type: Number, default: 0 },
   earlyBirdDeadline: { type: Date, default: null },
 
-  // Installment plan: manual per-payment, no saved-card auto-charge. First
-  // installment is the purchase itself; each next one is due 1 calendar month later.
+  // Installment plan: manual per-payment, no saved-card auto-charge. The
+  // instructor defines each installment explicitly — its amount and how many
+  // days after enrollment it's due. Installment 1 is the purchase itself
+  // (daysAfterEnrollment = 0). The amounts must sum to the effective (after
+  // early-bird) course price — enforced in routes/courses.js on save.
   installmentPlanEnabled: { type: Boolean, default: false },
-  installmentCount: { type: Number, default: 0 },
+  installmentPlan: [{
+    amount: { type: Number, required: true },
+    daysAfterEnrollment: { type: Number, default: 0 },
+  }],
 }, { timestamps: true });
 
 // No pre-save hooks — sync logic is handled in route handlers

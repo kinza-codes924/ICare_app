@@ -21,6 +21,15 @@
 # Stray zero-byte file that confuses Vercel Go framework detection
 cmd
 
+# Backend has its own Vercel project — exclude from frontend deploy
+/icare-backend/
+
+# node_modules anywhere
+node_modules/
+
+# Large docs folder
+/docs/
+
 # Flutter source files — not needed, site is pre-built
 # Leading / anchors to repo root so build/web/assets/, build/web/lib/, etc.
 # are NOT accidentally excluded (without / the pattern matches at any depth).

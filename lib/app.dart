@@ -44,7 +44,10 @@ class _AppState extends ConsumerState<App> {
 
         if (mounted) {
           setState(() {
-            content = const TabsScreen();
+            // NOTE: this legacy widget is not wired into the app (routing is
+            // handled by GoRouter in main.dart). TabsScreen is now a shell that
+            // requires a child, so we can't build it bare here.
+            content = const SplashScreen();
             _isLoading = false;
           });
         }

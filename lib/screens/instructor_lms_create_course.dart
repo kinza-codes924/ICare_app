@@ -108,9 +108,116 @@ class _InstructorLmsCreateCourseScreenState
   final _earlyBirdDaysController = TextEditingController();
   DateTime? _earlyBirdDate;
 
-  // Installment plan
+  // Installment plan — instructor adds each installment manually: an amount
+  // plus (for installments 2+) how many days after enrollment it's due.
+  // Installment 1 is the on-enrollment purchase (days fixed at 0). The amounts
+  // must total the effective (after early-bird) course price.
   bool _installmentPlanEnabled = false;
-  int _installmentCount = 2;
+  final List<_InstallmentRow> _installments = [
+    _InstallmentRow(), // installment 1 (on enrollment)
+    _InstallmentRow(), // installment 2
+  ];
+
+  /// Course price after the early-bird flat discount — the installments must
+  /// sum to this. Mirrors the server's computeEffectivePrice.
+  double get _effectivePrice {
+    final price = double.tryParse(_priceController.text) ?? 0;
+    final eb = _earlyBirdEnabled
+        ? (double.tryParse(_earlyBirdAmountController.text) ?? 0)
+        : 0;
+    final v = price - eb;
+    return v > 0 ? v : 0;
+  }
+
+  double get _installmentsTotal {
+    double sum = 0;
+    for (final r in _installments) {
+      sum += double.tryParse(r.amount.text) ?? 0;
+    }
+    return sum;
+  }
+
+  List<Widget> _buildInstallmentRows() {
+    return [
+      for (int i = 0; i < _installments.length; i++)
+        Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              // Installment number badge
+              Container(
+                width: 28,
+                height: 28,
+                alignment: Alignment.center,
+                decoration: const BoxDecoration(
+                  color: Color(0xFFEEF0FF),
+                  shape: BoxShape.circle,
+                ),
+                child: Text('${i + 1}',
+                    style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF6366F1))),
+              ),
+              const SizedBox(width: 10),
+              // Amount
+              Expanded(
+                flex: 3,
+                child: TextField(
+                  controller: _installments[i].amount,
+                  keyboardType: TextInputType.number,
+                  onChanged: (_) => setState(() {}),
+                  decoration: const InputDecoration(
+                    labelText: 'Amount (PKR)',
+                    isDense: true,
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              // Days after enrollment — first installment is fixed at 0.
+              Expanded(
+                flex: 3,
+                child: i == 0
+                    ? const InputDecorator(
+                        decoration: InputDecoration(
+                          labelText: 'Due',
+                          isDense: true,
+                          border: OutlineInputBorder(),
+                        ),
+                        child: Text('On enrollment',
+                            style: TextStyle(
+                                fontSize: 13, color: Color(0xFF64748B))),
+                      )
+                    : TextField(
+                        controller: _installments[i].days,
+                        keyboardType: TextInputType.number,
+                        onChanged: (_) => setState(() {}),
+                        decoration: const InputDecoration(
+                          labelText: 'Days after enrollment',
+                          isDense: true,
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+              ),
+              // Remove (keep at least 2 installments)
+              if (i > 0 && _installments.length > 2)
+                IconButton(
+                  icon: const Icon(Icons.remove_circle_outline_rounded,
+                      color: Color(0xFFEF4444), size: 20),
+                  onPressed: () => setState(() {
+                    _installments[i].dispose();
+                    _installments.removeAt(i);
+                  }),
+                )
+              else
+                const SizedBox(width: 40),
+            ],
+          ),
+        ),
+    ];
+  }
 
   // Modules
   final List<Map<String, dynamic>> _modules = [];
@@ -208,6 +315,9 @@ class _InstructorLmsCreateCourseScreenState
     _voucherController.dispose();
     _earlyBirdAmountController.dispose();
     _earlyBirdDaysController.dispose();
+    for (final r in _installments) {
+      r.dispose();
+    }
     super.dispose();
   }
 
@@ -249,15 +359,31 @@ class _InstructorLmsCreateCourseScreenState
         return;
       }
     }
-    if (!_isFree &&
-        _installmentPlanEnabled &&
-        (_installmentCount < 2 || _installmentCount > 12)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Installment count must be between 2 and 12'),
-        ),
-      );
-      return;
+    if (!_isFree && _installmentPlanEnabled) {
+      String? err;
+      if (_installments.length < 2) {
+        err = 'Add at least 2 installments';
+      } else {
+        int prevDays = -1;
+        for (int i = 0; i < _installments.length; i++) {
+          final amt = double.tryParse(_installments[i].amount.text) ?? 0;
+          final days = i == 0 ? 0 : (int.tryParse(_installments[i].days.text) ?? -1);
+          if (amt <= 0) { err = 'Installment ${i + 1}: enter an amount'; break; }
+          if (i > 0 && days <= prevDays) {
+            err = 'Installment ${i + 1}: days must be more than the previous one';
+            break;
+          }
+          prevDays = days;
+        }
+        if (err == null && _installmentsTotal.round() != _effectivePrice.round()) {
+          err = 'Installments must total PKR ${_effectivePrice.round()} '
+              '(currently PKR ${_installmentsTotal.round()})';
+        }
+      }
+      if (err != null) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(err)));
+        return;
+      }
     }
 
     setState(() => _isSubmitting = true);
@@ -308,7 +434,14 @@ class _InstructorLmsCreateCourseScreenState
                   .toIso8601String(),
         if (!_isFree && _installmentPlanEnabled) 'installmentPlanEnabled': true,
         if (!_isFree && _installmentPlanEnabled)
-          'installmentCount': _installmentCount,
+          'installmentPlan': [
+            for (int i = 0; i < _installments.length; i++)
+              {
+                'amount': double.tryParse(_installments[i].amount.text) ?? 0,
+                'daysAfterEnrollment':
+                    i == 0 ? 0 : (int.tryParse(_installments[i].days.text) ?? 0),
+              },
+          ],
       };
 
       await _lmsService.createCourse(courseData);
@@ -1624,50 +1757,62 @@ class _InstructorLmsCreateCourseScreenState
                 ),
                 if (_installmentPlanEnabled) ...[
                   const SizedBox(height: 12),
-                  DropdownButtonFormField<int>(
-                    initialValue: _installmentCount,
-                    decoration: const InputDecoration(
-                      labelText: 'Number of installments',
-                      border: OutlineInputBorder(),
-                      prefixIcon: Icon(Icons.format_list_numbered_rounded),
+                  ..._buildInstallmentRows(),
+                  const SizedBox(height: 8),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton.icon(
+                      onPressed: () => setState(
+                          () => _installments.add(_InstallmentRow())),
+                      icon: const Icon(Icons.add_circle_outline_rounded,
+                          size: 20, color: Color(0xFF6366F1)),
+                      label: const Text('Add Installment',
+                          style: TextStyle(
+                              color: Color(0xFF6366F1),
+                              fontWeight: FontWeight.w700)),
                     ),
-                    items: List.generate(11, (i) => i + 2)
-                        .map(
-                          (n) => DropdownMenuItem(
-                            value: n,
-                            child: Text('$n installments'),
-                          ),
-                        )
-                        .toList(),
-                    onChanged: (v) => setState(() => _installmentCount = v!),
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 8),
+                  // Live total vs required — green when it matches.
                   Builder(
                     builder: (_) {
-                      final price = double.tryParse(_priceController.text) ?? 0;
-                      final earlyBirdAmt = _earlyBirdEnabled
-                          ? (double.tryParse(_earlyBirdAmountController.text) ??
-                                0)
-                          : 0;
-                      final effective = (price - earlyBirdAmt).clamp(
-                        0,
-                        double.infinity,
-                      );
-                      final per = _installmentCount > 0
-                          ? (effective / _installmentCount)
-                          : 0;
+                      final total = _installmentsTotal;
+                      final need = _effectivePrice;
+                      final ok = total.round() == need.round() && need > 0;
                       return Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFEFF6FF),
+                          color: ok
+                              ? const Color(0xFFE7F8EF)
+                              : const Color(0xFFFEF3F2),
                           borderRadius: BorderRadius.circular(8),
                         ),
-                        child: Text(
-                          'Illustrative: ~PKR ${per.toStringAsFixed(0)} × $_installmentCount — first installment is due now, each next one 1 month later. The server computes the exact split (any rounding goes onto the last installment).',
-                          style: const TextStyle(
-                            fontSize: 11,
-                            color: Color(0xFF64748B),
-                          ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              ok
+                                  ? Icons.check_circle_rounded
+                                  : Icons.info_outline_rounded,
+                              size: 18,
+                              color: ok
+                                  ? const Color(0xFF10B981)
+                                  : const Color(0xFFEF4444),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'Total: PKR ${total.round()} — must equal PKR ${need.round()}'
+                                '${_earlyBirdEnabled ? " (price after Early Bird)" : ""}',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: ok
+                                      ? const Color(0xFF047857)
+                                      : const Color(0xFFB91C1C),
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       );
                     },
@@ -2068,6 +2213,17 @@ class _InstructorLmsCreateCourseScreenState
         ],
       ),
     );
+  }
+}
+
+// One row of the manual installment plan: an amount, and how many days after
+// enrollment it's due (0 for the first, on-enrollment installment).
+class _InstallmentRow {
+  final TextEditingController amount = TextEditingController();
+  final TextEditingController days = TextEditingController();
+  void dispose() {
+    amount.dispose();
+    days.dispose();
   }
 }
 

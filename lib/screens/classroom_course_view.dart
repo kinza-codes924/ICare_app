@@ -1693,6 +1693,9 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
     final isLive = type == 'live';
     final status = lesson['status']?.toString() ?? '';
     final scheduledAt = lesson['scheduledAt']?.toString() ?? lesson['scheduledDate']?.toString() ?? '';
+    final meetingLink = lesson['meetingLink']?.toString() ?? '';
+    final hasMeetLink = isLive && meetingLink.isNotEmpty && meetingLink.startsWith('http');
+    final isScheduled = isLive && status != 'live' && status != 'ended' && status != 'completed';
 
     String dateLabel = '';
     if (scheduledAt.isNotEmpty) {
@@ -1722,32 +1725,65 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
         decoration: BoxDecoration(
           border: Border(bottom: BorderSide(color: Colors.grey.shade100)),
         ),
-        child: Row(children: [
-          Container(
-            width: 34, height: 34,
-            decoration: BoxDecoration(color: iconColor.withValues(alpha: 0.1), shape: BoxShape.circle),
-            child: Icon(icon, color: iconColor, size: 18),
-          ),
-          const SizedBox(width: 12),
-          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: Color(0xFF202124))),
-            if (statusLabel.isNotEmpty)
-              Text(statusLabel, style: TextStyle(fontSize: 11, color: statusColor, fontWeight: FontWeight.w600)),
-          ])),
-          if (status == 'live')
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(color: Colors.red, borderRadius: BorderRadius.circular(6)),
-              child: const Text('JOIN', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w900)),
-            )
-          else
-            Icon(Icons.chevron_right_rounded, size: 18, color: Colors.grey.shade400),
+              width: 34, height: 34,
+              decoration: BoxDecoration(color: iconColor.withValues(alpha: 0.1), shape: BoxShape.circle),
+              child: Icon(icon, color: iconColor, size: 18),
+            ),
+            const SizedBox(width: 12),
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: Color(0xFF202124))),
+              if (statusLabel.isNotEmpty)
+                Text(statusLabel, style: TextStyle(fontSize: 11, color: statusColor, fontWeight: FontWeight.w600)),
+            ])),
+            if (status == 'live')
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(color: Colors.red, borderRadius: BorderRadius.circular(6)),
+                child: const Text('JOIN', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w900)),
+              )
+            else if (hasMeetLink && isScheduled)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(color: const Color(0xFF1A73E8), borderRadius: BorderRadius.circular(6)),
+                child: const Text('JOIN', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w900)),
+              )
+            else
+              Icon(Icons.chevron_right_rounded, size: 18, color: Colors.grey.shade400),
+          ]),
+          if (hasMeetLink && isScheduled) ...[
+            const SizedBox(height: 8),
+            GestureDetector(
+              onTap: () async {
+                final uri = Uri.tryParse(meetingLink);
+                if (uri != null) await launchUrl(uri, mode: LaunchMode.externalApplication);
+              },
+              child: Container(
+                margin: const EdgeInsets.only(left: 46),
+                padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE8F0FE),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: const Color(0xFF1A73E8).withValues(alpha: 0.3)),
+                ),
+                child: const Row(children: [
+                  Icon(Icons.video_call_rounded, color: Color(0xFF1A73E8), size: 16),
+                  SizedBox(width: 6),
+                  Text('Join via Google Meet', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF1A73E8))),
+                  Spacer(),
+                  Icon(Icons.open_in_new_rounded, color: Color(0xFF1A73E8), size: 14),
+                ]),
+              ),
+            ),
+          ],
         ]),
       ),
     );
   }
 
-  void _openLessonItem(Map lesson) {
+  Future<void> _openLessonItem(Map lesson) async {
     final type = lesson['type']?.toString() ?? 'lesson';
     final status = lesson['status']?.toString() ?? '';
     final sessionId = lesson['_id']?.toString() ?? '';
@@ -1767,6 +1803,12 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
       } else if (status == 'ended' || status == 'completed') {
         _showCompletedSessionOptions(sessionId, title, recordingUrl);
       } else {
+        final meetLink = lesson['meetingLink']?.toString() ?? '';
+        if (meetLink.isNotEmpty && meetLink.startsWith('http')) {
+          final uri = Uri.tryParse(meetLink);
+          if (uri != null) await launchUrl(uri, mode: LaunchMode.externalApplication);
+          return;
+        }
         final scheduledAt = lesson['scheduledAt']?.toString() ?? '';
         String dateLabel = scheduledAt;
         if (scheduledAt.isNotEmpty) {
@@ -2063,6 +2105,10 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
       );
     }
 
+    final sessionMeetLink = type == 'session' ? (data['meetingLink']?.toString() ?? '') : '';
+    final hasSessionMeetLink = sessionMeetLink.isNotEmpty && sessionMeetLink.startsWith('http');
+    final isScheduledSession = type == 'session' && sessionStatus == 'scheduled';
+
     return InkWell(
       onTap: () => _openItem(type, data),
       child: Container(
@@ -2071,68 +2117,101 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
         decoration: BoxDecoration(
           border: Border(bottom: BorderSide(color: Colors.grey.shade100)),
         ),
-        child: Row(
-          children: [
-            // Icon
-            Container(
-              width: 32,
-              height: 32,
-              decoration: BoxDecoration(
-                color: iconBg,
-                shape: BoxShape.circle,
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(
+            children: [
+              // Icon
+              Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  color: iconBg,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(icon, color: Colors.white, size: 16),
               ),
-              child: Icon(icon, color: Colors.white, size: 16),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(title,
-                      style: const TextStyle(
-                          fontSize: 14, color: Color(0xFF202124))),
-                  if (dueLabel.isNotEmpty || points.isNotEmpty)
-                    Text(
-                      [
-                        if (dueLabel.isNotEmpty) 'Due $dueLabel',
-                        if (points.isNotEmpty) '$points points',
-                      ].join('  ·  '),
-                      style: const TextStyle(
-                          fontSize: 12, color: Color(0xFF70757A)),
-                    ),
-                  if (type == 'session' && sessionStatus.isNotEmpty && sessionStatus != 'live')
-                    Row(children: [
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title,
+                        style: const TextStyle(
+                            fontSize: 14, color: Color(0xFF202124))),
+                    if (dueLabel.isNotEmpty || points.isNotEmpty)
                       Text(
-                        sessionStatus == 'scheduled' ? 'Scheduled${dueLabel.isNotEmpty ? ' · $dueLabel' : ''}' :
-                        sessionStatus == 'ended' ? 'Session ended' :
-                        sessionStatus == 'completed' ? 'Completed' : sessionStatus,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: sessionStatus == 'scheduled' ? const Color(0xFF1A73E8) : const Color(0xFF70757A),
-                        ),
+                        [
+                          if (dueLabel.isNotEmpty) 'Due $dueLabel',
+                          if (points.isNotEmpty) '$points points',
+                        ].join('  ·  '),
+                        style: const TextStyle(
+                            fontSize: 12, color: Color(0xFF70757A)),
                       ),
-                    ]),
-                ],
+                    if (type == 'session' && sessionStatus.isNotEmpty && sessionStatus != 'live')
+                      Row(children: [
+                        Text(
+                          sessionStatus == 'scheduled' ? 'Scheduled${dueLabel.isNotEmpty ? ' · $dueLabel' : ''}' :
+                          sessionStatus == 'ended' ? 'Session ended' :
+                          sessionStatus == 'completed' ? 'Completed' : sessionStatus,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: sessionStatus == 'scheduled' ? const Color(0xFF1A73E8) : const Color(0xFF70757A),
+                          ),
+                        ),
+                      ]),
+                  ],
+                ),
+              ),
+              if (widget.isInstructor)
+                IconButton(
+                  icon: const Icon(Icons.more_vert_rounded,
+                      size: 18, color: Color(0xFF70757A)),
+                  onPressed: () => _showClassworkMenu(type, data),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                )
+              else if (isScheduledSession && hasSessionMeetLink)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(color: const Color(0xFF1A73E8), borderRadius: BorderRadius.circular(6)),
+                  child: const Text('JOIN', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w900)),
+                )
+              else
+                const Icon(Icons.chevron_right_rounded,
+                    size: 18, color: Color(0xFFDADCE0)),
+            ],
+          ),
+          if (!widget.isInstructor && isScheduledSession && hasSessionMeetLink) ...[
+            const SizedBox(height: 8),
+            GestureDetector(
+              onTap: () async {
+                final uri = Uri.tryParse(sessionMeetLink);
+                if (uri != null) await launchUrl(uri, mode: LaunchMode.externalApplication);
+              },
+              child: Container(
+                margin: const EdgeInsets.only(left: 48),
+                padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE8F0FE),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: const Color(0xFF1A73E8).withValues(alpha: 0.3)),
+                ),
+                child: const Row(children: [
+                  Icon(Icons.video_call_rounded, color: Color(0xFF1A73E8), size: 16),
+                  SizedBox(width: 6),
+                  Text('Join via Google Meet', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF1A73E8))),
+                  Spacer(),
+                  Icon(Icons.open_in_new_rounded, color: Color(0xFF1A73E8), size: 14),
+                ]),
               ),
             ),
-            if (widget.isInstructor)
-              IconButton(
-                icon: const Icon(Icons.more_vert_rounded,
-                    size: 18, color: Color(0xFF70757A)),
-                onPressed: () => _showClassworkMenu(type, data),
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-              )
-            else
-              const Icon(Icons.chevron_right_rounded,
-                  size: 18, color: Color(0xFFDADCE0)),
           ],
-        ),
+        ]),
       ),
     );
   }
 
-  void _openItem(String type, Map data) {
+  Future<void> _openItem(String type, Map data) async {
     if (type == 'assignment') {
       if (widget.isInstructor) {
         // Straight into that assignment's submissions/grading — the old
@@ -2186,8 +2265,14 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
         return;
       }
 
-      // Scheduled sessions that haven't started → don't open live screen
+      // Scheduled sessions — open Google Meet link if set, else show info
       if (status == 'scheduled') {
+        final meetLink = data['meetingLink']?.toString() ?? '';
+        if (meetLink.isNotEmpty && meetLink.startsWith('http')) {
+          final uri = Uri.tryParse(meetLink);
+          if (uri != null) await launchUrl(uri, mode: LaunchMode.externalApplication);
+          return;
+        }
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
           content: Text('This session has not started yet.'),
           backgroundColor: Color(0xFF64748B),

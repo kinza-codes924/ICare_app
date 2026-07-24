@@ -1,4 +1,5 @@
 import 'package:easy_localization/easy_localization.dart';
+import 'package:go_router/go_router.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:icare/screens/classroom_course_view.dart';
@@ -105,10 +106,7 @@ class _InstructorLmsDashboardState extends ConsumerState<InstructorLmsDashboard>
       );
       await ref.read(authProvider.notifier).setUser(user);
       if (!mounted) return;
-      Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (_) => const TabsScreen()),
-        (route) => false,
-      );
+      context.go('/dashboard');
     } else {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(

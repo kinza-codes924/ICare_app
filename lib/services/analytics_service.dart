@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:icare/services/api_service.dart';
 
 class AnalyticsService {
@@ -51,8 +52,18 @@ class AnalyticsService {
     return response.data['downloadUrl'] ?? '';
   }
 
-  // Student Learning Metrics — endpoint may not exist, return defaults silently
+  // Student Learning Metrics — engagement rate, average quiz score and
+  // estimated time spent, computed server-side from the student's lesson
+  // completions and quiz attempts. Falls back to zeros if the call fails so
+  // the dashboard still renders.
   Future<Map<String, dynamic>> getStudentMetrics() async {
+    try {
+      final response = await _apiService.get('/analytics/student-stats');
+      final analytics = response.data['analytics'];
+      if (analytics is Map) return Map<String, dynamic>.from(analytics);
+    } catch (e) {
+      debugPrint('Error getting student metrics: $e');
+    }
     return {'engagementRate': '0%', 'avgQuizScore': '0%', 'timeSpent': '0 hrs'};
   }
 

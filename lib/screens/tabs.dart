@@ -75,15 +75,21 @@ import 'package:icare/services/api_service.dart';
 import 'package:icare/services/auth_service.dart';
 import 'package:icare/models/user.dart' as app_user;
 
+/// App shell for logged-in users: sidebar (web) / drawer + bottom nav (mobile),
+/// header, and the notification poller. The screen shown inside it comes from
+/// the router as [child] — each one has its own URL, so refresh / back / deep
+/// links all work. Previously this widget picked the screen itself from an
+/// internal `currentIndex`, which meant every screen shared the `/dashboard`
+/// URL.
 class TabsScreen extends ConsumerStatefulWidget {
+  final Widget child;
   final String? initialAdminTab;
-  const TabsScreen({super.key, this.initialAdminTab});
+  const TabsScreen({super.key, required this.child, this.initialAdminTab});
   @override
   ConsumerState<TabsScreen> createState() => _TabsScreenState();
 }
 
 class _TabsScreenState extends ConsumerState<TabsScreen> {
-  var currentIndex = 0;
   Timer? _livePoller;
   Timer? _notifPoller;
   int _notifUnreadCount = 0;
@@ -104,10 +110,31 @@ class _TabsScreenState extends ConsumerState<TabsScreen> {
   final LmsService _lms = LmsService();
   final CourseService _courseService = CourseService();
 
-  void _selectPage(int index) {
-    setState(() {
-      currentIndex = index;
-    });
+  /// Current shell location, e.g. `/doctor/appointments` — drives which nav
+  /// item is highlighted (this used to be the `currentIndex` int).
+  String get _location => GoRouterState.of(context).matchedLocation;
+
+  /// Routes whose screen has its own bottom-right FloatingActionButton
+  /// ("New Post", "New Course", etc.). On these the floating WhatsApp button
+  /// must sit higher so the two don't overlap.
+  static const _routesWithOwnFab = {
+    '/community',
+    '/instructor/manage-courses',
+    '/instructor/precautions',
+    '/lab/tests',
+  };
+
+  /// How far up from the bottom the WhatsApp button should float for the
+  /// given location — lifted above the screen's own FAB where one exists.
+  double _whatsappOffset(String location, String role) {
+    // Community has an extended "New Post" FAB (plus an extra "Add Topic" FAB
+    // for admins), so it needs the most clearance.
+    if (location == '/community' || location.startsWith('/community/')) return 150;
+    if (_routesWithOwnFab.any((p) => location == p || location.startsWith('$p/'))) {
+      return 90;
+    }
+    if (role == 'Pharmacy' && location.startsWith('/pharmacy/orders')) return 90;
+    return 20;
   }
 
   @override
@@ -371,154 +398,11 @@ class _TabsScreenState extends ConsumerState<TabsScreen> {
     final bool isWeb = screenWidth > 600;
     final double maxWidth = 430;
 
-    Widget activePage = const HomeScreen();
-    if (role == "Pharmacy") {
-      if (currentIndex == 0) {
-        activePage = const PharmacistDashboard();
-      } else if (currentIndex == 1) {
-        activePage = const PharmacyOrders();
-      } else if (currentIndex == 2) {
-        activePage = const PharmacyInventory();
-      } else if (currentIndex == 3) {
-        activePage = const PharmacyProfileSetup();
-      } else if (currentIndex == 20) {
-        activePage = const PharmacyOrders();
-      } else if (currentIndex == 21) {
-        activePage = const PaymentInvoices(isPharmacy: true);
-      } else if (currentIndex == 22) {
-        activePage = const PharmacyAnalytics();
-      } else if (currentIndex == 23) {
-        activePage = const SettingsScreen();
-      } else if (currentIndex == 24) {
-        activePage = const HelpAndSupport();
-      }
-    } else if (role == "Laboratory") {
-      if (currentIndex == 0) {
-        activePage = const LaboratoryDashboard();
-      } else if (currentIndex == 1) {
-        activePage = const LabBookingsManagement();
-      } else if (currentIndex == 2) {
-        activePage = const LabReportsScreen();
-      } else if (currentIndex == 3) {
-        activePage = const LabProfileSetup();
-      } else if (currentIndex == 20) {
-        activePage = const LabBookingsManagement();
-      } else if (currentIndex == 21) {
-        activePage = const LabTestsManagement();
-      } else if (currentIndex == 22) {
-        activePage = const PaymentInvoices();
-      } else if (currentIndex == 23) {
-        activePage = const LabAnalytics();
-      } else if (currentIndex == 24) {
-        activePage = const SettingsScreen();
-      } else if (currentIndex == 25) {
-        activePage = const HelpAndSupport();
-      }
-    } else if (role == "Doctor") {
-      if (currentIndex == 0) {
-        activePage = const DoctorDashboard();
-      } else if (currentIndex == 1) {
-        activePage = const DoctorAppointmentsScreen();
-      } else if (currentIndex == 20) {
-        activePage = const DoctorScheduleCalendar();
-      } else if (currentIndex == 21) {
-        activePage = const DoctorAnalytics();
-      } else if (currentIndex == 22) {
-        activePage = const HealthCommunityScreen();
-      } else if (currentIndex == 23) {
-        activePage = const DoctorAvailability();
-      } else if (currentIndex == 24) {
-        activePage = const DoctorNotifications();
-      } else if (currentIndex == 25) {
-        activePage = const HelpAndSupport();
-      } else if (currentIndex == 26) {
-        activePage = const SettingsScreen();
-      }
-    } else if (role == "Instructor") {
-      if (currentIndex == 0) {
-        activePage = const InstructorDashboardScreen();
-      } else if (currentIndex == 1) {
-        activePage = InstructorCoursesManagementScreen();
-      } else if (currentIndex == 20) {
-        activePage = InstructorCoursesManagementScreen();
-      } else if (currentIndex == 21) {
-        activePage = InstructorLearnersScreen();
-      } else if (currentIndex == 22) {
-        activePage = InstructorPrecautionsManagementScreen();
-      } else if (currentIndex == 23) {
-        activePage = InstructorAnalytics();
-      } else if (currentIndex == 24) {
-        activePage = const SettingsScreen();
-      }
-    } else if (role == "Student") {
-      if (currentIndex == 0) {
-        activePage = StudentDashboard();
-      } else if (currentIndex == 1) {
-        activePage = Courses();
-      } else if (currentIndex == 2) {
-        activePage = const StudentProfileSetup();
-      } else if (currentIndex == 3) {
-        activePage = const Courses(browse: true);
-      } else if (currentIndex == 4) {
-        activePage = const CertificatesScreen();
-      } else if (currentIndex == 5) {
-        activePage = const AssessmentsScreen();
-      } else if (currentIndex == 6) {
-        activePage = const SettingsScreen();
-      } else if (currentIndex == 20) {
-        activePage = const StudentLmsDashboard();
-      }
-    } else if (role == "Admin") {
-      if (currentIndex == 0) {
-        activePage = AdminDashboard(
-          initialTab: widget.initialAdminTab ?? 'Pending',
-        );
-      } else if (currentIndex == 2) {
-        activePage = ChatListScreen();
-      } else if (currentIndex == 3) {
-        activePage = ProfileScreen();
-      } else {
-        activePage = AdminDashboard(
-          initialTab: widget.initialAdminTab ?? 'Pending',
-        );
-      }
-    } else {
-      // Default to Patient dashboard
-      if (currentIndex == 0) {
-        activePage = const HomeScreen();
-      } else if (currentIndex == 1) {
-        activePage = isWeb ? ProfileScreen() : const ProfileEditScreen();
-      } else if (currentIndex == 20) {
-        activePage = const BookingsHistoryScreen();
-      } else if (currentIndex == 21) {
-        activePage = const PatientPrescriptions();
-      } else if (currentIndex == 22) {
-        activePage = const PharmaciesScreen();
-      } else if (currentIndex == 23) {
-        activePage = const PatientBookLabFlow();
-      } else if (currentIndex == 24) {
-        activePage = const HealthJourneyScreen();
-      } else if (currentIndex == 25) {
-        activePage = const LifestyleTrackerScreen();
-      } else if (currentIndex == 28) {
-        activePage = LabReportsScreen();
-      } else if (currentIndex == 29) {
-        activePage = const ReminderList();
-      } else if (currentIndex == 30) {
-        activePage = const HealthCommunityScreen();
-      } else if (currentIndex == 31) {
-        activePage = const GamificationScreen();
-      } else if (currentIndex == 32) {
-        activePage = const SettingsScreen();
-      }
-    }
+    // The screen itself comes from the router (see ShellRoute in
+    // app_router.dart) — this shell only supplies the chrome around it.
+    final Widget activePage = widget.child;
 
-    final tabs = buildTabs(
-      role: role,
-      context: context,
-      currentIndex: currentIndex,
-      onSelect: _selectPage,
-    );
+    final location = _location;
 
     // ── Mobile: original layout, zero changes ──────────────────────────────
     if (!isWeb) {
@@ -604,7 +488,7 @@ class _TabsScreenState extends ConsumerState<TabsScreen> {
             activePage,
             if (role != 'Patient')
               WhatsAppFloatingButton(
-                bottomOffset: (role == 'Pharmacy' && currentIndex == 1) ? 90 : 20,
+                bottomOffset: _whatsappOffset(location, role),
               ),
           ],
         ),
@@ -612,8 +496,7 @@ class _TabsScreenState extends ConsumerState<TabsScreen> {
           tabs: buildTabs(
             role: role,
             context: context,
-            currentIndex: currentIndex,
-            onSelect: _selectPage,
+            location: location,
           ),
           onSelect: (value) {},
         ),
@@ -629,9 +512,8 @@ class _TabsScreenState extends ConsumerState<TabsScreen> {
             children: [
               // ── Left Sidebar ────────────────────────────────────────────────
               _WebSidebar(
-                currentIndex: currentIndex,
+                location: location,
                 role: role,
-                onSelect: _selectPage,
               ),
               // ── Main content area ─────────────────────────────────────────
               Expanded(
@@ -680,7 +562,7 @@ class _TabsScreenState extends ConsumerState<TabsScreen> {
           ),
           if (role != 'Patient')
             WhatsAppFloatingButton(
-              bottomOffset: (role == 'Pharmacy' && currentIndex == 1) ? 90 : 20,
+              bottomOffset: _whatsappOffset(location, role),
             ),
         ],
       ),
@@ -693,13 +575,13 @@ class _TabsScreenState extends ConsumerState<TabsScreen> {
 // ═══════════════════════════════════════════════════════════════════════════
 class _WebSidebar extends ConsumerStatefulWidget {
   const _WebSidebar({
-    required this.currentIndex,
+    required this.location,
     required this.role,
-    required this.onSelect,
   });
-  final int currentIndex;
+  /// Current route, e.g. `/doctor/appointments` — decides which item is
+  /// highlighted, and each item navigates by URL rather than by index.
+  final String location;
   final String role;
-  final void Function(int) onSelect;
 
   @override
   ConsumerState<_WebSidebar> createState() => _WebSidebarState();
@@ -863,31 +745,30 @@ class _WebSidebarState extends ConsumerState<_WebSidebar> {
   @override
   Widget build(BuildContext context) {
     final role = widget.role;
-    final currentIndex = widget.currentIndex;
-    final onSelect = widget.onSelect;
+    final location = widget.location;
     final List<_SidebarItem> items;
     if (role == 'Admin') {
       items = <_SidebarItem>[];
     } else if (role == 'Instructor') {
       items = [
-        _SidebarItem(icon: Icons.dashboard_outlined, label: 'Dashboard', index: 0),
-        _SidebarItem(icon: Icons.school_outlined, label: 'Courses', index: 1),
+        _SidebarItem(icon: Icons.dashboard_outlined, label: 'Dashboard', path: '/instructor/dashboard'),
+        _SidebarItem(icon: Icons.school_outlined, label: 'Courses', path: '/instructor/manage-courses'),
       ];
     } else if (role == 'Patient') {
       items = [
-        _SidebarItem(icon: Icons.home_outlined, label: 'Home', index: 0),
+        _SidebarItem(icon: Icons.home_outlined, label: 'Home', path: '/patient/home'),
       ];
     } else if (role == 'Doctor') {
       items = [
         _SidebarItem(
           icon: Icons.home_outlined,
           label: 'Dashboard',
-          index: 0,
+          path: '/doctor/dashboard',
         ),
         _SidebarItem(
           icon: Icons.calendar_month_outlined,
           label: 'Appointments',
-          index: 1,
+          path: '/doctor/appointments',
         ),
       ];
     } else {
@@ -895,7 +776,11 @@ class _WebSidebarState extends ConsumerState<_WebSidebar> {
         _SidebarItem(
           icon: Icons.home_outlined,
           label: role == 'Student' ? 'Learning Dashboard' : 'Home',
-          index: 0,
+          path: role == 'Student'
+              ? '/student/dashboard'
+              : (role == 'Pharmacy'
+                    ? '/pharmacy/dashboard'
+                    : (role == 'Laboratory' ? '/lab/dashboard' : '/patient/home')),
         ),
         _SidebarItem(
           icon: role == 'Pharmacy'
@@ -910,7 +795,11 @@ class _WebSidebarState extends ConsumerState<_WebSidebar> {
               : (role == 'Laboratory'
                     ? 'New Requests'
                     : (role == 'Student' ? 'My Courses' : 'Appointments')),
-          index: 1,
+          path: role == 'Pharmacy'
+              ? '/pharmacy/orders'
+              : (role == 'Laboratory'
+                    ? '/lab/bookings'
+                    : (role == 'Student' ? '/student/courses' : '/doctor/appointments')),
         ),
         if (role != 'Student')
           _SidebarItem(
@@ -922,7 +811,9 @@ class _WebSidebarState extends ConsumerState<_WebSidebar> {
             label: role == 'Pharmacy'
                 ? 'Inventory'
                 : (role == 'Laboratory' ? 'Records' : 'Messages'),
-            index: 2,
+            path: role == 'Pharmacy'
+                ? '/pharmacy/inventory'
+                : (role == 'Laboratory' ? '/lab/reports' : '/chat'),
           ),
       ];
     }
@@ -1085,9 +976,10 @@ class _WebSidebarState extends ConsumerState<_WebSidebar> {
                 padding: const EdgeInsets.symmetric(horizontal: 12),
                 children: [
                   ...items.map((item) {
-                    final isSelected = currentIndex == item.index;
+                    final isSelected = location == item.path ||
+                        location.startsWith('${item.path}/');
                     return GestureDetector(
-                      onTap: () => onSelect(item.index),
+                      onTap: () => context.go(item.path),
                       child: AnimatedContainer(
                         duration: const Duration(milliseconds: 200),
                         margin: const EdgeInsets.only(bottom: 4),
@@ -1152,21 +1044,21 @@ class _WebSidebarState extends ConsumerState<_WebSidebar> {
                 // ── Role-specific extra nav items ──────────────────────────
                 if (role == 'Patient') ...[
                   const SizedBox(height: 8),
-                  _buildExtraNavItem(context, Icons.calendar_month_outlined, 'My Appointments', () => onSelect(20)),
-                  _buildExtraNavItem(context, Icons.medication_liquid_outlined, 'My Prescriptions', () => onSelect(21)),
-                  _buildExtraNavItem(context, Icons.medication_outlined, 'Order Medicines', () => onSelect(22)),
-                  _buildExtraNavItem(context, Icons.science_outlined, 'Book a Lab Test', () => onSelect(23)),
+                  _buildExtraNavItem(context, Icons.calendar_month_outlined, 'My Appointments', () => context.go('/patient/bookings-history')),
+                  _buildExtraNavItem(context, Icons.medication_liquid_outlined, 'My Prescriptions', () => context.go('/patient/prescriptions')),
+                  _buildExtraNavItem(context, Icons.medication_outlined, 'Order Medicines', () => context.go('/patient/pharmacies')),
+                  _buildExtraNavItem(context, Icons.science_outlined, 'Book a Lab Test', () => context.go('/patient/book-lab')),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
                     child: Divider(color: const Color(0xFFE8ECF5), height: 1),
                   ),
-                  _buildExtraNavItem(context, Icons.history_outlined, 'Health Journey', () => onSelect(24)),
-                  _buildExtraNavItem(context, Icons.monitor_heart_outlined, 'Health Tracker', () => onSelect(25)),
-                  _buildExtraNavItem(context, Icons.biotech_outlined, 'Lab Results/Reports', () => onSelect(28)),
-                  _buildExtraNavItem(context, Icons.alarm_outlined, 'Reminders', () => onSelect(29)),
-                  _buildExtraNavItem(context, Icons.people_outline_rounded, 'Health Community', () => onSelect(30)),
-                  _buildExtraNavItem(context, Icons.emoji_events_outlined, 'Achievements & Rewards', () => onSelect(31)),
-                  _buildExtraNavItem(context, Icons.settings_outlined, 'Settings', () => onSelect(32)),
+                  _buildExtraNavItem(context, Icons.history_outlined, 'Health Journey', () => context.go('/patient/health-journey')),
+                  _buildExtraNavItem(context, Icons.monitor_heart_outlined, 'Health Tracker', () => context.go('/patient/health-tracker')),
+                  _buildExtraNavItem(context, Icons.biotech_outlined, 'Lab Results/Reports', () => context.go('/patient/lab-reports')),
+                  _buildExtraNavItem(context, Icons.alarm_outlined, 'Reminders', () => context.go('/reminders')),
+                  _buildExtraNavItem(context, Icons.people_outline_rounded, 'Health Community', () => context.go('/community')),
+                  _buildExtraNavItem(context, Icons.emoji_events_outlined, 'Achievements & Rewards', () => context.go('/rewards')),
+                  _buildExtraNavItem(context, Icons.settings_outlined, 'Settings', () => context.go('/settings')),
                 ],
 
                 if (role == 'Doctor') ...[
@@ -1175,13 +1067,13 @@ class _WebSidebarState extends ConsumerState<_WebSidebar> {
                     padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
                     child: Divider(color: const Color(0xFFE8ECF5), height: 1),
                   ),
-                  _buildExtraNavItem(context, Icons.schedule_outlined, 'My Schedule', () => onSelect(20)),
-                  _buildExtraNavItem(context, Icons.analytics_outlined, 'Analytics', () => onSelect(21)),
-                  _buildExtraNavItem(context, Icons.people_outline_rounded, 'Health Community', () => onSelect(22)),
-                  _buildExtraNavItem(context, Icons.event_available_outlined, 'Availability', () => onSelect(23)),
-                  _buildExtraNavItem(context, Icons.notifications_outlined, 'Notifications', () => onSelect(24)),
-                  _buildExtraNavItem(context, Icons.help_outline_rounded, 'Help & Support', () => onSelect(25)),
-                  _buildExtraNavItem(context, Icons.settings_outlined, 'Settings', () => onSelect(26)),
+                  _buildExtraNavItem(context, Icons.schedule_outlined, 'My Schedule', () => context.go('/doctor/schedule')),
+                  _buildExtraNavItem(context, Icons.analytics_outlined, 'Analytics', () => context.go('/doctor/analytics')),
+                  _buildExtraNavItem(context, Icons.people_outline_rounded, 'Health Community', () => context.go('/community')),
+                  _buildExtraNavItem(context, Icons.event_available_outlined, 'Availability', () => context.go('/doctor/availability')),
+                  _buildExtraNavItem(context, Icons.notifications_outlined, 'Notifications', () => context.go('/doctor/notifications')),
+                  _buildExtraNavItem(context, Icons.help_outline_rounded, 'Help & Support', () => context.go('/help')),
+                  _buildExtraNavItem(context, Icons.settings_outlined, 'Settings', () => context.go('/settings')),
                 ],
 
                 if (role == 'Instructor') ...[
@@ -1190,11 +1082,11 @@ class _WebSidebarState extends ConsumerState<_WebSidebar> {
                     padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
                     child: Divider(color: const Color(0xFFE8ECF5), height: 1),
                   ),
-                  _buildExtraNavItem(context, Icons.library_books_outlined, 'Manage Courses', () => onSelect(20)),
-                  _buildExtraNavItem(context, Icons.group_outlined, 'Assigned Learners', () => onSelect(21)),
-                  _buildExtraNavItem(context, Icons.health_and_safety_outlined, 'Health Precautions', () => onSelect(22)),
-                  _buildExtraNavItem(context, Icons.analytics_outlined, 'Educational Analytics', () => onSelect(23)),
-                  _buildExtraNavItem(context, Icons.settings_outlined, 'Settings', () => onSelect(24)),
+                  _buildExtraNavItem(context, Icons.library_books_outlined, 'Manage Courses', () => context.go('/instructor/manage-courses')),
+                  _buildExtraNavItem(context, Icons.group_outlined, 'Assigned Learners', () => context.go('/instructor/assigned-learners')),
+                  _buildExtraNavItem(context, Icons.health_and_safety_outlined, 'Health Precautions', () => context.go('/instructor/precautions')),
+                  _buildExtraNavItem(context, Icons.analytics_outlined, 'Educational Analytics', () => context.go('/instructor/analytics')),
+                  _buildExtraNavItem(context, Icons.settings_outlined, 'Settings', () => context.go('/settings')),
                 ],
 
                 if (role == 'Laboratory') ...[
@@ -1203,12 +1095,12 @@ class _WebSidebarState extends ConsumerState<_WebSidebar> {
                     padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
                     child: Divider(color: const Color(0xFFE8ECF5), height: 1),
                   ),
-                  _buildExtraNavItem(context, Icons.list_alt_outlined, 'Orders', () => onSelect(20)),
-                  _buildExtraNavItem(context, Icons.science_outlined, 'Test Catalog', () => onSelect(21)),
-                  _buildExtraNavItem(context, Icons.receipt_long_outlined, 'Invoices', () => onSelect(22)),
-                  _buildExtraNavItem(context, Icons.analytics_outlined, 'Analytics', () => onSelect(23)),
-                  _buildExtraNavItem(context, Icons.settings_outlined, 'Settings', () => onSelect(24)),
-                  _buildExtraNavItem(context, Icons.support_agent_outlined, 'iCare Lab Support', () => onSelect(25)),
+                  _buildExtraNavItem(context, Icons.list_alt_outlined, 'Orders', () => context.go('/lab/bookings')),
+                  _buildExtraNavItem(context, Icons.science_outlined, 'Test Catalog', () => context.go('/lab/tests')),
+                  _buildExtraNavItem(context, Icons.receipt_long_outlined, 'Invoices', () => context.go('/lab/invoices')),
+                  _buildExtraNavItem(context, Icons.analytics_outlined, 'Analytics', () => context.go('/lab/analytics')),
+                  _buildExtraNavItem(context, Icons.settings_outlined, 'Settings', () => context.go('/settings')),
+                  _buildExtraNavItem(context, Icons.support_agent_outlined, 'iCare Lab Support', () => context.go('/help')),
                 ],
 
                 if (role == 'Pharmacy') ...[
@@ -1217,11 +1109,11 @@ class _WebSidebarState extends ConsumerState<_WebSidebar> {
                     padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
                     child: Divider(color: const Color(0xFFE8ECF5), height: 1),
                   ),
-                  _buildExtraNavItem(context, Icons.hourglass_empty_outlined, 'Awaiting Fulfillment', () => onSelect(20)),
-                  _buildExtraNavItem(context, Icons.receipt_long_outlined, 'Invoices', () => onSelect(21)),
-                  _buildExtraNavItem(context, Icons.analytics_outlined, 'Analytics', () => onSelect(22)),
-                  _buildExtraNavItem(context, Icons.settings_outlined, 'Settings', () => onSelect(23)),
-                  _buildExtraNavItem(context, Icons.support_agent_outlined, 'iCare Pharmacist Support', () => onSelect(24)),
+                  _buildExtraNavItem(context, Icons.hourglass_empty_outlined, 'Awaiting Fulfillment', () => context.go('/pharmacy/active-orders')),
+                  _buildExtraNavItem(context, Icons.receipt_long_outlined, 'Invoices', () => context.go('/pharmacy/invoices')),
+                  _buildExtraNavItem(context, Icons.analytics_outlined, 'Analytics', () => context.go('/pharmacy/analytics')),
+                  _buildExtraNavItem(context, Icons.settings_outlined, 'Settings', () => context.go('/settings')),
+                  _buildExtraNavItem(context, Icons.support_agent_outlined, 'iCare Pharmacist Support', () => context.go('/help')),
                 ],
 
                 if (role == 'Student') ...[
@@ -1236,30 +1128,30 @@ class _WebSidebarState extends ConsumerState<_WebSidebar> {
                       height: 1,
                     ),
                   ),
-                  _buildExtraNavItem(context, Icons.class_outlined, 'Open Classroom', () => onSelect(20)),
+                  _buildExtraNavItem(context, Icons.class_outlined, 'Open Classroom', () => context.go('/student/classroom')),
                   _buildExtraNavItem(
                     context,
                     Icons.travel_explore_outlined,
                     'Browse Courses',
-                    () => onSelect(3),
+                    () => context.go('/student/browse'),
                   ),
                   _buildExtraNavItem(
                     context,
                     Icons.workspace_premium_outlined,
                     'My Certificates',
-                    () => onSelect(4),
+                    () => context.go('/student/certificates'),
                   ),
                   _buildExtraNavItem(
                     context,
                     Icons.task_alt_outlined,
                     'Assessments',
-                    () => onSelect(5),
+                    () => context.go('/student/assessments'),
                   ),
                   _buildExtraNavItem(
                     context,
                     Icons.settings_outlined,
                     'Settings',
-                    () => onSelect(6),
+                    () => context.go('/settings'),
                   ),
                 ],
 
@@ -1269,79 +1161,37 @@ class _WebSidebarState extends ConsumerState<_WebSidebar> {
                     context,
                     Icons.verified_user_outlined,
                     'Verify Applications',
-                    () {
-                      Navigator.of(context).pushReplacement(
-                        MaterialPageRoute(
-                          builder: (ctx) =>
-                              const TabsScreen(initialAdminTab: 'Pending'),
-                        ),
-                      );
-                    },
+                    () => context.go('/admin/dashboard?adminTab=Pending'),
                   ),
                   _buildExtraNavItem(
                     context,
                     Icons.medical_services_outlined,
                     'Manage Doctors',
-                    () {
-                      Navigator.of(context).pushReplacement(
-                        MaterialPageRoute(
-                          builder: (ctx) =>
-                              const TabsScreen(initialAdminTab: 'Doctor'),
-                        ),
-                      );
-                    },
+                    () => context.go('/admin/dashboard?adminTab=Doctor'),
                   ),
                   _buildExtraNavItem(
                     context,
                     Icons.school_outlined,
                     'Manage Students',
-                    () {
-                      Navigator.of(context).pushReplacement(
-                        MaterialPageRoute(
-                          builder: (ctx) =>
-                              const TabsScreen(initialAdminTab: 'Student'),
-                        ),
-                      );
-                    },
+                    () => context.go('/admin/dashboard?adminTab=Student'),
                   ),
                   _buildExtraNavItem(
                     context,
                     Icons.local_pharmacy_outlined,
                     'Manage Pharmacies',
-                    () {
-                      Navigator.of(context).pushReplacement(
-                        MaterialPageRoute(
-                          builder: (ctx) =>
-                              const TabsScreen(initialAdminTab: 'Pharmacy'),
-                        ),
-                      );
-                    },
+                    () => context.go('/admin/dashboard?adminTab=Pharmacy'),
                   ),
                   _buildExtraNavItem(
                     context,
                     Icons.biotech_outlined,
                     'Manage Laboratories',
-                    () {
-                      Navigator.of(context).pushReplacement(
-                        MaterialPageRoute(
-                          builder: (ctx) =>
-                              const TabsScreen(initialAdminTab: 'Laboratory'),
-                        ),
-                      );
-                    },
+                    () => context.go('/admin/dashboard?adminTab=Laboratory'),
                   ),
                   _buildExtraNavItem(
                     context,
                     Icons.person_add_outlined,
                     'Manage Instructors',
-                    () {
-                      Navigator.of(context).pushReplacement(
-                        MaterialPageRoute(
-                          builder: (ctx) =>
-                              const TabsScreen(initialAdminTab: 'Instructor'),
-                        ),
-                      );
-                    },
+                    () => context.go('/admin/dashboard?adminTab=Instructor'),
                   ),
                   _buildExtraNavItem(
                     context,
@@ -1782,11 +1632,12 @@ class _WebTopBarState extends ConsumerState<_WebTopBar> {
 class _SidebarItem {
   final IconData icon;
   final String label;
-  final int index;
+  /// Route this item navigates to, e.g. `/doctor/appointments`.
+  final String path;
   const _SidebarItem({
     required this.icon,
     required this.label,
-    required this.index,
+    required this.path,
   });
 }
 

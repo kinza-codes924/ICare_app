@@ -136,10 +136,11 @@ async function calculateAmount({ type, refId, voucherCode, userId, installmentIn
       appliedVoucher = voucher.code;
     }
     // Installment-enabled courses: "purchase" always means "pay installment 1"
-    // — the full schedule (with its own rounding-safe split) is generated at
-    // fulfillment time, not here.
-    if (course.installmentPlanEnabled && course.installmentCount >= 2 && !voucherCode) {
-      amount = Math.floor(amount / course.installmentCount);
+    // — the full schedule is generated at fulfillment time, not here. The
+    // instructor-defined plan's first row is the amount due on enrollment.
+    if (course.installmentPlanEnabled && Array.isArray(course.installmentPlan)
+        && course.installmentPlan.length >= 2 && !voucherCode) {
+      amount = Number(course.installmentPlan[0].amount) || 0;
     }
     return {
       amount: Math.max(0, Number(amount) || 0),
@@ -254,13 +255,12 @@ async function fulfillPayment(payment) {
     // regenerates it (idempotent).
     if (enrollment && (!enrollment.installments || enrollment.installments.length === 0)) {
       const course = await Course.findById(payment.refId).lean();
-      if (course?.installmentPlanEnabled && course.installmentCount >= 2 && !payment.voucherCode) {
-        const totalAmount = computeEffectivePrice(course);
+      if (course?.installmentPlanEnabled && Array.isArray(course.installmentPlan)
+          && course.installmentPlan.length >= 2 && !payment.voucherCode) {
         enrollment.installmentPlanEnabled = true;
         enrollment.installments = buildInstallmentSchedule({
-          totalAmount,
-          count: course.installmentCount,
-          firstDueDate: new Date(),
+          plan: course.installmentPlan,
+          enrollmentDate: enrollment.createdAt || new Date(),
           firstPaymentId: payment._id,
         });
         await enrollment.save();

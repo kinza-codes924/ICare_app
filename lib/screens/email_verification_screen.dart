@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:icare/services/auth_service.dart';
 import 'package:icare/widgets/custom_button.dart';
@@ -278,9 +279,7 @@ class _EmailVerificationScreenState extends ConsumerState<EmailVerificationScree
               CustomButton(
                 label: 'Skip for Now',
                 onPressed: () {
-                  Navigator.of(context).pushReplacement(
-                    MaterialPageRoute(builder: (ctx) => const TabsScreen()),
-                  );
+                  context.go('/dashboard');
                 },
                 bgColor: Colors.grey[600],
               ),

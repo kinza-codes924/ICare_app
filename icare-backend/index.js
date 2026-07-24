@@ -37,6 +37,7 @@ const lifestyleAdviceRoutes = require('./routes/lifestyle-advice');
 const uploadRoutes = require('./routes/upload');
 const assignmentsRoutes = require('./routes/assignments');
 const lmsInstallmentsRoutes = require('./routes/lms-installments');
+const analyticsRoutes   = require('./routes/analytics');
 const attendanceRoutes  = require('./routes/attendance');
 const announcementsRoutes = require('./routes/announcements');
 const verificationRoutes = require('./routes/verification');
@@ -93,7 +94,14 @@ app.use(cors({
     const allowed = ALLOWED_ORIGINS.some(o =>
       typeof o === 'string' ? o === origin : o.test?.(origin)
     );
-    callback(allowed ? null : new Error('Not allowed by CORS'), allowed);
+    // Never throw for a disallowed origin. Throwing surfaces as a 500 from
+    // the error handler — which is both wrong (the server is healthy; the
+    // request simply isn't permitted cross-origin) and noisy (it triggers
+    // Vercel's 5xx spike alerts). Passing `false` just omits the
+    // Access-Control-Allow-Origin header, so the browser blocks the response
+    // itself — the correct CORS behavior.
+    if (!allowed) console.warn(`[CORS] blocked origin: ${origin}`);
+    callback(null, allowed);
   },
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'x-platform'],
@@ -182,6 +190,7 @@ app.use('/api/upload', uploadRoutes);
 app.use('/api/community', communityRoutes);
 app.use('/api/lms/assignments',   assignmentsRoutes);
 app.use('/api/lms/installments',  lmsInstallmentsRoutes);
+app.use('/api/analytics',         analyticsRoutes);
 app.use('/api/lms/attendance',    attendanceRoutes);
 app.use('/api/lms/announcements', announcementsRoutes);
 app.use('/api/verification', verificationRoutes);

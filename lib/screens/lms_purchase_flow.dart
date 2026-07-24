@@ -164,14 +164,44 @@ class _LmsPurchaseFlowState extends ConsumerState<LmsPurchaseFlow> {
     }
   }
 
+  // Amount shown on the payment screen. This is display-only — the server
+  // re-computes the real charge in payments.js — so it just needs to match
+  // what will actually be charged.
+  double _displayAmount() {
+    double toNum(dynamic v) =>
+        (v is num) ? v.toDouble() : (double.tryParse('${v ?? ''}') ?? 0.0);
+
+    final base = toNum(widget.course['price'] ?? widget.course['cost']);
+    // discountedPrice only counts when it's a real positive value — a stored
+    // 0 must NOT wipe out the price (that was the "PKR 0 on payment screen"
+    // bug: `0 ?? price` returns 0 because 0 isn't null).
+    final rawDiscounted = widget.course['discountedPrice'];
+    final discounted = (rawDiscounted is num && rawDiscounted > 0)
+        ? rawDiscounted.toDouble()
+        : null;
+
+    // Server sends the after-early-bird price as effectivePrice when present.
+    final rawEffective = widget.course['effectivePrice'];
+    double effective = (rawEffective is num && rawEffective > 0)
+        ? rawEffective.toDouble()
+        : (discounted ?? base);
+
+    // Installment-enabled → the purchase pays only the FIRST installment.
+    if (widget.course['installmentPlanEnabled'] == true) {
+      final plan = widget.course['installmentPlan'];
+      if (plan is List && plan.isNotEmpty) {
+        return toNum((plan.first as Map?)?['amount']);
+      }
+    }
+    return effective;
+  }
+
   void _proceedToPayment() {
-    final price = (widget.course['discountedPrice'] ?? widget.course['price'] ?? widget.course['cost'] ?? 0);
-    final amount = (price is num) ? price.toDouble() : double.tryParse(price.toString()) ?? 0.0;
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(
         builder: (_) => SelectPaymentMethod(
-          amount: amount,
+          amount: _displayAmount(),
           onPaymentSuccess: _handlePaymentSuccess,
           courseId: widget.course['_id'],
         ),
