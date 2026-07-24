@@ -703,6 +703,8 @@ class _ViewCourseState extends ConsumerState<ViewCourse> {
 
     final price = widget.courseData?['price'];
     final isFree = price == null || price == 0 || widget.courseData?['isFree'] == true;
+    final hasInstallment = widget.courseData?['installmentPlanEnabled'] == true &&
+        (widget.courseData?['installmentPlan'] as List?)?.isNotEmpty == true;
 
     return Column(
       children: [
@@ -729,7 +731,130 @@ class _ViewCourseState extends ConsumerState<ViewCourse> {
                 : const Text('Enroll Now', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white)),
           ),
         ),
+        if (hasInstallment) ...[
+          const SizedBox(height: 10),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              icon: const Icon(Icons.payments_outlined, size: 18),
+              label: const Text('Enroll With Installment',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+              onPressed: _isPurchasing ? null : () => _showInstallmentSheet(courseId),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.primaryColor,
+                side: BorderSide(color: AppColors.primaryColor, width: 1.5),
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+            ),
+          ),
+        ],
       ],
+    );
+  }
+
+  void _showInstallmentSheet(String courseId) {
+    final course = widget.courseData ?? {};
+    final plan = (course['installmentPlan'] as List?) ?? [];
+    final firstAmt = plan.isNotEmpty ? (plan.first['amount'] ?? 0) : 0;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 40, height: 4,
+                decoration: BoxDecoration(
+                    color: const Color(0xFFE2E8F0),
+                    borderRadius: BorderRadius.circular(2)),
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Text('Installment Plan',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: Color(0xFF0F172A))),
+            const SizedBox(height: 4),
+            const Text('Pay in easy installments. First payment on enrollment.',
+                style: TextStyle(fontSize: 13, color: Color(0xFF64748B))),
+            const SizedBox(height: 20),
+            ...plan.asMap().entries.map((e) {
+              final i = e.key;
+              final row = e.value as Map? ?? {};
+              final amt = row['amount'] ?? 0;
+              final days = row['daysAfterEnrollment'] ?? 0;
+              final label = i == 0
+                  ? 'On Enrollment'
+                  : 'After $days day${days == 1 ? '' : 's'}';
+              return Container(
+                margin: const EdgeInsets.only(bottom: 10),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  color: i == 0 ? const Color(0xFFEFF6FF) : const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                      color: i == 0 ? AppColors.primaryColor.withValues(alpha: 0.3) : const Color(0xFFE2E8F0)),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 28, height: 28,
+                      decoration: BoxDecoration(
+                          color: i == 0 ? AppColors.primaryColor : const Color(0xFF64748B),
+                          shape: BoxShape.circle),
+                      child: Center(
+                        child: Text('${i + 1}',
+                            style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w700)),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(label,
+                          style: TextStyle(
+                              fontSize: 14, fontWeight: FontWeight.w600,
+                              color: i == 0 ? AppColors.primaryColor : const Color(0xFF334155))),
+                    ),
+                    Text('PKR ${amt.toString()}',
+                        style: TextStyle(
+                            fontSize: 15, fontWeight: FontWeight.w800,
+                            color: i == 0 ? AppColors.primaryColor : const Color(0xFF0F172A))),
+                  ],
+                ),
+              );
+            }),
+            const SizedBox(height: 20),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => LmsPurchaseFlow(course: course)),
+                  ).then((_) {
+                    if (mounted) setState(() {});
+                  });
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primaryColor,
+                  padding: const EdgeInsets.symmetric(vertical: 15),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  elevation: 0,
+                ),
+                child: Text('Pay First Installment — PKR ${firstAmt.toString()}',
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.white)),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 

@@ -551,13 +551,6 @@ function validatePricingFields(body) {
     if (!Array.isArray(plan) || plan.length < 2) {
       return 'Add at least 2 installments';
     }
-    // Effective price = discounted/base minus early-bird flat amount (mirrors
-    // computeEffectivePrice) — the installments must sum to exactly this.
-    const base = Number(body.discountedPrice || body.price || 0);
-    const eb = body.earlyBirdEnabled ? Number(body.earlyBirdAmount || 0) : 0;
-    const effective = Math.max(0, base - eb);
-
-    let sum = 0;
     let prevDays = -1;
     for (let i = 0; i < plan.length; i++) {
       const amt = Number(plan[i]?.amount);
@@ -569,10 +562,6 @@ function validatePricingFields(body) {
         return `Installment ${i + 1}: days must be greater than the previous installment`;
       }
       prevDays = days;
-      sum += amt;
-    }
-    if (Math.round(sum) !== Math.round(effective)) {
-      return `Installment amounts must total PKR ${Math.round(effective)} (currently PKR ${Math.round(sum)})`;
     }
   }
   return null;

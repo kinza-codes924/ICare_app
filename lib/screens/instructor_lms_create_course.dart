@@ -375,10 +375,6 @@ class _InstructorLmsCreateCourseScreenState
           }
           prevDays = days;
         }
-        if (err == null && _installmentsTotal.round() != _effectivePrice.round()) {
-          err = 'Installments must total PKR ${_effectivePrice.round()} '
-              '(currently PKR ${_installmentsTotal.round()})';
-        }
       }
       if (err != null) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(err)));
@@ -1773,43 +1769,27 @@ class _InstructorLmsCreateCourseScreenState
                     ),
                   ),
                   const SizedBox(height: 8),
-                  // Live total vs required — green when it matches.
+                  // Live total — neutral info only, no restriction.
                   Builder(
                     builder: (_) {
                       final total = _installmentsTotal;
-                      final need = _effectivePrice;
-                      final ok = total.round() == need.round() && need > 0;
                       return Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: ok
-                              ? const Color(0xFFE7F8EF)
-                              : const Color(0xFFFEF3F2),
+                          color: const Color(0xFFF1F5F9),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Row(
                           children: [
-                            Icon(
-                              ok
-                                  ? Icons.check_circle_rounded
-                                  : Icons.info_outline_rounded,
-                              size: 18,
-                              color: ok
-                                  ? const Color(0xFF10B981)
-                                  : const Color(0xFFEF4444),
-                            ),
+                            const Icon(Icons.info_outline_rounded,
+                                size: 18, color: Color(0xFF64748B)),
                             const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                'Total: PKR ${total.round()} — must equal PKR ${need.round()}'
-                                '${_earlyBirdEnabled ? " (price after Early Bird)" : ""}',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                  color: ok
-                                      ? const Color(0xFF047857)
-                                      : const Color(0xFFB91C1C),
-                                ),
+                            Text(
+                              'Total installments: PKR ${total.round()}',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFF475569),
                               ),
                             ),
                           ],
