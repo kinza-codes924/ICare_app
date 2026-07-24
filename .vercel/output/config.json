@@ -1,0 +1,33 @@
+{
+  "version": 3,
+  "routes": [
+    {
+      "src": "/manifest.json",
+      "headers": { "Content-Type": "application/manifest+json" },
+      "continue": true
+    },
+    {
+      "src": "/(index\\.html|flutter_bootstrap\\.js|main\\.dart\\.js|flutter_service_worker\\.js|version\\.json)",
+      "headers": { "Cache-Control": "no-store, no-cache, must-revalidate" },
+      "continue": true
+    },
+    {
+      "src": "/",
+      "headers": { "Cache-Control": "no-store, no-cache, must-revalidate" },
+      "continue": true
+    },
+    {
+      "src": "/(.*)",
+      "headers": {
+        "Cross-Origin-Opener-Policy": "unsafe-none",
+        "Cross-Origin-Embedder-Policy": "unsafe-none"
+      },
+      "continue": true
+    },
+    { "handle": "filesystem" },
+    {
+      "src": "/(.*)",
+      "dest": "/index.html"
+    }
+  ]
+}
