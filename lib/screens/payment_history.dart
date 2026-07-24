@@ -1,5 +1,7 @@
+import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:icare/services/api_service.dart';
 import 'package:icare/services/laboratory_service.dart';
 import 'package:icare/services/order_service.dart';
@@ -7,6 +9,8 @@ import 'package:icare/services/payment_service.dart';
 import 'package:icare/utils/theme.dart';
 import 'package:icare/widgets/back_button.dart';
 import 'package:intl/intl.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
 // ignore: avoid_web_libraries_in_flutter
 import 'dart:html' as html;
 
@@ -156,73 +160,206 @@ class _PaymentHistoryScreenState extends State<PaymentHistoryScreen> {
     }
   }
 
-  void _downloadInvoice(Map<String, dynamic> p) {
+  Future<void> _downloadInvoice(Map<String, dynamic> p) async {
     final date = p['date'] as DateTime?;
     final dateStr = date != null ? DateFormat('d MMM yyyy, hh:mm a').format(date) : 'N/A';
     final amount = (p['amount'] as double);
     final amountStr = amount > 0 ? 'Rs. ${NumberFormat('#,##0').format(amount)}' : '—';
     final ref = p['ref']?.toString() ?? '';
     final id = p['paymentId']?.toString() ?? '';
+    final invoiceNo = id.isNotEmpty ? id.substring(0, 8).toUpperCase() : 'N/A';
 
-    final html_content = '''<!DOCTYPE html>
-<html>
-<head>
-<meta charset="utf-8"/>
-<title>iCare Invoice</title>
-<style>
-  body { font-family: Arial, sans-serif; margin: 40px; color: #0f172a; }
-  .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #0036BC; padding-bottom: 20px; margin-bottom: 30px; }
-  .logo { font-size: 28px; font-weight: 900; color: #0036BC; }
-  .invoice-title { font-size: 14px; color: #64748b; text-align: right; }
-  .invoice-title strong { font-size: 20px; color: #0f172a; display: block; }
-  .section { margin-bottom: 24px; }
-  .section h3 { font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: #64748b; margin-bottom: 8px; }
-  .row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #e2e8f0; }
-  .row:last-child { border-bottom: none; }
-  .label { color: #64748b; font-size: 14px; }
-  .value { font-weight: 700; font-size: 14px; }
-  .total-row { background: #eff6ff; border-radius: 8px; padding: 14px 16px; display: flex; justify-content: space-between; margin-top: 16px; }
-  .total-label { font-size: 16px; font-weight: 700; }
-  .total-value { font-size: 20px; font-weight: 900; color: #0036BC; }
-  .badge { background: #ecfdf5; color: #059669; border-radius: 20px; padding: 4px 12px; font-size: 12px; font-weight: 700; }
-  .footer { margin-top: 40px; text-align: center; color: #94a3b8; font-size: 12px; border-top: 1px solid #e2e8f0; padding-top: 20px; }
-</style>
-</head>
-<body>
-<div class="header">
-  <div class="logo">iCare</div>
-  <div class="invoice-title">
-    <strong>INVOICE</strong>
-    ${id.isNotEmpty ? '#${id.substring(0, 8).toUpperCase()}' : ''}
-  </div>
-</div>
-<div class="section">
-  <h3>Payment Details</h3>
-  <div class="row"><span class="label">Description</span><span class="value">${p['title']}</span></div>
-  <div class="row"><span class="label">Type</span><span class="value">${p['subtitle']}</span></div>
-  <div class="row"><span class="label">Date</span><span class="value">$dateStr</span></div>
-  <div class="row"><span class="label">Status</span><span class="value"><span class="badge">${p['status']}</span></span></div>
-  ${ref.isNotEmpty ? '<div class="row"><span class="label">Reference</span><span class="value">$ref</span></div>' : ''}
-</div>
-<div class="total-row">
-  <span class="total-label">Total Paid</span>
-  <span class="total-value">$amountStr</span>
-</div>
-<div class="footer">
-  iCare Virtual Hospital &nbsp;|&nbsp; icare.com.co<br/>
-  This is a computer-generated invoice and does not require a signature.
-</div>
-</body>
-</html>''';
+    // Load logo
+    pw.ImageProvider? logoImage;
+    try {
+      final logoBytes = await rootBundle.load('assets/images/logo.png');
+      logoImage = pw.MemoryImage(logoBytes.buffer.asUint8List());
+    } catch (_) {}
+
+    final primaryColor = PdfColor.fromHex('#0036BC');
+    final greyColor = PdfColor.fromHex('#64748B');
+    final lightBlue = PdfColor.fromHex('#EFF6FF');
+    final borderColor = PdfColor.fromHex('#E2E8F0');
+    final greenColor = PdfColor.fromHex('#059669');
+
+    final doc = pw.Document();
+
+    doc.addPage(pw.Page(
+      pageFormat: PdfPageFormat.a4,
+      margin: const pw.EdgeInsets.all(40),
+      build: (pw.Context ctx) {
+        return pw.Column(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: [
+            // Header: logo + INVOICE label
+            pw.Row(
+              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: pw.CrossAxisAlignment.center,
+              children: [
+                if (logoImage != null)
+                  pw.Image(logoImage, width: 100, height: 40, fit: pw.BoxFit.contain)
+                else
+                  pw.Text('iCare',
+                      style: pw.TextStyle(
+                          fontSize: 26,
+                          fontWeight: pw.FontWeight.bold,
+                          color: primaryColor)),
+                pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.end,
+                  children: [
+                    pw.Text('INVOICE',
+                        style: pw.TextStyle(
+                            fontSize: 22,
+                            fontWeight: pw.FontWeight.bold,
+                            color: primaryColor)),
+                    pw.SizedBox(height: 4),
+                    pw.Text('#$invoiceNo',
+                        style: pw.TextStyle(fontSize: 12, color: greyColor)),
+                  ],
+                ),
+              ],
+            ),
+            pw.SizedBox(height: 6),
+            pw.Divider(color: primaryColor, thickness: 2),
+            pw.SizedBox(height: 20),
+
+            // Issued to / Date
+            pw.Row(
+              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+              children: [
+                pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.start,
+                  children: [
+                    pw.Text('ISSUED BY',
+                        style: pw.TextStyle(fontSize: 9, color: greyColor,
+                            letterSpacing: 1)),
+                    pw.SizedBox(height: 4),
+                    pw.Text('iCare Virtual Hospital',
+                        style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold)),
+                    pw.Text('icare.com.co',
+                        style: pw.TextStyle(fontSize: 11, color: greyColor)),
+                  ],
+                ),
+                pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.end,
+                  children: [
+                    pw.Text('DATE',
+                        style: pw.TextStyle(fontSize: 9, color: greyColor,
+                            letterSpacing: 1)),
+                    pw.SizedBox(height: 4),
+                    pw.Text(dateStr,
+                        style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold)),
+                  ],
+                ),
+              ],
+            ),
+            pw.SizedBox(height: 24),
+
+            // Payment details table
+            pw.Text('PAYMENT DETAILS',
+                style: pw.TextStyle(fontSize: 9, color: greyColor, letterSpacing: 1)),
+            pw.SizedBox(height: 8),
+            pw.Container(
+              decoration: pw.BoxDecoration(
+                border: pw.Border.all(color: borderColor),
+                borderRadius: pw.BorderRadius.circular(6),
+              ),
+              child: pw.Column(
+                children: [
+                  _pdfRow('Description', p['title'].toString(), primaryColor, borderColor, isFirst: true),
+                  _pdfRow('Type', p['subtitle'].toString(), primaryColor, borderColor),
+                  _pdfRow('Date', dateStr, primaryColor, borderColor),
+                  _pdfRow('Status', p['status'].toString(), primaryColor, borderColor,
+                      valueColor: greenColor),
+                  if (ref.isNotEmpty)
+                    _pdfRow('Reference', ref, primaryColor, borderColor),
+                  if (id.isNotEmpty)
+                    _pdfRow('Payment ID', id, primaryColor, borderColor, isLast: true),
+                ],
+              ),
+            ),
+            pw.SizedBox(height: 20),
+
+            // Total box
+            pw.Container(
+              padding: const pw.EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+              decoration: pw.BoxDecoration(
+                color: lightBlue,
+                borderRadius: pw.BorderRadius.circular(8),
+              ),
+              child: pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  pw.Text('Total Paid',
+                      style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
+                  pw.Text(amountStr,
+                      style: pw.TextStyle(
+                          fontSize: 20,
+                          fontWeight: pw.FontWeight.bold,
+                          color: primaryColor)),
+                ],
+              ),
+            ),
+
+            pw.Spacer(),
+
+            // Footer
+            pw.Divider(color: borderColor),
+            pw.SizedBox(height: 8),
+            pw.Center(
+              child: pw.Text(
+                'iCare Virtual Hospital  |  icare.com.co\n'
+                'This is a computer-generated invoice and does not require a signature.',
+                textAlign: pw.TextAlign.center,
+                style: pw.TextStyle(fontSize: 9, color: greyColor),
+              ),
+            ),
+          ],
+        );
+      },
+    ));
+
+    final Uint8List pdfBytes = await doc.save();
 
     if (kIsWeb) {
-      final blob = html.Blob([html_content], 'text/html');
+      final blob = html.Blob([pdfBytes], 'application/pdf');
       final url = html.Url.createObjectUrlFromBlob(blob);
       final anchor = html.AnchorElement(href: url)
-        ..setAttribute('download', 'icare-invoice-${id.isNotEmpty ? id.substring(0, 8) : 'receipt'}.html')
+        ..setAttribute('download', 'icare-invoice-$invoiceNo.pdf')
         ..click();
       html.Url.revokeObjectUrl(url);
     }
+  }
+
+  pw.Widget _pdfRow(
+    String label,
+    String value,
+    PdfColor primary,
+    PdfColor border, {
+    bool isFirst = false,
+    bool isLast = false,
+    PdfColor? valueColor,
+  }) {
+    return pw.Container(
+      padding: const pw.EdgeInsets.symmetric(horizontal: 16, vertical: 11),
+      decoration: pw.BoxDecoration(
+        border: pw.Border(
+          bottom: isLast ? pw.BorderSide.none : pw.BorderSide(color: border),
+        ),
+      ),
+      child: pw.Row(
+        mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+        children: [
+          pw.Text(label,
+              style: pw.TextStyle(fontSize: 12, color: PdfColor.fromHex('#64748B'))),
+          pw.Text(value,
+              style: pw.TextStyle(
+                  fontSize: 12,
+                  fontWeight: pw.FontWeight.bold,
+                  color: valueColor ?? PdfColor.fromHex('#0F172A'))),
+        ],
+      ),
+    );
   }
 
   void _showDetail(Map<String, dynamic> p) {
@@ -295,7 +432,7 @@ class _PaymentHistoryScreenState extends State<PaymentHistoryScreen> {
                 child: ElevatedButton.icon(
                   onPressed: () {
                     Navigator.pop(ctx);
-                    _downloadInvoice(p);
+                    _downloadInvoice(p);  // async — fire and forget
                   },
                   icon: const Icon(Icons.download_rounded, size: 18),
                   label: const Text('Download Invoice',
