@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -11,8 +12,8 @@ import 'package:icare/widgets/back_button.dart';
 import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
-// ignore: avoid_web_libraries_in_flutter
-import 'dart:html' as html;
+import 'package:path_provider/path_provider.dart';
+import 'package:open_file/open_file.dart';
 
 /// Payment history for Patients (appointments, pharmacy orders, lab bookings)
 /// and Students (course purchases).
@@ -321,13 +322,20 @@ class _PaymentHistoryScreenState extends State<PaymentHistoryScreen> {
 
     final Uint8List pdfBytes = await doc.save();
 
-    if (kIsWeb) {
-      final blob = html.Blob([pdfBytes], 'application/pdf');
-      final url = html.Url.createObjectUrlFromBlob(blob);
-      final anchor = html.AnchorElement(href: url)
-        ..setAttribute('download', 'icare-invoice-$invoiceNo.pdf')
-        ..click();
-      html.Url.revokeObjectUrl(url);
+    // Mobile (Android/iOS): save PDF to app documents dir and open it
+    // with the device's default PDF viewer / share sheet.
+    try {
+      final dir = await getApplicationDocumentsDirectory();
+      final file = File('${dir.path}/icare-invoice-$invoiceNo.pdf');
+      await file.writeAsBytes(pdfBytes, flush: true);
+      await OpenFile.open(file.path);
+    } catch (e) {
+      debugPrint('Failed to save/open invoice PDF: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not save invoice. Please try again.')),
+        );
+      }
     }
   }
 
@@ -426,7 +434,7 @@ class _PaymentHistoryScreenState extends State<PaymentHistoryScreen> {
             if ((p['paymentId']?.toString() ?? '').isNotEmpty)
               _detailRow('Payment ID', p['paymentId'].toString()),
             const SizedBox(height: 20),
-            if (p['status'] == 'Paid' && kIsWeb)
+            if (p['status'] == 'Paid')
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(
