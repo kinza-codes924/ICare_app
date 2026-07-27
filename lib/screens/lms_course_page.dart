@@ -13,6 +13,7 @@ import 'package:icare/screens/certificate_templates_screen.dart';
 import 'package:icare/screens/assignment_submit_screen.dart';
 import 'package:icare/screens/quiz_take_screen.dart';
 import 'package:icare/screens/student_course_settings_screen.dart';
+import 'package:icare/screens/installment_schedule_screen.dart';
 import 'package:icare/widgets/video_player_widget.dart';
 import 'package:intl/intl.dart';
 
@@ -40,6 +41,9 @@ class _LmsCoursePageState extends State<LmsCoursePage> with SingleTickerProvider
   String get _courseId => widget.course['_id']?.toString() ?? '';
   String get _courseName => widget.course['title'] ?? 'Course';
   int _attendanceRefreshKey = 0;
+  String? _lockReason;
+  bool _installmentPlanEnabled = false;
+  List<dynamic> _installments = [];
 
   @override
   void initState() {
@@ -51,6 +55,22 @@ class _LmsCoursePageState extends State<LmsCoursePage> with SingleTickerProvider
         setState(() => _attendanceRefreshKey++);
       }
     });
+    if (!widget.isInstructor) _fetchLockStatus();
+  }
+
+  Future<void> _fetchLockStatus() async {
+    if (_courseId.isEmpty) return;
+    try {
+      final data = await _lms.getCourseDetails(_courseId);
+      final course = data['course'] ?? data;
+      if (mounted) {
+        setState(() {
+          _lockReason = course['lockReason']?.toString();
+          _installmentPlanEnabled = (course['installmentPlanEnabled'] as bool?) ?? false;
+          _installments = (course['installments'] as List?) ?? [];
+        });
+      }
+    } catch (_) {}
   }
 
   @override
@@ -117,15 +137,74 @@ class _LmsCoursePageState extends State<LmsCoursePage> with SingleTickerProvider
             ),
           ),
         ],
-        body: TabBarView(
-          controller: _tabs,
+        body: Column(
           children: [
-            _StreamTab(courseId: _courseId, lms: _lms, isInstructor: widget.isInstructor),
-            _ClassworkTab(courseId: _courseId, lms: _lms, isInstructor: widget.isInstructor, course: widget.course, enrollmentId: widget.enrollmentId),
-            _GradesTab(courseId: _courseId, lms: _lms, isInstructor: widget.isInstructor, course: widget.course, enrollmentId: widget.enrollmentId),
-            _PeopleTab(courseId: _courseId, lms: _lms, course: widget.course, isInstructor: widget.isInstructor),
-            _AttendanceTab(key: ValueKey(_attendanceRefreshKey), courseId: _courseId, lms: _lms, isInstructor: widget.isInstructor),
-            _RecordingsTab(courseId: _courseId, lms: _lms),
+            if (_lockReason == 'installment_overdue')
+              GestureDetector(
+                onTap: () => Navigator.push(context, MaterialPageRoute(
+                  builder: (_) => InstallmentScheduleScreen(courseId: _courseId, courseTitle: _courseName),
+                )).then((_) => _fetchLockStatus()),
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  color: const Color(0xFFDC2626),
+                  child: Row(children: [
+                    const Icon(Icons.lock_rounded, color: Colors.white, size: 22),
+                    const SizedBox(width: 12),
+                    const Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Text('COURSE LOCKED', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 1)),
+                      Text('Installment overdue — pay now to unlock', style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w700)),
+                    ])),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(8)),
+                      child: const Text('PAY NOW', style: TextStyle(color: Color(0xFFDC2626), fontSize: 12, fontWeight: FontWeight.w800)),
+                    ),
+                  ]),
+                ),
+              )
+            else if (_installmentPlanEnabled && _installments.isNotEmpty)
+              Builder(builder: (_) {
+                final nextPending = _installments.firstWhere(
+                  (i) => i['status'] != 'paid',
+                  orElse: () => null,
+                );
+                if (nextPending == null) return const SizedBox.shrink();
+                final due = DateTime.tryParse(nextPending['dueDate']?.toString() ?? '');
+                final dueStr = due != null ? DateFormat('d MMM').format(due) : '';
+                return GestureDetector(
+                  onTap: () => Navigator.push(context, MaterialPageRoute(
+                    builder: (_) => InstallmentScheduleScreen(courseId: _courseId, courseTitle: _courseName),
+                  )).then((_) => _fetchLockStatus()),
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    color: const Color(0xFFEFF6FF),
+                    child: Row(children: [
+                      const Icon(Icons.payments_outlined, color: Color(0xFF2563EB), size: 18),
+                      const SizedBox(width: 10),
+                      Expanded(child: Text(
+                        'Next installment due${dueStr.isNotEmpty ? ' $dueStr' : ''} — tap to view schedule',
+                        style: const TextStyle(fontSize: 13, color: Color(0xFF1D4ED8), fontWeight: FontWeight.w600),
+                      )),
+                      const Icon(Icons.arrow_forward_ios_rounded, size: 13, color: Color(0xFF2563EB)),
+                    ]),
+                  ),
+                );
+              }),
+            Expanded(
+              child: TabBarView(
+                controller: _tabs,
+                children: [
+                  _StreamTab(courseId: _courseId, lms: _lms, isInstructor: widget.isInstructor),
+                  _ClassworkTab(courseId: _courseId, lms: _lms, isInstructor: widget.isInstructor, course: widget.course, enrollmentId: widget.enrollmentId),
+                  _GradesTab(courseId: _courseId, lms: _lms, isInstructor: widget.isInstructor, course: widget.course, enrollmentId: widget.enrollmentId),
+                  _PeopleTab(courseId: _courseId, lms: _lms, course: widget.course, isInstructor: widget.isInstructor),
+                  _AttendanceTab(key: ValueKey(_attendanceRefreshKey), courseId: _courseId, lms: _lms, isInstructor: widget.isInstructor),
+                  _RecordingsTab(courseId: _courseId, lms: _lms),
+                ],
+              ),
+            ),
           ],
         ),
       ),
