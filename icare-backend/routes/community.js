@@ -4,6 +4,7 @@ const mongoose = require('mongoose');
 const { connectMongoDB } = require('../config/mongodb');
 const CommunityPost = require('../models/CommunityPost');
 const CommunityTopic = require('../models/CommunityTopic');
+const User = require('../models/User');
 const { authMiddleware } = require('../middleware/auth');
 const cloudinary = require('../config/cloudinary');
 
@@ -89,14 +90,27 @@ router.get('/posts', async (req, res) => {
       .skip(Number(skip))
       .lean();
 
-    const formatted = posts.map(p => ({
-      ...p,
-      id: p._id.toString(),
-      authorName: p.userName || p.authorName || 'User',
-      authorRole: p.userRole || p.authorRole || 'Patient',
-      likeCount: (p.likes || []).length,
-      commentCount: (p.comments || []).length,
-    }));
+    // Fetch user profiles to get live name + avatar (covers old posts with missing userName)
+    const userIds = [...new Set(posts.map(p => p.userId?.toString()).filter(Boolean))];
+    const users = await User.find({ _id: { $in: userIds } })
+      .select('name username profilePicture role')
+      .lean();
+    const userMap = {};
+    users.forEach(u => { userMap[u._id.toString()] = u; });
+
+    const formatted = posts.map(p => {
+      const uid = p.userId?.toString();
+      const u = userMap[uid] || {};
+      return {
+        ...p,
+        id: p._id.toString(),
+        authorName: u.name || u.username || p.userName || 'User',
+        authorRole: u.role || p.userRole || 'Patient',
+        authorAvatar: u.profilePicture || null,
+        likeCount: (p.likes || []).length,
+        commentCount: (p.comments || []).length,
+      };
+    });
 
     res.json({ success: true, posts: formatted });
   } catch (err) {

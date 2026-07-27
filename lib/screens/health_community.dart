@@ -343,6 +343,7 @@ class _HealthCommunityScreenState extends ConsumerState<HealthCommunityScreen> {
     final initial = authorName.isNotEmpty ? authorName[0].toUpperCase() : 'U';
     final isExpert = post['isExpert'] ?? false;
     final role = post['authorRole'] ?? post['author']?['role'] ?? 'Patient';
+    final authorAvatar = post['authorAvatar']?.toString();
     final timeRaw = post['createdAt'] ?? post['updatedAt'];
     final time = timeRaw != null
         ? DateTime.parse(timeRaw.toString())
@@ -373,13 +374,18 @@ class _HealthCommunityScreenState extends ConsumerState<HealthCommunityScreen> {
                   backgroundColor: isExpert
                       ? Colors.blue
                       : AppColors.primaryColor.withValues(alpha: 0.1),
-                  child: Text(
-                    initial,
-                    style: TextStyle(
-                      color: isExpert ? Colors.white : AppColors.primaryColor,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
+                  backgroundImage: (authorAvatar != null && authorAvatar.isNotEmpty && !authorAvatar.startsWith('data:'))
+                      ? NetworkImage(authorAvatar)
+                      : null,
+                  child: (authorAvatar == null || authorAvatar.isEmpty || authorAvatar.startsWith('data:'))
+                      ? Text(
+                          initial,
+                          style: TextStyle(
+                            color: isExpert ? Colors.white : AppColors.primaryColor,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        )
+                      : null,
                 ),
                 const SizedBox(width: 16),
                 Expanded(
