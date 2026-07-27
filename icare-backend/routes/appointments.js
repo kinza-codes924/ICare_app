@@ -141,6 +141,51 @@ router.post('/book_appointment', authMiddleware, async (req, res) => {
       return res.status(404).json({ success: false, message: 'Doctor not found' });
     }
 
+    // ── Availability validation ──────────────────────────────────────────────
+    const profile = await DoctorProfile.findOne({ user_id: toId(doctorId) }).lean();
+    if (profile) {
+      // 1. Check day availability
+      const bookingDate = new Date(date);
+      const dayNames = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+      const dayName = dayNames[bookingDate.getDay()];
+      if (profile.available_days?.length > 0) {
+        const dayOk = profile.available_days.some(d => d.trim().toLowerCase() === dayName.toLowerCase());
+        if (!dayOk) {
+          return res.status(400).json({ success: false, message: `Doctor is not available on ${dayName}` });
+        }
+      }
+
+      // 2. Check time slot within available_hours
+      if (profile.available_hours?.start && profile.available_hours?.end) {
+        const parseToMinutes = (str) => {
+          if (!str) return null;
+          const s = str.trim().toUpperCase();
+          const ampm = s.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/);
+          if (ampm) {
+            let h = parseInt(ampm[1]), m = parseInt(ampm[2]);
+            if (ampm[3] === 'PM' && h !== 12) h += 12;
+            if (ampm[3] === 'AM' && h === 12) h = 0;
+            return h * 60 + m;
+          }
+          const h24 = s.match(/^(\d{1,2}):(\d{2})$/);
+          if (h24) return parseInt(h24[1]) * 60 + parseInt(h24[2]);
+          return null;
+        };
+        const slotMins  = parseToMinutes(timeSlot);
+        const startMins = parseToMinutes(profile.available_hours.start);
+        const endMins   = parseToMinutes(profile.available_hours.end);
+        if (slotMins !== null && startMins !== null && endMins !== null) {
+          if (slotMins < startMins || slotMins >= endMins) {
+            return res.status(400).json({
+              success: false,
+              message: `Doctor is only available between ${profile.available_hours.start} and ${profile.available_hours.end}`,
+            });
+          }
+        }
+      }
+    }
+    // ────────────────────────────────────────────────────────────────────────
+
     const appt = await Appointment.create({
       patient_id: patientId,
       doctor_id: toId(doctorId),
