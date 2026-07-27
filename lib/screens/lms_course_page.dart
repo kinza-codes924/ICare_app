@@ -197,7 +197,7 @@ class _LmsCoursePageState extends State<LmsCoursePage> with SingleTickerProvider
                 controller: _tabs,
                 children: [
                   _StreamTab(courseId: _courseId, lms: _lms, isInstructor: widget.isInstructor),
-                  _ClassworkTab(courseId: _courseId, lms: _lms, isInstructor: widget.isInstructor, course: widget.course, enrollmentId: widget.enrollmentId),
+                  _ClassworkTab(courseId: _courseId, lms: _lms, isInstructor: widget.isInstructor, course: widget.course, enrollmentId: widget.enrollmentId, lockReason: _lockReason),
                   _GradesTab(courseId: _courseId, lms: _lms, isInstructor: widget.isInstructor, course: widget.course, enrollmentId: widget.enrollmentId),
                   _PeopleTab(courseId: _courseId, lms: _lms, course: widget.course, isInstructor: widget.isInstructor),
                   _AttendanceTab(key: ValueKey(_attendanceRefreshKey), courseId: _courseId, lms: _lms, isInstructor: widget.isInstructor),
@@ -514,7 +514,8 @@ class _ClassworkTab extends StatefulWidget {
   final bool isInstructor;
   final Map<String, dynamic> course;
   final String? enrollmentId;
-  const _ClassworkTab({required this.courseId, required this.lms, required this.isInstructor, required this.course, this.enrollmentId});
+  final String? lockReason;
+  const _ClassworkTab({required this.courseId, required this.lms, required this.isInstructor, required this.course, this.enrollmentId, this.lockReason});
 
   @override
   State<_ClassworkTab> createState() => _ClassworkTabState();
@@ -664,7 +665,23 @@ class _ClassworkTabState extends State<_ClassworkTab> {
               label: const Text('Assignment', style: TextStyle(color: Colors.white)),
             )
           : null,
-      body: RefreshIndicator(
+      body: widget.lockReason == 'installment_overdue'
+          ? const Center(
+              child: Padding(
+                padding: EdgeInsets.all(32),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.lock_rounded, size: 64, color: Color(0xFFDC2626)),
+                    SizedBox(height: 16),
+                    Text('Course content is locked', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: Color(0xFF0F172A))),
+                    SizedBox(height: 8),
+                    Text('Pay your overdue installment to unlock access.', textAlign: TextAlign.center, style: TextStyle(fontSize: 14, color: Color(0xFF64748B))),
+                  ],
+                ),
+              ),
+            )
+          : RefreshIndicator(
         onRefresh: _load,
         child: ListView(
           padding: const EdgeInsets.all(16),
@@ -706,6 +723,7 @@ class _ClassworkTabState extends State<_ClassworkTab> {
     );
   }
 }
+
 
 class _SectionHeader extends StatelessWidget {
   final String title;
