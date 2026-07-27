@@ -1,9 +1,11 @@
-import 'dart:convert' show base64Encode;
 import 'dart:io' show File;
+import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:icare/utils/api_constants.dart';
+import 'package:icare/utils/shared_pref.dart';
 import 'package:icare/utils/theme.dart';
 import 'package:icare/widgets/back_button.dart';
 import 'package:icare/services/course_service.dart';
@@ -1045,14 +1047,29 @@ class _CreatePostSheetState extends State<_CreatePostSheet> {
         'category': _selectedCategory,
       };
 
-      // If an image is selected, convert to base64 before sending
+      // Upload image via multipart to /api/upload/image → get Cloudinary URL
       if (_imageFile != null) {
         try {
+          final token = await SharedPref().getToken() ?? '';
           final bytes = await _imageFile!.readAsBytes();
-          final base64Image = 'data:image/jpeg;base64,${base64Encode(bytes)}';
-          data['image'] = base64Image;
+          final filename = _imageFile!.name.isNotEmpty ? _imageFile!.name : 'image.jpg';
+          final formData = FormData.fromMap({
+            'file': MultipartFile.fromBytes(bytes, filename: filename),
+            'folder': 'community_posts',
+          });
+          final res = await Dio().post(
+            '${ApiConstants.baseUrl}/upload/image',
+            data: formData,
+            options: Options(
+              headers: {'Authorization': 'Bearer $token'},
+              validateStatus: (s) => s != null && s < 600,
+            ),
+          );
+          if (res.statusCode == 200 && res.data['success'] == true) {
+            data['imageUrl'] = res.data['url'];
+          }
         } catch (e) {
-          debugPrint('Error converting image to base64: $e');
+          debugPrint('Image upload error: $e');
         }
       }
 
