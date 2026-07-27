@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_switch/flutter_switch.dart';
+import 'package:icare/models/lab_test.dart';
+import 'package:icare/screens/confirm_booking.dart';
 import 'package:icare/screens/select_test.dart';
 import 'package:icare/widgets/back_button.dart';
 import 'package:intl/intl.dart';
@@ -447,23 +449,40 @@ class _BookLabScreenState extends State<BookLabScreen> {
       );
       return;
     }
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (ctx) => SelectTest(
-          bookingData: {
-            'labId': widget.labId,
-            'labProfileId': widget.labProfileId,
-            'labTitle': widget.labTitle ?? 'Laboratory Service',
-            'date': _selectedDate,
-            'time': _selectedTime,
-            'city': _cityController.text,
-            'address': _addressController.text,
-            'homeSample': _homeSample,
-            'preSelectedTests': widget.preSelectedTests ?? [],
-          },
+
+    final bookingData = {
+      'labId': widget.labId,
+      'labProfileId': widget.labProfileId,
+      'labTitle': widget.labTitle ?? 'Laboratory Service',
+      'date': _selectedDate,
+      'time': _selectedTime,
+      'city': _cityController.text,
+      'address': _addressController.text,
+      'homeSample': _homeSample,
+      'preSelectedTests': widget.preSelectedTests ?? [],
+    };
+
+    final preSelected = widget.preSelectedTests ?? [];
+
+    // If tests were pre-selected in Step 2 of PatientBookLabFlow, skip SelectTest
+    // and go directly to confirmation with those tests
+    if (preSelected.isNotEmpty) {
+      final labTests = preSelected.map((name) => LabTest(
+        id: name,
+        name: name,
+        price: 0,
+      )).toList();
+      Navigator.of(context).push(MaterialPageRoute(
+        builder: (ctx) => ConfirmBookingScreen(
+          bookingData: bookingData,
+          selectedTests: labTests,
         ),
-      ),
-    );
+      ));
+    } else {
+      Navigator.of(context).push(MaterialPageRoute(
+        builder: (ctx) => SelectTest(bookingData: bookingData),
+      ));
+    }
   }
 
   Future<void> _pickDate() async {
