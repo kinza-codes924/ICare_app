@@ -1,4 +1,4 @@
-import 'package:dio/dio.dart';
+﻿import 'package:dio/dio.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -46,9 +46,9 @@ import 'package:icare/services/reminder_service.dart';
 // 1 reward point = 0.01 PKR (100 pts = 1 PKR). Configurable from backend.
 const double _kPointToPkr = 0.01;
 
-// ═══════════════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // SETTINGS SCREEN
-// ═══════════════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -173,10 +173,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         });
         // Re-schedule JS daily reminders so they survive page refresh
         if (_medReminderTime != null) {
-          scheduleDailyReminder('medication', 'Medication Reminder 💊', 'Time to take your medication. Stay on track!', _medReminderTime!.hour, _medReminderTime!.minute);
+          scheduleDailyReminder('medication', 'Medication Reminder ðŸ’Š', 'Time to take your medication. Stay on track!', _medReminderTime!.hour, _medReminderTime!.minute);
         }
         if (_healthCheckReminderTime != null) {
-          scheduleDailyReminder('health_check', 'Health Check Reminder ❤️', 'Time to log your health metrics (BP, weight, etc.).', _healthCheckReminderTime!.hour, _healthCheckReminderTime!.minute);
+          scheduleDailyReminder('health_check', 'Health Check Reminder â¤ï¸', 'Time to log your health metrics (BP, weight, etc.).', _healthCheckReminderTime!.hour, _healthCheckReminderTime!.minute);
         }
       }
     } catch (_) {}
@@ -377,7 +377,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ]),
           ),
           const SizedBox(height: 12),
-          // Step 2 — QR code
+          // Step 2 â€” QR code
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(color: const Color(0xFFF0FDF4), borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xFFBBF7D0))),
@@ -417,7 +417,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ]),
           ),
           const SizedBox(height: 12),
-          // Step 3 — enter code
+          // Step 3 â€” enter code
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(color: const Color(0xFFFFFBEB), borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xFFFDE68A))),
@@ -501,7 +501,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             );
           }
         }
-        // cancelled/failed → do nothing, switch stays off
+        // cancelled/failed â†’ do nothing, switch stays off
       } catch (e) {
         debugPrint('Toggle biometrics error: $e');
         if (mounted) {
@@ -822,7 +822,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         items.add({
           'id': b['_id'] ?? '',
           'type': 'lab_test',
-          'title': '$testName — $lab',
+          'title': '$testName â€” $lab',
           'amount': price != 0 ? 'PKR $price' : '',
           'amountNum': price,
           'date': b['createdAt'] ?? b['test_date'] ?? b['date'] ?? '',
@@ -865,11 +865,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     String selected = currentLang;
     final langs = [
       {'code': 'en', 'label': 'English', 'native': 'English'},
-      {'code': 'ur', 'label': 'اردو', 'native': 'Urdu'},
+      {'code': 'ur', 'label': 'Ø§Ø±Ø¯Ùˆ', 'native': 'Urdu'},
     ];
     showDialog(context: ctx, builder: (dc) => StatefulBuilder(builder: (_, setS) => AlertDialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      title: const Row(children: [Icon(Icons.translate_rounded, color: Color(0xFF64748B), size: 22), SizedBox(width: 10), Text('Language / زبان', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16))]),
+      title: const Row(children: [Icon(Icons.translate_rounded, color: Color(0xFF64748B), size: 22), SizedBox(width: 10), Text('Language / Ø²Ø¨Ø§Ù†', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16))]),
       content: SizedBox(width: double.maxFinite,child: Column(mainAxisSize: MainAxisSize.min, children: [
         ...langs.map((lang) {
           final isSel = selected == lang['code'];
@@ -906,10 +906,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             Navigator.pop(dc);
             final locale = selected == 'ur' ? const Locale('ur') : const Locale('en');
             await ctx.setLocale(locale);
-            setState(() => _selectedLanguage = selected == 'ur' ? 'اردو' : 'English');
+            setState(() => _selectedLanguage = selected == 'ur' ? 'Ø§Ø±Ø¯Ùˆ' : 'English');
             if (mounted) {
               ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                content: Text(selected == 'ur' ? 'زبان اردو میں تبدیل ہو گئی' : 'Language set to English'),
+                content: Text(selected == 'ur' ? 'Ø²Ø¨Ø§Ù† Ø§Ø±Ø¯Ùˆ Ù…ÛŒÚº ØªØ¨Ø¯ÛŒÙ„ ÛÙˆ Ú¯Ø¦ÛŒ' : 'Language set to English'),
                 backgroundColor: Colors.green,
                 duration: const Duration(seconds: 2),
               ));
@@ -1198,7 +1198,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           final widgets = <pw.Widget>[];
           widgets.add(pw.SizedBox(height: 8));
 
-          // ── Consultations ──
+          // â”€â”€ Consultations â”€â”€
           if (appts.isNotEmpty) {
             widgets.add(pw.Text('Consultations (${appts.length})', style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold, color: PdfColors.blue800)));
             widgets.add(pw.SizedBox(height: 8));
@@ -1222,7 +1222,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             widgets.add(pw.SizedBox(height: 12));
           }
 
-          // ── Lab Tests ──
+          // â”€â”€ Lab Tests â”€â”€
           if (labBookings.isNotEmpty) {
             widgets.add(pw.Text('Lab Tests (${labBookings.length})', style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold, color: PdfColors.green800)));
             widgets.add(pw.SizedBox(height: 8));
@@ -1246,7 +1246,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             widgets.add(pw.SizedBox(height: 12));
           }
 
-          // ── Medicine Orders ──
+          // â”€â”€ Medicine Orders â”€â”€
           if (orders.isNotEmpty) {
             widgets.add(pw.Text('Medicine Orders (${orders.length})', style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold, color: PdfColors.purple)));
             widgets.add(pw.SizedBox(height: 8));
@@ -1512,7 +1512,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       if (time != null) {
         await prefs.setString('med_reminder_time', '${time.hour}:${time.minute}');
         await ReminderService().createReminder({'title': 'Take your medication', 'type': 'medication', 'time': '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}', 'isRecurring': true});
-        scheduleDailyReminder('medication', 'Medication Reminder 💊', 'Time to take your medication. Stay on track!', time.hour, time.minute);
+        scheduleDailyReminder('medication', 'Medication Reminder ðŸ’Š', 'Time to take your medication. Stay on track!', time.hour, time.minute);
       } else {
         await prefs.remove('med_reminder_time');
         cancelDailyReminder('medication');
@@ -1527,7 +1527,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       if (time != null) {
         await prefs.setString('health_check_reminder_time', '${time.hour}:${time.minute}');
         await ReminderService().createReminder({'title': 'Log your health metrics', 'type': 'health_check', 'time': '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}', 'isRecurring': true});
-        scheduleDailyReminder('health_check', 'Health Check Reminder ❤️', 'Time to log your health metrics (BP, weight, etc.).', time.hour, time.minute);
+        scheduleDailyReminder('health_check', 'Health Check Reminder â¤ï¸', 'Time to log your health metrics (BP, weight, etc.).', time.hour, time.minute);
       } else {
         await prefs.remove('health_check_reminder_time');
         cancelDailyReminder('health_check');
@@ -1650,9 +1650,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // SHARED PARAMS
-// ═══════════════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 class _SettingsLayoutParams {
   final String role;
@@ -1738,9 +1738,9 @@ class _SettingsLayoutParams {
   });
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // WEB LAYOUT
-// ═══════════════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 class _WebSettingsLayout extends StatelessWidget {
   final _SettingsLayoutParams p;
@@ -1777,7 +1777,7 @@ class _WebSettingsLayout extends StatelessWidget {
       ])))));
   }
 
-  // ── PROFILE CARD ──
+  // â”€â”€ PROFILE CARD â”€â”€
   Widget _profileCard(BuildContext context) {
     return Card(elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Padding(padding: const EdgeInsets.all(20), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -1808,7 +1808,7 @@ class _WebSettingsLayout extends StatelessWidget {
     return Row(children: [Icon(icon, size: 18, color: const Color(0xFF64748B)), const SizedBox(width: 10), Text('$label: ', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF475569))), Expanded(child: Text(value, style: const TextStyle(fontSize: 14, color: Color(0xFF64748B))))]);
   }
 
-  // ── HEALTH PROFILE ──
+  // â”€â”€ HEALTH PROFILE â”€â”€
   Widget _healthProfile(BuildContext context) {
     return Card(elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Padding(padding: const EdgeInsets.all(20), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -1825,13 +1825,13 @@ class _WebSettingsLayout extends StatelessWidget {
       ])));
   }
 
-  // ── NOTIFICATIONS ──
+  // â”€â”€ NOTIFICATIONS â”€â”€
   Widget _notificationsCard(BuildContext context) {
     return Card(elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Padding(padding: const EdgeInsets.all(20), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         _sectionLabel('Notifications'), const SizedBox(height: 16),
         if (p.isLaboratory) ...[
-          _switchTile(icon: Icons.notifications_active_outlined, title: 'New Test Requests', subtitle: 'Required • Cannot be turned off', value: true, onChanged: (_) {}),
+          _switchTile(icon: Icons.notifications_active_outlined, title: 'New Test Requests', subtitle: 'Required â€¢ Cannot be turned off', value: true, onChanged: (_) {}),
           const Divider(height: 1),
           _switchTile(icon: Icons.biotech_outlined, title: 'Sample Collection Status', subtitle: 'Updates on sample pickup & processing', value: p.notifPrefs['delivery_updates'] ?? true, onChanged: (v) => p.onSaveNotifPref('delivery_updates', v)),
           const Divider(height: 1),
@@ -1841,7 +1841,7 @@ class _WebSettingsLayout extends StatelessWidget {
           const Divider(height: 1),
           _switchTile(icon: Icons.volume_up_outlined, title: 'Sound Notifications', subtitle: 'Play sound for notifications', value: p.notifPrefs['sound_notifications'] ?? true, onChanged: (v) => p.onSaveNotifPref('sound_notifications', v)),
         ] else if (p.isPharmacy) ...[
-          _switchTile(icon: Icons.notifications_active_outlined, title: 'New Orders', subtitle: 'Required • Cannot be turned off', value: true, onChanged: (_) {}),
+          _switchTile(icon: Icons.notifications_active_outlined, title: 'New Orders', subtitle: 'Required â€¢ Cannot be turned off', value: true, onChanged: (_) {}),
           const Divider(height: 1),
           _switchTile(icon: Icons.local_shipping_outlined, title: 'Order Dispatched', subtitle: 'Notify when order is out for delivery', value: p.notifPrefs['order_dispatched'] ?? true, onChanged: (v) => p.onSaveNotifPref('order_dispatched', v)),
           const Divider(height: 1),
@@ -1870,7 +1870,7 @@ class _WebSettingsLayout extends StatelessWidget {
       ])));
   }
 
-  // ── WATER REMINDER ──
+  // â”€â”€ WATER REMINDER â”€â”€
   Widget _waterReminderCard(BuildContext context) {
     final labels = {'30': '30 min', '60': '1 hr', '120': '2 hrs', '180': '3 hrs'};
     final label = labels[p.waterReminderMinutes.toString()] ?? '1 hr';
@@ -1881,7 +1881,7 @@ class _WebSettingsLayout extends StatelessWidget {
       ])));
   }
 
-  // ── REMINDERS & NOTIFICATIONS ──
+  // â”€â”€ REMINDERS & NOTIFICATIONS â”€â”€
   Widget _remindersCard(BuildContext context) {
     final waterLabels = {'30': '30 min', '60': '1 hr', '120': '2 hrs', '180': '3 hrs'};
     final waterLabel = waterLabels[p.waterReminderMinutes.toString()] ?? '1 hr';
@@ -1905,7 +1905,7 @@ class _WebSettingsLayout extends StatelessWidget {
       ])));
   }
 
-  // ── DIAGNOSTICS SETTINGS ──
+  // â”€â”€ DIAGNOSTICS SETTINGS â”€â”€
   Widget _diagnosticsCard(BuildContext context) {
     return Card(elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Padding(padding: const EdgeInsets.all(20), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -1924,7 +1924,7 @@ class _WebSettingsLayout extends StatelessWidget {
       ])));
   }
 
-  // ── REWARDS ──
+  // â”€â”€ REWARDS â”€â”€
   Widget _rewardsCard(BuildContext context) {
     return Card(elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Padding(padding: const EdgeInsets.all(20), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -1952,7 +1952,7 @@ class _WebSettingsLayout extends StatelessWidget {
         Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text('${p.totalPoints}', style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w900, color: Colors.white)),
           const Text('Total Points', style: TextStyle(fontSize: 12, color: Colors.white70, fontWeight: FontWeight.w600)),
-          Text('≈ PKR ${(p.totalPoints * _kPointToPkr).toStringAsFixed(2)}', style: const TextStyle(fontSize: 11, color: Colors.white60)),
+          Text('â‰ˆ PKR ${(p.totalPoints * _kPointToPkr).toStringAsFixed(2)}', style: const TextStyle(fontSize: 11, color: Colors.white60)),
         ]),
       ]),
     );
@@ -1975,12 +1975,12 @@ class _WebSettingsLayout extends StatelessWidget {
             Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text('${p.totalPoints}', style: const TextStyle(fontSize: 36, fontWeight: FontWeight.w900, color: Colors.white)),
               const Text('Reward Points', style: TextStyle(fontSize: 13, color: Colors.white70)),
-              Text('≈ PKR ${(p.totalPoints * _kPointToPkr).toStringAsFixed(2)}', style: const TextStyle(fontSize: 12, color: Colors.white60)),
+              Text('â‰ˆ PKR ${(p.totalPoints * _kPointToPkr).toStringAsFixed(2)}', style: const TextStyle(fontSize: 12, color: Colors.white60)),
             ]),
           ]),
         ),
         const SizedBox(height: 16),
-        const Text('Points are earned by:\n• Logging vitals (+5 pts each)\n• Completing daily goals (+10 pts)\n• Taking all medications (+10 pts)\n• Attending consultations (+15 pts)', style: TextStyle(fontSize: 13, color: Color(0xFF475569), height: 1.6)),
+        const Text('Points are earned by:\nâ€¢ Logging vitals (+5 pts each)\nâ€¢ Completing daily goals (+10 pts)\nâ€¢ Taking all medications (+10 pts)\nâ€¢ Attending consultations (+15 pts)', style: TextStyle(fontSize: 13, color: Color(0xFF475569), height: 1.6)),
         const SizedBox(height: 12),
         SizedBox(width: double.infinity, child: ElevatedButton.icon(onPressed: () { Navigator.pop(dc); _showRedeemRewardsDialog(context); }, icon: const Icon(Icons.redeem_rounded, size: 18), label: const Text('Redeem Points'), style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF10B981), foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))))),
       ])),
@@ -2030,7 +2030,7 @@ class _WebSettingsLayout extends StatelessWidget {
           ));
         }),
         const Divider(),
-        const Text('1 pt = PKR 0.01 • Rate may change by platform', style: TextStyle(fontSize: 11, color: Color(0xFF94A3B8))),
+        const Text('1 pt = PKR 0.01 â€¢ Rate may change by platform', style: TextStyle(fontSize: 11, color: Color(0xFF94A3B8))),
       ])),
       actions: [TextButton(onPressed: () => Navigator.pop(dc2), child: const Text('Close'))],
     )));
@@ -2114,7 +2114,7 @@ class _WebSettingsLayout extends StatelessWidget {
     ));
   }
 
-  // ── PRIVACY ──
+  // â”€â”€ PRIVACY â”€â”€
   Widget _privacyCard(BuildContext context) {
     return Card(elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Padding(padding: const EdgeInsets.all(20), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -2123,7 +2123,7 @@ class _WebSettingsLayout extends StatelessWidget {
       ])));
   }
 
-  // ── PAYMENTS ──
+  // â”€â”€ PAYMENTS â”€â”€
   Widget _paymentCard(BuildContext context) {
     return Card(elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Padding(padding: const EdgeInsets.all(20), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -2134,7 +2134,7 @@ class _WebSettingsLayout extends StatelessWidget {
       ])));
   }
 
-  // ── STUDENT PAYMENTS ──
+  // â”€â”€ STUDENT PAYMENTS â”€â”€
   Widget _studentPaymentCard(BuildContext context) {
     return Card(elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Padding(padding: const EdgeInsets.all(20), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -2143,7 +2143,7 @@ class _WebSettingsLayout extends StatelessWidget {
       ])));
   }
 
-  // ── CONTACT ──
+  // â”€â”€ CONTACT â”€â”€
   Widget _contactCard(BuildContext context) {
     return Card(elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Padding(padding: const EdgeInsets.all(20), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -2162,7 +2162,7 @@ class _WebSettingsLayout extends StatelessWidget {
       ])));
   }
 
-  // ── PHARMACY ──
+  // â”€â”€ PHARMACY â”€â”€
   Widget _pharmacyCard(BuildContext context) {
     return Card(elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Padding(padding: const EdgeInsets.all(20), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -2175,7 +2175,7 @@ class _WebSettingsLayout extends StatelessWidget {
       ])));
   }
 
-  // ── LAB MANAGEMENT ──
+  // â”€â”€ LAB MANAGEMENT â”€â”€
   Widget _labManagementCard(BuildContext context) {
     return Card(elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Padding(padding: const EdgeInsets.all(20), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -2186,7 +2186,7 @@ class _WebSettingsLayout extends StatelessWidget {
       ])));
   }
 
-  // ── LEARNING ──
+  // â”€â”€ LEARNING â”€â”€
   Widget _learningCard(BuildContext context) {
     return Card(elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Padding(padding: const EdgeInsets.all(20), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -2201,7 +2201,7 @@ class _WebSettingsLayout extends StatelessWidget {
       ])));
   }
 
-  // ── SECURITY ──
+  // â”€â”€ SECURITY â”€â”€
   Widget _securityCard(BuildContext context) {
     return Card(elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Padding(padding: const EdgeInsets.all(20), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -2224,7 +2224,7 @@ class _WebSettingsLayout extends StatelessWidget {
       ])));
   }
 
-  // ── NOTIFICATION SETTINGS (Doctor only) ──
+  // â”€â”€ NOTIFICATION SETTINGS (Doctor only) â”€â”€
   Widget _notificationSettingsCard(BuildContext context) {
     return Card(elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Padding(padding: const EdgeInsets.all(20), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -2233,7 +2233,7 @@ class _WebSettingsLayout extends StatelessWidget {
       ])));
   }
 
-  // ── DOCTOR PROFESSIONAL SETTINGS ──
+  // â”€â”€ DOCTOR PROFESSIONAL SETTINGS â”€â”€
   Widget _doctorProfessionalCard(BuildContext context) {
     return Card(
       elevation: 0,
@@ -2274,7 +2274,7 @@ class _WebSettingsLayout extends StatelessWidget {
     );
   }
 
-  // ── LANGUAGE ──
+  // â”€â”€ LANGUAGE â”€â”€
   Widget _languageCard(BuildContext context) {
     return Card(elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Padding(padding: const EdgeInsets.all(20), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -2285,7 +2285,7 @@ class _WebSettingsLayout extends StatelessWidget {
       ])));
   }
 
-  // ── HEALTH MODE ──
+  // â”€â”€ HEALTH MODE â”€â”€
   Widget _trackerCard(BuildContext context) {
     final items = [
       ('bloodPressure', Icons.favorite_border_rounded, 'Blood Pressure', const Color(0xFFEF4444)),
@@ -2330,20 +2330,20 @@ class _WebSettingsLayout extends StatelessWidget {
       ])));
   }
 
-  // ── ABOUT ──
+  // â”€â”€ ABOUT â”€â”€
   Widget _aboutCard(BuildContext context) {
     return Card(elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Padding(padding: const EdgeInsets.all(20), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         _sectionLabel('About & Legal'), const SizedBox(height: 16),
         _settingsTile(icon: Icons.info_outline, iconColor: const Color(0xFF64748B), title: 'About Us', subtitle: 'Learn more about iCare', onTap: () => context.push('/about-us')),
         const Divider(height: 1),
-        _settingsTile(icon: Icons.verified_outlined, iconColor: const Color(0xFF10B981), title: 'DRAP Guidelines', subtitle: 'Drug Regulatory Authority of Pakistan', onTap: () async { try { await launchUrl(Uri.parse('https://www.dra.gov.pk'), mode: LaunchMode.externalApplication); } catch (_) {} }),
+        _settingsTile(icon: Icons.verified_outlined, iconColor: const Color(0xFF10B981), title: 'DRAP Guidelines', subtitle: 'Drug Regulatory Authority of Pakistan', onTap: () async { try { await launchUrl(Uri.parse('https://www.drap.gov.pk'), mode: LaunchMode.externalApplication); } catch (_) {} }),
         const Divider(height: 1),
-        _settingsTile(icon: Icons.policy_outlined, iconColor: const Color(0xFF3B82F6), title: 'Drug Policy', subtitle: 'National drug laws & regulations', onTap: () async { try { await launchUrl(Uri.parse('https://www.dra.gov.pk/laws-regulations/'), mode: LaunchMode.externalApplication); } catch (_) {} }),
+        _settingsTile(icon: Icons.policy_outlined, iconColor: const Color(0xFF3B82F6), title: 'Drug Policy', subtitle: 'National drug laws & regulations', onTap: () async { try { await launchUrl(Uri.parse('https://www.drap.gov.pk/laws-and-regulations/'), mode: LaunchMode.externalApplication); } catch (_) {} }),
       ])));
   }
 
-  // ── LOGOUT ──
+  // â”€â”€ LOGOUT â”€â”€
   Widget _logoutButton(BuildContext context) {
     return Center(
       child: SizedBox(
@@ -2363,7 +2363,7 @@ class _WebSettingsLayout extends StatelessWidget {
     );
   }
 
-  // ── DELETE ACCOUNT ──
+  // â”€â”€ DELETE ACCOUNT â”€â”€
   Widget _dangerZoneCard(BuildContext context) {
     return Card(
       elevation: 0,
@@ -2380,7 +2380,7 @@ class _WebSettingsLayout extends StatelessWidget {
     );
   }
 
-  // ── REUSABLE ──
+  // â”€â”€ REUSABLE â”€â”€
   Widget _sectionLabel(String title) {
     return Row(children: [const Icon(Icons.circle, size: 8, color: AppColors.primaryColor), const SizedBox(width: 8), Text(title.tr(), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700))]);
   }
@@ -2394,13 +2394,13 @@ class _WebSettingsLayout extends StatelessWidget {
   }
 
   Widget _comingSoonBanner(String feature) {
-    return Container(width: double.infinity, margin: const EdgeInsets.only(top: 8), padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12), decoration: BoxDecoration(color: const Color(0xFFFEFCE8), borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xFFFEF08A))), child: Row(children: [const Icon(Icons.access_time_rounded, size: 18, color: Color(0xFFCA8A04)), const SizedBox(width: 10), Expanded(child: Text('$feature — Coming soon', style: const TextStyle(fontSize: 13, color: Color(0xFF854D0E))))]));
+    return Container(width: double.infinity, margin: const EdgeInsets.only(top: 8), padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12), decoration: BoxDecoration(color: const Color(0xFFFEFCE8), borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xFFFEF08A))), child: Row(children: [const Icon(Icons.access_time_rounded, size: 18, color: Color(0xFFCA8A04)), const SizedBox(width: 10), Expanded(child: Text('$feature â€” Coming soon', style: const TextStyle(fontSize: 13, color: Color(0xFF854D0E))))]));
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // MOBILE LAYOUT
-// ═══════════════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 class _MobileSettingsLayout extends StatelessWidget {
   final _SettingsLayoutParams p;
@@ -2522,13 +2522,13 @@ class _MobileSettingsLayout extends StatelessWidget {
       child: Padding(padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         _sectionLabel('Notifications'), const SizedBox(height: 12),
         if (p.isLaboratory) ...[
-          _switchTile(icon: Icons.notifications_active_outlined, title: 'New Test Requests', subtitle: 'Required • Cannot be turned off', value: true, onChanged: (_) {}),
+          _switchTile(icon: Icons.notifications_active_outlined, title: 'New Test Requests', subtitle: 'Required â€¢ Cannot be turned off', value: true, onChanged: (_) {}),
           const Divider(height: 1), _switchTile(icon: Icons.biotech_outlined, title: 'Sample Collection Status', subtitle: 'Updates on sample pickup & processing', value: p.notifPrefs['delivery_updates'] ?? true, onChanged: (v) => p.onSaveNotifPref('delivery_updates', v)),
           const Divider(height: 1), _switchTile(icon: Icons.upload_file_outlined, title: 'Result Upload Reminders', subtitle: 'Reminders to upload pending results', value: p.notifPrefs['booking_updates'] ?? true, onChanged: (v) => p.onSaveNotifPref('booking_updates', v)),
           const Divider(height: 1), _switchTile(icon: Icons.warning_amber_outlined, title: 'System Alerts', subtitle: 'Platform & maintenance notifications', value: p.notifPrefs['system_alerts'] ?? true, onChanged: (v) => p.onSaveNotifPref('system_alerts', v)),
           const Divider(height: 1), _switchTile(icon: Icons.volume_up_outlined, title: 'Sound Notifications', subtitle: 'Play sound', value: p.notifPrefs['sound_notifications'] ?? true, onChanged: (v) => p.onSaveNotifPref('sound_notifications', v)),
         ] else if (p.isPharmacy) ...[
-          _switchTile(icon: Icons.notifications_active_outlined, title: 'New Orders', subtitle: 'Required • Cannot be turned off', value: true, onChanged: (_) {}),
+          _switchTile(icon: Icons.notifications_active_outlined, title: 'New Orders', subtitle: 'Required â€¢ Cannot be turned off', value: true, onChanged: (_) {}),
           const Divider(height: 1), _switchTile(icon: Icons.local_shipping_outlined, title: 'Order Dispatched', subtitle: 'Notify when order is out for delivery', value: p.notifPrefs['order_dispatched'] ?? true, onChanged: (v) => p.onSaveNotifPref('order_dispatched', v)),
           const Divider(height: 1), _switchTile(icon: Icons.update_rounded, title: 'Delivery Status Updates', subtitle: 'Real-time delivery tracking notifications', value: p.notifPrefs['delivery_updates'] ?? true, onChanged: (v) => p.onSaveNotifPref('delivery_updates', v)),
           const Divider(height: 1), _switchTile(icon: Icons.warning_amber_outlined, title: 'System Alerts', subtitle: 'Platform & maintenance notifications', value: p.notifPrefs['system_alerts'] ?? true, onChanged: (v) => p.onSaveNotifPref('system_alerts', v)),
@@ -2706,7 +2706,7 @@ class _MobileSettingsLayout extends StatelessWidget {
       ])));
   }
 
-  // ── DOCTOR PROFESSIONAL SETTINGS ──
+  // â”€â”€ DOCTOR PROFESSIONAL SETTINGS â”€â”€
   Widget _doctorProfessionalCard(BuildContext context) {
     return Card(
       elevation: 0,
@@ -2768,9 +2768,9 @@ class _MobileSettingsLayout extends StatelessWidget {
         _sectionLabel('About & Legal'), const SizedBox(height: 12),
         _settingsTile(icon: Icons.info_outline, iconColor: const Color(0xFF64748B), title: 'About Us', subtitle: 'Learn about iCare', onTap: () => context.push('/about-us')),
         const Divider(height: 1),
-        _settingsTile(icon: Icons.verified_outlined, iconColor: const Color(0xFF10B981), title: 'DRAP Guidelines', subtitle: 'Drug Regulatory Authority of Pakistan', onTap: () async { try { await launchUrl(Uri.parse('https://www.dra.gov.pk'), mode: LaunchMode.externalApplication); } catch (_) {} }),
+        _settingsTile(icon: Icons.verified_outlined, iconColor: const Color(0xFF10B981), title: 'DRAP Guidelines', subtitle: 'Drug Regulatory Authority of Pakistan', onTap: () async { try { await launchUrl(Uri.parse('https://www.drap.gov.pk'), mode: LaunchMode.externalApplication); } catch (_) {} }),
         const Divider(height: 1),
-        _settingsTile(icon: Icons.policy_outlined, iconColor: const Color(0xFF3B82F6), title: 'Drug Policy', subtitle: 'National drug laws & regulations', onTap: () async { try { await launchUrl(Uri.parse('https://www.dra.gov.pk/laws-regulations/'), mode: LaunchMode.externalApplication); } catch (_) {} }),
+        _settingsTile(icon: Icons.policy_outlined, iconColor: const Color(0xFF3B82F6), title: 'Drug Policy', subtitle: 'National drug laws & regulations', onTap: () async { try { await launchUrl(Uri.parse('https://www.drap.gov.pk/laws-and-regulations/'), mode: LaunchMode.externalApplication); } catch (_) {} }),
       ])));
   }
 
@@ -2793,7 +2793,7 @@ class _MobileSettingsLayout extends StatelessWidget {
     );
   }
 
-  // ── DELETE ACCOUNT ──
+  // â”€â”€ DELETE ACCOUNT â”€â”€
   Widget _dangerZoneCard(BuildContext context) {
     return Card(
       elevation: 0,
@@ -2840,7 +2840,7 @@ class _MobileSettingsLayout extends StatelessWidget {
         Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text('${p.totalPoints}', style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w900, color: Colors.white)),
           const Text('Total Points', style: TextStyle(fontSize: 12, color: Colors.white70, fontWeight: FontWeight.w600)),
-          Text('≈ PKR ${(p.totalPoints * _kPointToPkr).toStringAsFixed(2)}', style: const TextStyle(fontSize: 11, color: Colors.white60)),
+          Text('â‰ˆ PKR ${(p.totalPoints * _kPointToPkr).toStringAsFixed(2)}', style: const TextStyle(fontSize: 11, color: Colors.white60)),
         ]),
       ]),
     );
@@ -2860,12 +2860,12 @@ class _MobileSettingsLayout extends StatelessWidget {
             Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text('${p.totalPoints}', style: const TextStyle(fontSize: 36, fontWeight: FontWeight.w900, color: Colors.white)),
               const Text('Reward Points', style: TextStyle(fontSize: 13, color: Colors.white70)),
-              Text('≈ PKR ${(p.totalPoints * _kPointToPkr).toStringAsFixed(2)}', style: const TextStyle(fontSize: 12, color: Colors.white60)),
+              Text('â‰ˆ PKR ${(p.totalPoints * _kPointToPkr).toStringAsFixed(2)}', style: const TextStyle(fontSize: 12, color: Colors.white60)),
             ]),
           ]),
         ),
         const SizedBox(height: 16),
-        const Text('Points are earned by:\n• Logging vitals (+5 pts each)\n• Completing daily goals (+10 pts)\n• Taking all medications (+10 pts)\n• Attending consultations (+15 pts)', style: TextStyle(fontSize: 13, color: Color(0xFF475569), height: 1.6)),
+        const Text('Points are earned by:\nâ€¢ Logging vitals (+5 pts each)\nâ€¢ Completing daily goals (+10 pts)\nâ€¢ Taking all medications (+10 pts)\nâ€¢ Attending consultations (+15 pts)', style: TextStyle(fontSize: 13, color: Color(0xFF475569), height: 1.6)),
         const SizedBox(height: 12),
         SizedBox(width: double.infinity, child: ElevatedButton.icon(onPressed: () { Navigator.pop(dc); _showRedeemRewardsDialog(context); }, icon: const Icon(Icons.redeem_rounded, size: 18), label: const Text('Redeem Points'), style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF10B981), foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))))),
       ])),
@@ -2915,7 +2915,7 @@ class _MobileSettingsLayout extends StatelessWidget {
           ));
         }),
         const Divider(),
-        const Text('1 pt = PKR 0.01 • Rate may change by platform', style: TextStyle(fontSize: 11, color: Color(0xFF94A3B8))),
+        const Text('1 pt = PKR 0.01 â€¢ Rate may change by platform', style: TextStyle(fontSize: 11, color: Color(0xFF94A3B8))),
       ])),
       actions: [TextButton(onPressed: () => Navigator.pop(dc2), child: const Text('Close'))],
     )));
@@ -3000,9 +3000,9 @@ class _MobileSettingsLayout extends StatelessWidget {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // PROFILE EDIT CARD
-// ═══════════════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 class _ProfileEditCard extends ConsumerStatefulWidget {
   final _SettingsLayoutParams p;
@@ -3121,7 +3121,7 @@ class _ProfileEditCardState extends ConsumerState<_ProfileEditCard> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // ── Avatar + name + email ───────────────────────────────────
+              // â”€â”€ Avatar + name + email â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -3146,7 +3146,7 @@ class _ProfileEditCardState extends ConsumerState<_ProfileEditCard> {
                     ),
                   ),
                   // Edit toggle button (only visible in view mode)
-                  // Doctors → open DoctorProfileSetup. Others → inline edit mode.
+                  // Doctors â†’ open DoctorProfileSetup. Others â†’ inline edit mode.
                   if (!_editMode)
                     TextButton.icon(
                       onPressed: () {
@@ -3174,7 +3174,7 @@ class _ProfileEditCardState extends ConsumerState<_ProfileEditCard> {
               const Divider(color: Color(0xFFE2E8F0)),
               const SizedBox(height: 16),
 
-              // ── VIEW MODE ────────────────────────────────────────────────
+              // â”€â”€ VIEW MODE â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
               if (!_editMode) ...[
                 _viewRow(Icons.person_outline_rounded,       'Full Name',    name),
                 _viewRow(Icons.phone_outlined,               'Phone',        phone),
@@ -3184,7 +3184,7 @@ class _ProfileEditCardState extends ConsumerState<_ProfileEditCard> {
                 _viewRow(Icons.location_on_outlined,         'Address',      address),
               ],
 
-              // ── EDIT MODE ────────────────────────────────────────────────
+              // â”€â”€ EDIT MODE â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
               if (_editMode) ...[
                 _editField('Full Name',    _nameCtrl,  Icons.person_outline_rounded, hint: 'Your full name'),
                 const SizedBox(height: 14),
@@ -3210,7 +3210,7 @@ class _ProfileEditCardState extends ConsumerState<_ProfileEditCard> {
 
                 const SizedBox(height: 24),
 
-                // ── Action buttons ─────────────────────────────────────────
+                // â”€â”€ Action buttons â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
                 Row(
                   children: [
                     Expanded(
@@ -3250,7 +3250,7 @@ class _ProfileEditCardState extends ConsumerState<_ProfileEditCard> {
     );
   }
 
-  // ── Helpers ───────────────────────────────────────────────────────────────
+  // â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   Widget _viewRow(IconData icon, String label, String value, {bool? verified}) {
     return Padding(
