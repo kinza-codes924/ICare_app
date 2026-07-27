@@ -92,6 +92,8 @@ router.get('/posts', async (req, res) => {
     const formatted = posts.map(p => ({
       ...p,
       id: p._id.toString(),
+      authorName: p.userName || p.authorName || 'User',
+      authorRole: p.userRole || p.authorRole || 'Patient',
       likeCount: (p.likes || []).length,
       commentCount: (p.comments || []).length,
     }));
