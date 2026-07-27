@@ -4,10 +4,8 @@ allprojects {
         mavenCentral()
     }
 }
-
 val newBuildDir: Directory = rootProject.layout.buildDirectory.dir("../../build").get()
 rootProject.layout.buildDirectory.value(newBuildDir)
-
 subprojects {
     val newSubprojectBuildDir: Directory = newBuildDir.dir(project.name)
     project.layout.buildDirectory.value(newSubprojectBuildDir)
@@ -48,10 +46,22 @@ fun Project.backfillNamespace() {
         // Not an Android library / no namespace API — nothing to fix.
     }
 }
-
 subprojects {
     plugins.withId("com.android.library") { backfillNamespace() }
     plugins.withId("com.android.application") { backfillNamespace() }
+}
+
+// Fix for CameraX 1.5.x release builds failing with:
+// "class file for androidx.concurrent.futures.CallbackToFutureAdapter not found"
+// Gradle 8.14+/9's stricter classpath isolation stops promoting this
+// transitive dependency onto the compile classpath, so we add it explicitly
+// to every Android module. Must also run before evaluationDependsOn(":app").
+subprojects {
+    afterEvaluate {
+        if (project.plugins.hasPlugin("com.android.library") || project.plugins.hasPlugin("com.android.application")) {
+            project.dependencies.add("implementation", "androidx.concurrent:concurrent-futures:1.2.0")
+        }
+    }
 }
 
 subprojects {

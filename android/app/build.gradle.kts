@@ -15,7 +15,7 @@ if (keystorePropertiesFile.exists()) {
 }
 
 android {
-    namespace = "com.cartzlink.icare"
+    namespace = "com.cartzlinkv2.icare"
     compileSdk = 36
     ndkVersion = "28.2.13676358"
 
@@ -30,7 +30,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.cartzlink.icare"
+        applicationId = "com.cartzlinkv2.icare"
         minSdk = flutter.minSdkVersion
         targetSdk = 35
         versionCode = 1
@@ -72,4 +72,6 @@ dependencies {
     implementation(platform("com.google.firebase:firebase-bom:34.0.0"))
     implementation("com.google.firebase:firebase-messaging")
     implementation("androidx.multidex:multidex:2.0.1")
+    implementation("androidx.concurrent:concurrent-futures:1.2.0") 
+
 }
