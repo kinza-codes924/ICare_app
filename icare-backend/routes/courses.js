@@ -498,6 +498,8 @@ router.get('/:id', authMiddleware, async (req, res) => {
         course: {
           ...course, modules: [], enrollmentId: enrollment._id.toString(),
           locked: true, lockReason: 'installment_overdue',
+          installmentPlanEnabled: enrollment.installmentPlanEnabled || false,
+          installments: enrollment.installments || [],
         },
       });
     }
