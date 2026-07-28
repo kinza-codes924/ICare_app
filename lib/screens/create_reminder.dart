@@ -56,10 +56,12 @@ class _CreateReminderState extends State<CreateReminder> {
 
     setState(() => _isSubmitting = true);
 
-    final dt = DateTime(
+    // Build as local time then convert to UTC so Google Calendar shows correct time
+    final dtLocal = DateTime(
       _selectedDate!.year, _selectedDate!.month, _selectedDate!.day,
       _selectedTime!.hour, _selectedTime!.minute,
     );
+    final dt = dtLocal.toUtc();
 
     final result = await _reminderService.createReminder({
       'title': label,

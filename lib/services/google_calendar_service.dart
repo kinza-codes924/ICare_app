@@ -120,6 +120,10 @@ class GoogleCalendarService {
         DateTime dt;
         try {
           dt = DateTime.parse(scheduledStr);
+          // If no timezone info in string, treat as UTC (stored as UTC from app)
+          if (!scheduledStr.contains('Z') && !scheduledStr.contains('+')) {
+            dt = DateTime.utc(dt.year, dt.month, dt.day, dt.hour, dt.minute, dt.second);
+          }
         } catch (_) {
           skipped++;
           continue;
