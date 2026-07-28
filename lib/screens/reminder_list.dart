@@ -32,7 +32,7 @@ class _ReminderListState extends State<ReminderList> with SingleTickerProviderSt
   Map<String, String> _parseScheduled(String? s) {
     if (s == null || s.isEmpty) return {'date': '', 'time': ''};
     try {
-      final dt = DateTime.parse(s);
+      final dt = DateTime.parse(s).toLocal();
       return {
         'date': DateFormat('dd MMM yyyy').format(dt),
         'time': DateFormat('hh:mm a').format(dt),
@@ -133,7 +133,7 @@ class _ReminderListState extends State<ReminderList> with SingleTickerProviderSt
     try {
       final s = r['scheduledFor'] as String?;
       if (s == null) return -1;
-      return DateTime.parse(s).hour;
+      return DateTime.parse(s).toLocal().hour;
     } catch (_) { return -1; }
   }
 
