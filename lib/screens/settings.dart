@@ -10,6 +10,7 @@ import 'package:icare/screens/payment_history.dart';
 import 'package:icare/screens/change_password.dart' show ChangePassword;
 import 'package:icare/screens/certificates_screen.dart';
 import 'package:icare/screens/courses.dart' show Courses;
+import 'package:icare/screens/student_lms_dashboard.dart' show StudentLmsDashboard;
 import 'package:icare/screens/doctor_availability.dart' show DoctorAvailability;
 import 'package:icare/screens/doctor_profile_setup.dart' show DoctorProfileSetup;
 import 'package:icare/screens/current_medications_page.dart';
@@ -2191,11 +2192,11 @@ class _WebSettingsLayout extends StatelessWidget {
     return Card(elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Padding(padding: const EdgeInsets.all(20), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         _sectionLabel('Learning'), const SizedBox(height: 16),
-        _settingsTile(icon: Icons.book_outlined, iconColor: const Color(0xFF6366F1), title: 'Enrolled Courses', subtitle: 'View your enrolled courses', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const Courses()))),
+        _settingsTile(icon: Icons.book_outlined, iconColor: const Color(0xFF6366F1), title: 'Enrolled Courses', subtitle: 'View your enrolled courses', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const Courses(myPurchased: true)))),
         const Divider(height: 1),
         _settingsTile(icon: Icons.verified_outlined, iconColor: const Color(0xFF10B981), title: 'Certificates', subtitle: 'View your earned certificates', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CertificatesScreen()))),
         const Divider(height: 1),
-        _settingsTile(icon: Icons.trending_up_outlined, iconColor: const Color(0xFF8B5CF6), title: 'Progress Tracking', subtitle: 'View your course completion', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const Courses()))),
+        _settingsTile(icon: Icons.trending_up_outlined, iconColor: const Color(0xFF8B5CF6), title: 'Progress Tracking', subtitle: 'View your course completion', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const StudentLmsDashboard()))),
         const Divider(height: 1),
         _switchTile(icon: Icons.notifications_active_outlined, title: 'Notifications for New Courses', subtitle: 'Get notified about new offerings', value: p.courseNotificationsEnabled, onChanged: p.onToggleCourseNotifications),
       ])));
@@ -2673,9 +2674,9 @@ class _MobileSettingsLayout extends StatelessWidget {
     return Card(elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Padding(padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         _sectionLabel('Learning'), const SizedBox(height: 12),
-        _settingsTile(icon: Icons.book_outlined, iconColor: const Color(0xFF6366F1), title: 'Enrolled Courses', subtitle: 'View courses', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const Courses()))),
+        _settingsTile(icon: Icons.book_outlined, iconColor: const Color(0xFF6366F1), title: 'Enrolled Courses', subtitle: 'View courses', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const Courses(myPurchased: true)))),
         const Divider(height: 1), _settingsTile(icon: Icons.verified_outlined, iconColor: const Color(0xFF10B981), title: 'Certificates', subtitle: 'Earned certificates', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CertificatesScreen()))),
-        const Divider(height: 1), _settingsTile(icon: Icons.trending_up_outlined, iconColor: const Color(0xFF8B5CF6), title: 'Progress Tracking', subtitle: 'View course completion', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const Courses()))),
+        const Divider(height: 1), _settingsTile(icon: Icons.trending_up_outlined, iconColor: const Color(0xFF8B5CF6), title: 'Progress Tracking', subtitle: 'View course completion', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const StudentLmsDashboard()))),
         const Divider(height: 1), _switchTile(icon: Icons.notifications_active_outlined, title: 'Notifications for New Courses', subtitle: 'Get notified', value: p.courseNotificationsEnabled, onChanged: p.onToggleCourseNotifications),
       ])));
   }
