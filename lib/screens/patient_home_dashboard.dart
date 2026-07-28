@@ -34,6 +34,13 @@ class _PatientHomeDashboardState extends ConsumerState<PatientHomeDashboard> {
   int _points = 0;
   int _recordsCount = 0;
   bool _loading = true;
+  final _scrollCtrl = ScrollController();
+
+  @override
+  void dispose() {
+    _scrollCtrl.dispose();
+    super.dispose();
+  }
 
   static const _navy = Color(0xFF0F172A);
   static const _slate = Color(0xFF64748B);
@@ -104,7 +111,13 @@ class _PatientHomeDashboardState extends ConsumerState<PatientHomeDashboard> {
     final isDesktop = width > 1000;
     final isTablet = width > 640;
 
-    return Container(
+    return Scrollbar(
+      controller: _scrollCtrl,
+      thumbVisibility: true,
+      trackVisibility: true,
+      child: SingleChildScrollView(
+        controller: _scrollCtrl,
+        child: Container(
       color: const Color(0xFFF6F8FB),
       padding: EdgeInsets.all(isDesktop ? 28 : 16),
       child: Column(
@@ -149,6 +162,8 @@ class _PatientHomeDashboardState extends ConsumerState<PatientHomeDashboard> {
           ],
           const SizedBox(height: 32),
         ],
+      ),
+        ),
       ),
     );
   }
