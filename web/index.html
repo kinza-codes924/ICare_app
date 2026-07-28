@@ -16,6 +16,12 @@
   <link rel="manifest" href="manifest.json">
   <style>
     body { margin: 0; background: #ffffff; }
+    /* Show native browser scrollbar on Flutter web's glass pane */
+    flt-glass-pane { overflow-y: auto !important; }
+    flt-glass-pane::-webkit-scrollbar { width: 8px; }
+    flt-glass-pane::-webkit-scrollbar-track { background: #f1f5f9; }
+    flt-glass-pane::-webkit-scrollbar-thumb { background: #94a3b8; border-radius: 4px; }
+    flt-glass-pane::-webkit-scrollbar-thumb:hover { background: #64748b; }
     #loading {
       position: fixed; inset: 0;
       display: flex; flex-direction: column;
