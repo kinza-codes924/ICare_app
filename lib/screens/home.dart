@@ -1212,11 +1212,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       content = const StudentHome();
     }
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.only(bottom: 0),
-      child: Container(
-        color: Colors.white,
-        child: content,
+    return Scrollbar(
+      thumbVisibility: true,
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.only(bottom: 0),
+        child: Container(
+          color: Colors.white,
+          child: content,
+        ),
       ),
     );
   }
