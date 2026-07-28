@@ -45,8 +45,15 @@ router.post('/', authMiddleware, async (req, res) => {
     try {
       let notifMessage = message || '';
       if (scheduledFor) {
-        const dt = new Date(scheduledFor);
-        notifMessage = `Reminder set for ${dt.toLocaleDateString('en-PK', { day: '2-digit', month: 'short', year: 'numeric' })} at ${dt.toLocaleTimeString('en-PK', { hour: '2-digit', minute: '2-digit' })}. ${notifMessage}`.trim();
+        // Convert UTC to PKT (UTC+5) for display — Vercel runs in UTC
+        const dt = new Date(new Date(scheduledFor).getTime() + 5 * 60 * 60 * 1000);
+        const day = String(dt.getUTCDate()).padStart(2, '0');
+        const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+        const mon = months[dt.getUTCMonth()];
+        const yr = dt.getUTCFullYear();
+        const hh = String(dt.getUTCHours()).padStart(2, '0');
+        const mm = String(dt.getUTCMinutes()).padStart(2, '0');
+        notifMessage = `Reminder set for ${day}-${mon}-${yr} at ${hh}:${mm}.`.trim();
       }
       await Notification.create({
         userId: req.user.id,
