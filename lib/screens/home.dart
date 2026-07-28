@@ -41,6 +41,7 @@ class HomeScreen extends ConsumerStatefulWidget {
 class _HomeScreenState extends ConsumerState<HomeScreen> {
   DateTime? _selectedDate;
   final PageController _pageController = PageController();
+  final ScrollController _mainScrollController = ScrollController();
   int _currentSlide = 0;
   final DoctorService _doctorService = DoctorService();
   final UserService _userService = UserService();
@@ -98,6 +99,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   @override
   void dispose() {
     _pageController.dispose();
+    _mainScrollController.dispose();
     super.dispose();
   }
 
@@ -1213,8 +1215,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     }
 
     return Scrollbar(
+      controller: _mainScrollController,
       thumbVisibility: true,
+      trackVisibility: true,
       child: SingleChildScrollView(
+        controller: _mainScrollController,
         padding: const EdgeInsets.only(bottom: 0),
         child: Container(
           color: Colors.white,
