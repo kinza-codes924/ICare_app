@@ -78,3 +78,6 @@ String registerLmsVideoView() {
   } catch (_) {}
   return viewId;
 }
+
+// Web does not use WebView — Jitsi runs via HtmlElementView
+Widget buildJitsiWebView() => const SizedBox.shrink();

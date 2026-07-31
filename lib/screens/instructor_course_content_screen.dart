@@ -908,7 +908,13 @@ class InstructorCourseContentScreenState extends State<InstructorCourseContentSc
     final isPublished = assignment['isPublished'] == true;
     final id = assignment['_id']?.toString() ?? '';
 
-    return Container(
+    return GestureDetector(
+      onTap: id.isEmpty ? null : () => showDialog(
+        context: context,
+        barrierDismissible: true,
+        builder: (_) => _AssignmentPreviewDialog(assignmentId: id),
+      ),
+      child: Container(
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -961,6 +967,7 @@ class InstructorCourseContentScreenState extends State<InstructorCourseContentSc
           child: const Icon(Icons.delete_outline_rounded, color: Colors.red, size: 20),
         ),
       ]),
+      ),
     );
   }
 

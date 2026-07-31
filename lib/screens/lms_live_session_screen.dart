@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:go_router/go_router.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:icare/services/lms_service.dart';
 import 'package:icare/utils/shared_pref.dart';
 import 'package:icare/utils/theme.dart';
@@ -404,7 +405,14 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
       return;
     }
 
-    // Mobile: lmsJoinChannel (stub) opens Jitsi in external browser
+    // Mobile: request native Android camera/mic permission BEFORE loading the
+    // WebView — granting the WebView's own onPermissionRequest is not enough;
+    // without the OS-level runtime permission, Chromium's getUserMedia inside
+    // the WebView fails with SecurityException and Jitsi shows its own
+    // "meeting needs to use your microphone/camera" stall screen forever.
+    await [Permission.camera, Permission.microphone].request();
+
+    // Mobile: lmsJoinChannel (stub) opens Jitsi in-app via WebView
     lmsSetCallbacks(
       onJoined: () {
         if (mounted && !_joined) {
@@ -522,10 +530,12 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
     });
   }
 
-  /// Web: poll the JS flag set when the user presses Jitsi's own hangup button.
-  /// Jitsi's UI is the only call UI now, so this is how the screen closes.
+  /// Polls the flag set when the user presses Jitsi's own hangup button.
+  /// Jitsi's UI is the only call UI now, so this is how the screen closes —
+  /// on mobile too, where the WebView reports readyToClose back to Dart.
+  /// Without this the user is left sitting on Jitsi's own close page instead
+  /// of being returned to the iCare dashboard.
   void _startClosedPoller() {
-    if (!kIsWeb) return;
     _closedPoller = Timer.periodic(const Duration(seconds: 1), (_) {
       if (!mounted) return;
       if (lmsIsSessionClosed()) {
@@ -551,10 +561,10 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
     // Show "saving" overlay instead of the (now dead) Jitsi iframe
     if (mounted) setState(() {});
 
-    if (kIsWeb && widget.isInstructor) {
+    if (widget.isInstructor) {
       // Jibri only finalizes + uploads once it gets an explicit stop
-      // command — disposing the Jitsi iframe (lmsLeaveChannel, below) does
-      // NOT stop it, it just keeps recording forever server-side with
+      // command — disposing the Jitsi iframe/WebView (lmsLeaveChannel, below)
+      // does NOT stop it, it just keeps recording forever server-side with
       // nothing ever reaching Classwork. Send stop and give it a moment to
       // actually reach Jibri over XMPP before tearing down the connection.
       lmsStopRecording();
@@ -667,7 +677,7 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
               const CircularProgressIndicator(color: Colors.white),
               const SizedBox(height: 20),
               Text(
-                kIsWeb && widget.isInstructor ? 'Saving recording...' : 'Leaving session...',
+                widget.isInstructor ? 'Saving recording...' : 'Leaving session...',
                 style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600),
               ),
             ],
@@ -684,6 +694,14 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
       return Scaffold(
         backgroundColor: const Color(0xFF1C2333),
         body: SizedBox.expand(child: HtmlElementView(viewType: _cameraViewName!)),
+      );
+    }
+
+    // Mobile: full-screen WebView (Jitsi in-app, no external browser)
+    if (!kIsWeb && _joined) {
+      return Scaffold(
+        backgroundColor: const Color(0xFF1C2333),
+        body: SizedBox.expand(child: buildJitsiWebView()),
       );
     }
 
