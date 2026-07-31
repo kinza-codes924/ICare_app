@@ -1,15 +1,24 @@
 const Course = require('../models/Course');
 const Quiz = require('../models/Quiz');
 const QuizAttempt = require('../models/QuizAttempt');
+const AssignmentSubmission = require('../models/AssignmentSubmission');
 
 // Re-evaluates whether `moduleId` (and, transitively, the whole course) should
-// be marked complete for this enrollment: every lesson in the module must be
-// in enrollment.lessonCompletions AND every published quiz tied to the module
-// (Quiz.moduleId) must have a passed QuizAttempt for this student. Mutates
-// enrollment.moduleCompletions / isCompleted / completedAt in place but does
-// NOT save — callers save the enrollment themselves. Safe to call repeatedly;
-// only appends when not already present (won't create duplicate completions
-// or bump completedAt on an already-completed enrollment).
+// be marked complete for this enrollment. A module counts as complete only
+// when ALL of the following hold:
+//   - every real content lesson (module.lessons entries NOT of type
+//     'assignment'/'live' — those are reference entries, not watchable
+//     content) is in enrollment.lessonCompletions
+//   - every assignment-type entry in module.lessons has a submitted
+//     AssignmentSubmission from this student (previously not checked at
+//     all here, which is why a module could "complete" via the manual
+//     button without the assignment ever being submitted)
+//   - every published quiz tied to the module (Quiz.moduleId) has a passed
+//     QuizAttempt for this student
+// Mutates enrollment.moduleCompletions / isCompleted / completedAt in place
+// but does NOT save — callers save the enrollment themselves. Safe to call
+// repeatedly; only appends when not already present (won't create duplicate
+// completions or bump completedAt on an already-completed enrollment).
 async function recheckModuleCompletion(enrollment, moduleId) {
   if (!moduleId) return;
   const course = await Course.findById(enrollment.courseId).lean();
@@ -17,9 +26,26 @@ async function recheckModuleCompletion(enrollment, moduleId) {
   const module = (course.modules || []).find(m => m._id?.toString() === moduleId);
   if (!module) return;
 
-  const moduleLessonIds = (module.lessons || []).map(l => l._id?.toString()).filter(Boolean);
+  const lessons = module.lessons || [];
+  const contentLessonIds = lessons
+    .filter(l => (l.type || 'content') !== 'assignment' && (l.type || 'content') !== 'live')
+    .map(l => l._id?.toString()).filter(Boolean);
+  const assignmentLessonIds = lessons
+    .filter(l => l.type === 'assignment')
+    .map(l => l._id?.toString()).filter(Boolean);
+
   const completedLessonIds = new Set((enrollment.lessonCompletions || []).map(lc => lc.lessonId));
-  const allLessonsDone = moduleLessonIds.every(id => completedLessonIds.has(id));
+  const allLessonsDone = contentLessonIds.every(id => completedLessonIds.has(id));
+
+  let allAssignmentsSubmitted = true;
+  if (assignmentLessonIds.length) {
+    const submissions = await AssignmentSubmission.find({
+      assignmentId: { $in: assignmentLessonIds },
+      studentId: enrollment.userId,
+    }).select('assignmentId').lean();
+    const submittedIds = new Set(submissions.map(s => s.assignmentId.toString()));
+    allAssignmentsSubmitted = assignmentLessonIds.every(id => submittedIds.has(id));
+  }
 
   const moduleQuizzes = await Quiz.find({ courseId: enrollment.courseId, moduleId, isPublished: true }).select('_id').lean();
   let allQuizzesPassed = true;
@@ -33,7 +59,7 @@ async function recheckModuleCompletion(enrollment, moduleId) {
     allQuizzesPassed = moduleQuizzes.every(q => passedQuizIds.has(q._id.toString()));
   }
 
-  if (allLessonsDone && allQuizzesPassed) {
+  if (allLessonsDone && allAssignmentsSubmitted && allQuizzesPassed) {
     const alreadyCompleted = (enrollment.moduleCompletions || []).find(mc => mc.moduleId === moduleId);
     if (!alreadyCompleted) {
       if (!enrollment.moduleCompletions) enrollment.moduleCompletions = [];
@@ -41,12 +67,19 @@ async function recheckModuleCompletion(enrollment, moduleId) {
     }
   }
 
+  const wasCompleted = enrollment.isCompleted === true;
   const allModuleIds = (course.modules || []).map(m => m._id?.toString()).filter(Boolean);
   const completedModuleIds = new Set((enrollment.moduleCompletions || []).map(mc => mc.moduleId));
   if (allModuleIds.length && allModuleIds.every(id => completedModuleIds.has(id))) {
     enrollment.isCompleted = true;
     enrollment.completedAt = enrollment.completedAt || new Date();
   }
+
+  // Tells the caller whether the course JUST became fully complete on this
+  // call (as opposed to having already been complete) — used to fire a
+  // one-time "ready to certify" notification to the Lead Instructor instead
+  // of re-notifying on every subsequent lesson/quiz touch.
+  return { justCompletedCourse: !wasCompleted && enrollment.isCompleted === true };
 }
 
 module.exports = { recheckModuleCompletion };

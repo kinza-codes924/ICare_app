@@ -233,7 +233,7 @@ router.post('/:assignmentId/submit', authMiddleware, upload.single('file'), asyn
           }).catch(() => {});
         }
 
-        // In-app ONLY to instructor (no email)
+        // In-app + email to instructor
         if (instructor) {
           await Notification.create({
             userId: toId(assignment.instructorId.toString()),
@@ -242,6 +242,18 @@ router.post('/:assignmentId/submit', authMiddleware, upload.single('file'), asyn
             message: `${student?.name || 'A student'} submitted "${assignment.title}"${isLate ? ' (late)' : ''} in "${course?.title || 'your course'}"`,
             data: { type: 'assignment_submission_received', assignmentId: assignment._id.toString(), courseId: assignment.courseId.toString(), studentId: studentId.toString() },
           });
+
+          if (instructor.email) {
+            const { sendEmail } = require('../utils/email');
+            sendEmail({
+              to: instructor.email,
+              subject: `New Submission: ${assignment.title}`,
+              html: `<p>Hi ${instructor.name || 'Instructor'},</p>
+                     <p><b>${student?.name || 'A student'}</b> submitted <b>"${assignment.title}"</b> in the course <b>"${course?.title || ''}"</b>${isLate ? ' (submitted after the due date)' : ''}.</p>
+                     <p>Log in to iCare to review and grade it.</p>
+                     <p>— iCare LMS Team</p>`,
+            }).catch(() => {});
+          }
         }
       } catch (_) {}
     });

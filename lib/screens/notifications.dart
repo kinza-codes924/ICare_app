@@ -7,7 +7,9 @@ import 'package:icare/screens/patient_prescriptions.dart';
 import 'package:icare/screens/reminder_list.dart';
 import 'package:icare/services/notification_service.dart';
 import 'package:icare/services/course_service.dart';
+import 'package:icare/services/lms_service.dart';
 import 'package:icare/screens/classroom_course_view.dart';
+import 'package:icare/screens/lms_course_page.dart';
 import 'package:icare/utils/theme.dart';
 import 'package:icare/utils/utils.dart';
 import 'package:icare/widgets/back_button.dart';
@@ -153,6 +155,14 @@ class _NotificationScreenState extends State<NotificationScreen> {
     if (data is! Map) return;
     final courseId = data['courseId']?.toString() ?? '';
     if (courseId.isEmpty) return;
+    if (data['subType']?.toString() == 'coteacher_invite') {
+      _showCoTeacherInviteDialog(courseId, data['courseName']?.toString() ?? 'this course');
+      return;
+    }
+    if (data['type']?.toString() == 'certificate_ready') {
+      await _openInstructorGradesTab(courseId);
+      return;
+    }
     try {
       // Find the enrollment for this course so classwork/submissions work
       final enrollments = await CourseService().myPurchases();
@@ -181,6 +191,61 @@ class _NotificationScreenState extends State<NotificationScreen> {
     } catch (e) {
       debugPrint('Notification navigation error: $e');
     }
+  }
+
+  /// "Certificate Ready to Issue" fires to the Lead Instructor, who has no
+  /// enrollment for their own course — unlike student notifications, this
+  /// looks the course up via the instructor's own course list and opens the
+  /// Grades tab, where the "Ready to Certify" section lives.
+  Future<void> _openInstructorGradesTab(String courseId) async {
+    try {
+      final result = await LmsService().getInstructorCourses();
+      final courses = result['courses'] as List? ?? [];
+      Map<String, dynamic>? course;
+      for (final c in courses) {
+        if (c is Map && c['_id']?.toString() == courseId) {
+          course = Map<String, dynamic>.from(c);
+          break;
+        }
+      }
+      if (course == null || !mounted) return;
+      Navigator.of(context).push(MaterialPageRoute(
+        builder: (_) => LmsCoursePage(course: course!, isInstructor: true, initialTabIndex: 2),
+      ));
+    } catch (e) {
+      debugPrint('Certificate notification navigation error: $e');
+    }
+  }
+
+  Future<void> _showCoTeacherInviteDialog(String courseId, String courseName) async {
+    final choice = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Co-Teacher Invitation'),
+        content: Text('You\'ve been invited to co-teach "$courseName". Accept to join this course.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Decline')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF1A73E8), foregroundColor: Colors.white),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Accept'),
+          ),
+        ],
+      ),
+    );
+    if (choice == null || !mounted) return;
+    final lms = LmsService();
+    final result = choice
+        ? await lms.acceptCoTeacherInvite(courseId)
+        : await lms.rejectCoTeacherInvite(courseId);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(result['success'] == true
+          ? (choice ? 'Invitation accepted — check My Courses' : 'Invitation declined')
+          : (result['message'] ?? 'Failed')),
+      backgroundColor: result['success'] == true ? Colors.green : Colors.red,
+    ));
   }
 
   int get _unreadCount =>

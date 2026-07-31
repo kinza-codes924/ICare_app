@@ -829,9 +829,15 @@ class InstructorCourseContentScreenState extends State<InstructorCourseContentSc
     final isLive = status == 'live';
     final isEnded = status == 'ended' || status == 'completed';
     final id = session['_id']?.toString() ?? '';
-    // Recordings now archive to Google Drive only — no in-app playback for
-    // ended sessions here anymore, so this card just shows the session
-    // happened, without a "Play" action.
+    final driveUrl = session['driveBackupUrl']?.toString() ?? '';
+    // A session scheduled for a specific future time can't be started early —
+    // this only controls the button's enabled state; the backend (set-live)
+    // is the real gate since the client's clock/lock state can't be trusted.
+    DateTime? scheduledDt;
+    if (scheduledAt.isNotEmpty) {
+      try { scheduledDt = DateTime.parse(scheduledAt); } catch (_) {}
+    }
+    final isLockedByTime = !isLive && !isEnded && scheduledDt != null && scheduledDt.isAfter(DateTime.now());
 
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
@@ -860,18 +866,48 @@ class InstructorCourseContentScreenState extends State<InstructorCourseContentSc
             Text(_fmtDate(scheduledAt), style: TextStyle(fontSize: 12, color: isEnded ? const Color(0xFF64748B) : const Color(0xFFF59E0B))),
         ])),
         if (isEnded)
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            decoration: BoxDecoration(color: Colors.grey[200], borderRadius: BorderRadius.circular(8)),
-            child: const Text('Ended', style: TextStyle(color: Colors.black45, fontSize: 12, fontWeight: FontWeight.w600)),
+          GestureDetector(
+            onTap: driveUrl.isEmpty ? null : () async {
+              final uri = Uri.parse(driveUrl);
+              if (await canLaunchUrl(uri)) await launchUrl(uri, mode: LaunchMode.externalApplication);
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: driveUrl.isEmpty ? Colors.grey[200] : const Color(0xFF10B981),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                driveUrl.isEmpty ? 'Ended' : 'Recording',
+                style: TextStyle(
+                  color: driveUrl.isEmpty ? Colors.black45 : Colors.white,
+                  fontSize: 12, fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
           )
         else
           GestureDetector(
-            onTap: () => _startLiveSession(session),
+            onTap: isLockedByTime ? () {
+              ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                content: Text('This session unlocks at ${_fmtDate(scheduledAt)}'),
+                backgroundColor: Colors.orange,
+              ));
+            } : () => _startLiveSession(session),
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              decoration: BoxDecoration(color: isLive ? Colors.red : AppColors.primaryColor, borderRadius: BorderRadius.circular(8)),
-              child: Text(isLive ? 'Join Live' : 'Start', style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700)),
+              decoration: BoxDecoration(
+                color: isLockedByTime ? Colors.grey[400] : (isLive ? Colors.red : AppColors.primaryColor),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(mainAxisSize: MainAxisSize.min, children: [
+                if (isLockedByTime) const Padding(
+                  padding: EdgeInsets.only(right: 4),
+                  child: Icon(Icons.lock_outline_rounded, size: 12, color: Colors.white),
+                ),
+                Text(isLockedByTime ? 'Locked' : (isLive ? 'Join Live' : 'Start'),
+                    style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700)),
+              ]),
             ),
           ),
         const SizedBox(width: 8),

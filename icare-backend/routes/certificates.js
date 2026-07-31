@@ -20,9 +20,43 @@ async function assertLeadInstructor(courseId, userId) {
   const uid = userId.toString();
   if (course.instructor_id?.toString() === uid) return { ok: true, course };
   const coTeacher = (course.coTeachers || []).find(t => t.userId?.toString() === uid);
-  if (coTeacher?.role === 'lead') return { ok: true, course };
+  const isLeadRole = (coTeacher?.role || '').toLowerCase() === 'lead' || (coTeacher?.role || '').toLowerCase() === 'lead instructor';
+  if (isLeadRole && (coTeacher.status ?? 'accepted') === 'accepted') return { ok: true, course };
   return { ok: false, status: 403, message: 'Only the Lead Instructor can issue or approve certificates' };
 }
+
+// GET /api/certificates/ready/:courseId — Lead Instructor sees students who
+// finished every module but don't have a Certificate document yet (nobody
+// has hit "Issue Certificate" for them). Distinct from /pending, which is
+// for certificates that already exist and are awaiting approval.
+router.get('/ready/:courseId', authMiddleware, async (req, res) => {
+  try {
+    await connectMongoDB();
+    const perm = await assertLeadInstructor(req.params.courseId, req.user.id);
+    if (!perm.ok) return res.status(perm.status).json({ success: false, message: perm.message });
+
+    const completedEnrollments = await Enrollment.find({
+      courseId: toId(req.params.courseId),
+      isCompleted: true,
+    }).populate('userId', 'name username email').lean();
+
+    const existingCerts = await Certificate.find({ courseId: toId(req.params.courseId) }).select('studentId enrollmentId').lean();
+    const certifiedStudentIds = new Set(existingCerts.map(c => c.studentId?.toString()));
+
+    const ready = completedEnrollments
+      .filter(e => !certifiedStudentIds.has(e.userId?._id?.toString()))
+      .map(e => ({
+        enrollmentId: e._id,
+        studentId: e.userId?._id,
+        studentName: e.userId?.name || e.userId?.username || 'Student',
+        completedAt: e.completedAt,
+      }));
+
+    res.json({ success: true, ready });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
 
 // GET /api/certificates/pending/:courseId — instructor sees pending approvals
 router.get('/pending/:courseId', authMiddleware, async (req, res) => {

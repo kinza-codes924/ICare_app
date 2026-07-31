@@ -1541,13 +1541,14 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
     final status = session['status']?.toString() ?? 'scheduled';
     final scheduledAt = session['scheduledAt']?.toString() ?? '';
     final recordingUrl = session['recordingUrl']?.toString() ?? '';
+    final driveUrl = session['driveBackupUrl']?.toString() ?? '';
     final meetingLink = session['meetingLink']?.toString() ?? '';
     final isEnded = status == 'ended' || status == 'completed';
     final id = session['_id']?.toString() ?? '';
     final hasMeetLink = meetingLink.isNotEmpty && meetingLink.startsWith('http');
 
     return GestureDetector(
-      onTap: isEnded ? () => _showCompletedSessionOptions(id, title, recordingUrl) : null,
+      onTap: isEnded ? () => _showCompletedSessionOptions(id, title, recordingUrl, driveUrl) : null,
       child: Container(
         margin: const EdgeInsets.only(bottom: 8),
         padding: const EdgeInsets.all(12),
@@ -1575,10 +1576,25 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
                   style: TextStyle(fontSize: 12, color: isEnded ? const Color(0xFF64748B) : const Color(0xFFF59E0B))),
             ])),
             if (isEnded)
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                decoration: BoxDecoration(color: Colors.grey[200], borderRadius: BorderRadius.circular(8)),
-                child: const Text('Ended', style: TextStyle(color: Colors.black45, fontSize: 12, fontWeight: FontWeight.w600)),
+              GestureDetector(
+                onTap: driveUrl.isEmpty ? null : () async {
+                  final uri = Uri.tryParse(driveUrl);
+                  if (uri != null) await launchUrl(uri, mode: LaunchMode.externalApplication);
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: driveUrl.isEmpty ? Colors.grey[200] : const Color(0xFF10B981),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    driveUrl.isEmpty ? 'Ended' : 'Recording',
+                    style: TextStyle(
+                      color: driveUrl.isEmpty ? Colors.black45 : Colors.white,
+                      fontSize: 12, fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
               )
             else
               Container(
@@ -1797,6 +1813,7 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
     final sessionId = lesson['_id']?.toString() ?? '';
     final title = lesson['title']?.toString() ?? 'Session';
     final recordingUrl = lesson['recordingUrl']?.toString() ?? '';
+    final driveUrl = lesson['driveBackupUrl']?.toString() ?? '';
 
     if (type == 'live') {
       if (status == 'live') {
@@ -1809,7 +1826,7 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
           ),
         ));
       } else if (status == 'ended' || status == 'completed') {
-        _showCompletedSessionOptions(sessionId, title, recordingUrl);
+        _showCompletedSessionOptions(sessionId, title, recordingUrl, driveUrl);
       } else {
         final meetLink = lesson['meetingLink']?.toString() ?? '';
         if (meetLink.isNotEmpty && meetLink.startsWith('http')) {
@@ -2283,10 +2300,11 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
       final sessionTitle = data['title']?.toString() ?? 'Live Session';
       final status = data['status']?.toString() ?? '';
       final recordingUrl = data['recordingUrl']?.toString() ?? '';
+      final driveUrl = data['driveBackupUrl']?.toString() ?? '';
 
       // Completed/ended sessions → show recording options (for all users)
       if (status == 'completed' || status == 'ended') {
-        _showCompletedSessionOptions(sessionId, sessionTitle, recordingUrl);
+        _showCompletedSessionOptions(sessionId, sessionTitle, recordingUrl, driveUrl);
         return;
       }
 
@@ -2320,7 +2338,7 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
     }
   }
 
-  void _showCompletedSessionOptions(String sessionId, String title, String recordingUrl) {
+  void _showCompletedSessionOptions(String sessionId, String title, String recordingUrl, [String driveUrl = '']) {
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(
@@ -2342,8 +2360,24 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
             ),
             const SizedBox(height: 4),
             const Divider(),
-            // Recordings now archive to Google Drive only — no in-app
-            // playback option here anymore ("Watch Recording" removed).
+            // Recordings archive to Google Drive — no in-app playback (large
+            // files don't stream reliably in <video>), so this opens the
+            // Drive file directly in a new tab/browser instead.
+            if (driveUrl.isNotEmpty)
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(color: const Color(0xFFE6F4EA), shape: BoxShape.circle),
+                  child: const Icon(Icons.play_circle_outline_rounded, color: Color(0xFF188038), size: 22),
+                ),
+                title: const Text('Recording', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+                subtitle: const Text('Opens the recording in Google Drive', style: TextStyle(fontSize: 12)),
+                onTap: () async {
+                  Navigator.pop(context);
+                  final uri = Uri.tryParse(driveUrl);
+                  if (uri != null) await launchUrl(uri, mode: LaunchMode.externalApplication);
+                },
+              ),
             if (widget.isInstructor && recordingUrl.isNotEmpty)
               ListTile(
                 leading: Container(
@@ -2930,7 +2964,7 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
 
   Future<void> _showInviteTeacherDialog() async {
     final emailCtrl = TextEditingController();
-    String selectedRole = 'normal';
+    final roleCtrl = TextEditingController(text: 'Co-Instructor');
     await showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(builder: (ctx, setDlg) => AlertDialog(
@@ -2942,7 +2976,7 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
         ]),
         content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
           const Text(
-            'Enter the email address of the teacher you want to invite. They will receive an email to join this course as a co-teacher.',
+            'Enter the email address of the teacher you want to invite. They\'ll get a notification and email, and will need to accept before joining this course.',
             style: TextStyle(fontSize: 13, color: Color(0xFF64748B)),
           ),
           const SizedBox(height: 16),
@@ -2957,13 +2991,15 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
             ),
           ),
           const SizedBox(height: 16),
-          const Align(alignment: Alignment.centerLeft, child: Text('Role', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13))),
-          const SizedBox(height: 8),
-          Row(children: [
-            Expanded(child: _inviteRoleChip('Lead Instructor', 'lead', selectedRole, (v) => setDlg(() => selectedRole = v))),
-            const SizedBox(width: 8),
-            Expanded(child: _inviteRoleChip('Normal Instructor', 'normal', selectedRole, (v) => setDlg(() => selectedRole = v))),
-          ]),
+          TextField(
+            controller: roleCtrl,
+            decoration: const InputDecoration(
+              labelText: 'Role',
+              hintText: 'e.g. Co-Instructor, Coordinator, Lead Instructor',
+              border: OutlineInputBorder(),
+              prefixIcon: Icon(Icons.badge_outlined),
+            ),
+          ),
           const SizedBox(height: 12),
           Container(
             padding: const EdgeInsets.all(10),
@@ -2976,7 +3012,7 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
               Icon(Icons.info_outline, color: Colors.amber.shade700, size: 16),
               const SizedBox(width: 8),
               const Expanded(child: Text(
-                'Co-teachers can manage content, grade assignments, and run live sessions. Only the Lead Instructor can issue certificates.',
+                'Co-teachers can manage content, grade assignments, and run live sessions. Only a "Lead Instructor" role can issue certificates — type that exact role to grant it.',
                 style: TextStyle(fontSize: 11, color: Color(0xFF78350F)),
               )),
             ]),
@@ -2988,6 +3024,7 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
             style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF1A73E8), foregroundColor: Colors.white),
             onPressed: () async {
               final email = emailCtrl.text.trim();
+              final role = roleCtrl.text.trim();
               if (email.isEmpty || !email.contains('@')) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(content: Text('Please enter a valid email'), backgroundColor: Colors.red),
@@ -2996,7 +3033,7 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
               }
               Navigator.pop(ctx);
               try {
-                await _lms.inviteTeacher(courseId: _courseId, email: email, role: selectedRole);
+                await _lms.inviteTeacher(courseId: _courseId, email: email, role: role.isEmpty ? 'normal' : role);
                 if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
@@ -3021,27 +3058,51 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
     );
   }
 
-  Widget _inviteRoleChip(String label, String value, String selected, void Function(String) onTap) {
-    final isSelected = selected == value;
-    return GestureDetector(
-      onTap: () => onTap(value),
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 10),
-        decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFF1A73E8).withValues(alpha: 0.1) : const Color(0xFFF8FAFC),
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: isSelected ? const Color(0xFF1A73E8) : const Color(0xFFE2E8F0)),
-        ),
-        child: Center(
-          child: Text(
-            label,
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: isSelected ? const Color(0xFF1A73E8) : const Color(0xFF64748B),
+  Future<void> _showChangeRoleDialog(String userId, String name, String currentRole) async {
+    final roleCtrl = TextEditingController(text: currentRole == 'normal' ? '' : currentRole);
+    await showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text('Change Role — $name'),
+        content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+          TextField(
+            controller: roleCtrl,
+            decoration: const InputDecoration(
+              labelText: 'Role',
+              hintText: 'e.g. Co-Instructor, Coordinator, Lead Instructor',
+              border: OutlineInputBorder(),
+              prefixIcon: Icon(Icons.badge_outlined),
             ),
           ),
-        ),
+          const SizedBox(height: 10),
+          const Text(
+            'Only a "Lead Instructor" role can issue certificates and manage other co-teachers.',
+            style: TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+          ),
+        ]),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF1A73E8), foregroundColor: Colors.white),
+            onPressed: () async {
+              final role = roleCtrl.text.trim();
+              if (role.isEmpty) return;
+              Navigator.pop(ctx);
+              final result = await _lms.updateCoTeacherRole(
+                courseId: _courseId, userId: userId, role: role,
+              );
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                  content: Text(result['success'] == true ? 'Role updated' : (result['message'] ?? 'Failed')),
+                  backgroundColor: result['success'] == true ? Colors.green : Colors.red,
+                ));
+                if (result['success'] == true) _loadPeople();
+              }
+            },
+            child: const Text('Save'),
+          ),
+        ],
       ),
     );
   }
@@ -3089,8 +3150,11 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
             final ctName = ct['name']?.toString() ?? ct['email']?.toString() ?? 'Co-Teacher';
             final ctRole = ct['role']?.toString() ?? 'normal';
             final ctId = ct['userId']?.toString() ?? '';
-            final roleLabel = ctRole == 'lead' ? 'Lead Instructor' : 'Co-Instructor';
-            return _personRow(ctName, isTeacher: true, roleLabel: roleLabel, isLead: ctRole == 'lead',
+            final ctStatus = ct['status']?.toString() ?? 'accepted';
+            final isLeadRole = ctRole.toLowerCase() == 'lead' || ctRole.toLowerCase() == 'lead instructor';
+            final baseLabel = isLeadRole ? 'Lead Instructor' : (ctRole == 'normal' ? 'Co-Instructor' : ctRole);
+            final roleLabel = ctStatus == 'pending' ? '$baseLabel · Pending' : baseLabel;
+            return _personRow(ctName, isTeacher: true, roleLabel: roleLabel, isLead: isLeadRole,
               onRemove: widget.isInstructor && ctId.isNotEmpty ? () async {
                 final confirm = await showDialog<bool>(
                   context: context,
@@ -3120,6 +3184,7 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
                   }
                 }
               } : null,
+              onChangeRole: widget.isInstructor && ctId.isNotEmpty ? (_) => _showChangeRoleDialog(ctId, ctName, ctRole) : null,
             );
           }),
           const SizedBox(height: 24),
@@ -3213,7 +3278,7 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
     }
   }
 
-  Widget _personRow(String name, {required bool isTeacher, String? roleLabel, bool isLead = false, VoidCallback? onRemove, String? studentId, VoidCallback? onRemoveStudent}) {
+  Widget _personRow(String name, {required bool isTeacher, String? roleLabel, bool isLead = false, VoidCallback? onRemove, String? studentId, VoidCallback? onRemoveStudent, ValueChanged<String>? onChangeRole}) {
     final avatarColor = isTeacher
         ? (isLead ? const Color(0xFF9334E6) : const Color(0xFF1A73E8))
         : Colors.grey.shade300;
@@ -3260,13 +3325,35 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
                 ),
               ),
             ),
-            if (onRemove != null)
-              IconButton(
-                icon: const Icon(Icons.person_remove_outlined, size: 16, color: Colors.red),
-                onPressed: onRemove,
+            if (onRemove != null || onChangeRole != null)
+              PopupMenuButton<String>(
+                icon: const Icon(Icons.more_vert_rounded, size: 18, color: Color(0xFF70757A)),
                 padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
-                tooltip: 'Remove co-teacher',
+                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                itemBuilder: (_) => [
+                  if (onChangeRole != null)
+                    const PopupMenuItem(
+                      value: 'role',
+                      child: Row(children: [
+                        Icon(Icons.badge_outlined, size: 18, color: Color(0xFF1A73E8)),
+                        SizedBox(width: 10),
+                        Text('Change role / permission'),
+                      ]),
+                    ),
+                  if (onRemove != null)
+                    const PopupMenuItem(
+                      value: 'remove',
+                      child: Row(children: [
+                        Icon(Icons.person_remove_outlined, size: 18, color: Colors.red),
+                        SizedBox(width: 10),
+                        Text('Remove co-teacher', style: TextStyle(color: Colors.red)),
+                      ]),
+                    ),
+                ],
+                onSelected: (v) {
+                  if (v == 'remove') onRemove?.call();
+                  if (v == 'role') onChangeRole?.call(name);
+                },
               ),
           ] else if (!isTeacher)
             PopupMenuButton<String>(

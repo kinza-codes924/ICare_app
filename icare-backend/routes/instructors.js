@@ -105,7 +105,13 @@ router.get('/my-courses', authMiddleware, async (req, res) => {
       is_active: { $ne: false },
       $or: [
         { instructor_id: instructorId },
-        { 'coTeachers.userId': instructorId },
+        // Only surface co-taught courses the invite was actually accepted
+        // for — a pending invite shouldn't grant a "My Courses" entry
+        // before the invited teacher has accepted it. status doesn't exist
+        // on co-teacher entries added before this field was introduced, so
+        // treat "no status field" as accepted too (grandfathered in).
+        { coTeachers: { $elemMatch: { userId: instructorId, status: { $in: ['accepted', null] } } } },
+        { coTeachers: { $elemMatch: { userId: instructorId, status: { $exists: false } } } },
       ],
     }).lean();
     // Tag co-taught courses so the frontend can distinguish them

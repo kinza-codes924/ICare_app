@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:icare/services/api_service.dart';
 
@@ -492,6 +493,13 @@ class LmsService {
         {'moduleId': moduleId},
       );
       return response.data ?? {'success': true};
+    } on DioException catch (e) {
+      // The backend now validates completion here (400 when lessons/
+      // assignments/quizzes are still incomplete) — surface its message
+      // instead of the raw exception string.
+      final data = e.response?.data;
+      final serverMessage = data is Map ? data['message']?.toString() : null;
+      return {'success': false, 'message': serverMessage ?? e.toString()};
     } catch (e) {
       return {'success': false, 'message': e.toString()};
     }
@@ -997,6 +1005,24 @@ class LmsService {
     }
   }
 
+  Future<Map<String, dynamic>> acceptCoTeacherInvite(String courseId) async {
+    try {
+      final response = await _api.post('/courses/$courseId/co-teacher/accept', {});
+      return response.data ?? {'success': true};
+    } catch (e) {
+      return {'success': false, 'message': e.toString().replaceAll('Exception: ', '')};
+    }
+  }
+
+  Future<Map<String, dynamic>> rejectCoTeacherInvite(String courseId) async {
+    try {
+      final response = await _api.post('/courses/$courseId/co-teacher/reject', {});
+      return response.data ?? {'success': true};
+    } catch (e) {
+      return {'success': false, 'message': e.toString().replaceAll('Exception: ', '')};
+    }
+  }
+
   Future<List<dynamic>> getCourseInstructors(String courseId) async {
     try {
       final response = await _api.get('/courses/$courseId/instructors');
@@ -1010,6 +1036,15 @@ class LmsService {
       return response.data ?? {'success': true};
     } catch (e) {
       return {'success': false, 'message': e.toString()};
+    }
+  }
+
+  Future<Map<String, dynamic>> updateCoTeacherRole({required String courseId, required String userId, required String role}) async {
+    try {
+      final response = await _api.put('/courses/$courseId/co-teacher/$userId/role', {'role': role});
+      return response.data ?? {'success': true};
+    } catch (e) {
+      return {'success': false, 'message': e.toString().replaceAll('Exception: ', '')};
     }
   }
 
@@ -1056,6 +1091,16 @@ class LmsService {
     try {
       final response = await _api.get('/certificates/pending/$courseId');
       return response.data['certificates'] ?? [];
+    } catch (_) { return []; }
+  }
+
+  // Students who finished every module but don't have a Certificate document
+  // yet — the Lead Instructor issues it from here (distinct from "pending",
+  // which is for certificates already issued and awaiting approval).
+  Future<List<dynamic>> getReadyForCertificate(String courseId) async {
+    try {
+      final response = await _api.get('/certificates/ready/$courseId');
+      return response.data['ready'] ?? [];
     } catch (_) { return []; }
   }
 

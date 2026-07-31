@@ -20,6 +20,50 @@ function toId(id) {
   try { return new mongoose.Types.ObjectId(id); } catch { return null; }
 }
 
+// Notifies the Lead Instructor (course owner, or the co-teacher with role
+// 'lead'/'lead instructor') that a student finished every module and is
+// ready to be issued a certificate. Fired once, right when the course
+// transitions to isCompleted — see recheckModuleCompletion's
+// justCompletedCourse flag, which callers pass in here.
+async function notifyLeadInstructorCourseComplete(enrollment) {
+  try {
+    const course = await Course.findById(enrollment.courseId).select('title instructor_id coTeachers').lean();
+    if (!course) return;
+    const User = require('../models/User');
+    const Notification = require('../models/Notification');
+    const student = await User.findById(enrollment.userId).select('name username').lean();
+
+    const leadCoTeacher = (course.coTeachers || []).find(t => {
+      const roleLower = (t.role || '').toLowerCase();
+      return (roleLower === 'lead' || roleLower === 'lead instructor') && (t.status ?? 'accepted') === 'accepted';
+    });
+    const leadUserId = leadCoTeacher?.userId || course.instructor_id;
+    if (!leadUserId) return;
+
+    const lead = await User.findById(leadUserId).select('name email').lean();
+    const studentName = student?.name || student?.username || 'A student';
+
+    await Notification.create({
+      userId: leadUserId,
+      type: 'general',
+      title: 'Certificate Ready to Issue',
+      message: `${studentName} completed all modules in "${course.title}" — issue their certificate.`,
+      data: { type: 'certificate_ready', courseId: course._id, enrollmentId: enrollment._id, studentId: enrollment.userId },
+    });
+
+    if (lead?.email) {
+      sendEmail({
+        to: lead.email,
+        subject: `Certificate ready to issue: ${course.title}`,
+        html: `<p>Hi ${lead.name || 'Instructor'},</p>
+               <p><b>${studentName}</b> has completed every module in <b>"${course.title}"</b> and is ready for their certificate.</p>
+               <p>Log in to iCare to review and issue it.</p>
+               <p>— iCare LMS Team</p>`,
+      }).catch(() => {});
+    }
+  } catch (_) { /* notification failure should not break the response */ }
+}
+
 async function computeProgress(enrollment) {
   const course = await Course.findById(enrollment.courseId).lean();
   const totalLessons = (course?.modules || []).reduce((sum, m) => sum + (m.lessons?.length || 0), 0);
@@ -110,7 +154,7 @@ router.delete('/:courseId/students/:studentId', authMiddleware, async (req, res)
     if (!course) return res.status(404).json({ success: false, message: 'Course not found' });
     const uid = req.user.id?.toString();
     const isOwner = course.instructor_id?.toString() === uid
-      || (course.coTeachers || []).some(t => t.userId?.toString() === uid);
+      || (course.coTeachers || []).some(t => t.userId?.toString() === uid && (t.status ?? 'accepted') === 'accepted');
     if (!isOwner) return res.status(403).json({ success: false, message: 'Only the instructor can remove students' });
 
     const result = await Enrollment.deleteOne({ courseId, userId: studentId });
@@ -334,19 +378,27 @@ router.get('/enrollments/my', authMiddleware, async (req, res) => {
     await connectMongoDB();
     const uId = toId(req.user.id);
     const enrollments = await Enrollment.find({ userId: uId }).lean();
-    // Populate course data
+    // Populate course data — is_active: { $ne: false } excludes deleted/
+    // deactivated courses (deletion sets is_active: false rather than
+    // removing the document). Without this filter, an enrollment for a
+    // course an instructor deleted kept showing up as a broken/unrelated
+    // entry in the student's My Courses list.
     const courseIds = enrollments.map(e => e.courseId);
-    const courses = await Course.find({ _id: { $in: courseIds } }).lean();
+    const courses = await Course.find({ _id: { $in: courseIds }, is_active: { $ne: false } }).lean();
     const courseMap = {};
     courses.forEach(c => { courseMap[c._id.toString()] = c; });
-    const items = await Promise.all(enrollments.map(async (e) => {
-      const { progressPct } = await computeProgress(e);
-      return {
-        ...e,
-        course: courseMap[e.courseId.toString()] || null,
-        progress: { ...e.progress, percent: progressPct },
-      };
-    }));
+    const items = await Promise.all(
+      enrollments
+        .filter(e => courseMap[e.courseId?.toString()])
+        .map(async (e) => {
+          const { progressPct } = await computeProgress(e);
+          return {
+            ...e,
+            course: courseMap[e.courseId.toString()],
+            progress: { ...e.progress, percent: progressPct },
+          };
+        })
+    );
     res.json({ success: true, enrollments: items, items, count: items.length });
   } catch (e) {
     res.status(500).json({ success: false, message: e.message });
@@ -483,7 +535,7 @@ router.get('/:id', authMiddleware, async (req, res) => {
     // owns the course or a student who has actually enrolled.
     const uid = req.user.id?.toString();
     const isOwner = course.instructor_id?.toString() === uid
-      || (course.coTeachers || []).some(t => t.userId?.toString() === uid);
+      || (course.coTeachers || []).some(t => t.userId?.toString() === uid && (t.status ?? 'accepted') === 'accepted');
     if (!enrollment && !isOwner) {
       return res.json({ success: true, course: { ...course, modules: [], enrollmentId: null, locked: true } });
     }
@@ -651,7 +703,14 @@ router.delete('/:id', authMiddleware, async (req, res) => {
   }
 });
 
-// POST /enrollments/:id/complete-module — mark module as complete
+// POST /enrollments/:id/complete-module — mark module as complete.
+// This is the manual "Mark Module as Complete" button — it does NOT force
+// completion. It re-validates via recheckModuleCompletion (same rule the
+// automatic per-lesson/per-assignment/per-quiz completion uses: every
+// lesson watched, every assignment submitted, every quiz passed) and only
+// actually marks it done if that validation passes. Previously this pushed
+// a completion unconditionally, so a student could "complete" a module —
+// and unlock the next one — without ever submitting its assignment.
 router.post('/enrollments/:id/complete-module', authMiddleware, async (req, res) => {
   try {
     await connectMongoDB();
@@ -667,9 +726,16 @@ router.post('/enrollments/:id/complete-module', authMiddleware, async (req, res)
       return res.json({ success: true, message: 'Module already completed', enrollment });
     }
 
-    // Add completion
-    enrollment.moduleCompletions.push({ moduleId, completedAt: new Date() });
+    const result = await recheckModuleCompletion(enrollment, moduleId);
+    const nowCompleted = enrollment.moduleCompletions.find(mc => mc.moduleId === moduleId);
+    if (!nowCompleted) {
+      return res.status(400).json({
+        success: false,
+        message: 'This module is not fully complete yet — finish all lessons, assignments, and quizzes first.',
+      });
+    }
     await enrollment.save();
+    if (result?.justCompletedCourse) notifyLeadInstructorCourseComplete(enrollment);
 
     // Send notification to instructor (non-blocking)
     try {
@@ -712,11 +778,14 @@ router.post('/enrollments/:id/complete-lesson', authMiddleware, async (req, res)
     }
 
     // Auto-complete module (and course) if all lessons AND all published quizzes in it are done
+    let justCompletedCourse = false;
     if (moduleId) {
-      await recheckModuleCompletion(enrollment, moduleId);
+      const result = await recheckModuleCompletion(enrollment, moduleId);
+      justCompletedCourse = result?.justCompletedCourse === true;
     }
 
     await enrollment.save();
+    if (justCompletedCourse) notifyLeadInstructorCourseComplete(enrollment);
 
     const p = await computeProgress(enrollment);
     res.json({ success: true, progressPct: p.progressPct, isCompleted: enrollment.isCompleted || false,
@@ -751,11 +820,15 @@ router.get('/enrollments/:id/progress', authMiddleware, async (req, res) => {
   }
 });
 
-// POST /courses/:id/invite-teacher — invite co-teacher by email with role
+// POST /courses/:id/invite-teacher — invite co-teacher by email with a role label.
+// role is free text (e.g. "Coordinator"); 'lead' is the one reserved value
+// that grants certificate-issuing authority. The invite is added as
+// status:'pending' — the invited teacher must accept it (see accept/reject
+// routes below) before they get real access to the course.
 router.post('/:id/invite-teacher', authMiddleware, async (req, res) => {
   try {
     await connectMongoDB();
-    const { email, role } = req.body; // role: 'lead' | 'normal'
+    const { email, role } = req.body;
     if (!email) return res.status(400).json({ success: false, message: 'Email required' });
 
     const course = await Course.findById(toId(req.params.id)).lean();
@@ -768,7 +841,8 @@ router.post('/:id/invite-teacher', authMiddleware, async (req, res) => {
       return res.status(404).json({ success: false, message: `No user found with email: ${email}. They must register on iCare first.` });
     }
 
-    const teacherRole = role === 'lead' ? 'lead' : 'normal';
+    const teacherRole = ((role || '') + '').trim() || 'normal';
+    const roleLabel = teacherRole.toLowerCase() === 'lead' ? 'Lead Instructor' : teacherRole === 'normal' ? 'Co-Instructor' : teacherRole;
 
     // Add as co-teacher with role if not already
     const existingEntry = (course.coTeachers || []).find(t => {
@@ -778,7 +852,7 @@ router.post('/:id/invite-teacher', authMiddleware, async (req, res) => {
     if (existingEntry) return res.json({ success: true, message: 'This teacher is already in the course.' });
 
     await Course.findByIdAndUpdate(toId(req.params.id), {
-      $addToSet: { coTeachers: { userId: invitedUser._id, role: teacherRole, name: invitedUser.name, email: invitedUser.email } }
+      $addToSet: { coTeachers: { userId: invitedUser._id, role: teacherRole, status: 'pending', name: invitedUser.name, email: invitedUser.email, invitedAt: new Date() } }
     });
 
     // Send notification to invited teacher
@@ -787,9 +861,9 @@ router.post('/:id/invite-teacher', authMiddleware, async (req, res) => {
     await Notification.create({
       userId: invitedUser._id,
       type: 'general',
-      title: `${teacherRole === 'lead' ? 'Lead' : 'Co'}-Teacher Invitation`,
-      message: `${inviter?.name || 'An instructor'} has invited you as ${teacherRole === 'lead' ? 'Lead' : 'Normal'} Instructor for "${course.title}"`,
-      data: { courseId: course._id, courseName: course.title },
+      title: 'Co-Teacher Invitation',
+      message: `${inviter?.name || 'An instructor'} has invited you as ${roleLabel} for "${course.title}". Accept to join.`,
+      data: { courseId: course._id, courseName: course.title, subType: 'coteacher_invite' },
     }).catch(() => {});
 
     // Email the invited teacher
@@ -797,8 +871,8 @@ router.post('/:id/invite-teacher', authMiddleware, async (req, res) => {
       to: invitedUser.email,
       subject: `You're invited to co-teach on iCare: ${course.title}`,
       html: `<p>Hi ${invitedUser.name || 'there'},</p>
-             <p><b>${inviter?.name || 'An instructor'}</b> has invited you as <b>${teacherRole === 'lead' ? 'Lead' : 'Co'}-Teacher</b> for the course <b>"${course.title}"</b> on iCare LMS.</p>
-             <p>Log in to your iCare instructor account — the course will now appear in your <b>My Courses</b> list.</p>
+             <p><b>${inviter?.name || 'An instructor'}</b> has invited you as <b>${roleLabel}</b> for the course <b>"${course.title}"</b> on iCare LMS.</p>
+             <p>Log in to your iCare instructor account and accept the invitation — the course will then appear in your <b>My Courses</b> list.</p>
              <p>— iCare Team</p>`,
     }).catch(e => console.error('Co-teacher invite email failed:', e.message));
 
@@ -808,14 +882,99 @@ router.post('/:id/invite-teacher', authMiddleware, async (req, res) => {
   }
 });
 
+// POST /courses/:id/co-teacher/accept — invited teacher accepts the invite
+router.post('/:id/co-teacher/accept', authMiddleware, async (req, res) => {
+  try {
+    await connectMongoDB();
+    const course = await Course.findById(toId(req.params.id));
+    if (!course) return res.status(404).json({ success: false, message: 'Course not found' });
+
+    const entry = (course.coTeachers || []).find(t => t.userId?.toString() === req.user.id);
+    if (!entry) return res.status(404).json({ success: false, message: 'No pending invite found for this user' });
+
+    entry.status = 'accepted';
+    await course.save();
+    res.json({ success: true, message: 'Invitation accepted' });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+// POST /courses/:id/co-teacher/reject — invited teacher declines the invite
+router.post('/:id/co-teacher/reject', authMiddleware, async (req, res) => {
+  try {
+    await connectMongoDB();
+    const course = await Course.findById(toId(req.params.id));
+    if (!course) return res.status(404).json({ success: false, message: 'Course not found' });
+
+    const before = (course.coTeachers || []).length;
+    course.coTeachers = (course.coTeachers || []).filter(t => t.userId?.toString() !== req.user.id);
+    if (course.coTeachers.length === before) {
+      return res.status(404).json({ success: false, message: 'No pending invite found for this user' });
+    }
+    await course.save();
+    res.json({ success: true, message: 'Invitation declined' });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+// Only the course owner or a co-teacher with role 'lead'/'lead instructor'
+// may manage other co-teachers (remove, change role).
+async function assertCanManageCoTeachers(courseId, userId) {
+  const course = await Course.findById(courseId).select('instructor_id coTeachers').lean();
+  if (!course) return { ok: false, status: 404, message: 'Course not found' };
+  const uid = userId.toString();
+  if (course.instructor_id?.toString() === uid) return { ok: true, course };
+  const self = (course.coTeachers || []).find(t => t.userId?.toString() === uid);
+  const isLead = (self?.role || '').toLowerCase() === 'lead' || (self?.role || '').toLowerCase() === 'lead instructor';
+  if (isLead && (self.status ?? 'accepted') === 'accepted') return { ok: true, course };
+  return { ok: false, status: 403, message: 'Only the course owner or Lead Instructor can manage co-teachers' };
+}
+
 // DELETE /courses/:id/co-teacher/:userId — remove a co-teacher
 router.delete('/:id/co-teacher/:userId', authMiddleware, async (req, res) => {
   try {
     await connectMongoDB();
+    const check = await assertCanManageCoTeachers(req.params.id, req.user.id);
+    if (!check.ok) return res.status(check.status).json({ success: false, message: check.message });
     await Course.findByIdAndUpdate(toId(req.params.id), {
       $pull: { coTeachers: { userId: toId(req.params.userId) } },
     });
     res.json({ success: true });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+// PUT /courses/:id/co-teacher/:userId/role — grant/change a co-teacher's role
+// (e.g. promote to 'lead' so they can issue certificates and manage other co-teachers)
+router.put('/:id/co-teacher/:userId/role', authMiddleware, async (req, res) => {
+  try {
+    await connectMongoDB();
+    const check = await assertCanManageCoTeachers(req.params.id, req.user.id);
+    if (!check.ok) return res.status(check.status).json({ success: false, message: check.message });
+
+    const role = ((req.body.role || '') + '').trim();
+    if (!role) return res.status(400).json({ success: false, message: 'role is required' });
+
+    const course = await Course.findById(toId(req.params.id));
+    const entry = (course.coTeachers || []).find(t => t.userId?.toString() === req.params.userId);
+    if (!entry) return res.status(404).json({ success: false, message: 'Co-teacher not found' });
+
+    entry.role = role;
+    await course.save();
+
+    const Notification = require('../models/Notification');
+    await Notification.create({
+      userId: entry.userId,
+      type: 'general',
+      title: 'Role Updated',
+      message: `Your role for "${course.title}" was changed to ${role}.`,
+      data: { courseId: course._id, courseName: course.title },
+    }).catch(() => {});
+
+    res.json({ success: true, message: `Role updated to ${role}` });
   } catch (e) {
     res.status(500).json({ success: false, message: e.message });
   }

@@ -213,8 +213,18 @@ router.post('/course/:courseId/set-live', authMiddleware, async (req, res) => {
     // Resolve title: use provided title, or inherit from the scheduled session template
     let sessionTitle = title || 'Live Session';
     if (sessionId && sessionId !== req.params.courseId) {
-      const template = await LiveSession.findById(toId(sessionId)).select('title').lean();
+      const template = await LiveSession.findById(toId(sessionId)).select('title scheduledAt').lean();
       if (template?.title) sessionTitle = template.title;
+      // A session scheduled for a specific future time can't be started
+      // early — "Go Live" stays locked client-side too, but the backend
+      // is the real gate since the client's clock/lock state can't be trusted.
+      if (template?.scheduledAt && new Date(template.scheduledAt) > new Date()) {
+        return res.status(403).json({
+          success: false,
+          message: `This session is scheduled for ${new Date(template.scheduledAt).toISOString()} and cannot be started early.`,
+          scheduledAt: template.scheduledAt,
+        });
+      }
     }
 
     // Create a fresh LiveSession document — each go-live gets a new _id,

@@ -1405,6 +1405,7 @@ class _GradesTab extends StatefulWidget {
 class _GradesTabState extends State<_GradesTab> {
   List<dynamic> _grades = [];
   List<dynamic> _pendingCerts = [];
+  List<dynamic> _readyForCert = [];
   bool _loading = true;
   bool _certLoading = false;
 
@@ -1415,9 +1416,23 @@ class _GradesTabState extends State<_GradesTab> {
     final futures = <Future>[
       widget.lms.getCourseGrades(widget.courseId).then((g) => _grades = g),
       if (widget.isInstructor) widget.lms.getPendingCertificates(widget.courseId).then((c) => _pendingCerts = c),
+      if (widget.isInstructor) widget.lms.getReadyForCertificate(widget.courseId).then((r) => _readyForCert = r),
     ];
     await Future.wait(futures);
     if (mounted) setState(() => _loading = false);
+  }
+
+  Future<void> _issueCertificate(String enrollmentId, String studentName) async {
+    setState(() => _certLoading = true);
+    final result = await widget.lms.generateCertificate(enrollmentId: enrollmentId);
+    if (mounted) {
+      setState(() => _certLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(result['success'] == true ? 'Certificate issued for $studentName' : (result['message'] ?? 'Failed to issue certificate')),
+        backgroundColor: result['success'] == true ? Colors.green : Colors.red,
+      ));
+      if (result['success'] == true) _load();
+    }
   }
 
   Future<void> _approveCert(String certId, String studentName, String action) async {
@@ -1503,6 +1518,48 @@ class _GradesTabState extends State<_GradesTab> {
             ]),
           ),
           const SizedBox(height: 20),
+
+          // Instructor (Lead only, enforced server-side): students who
+          // finished every module but have no certificate yet
+          if (widget.isInstructor && _readyForCert.isNotEmpty) ...[
+            Container(
+              margin: const EdgeInsets.only(bottom: 16),
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: const Color(0xFFECFDF5),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.4)),
+              ),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Row(children: [
+                  const Icon(Icons.workspace_premium_rounded, color: Color(0xFF10B981), size: 18),
+                  const SizedBox(width: 8),
+                  Text('Ready to Certify (${_readyForCert.length})',
+                    style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13)),
+                ]),
+                const SizedBox(height: 10),
+                ..._readyForCert.map((r) {
+                  final name = r['studentName']?.toString() ?? 'Student';
+                  final enrollmentId = r['enrollmentId']?.toString() ?? '';
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Row(children: [
+                      CircleAvatar(radius: 16, backgroundColor: const Color(0xFF10B981).withValues(alpha: 0.1),
+                        child: Text(name.isNotEmpty ? name[0].toUpperCase() : '?', style: const TextStyle(color: Color(0xFF10B981), fontWeight: FontWeight.w700))),
+                      const SizedBox(width: 10),
+                      Expanded(child: Text(name, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600))),
+                      ElevatedButton(
+                        onPressed: (_certLoading || enrollmentId.isEmpty) ? null : () => _issueCertificate(enrollmentId, name),
+                        style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF10B981), foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8)),
+                        child: const Text('Issue Certificate', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+                      ),
+                    ]),
+                  );
+                }),
+              ]),
+            ),
+          ],
 
           // Instructor: pending certificate approvals
           if (widget.isInstructor && _pendingCerts.isNotEmpty) ...[
@@ -2316,6 +2373,10 @@ class _MarkAttendanceScreenState extends State<_MarkAttendanceScreen> {
   List<Map<String, dynamic>> _students = [];
   // studentId → status
   final Map<String, String> _statusMap = {};
+  // studentId → {joinedAt, leftAt, durationMinutes} — from the live-session
+  // join/leave timestamps (Attendance.records), not editable here, just shown
+  // so the instructor can see when each student actually attended.
+  final Map<String, Map<String, dynamic>> _timestampMap = {};
 
   @override
   void initState() {
@@ -2326,12 +2387,34 @@ class _MarkAttendanceScreenState extends State<_MarkAttendanceScreen> {
   Future<void> _load() async {
     setState(() => _loading = true);
     try {
-      final students = await widget.lms.getCourseStudents(widget.courseId);
-      final existing = List<Map<String, dynamic>>.from(widget.session['records'] ?? []);
+      final sessionId = widget.session['_id']?.toString() ?? '';
+      final results = await Future.wait([
+        widget.lms.getCourseStudents(widget.courseId),
+        sessionId.isNotEmpty ? widget.lms.getAttendanceSessionDetail(sessionId) : Future.value(<String, dynamic>{}),
+      ]);
+      final students = results[0] as List;
+      final detail = results[1] as Map;
+      final detailStudents = List<Map<String, dynamic>>.from(detail['students'] ?? []);
+
       final statusMap = <String, String>{};
-      for (final r in existing) {
+      final timestampMap = <String, Map<String, dynamic>>{};
+      for (final r in detailStudents) {
         final id = r['studentId']?.toString() ?? '';
-        if (id.isNotEmpty) statusMap[id] = r['status']?.toString() ?? 'absent';
+        if (id.isEmpty) continue;
+        statusMap[id] = r['status']?.toString() ?? 'absent';
+        timestampMap[id] = {
+          'joinedAt': r['joinedAt'],
+          'leftAt': r['leftAt'],
+          'durationMinutes': r['durationMinutes'],
+        };
+      }
+      // Fallback to the raw records passed in if the detail call failed/is empty
+      if (statusMap.isEmpty) {
+        final existing = List<Map<String, dynamic>>.from(widget.session['records'] ?? []);
+        for (final r in existing) {
+          final id = r['studentId']?.toString() ?? '';
+          if (id.isNotEmpty) statusMap[id] = r['status']?.toString() ?? 'absent';
+        }
       }
       if (mounted) {
         setState(() {
@@ -2340,6 +2423,7 @@ class _MarkAttendanceScreenState extends State<_MarkAttendanceScreen> {
           for (final s in _students) {
             final id = s['_id']?.toString() ?? '';
             _statusMap[id] = statusMap[id] ?? 'absent';
+            if (timestampMap[id] != null) _timestampMap[id] = timestampMap[id]!;
           }
           _loading = false;
         });
@@ -2469,6 +2553,8 @@ class _MarkAttendanceScreenState extends State<_MarkAttendanceScreen> {
                             final email = student['email']?.toString() ?? '';
                             final status = _statusMap[id] ?? 'absent';
 
+                            final ts = _timestampMap[id];
+
                             return Container(
                               margin: const EdgeInsets.only(bottom: 10),
                               padding: const EdgeInsets.all(14),
@@ -2477,35 +2563,41 @@ class _MarkAttendanceScreenState extends State<_MarkAttendanceScreen> {
                                 borderRadius: BorderRadius.circular(12),
                                 border: Border.all(color: _borderColor(status).withValues(alpha: 0.3)),
                               ),
-                              child: Row(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  CircleAvatar(
-                                    backgroundColor: _borderColor(status).withValues(alpha: 0.15),
-                                    radius: 22,
-                                    child: Text(
-                                      name.isNotEmpty ? name[0].toUpperCase() : '?',
-                                      style: TextStyle(fontWeight: FontWeight.w800, color: _borderColor(status), fontSize: 16),
-                                    ),
+                                  Row(
+                                    children: [
+                                      CircleAvatar(
+                                        backgroundColor: _borderColor(status).withValues(alpha: 0.15),
+                                        radius: 22,
+                                        child: Text(
+                                          name.isNotEmpty ? name[0].toUpperCase() : '?',
+                                          style: TextStyle(fontWeight: FontWeight.w800, color: _borderColor(status), fontSize: 16),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(name, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+                                            if (email.isNotEmpty)
+                                              Text(email, style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8))),
+                                          ],
+                                        ),
+                                      ),
+                                      // Status toggle buttons
+                                      Row(children: [
+                                        _statusBtn(id, 'present', Icons.check_circle_rounded, Colors.green, status),
+                                        const SizedBox(width: 6),
+                                        _statusBtn(id, 'late', Icons.watch_later_rounded, Colors.orange, status),
+                                        const SizedBox(width: 6),
+                                        _statusBtn(id, 'absent', Icons.cancel_rounded, Colors.red, status),
+                                      ]),
+                                    ],
                                   ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text(name, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
-                                        if (email.isNotEmpty)
-                                          Text(email, style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8))),
-                                      ],
-                                    ),
-                                  ),
-                                  // Status toggle buttons
-                                  Row(children: [
-                                    _statusBtn(id, 'present', Icons.check_circle_rounded, Colors.green, status),
-                                    const SizedBox(width: 6),
-                                    _statusBtn(id, 'late', Icons.watch_later_rounded, Colors.orange, status),
-                                    const SizedBox(width: 6),
-                                    _statusBtn(id, 'absent', Icons.cancel_rounded, Colors.red, status),
-                                  ]),
+                                  if (ts != null) _instructorTimestampRow(ts),
                                 ],
                               ),
                             );
@@ -2515,6 +2607,41 @@ class _MarkAttendanceScreenState extends State<_MarkAttendanceScreen> {
               ],
             ),
     );
+  }
+
+  Widget _instructorTimestampRow(Map<String, dynamic> ts) {
+    String? fmtTime(dynamic iso) {
+      if (iso == null) return null;
+      try {
+        final dt = DateTime.parse(iso.toString()).toLocal();
+        final h = dt.hour % 12 == 0 ? 12 : dt.hour % 12;
+        final m = dt.minute.toString().padLeft(2, '0');
+        final period = dt.hour < 12 ? 'AM' : 'PM';
+        return '$h:$m $period';
+      } catch (_) { return null; }
+    }
+    final joined = fmtTime(ts['joinedAt']);
+    final left = fmtTime(ts['leftAt']);
+    final mins = ts['durationMinutes'];
+    if (joined == null && left == null && mins == null) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 8, left: 56),
+      child: Wrap(spacing: 14, runSpacing: 4, children: [
+        if (joined != null) _instructorTsBit(Icons.login_rounded, 'Joined', joined),
+        if (left != null) _instructorTsBit(Icons.logout_rounded, 'Left', left),
+        if (mins != null) _instructorTsBit(Icons.timer_outlined, 'Duration', '$mins min'),
+      ]),
+    );
+  }
+
+  Widget _instructorTsBit(IconData icon, String label, String value) {
+    return Row(mainAxisSize: MainAxisSize.min, children: [
+      Icon(icon, size: 11, color: const Color(0xFF10B981)),
+      const SizedBox(width: 3),
+      Text('$label: ', style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8))),
+      Text(value, style: const TextStyle(fontSize: 11, color: Color(0xFF0F172A), fontWeight: FontWeight.w700)),
+    ]);
   }
 
   Widget _summaryChip(String label, int count, Color color) {

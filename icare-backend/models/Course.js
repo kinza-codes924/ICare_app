@@ -74,12 +74,17 @@ const courseSchema = new mongoose.Schema({
     ref: 'User',
     required: true,
   },
-  // Co-instructors with role: lead | normal
+  // Co-instructors. role is a free-text label ("Coordinator", etc) except
+  // for the reserved 'lead' value, which grants certificate-issuing
+  // authority — see certificate routes. status gates a co-teacher's access
+  // until they accept the invite (see invite-teacher / accept / reject routes).
   coTeachers: [{
     userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     name: String,
     email: String,
-    role: { type: String, enum: ['lead', 'normal'], default: 'normal' },
+    role: { type: String, default: 'normal' },
+    status: { type: String, enum: ['pending', 'accepted', 'rejected'], default: 'pending' },
+    invitedAt: { type: Date, default: Date.now },
   }],
   // Mark as RM Health Solutions / RMS UK course for public home display
   isRmsCourse: { type: Boolean, default: false },
