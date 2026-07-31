@@ -35,6 +35,7 @@ class _ViewCourseState extends ConsumerState<ViewCourse> {
   bool _isInstructor = false;
   final Set<String> _completedModuleIds = {};
   final Set<String> _completedLessonIds = {};
+  String? _lockReason;
 
   @override
   void initState() {
@@ -45,6 +46,23 @@ class _ViewCourseState extends ConsumerState<ViewCourse> {
     _currentEnrollmentId = widget.enrollmentId;
     _loadQuestions();
     _checkRole();
+    _loadLockStatus();
+  }
+
+  // The "Enrolled — active access" card otherwise stays green/openable even
+  // after an installment goes overdue and the classroom itself locks — this
+  // pulls the same lockReason the classroom uses so the card can reflect it
+  // here too, instead of only surfacing the lock once the student taps in.
+  Future<void> _loadLockStatus() async {
+    final courseId = widget.courseData?['_id']?.toString();
+    if (courseId == null || courseId.isEmpty) return;
+    try {
+      final result = await _lms.getCourseDetails(courseId);
+      final course = result['course'] ?? result;
+      if (mounted && course is Map) {
+        setState(() => _lockReason = course['lockReason']?.toString());
+      }
+    } catch (_) {}
   }
 
   Future<void> _checkRole() async {
@@ -669,19 +687,30 @@ class _ViewCourseState extends ConsumerState<ViewCourse> {
 
   Widget _buildEnrollmentCard(String courseId) {
     if (_isPurchased) {
+      final isLocked = _lockReason == 'installment_overdue';
       return Column(
         children: [
-          const Icon(Icons.check_circle_rounded, color: Color(0xFF10B981), size: 48),
+          Icon(isLocked ? Icons.lock_rounded : Icons.check_circle_rounded,
+              color: isLocked ? const Color(0xFFDC2626) : const Color(0xFF10B981), size: 48),
           const SizedBox(height: 12),
-          const Text('Enrolled', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF10B981))),
+          Text(isLocked ? 'Course Locked' : 'Enrolled',
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold,
+                  color: isLocked ? const Color(0xFFDC2626) : const Color(0xFF10B981))),
           const SizedBox(height: 8),
-          const Text('You have active access to this course.', textAlign: TextAlign.center, style: TextStyle(color: Color(0xFF64748B))),
+          Text(
+            isLocked
+                ? 'Installment overdue — pay now to unlock this course.'
+                : 'You have active access to this course.',
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: Color(0xFF64748B)),
+          ),
           const SizedBox(height: 16),
           SizedBox(
             width: double.infinity,
             child: ElevatedButton.icon(
-              icon: const Icon(Icons.open_in_new_rounded, color: Colors.white),
-              label: const Text('Open Course', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+              icon: Icon(isLocked ? Icons.lock_open_rounded : Icons.open_in_new_rounded, color: Colors.white),
+              label: Text(isLocked ? 'Pay Now to Unlock' : 'Open Course',
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
               onPressed: () => Navigator.push(context, MaterialPageRoute(
                 builder: (_) => LmsCoursePage(
                   course: widget.courseData ?? {},
@@ -690,7 +719,7 @@ class _ViewCourseState extends ConsumerState<ViewCourse> {
                 ),
               )),
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primaryColor,
+                backgroundColor: isLocked ? const Color(0xFFDC2626) : AppColors.primaryColor,
                 padding: const EdgeInsets.symmetric(vertical: 14),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 elevation: 0,

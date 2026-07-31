@@ -3,9 +3,9 @@
 // x-cron-secret header). Two responsibilities in one pass:
 //   (A) send a "due" reminder (in-app + email) the first time an installment's
 //       dueDate has arrived and it's still pending
-//   (B) auto-lock a course once the grace period lapses — the grace deadline
-//       is the NEXT installment's due date (or +1 calendar month if this is
-//       the last installment), matching the "exactly one month later" spec.
+//   (B) auto-lock a course 3 days after an installment's own due date passes
+//       unpaid — short enough to not leave the course unlocked for weeks,
+//       long enough to absorb a genuine bank/payment delay.
 // Idempotent: dueReminderSentAt / installmentLocked flags are checked before
 // acting, so re-running the same day never double-sends/double-locks.
 const express = require('express');
@@ -16,7 +16,6 @@ const Course = require('../models/Course');
 const User = require('../models/User');
 const Notification = require('../models/Notification');
 const { sendEmail } = require('../utils/email');
-const { addOneCalendarMonth } = require('../utils/installments');
 
 async function handleProcessInstallments(req, res) {
   const cronSecret = req.headers['x-cron-secret'] || req.query.secret;
@@ -72,8 +71,10 @@ async function handleProcessInstallments(req, res) {
       const pending = enr.installments.filter((i) => i.status === 'pending').sort((a, b) => a.index - b.index);
       if (!pending.length) continue;
       const firstPending = pending[0];
-      const nextInst = enr.installments.find((i) => i.index === firstPending.index + 1);
-      const graceDeadline = nextInst ? new Date(nextInst.dueDate) : addOneCalendarMonth(new Date(firstPending.dueDate));
+      // 3-day grace after the installment's own due date — covers genuine
+      // bank/payment delays without leaving the course unlocked for a full
+      // month past the due date.
+      const graceDeadline = new Date(new Date(firstPending.dueDate).getTime() + 3 * 24 * 60 * 60 * 1000);
       if (now < graceDeadline) continue;
 
       firstPending.status = 'overdue';

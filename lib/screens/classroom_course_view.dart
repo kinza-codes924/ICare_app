@@ -1267,9 +1267,16 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
     // stale "JOIN" affordance after the instructor has ended the session.
     final liveSession = _sessions.where((s) => s['status']?.toString() == 'live').firstOrNull;
 
-    final standaloneAssignments = _assignments;
-    final standaloneQuizzes = _quizzes;
-    final standaloneSessions = _sessions.where((s) => s['status']?.toString() != 'live').toList();
+    // Installment-locked students see only the "pay now" banner — assignments,
+    // quizzes, and standalone sessions must not stay reachable as a side door
+    // around the module lock (previously only the modules list was cleared,
+    // leaving these three lists fully visible/tappable underneath the banner).
+    final isInstallmentLocked = _lockReason == 'installment_overdue';
+    final standaloneAssignments = isInstallmentLocked ? const <dynamic>[] : _assignments;
+    final standaloneQuizzes = isInstallmentLocked ? const <dynamic>[] : _quizzes;
+    final standaloneSessions = isInstallmentLocked
+        ? const <dynamic>[]
+        : _sessions.where((s) => s['status']?.toString() != 'live').toList();
 
     return RefreshIndicator(
       onRefresh: _loadModules,
@@ -1344,8 +1351,9 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
           ],
           // Live session banner — gated on _isSessionLive (polled every 5s),
           // not on the unpolled _sessions list, so it appears/disappears in
-          // sync with the Stream tab's banner and the FAB.
-          if (_isSessionLive) ...[
+          // sync with the Stream tab's banner and the FAB. Suppressed while
+          // installment-locked so a locked student can't join a live class.
+          if (_isSessionLive && !isInstallmentLocked) ...[
             GestureDetector(
               onTap: _joinLiveClass,
               child: Container(
