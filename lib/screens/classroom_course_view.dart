@@ -2220,6 +2220,17 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
   }
 
   Future<void> _openItem(String type, Map data) async {
+    // Blocks the Announcement/Stream feed cards from being a side door around
+    // an installment lock — the Course Content tab already hides these tiles
+    // entirely, but the feed still linked straight into the same assignment/
+    // quiz/session for a locked student.
+    if (!widget.isInstructor && _lockReason == 'installment_overdue') {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('This course is locked due to an overdue installment. Pay now to unlock.'),
+        backgroundColor: Color(0xFFDC2626),
+      ));
+      return;
+    }
     if (type == 'assignment') {
       if (widget.isInstructor) {
         // Straight into that assignment's submissions/grading — the old

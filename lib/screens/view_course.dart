@@ -917,6 +917,18 @@ class _ViewCourseState extends ConsumerState<ViewCourse> {
     bool isPurchased,
     String courseId,
   ) {
+    // Same lock the enrollment card shows — without this, the curriculum
+    // list here (and the assignment/lesson tiles it renders) stayed fully
+    // tappable even while the "Course Locked" card sat right next to it.
+    if (_lockReason == 'installment_overdue') {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 20),
+        child: Text(
+          'This course is locked due to an overdue installment. Pay now to view the curriculum.',
+          style: TextStyle(color: Color(0xFFDC2626), fontWeight: FontWeight.w600),
+        ),
+      );
+    }
     if (modules.isEmpty) {
       return const Center(
         child: Padding(
