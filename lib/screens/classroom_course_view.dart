@@ -2225,9 +2225,15 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
     // entirely, but the feed still linked straight into the same assignment/
     // quiz/session for a locked student.
     if (!widget.isInstructor && _lockReason == 'installment_overdue') {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('This course is locked due to an overdue installment. Pay now to unlock.'),
-        backgroundColor: Color(0xFFDC2626),
+      final messenger = ScaffoldMessenger.of(context);
+      messenger.showSnackBar(SnackBar(
+        content: const Text('This course is locked due to an overdue installment. Pay now to unlock.'),
+        backgroundColor: const Color(0xFFDC2626),
+        action: SnackBarAction(
+          label: 'Dismiss',
+          textColor: Colors.white,
+          onPressed: () => messenger.hideCurrentSnackBar(),
+        ),
       ));
       return;
     }
