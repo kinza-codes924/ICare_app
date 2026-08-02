@@ -3829,16 +3829,24 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
                     style: TextStyle(color: pctColor, fontWeight: FontWeight.w700, fontSize: 13)),
               ),
               title: Text(name, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: Color(0xFF202124))),
-              subtitle: Text('$present present · $late late · ${total - present - late} absent (of $total)',
+              subtitle: Text('$present present · $late late · ${total - present - late} absent (of $total) · tap to see timestamps',
                   style: const TextStyle(fontSize: 11, color: Color(0xFF70757A))),
-              trailing: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: pctColor.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(12),
+              // ExpansionTile's trailing slot replaces its default chevron
+              // entirely — putting the % badge there with nothing else made
+              // this look like a plain, non-interactive row. The instructor
+              // could still tap it, but had no visual cue it expanded.
+              trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: pctColor.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text('$pct%', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: pctColor)),
                 ),
-                child: Text('$pct%', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: pctColor)),
-              ),
+                const SizedBox(width: 4),
+                const Icon(Icons.expand_more_rounded, color: Color(0xFF70757A)),
+              ]),
               children: sessions.isEmpty
                   ? [const Align(alignment: Alignment.centerLeft,
                       child: Padding(padding: EdgeInsets.only(bottom: 8),
