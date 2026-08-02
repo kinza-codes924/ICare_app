@@ -1005,6 +1005,13 @@ class LmsService {
     }
   }
 
+  Future<List<dynamic>> getMyPendingInvites() async {
+    try {
+      final response = await _api.get('/courses/my-pending-invites');
+      return response.data['invites'] ?? [];
+    } catch (_) { return []; }
+  }
+
   Future<Map<String, dynamic>> acceptCoTeacherInvite(String courseId) async {
     try {
       final response = await _api.post('/courses/$courseId/co-teacher/accept', {});

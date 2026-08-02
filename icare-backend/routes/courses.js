@@ -472,6 +472,39 @@ router.put('/:courseId/certificate/release', authMiddleware, async (req, res) =>
   } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 });
 
+// GET /courses/my-pending-invites — all co-teacher invites awaiting this
+// user's response, across every course. Surfaced directly on the instructor
+// Home tab (not just buried in a notification) so an invite can't be missed.
+// MUST be registered before GET /:id, or Express matches "my-pending-invites"
+// as an :id param and this route never gets hit.
+router.get('/my-pending-invites', authMiddleware, async (req, res) => {
+  try {
+    await connectMongoDB();
+    const uid = req.user.id?.toString();
+    const courses = await Course.find({ 'coTeachers.userId': toId(uid), 'coTeachers.status': 'pending' })
+      .select('title instructor_id coTeachers')
+      .lean();
+
+    const invites = [];
+    for (const course of courses) {
+      const entry = (course.coTeachers || []).find(t => t.userId?.toString() === uid && t.status === 'pending');
+      if (!entry) continue;
+      const inviter = await require('../models/User').findById(course.instructor_id).select('name username').lean();
+      invites.push({
+        courseId: course._id,
+        courseTitle: course.title,
+        role: entry.role || 'normal',
+        invitedAt: entry.invitedAt || null,
+        inviterName: inviter?.name || inviter?.username || 'An instructor',
+      });
+    }
+
+    res.json({ success: true, invites });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
 // GET /api/courses/:id — get single course
 router.get('/:id', authMiddleware, async (req, res) => {
   try {

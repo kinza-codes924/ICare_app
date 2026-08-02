@@ -41,17 +41,13 @@ class _AccountActivatedScreenState extends State<AccountActivatedScreen>
     super.dispose();
   }
 
+  // This applicant was never actually logged in — the verification flow
+  // deliberately doesn't persist a session for an unapproved account (see
+  // VerificationStatusScreen's token comment), so there's nothing in
+  // SharedPref for /tabs to read. Sending them there directly landed on a
+  // broken/empty dashboard. Route through a real login instead.
   void _goOnline() {
-    // Navigate to appropriate dashboard based on role
-    if (widget.role == 'Doctor') {
-      context.go('/tabs');
-    } else if (widget.role == 'Pharmacy') {
-      context.go('/tabs');
-    } else if (widget.role == 'Laboratory') {
-      context.go('/tabs');
-    } else {
-      context.go('/tabs');
-    }
+    context.go('/login');
   }
 
   @override
@@ -158,9 +154,9 @@ class _AccountActivatedScreenState extends State<AccountActivatedScreen>
                           height: 56,
                           child: ElevatedButton.icon(
                             onPressed: _goOnline,
-                            icon: const Icon(Icons.rocket_launch_rounded, size: 22),
+                            icon: const Icon(Icons.login_rounded, size: 22),
                             label: const Text(
-                              'Go Online Now',
+                              'Login to Continue',
                               style: TextStyle(
                                 fontSize: 17,
                                 fontWeight: FontWeight.w900,

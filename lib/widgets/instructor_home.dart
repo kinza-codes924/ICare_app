@@ -9,6 +9,7 @@ import 'package:icare/screens/laboratories.dart';
 import 'package:icare/screens/labb_details.dart';
 import 'package:icare/screens/view_course.dart';
 import 'package:icare/services/instructor_service.dart';
+import 'package:icare/services/lms_service.dart';
 import 'package:icare/utils/imagePaths.dart';
 import 'package:icare/utils/theme.dart';
 import 'package:icare/utils/utils.dart';
@@ -26,6 +27,80 @@ class InstructorHome extends StatefulWidget {
 }
 
 class _InstructorHomeState extends State<InstructorHome> {
+  final LmsService _lms = LmsService();
+  List<dynamic> _pendingInvites = [];
+  final Set<String> _respondingCourseIds = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _lms.getMyPendingInvites().then((invites) {
+      if (mounted) setState(() => _pendingInvites = invites);
+    });
+  }
+
+  Future<void> _respondToInvite(String courseId, bool accept) async {
+    setState(() => _respondingCourseIds.add(courseId));
+    final result = accept
+        ? await _lms.acceptCoTeacherInvite(courseId)
+        : await _lms.rejectCoTeacherInvite(courseId);
+    if (!mounted) return;
+    setState(() {
+      _respondingCourseIds.remove(courseId);
+      if (result['success'] == true) {
+        _pendingInvites.removeWhere((i) => i['courseId']?.toString() == courseId);
+      }
+    });
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(result['success'] == true
+          ? (accept ? 'Invitation accepted — course added to My Courses' : 'Invitation declined')
+          : (result['message'] ?? 'Failed')),
+      backgroundColor: result['success'] == true ? Colors.green : Colors.red,
+    ));
+  }
+
+  Widget _buildMobileInviteBanner(dynamic inv) {
+    final courseId = inv['courseId']?.toString() ?? '';
+    final courseTitle = inv['courseTitle']?.toString() ?? 'a course';
+    final inviterName = inv['inviterName']?.toString() ?? 'An instructor';
+    final isResponding = _respondingCourseIds.contains(courseId);
+
+    return Container(
+      width: Utils.windowWidth(context) * 0.9,
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFEFF6FF),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFF1A73E8).withValues(alpha: 0.3)),
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text('$inviterName invited you to co-teach "$courseTitle"',
+            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF0F172A))),
+        const SizedBox(height: 10),
+        if (isResponding)
+          const Center(child: SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)))
+        else
+          Row(children: [
+            Expanded(
+              child: OutlinedButton(
+                onPressed: () => _respondToInvite(courseId, false),
+                child: const Text('Reject'),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: ElevatedButton(
+                onPressed: () => _respondToInvite(courseId, true),
+                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF1A73E8), foregroundColor: Colors.white),
+                child: const Text('Accept'),
+              ),
+            ),
+          ]),
+      ]),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final bool isDesktop = Utils.windowWidth(context) > 900;
@@ -36,6 +111,8 @@ class _InstructorHomeState extends State<InstructorHome> {
         child: Column(
           children: [
             SizedBox(height: ScallingConfig.scale(10)),
+            if (_pendingInvites.isNotEmpty)
+              ..._pendingInvites.map((inv) => _buildMobileInviteBanner(inv)),
             // Dashboard Button
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -127,9 +204,12 @@ class _InstructorWebDashboard extends StatefulWidget {
 
 class _InstructorWebDashboardState extends State<_InstructorWebDashboard> {
   final InstructorService _instructorService = InstructorService();
+  final LmsService _lms = LmsService();
   List<dynamic> _courses = [];
   Map<String, dynamic> _stats = {};
+  List<dynamic> _pendingInvites = [];
   bool _isLoading = true;
+  final Set<String> _respondingCourseIds = {};
 
   @override
   void initState() {
@@ -142,12 +222,14 @@ class _InstructorWebDashboardState extends State<_InstructorWebDashboard> {
       final results = await Future.wait([
         _instructorService.getMyCourses(),
         _instructorService.getStats(),
+        _lms.getMyPendingInvites(),
       ]);
 
       if (mounted) {
         setState(() {
           _courses = results[0] as List;
           _stats = results[1] as Map<String, dynamic>;
+          _pendingInvites = results[2] as List;
           _isLoading = false;
         });
       }
@@ -157,6 +239,22 @@ class _InstructorWebDashboardState extends State<_InstructorWebDashboard> {
         setState(() => _isLoading = false);
       }
     }
+  }
+
+  Future<void> _respondToInvite(String courseId, bool accept) async {
+    setState(() => _respondingCourseIds.add(courseId));
+    final result = accept
+        ? await _lms.acceptCoTeacherInvite(courseId)
+        : await _lms.rejectCoTeacherInvite(courseId);
+    if (!mounted) return;
+    setState(() => _respondingCourseIds.remove(courseId));
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(result['success'] == true
+          ? (accept ? 'Invitation accepted — course added to My Courses' : 'Invitation declined')
+          : (result['message'] ?? 'Failed')),
+      backgroundColor: result['success'] == true ? Colors.green : Colors.red,
+    ));
+    if (result['success'] == true) _loadData();
   }
 
   @override
@@ -200,6 +298,15 @@ class _InstructorWebDashboardState extends State<_InstructorWebDashboard> {
           // ── Header ──────────────────────────────────────────────────────
           _buildHeader(context),
           const SizedBox(height: 36),
+
+          // ── Pending co-teacher invites ──────────────────────────────────
+          // Surfaced directly here (not just as a notification) so an
+          // instructor invited to co-teach a course can't miss it — this was
+          // previously invisible until they happened to open Notifications.
+          if (_pendingInvites.isNotEmpty) ...[
+            ..._pendingInvites.map((inv) => _buildInviteBanner(inv)),
+            const SizedBox(height: 20),
+          ],
 
           // ── Stats Row ───────────────────────────────────────────────────
           _buildStatsRow(statsData),
@@ -265,6 +372,62 @@ class _InstructorWebDashboardState extends State<_InstructorWebDashboard> {
   }
 
   // ── Header with search ──────────────────────────────────────────────────
+  Widget _buildInviteBanner(dynamic inv) {
+    final courseId = inv['courseId']?.toString() ?? '';
+    final courseTitle = inv['courseTitle']?.toString() ?? 'a course';
+    final inviterName = inv['inviterName']?.toString() ?? 'An instructor';
+    final role = inv['role']?.toString() ?? 'normal';
+    final roleLower = role.toLowerCase();
+    final roleLabel = (roleLower == 'lead' || roleLower == 'lead instructor')
+        ? 'Lead Instructor'
+        : (role == 'normal' ? 'Co-Instructor' : role);
+    final isResponding = _respondingCourseIds.contains(courseId);
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: const Color(0xFFEFF6FF),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFF1A73E8).withValues(alpha: 0.3)),
+      ),
+      child: Row(children: [
+        Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(color: const Color(0xFF1A73E8).withValues(alpha: 0.1), shape: BoxShape.circle),
+          child: const Icon(Icons.person_add_alt_1_rounded, color: Color(0xFF1A73E8), size: 22),
+        ),
+        const SizedBox(width: 14),
+        Expanded(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(
+              '$inviterName invited you to co-teach "$courseTitle"',
+              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
+            ),
+            const SizedBox(height: 2),
+            Text('Role: $roleLabel', style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+          ]),
+        ),
+        const SizedBox(width: 12),
+        if (isResponding)
+          const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+        else ...[
+          TextButton(
+            onPressed: () => _respondToInvite(courseId, false),
+            style: TextButton.styleFrom(foregroundColor: const Color(0xFF64748B)),
+            child: const Text('Reject'),
+          ),
+          const SizedBox(width: 8),
+          ElevatedButton(
+            onPressed: () => _respondToInvite(courseId, true),
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF1A73E8), foregroundColor: Colors.white),
+            child: const Text('Accept'),
+          ),
+        ],
+      ]),
+    );
+  }
+
   Widget _buildHeader(BuildContext context) {
     return Row(
       children: [
