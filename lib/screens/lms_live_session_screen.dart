@@ -146,9 +146,14 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
       // BEFORE initialising the Agora room (room name is derived from _sessionDocId).
       if (widget.isInstructor) await _notifyStudents();
 
-      // Step 3: Join the session (registers attendance)
+      // Step 3: Join the session (adds to LiveSession.attendees[])
       if (_sessionDocId.isNotEmpty && _sessionDocId != widget.courseId) {
         await _lms.joinLiveSession(_sessionDocId);
+        // Separately records a timestamped Attendance row (joinedAt) — this
+        // was never called anywhere in this screen, so the Grades tab's
+        // per-session "Joined at / Left at / Duration" always showed
+        // nothing despite the UI for it being wired up correctly.
+        await _lms.recordLiveSessionJoin(_sessionDocId);
       }
 
       // Step 4: Start web camera (uses _sessionDocId for Agora room name)
@@ -575,6 +580,10 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
 
     if (_sessionDocId.isNotEmpty && _sessionDocId != widget.courseId) {
       try { await _lms.leaveLiveSession(_sessionDocId); } catch (_) {}
+      // Completes the Attendance row's leftAt/durationMinutes started by
+      // recordLiveSessionJoin above — without this the join timestamp was
+      // saved but never closed out, so duration/left-at stayed blank too.
+      try { await _lms.recordLiveSessionLeave(_sessionDocId); } catch (_) {}
     }
 
     if (widget.isInstructor) {

@@ -3599,19 +3599,46 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
                       try { date = DateTime.parse(dateStr); } catch (_) {}
                       final stColor = st == 'present' ? const Color(0xFF188038) : st == 'late' ? const Color(0xFFE37400) : const Color(0xFFD93025);
                       final stBg = st == 'present' ? const Color(0xFFE6F4EA) : st == 'late' ? const Color(0xFFFFF3E0) : const Color(0xFFFCE8E6);
+                      // getMyAttendance (/course/:courseId/my) already returns
+                      // joinedAt/leftAt/durationMinutes per session — this row
+                      // just never rendered them, only status + date.
+                      String? fmtTime(dynamic iso) {
+                        if (iso == null) return null;
+                        try {
+                          final dt = DateTime.parse(iso.toString()).toLocal();
+                          final h = dt.hour % 12 == 0 ? 12 : dt.hour % 12;
+                          final m = dt.minute.toString().padLeft(2, '0');
+                          final period = dt.hour < 12 ? 'AM' : 'PM';
+                          return '$h:$m $period';
+                        } catch (_) { return null; }
+                      }
+                      final joined = fmtTime(s['joinedAt']);
+                      final left = fmtTime(s['leftAt']);
+                      final mins = s['durationMinutes'];
                       return Padding(
-                        padding: const EdgeInsets.only(bottom: 6),
-                        child: Row(children: [
-                          Container(width: 8, height: 8, decoration: BoxDecoration(color: stColor, shape: BoxShape.circle)),
-                          const SizedBox(width: 8),
-                          Expanded(child: Text(s['sessionTitle']?.toString() ?? 'Session', style: const TextStyle(fontSize: 12, color: Color(0xFF202124)))),
-                          if (date != null) Text(DateFormat('MMM d').format(date), style: const TextStyle(fontSize: 11, color: Color(0xFF70757A))),
-                          const SizedBox(width: 8),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                            decoration: BoxDecoration(color: stBg, borderRadius: BorderRadius.circular(8)),
-                            child: Text(st[0].toUpperCase() + st.substring(1), style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: stColor)),
-                          ),
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                          Row(children: [
+                            Container(width: 8, height: 8, decoration: BoxDecoration(color: stColor, shape: BoxShape.circle)),
+                            const SizedBox(width: 8),
+                            Expanded(child: Text(s['sessionTitle']?.toString() ?? 'Session', style: const TextStyle(fontSize: 12, color: Color(0xFF202124)))),
+                            if (date != null) Text(DateFormat('MMM d').format(date), style: const TextStyle(fontSize: 11, color: Color(0xFF70757A))),
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                              decoration: BoxDecoration(color: stBg, borderRadius: BorderRadius.circular(8)),
+                              child: Text(st[0].toUpperCase() + st.substring(1), style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: stColor)),
+                            ),
+                          ]),
+                          if (joined != null || left != null || mins != null)
+                            Padding(
+                              padding: const EdgeInsets.only(left: 16, top: 3),
+                              child: Wrap(spacing: 12, runSpacing: 2, children: [
+                                if (joined != null) Text('Joined: $joined', style: const TextStyle(fontSize: 11, color: Color(0xFF70757A))),
+                                if (left != null) Text('Left: $left', style: const TextStyle(fontSize: 11, color: Color(0xFF70757A))),
+                                if (mins != null) Text('Duration: $mins min', style: const TextStyle(fontSize: 11, color: Color(0xFF70757A))),
+                              ]),
+                            ),
                         ]),
                       );
                     }),
