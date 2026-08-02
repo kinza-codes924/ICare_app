@@ -56,11 +56,21 @@ class _LessonDetailPageState extends State<LessonDetailPage> with SingleTickerPr
     setState(() { _markingComplete = true; _isCompleted = !_isCompleted; });
     try {
       if (_isCompleted) {
-        await _lms.markLessonComplete(
+        // markLessonComplete never throws on failure — it returns
+        // {success:false, message:...} — so the result MUST be checked here.
+        // Previously it wasn't, so the "Lesson marked as completed!" toast
+        // and the checked box showed even when the backend call failed and
+        // nothing was actually saved; reopening the lesson then loaded the
+        // real (still-incomplete) state from the server and looked like the
+        // tap had been silently undone.
+        final result = await _lms.markLessonComplete(
           enrollmentId: enrollmentId,
           lessonId: lessonId,
           moduleId: widget.moduleId.isNotEmpty ? widget.moduleId : null,
         );
+        if (result['success'] != true) {
+          throw Exception(result['message'] ?? 'Failed to mark lesson complete');
+        }
         widget.onLessonCompleted?.call(lessonId);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -68,8 +78,13 @@ class _LessonDetailPageState extends State<LessonDetailPage> with SingleTickerPr
         );
         }
       }
-    } catch (_) {
-      if (mounted) setState(() => _isCompleted = !_isCompleted);
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isCompleted = !_isCompleted);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not save: ${e.toString().replaceAll('Exception: ', '')}'), backgroundColor: Colors.red),
+        );
+      }
     } finally {
       if (mounted) setState(() => _markingComplete = false);
     }

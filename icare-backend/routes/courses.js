@@ -556,6 +556,14 @@ router.get('/:id', authMiddleware, async (req, res) => {
       });
     }
 
+    // Lesson-level completion flag — without this, LessonDetailPage's
+    // initState() (widget.lesson['isCompleted']) always saw undefined/false
+    // regardless of what was actually saved in enrollment.lessonCompletions,
+    // so a lesson the student had already marked complete looked unchecked
+    // again the moment they reopened it (the POST to complete-lesson had
+    // actually succeeded — this GET just never reported it back).
+    const completedLessonIds = new Set((enrollment?.lessonCompletions || []).map(lc => lc.lessonId));
+
     course.modules = (course.modules || []).map((mod, idx) => {
       let isLocked = false;
       let unlockDate = null;
@@ -574,7 +582,12 @@ router.get('/:id', authMiddleware, async (req, res) => {
         isLocked = prevId ? !completedModuleIds.has(prevId) : false;
       }
 
-      return { ...mod, isLocked, unlockDate };
+      const lessons = (mod.lessons || []).map(l => ({
+        ...l,
+        isCompleted: completedLessonIds.has(l._id?.toString()),
+      }));
+
+      return { ...mod, lessons, isLocked, unlockDate };
     });
 
     course.enrollmentId = enrollment?._id?.toString() || null;

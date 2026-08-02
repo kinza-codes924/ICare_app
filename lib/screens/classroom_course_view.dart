@@ -3801,32 +3801,37 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
         final total = (s['total'] as num? ?? 0).toInt();
         final late = (s['late'] as num? ?? 0).toInt();
         final pctColor = pct >= 75 ? const Color(0xFF188038) : pct >= 50 ? const Color(0xFFE37400) : const Color(0xFFD93025);
+        // Per-session join/leave/duration — already returned by the /report
+        // endpoint (sessionRows) but never rendered here before, so the
+        // instructor only ever saw the present/late/absent tallies, never
+        // the actual timestamps.
+        final sessions = (s['sessions'] as List?)
+                ?.where((sess) => sess is Map && sess['status'] == 'present')
+                .toList() ??
+            const [];
 
-        return Container(
-          margin: const EdgeInsets.only(bottom: 8),
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: const Color(0xFFDADCE0)),
-          ),
-          child: Row(
-            children: [
-              CircleAvatar(
+        return Theme(
+          data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+          child: Container(
+            margin: const EdgeInsets.only(bottom: 8),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: const Color(0xFFDADCE0)),
+            ),
+            child: ExpansionTile(
+              tilePadding: const EdgeInsets.symmetric(horizontal: 12),
+              childrenPadding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
+              leading: CircleAvatar(
                 radius: 16,
                 backgroundColor: pctColor.withValues(alpha: 0.12),
                 child: Text(name.isNotEmpty ? name[0].toUpperCase() : 'S',
                     style: TextStyle(color: pctColor, fontWeight: FontWeight.w700, fontSize: 13)),
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(name, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: Color(0xFF202124))),
-                  Text('$present present · $late late · ${total - present - late} absent (of $total)',
-                      style: const TextStyle(fontSize: 11, color: Color(0xFF70757A))),
-                ]),
-              ),
-              Container(
+              title: Text(name, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: Color(0xFF202124))),
+              subtitle: Text('$present present · $late late · ${total - present - late} absent (of $total)',
+                  style: const TextStyle(fontSize: 11, color: Color(0xFF70757A))),
+              trailing: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
                   color: pctColor.withValues(alpha: 0.1),
@@ -3834,10 +3839,50 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
                 ),
                 child: Text('$pct%', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: pctColor)),
               ),
-            ],
+              children: sessions.isEmpty
+                  ? [const Align(alignment: Alignment.centerLeft,
+                      child: Padding(padding: EdgeInsets.only(bottom: 8),
+                        child: Text('No timestamped sessions yet', style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8)))))]
+                  : sessions.map((sess) => _attendanceSessionTimestampRow(sess)).toList(),
+            ),
           ),
         );
       }).toList(),
+    );
+  }
+
+  Widget _attendanceSessionTimestampRow(dynamic sess) {
+    String? fmtTime(dynamic iso) {
+      if (iso == null) return null;
+      try {
+        final dt = DateTime.parse(iso.toString()).toLocal();
+        final h = dt.hour % 12 == 0 ? 12 : dt.hour % 12;
+        final m = dt.minute.toString().padLeft(2, '0');
+        final period = dt.hour < 12 ? 'AM' : 'PM';
+        return '$h:$m $period';
+      } catch (_) { return null; }
+    }
+    final title = sess['sessionTitle']?.toString() ?? 'Session';
+    final joined = fmtTime(sess['joinedAt']);
+    final left = fmtTime(sess['leftAt']);
+    final mins = sess['durationMinutes'];
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        const Icon(Icons.schedule_rounded, size: 12, color: Color(0xFF10B981)),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(title, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF202124))),
+            Wrap(spacing: 12, runSpacing: 2, children: [
+              if (joined != null) Text('Joined: $joined', style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+              if (left != null) Text('Left: $left', style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+              if (mins != null) Text('Duration: $mins min', style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+            ]),
+          ]),
+        ),
+      ]),
     );
   }
 }
