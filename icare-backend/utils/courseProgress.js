@@ -2,6 +2,7 @@ const Course = require('../models/Course');
 const Quiz = require('../models/Quiz');
 const QuizAttempt = require('../models/QuizAttempt');
 const AssignmentSubmission = require('../models/AssignmentSubmission');
+const { sendEmail } = require('./email');
 
 // Re-evaluates whether `moduleId` (and, transitively, the whole course) should
 // be marked complete for this enrollment. A module counts as complete only
@@ -82,4 +83,50 @@ async function recheckModuleCompletion(enrollment, moduleId) {
   return { justCompletedCourse: !wasCompleted && enrollment.isCompleted === true };
 }
 
-module.exports = { recheckModuleCompletion };
+// Notifies the Lead Instructor (course owner, or the co-teacher with role
+// 'lead'/'lead instructor') that a student finished every module and is
+// ready to be issued a certificate. Fired once, right when the course
+// transitions to isCompleted — see recheckModuleCompletion's
+// justCompletedCourse flag, which callers pass in here. Shared by both the
+// lesson-completion and quiz-submission routes (courses.js, quizzes.js) —
+// a course can just as easily finish on its last quiz as its last lesson.
+async function notifyLeadInstructorCourseComplete(enrollment) {
+  try {
+    const course = await Course.findById(enrollment.courseId).select('title instructor_id coTeachers').lean();
+    if (!course) return;
+    const User = require('../models/User');
+    const Notification = require('../models/Notification');
+    const student = await User.findById(enrollment.userId).select('name username').lean();
+
+    const leadCoTeacher = (course.coTeachers || []).find(t => {
+      const roleLower = (t.role || '').toLowerCase();
+      return (roleLower === 'lead' || roleLower === 'lead instructor') && (t.status ?? 'accepted') === 'accepted';
+    });
+    const leadUserId = leadCoTeacher?.userId || course.instructor_id;
+    if (!leadUserId) return;
+
+    const lead = await User.findById(leadUserId).select('name email').lean();
+    const studentName = student?.name || student?.username || 'A student';
+
+    await Notification.create({
+      userId: leadUserId,
+      type: 'general',
+      title: 'Certificate Ready to Issue',
+      message: `${studentName} completed all modules in "${course.title}" — issue their certificate.`,
+      data: { type: 'certificate_ready', courseId: course._id, enrollmentId: enrollment._id, studentId: enrollment.userId },
+    });
+
+    if (lead?.email) {
+      sendEmail({
+        to: lead.email,
+        subject: `Certificate ready to issue: ${course.title}`,
+        html: `<p>Hi ${lead.name || 'Instructor'},</p>
+               <p><b>${studentName}</b> has completed every module in <b>"${course.title}"</b> and is ready for their certificate.</p>
+               <p>Log in to iCare to review and issue it.</p>
+               <p>— iCare LMS Team</p>`,
+      }).catch(() => {});
+    }
+  } catch (_) { /* notification failure should not break the response */ }
+}
+
+module.exports = { recheckModuleCompletion, notifyLeadInstructorCourseComplete };

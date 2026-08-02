@@ -239,6 +239,15 @@ class _QuizTakeScreenState extends State<QuizTakeScreen> {
         answers: answersPayload,
         timeSpent: timeSpent,
       );
+      // submitQuiz never throws on a failed request — it returns
+      // {success:false, message:...} — so this must be checked explicitly.
+      // Previously it wasn't, so a failed submission (network error, expired
+      // token, backend validation failure) still flipped _quizCompleted to
+      // true and rendered the result screen with garbage/zeroed data instead
+      // of surfacing the actual failure and letting the student retry.
+      if (result['success'] == false) {
+        throw Exception(result['message'] ?? 'Failed to submit quiz');
+      }
       if (mounted) {
         setState(() {
           _isSubmitting = false;
@@ -251,7 +260,7 @@ class _QuizTakeScreenState extends State<QuizTakeScreen> {
       if (mounted) {
         setState(() => _isSubmitting = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Submission failed: ${e.toString()}')),
+          SnackBar(content: Text('Submission failed: ${e.toString().replaceAll('Exception: ', '')}'), backgroundColor: Colors.red),
         );
       }
     }

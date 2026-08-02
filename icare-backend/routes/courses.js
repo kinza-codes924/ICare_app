@@ -13,55 +13,11 @@ const { sendEmail } = require('../utils/email');
 const LiveSession = require('../models/LiveSession');
 const CourseReview = require('../models/CourseReview');
 const { Voucher, applyVoucherDiscount } = require('./vouchers');
-const { recheckModuleCompletion } = require('../utils/courseProgress');
+const { recheckModuleCompletion, notifyLeadInstructorCourseComplete } = require('../utils/courseProgress');
 const { computeEffectivePrice, isEarlyBirdActive } = require('../utils/installments');
 
 function toId(id) {
   try { return new mongoose.Types.ObjectId(id); } catch { return null; }
-}
-
-// Notifies the Lead Instructor (course owner, or the co-teacher with role
-// 'lead'/'lead instructor') that a student finished every module and is
-// ready to be issued a certificate. Fired once, right when the course
-// transitions to isCompleted — see recheckModuleCompletion's
-// justCompletedCourse flag, which callers pass in here.
-async function notifyLeadInstructorCourseComplete(enrollment) {
-  try {
-    const course = await Course.findById(enrollment.courseId).select('title instructor_id coTeachers').lean();
-    if (!course) return;
-    const User = require('../models/User');
-    const Notification = require('../models/Notification');
-    const student = await User.findById(enrollment.userId).select('name username').lean();
-
-    const leadCoTeacher = (course.coTeachers || []).find(t => {
-      const roleLower = (t.role || '').toLowerCase();
-      return (roleLower === 'lead' || roleLower === 'lead instructor') && (t.status ?? 'accepted') === 'accepted';
-    });
-    const leadUserId = leadCoTeacher?.userId || course.instructor_id;
-    if (!leadUserId) return;
-
-    const lead = await User.findById(leadUserId).select('name email').lean();
-    const studentName = student?.name || student?.username || 'A student';
-
-    await Notification.create({
-      userId: leadUserId,
-      type: 'general',
-      title: 'Certificate Ready to Issue',
-      message: `${studentName} completed all modules in "${course.title}" — issue their certificate.`,
-      data: { type: 'certificate_ready', courseId: course._id, enrollmentId: enrollment._id, studentId: enrollment.userId },
-    });
-
-    if (lead?.email) {
-      sendEmail({
-        to: lead.email,
-        subject: `Certificate ready to issue: ${course.title}`,
-        html: `<p>Hi ${lead.name || 'Instructor'},</p>
-               <p><b>${studentName}</b> has completed every module in <b>"${course.title}"</b> and is ready for their certificate.</p>
-               <p>Log in to iCare to review and issue it.</p>
-               <p>— iCare LMS Team</p>`,
-      }).catch(() => {});
-    }
-  } catch (_) { /* notification failure should not break the response */ }
 }
 
 async function computeProgress(enrollment) {
@@ -525,7 +481,35 @@ router.get('/:id', authMiddleware, async (req, res) => {
 
     // Attach module unlock info for student view
     const now = new Date();
-    const enrollment = await Enrollment.findOne({ userId: toId(req.user.id), courseId: course._id }).lean();
+    // Not .lean() — recheckModuleCompletion needs a real document to push
+    // subdocs onto and save(). This also self-heals stale progress: some
+    // older lessonCompletions rows were saved with moduleId:null (a since-
+    // fixed frontend bug), which meant a fully-watched module's completion
+    // was never (re)computed because complete-lesson's `if (moduleId)`
+    // guard skipped it — the student was stuck with every lesson checked
+    // off but the next module still locked, with no action left to take
+    // that would ever re-trigger the check. Re-running it here, on every
+    // course fetch, means simply opening the course fixes it.
+    const enrollmentDoc = await Enrollment.findOne({ userId: toId(req.user.id), courseId: course._id });
+    if (enrollmentDoc) {
+      let changed = false;
+      let justCompletedCourse = false;
+      for (const mod of (course.modules || [])) {
+        const modId = mod._id?.toString();
+        if (!modId) continue;
+        const alreadyDone = (enrollmentDoc.moduleCompletions || []).some(mc => mc.moduleId === modId);
+        if (alreadyDone) continue;
+        const before = (enrollmentDoc.moduleCompletions || []).length;
+        const result = await recheckModuleCompletion(enrollmentDoc, modId);
+        if ((enrollmentDoc.moduleCompletions || []).length > before) changed = true;
+        if (result?.justCompletedCourse) justCompletedCourse = true;
+      }
+      if (changed) {
+        await enrollmentDoc.save();
+        if (justCompletedCourse) notifyLeadInstructorCourseComplete(enrollmentDoc);
+      }
+    }
+    const enrollment = enrollmentDoc ? enrollmentDoc.toObject() : null;
     const completedModuleIds = new Set((enrollment?.moduleCompletions || []).map(m => m.moduleId));
 
     // Gate full module/lesson content behind enrollment (or ownership) —

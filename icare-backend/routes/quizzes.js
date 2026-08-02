@@ -6,7 +6,7 @@ const { authMiddleware } = require('../middleware/auth');
 const Quiz = require('../models/Quiz');
 const QuizAttempt = require('../models/QuizAttempt');
 const Enrollment = require('../models/Enrollment');
-const { recheckModuleCompletion } = require('../utils/courseProgress');
+const { recheckModuleCompletion, notifyLeadInstructorCourseComplete } = require('../utils/courseProgress');
 
 function toId(id) {
   try { return new mongoose.Types.ObjectId(id); } catch { return null; }
@@ -172,8 +172,11 @@ router.post('/:id/submit', authMiddleware, async (req, res) => {
         if (question.type === 'mcq' || question.type === 'true_false') {
           isCorrect = studentAnswer.answer === question.correctAnswer;
         } else if (question.type === 'short_answer') {
-          isCorrect = studentAnswer.answer.toLowerCase().trim() === 
-                     question.correctAnswer.toLowerCase().trim();
+          // Guards against a non-string answer (e.g. an MCQ-shaped payload
+          // sent for a short-answer question) crashing .toLowerCase() with
+          // a TypeError — that 500 was what silently failed the submission.
+          isCorrect = String(studentAnswer.answer ?? '').toLowerCase().trim() ===
+                     String(question.correctAnswer ?? '').toLowerCase().trim();
         }
         // Essay questions need manual grading
         
@@ -216,8 +219,9 @@ router.post('/:id/submit', authMiddleware, async (req, res) => {
       try {
         const enrollment = await Enrollment.findOne({ courseId: quiz.courseId, userId: studentId });
         if (enrollment) {
-          await recheckModuleCompletion(enrollment, quiz.moduleId);
+          const result = await recheckModuleCompletion(enrollment, quiz.moduleId);
           await enrollment.save();
+          if (result?.justCompletedCourse) notifyLeadInstructorCourseComplete(enrollment);
         }
       } catch (_) { /* non-blocking — quiz result already recorded */ }
     }
