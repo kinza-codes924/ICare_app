@@ -481,13 +481,19 @@ router.get('/my-pending-invites', authMiddleware, async (req, res) => {
   try {
     await connectMongoDB();
     const uid = req.user.id?.toString();
-    const courses = await Course.find({ 'coTeachers.userId': toId(uid), 'coTeachers.status': 'pending' })
+    // Also match legacy invites created before `status` existed on the
+    // schema — Mongoose's `default: 'pending'` only applies to new docs,
+    // it doesn't backfill rows already sitting in Mongo without the field.
+    const courses = await Course.find({
+      'coTeachers.userId': toId(uid),
+      $or: [{ 'coTeachers.status': 'pending' }, { 'coTeachers.status': { $exists: false } }],
+    })
       .select('title instructor_id coTeachers')
       .lean();
 
     const invites = [];
     for (const course of courses) {
-      const entry = (course.coTeachers || []).find(t => t.userId?.toString() === uid && t.status === 'pending');
+      const entry = (course.coTeachers || []).find(t => t.userId?.toString() === uid && (t.status === 'pending' || !t.status));
       if (!entry) continue;
       const inviter = await require('../models/User').findById(course.instructor_id).select('name username').lean();
       invites.push({

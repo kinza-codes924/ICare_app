@@ -69,7 +69,8 @@ class _VerificationStatusScreenState extends State<VerificationStatusScreen> {
       final api = ApiService();
       final response = await api.get('/auth/profile', token: widget.token);
       if (response.statusCode == 200) {
-        final user = response.data;
+        // Profile payload nests fields under `user`, not at the top level.
+        final user = (response.data['user'] as Map?) ?? response.data;
         final isApproved = user['isApproved'] == true || user['is_approved'] == true;
         if (isApproved && mounted) {
           setState(() => _currentStep = 2);
