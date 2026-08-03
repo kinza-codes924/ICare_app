@@ -34,9 +34,32 @@ async function recheckModuleCompletion(enrollment, moduleId) {
   const assignmentLessonIds = lessons
     .filter(l => l.type === 'assignment')
     .map(l => l._id?.toString()).filter(Boolean);
+  // Live sessions can't require an explicit "Mark Complete" tap (there's no
+  // watchable content to finish) so they'd otherwise block the module
+  // forever. Once the scheduled slot has fully elapsed, auto-record it as
+  // completed here — time-based, not attendance-based, matching how a
+  // missed/skipped session still isn't meant to permanently lock a student
+  // out of the rest of the course.
+  const liveLessons = lessons.filter(l => l.type === 'live');
+  const now = new Date();
+  for (const l of liveLessons) {
+    const lid = l._id?.toString();
+    if (!lid) continue;
+    const already = (enrollment.lessonCompletions || []).some(lc => lc.lessonId === lid);
+    if (already) continue;
+    const scheduledAt = l.liveSessionDateTime || l.scheduledAt;
+    if (!scheduledAt) continue;
+    const endTime = new Date(new Date(scheduledAt).getTime() + (Number(l.duration || l.duration_minutes) || 0) * 60000);
+    if (endTime <= now) {
+      if (!enrollment.lessonCompletions) enrollment.lessonCompletions = [];
+      enrollment.lessonCompletions.push({ lessonId: lid, moduleId, completedAt: new Date() });
+    }
+  }
 
   const completedLessonIds = new Set((enrollment.lessonCompletions || []).map(lc => lc.lessonId));
-  const allLessonsDone = contentLessonIds.every(id => completedLessonIds.has(id));
+  const liveLessonIds = liveLessons.map(l => l._id?.toString()).filter(Boolean);
+  const allLessonsDone = contentLessonIds.every(id => completedLessonIds.has(id)) &&
+    liveLessonIds.every(id => completedLessonIds.has(id));
 
   let allAssignmentsSubmitted = true;
   if (assignmentLessonIds.length) {

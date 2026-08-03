@@ -54,6 +54,9 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
   List<dynamic> _quizzes = [];
   List<dynamic> _sessions = [];
   bool _loadingClasswork = true;
+  List<dynamic> _readyForCert = [];
+  List<dynamic> _pendingCerts = [];
+  bool _certLoading = false;
 
   // Course modules (for Course Content tab)
   List<dynamic> _modules = [];
@@ -208,14 +211,69 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
       final a = await _lms.getCourseAssignments(_courseId);
       final q = await _lms.getCourseQuizzes(_courseId);
       final s = await _lms.getCourseSessions(_courseId);
+      List<dynamic> readyForCert = [];
+      List<dynamic> pendingCerts = [];
+      if (widget.isInstructor) {
+        readyForCert = await _lms.getReadyForCertificate(_courseId);
+        pendingCerts = await _lms.getPendingCertificates(_courseId);
+      }
       if (mounted) {
         setState(() {
           _assignments = a; _quizzes = q; _sessions = s;
+          _readyForCert = readyForCert; _pendingCerts = pendingCerts;
           _loadingClasswork = false;
         });
       }
     } catch (_) {
       if (mounted) setState(() => _loadingClasswork = false);
+    }
+  }
+
+  Future<void> _issueCertificate(String enrollmentId, String studentName) async {
+    setState(() => _certLoading = true);
+    final result = await _lms.generateCertificate(enrollmentId: enrollmentId);
+    if (mounted) {
+      setState(() => _certLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(result['success'] == true ? 'Certificate issued for $studentName' : (result['message'] ?? 'Failed to issue certificate')),
+        backgroundColor: result['success'] == true ? Colors.green : Colors.red,
+      ));
+      if (result['success'] == true) _loadClasswork();
+    }
+  }
+
+  Future<void> _approveCert(String certId, String studentName, String action) async {
+    final noteCtrl = TextEditingController();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(action == 'approve' ? 'Approve Certificate' : 'Reject Certificate'),
+        content: Column(mainAxisSize: MainAxisSize.min, children: [
+          Text('${action == 'approve' ? 'Approve' : 'Reject'} certificate for $studentName?'),
+          const SizedBox(height: 12),
+          TextField(controller: noteCtrl, decoration: const InputDecoration(labelText: 'Note (optional)', border: OutlineInputBorder()), maxLines: 2),
+        ]),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: action == 'approve' ? Colors.green : Colors.red,
+              foregroundColor: Colors.white,
+            ),
+            child: Text(action == 'approve' ? 'Approve' : 'Reject'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    final result = await _lms.approveCertificate(certId, action: action, note: noteCtrl.text.trim().isNotEmpty ? noteCtrl.text.trim() : null);
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(result['success'] == true ? 'Done!' : (result['message'] ?? 'Failed')),
+        backgroundColor: result['success'] == true ? Colors.green : Colors.red,
+      ));
+      if (result['success'] == true) _loadClasswork();
     }
   }
 
@@ -1534,15 +1592,39 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
     );
   }
 
+  // Sessions created before the create-lesson dialog was fixed to send a
+  // real ISO datetime stored a plain display string like "4/8/2026 6:17 PM"
+  // instead — DateTime.parse can't read that, which silently broke both the
+  // schedule-lock check (parse failure -> null -> treated as unlocked) and
+  // the formatted date label for any session created before that fix.
+  DateTime? _parseLegacyDMY(String raw) {
+    final match = RegExp(r'^(\d{1,2})/(\d{1,2})/(\d{4})(?:\s+(\d{1,2}):(\d{2})\s*(AM|PM))?$', caseSensitive: false)
+        .firstMatch(raw.trim());
+    if (match == null) return null;
+    final day = int.parse(match.group(1)!);
+    final month = int.parse(match.group(2)!);
+    final year = int.parse(match.group(3)!);
+    var hour = match.group(4) != null ? int.parse(match.group(4)!) : 0;
+    final minute = match.group(5) != null ? int.parse(match.group(5)!) : 0;
+    final ampm = match.group(6)?.toUpperCase();
+    if (ampm == 'PM' && hour != 12) hour += 12;
+    if (ampm == 'AM' && hour == 12) hour = 0;
+    try { return DateTime(year, month, day, hour, minute); } catch (_) { return null; }
+  }
+
+  DateTime? _parseScheduledAt(String raw) {
+    try { return DateTime.parse(raw); } catch (_) {}
+    return _parseLegacyDMY(raw);
+  }
+
   String _fmtSessionDate(String raw) {
-    try {
-      final dt = DateTime.parse(raw).toLocal();
-      final months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-      final h = dt.hour % 12 == 0 ? 12 : dt.hour % 12;
-      final m = dt.minute.toString().padLeft(2, '0');
-      final ampm = dt.hour < 12 ? 'AM' : 'PM';
-      return '${dt.day} ${months[dt.month - 1]} ${dt.year}  $h:$m $ampm';
-    } catch (_) { return raw; }
+    final dt = _parseScheduledAt(raw)?.toLocal();
+    if (dt == null) return raw;
+    final months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    final h = dt.hour % 12 == 0 ? 12 : dt.hour % 12;
+    final m = dt.minute.toString().padLeft(2, '0');
+    final ampm = dt.hour < 12 ? 'AM' : 'PM';
+    return '${dt.day} ${months[dt.month - 1]} ${dt.year}  $h:$m $ampm';
   }
 
   Widget _buildStudentSessionTile(dynamic session) {
@@ -1733,10 +1815,10 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
     String dateLabel = '';
     DateTime? scheduledDateTime;
     if (scheduledAt.isNotEmpty) {
-      try {
-        scheduledDateTime = DateTime.parse(scheduledAt).toLocal();
+      scheduledDateTime = _parseScheduledAt(scheduledAt)?.toLocal();
+      if (scheduledDateTime != null) {
         dateLabel = DateFormat('MMM d, yyyy – h:mm a').format(scheduledDateTime);
-      } catch (_) {}
+      }
     }
     // Locked = scheduled for a future date/time — the tile greys out and
     // can't be tapped until that moment passes, then it flips to "ready"
@@ -3767,6 +3849,95 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
       child: ListView(
         padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
         children: [
+          // ── Ready to Certify (Lead Instructor only, server 403s the
+          // fetch for anyone else so these lists stay empty) ──
+          if (widget.isInstructor && _readyForCert.isNotEmpty) ...[
+            Container(
+              margin: const EdgeInsets.only(bottom: 16),
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: const Color(0xFFECFDF5),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.4)),
+              ),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Row(children: [
+                  const Icon(Icons.workspace_premium_rounded, color: Color(0xFF10B981), size: 18),
+                  const SizedBox(width: 8),
+                  Text('Ready to Certify (${_readyForCert.length})',
+                    style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13)),
+                ]),
+                const SizedBox(height: 10),
+                ..._readyForCert.map((r) {
+                  final name = r['studentName']?.toString() ?? 'Student';
+                  final enrollmentId = r['enrollmentId']?.toString() ?? '';
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Row(children: [
+                      CircleAvatar(radius: 16, backgroundColor: const Color(0xFF10B981).withValues(alpha: 0.1),
+                        child: Text(name.isNotEmpty ? name[0].toUpperCase() : '?', style: const TextStyle(color: Color(0xFF10B981), fontWeight: FontWeight.w700))),
+                      const SizedBox(width: 10),
+                      Expanded(child: Text(name, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600))),
+                      ElevatedButton(
+                        onPressed: (_certLoading || enrollmentId.isEmpty) ? null : () => _issueCertificate(enrollmentId, name),
+                        style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF10B981), foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8)),
+                        child: const Text('Issue Certificate', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+                      ),
+                    ]),
+                  );
+                }),
+              ]),
+            ),
+          ],
+
+          // ── Pending certificate approvals ──
+          if (widget.isInstructor && _pendingCerts.isNotEmpty) ...[
+            Container(
+              margin: const EdgeInsets.only(bottom: 16),
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: Colors.amber.shade50,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.amber.shade300),
+              ),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Row(children: [
+                  const Icon(Icons.workspace_premium_rounded, color: Colors.amber, size: 18),
+                  const SizedBox(width: 8),
+                  Text('Pending Certificate Approvals (${_pendingCerts.length})',
+                    style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13)),
+                ]),
+                const SizedBox(height: 10),
+                ..._pendingCerts.map((c) => Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Row(children: [
+                    CircleAvatar(radius: 16, backgroundColor: const Color(0xFF1A73E8).withValues(alpha: 0.1),
+                      child: Text(((c['studentName'] ?? 'S') as String)[0].toUpperCase(),
+                        style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12, color: Color(0xFF1A73E8)))),
+                    const SizedBox(width: 10),
+                    Expanded(child: Text(c['studentName'] ?? 'Student',
+                      style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13))),
+                    TextButton(
+                      onPressed: () => _approveCert(c['_id'].toString(), c['studentName'] ?? 'Student', 'reject'),
+                      style: TextButton.styleFrom(foregroundColor: Colors.red, minimumSize: Size.zero, padding: const EdgeInsets.symmetric(horizontal: 8)),
+                      child: const Text('Reject', style: TextStyle(fontSize: 12)),
+                    ),
+                    ElevatedButton(
+                      onPressed: () => _approveCert(c['_id'].toString(), c['studentName'] ?? 'Student', 'approve'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.green, foregroundColor: Colors.white,
+                        minimumSize: Size.zero, padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        textStyle: const TextStyle(fontSize: 12),
+                      ),
+                      child: const Text('Approve'),
+                    ),
+                  ]),
+                )),
+              ]),
+            ),
+          ],
+
           // ── Assignments section ──
           if (_assignments.isNotEmpty) ...[
             const Text('Assignments', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Color(0xFF202124))),

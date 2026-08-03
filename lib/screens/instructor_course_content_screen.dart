@@ -818,15 +818,41 @@ class InstructorCourseContentScreenState extends State<InstructorCourseContentSc
     );
   }
 
+  // Sessions created before the scheduledAt fix stored a plain display
+  // string like "4/8/2026 6:17 PM" instead of an ISO datetime (see the
+  // lesson-save dialog below) — DateTime.parse can't read that format, so
+  // this recovers it manually rather than leaving those old sessions
+  // permanently unparseable (unlocked-by-default and showing a raw string).
+  DateTime? _parseLegacyDMY(String raw) {
+    final match = RegExp(r'^(\d{1,2})/(\d{1,2})/(\d{4})(?:\s+(\d{1,2}):(\d{2})\s*(AM|PM))?$', caseSensitive: false)
+        .firstMatch(raw.trim());
+    if (match == null) return null;
+    final day = int.parse(match.group(1)!);
+    final month = int.parse(match.group(2)!);
+    final year = int.parse(match.group(3)!);
+    var hour = match.group(4) != null ? int.parse(match.group(4)!) : 0;
+    final minute = match.group(5) != null ? int.parse(match.group(5)!) : 0;
+    final ampm = match.group(6)?.toUpperCase();
+    if (ampm == 'PM' && hour != 12) hour += 12;
+    if (ampm == 'AM' && hour == 12) hour = 0;
+    try { return DateTime(year, month, day, hour, minute); } catch (_) { return null; }
+  }
+
+  DateTime? _parseScheduledAt(String raw) {
+    try { return DateTime.parse(raw); } catch (_) {}
+    return _parseLegacyDMY(raw);
+  }
+
   String _fmtDate(String raw) {
     try {
       // Parse as UTC if it ends with Z, otherwise treat as local
-      DateTime dt;
+      DateTime? dt;
       if (raw.endsWith('Z') || raw.contains('+')) {
         dt = DateTime.parse(raw).toLocal();
       } else {
-        dt = DateTime.parse(raw);
+        dt = _parseScheduledAt(raw);
       }
+      if (dt == null) return raw;
       final months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
       final h = dt.hour % 12 == 0 ? 12 : dt.hour % 12;
       final m = dt.minute.toString().padLeft(2, '0');
@@ -846,10 +872,7 @@ class InstructorCourseContentScreenState extends State<InstructorCourseContentSc
     // A session scheduled for a specific future time can't be started early —
     // this only controls the button's enabled state; the backend (set-live)
     // is the real gate since the client's clock/lock state can't be trusted.
-    DateTime? scheduledDt;
-    if (scheduledAt.isNotEmpty) {
-      try { scheduledDt = DateTime.parse(scheduledAt); } catch (_) {}
-    }
+    final scheduledDt = scheduledAt.isNotEmpty ? _parseScheduledAt(scheduledAt) : null;
     final isLockedByTime = !isLive && !isEnded && scheduledDt != null && scheduledDt.isAfter(DateTime.now());
 
     return Container(
@@ -1295,11 +1318,8 @@ class InstructorCourseContentScreenState extends State<InstructorCourseContentSc
     // it stayed clickable (and misleadingly "unlocked"-looking) for sessions
     // scheduled hours/days in the future, even though the backend's
     // set-live route already rejects starting them early.
-    DateTime? lessonScheduledDt;
     final scheduledAtRaw = lesson['scheduledAt']?.toString() ?? lesson['liveSessionDateTime']?.toString() ?? '';
-    if (scheduledAtRaw.isNotEmpty) {
-      try { lessonScheduledDt = DateTime.parse(scheduledAtRaw); } catch (_) {}
-    }
+    final lessonScheduledDt = scheduledAtRaw.isNotEmpty ? _parseScheduledAt(scheduledAtRaw) : null;
     final isLockedByTime = isLiveSession && sessionStatus != 'live' && sessionStatus != 'ended' &&
         sessionStatus != 'completed' && lessonScheduledDt != null && lessonScheduledDt.isAfter(DateTime.now());
 
@@ -2504,8 +2524,20 @@ class _LessonDialogState extends State<_LessonDialog> {
               );
               return;
             }
+            // Must be a real ISO datetime, not a display string — this used
+            // to send "D/M/YYYY h:mm AM/PM" (e.g. "4/8/2026 6:17 PM"), which
+            // DateTime.parse can't read. That silently broke both the
+            // schedule-lock check (parse failure -> treated as unlocked)
+            // and the formatted date label (fell back to showing the raw
+            // string instead of a proper date).
             final scheduledAt = _scheduledDate != null
-                ? '${_scheduledDate!.day}/${_scheduledDate!.month}/${_scheduledDate!.year}${_scheduledTime != null ? ' ${_scheduledTime!.format(context)}' : ''}'
+                ? DateTime(
+                    _scheduledDate!.year,
+                    _scheduledDate!.month,
+                    _scheduledDate!.day,
+                    _scheduledTime?.hour ?? 0,
+                    _scheduledTime?.minute ?? 0,
+                  ).toIso8601String()
                 : null;
             widget.onSave({
               'title': _titleController.text.trim(),
