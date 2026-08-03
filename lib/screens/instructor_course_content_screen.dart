@@ -1,4 +1,5 @@
-﻿import 'package:flutter/material.dart';
+﻿import 'dart:async';
+import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:dio/dio.dart';
 import 'package:icare/screens/certificate_templates_screen.dart';
@@ -44,11 +45,23 @@ class InstructorCourseContentScreenState extends State<InstructorCourseContentSc
   List<dynamic> _assignments = [];
   List<dynamic> _quizzes = [];
   List<dynamic> _liveSessions = [];
+  // Ticks the schedule-lock check on session tiles so the Start button
+  // unlocks the moment scheduledAt passes, without a manual refresh.
+  Timer? _lockTicker;
 
   @override
   void initState() {
     super.initState();
     _loadCourse();
+    _lockTicker = Timer.periodic(const Duration(seconds: 30), (_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _lockTicker?.cancel();
+    super.dispose();
   }
 
   Future<void> _loadCourse() async {
@@ -1277,6 +1290,18 @@ class InstructorCourseContentScreenState extends State<InstructorCourseContentSc
     final isQuiz = lessonType == 'quiz';
     final hasRecording = lesson['recordingUrl'] != null && lesson['recordingUrl'].toString().isNotEmpty;
     final sessionStatus = lesson['status']?.toString() ?? 'scheduled';
+    // Mirrors the isLockedByTime check used for the other session-card
+    // renderer in this file — the Start button here had no such guard, so
+    // it stayed clickable (and misleadingly "unlocked"-looking) for sessions
+    // scheduled hours/days in the future, even though the backend's
+    // set-live route already rejects starting them early.
+    DateTime? lessonScheduledDt;
+    final scheduledAtRaw = lesson['scheduledAt']?.toString() ?? lesson['liveSessionDateTime']?.toString() ?? '';
+    if (scheduledAtRaw.isNotEmpty) {
+      try { lessonScheduledDt = DateTime.parse(scheduledAtRaw); } catch (_) {}
+    }
+    final isLockedByTime = isLiveSession && sessionStatus != 'live' && sessionStatus != 'ended' &&
+        sessionStatus != 'completed' && lessonScheduledDt != null && lessonScheduledDt.isAfter(DateTime.now());
 
     // Determine icon/color by type
     IconData typeIcon;
@@ -1387,8 +1412,27 @@ class InstructorCourseContentScreenState extends State<InstructorCourseContentSc
                 decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(8)),
                 child: const Text('No Recording', style: TextStyle(color: Colors.black54, fontSize: 12, fontWeight: FontWeight.w600)),
               )
+            else if (isLockedByTime)
+              // Scheduled for the future — can't start early
+              GestureDetector(
+                onTap: () {
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                    content: Text('This session unlocks at ${_fmtDate(scheduledAtRaw)}'),
+                    backgroundColor: const Color(0xFF1A73E8),
+                  ));
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(8)),
+                  child: const Row(mainAxisSize: MainAxisSize.min, children: [
+                    Icon(Icons.lock_rounded, color: Colors.black45, size: 14),
+                    SizedBox(width: 4),
+                    Text('Locked', style: TextStyle(color: Colors.black54, fontSize: 12, fontWeight: FontWeight.w700)),
+                  ]),
+                ),
+              )
             else
-              // Scheduled / upcoming — Start button
+              // Scheduled time has arrived — Start button
               GestureDetector(
                 onTap: () => _startLiveSession(lesson),
                 child: Container(
@@ -3101,4 +3145,5 @@ class _RecordingDialogState extends State<_RecordingDialog> {
     );
   }
 }
+
 
