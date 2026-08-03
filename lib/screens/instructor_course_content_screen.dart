@@ -1856,6 +1856,12 @@ class _ModuleDialogState extends State<_ModuleDialog> {
             }
 
             Navigator.pop(context, {
+              // Editing an existing module must keep its _id — dropping it
+              // meant Mongoose assigned a brand-new _id on save, silently
+              // orphaning that module's moduleCompletions entry (and any
+              // enrollment progress tied to it) even though nothing about
+              // the module's actual identity/position changed.
+              if (widget.module?['_id'] != null) '_id': widget.module!['_id'],
               'title': _titleController.text,
               'description': _descriptionController.text,
               'lessons': _lessons,
@@ -2540,6 +2546,11 @@ class _LessonDialogState extends State<_LessonDialog> {
                   ).toIso8601String()
                 : null;
             widget.onSave({
+              // Same reasoning as the module dialog — dropping _id on edit
+              // meant Mongoose assigned a new one on save, orphaning this
+              // lesson's entry in enrollment.lessonCompletions even though
+              // the student had already watched/completed it.
+              if (widget.lesson?['_id'] != null) '_id': widget.lesson!['_id'],
               'title': _titleController.text.trim(),
               'content': _contentController.text.trim(),
               'videoUrl': _lessonType == 'content' ? _videoUrlController.text.trim() : '',
