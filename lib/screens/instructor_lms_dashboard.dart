@@ -44,6 +44,8 @@ class _InstructorLmsDashboardState extends ConsumerState<InstructorLmsDashboard>
   _NavPage _activePage = _NavPage.home;
   bool _taughtExpanded = true;
   List<String> _availableRoles = [];
+  List<dynamic> _pendingInvites = [];
+  final Set<String> _respondingInviteIds = {};
 
   static const List<Color> _cardColors = [
     Color(0xFF1A73E8),
@@ -62,6 +64,84 @@ class _InstructorLmsDashboardState extends ConsumerState<InstructorLmsDashboard>
     _loadUser();
     _loadCourses();
     _loadAvailableRoles();
+    _loadPendingInvites();
+  }
+
+  Future<void> _loadPendingInvites() async {
+    final invites = await _lms.getMyPendingInvites();
+    if (mounted) setState(() => _pendingInvites = invites);
+  }
+
+  Future<void> _respondToInvite(String courseId, bool accept) async {
+    setState(() => _respondingInviteIds.add(courseId));
+    final result = accept
+        ? await _lms.acceptCoTeacherInvite(courseId)
+        : await _lms.rejectCoTeacherInvite(courseId);
+    if (!mounted) return;
+    setState(() {
+      _respondingInviteIds.remove(courseId);
+      if (result['success'] == true) {
+        _pendingInvites.removeWhere((i) => i['courseId']?.toString() == courseId);
+      }
+    });
+    if (accept && result['success'] == true) _loadCourses();
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(result['success'] == true
+          ? (accept ? 'Invitation accepted — course added to your classes' : 'Invitation declined')
+          : (result['message'] ?? 'Failed')),
+      backgroundColor: result['success'] == true ? const Color(0xFF188038) : const Color(0xFFB3261E),
+    ));
+  }
+
+  Widget _buildInviteBanner(dynamic inv) {
+    final courseId = inv['courseId']?.toString() ?? '';
+    final isResponding = _respondingInviteIds.contains(courseId);
+    return Container(
+      margin: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFFE8F0FE),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFF1A73E8).withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.mail_outline_rounded, color: Color(0xFF1A73E8)),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '${inv['inviterName'] ?? 'An instructor'} invited you as ${inv['role'] ?? 'Co-Instructor'} for "${inv['courseTitle'] ?? 'a course'}"',
+                  style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 14, color: Color(0xFF202124)),
+                ),
+                const SizedBox(height: 12),
+                isResponding
+                    ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                    : Row(
+                        children: [
+                          OutlinedButton(
+                            onPressed: () => _respondToInvite(courseId, false),
+                            child: const Text('Reject'),
+                          ),
+                          const SizedBox(width: 12),
+                          ElevatedButton(
+                            onPressed: () => _respondToInvite(courseId, true),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF1A73E8), foregroundColor: Colors.white,
+                            ),
+                            child: const Text('Accept'),
+                          ),
+                        ],
+                      ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _loadAvailableRoles() async {
@@ -653,16 +733,32 @@ class _InstructorLmsDashboardState extends ConsumerState<InstructorLmsDashboard>
         : (MediaQuery.of(context).size.width > 560 ? 2 : 1);
 
     return RefreshIndicator(
-      onRefresh: _loadCourses,
-      child: _courses.isEmpty ? _buildEmptyHome() : GridView.builder(
-        padding: const EdgeInsets.all(20),
-        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: crossCount,
-          crossAxisSpacing: 18, mainAxisSpacing: 18,
-          childAspectRatio: 1.35,
-        ),
-        itemCount: _courses.length,
-        itemBuilder: (ctx, i) => _buildCourseCard(_courses[i], i),
+      onRefresh: () async {
+        await _loadCourses();
+        await _loadPendingInvites();
+      },
+      child: ListView(
+        children: [
+          ..._pendingInvites.map((inv) => _buildInviteBanner(inv)),
+          if (_courses.isEmpty)
+            SizedBox(
+              height: MediaQuery.of(context).size.height * 0.6,
+              child: _buildEmptyHome(),
+            )
+          else
+            GridView.builder(
+              padding: const EdgeInsets.all(20),
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: crossCount,
+                crossAxisSpacing: 18, mainAxisSpacing: 18,
+                childAspectRatio: 1.35,
+              ),
+              itemCount: _courses.length,
+              itemBuilder: (ctx, i) => _buildCourseCard(_courses[i], i),
+            ),
+        ],
       ),
     );
   }
