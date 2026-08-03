@@ -187,7 +187,7 @@ class _QuizTakeScreenState extends State<QuizTakeScreen> {
     if (!autoSubmit) {
       final confirm = await showDialog<bool>(
         context: context,
-        builder: (_) => AlertDialog(
+        builder: (dialogContext) => AlertDialog(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           title: const Text('Submit Quiz', style: TextStyle(fontWeight: FontWeight.w800)),
           content: Text(
@@ -195,11 +195,11 @@ class _QuizTakeScreenState extends State<QuizTakeScreen> {
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(context, false),
+              onPressed: () => Navigator.pop(dialogContext, false),
               child: const Text('Cancel'),
             ),
             ElevatedButton(
-              onPressed: () => Navigator.pop(context, true),
+              onPressed: () => Navigator.pop(dialogContext, true),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primaryColor,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),

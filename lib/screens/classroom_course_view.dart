@@ -88,6 +88,11 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
   // FAB + Stream-tab banner already make an already-live session visible
   // without an extra transient alert stacked on top of them.
   bool _firstLiveCheck = true;
+  // Ticks the schedule-lock check on lesson tiles so a session tile flips
+  // from "Locked" to "Ready" the moment its scheduledAt time passes, without
+  // needing a manual refresh — nothing else in this screen forces a rebuild
+  // purely from wall-clock time moving forward.
+  Timer? _lockTicker;
 
   String get _courseId => widget.course['_id']?.toString() ?? '';
   String get _courseTitle =>
@@ -138,6 +143,9 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
   void _startLivePolling() {
     _checkLiveSession();
     _livePoller = Timer.periodic(const Duration(seconds: 5), (_) => _checkLiveSession());
+    _lockTicker = Timer.periodic(const Duration(seconds: 30), (_) {
+      if (mounted) setState(() {});
+    });
   }
 
   Future<void> _checkLiveSession() async {
@@ -178,6 +186,7 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
     _tabs.dispose();
     _postCtrl.dispose();
     _livePoller?.cancel();
+    _lockTicker?.cancel();
     super.dispose();
   }
 
@@ -1722,29 +1731,48 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
     final isScheduled = isLive && status != 'live' && status != 'ended' && status != 'completed';
 
     String dateLabel = '';
+    DateTime? scheduledDateTime;
     if (scheduledAt.isNotEmpty) {
-      try { dateLabel = DateFormat('MMM d, yyyy – h:mm a').format(DateTime.parse(scheduledAt).toLocal()); } catch (_) {}
+      try {
+        scheduledDateTime = DateTime.parse(scheduledAt).toLocal();
+        dateLabel = DateFormat('MMM d, yyyy – h:mm a').format(scheduledDateTime);
+      } catch (_) {}
     }
+    // Locked = scheduled for a future date/time — the tile greys out and
+    // can't be tapped until that moment passes, then it flips to "ready"
+    // (still needs the instructor to actually start it, a live room can't
+    // auto-start itself, but it's no longer misleadingly shown as open).
+    final isTimeLocked = isScheduled && scheduledDateTime != null && scheduledDateTime.isAfter(DateTime.now());
 
     Color iconColor = isLive ? Colors.red : const Color(0xFF1A73E8);
     IconData icon = isLive ? Icons.live_tv_rounded : Icons.play_circle_outline_rounded;
     if (type == 'video') icon = Icons.videocam_outlined;
     if (type == 'document') { icon = Icons.description_outlined; iconColor = const Color(0xFF188038); }
     if (type == 'quiz') { icon = Icons.quiz_outlined; iconColor = const Color(0xFF9334E6); }
+    if (isTimeLocked) { icon = Icons.lock_rounded; iconColor = const Color(0xFF94A3B8); }
 
     String statusLabel = '';
     Color statusColor = const Color(0xFF94A3B8);
     if (isLive) {
       if (status == 'live') { statusLabel = '● LIVE NOW'; statusColor = Colors.red; }
       else if (status == 'ended' || status == 'completed') { statusLabel = 'Ended'; statusColor = const Color(0xFF94A3B8); }
-      else if (dateLabel.isNotEmpty) { statusLabel = 'Scheduled · $dateLabel'; statusColor = const Color(0xFF1A73E8); }
+      else if (isTimeLocked && dateLabel.isNotEmpty) { statusLabel = 'Locked · unlocks $dateLabel'; statusColor = const Color(0xFF94A3B8); }
+      else if (isTimeLocked) { statusLabel = 'Locked'; statusColor = const Color(0xFF94A3B8); }
+      else if (dateLabel.isNotEmpty) { statusLabel = 'Ready · waiting for instructor'; statusColor = const Color(0xFF188038); }
       else { statusLabel = 'Scheduled'; statusColor = const Color(0xFF1A73E8); }
     }
 
     return InkWell(
-      onTap: () => _openLessonItem(lesson),
+      onTap: isTimeLocked ? () {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('This session unlocks $dateLabel'),
+          backgroundColor: const Color(0xFF1A73E8),
+        ));
+      } : () => _openLessonItem(lesson),
       borderRadius: BorderRadius.circular(8),
-      child: Container(
+      child: Opacity(
+        opacity: isTimeLocked ? 0.6 : 1,
+        child: Container(
         padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
         decoration: BoxDecoration(
           border: Border(bottom: BorderSide(color: Colors.grey.shade100)),
@@ -1768,16 +1796,16 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
                 decoration: BoxDecoration(color: Colors.red, borderRadius: BorderRadius.circular(6)),
                 child: const Text('JOIN', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w900)),
               )
-            else if (hasMeetLink && isScheduled)
+            else if (hasMeetLink && isScheduled && !isTimeLocked)
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(color: const Color(0xFF1A73E8), borderRadius: BorderRadius.circular(6)),
                 child: const Text('JOIN', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w900)),
               )
             else
-              Icon(Icons.chevron_right_rounded, size: 18, color: Colors.grey.shade400),
+              Icon(isTimeLocked ? Icons.lock_rounded : Icons.chevron_right_rounded, size: 18, color: Colors.grey.shade400),
           ]),
-          if (hasMeetLink && isScheduled) ...[
+          if (hasMeetLink && isScheduled && !isTimeLocked) ...[
             const SizedBox(height: 8),
             GestureDetector(
               onTap: () async {
@@ -1803,6 +1831,7 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
             ),
           ],
         ]),
+        ),
       ),
     );
   }
