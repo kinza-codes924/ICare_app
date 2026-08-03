@@ -7,6 +7,7 @@ const Certificate = require('../models/Certificate');
 const Enrollment = require('../models/Enrollment');
 const Course = require('../models/Course');
 const User = require('../models/User');
+const { sendEmail } = require('../utils/email');
 
 function toId(id) {
   try { return new mongoose.Types.ObjectId(id); } catch { return null; }
@@ -189,6 +190,32 @@ router.post('/', authMiddleware, async (req, res) => {
       qrCodeData,
       approvalStatus: requiresApproval ? 'pending' : 'approved',
     });
+
+    // Tell the student their certificate exists — previously this route only
+    // created the Certificate doc, so a student had no way to know one was
+    // ready short of manually checking My Certificates. Only notify here for
+    // the instant-approved case; the 'pending' case is notified by the
+    // /:id/approve route once actually approved, not at issue time.
+    if (certificate.approvalStatus === 'approved') {
+      const Notification = require('../models/Notification');
+      await Notification.create({
+        userId: student._id,
+        type: 'general',
+        title: 'Certificate Ready!',
+        message: `Your certificate for "${course.title}" is ready. Check My Certificates.`,
+        data: { type: 'certificate_issued', courseId: course._id, certificateId: certificate._id },
+      }).catch(() => {});
+
+      if (student.email) {
+        sendEmail({
+          to: student.email,
+          subject: `Your certificate for ${course.title} is ready`,
+          html: `<p>Hi ${student.name || 'there'},</p>
+                 <p>Congratulations on completing <b>${course.title}</b>! Your certificate is now available in your iCare account under <b>My Certificates</b>.</p>
+                 <p>— iCare Team</p>`,
+        }).catch(e => console.error('Certificate-ready email failed:', e.message));
+      }
+    }
 
     res.json({ success: true, certificate });
   } catch (e) {

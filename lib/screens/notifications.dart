@@ -10,6 +10,7 @@ import 'package:icare/services/course_service.dart';
 import 'package:icare/services/lms_service.dart';
 import 'package:icare/screens/classroom_course_view.dart';
 import 'package:icare/screens/lms_course_page.dart';
+import 'package:icare/screens/certificates_screen.dart';
 import 'package:icare/utils/theme.dart';
 import 'package:icare/utils/utils.dart';
 import 'package:icare/widgets/back_button.dart';
@@ -161,6 +162,11 @@ class _NotificationScreenState extends State<NotificationScreen> {
     }
     if (data['type']?.toString() == 'certificate_ready') {
       await _openInstructorGradesTab(courseId);
+      return;
+    }
+    if (data['type']?.toString() == 'certificate_issued') {
+      if (!mounted) return;
+      Navigator.push(context, MaterialPageRoute(builder: (_) => const CertificatesScreen()));
       return;
     }
     try {
