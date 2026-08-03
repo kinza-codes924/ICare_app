@@ -5,7 +5,8 @@ import 'package:url_launcher/url_launcher.dart';
 
 class VideoPlayerWidget extends StatefulWidget {
   final String videoUrl;
-  const VideoPlayerWidget({super.key, required this.videoUrl});
+  final VoidCallback? onWatched;
+  const VideoPlayerWidget({super.key, required this.videoUrl, this.onWatched});
 
   @override
   State<VideoPlayerWidget> createState() => _VideoPlayerWidgetState();
@@ -16,6 +17,16 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
   bool _initialized = false;
   bool _error = false;
   bool _showControls = true;
+  // Same reasoning as the web player: require actual playback past this
+  // point before firing onWatched, instead of trusting a bare button tap.
+  static const double _watchThreshold = 0.8;
+  bool _watchedFired = false;
+
+  void _fireWatchedOnce() {
+    if (_watchedFired) return;
+    _watchedFired = true;
+    widget.onWatched?.call();
+  }
 
   static bool _isDirect(String url) {
     final l = url.toLowerCase();
@@ -38,14 +49,24 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
     try {
       _ctrl = VideoPlayerController.networkUrl(Uri.parse(widget.videoUrl));
       await _ctrl!.initialize();
+      _ctrl!.addListener(_checkWatchProgress);
       if (mounted) setState(() => _initialized = true);
     } catch (_) {
       if (mounted) setState(() => _error = true);
     }
   }
 
+  void _checkWatchProgress() {
+    final v = _ctrl?.value;
+    if (v == null || !v.isInitialized || v.duration.inMilliseconds <= 0) return;
+    if (v.position.inMilliseconds / v.duration.inMilliseconds >= _watchThreshold) {
+      _fireWatchedOnce();
+    }
+  }
+
   @override
   void dispose() {
+    _ctrl?.removeListener(_checkWatchProgress);
     _ctrl?.dispose();
     super.dispose();
   }

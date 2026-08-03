@@ -592,12 +592,19 @@ router.get('/:id', authMiddleware, async (req, res) => {
       let unlockDate = null;
 
       if (course.courseType === 'pragmatic' && course.startDate) {
-        // Pragmatic: unlock only on scheduled date
+        // Pragmatic: unlock needs BOTH the scheduled date to have arrived
+        // AND (for modules after the first) the previous module actually
+        // completed — reaching the date alone used to unlock it regardless
+        // of whether lessons/quiz/assignment were ever finished.
         const days = mod.unlockAfterDays || 0;
         const unlock = new Date(course.startDate);
         unlock.setDate(unlock.getDate() + days);
         unlockDate = unlock.toISOString();
-        isLocked = now < unlock;
+        const dateLocked = now < unlock;
+        const prevMod = idx > 0 ? course.modules[idx - 1] : null;
+        const prevId = prevMod?._id?.toString();
+        const completionLocked = prevId ? !completedModuleIds.has(prevId) : false;
+        isLocked = dateLocked || completionLocked;
       } else if (course.courseType === 'self-paced' && idx > 0) {
         // Self-paced: previous module must be completed
         const prevMod = course.modules[idx - 1];

@@ -33,12 +33,26 @@ class _LessonDetailPageState extends State<LessonDetailPage> with SingleTickerPr
   final LmsService _lms = LmsService();
   bool _isCompleted = false;
   bool _markingComplete = false;
+  // Gates "Mark as Completed" on actually watching the video (see
+  // VideoPlayerWidget.onWatched) rather than trusting a bare button tap.
+  // Only relevant when this lesson has a video to begin with — lessons
+  // without one (text-only, or a live/assignment/quiz type) aren't gated.
+  bool _videoWatched = false;
+
+  bool get _requiresVideoWatch {
+    final lessonType = widget.lesson['type'] ?? 'content';
+    final videoUrl = widget.lesson['videoUrl'];
+    return lessonType == 'content' && videoUrl != null && videoUrl.toString().isNotEmpty;
+  }
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
     _isCompleted = widget.lesson['isCompleted'] == true;
+    // Already completed (from a previous visit) — don't re-lock the button
+    // behind a fresh watch requirement just because the player remounted.
+    _videoWatched = _isCompleted;
   }
 
   @override
@@ -49,6 +63,12 @@ class _LessonDetailPageState extends State<LessonDetailPage> with SingleTickerPr
 
   Future<void> _toggleComplete() async {
     if (_markingComplete) return;
+    if (_requiresVideoWatch && !_videoWatched && !_isCompleted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please watch the video before marking this lesson complete.'), backgroundColor: Colors.orange),
+      );
+      return;
+    }
     final lessonId = widget.lesson['_id']?.toString() ?? widget.lesson['id']?.toString() ?? '';
     final enrollmentId = widget.enrollmentId;
     if (enrollmentId == null || enrollmentId.isEmpty || lessonId.isEmpty) return;
@@ -142,7 +162,10 @@ class _LessonDetailPageState extends State<LessonDetailPage> with SingleTickerPr
                     color: Colors.black,
                     child: AspectRatio(
                       aspectRatio: 16 / 9,
-                      child: VideoPlayerWidget(videoUrl: videoUrl),
+                      child: VideoPlayerWidget(
+                        videoUrl: videoUrl,
+                        onWatched: () { if (mounted) setState(() => _videoWatched = true); },
+                      ),
                     ),
                   ),
 
@@ -361,8 +384,12 @@ class _LessonDetailPageState extends State<LessonDetailPage> with SingleTickerPr
                                   ),
                                 ),
                                 if (!_isCompleted)
-                                  const Text('Tap to mark this lesson as done',
-                                      style: TextStyle(fontSize: 11, color: Color(0xFF94A3B8))),
+                                  Text(
+                                    (_requiresVideoWatch && !_videoWatched)
+                                        ? 'Watch the video to unlock this'
+                                        : 'Tap to mark this lesson as done',
+                                    style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
+                                  ),
                               ],
                             ),
                           ),

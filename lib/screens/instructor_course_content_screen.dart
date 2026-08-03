@@ -1664,7 +1664,11 @@ class _ModuleDialogState extends State<_ModuleDialog> {
     }
     if (defaultType == 'quiz') {
       Navigator.push(context, MaterialPageRoute(
-        builder: (_) => InstructorCreateQuizScreen(courseId: widget.courseId),
+        // Without moduleId, recheckModuleCompletion's Quiz.find({ courseId,
+        // moduleId }) can never match this quiz, so its pass/fail state is
+        // silently never counted as a module requirement — the quiz shows
+        // "passed" to the student but the module never actually completes.
+        builder: (_) => InstructorCreateQuizScreen(courseId: widget.courseId, moduleId: widget.module?['_id']?.toString()),
       )).then((result) {
         if (result is Map<String, dynamic>) {
           setState(() => _lessons.add({...result, 'type': 'quiz'}));

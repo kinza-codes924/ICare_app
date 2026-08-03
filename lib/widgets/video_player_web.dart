@@ -7,7 +7,13 @@ import 'package:flutter/material.dart';
 
 class VideoPlayerWidget extends StatefulWidget {
   final String videoUrl;
-  const VideoPlayerWidget({super.key, required this.videoUrl});
+  // Fired once when playback has been watched past the completion threshold
+  // (see _watchThreshold below) — lets the caller require actual viewing
+  // before allowing "Mark as Completed", instead of trusting a bare button
+  // tap. Only tracked for direct <video> uploads (the only source lessons
+  // actually use); YouTube/Vimeo iframes don't fire this.
+  final VoidCallback? onWatched;
+  const VideoPlayerWidget({super.key, required this.videoUrl, this.onWatched});
 
   @override
   State<VideoPlayerWidget> createState() => _VideoPlayerWidgetState();
@@ -15,6 +21,17 @@ class VideoPlayerWidget extends StatefulWidget {
 
 class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
   late final String _viewType;
+  // 80%, not 100% — resists a naive drag-the-seekbar-to-the-end game while
+  // not requiring the last few seconds (which may never resolve for a
+  // still-buffering or Infinity-duration recording, see fixDurationIfNeeded).
+  static const double _watchThreshold = 0.8;
+  bool _watchedFired = false;
+
+  void _fireWatchedOnce() {
+    if (_watchedFired) return;
+    _watchedFired = true;
+    widget.onWatched?.call();
+  }
 
   static bool _isDirectVideo(String url) {
     final lower = url.toLowerCase();
@@ -264,6 +281,7 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
         final dur = effectiveDuration();
         if (dur > 0) {
           seekBar.valueAsNumber = (video.currentTime / dur) * 1000;
+          if (video.currentTime / dur >= _watchThreshold) _fireWatchedOnce();
         }
       }
       updateTimeLabel();
@@ -282,6 +300,7 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
       _setIcon(playBtn, 'play');
       showControls();
       hideTimer?.cancel();
+      _fireWatchedOnce();
     });
 
     playBtn.onClick.listen((_) {

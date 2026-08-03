@@ -10,11 +10,13 @@ import 'package:icare/utils/theme.dart';
 class InstructorCreateQuizScreen extends StatefulWidget {
   final String? courseId;
   final String? quizId; // For editing existing quiz
+  final String? moduleId; // Links this quiz to a module so its pass/fail state counts toward that module's completion
 
   const InstructorCreateQuizScreen({
     super.key,
     this.courseId,
     this.quizId,
+    this.moduleId,
   });
 
   @override
@@ -126,6 +128,7 @@ class _InstructorCreateQuizScreenState extends State<InstructorCreateQuizScreen>
     try {
       final quizData = {
         'courseId': _selectedCourseId,
+        if (widget.moduleId != null) 'moduleId': widget.moduleId,
         'title': _titleController.text,
         'description': _descriptionController.text,
         'timeLimit': _timeLimit,
