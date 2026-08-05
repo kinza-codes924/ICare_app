@@ -20,6 +20,7 @@ import 'package:icare/utils/shared_pref.dart';
 import 'package:icare/models/user.dart' as app_user;
 import 'package:icare/utils/imagePaths.dart';
 import 'package:icare/utils/recaptcha.dart';
+import 'package:icare/widgets/recaptcha_checkbox.dart';
 import 'package:icare/utils/theme.dart';
 import 'package:icare/utils/utils.dart';
 import 'package:icare/widgets/custom_text.dart';
@@ -1021,6 +1022,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                                 },
                               ),
 
+                              const SizedBox(height: 16),
+                              const Center(child: RecaptchaCheckbox()),
+
                               if (!isLogin) ...[
                                 const SizedBox(height: 16),
                                 CustomInputField(
@@ -1549,6 +1553,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                               return null;
                             },
                           ),
+
+                          const SizedBox(height: 12),
+                          const Center(child: RecaptchaCheckbox()),
 
                           if (!isLogin) ...[
                             SizedBox(height: 5),
@@ -2206,21 +2213,28 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
       );
       return;
     }
-    setState(() => isLoading = true);
-    // Root cause found: Random().nextInt(1 << 32) threw a RangeError
-    // (nextInt's argument must be <= 2^32, and dart2js's Dart-int shift
-    // semantics don't wrap the way a raw JS `1 << 32` does) — uncaught
-    // before executeRecaptcha's own try/catch even started, which crashed
-    // the whole isolate and took login/signup down with it. Fixed in
-    // recaptcha_web.dart. Still wrapped here in its own try/catch as a
-    // second line of defense — a recaptcha failure must never be able to
-    // block login/signup again, no matter what it is.
+    // v2 checkbox: read whatever the user has currently checked. Wrapped in
+    // its own try/catch — a recaptcha failure must never be able to crash
+    // or block login/signup outright (see recaptcha_web.dart history: a
+    // Random().nextInt(1 << 32) RangeError once took the whole isolate down
+    // before this point was even reached).
     String? recaptchaToken;
     try {
-      recaptchaToken = await executeRecaptcha(isLogin ? 'login' : 'signup');
+      recaptchaToken = await getRecaptchaResponse();
     } catch (_) {
       recaptchaToken = null;
     }
+    if (kIsWeb && recaptchaToken == null) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Please check "I\'m not a robot" to continue.'.tr()),
+          backgroundColor: const Color(0xFFEF4444),
+        ),
+      );
+      return;
+    }
+    setState(() => isLoading = true);
     try {
       if (isLogin) {
         debugPrint("🔐 Starting login process...");

@@ -1,22 +1,50 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:math';
 // ignore: avoid_web_libraries_in_flutter
 import 'dart:html' as html;
+// ignore: avoid_web_libraries_in_flutter
+import 'dart:ui_web' as ui_web;
 
-/// Bridges to the icare-recaptcha-request/-result CustomEvent pair set up
+/// v2 checkbox widget — bridges to the icare-recaptcha-* CustomEvents set up
 /// in web/index.html (same mechanism as the icare-reminder events already
 /// used elsewhere) — avoids Promise/js_util interop, which isn't stable
 /// across the Dart SDK version this project is pinned to.
-Future<String?> executeRecaptcha(String action) async {
-  // Random.nextInt's argument must be <= 2^32 (a documented hard limit,
-  // not inclusive-safe at exactly that boundary) — 1 << 32 sits right on
-  // that edge and can throw a RangeError depending on how dart2js compiles
-  // the shift (Dart ints aren't JS's 32-bit-wrapping bitwise ints), unlike
-  // a plain JS runtime where 1 << 32 harmlessly wraps to 1. That thrown
-  // RangeError, uncaught before the outer try/catch even started, is what
-  // crashed the whole isolate and took the login flow down with it.
-  final requestId = '${DateTime.now().microsecondsSinceEpoch}-${Random().nextInt(1 << 31)}';
+const String recaptchaContainerId = 'icare-recaptcha-container';
+const String _recaptchaViewType = 'icare-recaptcha-view';
+bool _viewFactoryRegistered = false;
+
+/// Registers the platform view that hosts the checkbox <div>, and asks the
+/// JS side to render the widget into it once the container exists in the
+/// DOM and grecaptcha has loaded. Safe to call multiple times.
+void registerRecaptchaView() {
+  if (!_viewFactoryRegistered) {
+    _viewFactoryRegistered = true;
+    ui_web.platformViewRegistry.registerViewFactory(_recaptchaViewType, (int viewId) {
+      final container = html.DivElement()
+        ..id = recaptchaContainerId
+        ..style.width = '304px'
+        ..style.height = '78px';
+      return container;
+    });
+
+    void mount() {
+      html.window.dispatchEvent(html.CustomEvent(
+        'icare-recaptcha-mount',
+        detail: jsonEncode({'containerId': recaptchaContainerId}),
+      ));
+    }
+
+    // grecaptcha may already be loaded (fast reload) or may still be loading.
+    html.window.on['icare-recaptcha-ready'].listen((_) => mount());
+    Timer(const Duration(milliseconds: 300), mount);
+  }
+}
+
+String get recaptchaViewType => _recaptchaViewType;
+
+/// Reads whatever the user has currently checked (or null if not checked /
+/// widget not ready / expired). Does not force a re-render.
+Future<String?> getRecaptchaResponse() async {
   final completer = Completer<String?>();
   StreamSubscription? sub;
 
@@ -24,16 +52,8 @@ Future<String?> executeRecaptcha(String action) async {
     try {
       final ce = event as html.CustomEvent;
       final raw = ce.detail;
-      // Both sides pass `detail` as a JSON string, not a raw object/Map —
-      // passing a Dart Map directly into CustomEvent's `detail` on dispatch
-      // throws at the JS-interop conversion layer (this crashed the whole
-      // Dart isolate the first time, taking the login flow down with it),
-      // and reading a raw JS object back out of `.detail` on the Dart side
-      // has the same problem in reverse.
       if (raw is! String) return;
       final map = jsonDecode(raw) as Map;
-      final gotId = map['requestId']?.toString();
-      if (gotId != requestId) return;
       final token = map['token']?.toString();
       sub?.cancel();
       if (!completer.isCompleted) completer.complete(token);
@@ -44,20 +64,23 @@ Future<String?> executeRecaptcha(String action) async {
   });
 
   try {
-    html.window.dispatchEvent(html.CustomEvent(
-      'icare-recaptcha-request',
-      detail: jsonEncode({'requestId': requestId, 'action': action}),
-    ));
+    html.window.dispatchEvent(html.CustomEvent('icare-recaptcha-request'));
   } catch (_) {
     sub.cancel();
     return null;
   }
 
   return completer.future.timeout(
-    const Duration(seconds: 8),
+    const Duration(seconds: 5),
     onTimeout: () {
       sub?.cancel();
       return null;
     },
   );
+}
+
+void resetRecaptcha() {
+  try {
+    html.window.dispatchEvent(html.CustomEvent('icare-recaptcha-reset'));
+  } catch (_) {}
 }

@@ -80,9 +80,9 @@ const register = async (req, res) => {
     }
 
     const { verifyRecaptcha } = require('../utils/recaptcha');
-    const recaptchaResult = await verifyRecaptcha(recaptchaToken, 'signup');
+    const recaptchaResult = await verifyRecaptcha(recaptchaToken);
     if (!recaptchaResult.ok) {
-      console.warn(`reCAPTCHA low score on signup for ${email}: score=${recaptchaResult.score}`);
+      return res.status(400).json({ success: false, message: 'Please complete the "I\'m not a robot" verification.' });
     }
 
     // Check existing
@@ -227,12 +227,14 @@ const login = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Please provide email and password' });
     }
 
-    // Soft-enforced for now (logs low scores, doesn't block) — see
-    // utils/recaptcha.js for why a hard block isn't turned on yet.
+    // v2 checkbox: a genuine pass/fail challenge, so failure blocks the
+    // request. Still soft when RECAPTCHA_SECRET_KEY is unset or Google's
+    // endpoint errors (see utils/recaptcha.js) so a config gap or Google
+    // outage can't itself take down login.
     const { verifyRecaptcha } = require('../utils/recaptcha');
-    const recaptchaResult = await verifyRecaptcha(recaptchaToken, 'login');
+    const recaptchaResult = await verifyRecaptcha(recaptchaToken);
     if (!recaptchaResult.ok) {
-      console.warn(`reCAPTCHA low score on login for ${email}: score=${recaptchaResult.score}`);
+      return res.status(400).json({ success: false, message: 'Please complete the "I\'m not a robot" verification.' });
     }
 
     // Find by email OR username

@@ -540,37 +540,61 @@
       }
     }
   </script>
-  <!-- reCAPTCHA v3 — invisible, no user challenge. Loaded with render=<siteKey>
-       so grecaptcha.execute() can be called per-action (login, register).
-       Bridged to Dart via a CustomEvent (same pattern as icare-reminder
-       below) instead of Promise/js_util interop, which isn't stable across
-       Dart SDK versions in this project. -->
-  <script src="https://www.google.com/recaptcha/api.js?render=6LcZd3ctAAAAAIju8cgrznQxbrSUtKqo5NkGI-d6"></script>
+  <!-- reCAPTCHA v2 — visible "I'm not a robot" checkbox widget. Rendered
+       explicitly (onload=icareRecaptchaOnLoad) into a container div that
+       Dart embeds via HtmlElementView. Bridged to Dart via CustomEvents
+       (same pattern as icare-reminder below) instead of Promise/js_util
+       interop, which isn't stable across Dart SDK versions in this project.
+       requestId not needed for the checkbox flow itself, but kept so the
+       response/error/expired callbacks all funnel through the same event
+       contract that recaptcha_web.dart already listens on. -->
+  <script src="https://www.google.com/recaptcha/api.js?onload=icareRecaptchaOnLoad&render=explicit" async defer></script>
   <script>
-    // Dart calls this by dispatching 'icare-recaptcha-request' with a JSON
-    // string detail {requestId, action}; the result comes back the same way
-    // as 'icare-recaptcha-result' with {requestId, token} (token is null on
-    // any failure/timeout). JSON strings both ways — not raw objects —
-    // because dart:html's CustomEvent interop only round-trips cleanly
-    // through primitives/strings, not JS objects passed as Dart Maps.
-    window.addEventListener('icare-recaptcha-request', function(e) {
-      var payload = {};
-      try { payload = JSON.parse(e.detail); } catch (err) {}
-      var requestId = payload.requestId;
-      var action = payload.action || 'submit';
-      function respond(token) {
-        window.dispatchEvent(new CustomEvent('icare-recaptcha-result', {
-          detail: JSON.stringify({ requestId: requestId, token: token })
-        }));
-      }
+    var ICARE_RECAPTCHA_SITE_KEY = '6LdJj3ctAAAAALkUpo1t1ZRodsIsrxnj0Qg-N6wR';
+    var _icareRecaptchaWidgetId = null;
+
+    function _icareRecaptchaEmit(token) {
+      window.dispatchEvent(new CustomEvent('icare-recaptcha-result', {
+        detail: JSON.stringify({ token: token })
+      }));
+    }
+
+    // Called by Google's script once it has loaded (onload= param above).
+    // Actual widget rendering happens lazily on 'icare-recaptcha-mount'
+    // (dispatched by Dart once the container div exists in the DOM).
+    window.icareRecaptchaOnLoad = function() {
+      window.dispatchEvent(new CustomEvent('icare-recaptcha-ready'));
+    };
+
+    window.addEventListener('icare-recaptcha-mount', function(e) {
       try {
-        if (!window.grecaptcha) { respond(null); return; }
-        grecaptcha.ready(function() {
-          grecaptcha.execute('6LcZd3ctAAAAAIju8cgrznQxbrSUtKqo5NkGI-d6', { action: action })
-            .then(function(token) { respond(token); })
-            .catch(function() { respond(null); });
+        if (!window.grecaptcha || !grecaptcha.render) return;
+        var containerId = (e.detail && JSON.parse(e.detail).containerId) || 'icare-recaptcha-container';
+        var el = document.getElementById(containerId);
+        if (!el || _icareRecaptchaWidgetId !== null) return;
+        _icareRecaptchaWidgetId = grecaptcha.render(containerId, {
+          sitekey: ICARE_RECAPTCHA_SITE_KEY,
+          callback: function(token) { _icareRecaptchaEmit(token); },
+          'expired-callback': function() { _icareRecaptchaEmit(null); },
+          'error-callback': function() { _icareRecaptchaEmit(null); },
         });
-      } catch (err) { respond(null); }
+      } catch (err) { _icareRecaptchaEmit(null); }
+    });
+
+    // Dart calls this on submit to read the current checkbox response
+    // without forcing the user to re-check it; result comes back on the
+    // same 'icare-recaptcha-result' event the callback above uses.
+    window.addEventListener('icare-recaptcha-request', function() {
+      try {
+        if (!window.grecaptcha || _icareRecaptchaWidgetId === null) { _icareRecaptchaEmit(null); return; }
+        _icareRecaptchaEmit(grecaptcha.getResponse(_icareRecaptchaWidgetId) || null);
+      } catch (err) { _icareRecaptchaEmit(null); }
+    });
+
+    window.addEventListener('icare-recaptcha-reset', function() {
+      try {
+        if (window.grecaptcha && _icareRecaptchaWidgetId !== null) grecaptcha.reset(_icareRecaptchaWidgetId);
+      } catch (err) {}
     });
   </script>
   <script src="flutter_bootstrap.js" async></script>
