@@ -68,18 +68,13 @@ async function sendViaBrevo({ to, subject, html }) {
 const sendEmail = async ({ to, subject, html }) => {
   const errors = [];
 
-  // 1. Try Resend (HTTP API — most reliable on Vercel)
-  if (process.env.RESEND_API_KEY) {
-    try {
-      await sendViaResend({ to, subject, html });
-      return;
-    } catch (e) {
-      errors.push(`Resend: ${e.message}`);
-      console.error('Resend failed:', e.message);
-    }
-  }
-
-  // 2. Try Gmail SMTP
+  // 1. Try Gmail SMTP first — Resend's sandbox sender (onboarding@resend.dev,
+  // used below as a fallback) only actually delivers to the Resend account
+  // owner's own verified address; no custom domain is verified on the
+  // Resend account, so an invite/notification sent to any other real
+  // recipient would silently fail at that step while looking "sent" to the
+  // instructor. Gmail SMTP delivers to real addresses, so it goes first
+  // until a verified sending domain is set up on Resend.
   if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
     try {
       await sendViaSmtp({ to, subject, html });
@@ -87,6 +82,18 @@ const sendEmail = async ({ to, subject, html }) => {
     } catch (e) {
       errors.push(`SMTP: ${e.message}`);
       console.error('SMTP failed:', e.message);
+    }
+  }
+
+  // 2. Fall back to Resend (HTTP API — works even if outbound SMTP is
+  // blocked on the hosting platform, but only reaches the sandbox owner).
+  if (process.env.RESEND_API_KEY) {
+    try {
+      await sendViaResend({ to, subject, html });
+      return;
+    } catch (e) {
+      errors.push(`Resend: ${e.message}`);
+      console.error('Resend failed:', e.message);
     }
   }
 
