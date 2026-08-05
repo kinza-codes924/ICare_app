@@ -2207,11 +2207,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
       return;
     }
     setState(() => isLoading = true);
-    // Invisible reCAPTCHA v3 — no user-facing challenge, just a token the
-    // backend scores server-side. Web-only (see recaptcha_web.dart); a null
-    // token on mobile/desktop or a failed grecaptcha load is expected and
-    // must not block the login/signup attempt.
-    final recaptchaToken = await executeRecaptcha(isLogin ? 'login' : 'signup');
+    // TEMPORARILY DISABLED — the executeRecaptcha() call was crashing the
+    // Dart isolate in production (main.dart.js:4434, inside a failed type
+    // cast) and taking the entire login/signup flow down with it. Root
+    // cause not yet isolated; login must not stay broken while that's
+    // debugged, so the call is stubbed out to null (same as "not
+    // available") until it's fixed and re-verified end-to-end.
+    // final recaptchaToken = await executeRecaptcha(isLogin ? 'login' : 'signup');
+    const String? recaptchaToken = null;
     try {
       if (isLogin) {
         debugPrint("🔐 Starting login process...");
