@@ -1167,6 +1167,15 @@ class LmsService {
     return response.data;
   }
 
+  Future<Map<String, dynamic>> getStudentProgress(String courseId, String studentId) async {
+    try {
+      final response = await _api.get('/courses/$courseId/student-progress/$studentId');
+      return response.data;
+    } catch (e) {
+      return {'success': false, 'message': e.toString()};
+    }
+  }
+
   Future<Map<String, dynamic>> publishCourse(String courseId) async {
     final response = await _api.put('/courses/$courseId', {'isPublished': true});
     return response.data;

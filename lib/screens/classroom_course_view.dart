@@ -13,8 +13,10 @@ import 'package:icare/screens/lesson_detail_page.dart';
 import 'package:icare/screens/doctor_notifications.dart';
 import 'package:icare/screens/instructor_assignments_list_screen.dart';
 import 'package:icare/services/lms_service.dart';
+import 'package:icare/services/notification_service.dart';
 import 'package:icare/screens/lms_live_session_screen.dart';
 import 'package:icare/screens/installment_schedule_screen.dart';
+import 'package:icare/widgets/video_player_widget.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -96,6 +98,8 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
   // needing a manual refresh — nothing else in this screen forces a rebuild
   // purely from wall-clock time moving forward.
   Timer? _lockTicker;
+  int _unreadNotifCount = 0;
+  Timer? _notifPoller;
 
   String get _courseId => widget.course['_id']?.toString() ?? '';
   String get _courseTitle =>
@@ -124,10 +128,13 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
   @override
   void initState() {
     super.initState();
+    // Instructors get a 5th tab (Attendance, split out of Grades per the
+    // client's request — it used to be a section inside Grades, now its
+    // own tab). Students still see 4 (Grades stays combined for them).
     _tabs = TabController(
-      length: 4,
+      length: widget.isInstructor ? 5 : 4,
       vsync: this,
-      initialIndex: widget.initialTab.clamp(0, 3),
+      initialIndex: widget.initialTab.clamp(0, widget.isInstructor ? 4 : 3),
     );
     _tabs.addListener(() => setState(() {}));
     _loadStream();
@@ -141,6 +148,8 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
     } else {
       _loadAttendanceReport();
     }
+    _loadUnreadNotifCount();
+    _notifPoller = Timer.periodic(const Duration(seconds: 20), (_) => _loadUnreadNotifCount());
   }
 
   void _startLivePolling() {
@@ -149,6 +158,16 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
     _lockTicker = Timer.periodic(const Duration(seconds: 30), (_) {
       if (mounted) setState(() {});
     });
+  }
+
+  Future<void> _loadUnreadNotifCount() async {
+    try {
+      final result = await NotificationService().getNotifications();
+      if (!mounted || result['success'] != true) return;
+      final list = (result['notifications'] as List?) ?? [];
+      final unread = list.where((n) => n is Map && n['read'] != true).length;
+      if (unread != _unreadNotifCount) setState(() => _unreadNotifCount = unread);
+    } catch (_) {}
   }
 
   Future<void> _checkLiveSession() async {
@@ -190,6 +209,7 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
     _postCtrl.dispose();
     _livePoller?.cancel();
     _lockTicker?.cancel();
+    _notifPoller?.cancel();
     super.dispose();
   }
 
@@ -416,6 +436,7 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
           _buildCourseContentTab(isWide),
           widget.isInstructor ? _buildPeopleTab(isWide) : _buildStudentGradesTab(),
           widget.isInstructor ? _buildGradesTab() : _buildPeopleTab(isWide),
+          if (widget.isInstructor) _buildAttendanceTab(),
         ],
       ),
     );
@@ -469,12 +490,31 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
       actions: [
         if (widget.isInstructor)
           IconButton(
-            icon: const Icon(Icons.notifications_outlined,
-                color: Color(0xFF444746), size: 20),
+            icon: Stack(clipBehavior: Clip.none, children: [
+              const Icon(Icons.notifications_outlined,
+                  color: Color(0xFF444746), size: 20),
+              if (_unreadNotifCount > 0)
+                Positioned(
+                  right: -4, top: -4,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                    constraints: const BoxConstraints(minWidth: 16),
+                    decoration: BoxDecoration(color: Colors.red, borderRadius: BorderRadius.circular(8)),
+                    child: Text(
+                      _unreadNotifCount > 9 ? '9+' : '$_unreadNotifCount',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w800),
+                    ),
+                  ),
+                ),
+            ]),
             tooltip: 'Notifications',
-            onPressed: () => Navigator.push(context, MaterialPageRoute(
-              builder: (_) => const DoctorNotifications(),
-            )),
+            onPressed: () async {
+              await Navigator.push(context, MaterialPageRoute(
+                builder: (_) => const DoctorNotifications(),
+              ));
+              _loadUnreadNotifCount();
+            },
           ),
         // Settings only (Edit Course content)
         if (widget.isInstructor)
@@ -501,11 +541,13 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
             const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
         unselectedLabelStyle:
             const TextStyle(fontSize: 14, fontWeight: FontWeight.w400),
+        isScrollable: widget.isInstructor,
         tabs: [
           const Tab(text: 'Announcement'),
           const Tab(text: 'Course Content'),
           Tab(text: widget.isInstructor ? 'People' : 'Grades'),
           Tab(text: widget.isInstructor ? 'Grades' : 'People'),
+          if (widget.isInstructor) const Tab(text: 'Attendance'),
         ],
       ),
     );
@@ -1831,17 +1873,42 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
     if (type == 'video') icon = Icons.videocam_outlined;
     if (type == 'document') { icon = Icons.description_outlined; iconColor = const Color(0xFF188038); }
     if (type == 'quiz') { icon = Icons.quiz_outlined; iconColor = const Color(0xFF9334E6); }
+    if (type == 'assignment') icon = Icons.assignment_outlined;
     if (isTimeLocked) { icon = Icons.lock_rounded; iconColor = const Color(0xFF94A3B8); }
+    // GET /courses/:id already returns isCompleted per lesson (see
+    // courses.js) but nothing here ever read it — the tile gave the student
+    // no visual sign of which lessons they'd actually finished. For
+    // assignments, submissionStatus distinguishes "submitted, awaiting
+    // grade" from "graded" instead of collapsing both into one checkmark.
+    final isLessonCompleted = lesson['isCompleted'] == true;
+    final submissionStatus = lesson['submissionStatus']?.toString();
+    if (type == 'assignment' && submissionStatus != null) {
+      icon = Icons.assignment_turned_in_rounded;
+      iconColor = isLessonCompleted ? const Color(0xFF188038) : const Color(0xFF1A73E8);
+    } else if (isLessonCompleted) {
+      icon = Icons.check_circle_rounded; iconColor = const Color(0xFF188038);
+    }
+
+    final recordingUrl = lesson['recordingUrl']?.toString() ?? '';
+    final driveUrl = lesson['driveBackupUrl']?.toString() ?? '';
+    final hasRecording = recordingUrl.isNotEmpty || driveUrl.isNotEmpty;
+    final isEndedSession = isLive && (status == 'ended' || status == 'completed');
 
     String statusLabel = '';
     Color statusColor = const Color(0xFF94A3B8);
     if (isLive) {
       if (status == 'live') { statusLabel = '● LIVE NOW'; statusColor = Colors.red; }
-      else if (status == 'ended' || status == 'completed') { statusLabel = 'Ended'; statusColor = const Color(0xFF94A3B8); }
+      else if (isEndedSession) { statusLabel = hasRecording ? 'Recording available' : 'Ended · no recording'; statusColor = hasRecording ? const Color(0xFF188038) : const Color(0xFF94A3B8); }
       else if (isTimeLocked && dateLabel.isNotEmpty) { statusLabel = 'Locked · unlocks $dateLabel'; statusColor = const Color(0xFF94A3B8); }
       else if (isTimeLocked) { statusLabel = 'Locked'; statusColor = const Color(0xFF94A3B8); }
       else if (dateLabel.isNotEmpty) { statusLabel = 'Ready · waiting for instructor'; statusColor = const Color(0xFF188038); }
       else { statusLabel = 'Scheduled'; statusColor = const Color(0xFF1A73E8); }
+    } else if (type == 'assignment') {
+      if (submissionStatus == 'graded') { statusLabel = 'Graded'; statusColor = const Color(0xFF188038); }
+      else if (submissionStatus == 'submitted' || submissionStatus == 'late') { statusLabel = 'Submitted'; statusColor = const Color(0xFF1A73E8); }
+      else { statusLabel = 'Not submitted'; statusColor = const Color(0xFF94A3B8); }
+    } else if (type == 'quiz' && isLessonCompleted) {
+      statusLabel = 'Completed'; statusColor = const Color(0xFF188038);
     }
 
     return InkWell(
@@ -1877,6 +1944,20 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(color: Colors.red, borderRadius: BorderRadius.circular(6)),
                 child: const Text('JOIN', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w900)),
+              )
+            else if (isEndedSession && hasRecording)
+              // The "Start" affordance a live session showed before it ran
+              // is replaced by this once it's over — tapping opens the
+              // recording (in-app playback, or the Google Drive backup)
+              // via _showCompletedSessionOptions in _openLessonItem below.
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(color: const Color(0xFF188038), borderRadius: BorderRadius.circular(6)),
+                child: const Row(mainAxisSize: MainAxisSize.min, children: [
+                  Icon(Icons.play_arrow_rounded, color: Colors.white, size: 13),
+                  SizedBox(width: 2),
+                  Text('RECORDING', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w900)),
+                ]),
               )
             else if (hasMeetLink && isScheduled && !isTimeLocked)
               Container(
@@ -2471,9 +2552,9 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
             ),
             const SizedBox(height: 4),
             const Divider(),
-            // Recordings archive to Google Drive — no in-app playback (large
-            // files don't stream reliably in <video>), so this opens the
-            // Drive file directly in a new tab/browser instead.
+            // Google Drive is the only playback source shown — recordingUrl
+            // (the raw Jibri file) is only used to detect "a recording
+            // exists at all", never played in-app.
             if (driveUrl.isNotEmpty)
               ListTile(
                 leading: Container(
@@ -2488,6 +2569,15 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
                   final uri = Uri.tryParse(driveUrl);
                   if (uri != null) await launchUrl(uri, mode: LaunchMode.externalApplication);
                 },
+              )
+            else if (recordingUrl.isNotEmpty)
+              // Recording exists but the Drive backup upload (a separate,
+              // async step after the session ends) hasn't finished yet —
+              // tell the student that instead of showing nothing at all.
+              const ListTile(
+                leading: Icon(Icons.hourglass_top_rounded, color: Color(0xFF94A3B8), size: 22),
+                title: Text('Recording is processing', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: Color(0xFF64748B))),
+                subtitle: Text('Uploading to Google Drive — check back shortly', style: TextStyle(fontSize: 12)),
               ),
             if (widget.isInstructor && recordingUrl.isNotEmpty)
               ListTile(
@@ -3393,7 +3483,8 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
     final avatarColor = isTeacher
         ? (isLead ? const Color(0xFF9334E6) : const Color(0xFF1A73E8))
         : Colors.grey.shade300;
-    return Padding(
+    final canViewProgress = widget.isInstructor && !isTeacher && studentId != null && studentId.isNotEmpty;
+    final row = Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
         children: [
@@ -3494,6 +3585,20 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
             ),
         ],
       ),
+    );
+    if (!canViewProgress) return row;
+    return InkWell(
+      onTap: () => _showStudentProgressDialog(studentId, name),
+      child: row,
+    );
+  }
+
+  Future<void> _showStudentProgressDialog(String studentId, String studentName) async {
+    final courseId = widget.course['_id']?.toString() ?? '';
+    if (courseId.isEmpty) return;
+    showDialog(
+      context: context,
+      builder: (_) => _StudentProgressDialog(lms: _lms, courseId: courseId, studentId: studentId, studentName: studentName),
     );
   }
 
@@ -3975,7 +4080,29 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
             const SizedBox(height: 24),
           ],
 
-          // ── Attendance Report section ──
+          if (_assignments.isEmpty && _readyForCert.isEmpty && _pendingCerts.isEmpty)
+            Center(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 60),
+                child: Column(mainAxisSize: MainAxisSize.min, children: [
+                  Icon(Icons.grade_outlined, size: 56, color: Colors.grey.shade300),
+                  const SizedBox(height: 12),
+                  const Text('No grades yet', style: TextStyle(fontSize: 15, color: Color(0xFF5F6368))),
+                ]),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  // ── Attendance tab (split out of Grades — was a section inside it) ──
+  Widget _buildAttendanceTab() {
+    return RefreshIndicator(
+      onRefresh: _loadAttendanceReport,
+      child: ListView(
+        padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+        children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -3992,15 +4119,14 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
             const Center(child: Padding(padding: EdgeInsets.all(24), child: CircularProgressIndicator(strokeWidth: 2)))
           else
             _buildAttendanceReportTable(),
-
-          if (_assignments.isEmpty && (_attendanceReport['students'] as List? ?? []).isEmpty)
+          if ((_attendanceReport['students'] as List? ?? []).isEmpty && !_loadingAttendanceReport)
             Center(
               child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 60),
+                padding: const EdgeInsets.symmetric(vertical: 40),
                 child: Column(mainAxisSize: MainAxisSize.min, children: [
-                  Icon(Icons.grade_outlined, size: 56, color: Colors.grey.shade300),
+                  Icon(Icons.how_to_reg_outlined, size: 56, color: Colors.grey.shade300),
                   const SizedBox(height: 12),
-                  const Text('No grades or attendance yet', style: TextStyle(fontSize: 15, color: Color(0xFF5F6368))),
+                  const Text('No attendance data yet', style: TextStyle(fontSize: 15, color: Color(0xFF5F6368))),
                 ]),
               ),
             ),
@@ -4183,5 +4309,275 @@ class _EmbeddedCourseContentState extends State<_EmbeddedCourseContent> {
   @override
   Widget build(BuildContext context) {
     return InstructorCourseContentScreen(key: _screenKey, courseId: widget.courseId, embedded: true);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+// In-app recording playback — plays recordingUrl directly instead of only
+// offering the Google Drive backup link, so a recording isn't inaccessible
+// just because the (separate, async) Drive upload step hasn't finished yet.
+// ─────────────────────────────────────────────────────────────
+class _RecordingPlaybackDialog extends StatefulWidget {
+  final String title;
+  final String url;
+  const _RecordingPlaybackDialog({required this.title, required this.url});
+
+  @override
+  State<_RecordingPlaybackDialog> createState() => _RecordingPlaybackDialogState();
+}
+
+class _RecordingPlaybackDialogState extends State<_RecordingPlaybackDialog> {
+  bool _expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final screenSize = MediaQuery.of(context).size;
+    final compactWidth = screenSize.width < 760 ? screenSize.width - 48 : 720.0;
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      insetPadding: _expanded
+          ? const EdgeInsets.all(16)
+          : const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
+      child: SizedBox(
+        width: _expanded ? screenSize.width - 32 : compactWidth,
+        height: _expanded ? screenSize.height - 32 : null,
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 8, 8),
+            child: Row(children: [
+              const Icon(Icons.play_circle_rounded, color: Color(0xFF10B981), size: 22),
+              const SizedBox(width: 10),
+              Expanded(child: Text(widget.title, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16))),
+              IconButton(
+                icon: Icon(_expanded ? Icons.close_fullscreen_rounded : Icons.open_in_full_rounded),
+                tooltip: _expanded ? 'Shrink' : 'Enlarge',
+                onPressed: () => setState(() => _expanded = !_expanded),
+              ),
+              IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(context)),
+            ]),
+          ),
+          if (_expanded)
+            Expanded(
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: VideoPlayerWidget(videoUrl: widget.url),
+              ),
+            )
+          else
+            AspectRatio(
+              aspectRatio: 16 / 9,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: VideoPlayerWidget(videoUrl: widget.url),
+              ),
+            ),
+          const SizedBox(height: 12),
+        ]),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+// Student progress dialog — instructor taps a student in People to see
+// their full breakdown: modules, lessons, assignments, quizzes, attendance.
+// ─────────────────────────────────────────────────────────────
+class _StudentProgressDialog extends StatefulWidget {
+  final LmsService lms;
+  final String courseId;
+  final String studentId;
+  final String studentName;
+  const _StudentProgressDialog({
+    required this.lms,
+    required this.courseId,
+    required this.studentId,
+    required this.studentName,
+  });
+
+  @override
+  State<_StudentProgressDialog> createState() => _StudentProgressDialogState();
+}
+
+class _StudentProgressDialogState extends State<_StudentProgressDialog> {
+  bool _loading = true;
+  Map<String, dynamic>? _progress;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final result = await widget.lms.getStudentProgress(widget.courseId, widget.studentId);
+    if (!mounted) return;
+    setState(() {
+      _loading = false;
+      if (result['success'] == true) {
+        _progress = result['progress'] as Map<String, dynamic>?;
+      } else {
+        _error = result['message']?.toString() ?? 'Failed to load progress';
+      }
+    });
+  }
+
+  Color _statusColor(String status) {
+    switch (status) {
+      case 'completed':
+      case 'graded':
+        return const Color(0xFF188038);
+      case 'submitted':
+        return const Color(0xFF1A73E8);
+      default:
+        return const Color(0xFF94A3B8);
+    }
+  }
+
+  String _statusLabel(String status) {
+    switch (status) {
+      case 'completed': return 'Completed';
+      case 'graded': return 'Graded';
+      case 'submitted': return 'Submitted';
+      default: return 'Not started';
+    }
+  }
+
+  IconData _typeIcon(String type) {
+    switch (type) {
+      case 'assignment': return Icons.assignment_outlined;
+      case 'quiz': return Icons.quiz_outlined;
+      case 'live': return Icons.live_tv_rounded;
+      default: return Icons.play_circle_outline_rounded;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final screenSize = MediaQuery.of(context).size;
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
+      child: SizedBox(
+        width: screenSize.width < 700 ? screenSize.width - 48 : 640,
+        height: screenSize.height * 0.75,
+        child: Column(children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 18, 8, 12),
+            child: Row(children: [
+              CircleAvatar(
+                radius: 18,
+                backgroundColor: const Color(0xFF1A73E8),
+                child: Text(
+                  widget.studentName.isNotEmpty ? widget.studentName[0].toUpperCase() : '?',
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(widget.studentName, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
+              ),
+              IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(context)),
+            ]),
+          ),
+          const Divider(height: 1),
+          Expanded(
+            child: _loading
+                ? const Center(child: CircularProgressIndicator(strokeWidth: 2))
+                : _error != null
+                    ? Center(child: Padding(
+                        padding: const EdgeInsets.all(24),
+                        child: Text(_error!, style: const TextStyle(color: Colors.red)),
+                      ))
+                    : _buildBody(),
+          ),
+        ]),
+      ),
+    );
+  }
+
+  Widget _buildBody() {
+    final p = _progress!;
+    final totalModules = (p['totalModules'] ?? 0) as int;
+    final completedModules = (p['completedModules'] ?? 0) as int;
+    final isCourseCompleted = p['isCourseCompleted'] == true;
+    final attendance = p['attendance'] as Map? ?? {};
+    final attended = (attendance['attended'] ?? 0) as int;
+    final totalSessions = (attendance['total'] ?? 0) as int;
+    final modules = (p['modules'] as List?) ?? [];
+    final extraAssignments = (p['extraAssignments'] as List?) ?? [];
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+      children: [
+        Row(children: [
+          Expanded(child: _statCard('Modules', '$completedModules / $totalModules', Icons.folder_outlined, const Color(0xFF1A73E8))),
+          const SizedBox(width: 10),
+          Expanded(child: _statCard('Attendance', totalSessions > 0 ? '$attended / $totalSessions' : '—', Icons.how_to_reg_outlined, const Color(0xFF9334E6))),
+          const SizedBox(width: 10),
+          Expanded(child: _statCard('Course', isCourseCompleted ? 'Completed' : 'In progress', Icons.emoji_events_outlined, isCourseCompleted ? const Color(0xFF188038) : const Color(0xFFE37400))),
+        ]),
+        const SizedBox(height: 20),
+        for (final mod in modules) ...[
+          Row(children: [
+            Icon(
+              (mod as Map)['isCompleted'] == true ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded,
+              size: 18,
+              color: mod['isCompleted'] == true ? const Color(0xFF188038) : const Color(0xFF94A3B8),
+            ),
+            const SizedBox(width: 8),
+            Expanded(child: Text(mod['title']?.toString() ?? 'Module', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14))),
+          ]),
+          const SizedBox(height: 6),
+          ...((mod['lessons'] as List?) ?? []).map((l) {
+            final lesson = l as Map;
+            final status = lesson['status']?.toString() ?? 'not_started';
+            return Padding(
+              padding: const EdgeInsets.only(left: 26, bottom: 6),
+              child: Row(children: [
+                Icon(_typeIcon(lesson['type']?.toString() ?? ''), size: 15, color: const Color(0xFF70757A)),
+                const SizedBox(width: 8),
+                Expanded(child: Text(lesson['title']?.toString() ?? 'Item', style: const TextStyle(fontSize: 13))),
+                Text(_statusLabel(status), style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: _statusColor(status))),
+              ]),
+            );
+          }),
+          const SizedBox(height: 12),
+        ],
+        if (extraAssignments.isNotEmpty) ...[
+          const Text('Other Assignments', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+          const SizedBox(height: 6),
+          ...extraAssignments.map((a) {
+            final assignment = a as Map;
+            final status = assignment['status']?.toString() ?? 'not_started';
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: Row(children: [
+                const Icon(Icons.assignment_outlined, size: 15, color: Color(0xFF70757A)),
+                const SizedBox(width: 8),
+                Expanded(child: Text(assignment['title']?.toString() ?? 'Assignment', style: const TextStyle(fontSize: 13))),
+                Text(_statusLabel(status), style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: _statusColor(status))),
+              ]),
+            );
+          }),
+        ],
+      ],
+    );
+  }
+
+  Widget _statCard(String label, String value, IconData icon, Color color) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Icon(icon, color: color, size: 18),
+        const SizedBox(height: 6),
+        Text(value, style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: color)),
+        Text(label, style: const TextStyle(fontSize: 11, color: Color(0xFF70757A))),
+      ]),
+    );
   }
 }

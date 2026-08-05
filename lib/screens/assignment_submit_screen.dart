@@ -40,6 +40,14 @@ class _AssignmentSubmitScreenState extends State<AssignmentSubmitScreen> {
   bool _uploadingFile = false;
   String? _uploadedFileName;
 
+  // The /upload/blob-doc endpoint runs as a Vercel serverless function,
+  // which hard-caps request bodies at 4.5 MB at the platform level —
+  // uploads over that are rejected before this route's own code (or its
+  // multer limit) ever runs, so Dio just sees a raw platform error with no
+  // useful message. Checking client-side first turns that into a clear,
+  // immediate "file too large" instead of a silent/confusing failure.
+  static const int _maxUploadBytes = 4 * 1024 * 1024; // 4 MB (leaves headroom under the 4.5 MB platform cap)
+
   Future<void> _pickAndUploadFile() async {
     try {
       final result = await FilePicker.platform.pickFiles(
@@ -54,6 +62,17 @@ class _AssignmentSubmitScreenState extends State<AssignmentSubmitScreen> {
         return;
       }
       final file = result.files.first;
+      if (file.bytes!.length > _maxUploadBytes) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('"${file.name}" is ${(file.bytes!.length / (1024 * 1024)).toStringAsFixed(1)} MB — the maximum allowed is 4 MB. Please choose a smaller file.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return;
+      }
       setState(() => _uploadingFile = true);
       final token = await SharedPref().getToken() ?? '';
       final res = await Dio().post(
@@ -649,42 +668,58 @@ class _AssignmentSubmitScreenState extends State<AssignmentSubmitScreen> {
 
                         if (_canEdit) ...[
                           // Direct file upload button
-                          SizedBox(
-                            width: double.infinity,
-                            child: ElevatedButton.icon(
-                              onPressed: _uploadingFile ? null : _pickAndUploadFile,
-                              icon: _uploadingFile
-                                  ? const SizedBox(
-                                      width: 16, height: 16,
-                                      child: CircularProgressIndicator(
-                                          strokeWidth: 2, color: Colors.white),
-                                    )
-                                  : const Icon(Icons.upload_file_rounded, size: 18),
-                              label: Text(
-                                _uploadingFile
-                                    ? 'Uploading...'
-                                    : (_uploadedFileName != null
-                                        ? 'Uploaded: $_uploadedFileName — tap to change'
-                                        : 'Upload File'),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
-                              ),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: _uploadedFileName != null
-                                    ? const Color(0xFF10B981)
-                                    : AppColors.primaryColor,
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(vertical: 14),
-                                elevation: 0,
-                                shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12)),
+                          Row(children: [
+                            Expanded(
+                              child: ElevatedButton.icon(
+                                onPressed: _uploadingFile ? null : _pickAndUploadFile,
+                                icon: _uploadingFile
+                                    ? const SizedBox(
+                                        width: 16, height: 16,
+                                        child: CircularProgressIndicator(
+                                            strokeWidth: 2, color: Colors.white),
+                                      )
+                                    : const Icon(Icons.upload_file_rounded, size: 18),
+                                label: Text(
+                                  _uploadingFile
+                                      ? 'Uploading...'
+                                      : (_uploadedFileName != null
+                                          ? 'Uploaded: $_uploadedFileName — tap to replace'
+                                          : 'Upload File'),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+                                ),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: _uploadedFileName != null
+                                      ? const Color(0xFF10B981)
+                                      : AppColors.primaryColor,
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(vertical: 14),
+                                  elevation: 0,
+                                  shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12)),
+                                ),
                               ),
                             ),
-                          ),
+                            if (_uploadedFileName != null && !_uploadingFile) ...[
+                              const SizedBox(width: 8),
+                              IconButton(
+                                onPressed: () => setState(() {
+                                  _uploadedFileName = null;
+                                  _fileUrlController.clear();
+                                }),
+                                icon: const Icon(Icons.close_rounded, color: Colors.red),
+                                tooltip: 'Remove file',
+                                style: IconButton.styleFrom(
+                                  backgroundColor: const Color(0xFFFFEBEE),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                ),
+                              ),
+                            ],
+                          ]),
                           const SizedBox(height: 6),
                           const Text(
-                            'PDF, Word, PowerPoint, Excel, images or ZIP — max 1 file.',
+                            'PDF, Word, PowerPoint, Excel, images or ZIP — max 1 file, up to 4 MB.',
                             style: TextStyle(fontSize: 11, color: Color(0xFF94A3B8), height: 1.5),
                           ),
                         ],

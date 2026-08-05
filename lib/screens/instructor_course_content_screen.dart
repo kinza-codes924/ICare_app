@@ -723,32 +723,37 @@ class InstructorCourseContentScreenState extends State<InstructorCourseContentSc
         items.add(_buildModuleCard(modules[i], i));
       }
 
-      // Live Sessions not linked to any module — kept flat for backward
-      // compatibility with sessions created before module-linking existed.
-      final unlinkedSessions = _liveSessions.where((s) {
-        final linked = (s as Map)['linkedModuleId']?.toString();
-        return linked == null || linked.isEmpty || !modules.any((m) => m['_id']?.toString() == linked);
-      }).toList();
-      if (unlinkedSessions.isNotEmpty) {
-        items.add(_buildSectionHeader(Icons.live_tv_rounded, 'Live Sessions', Colors.red));
-        for (final s in unlinkedSessions) {
-          items.add(_buildStandaloneSessionTile(s));
+      // Standalone Live Sessions/Assignments/Quizzes (not linked to any
+      // module — e.g. created via the old "Go Live" button, or before
+      // module-linking existed) are only shown when the course has NO
+      // modules at all. Once a course uses modules, everything must live
+      // inside a module per the client's requirement — a flat duplicate
+      // list alongside the module tree was confusing (same item seemingly
+      // appearing twice: once inside its module, once in this flat list).
+      if (modules.isEmpty) {
+        final unlinkedSessions = _liveSessions.where((s) {
+          final linked = (s as Map)['linkedModuleId']?.toString();
+          return linked == null || linked.isEmpty;
+        }).toList();
+        if (unlinkedSessions.isNotEmpty) {
+          items.add(_buildSectionHeader(Icons.live_tv_rounded, 'Live Sessions', Colors.red));
+          for (final s in unlinkedSessions) {
+            items.add(_buildStandaloneSessionTile(s));
+          }
         }
-      }
 
-      // Assignments section
-      if (_assignments.isNotEmpty) {
-        items.add(_buildSectionHeader(Icons.assignment_rounded, 'Assignments', const Color(0xFF6366F1)));
-        for (final a in _assignments) {
-          items.add(_buildStandaloneAssignmentTile(a));
+        if (_assignments.isNotEmpty) {
+          items.add(_buildSectionHeader(Icons.assignment_rounded, 'Assignments', const Color(0xFF6366F1)));
+          for (final a in _assignments) {
+            items.add(_buildStandaloneAssignmentTile(a));
+          }
         }
-      }
 
-      // Quizzes section
-      if (_quizzes.isNotEmpty) {
-        items.add(_buildSectionHeader(Icons.quiz_rounded, 'Quizzes', const Color(0xFFF59E0B)));
-        for (final q in _quizzes) {
-          items.add(_buildStandaloneQuizTile(q));
+        if (_quizzes.isNotEmpty) {
+          items.add(_buildSectionHeader(Icons.quiz_rounded, 'Quizzes', const Color(0xFFF59E0B)));
+          for (final q in _quizzes) {
+            items.add(_buildStandaloneQuizTile(q));
+          }
         }
       }
     }

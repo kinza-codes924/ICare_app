@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const mongoose = require('mongoose');
+const jwt = require('jsonwebtoken');
 const { connectMongoDB } = require('../config/mongodb');
 const { authMiddleware } = require('../middleware/auth');
 const Course = require('../models/Course');
@@ -50,9 +51,37 @@ async function computeProgress(enrollment) {
 router.get('/public', async (req, res) => {
   try {
     await connectMongoDB();
+    // A student's own enrolled courses must still show here even if the
+    // instructor later flipped the course to isPublished:false (editing
+    // content sets visibility:'private' -> isPublished:false, see
+    // instructors.js) — "My Courses" never filtered on isPublished, so a
+    // course could be fully accessible there yet silently vanish from
+    // Browse with no indication why. Auth is optional on this route (it's
+    // the public catalog), so only widen the filter when a valid token is
+    // actually present.
     const filter = { is_active: true, isPublished: true };
     if (req.query.q) filter.title = { $regex: req.query.q, $options: 'i' };
     if (req.query.category) filter.category = req.query.category;
+
+    const token = req.headers.authorization?.split(' ')[1];
+    if (token) {
+      try {
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        const enrollments = await Enrollment.find({ userId: toId(decoded.id) }).select('courseId').lean();
+        const enrolledCourseIds = enrollments.map(e => e.courseId).filter(Boolean);
+        if (enrolledCourseIds.length) {
+          const baseFilter = { is_active: true };
+          if (req.query.q) baseFilter.title = { $regex: req.query.q, $options: 'i' };
+          if (req.query.category) baseFilter.category = req.query.category;
+          const courses = await Course.find({
+            ...baseFilter,
+            $or: [{ isPublished: true }, { _id: { $in: enrolledCourseIds } }],
+          }).select('-modules').lean();
+          return res.json({ success: true, courses, count: courses.length });
+        }
+      } catch (_) { /* invalid/expired token — fall through to the public-only filter */ }
+    }
+
     const courses = await Course.find(filter).select('-modules').lean();
     res.json({ success: true, courses, count: courses.length });
   } catch (e) {
@@ -511,6 +540,118 @@ router.get('/my-pending-invites', authMiddleware, async (req, res) => {
   }
 });
 
+// GET /api/courses/:courseId/student-progress/:studentId — full progress
+// breakdown for one student in one course (Lead Instructor / owner use).
+// Registered before GET /:id so Express doesn't match "student-progress"
+// as the :id param.
+router.get('/:courseId/student-progress/:studentId', authMiddleware, async (req, res) => {
+  try {
+    await connectMongoDB();
+    const { courseId, studentId } = req.params;
+    const course = await Course.findById(toId(courseId)).lean();
+    if (!course) return res.status(404).json({ success: false, message: 'Course not found' });
+
+    const uid = req.user.id?.toString();
+    const isOwner = course.instructor_id?.toString() === uid
+      || (course.coTeachers || []).some(t => t.userId?.toString() === uid && (t.status ?? 'accepted') === 'accepted');
+    if (!isOwner) return res.status(403).json({ success: false, message: 'Not authorized' });
+
+    const enrollment = await Enrollment.findOne({ courseId: toId(courseId), userId: toId(studentId) }).lean();
+    if (!enrollment) return res.status(404).json({ success: false, message: 'Student is not enrolled in this course' });
+
+    const student = await require('../models/User').findById(toId(studentId)).select('name username email').lean();
+
+    // Per-module breakdown: lessons/assignments/quizzes done vs total
+    const completedLessonIds = new Set((enrollment.lessonCompletions || []).map(lc => lc.lessonId));
+    const completedModuleIds = new Set((enrollment.moduleCompletions || []).map(mc => mc.moduleId));
+
+    const allAssignmentLessonIds = [];
+    const allQuizLessonIds = [];
+    for (const mod of (course.modules || [])) {
+      for (const l of (mod.lessons || [])) {
+        if (l.type === 'assignment' && l._id) allAssignmentLessonIds.push(l._id);
+        if (l.type === 'quiz' && l._id) allQuizLessonIds.push(l._id);
+      }
+    }
+    const submissions = allAssignmentLessonIds.length
+      ? await AssignmentSubmission.find({ assignmentId: { $in: allAssignmentLessonIds }, studentId: toId(studentId) }).lean()
+      : [];
+    const submissionByAssignmentId = Object.fromEntries(submissions.map(s => [s.assignmentId.toString(), s.status]));
+    const passedAttempts = allQuizLessonIds.length
+      ? await QuizAttempt.find({ quizId: { $in: allQuizLessonIds }, studentId: toId(studentId), passed: true }).lean()
+      : [];
+    const passedQuizIds = new Set(passedAttempts.map(a => a.quizId.toString()));
+
+    const modules = (course.modules || []).map(mod => {
+      const lessons = (mod.lessons || []).map(l => {
+        const lid = l._id?.toString();
+        let itemStatus = 'not_started';
+        if (l.type === 'assignment') {
+          const s = submissionByAssignmentId[lid];
+          itemStatus = s === 'graded' ? 'graded' : (s ? 'submitted' : 'not_started');
+        } else if (l.type === 'quiz') {
+          itemStatus = passedQuizIds.has(lid) ? 'completed' : 'not_started';
+        } else if (l.type === 'live') {
+          itemStatus = completedLessonIds.has(lid) ? 'completed' : 'not_started';
+        } else {
+          itemStatus = completedLessonIds.has(lid) ? 'completed' : 'not_started';
+        }
+        return { _id: l._id, title: l.title, type: l.type || 'content', status: itemStatus };
+      });
+      return {
+        _id: mod._id,
+        title: mod.title,
+        isCompleted: completedModuleIds.has(mod._id?.toString()),
+        lessons,
+      };
+    });
+
+    // Standalone assignments/quizzes not embedded in any module
+    const standaloneAssignments = await Assignment.find({ courseId: toId(courseId), isPublished: true }).lean();
+    const standaloneAssignmentIds = new Set(standaloneAssignments.map(a => a._id.toString()));
+    const embeddedAssignmentIds = new Set(allAssignmentLessonIds.map(id => id.toString()));
+    const extraAssignments = standaloneAssignments.filter(a => !embeddedAssignmentIds.has(a._id.toString()));
+    let extraAssignmentStatuses = [];
+    if (extraAssignments.length) {
+      const extraSubs = await AssignmentSubmission.find({
+        assignmentId: { $in: extraAssignments.map(a => a._id) }, studentId: toId(studentId),
+      }).lean();
+      const subMap = Object.fromEntries(extraSubs.map(s => [s.assignmentId.toString(), s.status]));
+      extraAssignmentStatuses = extraAssignments.map(a => ({
+        _id: a._id, title: a.title, type: 'assignment',
+        status: subMap[a._id.toString()] === 'graded' ? 'graded' : (subMap[a._id.toString()] ? 'submitted' : 'not_started'),
+      }));
+    }
+
+    // Attendance summary for this student in this course
+    const liveSessions = await LiveSession.find({ courseId: toId(courseId) }).select('_id attendees').lean();
+    const totalSessions = liveSessions.length;
+    const attendedSessions = liveSessions.filter(s =>
+      (s.attendees || []).some(a => a?.toString() === studentId)
+    ).length;
+
+    const totalModules = modules.length;
+    const completedModulesCount = modules.filter(m => m.isCompleted).length;
+
+    res.json({
+      success: true,
+      progress: {
+        student: { _id: studentId, name: student?.name || student?.username || 'Student', email: student?.email || '' },
+        isCourseCompleted: enrollment.isCompleted === true,
+        totalModules,
+        completedModules: completedModulesCount,
+        modules,
+        extraAssignments: extraAssignmentStatuses,
+        attendance: { attended: attendedSessions, total: totalSessions },
+        enrolledAt: enrollment.createdAt || null,
+        completedAt: enrollment.completedAt || null,
+      },
+    });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
 // GET /api/courses/:id — get single course
 router.get('/:id', authMiddleware, async (req, res) => {
   try {
@@ -587,6 +728,36 @@ router.get('/:id', authMiddleware, async (req, res) => {
     // actually succeeded — this GET just never reported it back).
     const completedLessonIds = new Set((enrollment?.lessonCompletions || []).map(lc => lc.lessonId));
 
+    // Assignment/quiz-type lesson entries reuse the real Assignment/Quiz
+    // _id (see instructor_create_assignment_screen.dart / create_quiz_screen
+    // — the created doc's own _id is what gets pushed into module.lessons),
+    // so submission/attempt status can be looked up directly for the
+    // module-embedded tile too, not just the standalone Grades tab.
+    let submissionStatusByAssignmentId = {};
+    let quizPassedByQuizId = {};
+    if (enrollment) {
+      const assignmentLessonIds = [];
+      const quizLessonIds = [];
+      for (const mod of (course.modules || [])) {
+        for (const l of (mod.lessons || [])) {
+          if (l.type === 'assignment' && l._id) assignmentLessonIds.push(l._id);
+          if (l.type === 'quiz' && l._id) quizLessonIds.push(l._id);
+        }
+      }
+      if (assignmentLessonIds.length) {
+        const subs = await AssignmentSubmission.find({
+          assignmentId: { $in: assignmentLessonIds }, studentId: enrollment.userId,
+        }).select('assignmentId status').lean();
+        submissionStatusByAssignmentId = Object.fromEntries(subs.map(s => [s.assignmentId.toString(), s.status]));
+      }
+      if (quizLessonIds.length) {
+        const attempts = await QuizAttempt.find({
+          quizId: { $in: quizLessonIds }, studentId: enrollment.userId, passed: true,
+        }).select('quizId').lean();
+        quizPassedByQuizId = Object.fromEntries(attempts.map(a => [a.quizId.toString(), true]));
+      }
+    }
+
     course.modules = (course.modules || []).map((mod, idx) => {
       let isLocked = false;
       let unlockDate = null;
@@ -612,10 +783,17 @@ router.get('/:id', authMiddleware, async (req, res) => {
         isLocked = prevId ? !completedModuleIds.has(prevId) : false;
       }
 
-      const lessons = (mod.lessons || []).map(l => ({
-        ...l,
-        isCompleted: completedLessonIds.has(l._id?.toString()),
-      }));
+      const lessons = (mod.lessons || []).map(l => {
+        const lid = l._id?.toString();
+        if (l.type === 'assignment') {
+          const submissionStatus = submissionStatusByAssignmentId[lid] || null;
+          return { ...l, submissionStatus, isCompleted: submissionStatus === 'graded' };
+        }
+        if (l.type === 'quiz') {
+          return { ...l, isCompleted: quizPassedByQuizId[lid] === true };
+        }
+        return { ...l, isCompleted: completedLessonIds.has(lid) };
+      });
 
       return { ...mod, lessons, isLocked, unlockDate };
     });

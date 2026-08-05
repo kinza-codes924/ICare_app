@@ -297,18 +297,14 @@ router.put('/submissions/:submissionId/grade', authMiddleware, async (req, res) 
         }).lean();
         if (gradedSubs.length < allAssignments.length) return;
 
-        // Idempotency guard: this block re-runs on EVERY grading action once all
-        // assignments happen to be graded (e.g. an instructor re-grading/editing a
-        // mark later), not just the one action that first completes the course.
-        // Without this check it would re-stamp completedAt and re-send the
-        // "Course Completed!" notification on every subsequent regrade.
+        // Idempotency guard against re-notifying on every regrade.
         const existingEnrollment = await Enrollment.findOne(
           { courseId: sub.courseId, userId: sub.studentId },
           { isCompleted: 1 },
         ).lean();
         if (existingEnrollment?.isCompleted) return;
 
-        // Check passing: all assignments must meet passingMarks
+        // Check passing: all standalone assignments must meet passingMarks
         const assignmentMap = {};
         allAssignments.forEach(a => { assignmentMap[a._id.toString()] = a; });
         const allPassed = gradedSubs.every(s => {
@@ -316,24 +312,23 @@ router.put('/submissions/:submissionId/grade', authMiddleware, async (req, res) 
           return a ? s.marksObtained >= (a.passingMarks || 50) : false;
         });
 
-        // Mark enrollment completed (both top-level and progress.completed for compatibility)
-        await Enrollment.findOneAndUpdate(
-          { courseId: sub.courseId, userId: sub.studentId },
-          { $set: { completedAt: new Date(), isCompleted: true,
-                    'progress.completed': true, 'progress.completedAt': new Date() } },
-        );
-
-        // Notify student
+        // This used to unconditionally set isCompleted:true here just
+        // because every standalone assignment was graded — completely
+        // ignoring whether lessons/quizzes/other modules were done, which
+        // let "Issue Certificate" show up after finishing only 1 of 2
+        // modules. isCompleted is only the real completion system's call
+        // (recheckModuleCompletion, re-run on every course fetch) — this
+        // path only notifies the student that grading is done.
         const Course = require('../models/Course');
         const course = await Course.findById(toId(sub.courseId.toString())).lean();
         await Notification.create({
           userId: sub.studentId,
           type: 'general',
-          title: allPassed ? 'Course Completed!' : 'All Assignments Graded',
+          title: allPassed ? 'All Assignments Graded' : 'Assignments Graded',
           message: allPassed
-            ? `Congratulations! You've completed "${course?.title || 'the course'}". Your certificate is ready.`
+            ? `All assignments graded for "${course?.title || 'the course'}" — you passed! Check your scores.`
             : `All assignments graded for "${course?.title || 'the course'}". Check your scores.`,
-          data: { type: 'course_complete', courseId: sub.courseId.toString() },
+          data: { type: 'assignments_graded', courseId: sub.courseId.toString() },
         });
       } catch (_) {}
     });
@@ -377,7 +372,13 @@ router.get('/course/:courseId/my-grades', authMiddleware, async (req, res) => {
     await connectMongoDB();
     const studentId = toId(req.user.id);
     const courseId  = toId(req.params.courseId);
-    const assignments = await Assignment.find({ courseId, isPublished: true }).lean();
+    // No isPublished filter here — the submit route lets a student submit
+    // to any assignment in the course regardless of publish state, and
+    // grading has no publish check either. Filtering this view to
+    // isPublished:true meant a graded (or even just submitted) assignment
+    // that was never explicitly toggled "Published" silently vanished from
+    // the student's own Grades tab and stayed stuck showing "Pending".
+    const assignments = await Assignment.find({ courseId }).lean();
     const assignmentIds = assignments.map(a => a._id);
     const subs = await AssignmentSubmission.find({ studentId, assignmentId: { $in: assignmentIds } }).lean();
     const subMap = {};

@@ -28,8 +28,15 @@ async function recheckModuleCompletion(enrollment, moduleId) {
   if (!module) return;
 
   const lessons = module.lessons || [];
+  // Quiz-type entries are reference rows, not watchable/completable content —
+  // passing one is tracked via QuizAttempt (checked below), never via
+  // lessonCompletions. Without this exclusion, a quiz embedded in a module's
+  // lessons[] counted as a required "content lesson" that could never be
+  // satisfied (nothing ever calls complete-lesson for a quiz), so the module
+  // stayed permanently incomplete even after the quiz was passed and every
+  // real lesson was marked done.
   const contentLessonIds = lessons
-    .filter(l => (l.type || 'content') !== 'assignment' && (l.type || 'content') !== 'live')
+    .filter(l => !['assignment', 'live', 'quiz'].includes(l.type || 'content'))
     .map(l => l._id?.toString()).filter(Boolean);
   const assignmentLessonIds = lessons
     .filter(l => l.type === 'assignment')
