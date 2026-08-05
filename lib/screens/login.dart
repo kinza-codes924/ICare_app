@@ -2207,14 +2207,20 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
       return;
     }
     setState(() => isLoading = true);
-    // TEMPORARILY DISABLED — the executeRecaptcha() call was crashing the
-    // Dart isolate in production (main.dart.js:4434, inside a failed type
-    // cast) and taking the entire login/signup flow down with it. Root
-    // cause not yet isolated; login must not stay broken while that's
-    // debugged, so the call is stubbed out to null (same as "not
-    // available") until it's fixed and re-verified end-to-end.
-    // final recaptchaToken = await executeRecaptcha(isLogin ? 'login' : 'signup');
-    const String? recaptchaToken = null;
+    // Root cause found: Random().nextInt(1 << 32) threw a RangeError
+    // (nextInt's argument must be <= 2^32, and dart2js's Dart-int shift
+    // semantics don't wrap the way a raw JS `1 << 32` does) — uncaught
+    // before executeRecaptcha's own try/catch even started, which crashed
+    // the whole isolate and took login/signup down with it. Fixed in
+    // recaptcha_web.dart. Still wrapped here in its own try/catch as a
+    // second line of defense — a recaptcha failure must never be able to
+    // block login/signup again, no matter what it is.
+    String? recaptchaToken;
+    try {
+      recaptchaToken = await executeRecaptcha(isLogin ? 'login' : 'signup');
+    } catch (_) {
+      recaptchaToken = null;
+    }
     try {
       if (isLogin) {
         debugPrint("🔐 Starting login process...");

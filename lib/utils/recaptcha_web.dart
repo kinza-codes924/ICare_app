@@ -9,7 +9,14 @@ import 'dart:html' as html;
 /// used elsewhere) — avoids Promise/js_util interop, which isn't stable
 /// across the Dart SDK version this project is pinned to.
 Future<String?> executeRecaptcha(String action) async {
-  final requestId = '${DateTime.now().microsecondsSinceEpoch}-${Random().nextInt(1 << 32)}';
+  // Random.nextInt's argument must be <= 2^32 (a documented hard limit,
+  // not inclusive-safe at exactly that boundary) — 1 << 32 sits right on
+  // that edge and can throw a RangeError depending on how dart2js compiles
+  // the shift (Dart ints aren't JS's 32-bit-wrapping bitwise ints), unlike
+  // a plain JS runtime where 1 << 32 harmlessly wraps to 1. That thrown
+  // RangeError, uncaught before the outer try/catch even started, is what
+  // crashed the whole isolate and took the login flow down with it.
+  final requestId = '${DateTime.now().microsecondsSinceEpoch}-${Random().nextInt(1 << 31)}';
   final completer = Completer<String?>();
   StreamSubscription? sub;
 
