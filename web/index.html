@@ -540,6 +540,32 @@
       }
     }
   </script>
+  <!-- reCAPTCHA v3 — invisible, no user challenge. Loaded with render=<siteKey>
+       so grecaptcha.execute() can be called per-action (login, register).
+       Bridged to Dart via a CustomEvent (same pattern as icare-reminder
+       below) instead of Promise/js_util interop, which isn't stable across
+       Dart SDK versions in this project. -->
+  <script src="https://www.google.com/recaptcha/api.js?render=6LcZd3ctAAAAAIju8cgrznQxbrSUtKqo5NkGI-d6"></script>
+  <script>
+    // Dart calls this by dispatching 'icare-recaptcha-request' with
+    // {requestId, action}; the result comes back as 'icare-recaptcha-result'
+    // with {requestId, token} (token is null on any failure/timeout).
+    window.addEventListener('icare-recaptcha-request', function(e) {
+      var requestId = e.detail && e.detail.requestId;
+      var action = (e.detail && e.detail.action) || 'submit';
+      function respond(token) {
+        window.dispatchEvent(new CustomEvent('icare-recaptcha-result', { detail: { requestId: requestId, token: token } }));
+      }
+      try {
+        if (!window.grecaptcha) { respond(null); return; }
+        grecaptcha.ready(function() {
+          grecaptcha.execute('6LcZd3ctAAAAAIju8cgrznQxbrSUtKqo5NkGI-d6', { action: action })
+            .then(function(token) { respond(token); })
+            .catch(function() { respond(null); });
+        });
+      } catch (err) { respond(null); }
+    });
+  </script>
   <script src="flutter_bootstrap.js" async></script>
 
   <!-- LMS Live Session — Jitsi Meet (direct iframe) + MediaRecorder -->

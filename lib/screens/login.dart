@@ -19,6 +19,7 @@ import 'package:icare/services/user_service.dart';
 import 'package:icare/utils/shared_pref.dart';
 import 'package:icare/models/user.dart' as app_user;
 import 'package:icare/utils/imagePaths.dart';
+import 'package:icare/utils/recaptcha.dart';
 import 'package:icare/utils/theme.dart';
 import 'package:icare/utils/utils.dart';
 import 'package:icare/widgets/custom_text.dart';
@@ -2206,6 +2207,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
       return;
     }
     setState(() => isLoading = true);
+    // Invisible reCAPTCHA v3 — no user-facing challenge, just a token the
+    // backend scores server-side. Web-only (see recaptcha_web.dart); a null
+    // token on mobile/desktop or a failed grecaptcha load is expected and
+    // must not block the login/signup attempt.
+    final recaptchaToken = await executeRecaptcha(isLogin ? 'login' : 'signup');
     try {
       if (isLogin) {
         debugPrint("🔐 Starting login process...");
@@ -2214,6 +2220,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
         final result = await _authService.login(
           email: usernameController.text.trim(),
           password: passwordController.text.trim(),
+          recaptchaToken: recaptchaToken,
         );
         // 2FA check
         if (result['requiresOtp'] == true) {
@@ -2322,6 +2329,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
           password: passwordController.text.trim(),
           role: backendRole,
           phoneNumber: phoneController.text.trim(),
+          recaptchaToken: recaptchaToken,
           // licenseNumber: licenseController.text.trim(),
           // location: locationController.text.trim(),
           // organizationName: orgNameController.text.trim(),

@@ -25,6 +25,7 @@ class AuthService {
     String? phoneNumber,
     String? gender,
     String? dateOfBirth,
+    String? recaptchaToken,
   }) async {
     try {
       Response? response;
@@ -40,6 +41,7 @@ class AuthService {
           };
           if (gender != null) body['gender'] = gender;
           if (dateOfBirth != null) body['dateOfBirth'] = dateOfBirth;
+          if (recaptchaToken != null) body['recaptchaToken'] = recaptchaToken;
           response = await _apiService.post(ApiConfig.register, body);
           break;
         } on DioException catch (e) {
@@ -72,6 +74,7 @@ class AuthService {
   Future<Map<String, dynamic>> login({
     required String email,
     required String password,
+    String? recaptchaToken,
   }) async {
     try {
       Response? response;
@@ -79,7 +82,11 @@ class AuthService {
         try {
           response = await _apiService.post(
             ApiConfig.login,
-            {'email': email, 'password': password},
+            {
+              'email': email,
+              'password': password,
+              if (recaptchaToken != null) 'recaptchaToken': recaptchaToken,
+            },
           );
           break;
         } on DioException catch (e) {

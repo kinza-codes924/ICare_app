@@ -71,12 +71,18 @@ const generateMrNumber = async () => {
 const register = async (req, res) => {
   try {
     await connectMongoDB();
-    const { username: usernameField, name, email, phone, password, role: roleRaw } = req.body;
+    const { username: usernameField, name, email, phone, password, role: roleRaw, recaptchaToken } = req.body;
     const username = usernameField || name;
     const role = roleRaw?.toLowerCase();
 
     if (!username || !email || !password || !role) {
       return res.status(400).json({ success: false, message: 'Please provide all required fields' });
+    }
+
+    const { verifyRecaptcha } = require('../utils/recaptcha');
+    const recaptchaResult = await verifyRecaptcha(recaptchaToken, 'signup');
+    if (!recaptchaResult.ok) {
+      console.warn(`reCAPTCHA low score on signup for ${email}: score=${recaptchaResult.score}`);
     }
 
     // Check existing
@@ -215,10 +221,18 @@ const login = async (req, res) => {
       ensureAccount('instructor@icare.com', 'Dr. Instructor', 'Instructor', 'instructor123'),
     ]);
 
-    const { email, password } = req.body;
+    const { email, password, recaptchaToken } = req.body;
 
     if (!email || !password) {
       return res.status(400).json({ success: false, message: 'Please provide email and password' });
+    }
+
+    // Soft-enforced for now (logs low scores, doesn't block) — see
+    // utils/recaptcha.js for why a hard block isn't turned on yet.
+    const { verifyRecaptcha } = require('../utils/recaptcha');
+    const recaptchaResult = await verifyRecaptcha(recaptchaToken, 'login');
+    if (!recaptchaResult.ok) {
+      console.warn(`reCAPTCHA low score on login for ${email}: score=${recaptchaResult.score}`);
     }
 
     // Find by email OR username
