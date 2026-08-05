@@ -953,10 +953,24 @@ router.post('/:id/end-and-save', authMiddleware, async (req, res) => {
           'modules.$[].lessons.$[lesson].liveSessionDate': new Date(),
           'modules.$[].lessons.$[lesson].chatTranscript': transcript,
           'modules.$[].lessons.$[lesson].sessionSummary': JSON.stringify(sessionSummary),
+          // Overwrite the pre-set planned duration with how long the
+          // session actually ran, once it's known — the module-content
+          // list previously only ever showed the instructor's original
+          // estimate (e.g. "15 min") even after the session had long since
+          // ended and its real length was known.
+          'modules.$[].lessons.$[lesson].duration': durationMinutes,
         };
         if (session.recordingUrl) {
           setFields['modules.$[].lessons.$[lesson].videoUrl'] = session.recordingUrl;
+          // The classroom UI's module-lesson tile reads recordingUrl (see
+          // classroom_course_view.dart), not videoUrl — this was the actual
+          // reason a module-embedded live session's recording never showed
+          // up as available, even once Jibri had finished uploading it.
+          setFields['modules.$[].lessons.$[lesson].recordingUrl'] = session.recordingUrl;
           setFields['modules.$[].lessons.$[lesson].recordingAvailable'] = true;
+        }
+        if (session.driveBackupUrl) {
+          setFields['modules.$[].lessons.$[lesson].driveBackupUrl'] = session.driveBackupUrl;
         }
         await Course.updateOne(
           { _id: courseId },
@@ -1351,6 +1365,24 @@ router.post('/jibri-recording-complete', jibriUpload.single('file'), async (req,
           session.driveBackupUrl = result.webViewLink;
           await session.save();
           console.log(`Drive backup saved for session ${sessionId}: ${result.webViewLink}`);
+
+          // Propagate to the module-embedded lesson entry too, if this
+          // session is linked to one — the /end route already wrote a
+          // snapshot when the session finished, but the Drive upload is
+          // async and typically completes after that, so driveBackupUrl
+          // never made it into the lesson object the classroom UI reads
+          // (it only ever checked session.driveBackupUrl on the standalone
+          // LiveSession doc, which the module-lesson tile doesn't see).
+          if (session.linkedLessonId) {
+            await Course.updateOne(
+              { _id: session.courseId },
+              { $set: {
+                  'modules.$[].lessons.$[lesson].driveBackupUrl': result.webViewLink,
+                  'modules.$[].lessons.$[lesson].recordingUrl': session.recordingUrl || finalUrl,
+                } },
+              { arrayFilters: [{ 'lesson._id': toId(session.linkedLessonId) }] }
+            );
+          }
         } catch (e) {
           console.error(`Drive backup failed for session ${sessionId}:`, e.message);
         }

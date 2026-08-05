@@ -16,6 +16,7 @@ import 'package:icare/widgets/incoming_call_listener.dart';
 import 'package:icare/widgets/doctor_connect_now_listener.dart';
 import 'package:icare/widgets/appointment_reminder_listener.dart';
 import 'package:icare/widgets/reminder_banner_listener.dart';
+import 'package:icare/widgets/new_notification_listener.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter_web_plugins/url_strategy.dart';
 
@@ -90,6 +91,7 @@ class MyApp extends ConsumerWidget {
               IncomingCallListener(
                 child: DoctorConnectNowListener(
                   child: ReminderBannerListener(
+                  child: NewNotificationListener(
                   child: AppointmentReminderListener(
                     child: ResponsiveBreakpoints.builder(
                       child: child ?? const SizedBox(),
@@ -100,6 +102,7 @@ class MyApp extends ConsumerWidget {
                         Breakpoint(start: 1921, end: double.infinity, name: '4K'),
                       ],
                     ),
+                  ),
                   ),
                   ),
                 ),

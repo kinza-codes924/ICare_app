@@ -345,19 +345,29 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
     if (_courseId.isEmpty) { setState(() => _loadingGrades = false); return; }
     setState(() => _loadingGrades = true);
     try {
-      final grades = await _lms.getMyGrades(_courseId);
-      final attendance = await _lms.getMyAttendance(_courseId);
-      // Fetch the latest attempt for each quiz in this course
-      final quizList = await _lms.getCourseQuizzes(_courseId);
+      // grades/attendance/quiz-list were fetched one-at-a-time (await after
+      // await), and every quiz's attempt lookup was a further sequential
+      // round trip inside a for-loop — a course with N quizzes meant N+3
+      // sequential HTTP calls before this tab could render anything. All
+      // independent lookups now run in parallel via Future.wait.
+      final results = await Future.wait([
+        _lms.getMyGrades(_courseId),
+        _lms.getMyAttendance(_courseId),
+        _lms.getCourseQuizzes(_courseId),
+      ]);
+      final grades = results[0] as List;
+      final attendance = results[1] as Map<String, dynamic>;
+      final quizList = results[2] as List;
+
+      final attemptResults = await Future.wait(
+        quizList.map((q) => _lms.getMyQuizAttempts(q['_id']?.toString() ?? '')),
+      );
       final attempts = <dynamic>[];
-      for (final q in quizList) {
-        final qId = q['_id']?.toString() ?? '';
-        if (qId.isEmpty) continue;
-        final qAttempts = await _lms.getMyQuizAttempts(qId);
+      for (int i = 0; i < quizList.length; i++) {
+        final qAttempts = attemptResults[i];
         if (qAttempts.isNotEmpty) {
-          // Add the most recent attempt, tagged with quiz title
           final latest = Map<String, dynamic>.from(qAttempts.first is Map ? qAttempts.first : {});
-          latest['quizTitle'] = q['title']?.toString() ?? 'Quiz';
+          latest['quizTitle'] = quizList[i]['title']?.toString() ?? 'Quiz';
           attempts.add(latest);
         }
       }
@@ -1893,12 +1903,18 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
     final driveUrl = lesson['driveBackupUrl']?.toString() ?? '';
     final hasRecording = recordingUrl.isNotEmpty || driveUrl.isNotEmpty;
     final isEndedSession = isLive && (status == 'ended' || status == 'completed');
+    // Real elapsed minutes, set by the backend when the session ends (see
+    // live-sessions.js) — distinct from the instructor's planned duration
+    // shown before the session runs.
+    final actualDuration = (lesson['duration'] as num?)?.toInt();
+    final durationLabel = (isEndedSession && actualDuration != null && actualDuration > 0)
+        ? ' · ${actualDuration}min' : '';
 
     String statusLabel = '';
     Color statusColor = const Color(0xFF94A3B8);
     if (isLive) {
       if (status == 'live') { statusLabel = '● LIVE NOW'; statusColor = Colors.red; }
-      else if (isEndedSession) { statusLabel = hasRecording ? 'Recording available' : 'Ended · no recording'; statusColor = hasRecording ? const Color(0xFF188038) : const Color(0xFF94A3B8); }
+      else if (isEndedSession) { statusLabel = (hasRecording ? 'Recording available' : 'Ended · no recording') + durationLabel; statusColor = hasRecording ? const Color(0xFF188038) : const Color(0xFF94A3B8); }
       else if (isTimeLocked && dateLabel.isNotEmpty) { statusLabel = 'Locked · unlocks $dateLabel'; statusColor = const Color(0xFF94A3B8); }
       else if (isTimeLocked) { statusLabel = 'Locked'; statusColor = const Color(0xFF94A3B8); }
       else if (dateLabel.isNotEmpty) { statusLabel = 'Ready · waiting for instructor'; statusColor = const Color(0xFF188038); }
