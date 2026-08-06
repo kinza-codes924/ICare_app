@@ -113,6 +113,31 @@ async function recheckModuleCompletion(enrollment, moduleId) {
   return { justCompletedCourse: !wasCompleted && enrollment.isCompleted === true };
 }
 
+// GET /courses/:id's refresh loop only calls recheckModuleCompletion for
+// modules NOT already in moduleCompletions (skipping ones already marked
+// done) — so if every module had already been individually completed
+// across earlier visits, the loop calls recheckModuleCompletion zero times
+// on this pass, and the whole-course isCompleted flag (only set inside that
+// function) never gets (re)evaluated even though every module genuinely is
+// done. That silently blocked "Issue Certificate" from ever appearing for
+// such a student. This does the same cross-module check standalone, so the
+// caller can run it unconditionally after the loop regardless of whether
+// any individual module needed rechecking this pass.
+async function recheckCourseCompletion(enrollment) {
+  if (enrollment.isCompleted === true) return { justCompletedCourse: false };
+  const course = await Course.findById(enrollment.courseId).select('modules').lean();
+  if (!course) return { justCompletedCourse: false };
+  const allModuleIds = (course.modules || []).map(m => m._id?.toString()).filter(Boolean);
+  if (!allModuleIds.length) return { justCompletedCourse: false };
+  const completedModuleIds = new Set((enrollment.moduleCompletions || []).map(mc => mc.moduleId));
+  if (allModuleIds.every(id => completedModuleIds.has(id))) {
+    enrollment.isCompleted = true;
+    enrollment.completedAt = enrollment.completedAt || new Date();
+    return { justCompletedCourse: true };
+  }
+  return { justCompletedCourse: false };
+}
+
 // Notifies the Lead Instructor (course owner, or the co-teacher with role
 // 'lead'/'lead instructor') that a student finished every module and is
 // ready to be issued a certificate. Fired once, right when the course
@@ -159,4 +184,4 @@ async function notifyLeadInstructorCourseComplete(enrollment) {
   } catch (_) { /* notification failure should not break the response */ }
 }
 
-module.exports = { recheckModuleCompletion, notifyLeadInstructorCourseComplete };
+module.exports = { recheckModuleCompletion, recheckCourseCompletion, notifyLeadInstructorCourseComplete };

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart' show SystemSound, SystemSoundType, HapticFeedback;
+import 'package:flutter/services.dart' show HapticFeedback;
+import 'package:icare/utils/notify_tone.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:icare/widgets/whatsapp_button.dart';
 import 'package:icare/screens/admin_dashboard.dart';
@@ -182,7 +183,7 @@ class _TabsScreenState extends ConsumerState<TabsScreen> {
         // Show + mark read the single most recent genuinely-new one — it
         // will never be eligible to redisplay again either way.
         final notif = newOnes.first;
-        SystemSound.play(SystemSoundType.alert);
+        playNotifyTone();
         HapticFeedback.mediumImpact();
         _showNotifBanner(notif);
         final id = notif['_id']?.toString();

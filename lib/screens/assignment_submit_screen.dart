@@ -45,10 +45,13 @@ class _AssignmentSubmitScreenState extends State<AssignmentSubmitScreen> {
   // The /upload/blob-doc endpoint runs as a Vercel serverless function,
   // which hard-caps request bodies at 4.5 MB at the platform level —
   // uploads over that are rejected before this route's own code (or its
-  // multer limit) ever runs, so Dio just sees a raw platform error with no
-  // useful message. Checking client-side first turns that into a clear,
-  // immediate "file too large" instead of a silent/confusing failure.
-  static const int _maxUploadBytes = 4 * 1024 * 1024; // 4 MB (leaves headroom under the 4.5 MB platform cap)
+  // multer limit) ever runs, and the dropped connection surfaces to Dio as
+  // a bare "connection error" with no useful message. multipart/form-data
+  // framing (boundaries, per-part headers, the filename itself) adds
+  // overhead on top of the raw file bytes, so a file just under a 4 MB
+  // client check could still push the encoded request over 4.5 MB — 3.5 MB
+  // leaves real headroom instead of a razor-thin margin.
+  static const int _maxUploadBytes = 3670016; // 3.5 MB
 
   Future<void> _pickAndUploadFiles() async {
     try {
@@ -85,7 +88,7 @@ class _AssignmentSubmitScreenState extends State<AssignmentSubmitScreen> {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text('"${file.name}" is ${(file.bytes!.length / (1024 * 1024)).toStringAsFixed(1)} MB — the maximum allowed is 4 MB. Skipped.'),
+                content: Text('"${file.name}" is ${(file.bytes!.length / (1024 * 1024)).toStringAsFixed(1)} MB — the maximum allowed is 3.5 MB. Skipped.'),
                 backgroundColor: Colors.red,
               ),
             );
@@ -111,8 +114,17 @@ class _AssignmentSubmitScreenState extends State<AssignmentSubmitScreen> {
         } catch (e) {
           debugPrint('Assignment file upload error: $e');
           if (mounted) {
+            // Dio's raw "connection error"/"XMLHttpRequest onError" text is
+            // meaningless to a student — it almost always means the request
+            // got dropped by the platform's body-size limit or the network,
+            // not a real server error, so give a plain-language reason.
+            final isConnErr = e is DioException &&
+                (e.type == DioExceptionType.connectionError || e.type == DioExceptionType.unknown);
+            final msg = isConnErr
+                ? 'Upload failed for "${file.name}" — check your connection and try again. If the file is close to 3.5 MB, try a smaller one.'
+                : 'Upload failed for "${file.name}": $e';
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Upload failed for "${file.name}": $e'), backgroundColor: Colors.red),
+              SnackBar(content: Text(msg), backgroundColor: Colors.red),
             );
           }
         }
@@ -773,7 +785,7 @@ class _AssignmentSubmitScreenState extends State<AssignmentSubmitScreen> {
                           ),
                           const SizedBox(height: 6),
                           Text(
-                            'PDF, Word, PowerPoint, Excel, images or ZIP — up to $_maxFiles files, 4 MB each.',
+                            'PDF, Word, PowerPoint, Excel, images or ZIP — up to $_maxFiles files, 3.5 MB each.',
                             style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8), height: 1.5),
                           ),
                         ],

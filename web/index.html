@@ -597,6 +597,38 @@
       } catch (err) {}
     });
   </script>
+  <!-- SystemSound.play() (Flutter's built-in alert-sound API) is a no-op on
+       web — there's no OS alert sound to hook into, so notification banners
+       played silently despite the Dart code "calling" it. A short beep
+       synthesized via the Web Audio API is the actual fix; Dart triggers it
+       by dispatching 'icare-notify-tone', same CustomEvent bridge pattern
+       used for reCAPTCHA/reminders above (avoids needing an audio package
+       or asset file for a ~2-3s two-tone beep). -->
+  <script>
+    window.addEventListener('icare-notify-tone', function() {
+      try {
+        var ctx = window._icareAudioCtx || (window._icareAudioCtx = new (window.AudioContext || window.webkitAudioContext)());
+        if (ctx.state === 'suspended') ctx.resume();
+        function beep(freq, startAt, duration) {
+          var osc = ctx.createOscillator();
+          var gain = ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.value = freq;
+          gain.gain.setValueAtTime(0.0001, ctx.currentTime + startAt);
+          gain.gain.exponentialRampToValueAtTime(0.15, ctx.currentTime + startAt + 0.02);
+          gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + startAt + duration);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(ctx.currentTime + startAt);
+          osc.stop(ctx.currentTime + startAt + duration + 0.05);
+        }
+        // Two-note chime, ~0.6s total — audible and distinct without being
+        // a jarring multi-second siren.
+        beep(880, 0, 0.18);
+        beep(1174.66, 0.16, 0.32);
+      } catch (err) {}
+    });
+  </script>
   <script src="flutter_bootstrap.js" async></script>
 
   <!-- LMS Live Session — Jitsi Meet (direct iframe) + MediaRecorder -->

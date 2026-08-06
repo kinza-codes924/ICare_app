@@ -14,7 +14,7 @@ const { sendEmail } = require('../utils/email');
 const LiveSession = require('../models/LiveSession');
 const CourseReview = require('../models/CourseReview');
 const { Voucher, applyVoucherDiscount } = require('./vouchers');
-const { recheckModuleCompletion, notifyLeadInstructorCourseComplete } = require('../utils/courseProgress');
+const { recheckModuleCompletion, recheckCourseCompletion, notifyLeadInstructorCourseComplete } = require('../utils/courseProgress');
 const { computeEffectivePrice, isEarlyBirdActive } = require('../utils/installments');
 
 function toId(id) {
@@ -683,6 +683,17 @@ router.get('/:id', authMiddleware, async (req, res) => {
         const result = await recheckModuleCompletion(enrollmentDoc, modId);
         if ((enrollmentDoc.moduleCompletions || []).length > before) changed = true;
         if (result?.justCompletedCourse) justCompletedCourse = true;
+      }
+      // Covers the case where every module was already individually marked
+      // complete across earlier visits — the loop above then calls
+      // recheckModuleCompletion zero times this pass (its per-module
+      // `alreadyDone` skip), so the whole-course isCompleted flag (only
+      // ever set inside that function) never got a chance to fire even
+      // though the student had genuinely finished everything. This was the
+      // actual reason "Issue Certificate" never appeared for some students.
+      if (!justCompletedCourse) {
+        const courseResult = await recheckCourseCompletion(enrollmentDoc);
+        if (courseResult?.justCompletedCourse) { changed = true; justCompletedCourse = true; }
       }
       if (changed) {
         await enrollmentDoc.save();

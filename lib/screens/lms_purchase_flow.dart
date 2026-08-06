@@ -8,7 +8,9 @@ import 'package:icare/screens/select_payment_method.dart';
 import 'package:icare/services/api_service.dart';
 import 'package:icare/utils/shared_pref.dart';
 import 'package:icare/utils/theme.dart';
+import 'package:icare/utils/recaptcha.dart';
 import 'package:icare/widgets/back_button.dart';
+import 'package:icare/widgets/recaptcha_checkbox.dart';
 
 /// LMS Purchase Flow - Simple signup → Payment → Limited Access
 /// Step 1: Check if user is logged in
@@ -80,6 +82,13 @@ class _LmsPurchaseFlowState extends ConsumerState<LmsPurchaseFlow> {
     // Safe null check — form may have been disposed if login check raced ahead
     if (_formKey.currentState?.validate() != true) return;
 
+    String? recaptchaToken;
+    try {
+      recaptchaToken = await getRecaptchaResponse();
+    } catch (_) {
+      recaptchaToken = null;
+    }
+
     _submitting = true;
     setState(() => _isLoading = true);
 
@@ -90,6 +99,7 @@ class _LmsPurchaseFlowState extends ConsumerState<LmsPurchaseFlow> {
         'phone': _phoneController.text.trim(),
         'password': _passwordController.text,
         'role': 'Student',
+        if (recaptchaToken != null) 'recaptchaToken': recaptchaToken,
       });
 
       if (signupResponse.data['success'] == true) {
@@ -533,6 +543,16 @@ class _LmsPurchaseFlowState extends ConsumerState<LmsPurchaseFlow> {
 
   Widget _buildPurchaseButton() {
     final busy = _isLoading || _checkingLogin;
+    return Column(
+      children: [
+        const Center(child: RecaptchaCheckbox()),
+        const SizedBox(height: 16),
+        _buildPurchaseButtonInner(busy),
+      ],
+    );
+  }
+
+  Widget _buildPurchaseButtonInner(bool busy) {
     return SizedBox(
       width: double.infinity,
       child: ElevatedButton(

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:icare/services/notification_service.dart';
 import 'package:icare/utils/shared_pref.dart';
+import 'package:icare/utils/notify_tone.dart';
 import 'package:icare/screens/notifications.dart';
 
 /// Wraps the app and polls for new notifications, showing a temporary
@@ -69,7 +70,7 @@ class _NewNotificationListenerState extends State<NewNotificationListener> {
 
   void _showBanner(Map notif) {
     if (!mounted) return;
-    SystemSound.play(SystemSoundType.alert);
+    playNotifyTone();
     HapticFeedback.mediumImpact();
 
     final title = notif['title']?.toString() ?? 'New notification';

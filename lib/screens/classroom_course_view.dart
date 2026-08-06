@@ -1793,7 +1793,14 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
           assignment: Map<String, dynamic>.from(assignment is Map ? assignment : {}),
           courseId: _courseId,
         ),
-      )),
+      )).then((_) {
+        // The Grades tab caches _myGrades from initState and only otherwise
+        // refreshes on manual pull-to-refresh — without this, a student who
+        // just submitted saw the Grades tab still show "Pending" for it
+        // until they thought to pull-to-refresh themselves.
+        _loadStudentGrades();
+        _loadClasswork();
+      }),
       child: Container(
         margin: const EdgeInsets.only(bottom: 8),
         padding: const EdgeInsets.all(12),
@@ -2065,14 +2072,14 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
           assignment: Map<String, dynamic>.from(lesson),
           courseId: _courseId,
         ),
-      )).then((_) => _loadModules());
+      )).then((_) { _loadModules(); _loadStudentGrades(); });
     } else if (type == 'quiz') {
       Navigator.push(context, MaterialPageRoute(
         builder: (_) => QuizTakeScreen(
           quiz: Map<String, dynamic>.from(lesson),
           enrollmentId: widget.enrollmentId ?? '',
         ),
-      )).then((_) => _loadModules());
+      )).then((_) { _loadModules(); _loadStudentGrades(); });
     } else {
       // Content lesson — open detail page
       Navigator.push(context, MaterialPageRoute(
@@ -2494,7 +2501,7 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
             enrollmentId: widget.enrollmentId,
           ),
         ),
-      );
+      ).then((_) { _loadClasswork(); _loadStudentGrades(); });
     } else if (type == 'quiz') {
       if (widget.isInstructor) {
         _showClassworkMenu(type, data);
