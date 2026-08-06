@@ -11,6 +11,65 @@ const { uploadRecordingToDrive, backupUrlToDrive, getOrCreateCourseFolder, isCon
 
 const jibriUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 2 * 1024 * 1024 * 1024 } });
 
+// Shared by jibri-recording-complete (fresh recording) and the
+// /:id/retry-drive-backup route (retrying a session whose Drive backup
+// never completed — see that route's comment for why this could happen).
+// MUST be awaited by callers, not fired-and-forgotten — see the comment at
+// the jibri-recording-complete call site for why.
+async function backupSessionRecordingToDrive(session, { fileBuffer, sourceUrl } = {}) {
+  if (!driveConfigured()) return { ok: false, reason: 'not_configured' };
+  try {
+    const Course = require('../models/Course');
+    const course = await Course.findById(session.courseId).select('title driveFolderId');
+    let folderId = course?.driveFolderId;
+    if (!folderId && course) {
+      folderId = await getOrCreateCourseFolder(course.title);
+      await Course.updateOne({ _id: course._id }, { $set: { driveFolderId: folderId } });
+    }
+
+    // e.g. "abc course - Fundamentals lesson-1 - 16 Jul 2026, 10-13 PM.mp4"
+    const dt = new Date();
+    const dateStr = dt.toLocaleString('en-US', {
+      timeZone: 'Asia/Karachi',
+      day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true,
+    }).replace(':', '-');
+    const sanitize = (s) => (s || '').replace(/[\\/:*?"<>|]/g, '-').trim();
+    const driveFilename = `${sanitize(course?.title) || 'Course'} - ${sanitize(session.title) || 'recording'} - ${dateStr}.mp4`;
+    const result = fileBuffer
+      ? await uploadRecordingToDrive(fileBuffer, driveFilename, 'video/mp4', folderId)
+      : await backupUrlToDrive(sourceUrl, driveFilename, 'video/mp4', folderId);
+    if (!result) return { ok: false, reason: 'upload_returned_null' };
+
+    session.driveBackupUrl = result.webViewLink;
+    await session.save();
+    console.log(`Drive backup saved for session ${session._id}: ${result.webViewLink}`);
+
+    // Propagate to the module-embedded lesson entry too, if this session is
+    // linked to one — the /end route already wrote a snapshot when the
+    // session finished, but the Drive upload finishes after that, so
+    // driveBackupUrl never made it into the lesson object the classroom UI
+    // reads (it only ever checked session.driveBackupUrl on the standalone
+    // LiveSession doc, which the module-lesson tile doesn't see).
+    if (session.linkedLessonId) {
+      await Course.updateOne(
+        { _id: session.courseId },
+        { $set: {
+            'modules.$[].lessons.$[lesson].driveBackupUrl': result.webViewLink,
+            'modules.$[].lessons.$[lesson].recordingUrl': session.recordingUrl || sourceUrl,
+          } },
+        { arrayFilters: [{ 'lesson._id': toId(session.linkedLessonId) }] }
+      );
+    }
+    return { ok: true, url: result.webViewLink };
+  } catch (e) {
+    // Drive backup failing must never fail the whole recording-finalize
+    // request — recordingUrl (Cloudinary/Blob) has already saved
+    // successfully by this point regardless.
+    console.error(`Drive backup failed for session ${session._id}:`, e.message);
+    return { ok: false, reason: e.message };
+  }
+}
+
 function toId(id) {
   try { return new mongoose.Types.ObjectId(id); } catch { return null; }
 }
@@ -1340,61 +1399,19 @@ router.post('/jibri-recording-complete', jibriUpload.single('file'), async (req,
     session.isRecorded = true;
     await session.save();
 
-    // Google Drive backup (non-blocking, best-effort) — the in-app player
-    // keeps using finalUrl (Cloudinary/Blob) since large Drive files don't
-    // stream reliably in <video>; this just archives a copy for the client.
-    // No-ops silently if GOOGLE_DRIVE_* env vars aren't configured yet.
-    // Each course gets its own Drive subfolder (named after the course,
-    // created automatically on first use, cached on the Course document).
-    if (driveConfigured()) {
-      (async () => {
-        try {
-          const Course = require('../models/Course');
-          const course = await Course.findById(session.courseId).select('title driveFolderId');
-          let folderId = course?.driveFolderId;
-          if (!folderId && course) {
-            folderId = await getOrCreateCourseFolder(course.title);
-            await Course.updateOne({ _id: course._id }, { $set: { driveFolderId: folderId } });
-          }
-
-          // e.g. "abc course - Fundamentals lesson-1 - 16 Jul 2026, 10-13 PM.mp4"
-          const dt = new Date();
-          const dateStr = dt.toLocaleString('en-US', {
-            timeZone: 'Asia/Karachi',
-            day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true,
-          }).replace(':', '-');
-          const sanitize = (s) => (s || '').replace(/[\\/:*?"<>|]/g, '-').trim();
-          const driveFilename = `${sanitize(course?.title) || 'Course'} - ${sanitize(session.title) || 'recording'} - ${dateStr}.mp4`;
-          const result = req.file
-            ? await uploadRecordingToDrive(req.file.buffer, driveFilename, 'video/mp4', folderId)
-            : await backupUrlToDrive(finalUrl, driveFilename, 'video/mp4', folderId);
-          if (!result) return;
-          session.driveBackupUrl = result.webViewLink;
-          await session.save();
-          console.log(`Drive backup saved for session ${sessionId}: ${result.webViewLink}`);
-
-          // Propagate to the module-embedded lesson entry too, if this
-          // session is linked to one — the /end route already wrote a
-          // snapshot when the session finished, but the Drive upload is
-          // async and typically completes after that, so driveBackupUrl
-          // never made it into the lesson object the classroom UI reads
-          // (it only ever checked session.driveBackupUrl on the standalone
-          // LiveSession doc, which the module-lesson tile doesn't see).
-          if (session.linkedLessonId) {
-            await Course.updateOne(
-              { _id: session.courseId },
-              { $set: {
-                  'modules.$[].lessons.$[lesson].driveBackupUrl': result.webViewLink,
-                  'modules.$[].lessons.$[lesson].recordingUrl': session.recordingUrl || finalUrl,
-                } },
-              { arrayFilters: [{ 'lesson._id': toId(session.linkedLessonId) }] }
-            );
-          }
-        } catch (e) {
-          console.error(`Drive backup failed for session ${sessionId}:`, e.message);
-        }
-      })();
-    }
+    // Google Drive backup — the in-app player keeps using finalUrl
+    // (Cloudinary/Blob) since large Drive files don't stream reliably in
+    // <video>; this just archives a copy for the client. No-ops silently
+    // if GOOGLE_DRIVE_* env vars aren't configured yet.
+    //
+    // MUST be awaited before responding, not fired-and-forgotten: this is a
+    // Vercel serverless function, and the process can be frozen or torn
+    // down as soon as res.json() sends the response — a detached
+    // `(async () => {...})()` here was never guaranteed to actually finish,
+    // which is why driveBackupUrl sometimes never got set and the student/
+    // instructor UI stayed stuck showing "Recording is processing" forever
+    // even though recordingUrl (finalUrl) had already saved successfully.
+    await backupSessionRecordingToDrive(session, { fileBuffer: req.file?.buffer, sourceUrl: finalUrl });
 
     // Recordings are archived to Google Drive (above) and remain playable
     // from the Live Sessions list via recordingUrl — per the client's
@@ -1405,6 +1422,33 @@ router.post('/jibri-recording-complete', jibriUpload.single('file'), async (req,
     res.json({ success: true, url: finalUrl });
   } catch (e) {
     console.error('jibri-recording-complete error:', e.message);
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+// POST /live-sessions/:id/retry-drive-backup — instructor-triggerable retry
+// for a session whose recordingUrl saved fine but driveBackupUrl never got
+// set (e.g. a pre-fix session from before jibri-recording-complete started
+// awaiting the Drive upload — those are permanently stuck at "processing"
+// with no code path left that will ever revisit them on its own).
+router.post('/:id/retry-drive-backup', authMiddleware, async (req, res) => {
+  try {
+    await connectMongoDB();
+    const session = await LiveSession.findById(toId(req.params.id));
+    if (!session) return res.status(404).json({ success: false, message: 'Session not found' });
+    if (session.instructorId && session.instructorId.toString() !== req.user.id.toString() && req.user.role !== 'admin') {
+      return res.status(403).json({ success: false, message: 'Only the session instructor can retry this' });
+    }
+    if (!session.recordingUrl) {
+      return res.status(400).json({ success: false, message: 'This session has no recording to back up' });
+    }
+    if (session.driveBackupUrl) {
+      return res.json({ success: true, alreadyBackedUp: true, url: session.driveBackupUrl });
+    }
+    const result = await backupSessionRecordingToDrive(session, { sourceUrl: session.recordingUrl });
+    if (!result.ok) return res.status(502).json({ success: false, message: result.reason || 'Drive backup failed' });
+    res.json({ success: true, url: result.url });
+  } catch (e) {
     res.status(500).json({ success: false, message: e.message });
   }
 });

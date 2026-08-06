@@ -2605,10 +2605,31 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
               // Recording exists but the Drive backup upload (a separate,
               // async step after the session ends) hasn't finished yet —
               // tell the student that instead of showing nothing at all.
-              const ListTile(
-                leading: Icon(Icons.hourglass_top_rounded, color: Color(0xFF94A3B8), size: 22),
-                title: Text('Recording is processing', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: Color(0xFF64748B))),
-                subtitle: Text('Uploading to Google Drive — check back shortly', style: TextStyle(fontSize: 12)),
+              // Instructors additionally get a Retry action, since older
+              // sessions (recorded before the backend awaited this upload
+              // instead of firing it detached) can be stuck here permanently
+              // with no automatic path to ever finish on their own.
+              ListTile(
+                leading: const Icon(Icons.hourglass_top_rounded, color: Color(0xFF94A3B8), size: 22),
+                title: const Text('Recording is processing', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: Color(0xFF64748B))),
+                subtitle: const Text('Uploading to Google Drive — check back shortly', style: TextStyle(fontSize: 12)),
+                trailing: widget.isInstructor
+                    ? TextButton(
+                        onPressed: () async {
+                          Navigator.pop(context);
+                          final result = await _lms.retryDriveBackup(sessionId);
+                          if (!mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                            content: Text(result['success'] == true
+                                ? 'Drive backup complete — reopen to view'
+                                : (result['message']?.toString() ?? 'Retry failed, try again shortly')),
+                            backgroundColor: result['success'] == true ? Colors.green : Colors.red,
+                          ));
+                          if (result['success'] == true) _loadClasswork();
+                        },
+                        child: const Text('Retry'),
+                      )
+                    : null,
               ),
             if (widget.isInstructor && recordingUrl.isNotEmpty)
               ListTile(

@@ -69,6 +69,19 @@ class LmsService {
     } catch (e) { return {'success': false}; }
   }
 
+  // For sessions stuck showing "Recording is processing" forever — the
+  // Drive backup used to be fire-and-forget on the backend and could get
+  // torn down mid-upload by Vercel before it finished. Now-fixed sessions
+  // won't need this, but already-stuck ones have no other way to recover.
+  Future<Map<String, dynamic>> retryDriveBackup(String sessionId) async {
+    try {
+      final response = await _api.post('/live-sessions/$sessionId/retry-drive-backup', {});
+      return response.data ?? {};
+    } catch (e) {
+      return {'success': false, 'message': e.toString()};
+    }
+  }
+
   // ═══════════════════════════════════════════════════════════════════════
   // QUIZZES
   // ═══════════════════════════════════════════════════════════════════════
