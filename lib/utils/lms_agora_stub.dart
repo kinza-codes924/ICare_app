@@ -128,6 +128,12 @@ String _buildHostHtml() {
         filmstrip: { disableResizable: false },
         startWithAudioMuted: false,
         startWithVideoMuted: false,
+        // Deliberately does NOT disable notify.chatMessages, unlike the
+        // web build in web/index.html. There we suppress Jitsi's own
+        // message toast because we render a clickable replacement in the
+        // parent page; this is the mobile InAppWebView path, which has no
+        // such replacement, so killing it here would leave mobile users
+        // with no new-message indication at all.
         disabledNotifications: ['notify.moderator'],
         subject: '${_jsString(_pendingSubject)}' || undefined
       },
