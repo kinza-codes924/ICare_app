@@ -1628,7 +1628,7 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
                       padding: EdgeInsets.all(12),
                       child: Text('No lessons in this module', style: TextStyle(fontSize: 13, color: Color(0xFF94A3B8))),
                     )]
-                  : lessons.map<Widget>((lesson) => _buildLessonTile(lesson)).toList(),
+                  : lessons.map<Widget>((lesson) => _buildLessonTile(lesson, moduleId: module['_id']?.toString())).toList(),
         ),
       ),
     );
@@ -1850,7 +1850,7 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
     );
   }
 
-  Widget _buildLessonTile(dynamic l) {
+  Widget _buildLessonTile(dynamic l, {String? moduleId}) {
     final lesson = l is Map ? l : <String, dynamic>{};
     final title = lesson['title']?.toString() ?? 'Lesson';
     final type = lesson['type']?.toString() ?? 'lesson';
@@ -1930,7 +1930,7 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
           content: Text('This session unlocks $dateLabel'),
           backgroundColor: const Color(0xFF1A73E8),
         ));
-      } : () => _openLessonItem(lesson),
+      } : () => _openLessonItem(lesson, moduleId: moduleId),
       borderRadius: BorderRadius.circular(8),
       child: Opacity(
         opacity: isTimeLocked ? 0.6 : 1,
@@ -2012,10 +2012,16 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
     );
   }
 
-  Future<void> _openLessonItem(Map lesson) async {
+  Future<void> _openLessonItem(Map lesson, {String? moduleId}) async {
     final type = lesson['type']?.toString() ?? 'lesson';
     final status = lesson['status']?.toString() ?? '';
-    final sessionId = lesson['_id']?.toString() ?? '';
+    // liveSessionId is the real LiveSession document's _id (written by
+    // live-sessions.js at session-end, see 'modules.$[].lessons.$[lesson].
+    // liveSessionId') — lesson['_id'] is the module-lesson's own id, a
+    // different document. Falling back to lesson['_id'] only matters
+    // before the session has ever ended once (no liveSessionId yet).
+    final sessionId = lesson['liveSessionId']?.toString() ?? lesson['_id']?.toString() ?? '';
+    final lessonId = lesson['_id']?.toString();
     final title = lesson['title']?.toString() ?? 'Session';
     final recordingUrl = lesson['recordingUrl']?.toString() ?? '';
     final driveUrl = lesson['driveBackupUrl']?.toString() ?? '';
@@ -2028,6 +2034,16 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
             courseId: _courseId,
             sessionTitle: title,
             isInstructor: widget.isInstructor,
+            // Without these, endAndSaveSession never learns which module
+            // lesson to write status:'ended'/recordingUrl/driveBackupUrl
+            // onto, and falls back entirely to session.linkedLessonId —
+            // which is only ever set for sessions pre-scheduled via
+            // syncLiveSessions, not sessions joined straight from this
+            // module-lesson tile. That gap is why sessions started this way
+            // stayed stuck "Not started" in student/instructor progress no
+            // matter how long ago they'd actually ended.
+            lessonId: lessonId,
+            moduleId: moduleId,
           ),
         ));
       } else if (status == 'ended' || status == 'completed') {
