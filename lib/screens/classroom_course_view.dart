@@ -174,31 +174,15 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
     if (_courseId.isEmpty || !mounted) return;
     try {
       final result = await _lms.checkActiveLiveSession(_courseId);
-      final wasFirstCheck = _firstLiveCheck;
       _firstLiveCheck = false;
       if (mounted && result['isLive'] != _isSessionLive) {
         setState(() => _isSessionLive = result['isLive'] == true);
-        // Show the "just went live" alert only when this is a real
-        // transition witnessed while the screen was already open — not on
-        // the first poll, which just reports whatever state the session
-        // was already in (avoids stacking a SnackBar on top of the FAB and
-        // Stream-tab banner that already show an already-live session).
-        if (_isSessionLive && !wasFirstCheck) {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: const Row(children: [
-              Icon(Icons.live_tv_rounded, color: Colors.white),
-              SizedBox(width: 10),
-              Text('🔴 Your instructor just went LIVE! Tap to join.', style: TextStyle(fontWeight: FontWeight.w700)),
-            ]),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 8),
-            action: SnackBarAction(
-              label: 'JOIN NOW',
-              textColor: Colors.white,
-              onPressed: _joinLiveClass,
-            ),
-          ));
-        }
+        // No SnackBar/dialog here on top of that — a student already inside
+        // this course's classroom gets the persistent "LIVE NOW" banner
+        // (driven by _isSessionLive above) plus tabs.dart's own app-wide
+        // live-session poller/dialog, which fires regardless of which
+        // screen the student is on. Stacking a third alert here meant up to
+        // 3-4 separate "go live" notifications for the exact same event.
       }
     } catch (_) {}
   }
