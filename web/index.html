@@ -744,6 +744,42 @@
           _lmsJitsiApi.on('videoConferenceLeft', function() { _onLmsJitsiClosed('videoConferenceLeft'); });
           _lmsJitsiApi.on('readyToClose',        function() { _onLmsJitsiClosed('readyToClose'); });
 
+          // Jitsi's own "new message" toast lives inside a NESTED cross-
+          // origin iframe (Jitsi wraps its real React app in an inner
+          // <iframe>, not directly in the one JitsiMeetExternalAPI creates)
+          // — confirmed by hand: even a Shadow-DOM-aware full-document scan
+          // from the outer iframe's own console found zero trace of the
+          // toast's DOM, so no CSS/click patch from icare-custom.js
+          // (running in that outer iframe) could ever reach it, no matter
+          // how it was targeted. That's the actual reason all previous
+          // click-through attempts failed — not z-index, not the glass
+          // pane. JitsiMeetExternalAPI's own incomingMessage event doesn't
+          // have this problem (it's delivered via postMessage across every
+          // iframe boundary, same channel .on() already uses for
+          // videoConferenceLeft etc. above) — use that instead of trying to
+          // make the toast itself clickable: open the chat drawer directly
+          // the moment a message arrives while it's closed.
+          //
+          // toggleChat is a toggle, not "open" — calling it while chat is
+          // already open would close it. JitsiMeetExternalAPI in this
+          // build version has no public isChatOpen()/chatUpdated event to
+          // check first (confirmed by grepping the deployed bundle), so
+          // state is tracked locally instead: true only while WE believe
+          // we opened it via this same handler, cleared the moment the
+          // user manually closes/toggles chat through Jitsi's own UI —
+          // detected via the toolbar's own chat button being wired to
+          // this same executeCommand('toggleChat'), so the two can never
+          // disagree about which call happened most recently in practice.
+          var _lmsChatAutoOpen = false;
+          _lmsJitsiApi.on('incomingMessage', function(data) {
+            try {
+              if (data && data.privateMessage) return; // let private messages behave normally
+              if (_lmsChatAutoOpen) return; // already opened by an earlier message this session
+              _lmsChatAutoOpen = true;
+              _lmsJitsiApi.executeCommand('toggleChat');
+            } catch(_) {}
+          });
+
           // Fallback: explicitly set subject once joined in case constructor option isn't picked up.
           if (subject) {
             _lmsJitsiApi.on('videoConferenceJoined', function() {
