@@ -254,7 +254,15 @@
               }
             });
             console.log('[iCare lms-poll] matched file messages=', files.length);
-            if (files.length) _postToJitsiLms({ type: 'icare-file-list', files: files });
+            if (files.length) {
+              _postToJitsiLms({ type: 'icare-file-list', files: files });
+              // Same clickable parent-page toast as chat messages, but
+              // opening the File Upload tab instead. Only for files from
+              // someone ELSE — the uploader already knows they shared it,
+              // and this poller sees their own upload come back too.
+              var incoming = files.filter(function(f) { return f.sender !== _lmsSenderName; });
+              if (incoming.length) _lmsShowFileToast(incoming[incoming.length - 1].sender);
+            }
           }).catch(function(){});
       }, 4000);
     }
@@ -697,7 +705,7 @@
     // of its own. Building the toast here instead gives us the clickable
     // "Open chat" the client wants, with executeCommand('toggleChat')
     // opening the real Jitsi drawer (Chat / Polls / File Upload tabs).
-    function _lmsShowChatToast(sender, message) {
+    function _lmsBuildToast(title, message, actionLabel) {
       var old = document.getElementById('lms-chat-toast');
       if (old) old.remove();
 
@@ -710,7 +718,7 @@
 
       var head = document.createElement('div');
       head.style.cssText = 'display:flex;align-items:center;gap:8px;font-weight:700;font-size:14px;';
-      head.textContent = sender || 'New message';
+      head.textContent = title || 'New message';
 
       var close = document.createElement('span');
       close.textContent = '×';
@@ -723,15 +731,23 @@
       body.textContent = (message || '').slice(0, 120);
 
       var action = document.createElement('div');
-      action.textContent = 'Open chat';
+      action.textContent = actionLabel;
       action.style.cssText = 'margin-top:8px;color:#1A73E8;font-weight:700;font-size:13px;cursor:pointer;';
 
-      function openChat() {
+      // stopPropagation is essential: `action` is a CHILD of `toast`, so
+      // without it a click on the action runs the handler twice (once on
+      // the action, once bubbling up to the toast). toggleChat is a
+      // toggle, so firing it twice opened the drawer and immediately shut
+      // it again — the console showed two back-to-back
+      // "API command received: toggle-chat" lines per click, which is
+      // exactly why chat appeared not to open at all.
+      function open(e) {
+        if (e) e.stopPropagation();
         try { _lmsJitsiApi && _lmsJitsiApi.executeCommand('toggleChat'); } catch(_) {}
         toast.remove();
       }
-      action.addEventListener('click', openChat);
-      toast.addEventListener('click', openChat);
+      action.addEventListener('click', open);
+      toast.addEventListener('click', open);
 
       toast.appendChild(head);
       if (body.textContent) toast.appendChild(body);
@@ -739,6 +755,19 @@
       document.body.appendChild(toast);
 
       setTimeout(function() { if (toast.parentNode) toast.remove(); }, 8000);
+    }
+
+    function _lmsShowChatToast(sender, message) {
+      _lmsBuildToast(sender || 'New message', message, 'Open chat');
+    }
+
+    // Same toast for shared files. The drawer that opens is the same one
+    // holding Chat / Polls / File Upload tabs, so a single toggleChat gets
+    // the user there either way. (Polls have no equivalent toast: Jitsi's
+    // External API exposes no poll event — only incomingMessage and
+    // participantJoined — so there's nothing to hook for them here.)
+    function _lmsShowFileToast(sender) {
+      _lmsBuildToast(sender || 'Someone', 'shared a file', 'Open File Upload');
     }
 
     window.lmsJitsiJoin = function(roomName, displayName, isInstructor, jwt, subject, authToken) {
@@ -779,10 +808,15 @@
               filmstrip: { disableResizable: false },
               startWithAudioMuted: false,
               startWithVideoMuted: false,
-              // Suppresses the "You are now a moderator" toast — role assignment
-              // can lag by a second or two right after join and was showing for
-              // students during that window too.
-              disabledNotifications: ['notify.moderator'],
+              // notify.moderator: suppresses the "You are now a moderator"
+              // toast — role assignment can lag by a second or two right
+              // after join and was showing for students during that window.
+              // notify.chatMessages: suppresses Jitsi's OWN new-message
+              // toast, which has no "Open chat" action in this build and
+              // lives in a nested cross-origin iframe we can't touch — we
+              // render our own clickable one in the parent page instead
+              // (_lmsShowChatToast), so without this both appeared stacked.
+              disabledNotifications: ['notify.moderator', 'notify.chatMessages'],
               // NOTE: enableUserRolesBasedOnToken intentionally omitted — it makes
               // the client assume moderator status merely from HAVING a valid JWT,
               // regardless of the token's actual moderator:true/false claim. Real
