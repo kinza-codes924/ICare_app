@@ -616,6 +616,24 @@ router.get('/:courseId/student-progress/:studentId', authMiddleware, async (req,
       : [];
     const passedQuizIds = new Set(passedAttempts.map(a => a.quizId.toString()));
 
+    // Live-lesson completion (see recheckModuleCompletion) is intentionally
+    // time-based, not attendance-based — a missed session still isn't
+    // meant to block the rest of the course, so it still gets marked
+    // "done" once its time has passed regardless of who showed up. That's
+    // correct for unlock/module-completion purposes, but it made this
+    // progress view claim a student "Completed" a live session they never
+    // actually attended. Reporting-only fix: this view separately checks
+    // each live lesson's LiveSession.attendees and reports 'not_attended'
+    // instead of 'completed' when the student wasn't present, without
+    // touching lessonCompletions/moduleCompletions/unlock logic at all.
+    const liveSessionsForAttendance = await LiveSession.find({ courseId: toId(courseId) })
+      .select('_id linkedLessonId attendees').lean();
+    const attendedLessonIds = new Set(
+      liveSessionsForAttendance
+        .filter(s => (s.attendees || []).some(a => a?.toString() === studentId))
+        .map(s => s.linkedLessonId).filter(Boolean)
+    );
+
     const modules = (course.modules || []).map(mod => {
       const lessons = (mod.lessons || []).map(l => {
         const lid = l._id?.toString();
@@ -626,7 +644,8 @@ router.get('/:courseId/student-progress/:studentId', authMiddleware, async (req,
         } else if (l.type === 'quiz') {
           itemStatus = passedQuizIds.has(lid) ? 'completed' : 'not_started';
         } else if (l.type === 'live') {
-          itemStatus = completedLessonIds.has(lid) ? 'completed' : 'not_started';
+          if (!completedLessonIds.has(lid)) itemStatus = 'not_started';
+          else itemStatus = attendedLessonIds.has(lid) ? 'completed' : 'not_attended';
         } else {
           itemStatus = completedLessonIds.has(lid) ? 'completed' : 'not_started';
         }
@@ -658,9 +677,8 @@ router.get('/:courseId/student-progress/:studentId', authMiddleware, async (req,
     }
 
     // Attendance summary for this student in this course
-    const liveSessions = await LiveSession.find({ courseId: toId(courseId) }).select('_id attendees').lean();
-    const totalSessions = liveSessions.length;
-    const attendedSessions = liveSessions.filter(s =>
+    const totalSessions = liveSessionsForAttendance.length;
+    const attendedSessions = liveSessionsForAttendance.filter(s =>
       (s.attendees || []).some(a => a?.toString() === studentId)
     ).length;
 

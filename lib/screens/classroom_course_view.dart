@@ -4518,6 +4518,11 @@ class _StudentProgressDialogState extends State<_StudentProgressDialog> {
         return const Color(0xFF188038);
       case 'submitted':
         return const Color(0xFF1A73E8);
+      // Distinct from both "done" (green) and "not started" (grey) — the
+      // session itself finished (so it doesn't block course progress) but
+      // this specific student wasn't present for it.
+      case 'not_attended':
+        return const Color(0xFFE37400);
       default:
         return const Color(0xFF94A3B8);
     }
@@ -4528,6 +4533,7 @@ class _StudentProgressDialogState extends State<_StudentProgressDialog> {
       case 'completed': return 'Completed';
       case 'graded': return 'Graded';
       case 'submitted': return 'Submitted';
+      case 'not_attended': return 'Not Attended';
       default: return 'Not started';
     }
   }
