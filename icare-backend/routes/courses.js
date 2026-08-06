@@ -569,14 +569,26 @@ router.get('/:courseId/student-progress/:studentId', authMiddleware, async (req,
     const enrollmentDoc = await Enrollment.findOne({ courseId: toId(courseId), userId: toId(studentId) });
     if (!enrollmentDoc) return res.status(404).json({ success: false, message: 'Student is not enrolled in this course' });
     let progressChanged = false;
+    // Deliberately does NOT skip modules already in moduleCompletions —
+    // recheckModuleCompletion's live-lesson auto-complete step
+    // (lessonCompletions) runs unconditionally every call regardless of
+    // whether the MODULE itself was already marked done; a live session
+    // lesson added to an already-completed module (e.g. instructor adds
+    // another live session after students already finished everything
+    // else) would otherwise never get its own lessonCompletions entry —
+    // the module-level "already done" skip meant this function simply
+    // never ran again for that module, so the new lesson stayed "Not
+    // started" forever even after it genuinely ended. The function itself
+    // is idempotent (only ever appends when not already present), so
+    // re-running it on an already-complete module is always safe.
     for (const mod of (course.modules || [])) {
       const modId = mod._id?.toString();
       if (!modId) continue;
-      const alreadyDone = (enrollmentDoc.moduleCompletions || []).some(mc => mc.moduleId === modId);
-      if (alreadyDone) continue;
-      const before = (enrollmentDoc.moduleCompletions || []).length;
+      const beforeLessons = (enrollmentDoc.lessonCompletions || []).length;
+      const beforeModules = (enrollmentDoc.moduleCompletions || []).length;
       await recheckModuleCompletion(enrollmentDoc, modId);
-      if ((enrollmentDoc.moduleCompletions || []).length > before) progressChanged = true;
+      if ((enrollmentDoc.lessonCompletions || []).length > beforeLessons) progressChanged = true;
+      if ((enrollmentDoc.moduleCompletions || []).length > beforeModules) progressChanged = true;
     }
     if (progressChanged) await enrollmentDoc.save();
     const enrollment = enrollmentDoc.toObject();
@@ -696,14 +708,23 @@ router.get('/:id', authMiddleware, async (req, res) => {
     if (enrollmentDoc) {
       let changed = false;
       let justCompletedCourse = false;
+      // Deliberately does NOT skip modules already in moduleCompletions —
+      // see the matching comment on the /student-progress route above for
+      // why: recheckModuleCompletion's live-lesson auto-complete step
+      // needs to keep running even for an already-"done" module, since a
+      // NEW live-session lesson can be added to it later (e.g. instructor
+      // schedules another live class after the module was first
+      // completed), and that lesson's own lessonCompletions entry would
+      // otherwise never get written — the function is idempotent, so
+      // this is always safe to re-run.
       for (const mod of (course.modules || [])) {
         const modId = mod._id?.toString();
         if (!modId) continue;
-        const alreadyDone = (enrollmentDoc.moduleCompletions || []).some(mc => mc.moduleId === modId);
-        if (alreadyDone) continue;
-        const before = (enrollmentDoc.moduleCompletions || []).length;
+        const beforeLessons = (enrollmentDoc.lessonCompletions || []).length;
+        const beforeModules = (enrollmentDoc.moduleCompletions || []).length;
         const result = await recheckModuleCompletion(enrollmentDoc, modId);
-        if ((enrollmentDoc.moduleCompletions || []).length > before) changed = true;
+        if ((enrollmentDoc.lessonCompletions || []).length > beforeLessons) changed = true;
+        if ((enrollmentDoc.moduleCompletions || []).length > beforeModules) changed = true;
         if (result?.justCompletedCourse) justCompletedCourse = true;
       }
       // Covers the case where every module was already individually marked
