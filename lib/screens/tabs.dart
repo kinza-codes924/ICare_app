@@ -114,7 +114,25 @@ class _TabsScreenState extends ConsumerState<TabsScreen> {
 
   /// Current shell location, e.g. `/doctor/appointments` — drives which nav
   /// item is highlighted (this used to be the `currentIndex` int).
-  String get _location => GoRouterState.of(context).matchedLocation;
+  //
+  // Guarded: this widget can still be mid-rebuild (e.g. triggered by the
+  // live-session poller's setState while an LMS session is open full-
+  // screen via a raw Navigator.push, not a GoRouter route) at a moment
+  // when its context isn't under a valid RouteBase.builder subtree —
+  // GoRouterState.of throws in that window ("There is no GoRouterState
+  // above the current context"). That uncaught exception aborted whatever
+  // build/event triggered it, which is why toast clicks and other
+  // in-session interactions appeared to silently do nothing even though
+  // nothing was wrong with their own handlers. Falling back to the last-
+  // known location keeps the shell's nav highlighting correct without
+  // ever crashing the rebuild.
+  String _lastKnownLocation = '';
+  String get _location {
+    try {
+      _lastKnownLocation = GoRouterState.of(context).matchedLocation;
+    } catch (_) {}
+    return _lastKnownLocation;
+  }
 
   /// Routes whose screen has its own bottom-right FloatingActionButton
   /// ("New Post", "New Course", etc.). On these the floating WhatsApp button
