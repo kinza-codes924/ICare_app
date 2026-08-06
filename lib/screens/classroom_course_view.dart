@@ -2645,6 +2645,7 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
                   _deleteRecording(sessionId, title);
                 },
               ),
+            if (widget.isInstructor)
             ListTile(
               leading: Container(
                 padding: const EdgeInsets.all(8),
