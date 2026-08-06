@@ -951,6 +951,13 @@ router.post('/:id/end-and-save', authMiddleware, async (req, res) => {
           'modules.$[].lessons.$[lesson].type': 'live',
           'modules.$[].lessons.$[lesson].liveSessionId': session._id,
           'modules.$[].lessons.$[lesson].liveSessionDate': new Date(),
+          // The classroom UI's module-lesson tile derives "Ready · waiting
+          // for instructor" vs "Recording available" purely from this
+          // status field (classroom_course_view.dart _buildLessonTile) —
+          // it was never written here, so an ended session's module lesson
+          // stayed stuck showing "waiting for instructor" forever even once
+          // the recording existed.
+          'modules.$[].lessons.$[lesson].status': 'ended',
           'modules.$[].lessons.$[lesson].chatTranscript': transcript,
           'modules.$[].lessons.$[lesson].sessionSummary': JSON.stringify(sessionSummary),
           // Overwrite the pre-set planned duration with how long the

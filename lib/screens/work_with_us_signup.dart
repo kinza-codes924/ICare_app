@@ -9,6 +9,8 @@ import 'package:icare/utils/api_constants.dart';
 import 'package:icare/utils/theme.dart';
 import 'package:icare/utils/utils.dart';
 import 'package:icare/widgets/auth_left_panel.dart';
+import 'package:icare/widgets/recaptcha_checkbox.dart';
+import 'package:icare/utils/recaptcha.dart';
 import 'package:icare/screens/verification_status_screen.dart';
 
 class WorkWithUsSignup extends StatefulWidget {
@@ -357,6 +359,23 @@ class _WorkWithUsSignupState extends State<WorkWithUsSignup> {
       return;
     }
 
+    // v2 checkbox — wrapped in its own try/catch so a recaptcha failure can
+    // never crash this form (see recaptcha_web.dart history for why).
+    String? recaptchaToken;
+    try {
+      recaptchaToken = await getRecaptchaResponse();
+    } catch (_) {
+      recaptchaToken = null;
+    }
+    if (kIsWeb && recaptchaToken == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Please check "I\'m not a robot" to continue.'), backgroundColor: Colors.red, duration: const Duration(seconds: 4)),
+        );
+      }
+      return;
+    }
+
     setState(() => _submitting = true);
 
     try {
@@ -474,6 +493,7 @@ class _WorkWithUsSignupState extends State<WorkWithUsSignup> {
         'city': city,
         'address': address,
         'verificationDetails': vd,
+        if (recaptchaToken != null) 'recaptchaToken': recaptchaToken,
       });
 
       final resData = response.data;
@@ -1776,6 +1796,8 @@ class _WorkWithUsSignupState extends State<WorkWithUsSignup> {
             ],
           ),
         ),
+        const Center(child: RecaptchaCheckbox()),
+        const SizedBox(height: 16),
         SizedBox(
           width: double.infinity,
           height: 52,

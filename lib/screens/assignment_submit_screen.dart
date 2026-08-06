@@ -38,7 +38,9 @@ class _AssignmentSubmitScreenState extends State<AssignmentSubmitScreen> {
 
   // Direct file upload (Vercel Blob)
   bool _uploadingFile = false;
-  String? _uploadedFileName;
+  String? _uploadedFileName; // kept for legacy single-file display fallback
+  final List<Map<String, String>> _uploadedFiles = []; // [{url, name}]
+  static const int _maxFiles = 5;
 
   // The /upload/blob-doc endpoint runs as a Vercel serverless function,
   // which hard-caps request bodies at 4.5 MB at the platform level —
@@ -48,8 +50,14 @@ class _AssignmentSubmitScreenState extends State<AssignmentSubmitScreen> {
   // immediate "file too large" instead of a silent/confusing failure.
   static const int _maxUploadBytes = 4 * 1024 * 1024; // 4 MB (leaves headroom under the 4.5 MB platform cap)
 
-  Future<void> _pickAndUploadFile() async {
+  Future<void> _pickAndUploadFiles() async {
     try {
+      if (_uploadedFiles.length >= _maxFiles) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Maximum $_maxFiles files allowed.'), backgroundColor: Colors.red),
+        );
+        return;
+      }
       final result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
         allowedExtensions: [
@@ -57,59 +65,89 @@ class _AssignmentSubmitScreenState extends State<AssignmentSubmitScreen> {
           'txt', 'jpg', 'jpeg', 'png', 'zip',
         ],
         withData: true,
+        allowMultiple: true,
       );
-      if (result == null || result.files.isEmpty || result.files.first.bytes == null) {
-        return;
+      if (result == null || result.files.isEmpty) return;
+
+      final picked = result.files.where((f) => f.bytes != null).toList();
+      final remaining = _maxFiles - _uploadedFiles.length;
+      final toUpload = picked.take(remaining).toList();
+      if (picked.length > remaining && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Only $remaining more file(s) can be added (max $_maxFiles total).')),
+        );
       }
-      final file = result.files.first;
-      if (file.bytes!.length > _maxUploadBytes) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('"${file.name}" is ${(file.bytes!.length / (1024 * 1024)).toStringAsFixed(1)} MB — the maximum allowed is 4 MB. Please choose a smaller file.'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
-        return;
-      }
+
       setState(() => _uploadingFile = true);
       final token = await SharedPref().getToken() ?? '';
-      final res = await Dio().post(
-        '${ApiConstants.baseUrl}/upload/blob-doc',
-        data: FormData.fromMap({
-          'file': MultipartFile.fromBytes(file.bytes!, filename: file.name),
-        }),
-        options: Options(
-          headers: {'Authorization': 'Bearer $token'},
-          validateStatus: (s) => s != null && s < 600,
-        ),
-      );
-      if (res.statusCode == 200 &&
-          res.data['success'] == true &&
-          res.data['url'] != null) {
-        if (mounted) {
-          setState(() {
-            _fileUrlController.text = res.data['url'] as String;
-            _uploadedFileName = file.name;
-            _uploadingFile = false;
-          });
+      for (final file in toUpload) {
+        if (file.bytes!.length > _maxUploadBytes) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('"${file.name}" is ${(file.bytes!.length / (1024 * 1024)).toStringAsFixed(1)} MB — the maximum allowed is 4 MB. Skipped.'),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+          continue;
         }
-      } else {
-        throw Exception(res.data['message'] ?? 'Upload failed');
+        try {
+          final res = await Dio().post(
+            '${ApiConstants.baseUrl}/upload/blob-doc',
+            data: FormData.fromMap({
+              'file': MultipartFile.fromBytes(file.bytes!, filename: file.name),
+            }),
+            options: Options(
+              headers: {'Authorization': 'Bearer $token'},
+              validateStatus: (s) => s != null && s < 600,
+            ),
+          );
+          if (res.statusCode == 200 && res.data['success'] == true && res.data['url'] != null) {
+            _uploadedFiles.add({'url': res.data['url'] as String, 'name': file.name});
+          } else {
+            throw Exception(res.data['message'] ?? 'Upload failed');
+          }
+        } catch (e) {
+          debugPrint('Assignment file upload error: $e');
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Upload failed for "${file.name}": $e'), backgroundColor: Colors.red),
+            );
+          }
+        }
+      }
+      if (mounted) {
+        setState(() {
+          _uploadingFile = false;
+          if (_uploadedFiles.isNotEmpty) {
+            _fileUrlController.text = _uploadedFiles.first['url']!;
+            _uploadedFileName = _uploadedFiles.first['name'];
+          }
+        });
       }
     } catch (e) {
       debugPrint('Assignment file upload error: $e');
       if (mounted) {
         setState(() => _uploadingFile = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Upload failed: $e'),
-            backgroundColor: Colors.red,
-          ),
+          SnackBar(content: Text('Upload failed: $e'), backgroundColor: Colors.red),
         );
       }
     }
+  }
+
+  void _removeUploadedFile(int index) {
+    setState(() {
+      _uploadedFiles.removeAt(index);
+      if (_uploadedFiles.isEmpty) {
+        _fileUrlController.clear();
+        _uploadedFileName = null;
+      } else {
+        _fileUrlController.text = _uploadedFiles.first['url']!;
+        _uploadedFileName = _uploadedFiles.first['name'];
+      }
+    });
   }
 
   @override
@@ -145,6 +183,20 @@ class _AssignmentSubmitScreenState extends State<AssignmentSubmitScreen> {
             _existingSubmission = Map<String, dynamic>.from(submission);
             _contentController.text = submission['content']?.toString() ?? '';
             _fileUrlController.text = submission['fileUrl']?.toString() ?? '';
+            _uploadedFileName = submission['fileName']?.toString();
+            final existingFiles = submission['files'];
+            if (existingFiles is List && existingFiles.isNotEmpty) {
+              _uploadedFiles
+                ..clear()
+                ..addAll(existingFiles
+                    .whereType<Map>()
+                    .map((f) => {'url': f['url']?.toString() ?? '', 'name': f['name']?.toString() ?? 'File'})
+                    .where((f) => f['url']!.isNotEmpty));
+            } else if (submission['fileUrl'] != null) {
+              _uploadedFiles
+                ..clear()
+                ..add({'url': submission['fileUrl'].toString(), 'name': _uploadedFileName ?? 'File'});
+            }
             _isLoadingSubmission = false;
           });
         } else {
@@ -179,6 +231,7 @@ class _AssignmentSubmitScreenState extends State<AssignmentSubmitScreen> {
         content: content.isNotEmpty ? content : null,
         fileUrl: fileUrl.isNotEmpty ? fileUrl : null,
         fileName: fileUrl.isNotEmpty ? _uploadedFileName : null,
+        files: _uploadedFiles.isNotEmpty ? _uploadedFiles : null,
       );
       if (mounted) {
         setState(() {
@@ -639,88 +692,89 @@ class _AssignmentSubmitScreenState extends State<AssignmentSubmitScreen> {
                                 fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF374151))),
                         const SizedBox(height: 8),
 
-                        // Submitted / uploaded file preview
-                        Builder(builder: (_) {
-                          final fileUrl = _fileUrlController.text.trim();
-                          if (fileUrl.isEmpty) {
-                            if (_canEdit) return const SizedBox.shrink();
-                            return Container(
-                              width: double.infinity,
-                              padding: const EdgeInsets.all(14),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFF8FAFC),
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: const Color(0xFFE2E8F0)),
-                              ),
-                              child: const Text('No file submitted',
-                                  style: TextStyle(fontSize: 13, color: Color(0xFF94A3B8))),
+                        // Submitted / uploaded files preview
+                        if (_uploadedFiles.isEmpty)
+                          (!_canEdit
+                              ? Container(
+                                  width: double.infinity,
+                                  padding: const EdgeInsets.all(14),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFF8FAFC),
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                                  ),
+                                  child: const Text('No file submitted',
+                                      style: TextStyle(fontSize: 13, color: Color(0xFF94A3B8))),
+                                )
+                              : const SizedBox.shrink())
+                        else
+                          ...List.generate(_uploadedFiles.length, (i) {
+                            final f = _uploadedFiles[i];
+                            return Padding(
+                              padding: const EdgeInsets.only(bottom: 10),
+                              child: Row(children: [
+                                Expanded(
+                                  child: AttachmentViewer(
+                                    url: f['url']!,
+                                    name: f['name'] ?? 'Submitted file',
+                                    label: 'Tap to open in browser',
+                                  ),
+                                ),
+                                if (_canEdit && !_uploadingFile) ...[
+                                  const SizedBox(width: 8),
+                                  IconButton(
+                                    onPressed: () => _removeUploadedFile(i),
+                                    icon: const Icon(Icons.close_rounded, color: Colors.red, size: 18),
+                                    tooltip: 'Remove file',
+                                    style: IconButton.styleFrom(
+                                      backgroundColor: const Color(0xFFFFEBEE),
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                    ),
+                                  ),
+                                ],
+                              ]),
                             );
-                          }
-                          return Padding(
-                            padding: const EdgeInsets.only(bottom: 10),
-                            child: AttachmentViewer(
-                              url: fileUrl,
-                              name: _uploadedFileName ?? 'Submitted file',
-                              label: 'Tap to open in browser',
-                            ),
-                          );
-                        }),
+                          }),
 
                         if (_canEdit) ...[
                           // Direct file upload button
-                          Row(children: [
-                            Expanded(
-                              child: ElevatedButton.icon(
-                                onPressed: _uploadingFile ? null : _pickAndUploadFile,
-                                icon: _uploadingFile
-                                    ? const SizedBox(
-                                        width: 16, height: 16,
-                                        child: CircularProgressIndicator(
-                                            strokeWidth: 2, color: Colors.white),
-                                      )
-                                    : const Icon(Icons.upload_file_rounded, size: 18),
-                                label: Text(
-                                  _uploadingFile
-                                      ? 'Uploading...'
-                                      : (_uploadedFileName != null
-                                          ? 'Uploaded: $_uploadedFileName — tap to replace'
-                                          : 'Upload File'),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
-                                ),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: _uploadedFileName != null
-                                      ? const Color(0xFF10B981)
-                                      : AppColors.primaryColor,
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(vertical: 14),
-                                  elevation: 0,
-                                  shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(12)),
-                                ),
+                          SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton.icon(
+                              onPressed: (_uploadingFile || _uploadedFiles.length >= _maxFiles) ? null : _pickAndUploadFiles,
+                              icon: _uploadingFile
+                                  ? const SizedBox(
+                                      width: 16, height: 16,
+                                      child: CircularProgressIndicator(
+                                          strokeWidth: 2, color: Colors.white),
+                                    )
+                                  : const Icon(Icons.upload_file_rounded, size: 18),
+                              label: Text(
+                                _uploadingFile
+                                    ? 'Uploading...'
+                                    : (_uploadedFiles.isNotEmpty
+                                        ? 'Add another file (${_uploadedFiles.length}/$_maxFiles)'
+                                        : 'Upload Files'),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+                              ),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: _uploadedFiles.isNotEmpty
+                                    ? const Color(0xFF10B981)
+                                    : AppColors.primaryColor,
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(vertical: 14),
+                                elevation: 0,
+                                shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12)),
                               ),
                             ),
-                            if (_uploadedFileName != null && !_uploadingFile) ...[
-                              const SizedBox(width: 8),
-                              IconButton(
-                                onPressed: () => setState(() {
-                                  _uploadedFileName = null;
-                                  _fileUrlController.clear();
-                                }),
-                                icon: const Icon(Icons.close_rounded, color: Colors.red),
-                                tooltip: 'Remove file',
-                                style: IconButton.styleFrom(
-                                  backgroundColor: const Color(0xFFFFEBEE),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                ),
-                              ),
-                            ],
-                          ]),
+                          ),
                           const SizedBox(height: 6),
-                          const Text(
-                            'PDF, Word, PowerPoint, Excel, images or ZIP — max 1 file, up to 4 MB.',
-                            style: TextStyle(fontSize: 11, color: Color(0xFF94A3B8), height: 1.5),
+                          Text(
+                            'PDF, Word, PowerPoint, Excel, images or ZIP — up to $_maxFiles files, 4 MB each.',
+                            style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8), height: 1.5),
                           ),
                         ],
                       ],

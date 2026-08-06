@@ -758,7 +758,21 @@ router.get('/:id', authMiddleware, async (req, res) => {
       }
     }
 
-    course.modules = (course.modules || []).map((mod, idx) => {
+    // Defensive floor: modules/lessons are meant to render in the order the
+    // instructor arranged them (see PUT /:id, which stamps `order` = array
+    // index on every save) — sort explicitly here too so display order stays
+    // correct even if some older document predates that stamping.
+    course.modules = (course.modules || [])
+      .slice()
+      .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+      .map(mod => ({
+        ...mod,
+        lessons: Array.isArray(mod.lessons)
+          ? mod.lessons.slice().sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+          : mod.lessons,
+      }));
+
+    course.modules = course.modules.map((mod, idx) => {
       let isLocked = false;
       let unlockDate = null;
 
@@ -902,6 +916,18 @@ router.put('/:id', authMiddleware, async (req, res) => {
     await connectMongoDB();
     const pricingError = validatePricingFields(req.body);
     if (pricingError) return res.status(400).json({ success: false, message: pricingError });
+    // Stamp order = array position on every save so module/lesson display
+    // order is explicit and authoritative instead of relying on Mongo array
+    // position alone surviving every future edit path unchanged.
+    if (Array.isArray(req.body.modules)) {
+      req.body.modules = req.body.modules.map((mod, mIdx) => ({
+        ...mod,
+        order: mIdx,
+        lessons: Array.isArray(mod.lessons)
+          ? mod.lessons.map((lesson, lIdx) => ({ ...lesson, order: lIdx }))
+          : mod.lessons,
+      }));
+    }
     const course = await Course.findByIdAndUpdate(toId(req.params.id), { $set: req.body }, { new: true });
     if (!course) return res.status(404).json({ success: false, message: 'Not found' });
     // Same reasoning as POST / above — use the saved course.modules (real

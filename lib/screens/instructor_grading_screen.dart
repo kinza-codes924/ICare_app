@@ -309,15 +309,22 @@ class _InstructorGradingScreenState extends State<InstructorGradingScreen> {
                     const Icon(Icons.attach_file, size: 16, color: Color(0xFF64748B)),
                     const SizedBox(width: 4),
                     Expanded(
-                      child: Text(
-                        submission['fileName'] ?? 'Attached file',
-                        style: const TextStyle(
-                          fontSize: 13,
-                          color: Color(0xFF64748B),
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
+                      child: Builder(builder: (_) {
+                        final files = submission['files'];
+                        final count = files is List ? files.length : 1;
+                        final label = count > 1
+                            ? '$count files attached'
+                            : (submission['fileName'] ?? 'Attached file');
+                        return Text(
+                          label.toString(),
+                          style: const TextStyle(
+                            fontSize: 13,
+                            color: Color(0xFF64748B),
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        );
+                      }),
                     ),
                   ],
                 ),
@@ -517,17 +524,31 @@ class _GradingDialogState extends State<_GradingDialog> {
                 const SizedBox(height: 16),
               ],
 
-              // File attachment
+              // File attachment(s)
               if (widget.submission['fileUrl'] != null) ...[
-                const Text(
-                  'Attached File:',
-                  style: TextStyle(fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 8),
-                AttachmentViewer(
-                  url: widget.submission['fileUrl'].toString(),
-                  name: widget.submission['fileName']?.toString(),
-                ),
+                Builder(builder: (_) {
+                  final files = widget.submission['files'];
+                  final list = (files is List && files.isNotEmpty)
+                      ? files
+                      : [{'url': widget.submission['fileUrl'], 'name': widget.submission['fileName']}];
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        list.length > 1 ? 'Attached Files (${list.length}):' : 'Attached File:',
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 8),
+                      ...list.map((f) => Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: AttachmentViewer(
+                          url: f['url']?.toString() ?? '',
+                          name: f['name']?.toString(),
+                        ),
+                      )),
+                    ],
+                  );
+                }),
                 const SizedBox(height: 16),
               ],
 

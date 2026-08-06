@@ -165,17 +165,31 @@ router.post('/:assignmentId/submit', authMiddleware, upload.single('file'), asyn
     const assignment = await Assignment.findById(assignmentId).lean();
     if (!assignment) return res.status(404).json({ success: false, message: 'Assignment not found' });
 
-    let fileUrl = null, fileName = null;
+    let fileUrl = null, fileName = null, files = [];
     if (req.file) {
       // Multipart upload directly to this endpoint
       const result = await uploadBuffer(req.file.buffer, 'icare/lms/submissions');
       fileUrl  = result.secure_url;
       fileName = req.file.originalname;
+      files = [{ url: fileUrl, name: fileName }];
+    } else if (req.body.files) {
+      // Multiple files already uploaded client-side (via /upload/blob-doc,
+      // one call per file) — only the resulting {url, name} list is sent
+      // here as JSON. fileUrl/fileName still get set to the first file so
+      // older grading UI reading those singular fields keeps working.
+      try {
+        const parsed = typeof req.body.files === 'string' ? JSON.parse(req.body.files) : req.body.files;
+        if (Array.isArray(parsed)) {
+          files = parsed.filter(f => f && f.url).map(f => ({ url: f.url, name: f.name || null }));
+        }
+      } catch (_) {}
+      if (files.length) { fileUrl = files[0].url; fileName = files[0].name; }
     } else if (req.body.fileUrl) {
       // File was already uploaded client-side (e.g. via /upload/blob-doc)
       // and only the resulting URL is sent here as JSON.
       fileUrl  = req.body.fileUrl;
       fileName = req.body.fileName || null;
+      files = [{ url: fileUrl, name: fileName }];
     }
 
     const status = assignment.dueDate && new Date() > new Date(assignment.dueDate) ? 'late' : 'submitted';
@@ -184,7 +198,7 @@ router.post('/:assignmentId/submit', authMiddleware, upload.single('file'), asyn
     let submission;
     if (existing) {
       existing.content = content || existing.content;
-      if (fileUrl) { existing.fileUrl = fileUrl; existing.fileName = fileName; }
+      if (files.length) { existing.fileUrl = fileUrl; existing.fileName = fileName; existing.files = files; }
       existing.status = status;
       existing.submittedAt = new Date();
       await existing.save();
@@ -192,7 +206,7 @@ router.post('/:assignmentId/submit', authMiddleware, upload.single('file'), asyn
     } else {
       submission = await AssignmentSubmission.create({
         assignmentId, courseId: assignment.courseId, studentId,
-        content: content || '', fileUrl, fileName, status,
+        content: content || '', fileUrl, fileName, files, status,
       });
     }
 

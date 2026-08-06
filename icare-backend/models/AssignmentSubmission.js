@@ -5,8 +5,12 @@ const submissionSchema = new mongoose.Schema({
   courseId:     { type: mongoose.Schema.Types.ObjectId, ref: 'Course',     required: true },
   studentId:    { type: mongoose.Schema.Types.ObjectId, ref: 'User',       required: true },
   content:      { type: String, default: '' },       // text answer
-  fileUrl:      { type: String },                    // uploaded file (Cloudinary)
+  fileUrl:      { type: String },                    // legacy single-file field, kept for old submissions
   fileName:     { type: String },
+  // Multi-file support (5.1/5.2) — fileUrl/fileName above still get set to
+  // files[0] on submit so older grading UI reading the singular fields
+  // keeps working unchanged.
+  files:        { type: [{ url: String, name: String }], default: [] },
   marksObtained:{ type: Number, default: null },
   feedback:     { type: String, default: '' },
   status:       { type: String, enum: ['submitted', 'graded', 'late'], default: 'submitted' },

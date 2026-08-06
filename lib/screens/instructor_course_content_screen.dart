@@ -1566,15 +1566,23 @@ class InstructorCourseContentScreenState extends State<InstructorCourseContentSc
     );
   }
 
-  void _openRecording(dynamic lesson) {
-    final url = lesson['recordingUrl']?.toString() ?? '';
-    if (url.isEmpty) return;
-    final title = lesson['title']?.toString() ?? 'Recording';
-    showDialog(
-      context: context,
-      barrierDismissible: true,
-      builder: (ctx) => _RecordingDialog(title: title, url: url),
-    );
+  void _openRecording(dynamic lesson) async {
+    final recordingUrl = lesson['recordingUrl']?.toString() ?? '';
+    final driveUrl = lesson['driveBackupUrl']?.toString() ?? '';
+    if (recordingUrl.isEmpty && driveUrl.isEmpty) return;
+    // Google Drive is the only playback source shown — recordingUrl (the
+    // raw Jibri file) is only used to detect "a recording exists at all",
+    // never played in-app. Matches classroom_course_view.dart's behavior.
+    if (driveUrl.isNotEmpty) {
+      final uri = Uri.tryParse(driveUrl);
+      if (uri != null) await launchUrl(uri, mode: LaunchMode.externalApplication);
+      return;
+    }
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Recording is processing — uploading to Google Drive, check back shortly')),
+      );
+    }
   }
 
   Widget _buildEmptyState() {

@@ -79,10 +79,16 @@ const register = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Please provide all required fields' });
     }
 
+    // Soft-enforced here (unlike login) — multiple screens call this same
+    // /auth/register endpoint (work_with_us_signup.dart, lms_purchase_flow.dart,
+    // possibly more) and not all of them render the checkbox yet, so a hard
+    // block would reject every signup from a screen that hasn't been wired
+    // up. Once every register call site sends a token, flip this to match
+    // login's hard block.
     const { verifyRecaptcha } = require('../utils/recaptcha');
     const recaptchaResult = await verifyRecaptcha(recaptchaToken);
     if (!recaptchaResult.ok) {
-      return res.status(400).json({ success: false, message: 'Please complete the "I\'m not a robot" verification.' });
+      console.warn(`reCAPTCHA failed on register for ${email}: ${recaptchaResult.reason}`);
     }
 
     // Check existing

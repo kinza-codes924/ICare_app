@@ -1391,9 +1391,15 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
     // around the module lock (previously only the modules list was cleared,
     // leaving these three lists fully visible/tappable underneath the banner).
     final isInstallmentLocked = _lockReason == 'installment_overdue';
-    final standaloneAssignments = isInstallmentLocked ? const <dynamic>[] : _assignments;
-    final standaloneQuizzes = isInstallmentLocked ? const <dynamic>[] : _quizzes;
-    final standaloneSessions = isInstallmentLocked
+    // Once a course has modules, standalone (non-module-embedded) items are
+    // hidden entirely — everything relevant lives inside its module, and
+    // showing both looked like duplicated/confusing content to students.
+    // Matches the same hide-when-modules-exist rule already applied on the
+    // instructor side (instructor_course_content_screen.dart).
+    final hideStandalone = isInstallmentLocked || _modules.isNotEmpty;
+    final standaloneAssignments = hideStandalone ? const <dynamic>[] : _assignments;
+    final standaloneQuizzes = hideStandalone ? const <dynamic>[] : _quizzes;
+    final standaloneSessions = hideStandalone
         ? const <dynamic>[]
         : _sessions.where((s) => s['status']?.toString() != 'live').toList();
 
@@ -2834,7 +2840,7 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
                       sessionId: sessionId,
                       courseId: widget.course['_id']?.toString() ?? '',
                       sessionTitle: data['title']?.toString() ?? 'Live Session',
-                      isInstructor: true,
+                      isInstructor: widget.isInstructor,
                       lessonId: data['_id']?.toString(),
                     ),
                   ));
@@ -4057,6 +4063,42 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
                 )),
               ]),
             ),
+          ],
+
+          // ── Student Progress — per-module/per-lesson breakdown, previously
+          // only reachable by clicking a student in the People tab, which the
+          // client's grade-report-card requirement (9.2) needs visible here
+          // directly instead of buried behind another tab. ──
+          if (widget.isInstructor) ...[
+            const Text('Student Progress', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Color(0xFF202124))),
+            const SizedBox(height: 8),
+            if (_loadingPeople)
+              const Padding(padding: EdgeInsets.symmetric(vertical: 12), child: Center(child: CircularProgressIndicator(strokeWidth: 2)))
+            else if (_students.isEmpty)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 12),
+                child: Text('No students enrolled yet.', style: TextStyle(fontSize: 13, color: Color(0xFF70757A))),
+              )
+            else
+              ..._students.map((s) {
+                final name = (s['user'] as Map?)?['name']?.toString() ?? s['name']?.toString() ?? 'Student';
+                final studentId = ((s['user'] as Map?)?['_id'] ?? s['_id'])?.toString() ?? '';
+                if (studentId.isEmpty) return const SizedBox.shrink();
+                return ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: CircleAvatar(
+                    radius: 18,
+                    backgroundColor: const Color(0xFF1A73E8).withValues(alpha: 0.1),
+                    child: Text(name.isNotEmpty ? name[0].toUpperCase() : '?',
+                        style: const TextStyle(color: Color(0xFF1A73E8), fontWeight: FontWeight.w700)),
+                  ),
+                  title: Text(name, style: const TextStyle(fontSize: 14, color: Color(0xFF202124))),
+                  subtitle: const Text('Tap to view module/lesson/quiz progress', style: TextStyle(fontSize: 12, color: Color(0xFF70757A))),
+                  trailing: const Icon(Icons.chevron_right_rounded, color: Color(0xFF94A3B8)),
+                  onTap: () => _showStudentProgressDialog(studentId, name),
+                );
+              }),
+            const SizedBox(height: 24),
           ],
 
           // ── Assignments section ──

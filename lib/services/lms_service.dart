@@ -224,11 +224,13 @@ class LmsService {
     String? content,
     String? fileUrl,
     String? fileName,
+    List<Map<String, String>>? files,
   }) async {
     final response = await _api.post('/lms/assignments/$assignmentId/submit', {
       'content': content,
       'fileUrl': fileUrl,
       'fileName': fileName,
+      if (files != null && files.isNotEmpty) 'files': files,
     });
     return response.data;
   }
