@@ -634,7 +634,7 @@ router.get('/:courseId/student-progress/:studentId', authMiddleware, async (req,
     // "Not Attended" for students the Attendance collection correctly had
     // as Present.
     const liveSessionsForAttendance = await LiveSession.find({ courseId: toId(courseId) })
-      .select('_id linkedLessonId').lean();
+      .select('_id').lean();
     const attendanceDocs = await Attendance.find({ courseId: toId(courseId) })
       .select('liveSessionId records').lean();
     // liveSessionId -> true when this student has a present/late record
@@ -645,12 +645,22 @@ router.get('/:courseId/student-progress/:studentId', authMiddleware, async (req,
         .map(a => a.liveSessionId?.toString())
         .filter(Boolean)
     );
-    const attendedLessonIds = new Set(
-      liveSessionsForAttendance
-        .filter(s => attendedSessionIds.has(s._id?.toString()))
-        .map(s => s.linkedLessonId?.toString())
-        .filter(Boolean)
-    );
+    // Map attended sessions back to module lessons via the LESSON's own
+    // liveSessionId field, not LiveSession.linkedLessonId. Only the former
+    // is reliably written (end-and-save sets
+    // 'modules.$[].lessons.$[lesson].liveSessionId'); linkedLessonId is
+    // only ever set by syncLiveSessions for pre-scheduled sessions, so
+    // going session -> lesson silently matched nothing for sessions
+    // started straight from a module lesson tile — which is why a student
+    // with correct 13/15 attendance still showed "Not Attended" on the
+    // individual lesson row.
+    const attendedLessonIds = new Set();
+    for (const mod of (course.modules || [])) {
+      for (const l of (mod.lessons || [])) {
+        const sid = l.liveSessionId?.toString();
+        if (sid && attendedSessionIds.has(sid)) attendedLessonIds.add(l._id?.toString());
+      }
+    }
 
     const modules = (course.modules || []).map(mod => {
       const lessons = (mod.lessons || []).map(l => {
