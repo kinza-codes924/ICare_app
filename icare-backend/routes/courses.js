@@ -556,8 +556,30 @@ router.get('/:courseId/student-progress/:studentId', authMiddleware, async (req,
       || (course.coTeachers || []).some(t => t.userId?.toString() === uid && (t.status ?? 'accepted') === 'accepted');
     if (!isOwner) return res.status(403).json({ success: false, message: 'Not authorized' });
 
-    const enrollment = await Enrollment.findOne({ courseId: toId(courseId), userId: toId(studentId) }).lean();
-    if (!enrollment) return res.status(404).json({ success: false, message: 'Student is not enrolled in this course' });
+    // Not .lean() — recheckModuleCompletion needs a real document to push
+    // subdocs onto and save(). This view previously only ever read
+    // lessonCompletions/moduleCompletions as they already stood in the DB —
+    // that self-heals on GET /courses/:id (called when the STUDENT opens
+    // their own course), but the instructor's Student Progress dialog calls
+    // this route directly and could easily be opened before the student
+    // ever reopened the course after a session ended, showing a stale
+    // "Not started" for something the student had, in reality, already
+    // finished (e.g. a live session that ended, whose completion this same
+    // recheck would have already recorded had it run).
+    const enrollmentDoc = await Enrollment.findOne({ courseId: toId(courseId), userId: toId(studentId) });
+    if (!enrollmentDoc) return res.status(404).json({ success: false, message: 'Student is not enrolled in this course' });
+    let progressChanged = false;
+    for (const mod of (course.modules || [])) {
+      const modId = mod._id?.toString();
+      if (!modId) continue;
+      const alreadyDone = (enrollmentDoc.moduleCompletions || []).some(mc => mc.moduleId === modId);
+      if (alreadyDone) continue;
+      const before = (enrollmentDoc.moduleCompletions || []).length;
+      await recheckModuleCompletion(enrollmentDoc, modId);
+      if ((enrollmentDoc.moduleCompletions || []).length > before) progressChanged = true;
+    }
+    if (progressChanged) await enrollmentDoc.save();
+    const enrollment = enrollmentDoc.toObject();
 
     const student = await require('../models/User').findById(toId(studentId)).select('name username email').lean();
 

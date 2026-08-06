@@ -22,6 +22,15 @@
     flt-glass-pane::-webkit-scrollbar-track { background: #f1f5f9; }
     flt-glass-pane::-webkit-scrollbar-thumb { background: #94a3b8; border-radius: 4px; }
     flt-glass-pane::-webkit-scrollbar-thumb:hover { background: #64748b; }
+    /* Belt-and-suspenders for the LMS Jitsi click-through fix in
+       lmsJitsiJoin's ensureJitsiClickable(): if flt-glass-pane still wins
+       the paint order over the iframe purely from DOM position (later
+       sibling) rather than z-index, an explicit z-index alone on the host
+       container won't be enough — this class, toggled onto <body> only
+       while an LMS session is open, forces the glass pane itself behind
+       it too. Scoped to the class (not a blanket rule) so it never affects
+       Flutter UI on any other screen. */
+    body.icare-lms-live flt-glass-pane { z-index: 1 !important; }
     #loading {
       position: fixed; inset: 0;
       display: flex; flex-direction: column;
@@ -674,6 +683,7 @@
       console.log('LMS Jitsi: closed event', reason);
       try { if (_lmsJitsiApi) { _lmsJitsiApi.dispose(); _lmsJitsiApi = null; } } catch(_) {}
       try { var cc = document.getElementById('lms-jitsi-host'); if (cc) cc.innerHTML = ''; } catch(_) {}
+      try { document.body.classList.remove('icare-lms-live'); } catch(_) {}
       try { window.dispatchEvent(new CustomEvent('lmsJitsiEnded', { detail: { reason: reason } })); } catch(_) {}
     }
 
@@ -756,6 +766,32 @@
           _startLmsFilePoller();
           _postToJitsiLms({ type: 'icare-context', mode: 'lms', isInstructor: _lmsIsInstructor });
           console.log('LMS Jitsi: joining room', roomName, isInstructor ? '(instructor)' : '(student)');
+          document.body.classList.add('icare-lms-live');
+          // Explicitly force the Jitsi host container (and the iframe Jitsi
+          // creates inside it) above Flutter's glass pane and interactive —
+          // don't only rely on flt-glass-pane's default stacking behavior,
+          // since that alone wasn't enough (toasts inside Jitsi stayed
+          // unclickable even after removing the old lmsRaiseFlutterLayer
+          // call below). Runs on a short repeating check because Jitsi
+          // creates its <iframe> asynchronously after JitsiMeetExternalAPI
+          // is constructed, so it may not exist in the DOM yet right here.
+          (function ensureJitsiClickable(retries) {
+            retries = retries || 0;
+            var c = document.getElementById('lms-jitsi-host');
+            if (c) {
+              c.style.position = 'relative';
+              c.style.zIndex = '2147483000';
+              c.style.pointerEvents = 'auto';
+              var ifr = c.querySelector('iframe');
+              if (ifr) {
+                ifr.style.pointerEvents = 'auto';
+                ifr.style.position = 'relative';
+                ifr.style.zIndex = '2147483000';
+                return;
+              }
+            }
+            if (retries < 40) setTimeout(function() { ensureJitsiClickable(retries + 1); }, 250);
+          })();
           // Do NOT call lmsRaiseFlutterLayer here. That z-index hack dates
           // back to the pre-Jitsi Agora overlay UI (raw DOM video elements
           // stacked on top of Flutter's own glass pane) — see commit
