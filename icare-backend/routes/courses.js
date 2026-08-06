@@ -12,6 +12,7 @@ const Quiz = require('../models/Quiz');
 const QuizAttempt = require('../models/QuizAttempt');
 const { sendEmail } = require('../utils/email');
 const LiveSession = require('../models/LiveSession');
+const Attendance = require('../models/Attendance');
 const CourseReview = require('../models/CourseReview');
 const { Voucher, applyVoucherDiscount } = require('./vouchers');
 const { recheckModuleCompletion, recheckCourseCompletion, notifyLeadInstructorCourseComplete } = require('../utils/courseProgress');
@@ -232,7 +233,6 @@ router.get('/:courseId/engagement', authMiddleware, async (req, res) => {
       quizId: { $in: quizzes.map(q => q._id) },
     });
 
-    const Attendance = require('../models/Attendance');
     const sessions = await Attendance.find({ courseId }).lean();
     const enrollmentCount = await Enrollment.countDocuments({ courseId });
     let avgAttendancePct = 0;
@@ -622,16 +622,34 @@ router.get('/:courseId/student-progress/:studentId', authMiddleware, async (req,
     // "done" once its time has passed regardless of who showed up. That's
     // correct for unlock/module-completion purposes, but it made this
     // progress view claim a student "Completed" a live session they never
-    // actually attended. Reporting-only fix: this view separately checks
-    // each live lesson's LiveSession.attendees and reports 'not_attended'
-    // instead of 'completed' when the student wasn't present, without
-    // touching lessonCompletions/moduleCompletions/unlock logic at all.
+    // actually attended. Reporting-only fix: report 'not_attended' instead
+    // of 'completed' when the student wasn't present, without touching
+    // lessonCompletions/moduleCompletions/unlock logic at all.
+    //
+    // Source of truth is the Attendance collection (records[].status, with
+    // real joinedAt/leftAt/durationMinutes written by record-join/leave) —
+    // the same data the student's own Grades > Attendance tab renders, so
+    // both sides always agree. LiveSession.attendees is NOT reliable here:
+    // it isn't consistently populated on join, so keying off it reported
+    // "Not Attended" for students the Attendance collection correctly had
+    // as Present.
     const liveSessionsForAttendance = await LiveSession.find({ courseId: toId(courseId) })
-      .select('_id linkedLessonId attendees').lean();
+      .select('_id linkedLessonId').lean();
+    const attendanceDocs = await Attendance.find({ courseId: toId(courseId) })
+      .select('liveSessionId records').lean();
+    // liveSessionId -> true when this student has a present/late record
+    const attendedSessionIds = new Set(
+      attendanceDocs
+        .filter(a => (a.records || []).some(r =>
+          r?.studentId?.toString() === studentId && (r.status === 'present' || r.status === 'late')))
+        .map(a => a.liveSessionId?.toString())
+        .filter(Boolean)
+    );
     const attendedLessonIds = new Set(
       liveSessionsForAttendance
-        .filter(s => (s.attendees || []).some(a => a?.toString() === studentId))
-        .map(s => s.linkedLessonId).filter(Boolean)
+        .filter(s => attendedSessionIds.has(s._id?.toString()))
+        .map(s => s.linkedLessonId?.toString())
+        .filter(Boolean)
     );
 
     const modules = (course.modules || []).map(mod => {
@@ -676,10 +694,15 @@ router.get('/:courseId/student-progress/:studentId', authMiddleware, async (req,
       }));
     }
 
-    // Attendance summary for this student in this course
+    // Attendance summary for this student in this course — same Attendance
+    // collection source as the per-lesson status above (and as the
+    // student's own Attendance tab), not LiveSession.attendees, which
+    // isn't reliably populated. This is why the header previously showed
+    // "0 / N" attendance for a student the student-side view correctly
+    // reported as having attended most sessions.
     const totalSessions = liveSessionsForAttendance.length;
     const attendedSessions = liveSessionsForAttendance.filter(s =>
-      (s.attendees || []).some(a => a?.toString() === studentId)
+      attendedSessionIds.has(s._id?.toString())
     ).length;
 
     const totalModules = modules.length;

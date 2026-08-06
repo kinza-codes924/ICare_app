@@ -684,7 +684,61 @@
       try { if (_lmsJitsiApi) { _lmsJitsiApi.dispose(); _lmsJitsiApi = null; } } catch(_) {}
       try { var cc = document.getElementById('lms-jitsi-host'); if (cc) cc.innerHTML = ''; } catch(_) {}
       try { document.body.classList.remove('icare-lms-live'); } catch(_) {}
+      try { var t = document.getElementById('lms-chat-toast'); if (t) t.remove(); } catch(_) {}
       try { window.dispatchEvent(new CustomEvent('lmsJitsiEnded', { detail: { reason: reason } })); } catch(_) {}
+    }
+
+    // Our own "new message" toast, rendered in the PARENT page (not inside
+    // the Jitsi iframe). Jitsi's native toast is unreachable — it renders
+    // in a nested cross-origin iframe, so no selector, CSS or click
+    // handler from our side can ever touch it (verified by a Shadow-DOM
+    // aware full-document scan finding no trace of it), and this Jitsi
+    // build's own chat-message notification carries no "Open chat" action
+    // of its own. Building the toast here instead gives us the clickable
+    // "Open chat" the client wants, with executeCommand('toggleChat')
+    // opening the real Jitsi drawer (Chat / Polls / File Upload tabs).
+    function _lmsShowChatToast(sender, message) {
+      var old = document.getElementById('lms-chat-toast');
+      if (old) old.remove();
+
+      var toast = document.createElement('div');
+      toast.id = 'lms-chat-toast';
+      toast.style.cssText = 'position:fixed;left:20px;bottom:110px;z-index:2147483001;' +
+        'background:#fff;color:#1c2b3a;border-radius:10px;padding:12px 14px;max-width:320px;' +
+        'font-family:system-ui,-apple-system,sans-serif;box-shadow:0 6px 20px rgba(0,0,0,.28);' +
+        'border-left:4px solid #1A73E8;';
+
+      var head = document.createElement('div');
+      head.style.cssText = 'display:flex;align-items:center;gap:8px;font-weight:700;font-size:14px;';
+      head.textContent = sender || 'New message';
+
+      var close = document.createElement('span');
+      close.textContent = '×';
+      close.style.cssText = 'margin-left:auto;cursor:pointer;font-size:18px;line-height:1;color:#64748b;';
+      close.addEventListener('click', function(e) { e.stopPropagation(); toast.remove(); });
+      head.appendChild(close);
+
+      var body = document.createElement('div');
+      body.style.cssText = 'font-size:13px;margin-top:4px;color:#334155;word-break:break-word;';
+      body.textContent = (message || '').slice(0, 120);
+
+      var action = document.createElement('div');
+      action.textContent = 'Open chat';
+      action.style.cssText = 'margin-top:8px;color:#1A73E8;font-weight:700;font-size:13px;cursor:pointer;';
+
+      function openChat() {
+        try { _lmsJitsiApi && _lmsJitsiApi.executeCommand('toggleChat'); } catch(_) {}
+        toast.remove();
+      }
+      action.addEventListener('click', openChat);
+      toast.addEventListener('click', openChat);
+
+      toast.appendChild(head);
+      if (body.textContent) toast.appendChild(body);
+      toast.appendChild(action);
+      document.body.appendChild(toast);
+
+      setTimeout(function() { if (toast.parentNode) toast.remove(); }, 8000);
     }
 
     window.lmsJitsiJoin = function(roomName, displayName, isInstructor, jwt, subject, authToken) {
@@ -760,23 +814,16 @@
           // make the toast itself clickable: open the chat drawer directly
           // the moment a message arrives while it's closed.
           //
-          // toggleChat is a toggle, not "open" — calling it while chat is
-          // already open would close it. JitsiMeetExternalAPI in this
-          // build version has no public isChatOpen()/chatUpdated event to
-          // check first (confirmed by grepping the deployed bundle), so
-          // state is tracked locally instead: true only while WE believe
-          // we opened it via this same handler, cleared the moment the
-          // user manually closes/toggles chat through Jitsi's own UI —
-          // detected via the toolbar's own chat button being wired to
-          // this same executeCommand('toggleChat'), so the two can never
-          // disagree about which call happened most recently in practice.
-          var _lmsChatAutoOpen = false;
+          // Rather than auto-opening chat (which steals focus mid-session),
+          // render OUR OWN toast here in the parent page — outside the
+          // iframe, where we have full DOM control — carrying the "Open
+          // chat" action the client asked for. Clicking it runs
+          // executeCommand('toggleChat'), which opens Jitsi's real chat
+          // drawer (with its Chat / Polls / File Upload tabs).
           _lmsJitsiApi.on('incomingMessage', function(data) {
             try {
-              if (data && data.privateMessage) return; // let private messages behave normally
-              if (_lmsChatAutoOpen) return; // already opened by an earlier message this session
-              _lmsChatAutoOpen = true;
-              _lmsJitsiApi.executeCommand('toggleChat');
+              if (data && data.privateMessage) return; // private messages behave normally
+              _lmsShowChatToast(data && data.nick, data && data.message);
             } catch(_) {}
           });
 
