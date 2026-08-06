@@ -43,10 +43,20 @@ async function recheckModuleCompletion(enrollment, moduleId) {
     .map(l => l._id?.toString()).filter(Boolean);
   // Live sessions can't require an explicit "Mark Complete" tap (there's no
   // watchable content to finish) so they'd otherwise block the module
-  // forever. Once the scheduled slot has fully elapsed, auto-record it as
+  // forever. Once the session has actually ended, auto-record it as
   // completed here — time-based, not attendance-based, matching how a
   // missed/skipped session still isn't meant to permanently lock a student
   // out of the rest of the course.
+  //
+  // Primary signal is l.status === 'ended'/'completed', written directly
+  // onto the module-embedded lesson by live-sessions.js's /end-and-save
+  // route the moment the session finishes. The old fallback — reconstruct
+  // an end time from liveSessionDateTime + duration — only works for
+  // sessions the instructor pre-scheduled with a specific date/time; an
+  // ad-hoc "Go Live" session (no liveSessionDateTime set at all) hit
+  // `if (!scheduledAt) continue`, permanently skipping the completion
+  // check for that lesson no matter how long ago it ended. Kept as a
+  // fallback for any lesson that predates the status write.
   const liveLessons = lessons.filter(l => l.type === 'live');
   const now = new Date();
   for (const l of liveLessons) {
@@ -54,10 +64,15 @@ async function recheckModuleCompletion(enrollment, moduleId) {
     if (!lid) continue;
     const already = (enrollment.lessonCompletions || []).some(lc => lc.lessonId === lid);
     if (already) continue;
-    const scheduledAt = l.liveSessionDateTime || l.scheduledAt;
-    if (!scheduledAt) continue;
-    const endTime = new Date(new Date(scheduledAt).getTime() + (Number(l.duration || l.duration_minutes) || 0) * 60000);
-    if (endTime <= now) {
+    let hasEnded = l.status === 'ended' || l.status === 'completed';
+    if (!hasEnded) {
+      const scheduledAt = l.liveSessionDateTime || l.scheduledAt;
+      if (scheduledAt) {
+        const endTime = new Date(new Date(scheduledAt).getTime() + (Number(l.duration || l.duration_minutes) || 0) * 60000);
+        hasEnded = endTime <= now;
+      }
+    }
+    if (hasEnded) {
       if (!enrollment.lessonCompletions) enrollment.lessonCompletions = [];
       enrollment.lessonCompletions.push({ lessonId: lid, moduleId, completedAt: new Date() });
     }

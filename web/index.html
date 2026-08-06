@@ -756,7 +756,18 @@
           _startLmsFilePoller();
           _postToJitsiLms({ type: 'icare-context', mode: 'lms', isInstructor: _lmsIsInstructor });
           console.log('LMS Jitsi: joining room', roomName, isInstructor ? '(instructor)' : '(student)');
-          setTimeout(window.lmsRaiseFlutterLayer, 1200);
+          // Do NOT call lmsRaiseFlutterLayer here. That z-index hack dates
+          // back to the pre-Jitsi Agora overlay UI (raw DOM video elements
+          // stacked on top of Flutter's own glass pane) — see commit
+          // 6b3ada5. This screen embeds Jitsi via a real Flutter
+          // HtmlElementView platform view now, which already sits below
+          // flt-glass-pane in the correct default stacking order for click-
+          // through to work. Raising the glass pane above the iframe here
+          // put it above EVERYTHING inside Jitsi for the whole session,
+          // silently eating every click on Jitsi's own toasts/notifications
+          // (chat message, new poll, our custom "file shared" toast) even
+          // though they were visibly rendered — nothing wrong with any of
+          // those toasts themselves, they just could never receive a click.
         } catch(e) {
           console.error('lmsJitsiJoin error:', e);
         }
