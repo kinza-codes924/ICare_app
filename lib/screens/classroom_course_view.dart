@@ -511,7 +511,7 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
                     constraints: const BoxConstraints(minWidth: 16),
                     decoration: BoxDecoration(color: Colors.red, borderRadius: BorderRadius.circular(8)),
                     child: Text(
-                      _unreadNotifCount > 9 ? '9+' : '$_unreadNotifCount',
+                      _unreadNotifCount > 99 ? '99+' : '$_unreadNotifCount',
                       textAlign: TextAlign.center,
                       style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w800),
                     ),

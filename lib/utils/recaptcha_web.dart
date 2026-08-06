@@ -15,7 +15,12 @@ bool _viewFactoryRegistered = false;
 
 /// Registers the platform view that hosts the checkbox <div>, and asks the
 /// JS side to render the widget into it once the container exists in the
-/// DOM and grecaptcha has loaded. Safe to call multiple times.
+/// DOM and grecaptcha has loaded. Safe to call multiple times — the view
+/// *factory* is only registered once (Flutter throws if you register the
+/// same viewType twice), but the mount request is re-dispatched on every
+/// call, since this is a SPA where a fresh screen instance (and a fresh
+/// container element) can appear later in the same page load without
+/// index.html's onload callback ever firing again.
 void registerRecaptchaView() {
   if (!_viewFactoryRegistered) {
     _viewFactoryRegistered = true;
@@ -26,18 +31,18 @@ void registerRecaptchaView() {
         ..style.height = '78px';
       return container;
     });
-
-    void mount() {
-      html.window.dispatchEvent(html.CustomEvent(
-        'icare-recaptcha-mount',
-        detail: jsonEncode({'containerId': recaptchaContainerId}),
-      ));
-    }
-
-    // grecaptcha may already be loaded (fast reload) or may still be loading.
-    html.window.on['icare-recaptcha-ready'].listen((_) => mount());
-    Timer(const Duration(milliseconds: 300), mount);
   }
+
+  void mount() {
+    html.window.dispatchEvent(html.CustomEvent(
+      'icare-recaptcha-mount',
+      detail: jsonEncode({'containerId': recaptchaContainerId}),
+    ));
+  }
+
+  // grecaptcha may already be loaded (fast reload) or may still be loading.
+  html.window.on['icare-recaptcha-ready'].listen((_) => mount());
+  Timer(const Duration(milliseconds: 300), mount);
 }
 
 String get recaptchaViewType => _recaptchaViewType;

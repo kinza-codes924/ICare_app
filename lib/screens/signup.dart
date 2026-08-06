@@ -1,4 +1,5 @@
 import 'package:easy_localization/easy_localization.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -8,7 +9,9 @@ import 'package:icare/models/user.dart' as app_user;
 import 'package:icare/utils/imagePaths.dart';
 import 'package:icare/utils/theme.dart';
 import 'package:icare/utils/utils.dart';
+import 'package:icare/utils/recaptcha.dart';
 import 'package:icare/widgets/auth_left_panel.dart';
+import 'package:icare/widgets/recaptcha_checkbox.dart';
 
 class SignupScreen extends ConsumerStatefulWidget {
   final String role;
@@ -108,6 +111,18 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
       _showError('Please agree to the Terms & Conditions to continue.'.tr());
       return;
     }
+    // v2 checkbox — wrapped in its own try/catch so a recaptcha failure can
+    // never crash or block signup outright (see recaptcha_web.dart history).
+    String? recaptchaToken;
+    try {
+      recaptchaToken = await getRecaptchaResponse();
+    } catch (_) {
+      recaptchaToken = null;
+    }
+    if (kIsWeb && recaptchaToken == null) {
+      _showError('Please check "I\'m not a robot" to continue.'.tr());
+      return;
+    }
     setState(() => _isLoading = true);
 
     try {
@@ -140,6 +155,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
         phoneNumber: capturedPhone,
         gender: _isPatient ? capturedGender : null,
         dateOfBirth: (_isPatient && capturedDob != null) ? capturedDob.toIso8601String() : null,
+        recaptchaToken: recaptchaToken,
       );
 
       if (result['success']) {
@@ -748,6 +764,8 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                     const SizedBox(height: 28),
                     ..._buildFields(),
                     const SizedBox(height: 8),
+                    const Center(child: RecaptchaCheckbox()),
+                    const SizedBox(height: 16),
                     _submitBtn(),
                     const SizedBox(height: 20),
                     _signInLink(),
