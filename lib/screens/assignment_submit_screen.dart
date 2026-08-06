@@ -254,16 +254,7 @@ class _AssignmentSubmitScreenState extends State<AssignmentSubmitScreen> {
             'submittedAt': DateTime.now().toIso8601String(),
           };
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Row(children: [
-              Icon(Icons.check_circle_rounded, color: Colors.white, size: 18),
-              SizedBox(width: 8),
-              Text('Assignment submitted successfully!'),
-            ]),
-            backgroundColor: Color(0xFF10B981),
-          ),
-        );
+        _showSubmittedOverlay();
       }
     } catch (e) {
       if (mounted) {
@@ -279,6 +270,68 @@ class _AssignmentSubmitScreenState extends State<AssignmentSubmitScreen> {
         );
       }
     }
+  }
+
+  // A brief celebratory overlay right after submitting — previously the only
+  // feedback was a small SnackBar while the form silently swapped into the
+  // "Your Submission" view underneath, which didn't register as a clear
+  // confirmation. Matches the quiz result screen's success styling; auto-
+  // dismisses so it doesn't block re-reading the (now read-only) submission.
+  void _showSubmittedOverlay() {
+    showGeneralDialog(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: 'Submitted',
+      barrierColor: Colors.black54,
+      transitionDuration: const Duration(milliseconds: 250),
+      pageBuilder: (ctx, __, ___) {
+        Future.delayed(const Duration(seconds: 2), () {
+          if (Navigator.of(ctx).canPop()) Navigator.of(ctx).pop();
+        });
+        return Center(
+          child: Material(
+            color: Colors.transparent,
+            child: Container(
+              margin: const EdgeInsets.symmetric(horizontal: 40),
+              padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 24),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF10B981), Color(0xFF059669)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 64,
+                    height: 64,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.2),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.check_rounded, color: Colors.white, size: 34),
+                  ),
+                  const SizedBox(height: 14),
+                  const Text('Submitted!',
+                      style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900)),
+                  const SizedBox(height: 6),
+                  const Text('Your assignment has been submitted successfully.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: Colors.white70, fontSize: 13)),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+      transitionBuilder: (ctx, anim, __, child) => ScaleTransition(
+        scale: CurvedAnimation(parent: anim, curve: Curves.easeOutBack),
+        child: FadeTransition(opacity: anim, child: child),
+      ),
+    );
   }
 
   // ── Helpers ──────────────────────────────────────────────────────────────

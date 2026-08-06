@@ -839,6 +839,24 @@ class _QuizTakeScreenState extends State<QuizTakeScreen> {
             child: Column(
               children: [
                 Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: Colors.white.withValues(alpha: 0.4)),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.check_circle_rounded, color: Colors.white, size: 14),
+                      SizedBox(width: 6),
+                      Text('Quiz Submitted',
+                          style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700)),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 14),
+                Container(
                   width: 80,
                   height: 80,
                   decoration: BoxDecoration(
