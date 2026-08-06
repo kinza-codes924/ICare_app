@@ -136,6 +136,7 @@
     var _lmsSenderName = null;
     var _lmsFilePoller = null;
     var _lmsFileCursor = 0;
+    var _lmsIsInstructor = false;
 
     // Flutter web's shared_preferences JSON-encodes stored strings, so the
     // raw localStorage value is the token WRAPPED IN LITERAL DOUBLE QUOTES
@@ -223,7 +224,7 @@
         if (!_lmsJitsiApi) return;
         // Re-sent every tick — see the matching comment in
         // _startConsultFilePoller for why a single send-on-join isn't enough.
-        _postToJitsiLms({ type: 'icare-context', mode: 'lms' });
+        _postToJitsiLms({ type: 'icare-context', mode: 'lms', isInstructor: _lmsIsInstructor });
         var token = _lmsAuthToken || _lsToken();
         if (!token || !_lmsChatChannel) return;
         fetch('https://icare-backend-inky.vercel.app/api/call-chat/messages/'
@@ -655,6 +656,12 @@
     // Students keep the native hangup button but not the recording start/stop control.
     function _lmsToolbarButtonsFor(isInstructor) {
       if (isInstructor) return _JITSI_TOOLBAR_BUTTONS;
+      // Polls are instructor-only — students should only be able to answer
+      // an existing poll (Jitsi still lets them do that from the same
+      // panel), never see "Create a poll" themselves. Jitsi's own toolbar
+      // filter only hides the panel-opening button, not the create button
+      // inside the panel, so this alone isn't the full fix — see the poll
+      // config disabling create in configOverwrite below.
       return _JITSI_TOOLBAR_BUTTONS.filter(function(b) {
         return b !== 'recording';
       });
@@ -676,6 +683,7 @@
       _lmsAuthToken = (authToken && authToken.length > 10) ? authToken : (_lsToken() || null);
       _lmsChatChannel = roomName;
       _lmsSenderName = displayName || (isInstructor ? 'Instructor' : 'Student');
+      _lmsIsInstructor = !!isInstructor;
 
       var checkContainer = function(retries) {
         retries = retries || 0;
@@ -746,7 +754,7 @@
           }
 
           _startLmsFilePoller();
-          _postToJitsiLms({ type: 'icare-context', mode: 'lms' });
+          _postToJitsiLms({ type: 'icare-context', mode: 'lms', isInstructor: _lmsIsInstructor });
           console.log('LMS Jitsi: joining room', roomName, isInstructor ? '(instructor)' : '(student)');
           setTimeout(window.lmsRaiseFlutterLayer, 1200);
         } catch(e) {

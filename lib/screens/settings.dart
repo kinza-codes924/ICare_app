@@ -2218,10 +2218,11 @@ class _WebSettingsLayout extends StatelessWidget {
         // Face ID (camera-based, works on all Android devices)
         const Divider(height: 1),
         _switchTile(icon: Icons.face_retouching_natural, title: 'Face ID Sign-In', subtitle: p.isFaceEnabled ? 'Tap to disable Face ID login' : 'Enable camera Face ID login (works on all phones)', value: p.isFaceEnabled, onChanged: p.onToggleFaceId),
-        if (p.isPatient) ...[
-          const Divider(height: 1),
-          _switchTile(icon: Icons.verified_user_outlined, title: 'Two-Factor Authentication (2FA)', subtitle: p.is2FAEnabled ? 'Enabled' : 'Extra layer of security', value: p.is2FAEnabled, onChanged: p.onToggle2FA),
-        ],
+        // 2FA is enforced purely server-side on user.twoFactorEnabled at
+        // login (see authController.js) — not role-specific — so it should
+        // be available to every role, not just patients.
+        const Divider(height: 1),
+        _switchTile(icon: Icons.verified_user_outlined, title: 'Two-Factor Authentication (2FA)', subtitle: p.is2FAEnabled ? 'Enabled' : 'Extra layer of security', value: p.is2FAEnabled, onChanged: p.onToggle2FA),
       ])));
   }
 
@@ -2693,9 +2694,10 @@ class _MobileSettingsLayout extends StatelessWidget {
         ],
         // Face ID (camera-based)
         const Divider(height: 1), _switchTile(icon: Icons.face_retouching_natural, title: 'Face ID Sign-In', subtitle: p.isFaceEnabled ? 'Tap to disable' : 'Enable Face ID (camera)', value: p.isFaceEnabled, onChanged: p.onToggleFaceId),
-        if (p.isPatient) ...[
-          const Divider(height: 1), _switchTile(icon: Icons.verified_user_outlined, title: '2FA', subtitle: p.is2FAEnabled ? 'Enabled' : 'Extra security', value: p.is2FAEnabled, onChanged: p.onToggle2FA),
-        ],
+        // 2FA is enforced purely server-side on user.twoFactorEnabled at
+        // login (see authController.js) — not role-specific — so it should
+        // be available to every role, not just patients.
+        const Divider(height: 1), _switchTile(icon: Icons.verified_user_outlined, title: '2FA', subtitle: p.is2FAEnabled ? 'Enabled' : 'Extra security', value: p.is2FAEnabled, onChanged: p.onToggle2FA),
       ])));
   }
 

@@ -910,7 +910,7 @@ class InstructorCourseContentScreenState extends State<InstructorCourseContentSc
           GestureDetector(
             onTap: driveUrl.isEmpty ? null : () async {
               final uri = Uri.parse(driveUrl);
-              if (await canLaunchUrl(uri)) await launchUrl(uri, mode: LaunchMode.externalApplication);
+              if (await canLaunchUrl(uri)) await launchUrl(uri, mode: LaunchMode.externalApplication, webOnlyWindowName: '_blank');
             },
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -1421,12 +1421,12 @@ class InstructorCourseContentScreenState extends State<InstructorCourseContentSc
               GestureDetector(
                 onTap: () => _openRecording(lesson),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                  decoration: BoxDecoration(color: const Color(0xFF10B981), borderRadius: BorderRadius.circular(8)),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  decoration: BoxDecoration(color: const Color(0xFF10B981), borderRadius: BorderRadius.circular(10)),
                   child: const Row(mainAxisSize: MainAxisSize.min, children: [
-                    Icon(Icons.play_arrow_rounded, color: Colors.white, size: 16),
-                    SizedBox(width: 4),
-                    Text('Recording', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700)),
+                    Icon(Icons.play_arrow_rounded, color: Colors.white, size: 20),
+                    SizedBox(width: 6),
+                    Text('Recording', style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w700)),
                   ]),
                 ),
               )
@@ -1575,7 +1575,11 @@ class InstructorCourseContentScreenState extends State<InstructorCourseContentSc
     // never played in-app. Matches classroom_course_view.dart's behavior.
     if (driveUrl.isNotEmpty) {
       final uri = Uri.tryParse(driveUrl);
-      if (uri != null) await launchUrl(uri, mode: LaunchMode.externalApplication);
+      // LaunchMode.externalApplication navigates the current tab away on
+      // Flutter Web instead of opening a real new tab — webOnlyWindowName
+      // forces an actual new-tab open so the instructor doesn't lose their
+      // place in the app.
+      if (uri != null) await launchUrl(uri, mode: LaunchMode.externalApplication, webOnlyWindowName: '_blank');
       return;
     }
     if (mounted) {

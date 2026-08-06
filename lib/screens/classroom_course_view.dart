@@ -2596,7 +2596,9 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
                 onTap: () async {
                   Navigator.pop(context);
                   final uri = Uri.tryParse(driveUrl);
-                  if (uri != null) await launchUrl(uri, mode: LaunchMode.externalApplication);
+                  // webOnlyWindowName forces a real new tab — externalApplication
+                  // alone navigates the current tab away on Flutter Web.
+                  if (uri != null) await launchUrl(uri, mode: LaunchMode.externalApplication, webOnlyWindowName: '_blank');
                 },
               )
             else if (recordingUrl.isNotEmpty)
