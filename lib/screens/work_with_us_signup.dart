@@ -333,7 +333,15 @@ class _WorkWithUsSignupState extends State<WorkWithUsSignup> {
       if (res.statusCode == 200 && res.data is Map && res.data['success'] == true) {
         return res.data['url'] as String?;
       }
-    } catch (_) {}
+      // Log the reason rather than dropping it: a non-200 here (oversized
+      // file, expired token, blob quota) used to be indistinguishable from
+      // success — the applicant saw their submission go through while the
+      // admin's approval screen showed no document at all.
+      debugPrint('_uploadDoc failed for "$filename": '
+          'status=${res.statusCode} body=${res.data}');
+    } catch (e) {
+      debugPrint('_uploadDoc error for "$filename": $e');
+    }
     return null;
   }
 
@@ -549,11 +557,33 @@ class _WorkWithUsSignupState extends State<WorkWithUsSignup> {
             if (_instrCnicBytes != null) 'cnicDocument': _instrCnicBytes!,
             if (_instrCvBytes != null) 'cvDocument': _instrCvBytes!,
           };
+          final failedDocs = <String>[];
           for (final entry in uploads.entries) {
             final nameKey = '${entry.key}Name';
             final filename = (vd[nameKey] as String?) ?? entry.key;
             final url = await _uploadDoc(entry.value, filename, regToken);
-            if (url != null) vd[entry.key] = url;
+            if (url != null) {
+              vd[entry.key] = url;
+            } else {
+              // Drop the orphan *Name key too, otherwise verificationDetails
+              // carries a filename with no matching URL and the admin screen
+              // renders nothing for it (addDoc skips entries with empty data),
+              // making it look like the applicant never attached anything.
+              vd.remove(nameKey);
+              failedDocs.add(filename);
+            }
+          }
+          if (failedDocs.isNotEmpty && mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  'Could not upload: ${failedDocs.join(', ')}. '
+                  'Your application was submitted — please contact support to send these documents.',
+                ),
+                backgroundColor: Colors.orange.shade800,
+                duration: const Duration(seconds: 8),
+              ),
+            );
           }
 
           try {
@@ -618,6 +648,10 @@ class _WorkWithUsSignupState extends State<WorkWithUsSignup> {
       }
     } finally {
       if (mounted) setState(() => _submitting = false);
+      // reCAPTCHA tokens are single-use — see login.dart. Without this a
+      // failed submission left the checkbox ticked but returning an empty
+      // token, and re-clicking the tick did nothing.
+      if (kIsWeb) resetRecaptcha();
     }
   }
 

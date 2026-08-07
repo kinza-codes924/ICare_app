@@ -212,15 +212,22 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
     if (_courseId.isEmpty) { setState(() => _loadingClasswork = false); return; }
     setState(() => _loadingClasswork = true);
     try {
-      final a = await _lms.getCourseAssignments(_courseId);
-      final q = await _lms.getCourseQuizzes(_courseId);
-      final s = await _lms.getCourseSessions(_courseId);
-      List<dynamic> readyForCert = [];
-      List<dynamic> pendingCerts = [];
-      if (widget.isInstructor) {
-        readyForCert = await _lms.getReadyForCertificate(_courseId);
-        pendingCerts = await _lms.getPendingCertificates(_courseId);
-      }
+      // Fired together rather than awaited one-by-one: these five endpoints
+      // are independent, so sequential awaits cost the sum of five round
+      // trips before anything renders. In parallel the tab waits for the
+      // slowest single call instead.
+      final results = await Future.wait([
+        _lms.getCourseAssignments(_courseId),
+        _lms.getCourseQuizzes(_courseId),
+        _lms.getCourseSessions(_courseId),
+        if (widget.isInstructor) _lms.getReadyForCertificate(_courseId),
+        if (widget.isInstructor) _lms.getPendingCertificates(_courseId),
+      ]);
+      final a = results[0];
+      final q = results[1];
+      final s = results[2];
+      final readyForCert = widget.isInstructor ? results[3] : <dynamic>[];
+      final pendingCerts = widget.isInstructor ? results[4] : <dynamic>[];
       if (mounted) {
         setState(() {
           _assignments = a; _quizzes = q; _sessions = s;
