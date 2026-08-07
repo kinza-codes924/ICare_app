@@ -20,9 +20,14 @@ const { sendEmail } = require('./email');
 // but does NOT save — callers save the enrollment themselves. Safe to call
 // repeatedly; only appends when not already present (won't create duplicate
 // completions or bump completedAt on an already-completed enrollment).
-async function recheckModuleCompletion(enrollment, moduleId) {
+async function recheckModuleCompletion(enrollment, moduleId, preloadedCourse = null) {
   if (!moduleId) return;
-  const course = await Course.findById(enrollment.courseId).lean();
+  // preloadedCourse lets a caller that already has the course document reuse
+  // it. GET /courses/:id calls this once per module in a loop, so without it
+  // a 5-module course re-fetched the same (large, modules-and-lessons-heavy)
+  // document 5 times before it could render — the Course Content tab sat on
+  // a spinner for that whole round of queries.
+  const course = preloadedCourse || await Course.findById(enrollment.courseId).lean();
   if (!course) return;
   const module = (course.modules || []).find(m => m._id?.toString() === moduleId);
   if (!module) return;

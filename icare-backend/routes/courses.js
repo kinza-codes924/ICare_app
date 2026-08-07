@@ -586,7 +586,9 @@ router.get('/:courseId/student-progress/:studentId', authMiddleware, async (req,
       if (!modId) continue;
       const beforeLessons = (enrollmentDoc.lessonCompletions || []).length;
       const beforeModules = (enrollmentDoc.moduleCompletions || []).length;
-      await recheckModuleCompletion(enrollmentDoc, modId);
+      // `course` is already in memory here — pass it so this loop doesn't
+      // re-fetch the same document once per module.
+      await recheckModuleCompletion(enrollmentDoc, modId, course);
       if ((enrollmentDoc.lessonCompletions || []).length > beforeLessons) progressChanged = true;
       if ((enrollmentDoc.moduleCompletions || []).length > beforeModules) progressChanged = true;
     }
@@ -773,7 +775,8 @@ router.get('/:id', authMiddleware, async (req, res) => {
         if (!modId) continue;
         const beforeLessons = (enrollmentDoc.lessonCompletions || []).length;
         const beforeModules = (enrollmentDoc.moduleCompletions || []).length;
-        const result = await recheckModuleCompletion(enrollmentDoc, modId);
+        // Same as the GET /:id loop — reuse the course already loaded above.
+        const result = await recheckModuleCompletion(enrollmentDoc, modId, course);
         if ((enrollmentDoc.lessonCompletions || []).length > beforeLessons) changed = true;
         if ((enrollmentDoc.moduleCompletions || []).length > beforeModules) changed = true;
         if (result?.justCompletedCourse) justCompletedCourse = true;
