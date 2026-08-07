@@ -7,8 +7,7 @@ import 'package:icare/screens/instructor_learners_screen.dart';
 import 'package:icare/screens/instructor_analytics.dart';
 import 'package:icare/screens/instructor_precautions_management.dart';
 import 'package:icare/screens/instructor_profile_setup.dart';
-import 'package:icare/navigators/deferred_route.dart';
-import 'package:icare/screens/instructor_lms_dashboard.dart' deferred as i_lms_dash;
+import 'package:icare/screens/instructor_lms_dashboard.dart';
 import 'package:icare/screens/instructor_lms_courses.dart';
 import 'package:icare/screens/instructor_lms_create_course.dart';
 import 'package:icare/utils/theme.dart';
@@ -56,10 +55,7 @@ class InstructorSidebar extends StatelessWidget {
                     'LMS Dashboard',
                     Icons.school_rounded,
                     'lms',
-                    DeferredScreen(
-                      loader: i_lms_dash.loadLibrary,
-                      builder: () => i_lms_dash.InstructorLmsDashboard(),
-                    ),
+                    const InstructorLmsDashboard(),
                   ),
                   _buildNavItem(
                     context,
