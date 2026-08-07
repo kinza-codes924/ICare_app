@@ -1379,8 +1379,9 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Existing comments
-          ...comments.take(3).map((c) => Padding(
+          // Existing comments — all of them. This used to take(3), which
+          // silently hid the rest of a thread once a discussion got going.
+          ...comments.map((c) => Padding(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
             child: Row(children: [
               CircleAvatar(radius: 12, backgroundColor: const Color(0xFF1A73E8),
