@@ -1533,7 +1533,7 @@ router.post('/admin/reset-student-progress', authMiddleware, async (req, res) =>
       return res.status(403).json({ success: false, message: 'Admin only' });
     }
 
-    const { emails, resetCourseTitle, unenrollCourseTitles, confirm } = req.body || {};
+    const { emails, resetCourseTitle, unenrollCourseTitles, unenrollCourseIds, confirm } = req.body || {};
     if (!Array.isArray(emails) || emails.length === 0) {
       return res.status(400).json({ success: false, message: 'emails[] is required' });
     }
@@ -1544,8 +1544,9 @@ router.post('/admin/reset-student-progress', authMiddleware, async (req, res) =>
     const User = require('../models/User');
     const Certificate = require('../models/Certificate');
 
+    const esc = (s) => String(s).trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const findCourseByTitle = async (title) => Course.findOne({
-      title: { $regex: `^${String(title).trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, $options: 'i' },
+      title: { $regex: `^${esc(title)}$`, $options: 'i' },
     }).select('_id title').lean();
 
     const resetCourse = await findCourseByTitle(resetCourseTitle);
@@ -1553,11 +1554,26 @@ router.post('/admin/reset-student-progress', authMiddleware, async (req, res) =>
       return res.status(404).json({ success: false, message: `Course not found: ${resetCourseTitle}` });
     }
 
+    // Titles are not unique — the same name can exist on several Course
+    // documents (a re-created or duplicated course keeps its old name). A
+    // findOne here matched only one of them, so a student enrolled in a
+    // different course of the SAME name was reported "not enrolled" and
+    // silently skipped. Match every course sharing the title instead.
     const unenrollCourses = [];
     for (const t of (unenrollCourseTitles || [])) {
-      const c = await findCourseByTitle(t);
-      if (c) unenrollCourses.push(c);
+      const matches = await Course.find({
+        title: { $regex: `^${esc(t)}$`, $options: 'i' },
+      }).select('_id title').lean();
+      if (matches.length) unenrollCourses.push(...matches);
       else unenrollCourses.push({ _id: null, title: t, notFound: true });
+    }
+    // Explicit ids win over title guessing when the caller already knows
+    // exactly which course document to detach.
+    for (const id of (unenrollCourseIds || [])) {
+      const cid = toId(id);
+      if (!cid) { unenrollCourses.push({ _id: null, title: String(id), notFound: true }); continue; }
+      const c = await Course.findById(cid).select('_id title').lean();
+      unenrollCourses.push(c || { _id: cid, title: `(course ${id} — no longer exists)` });
     }
 
     const report = [];
@@ -1650,6 +1666,122 @@ router.post('/admin/reset-student-progress', authMiddleware, async (req, res) =>
         ? 'Changes applied.'
         : 'DRY RUN — nothing was changed. Re-send with confirm:true to apply.',
       resetCourse: resetCourse.title,
+      report,
+    });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+// POST /api/courses/admin/list-student-enrollments
+// Admin-only, read-only. Lists every course each given student is enrolled in,
+// so unwanted enrollments can be identified before anything is deleted —
+// unlike the reset route, this never needs course titles supplied up front.
+// Body: { emails: string[] }
+router.post('/admin/list-student-enrollments', authMiddleware, async (req, res) => {
+  try {
+    await connectMongoDB();
+    if ((req.user.role || '').toLowerCase() !== 'admin') {
+      return res.status(403).json({ success: false, message: 'Admin only' });
+    }
+    const { emails } = req.body || {};
+    if (!Array.isArray(emails) || emails.length === 0) {
+      return res.status(400).json({ success: false, message: 'emails[] is required' });
+    }
+
+    const User = require('../models/User');
+    const esc = (s) => String(s).trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const report = [];
+
+    for (const rawEmail of emails) {
+      const email = String(rawEmail).trim().toLowerCase();
+      const user = await User.findOne({ email: { $regex: `^${esc(email)}$`, $options: 'i' } })
+        .select('_id name email').lean();
+      if (!user) {
+        report.push({ email, found: false, note: 'No user with this email' });
+        continue;
+      }
+      const enrollments = await Enrollment.find({ userId: user._id })
+        .select('_id courseId isCompleted moduleCompletions lessonCompletions createdAt').lean();
+      const courses = await Course.find({ _id: { $in: enrollments.map(e => e.courseId) } })
+        .select('_id title').lean();
+      const titleById = new Map(courses.map(c => [c._id.toString(), c.title]));
+
+      report.push({
+        email: user.email,
+        name: user.name,
+        userId: user._id,
+        enrollmentCount: enrollments.length,
+        enrollments: enrollments.map(e => ({
+          enrollmentId: e._id,
+          courseId: e.courseId,
+          courseTitle: titleById.get(e.courseId?.toString()) || '(course deleted)',
+          isCompleted: !!e.isCompleted,
+          modulesCompleted: (e.moduleCompletions || []).length,
+          lessonsCompleted: (e.lessonCompletions || []).length,
+          enrolledAt: e.createdAt,
+        })),
+      });
+    }
+
+    res.json({ success: true, report });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+// POST /api/courses/admin/purge-orphan-enrollments
+// Admin-only. Deletes enrollments whose course no longer exists. These can't
+// be removed by title (the Course document is gone, so there is no title to
+// match), yet they still count toward a student's course list. Dry run by
+// default, same as the reset route.
+// Body: { emails: string[], confirm?: boolean }
+router.post('/admin/purge-orphan-enrollments', authMiddleware, async (req, res) => {
+  try {
+    await connectMongoDB();
+    if ((req.user.role || '').toLowerCase() !== 'admin') {
+      return res.status(403).json({ success: false, message: 'Admin only' });
+    }
+    const { emails, confirm } = req.body || {};
+    if (!Array.isArray(emails) || emails.length === 0) {
+      return res.status(400).json({ success: false, message: 'emails[] is required' });
+    }
+
+    const User = require('../models/User');
+    const esc = (s) => String(s).trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const report = [];
+
+    for (const rawEmail of emails) {
+      const email = String(rawEmail).trim().toLowerCase();
+      const user = await User.findOne({ email: { $regex: `^${esc(email)}$`, $options: 'i' } })
+        .select('_id name email').lean();
+      if (!user) {
+        report.push({ email, found: false, note: 'No user with this email' });
+        continue;
+      }
+      const enrollments = await Enrollment.find({ userId: user._id }).select('_id courseId').lean();
+      const existing = await Course.find({ _id: { $in: enrollments.map(e => e.courseId) } })
+        .select('_id').lean();
+      const existingIds = new Set(existing.map(c => c._id.toString()));
+      const orphans = enrollments.filter(e => !existingIds.has(e.courseId?.toString()));
+
+      const entry = {
+        email: user.email,
+        name: user.name,
+        orphanCount: orphans.length,
+        orphans: orphans.map(o => ({ enrollmentId: o._id, missingCourseId: o.courseId })),
+      };
+      if (confirm === true && orphans.length) {
+        await Enrollment.deleteMany({ _id: { $in: orphans.map(o => o._id) } });
+        entry.applied = `deleted ${orphans.length} orphan enrollment(s)`;
+      }
+      report.push(entry);
+    }
+
+    res.json({
+      success: true,
+      dryRun: confirm !== true,
+      message: confirm === true ? 'Orphans deleted.' : 'DRY RUN — re-send with confirm:true to apply.',
       report,
     });
   } catch (e) {

@@ -105,7 +105,21 @@ async function recheckModuleCompletion(enrollment, moduleId) {
     allQuizzesPassed = moduleQuizzes.every(q => passedQuizIds.has(q._id.toString()));
   }
 
-  if (allLessonsDone && allAssignmentsSubmitted && allQuizzesPassed) {
+  // A module with no content at all must never auto-complete. Each check
+  // above is an .every() over a list, and .every() on an empty array is
+  // true, so an empty module satisfied all three conditions vacuously and
+  // was marked complete the instant a student opened the course. That in
+  // turn unlocked it while the modules before it were still locked — which
+  // is exactly how "Module 5: Publication, Peer Review & Research Grants"
+  // appeared unlocked, containing only "No lessons in this module", beside
+  // a locked Module 2/3/4. Instructors do leave placeholder modules empty
+  // mid-build, so treat those as not-yet-completable rather than done.
+  const hasAnyRequirement = contentLessonIds.length > 0
+    || liveLessonIds.length > 0
+    || assignmentLessonIds.length > 0
+    || moduleQuizzes.length > 0;
+
+  if (hasAnyRequirement && allLessonsDone && allAssignmentsSubmitted && allQuizzesPassed) {
     const alreadyCompleted = (enrollment.moduleCompletions || []).find(mc => mc.moduleId === moduleId);
     if (!alreadyCompleted) {
       if (!enrollment.moduleCompletions) enrollment.moduleCompletions = [];
