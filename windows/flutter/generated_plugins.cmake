@@ -9,6 +9,7 @@ list(APPEND FLUTTER_PLUGIN_LIST
   file_selector_windows
   firebase_auth
   firebase_core
+  flutter_inappwebview_windows
   flutter_volume_controller
   iris_method_channel
   local_auth_windows
