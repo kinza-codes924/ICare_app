@@ -138,7 +138,7 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
     );
     _tabs.addListener(() => setState(() {}));
     _loadStream();
-    _loadClasswork();
+    _loadClasswork(refreshModules: false);
     _loadPeople();
     _loadModules();
     // Poll for live session every 10s (students only)
@@ -208,30 +208,35 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
     }
   }
 
-  Future<void> _loadClasswork() async {
+  /// [refreshModules] must stay false for the initState call only, where
+  /// _loadModules already runs alongside this. Every other caller is a
+  /// post-create/delete refresh that needs the assignment/quiz/session
+  /// lists re-fetched — and since those now come from _loadModules, they
+  /// have to trigger it explicitly or the new item wouldn't appear.
+  Future<void> _loadClasswork({bool refreshModules = true}) async {
     if (_courseId.isEmpty) { setState(() => _loadingClasswork = false); return; }
     setState(() => _loadingClasswork = true);
+    if (refreshModules) unawaited(_loadModules());
     try {
-      // Fired together rather than awaited one-by-one: these five endpoints
-      // are independent, so sequential awaits cost the sum of five round
-      // trips before anything renders. In parallel the tab waits for the
-      // slowest single call instead.
+      // Assignments/quizzes/sessions are deliberately NOT fetched here:
+      // _loadModules already requests all three (it needs them to annotate
+      // module lessons) and assigns the same three fields. Both ran from
+      // initState, so opening a course fired six redundant requests and the
+      // screen waited on whichever finished last. Only the certificate
+      // calls are unique to this loader, and they're instructor-only —
+      // for a student there is now nothing left to fetch.
+      if (!widget.isInstructor) {
+        if (mounted) setState(() => _loadingClasswork = false);
+        return;
+      }
       final results = await Future.wait([
-        _lms.getCourseAssignments(_courseId),
-        _lms.getCourseQuizzes(_courseId),
-        _lms.getCourseSessions(_courseId),
-        if (widget.isInstructor) _lms.getReadyForCertificate(_courseId),
-        if (widget.isInstructor) _lms.getPendingCertificates(_courseId),
+        _lms.getReadyForCertificate(_courseId),
+        _lms.getPendingCertificates(_courseId),
       ]);
-      final a = results[0];
-      final q = results[1];
-      final s = results[2];
-      final readyForCert = widget.isInstructor ? results[3] : <dynamic>[];
-      final pendingCerts = widget.isInstructor ? results[4] : <dynamic>[];
       if (mounted) {
         setState(() {
-          _assignments = a; _quizzes = q; _sessions = s;
-          _readyForCert = readyForCert; _pendingCerts = pendingCerts;
+          _readyForCert = results[0];
+          _pendingCerts = results[1];
           _loadingClasswork = false;
         });
       }

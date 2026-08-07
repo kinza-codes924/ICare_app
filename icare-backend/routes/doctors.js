@@ -179,6 +179,22 @@ router.get('/get_all_doctors', async (req, res) => {
       is_active: { $ne: false },
     }).select('_id username name email phone profilePicture role is_active').lean();
 
+    // Profile pictures are stored as base64 data URIs on the User document.
+    // Inlining those in a LIST response makes it enormous — one 100KB avatar
+    // per doctor, none of it cacheable, re-sent on every poll (public_home
+    // re-fetches this route every 30s). Hosted URLs stay as-is; oversized
+    // data URIs are dropped so the client falls back to initials, which
+    // buildProfileImageProvider already does for a null picture. Detail
+    // screens fetch the full user record separately and still show the photo.
+    const MAX_INLINE_PICTURE = 4096;
+    doctors.forEach(d => {
+      if (typeof d.profilePicture === 'string'
+        && d.profilePicture.startsWith('data:')
+        && d.profilePicture.length > MAX_INLINE_PICTURE) {
+        d.profilePicture = null;
+      }
+    });
+
     const result = doctors.map(d => {
       const p = profileMap[d._id.toString()] || {};
       const lastSeen = p.last_seen ? new Date(p.last_seen) : null;
