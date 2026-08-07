@@ -6,7 +6,8 @@ const User = require('../models/User');
 const PharmacyProfile = require('../models/PharmacyProfile');
 const PharmacyOrder = require('../models/PharmacyOrder');
 const { authMiddleware } = require('../middleware/auth');
-const PDFDocument = require('pdfkit');
+// pdfkit (~200ms) is required lazily: it is used only when generating an
+// invoice PDF, but this route file loads on every cold start.
 
 function toId(id) {
   try { return new mongoose.Types.ObjectId(id); } catch { return null; }
@@ -37,6 +38,7 @@ router.get('/:orderId/pdf', authMiddleware, async (req, res) => {
     const items = order.items || [];
 
     // Create PDF
+    const PDFDocument = require('pdfkit');
     const doc = new PDFDocument({ margin: 50, size: 'A4' });
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename=icare-invoice-${orderId}.pdf`);

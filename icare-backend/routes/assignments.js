@@ -2,7 +2,8 @@ const express = require('express');
 const router  = express.Router();
 const mongoose = require('mongoose');
 const multer   = require('multer');
-const { v2: cloudinary } = require('cloudinary');
+// cloudinary (~110ms) is required lazily inside uploadBuffer(): it is only
+// needed when a file is actually uploaded, not on every cold start.
 const { connectMongoDB }  = require('../config/mongodb');
 const { authMiddleware }  = require('../middleware/auth');
 const Assignment           = require('../models/Assignment');
@@ -17,6 +18,7 @@ function toId(id) {
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });
 
 function uploadBuffer(buffer, folder) {
+  const { v2: cloudinary } = require('cloudinary');
   return new Promise((resolve, reject) => {
     const stream = cloudinary.uploader.upload_stream(
       { folder, resource_type: 'auto' },
