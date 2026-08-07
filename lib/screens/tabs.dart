@@ -67,7 +67,8 @@ import 'package:icare/screens/instructor_learners_screen.dart';
 import 'package:icare/screens/instructor_precautions_management.dart';
 import 'package:icare/screens/instructor_analytics.dart';
 import 'package:icare/screens/instructor_profile_setup.dart';
-import 'package:icare/screens/instructor_lms_dashboard.dart';
+import 'package:icare/navigators/deferred_route.dart';
+import 'package:icare/screens/instructor_lms_dashboard.dart' deferred as i_lms_dash;
 import 'dart:async';
 import 'package:icare/screens/lms_live_session_screen.dart';
 import 'package:icare/services/lms_service.dart';
@@ -412,7 +413,14 @@ class _TabsScreenState extends ConsumerState<TabsScreen> {
 
     // Instructor gets the full Google Classroom LMS as their main interface
     if (role == 'Instructor') {
-      return const InstructorLmsDashboard();
+      // Deferred so the instructor LMS ships as its own chunk. tabs.dart is
+      // on every user's startup path, so importing it eagerly here pulled the
+      // whole instructor dashboard into main.dart.js for patients too — and
+      // kept the router's deferred import from splitting anything at all.
+      return DeferredScreen(
+        loader: i_lms_dash.loadLibrary,
+        builder: () => i_lms_dash.InstructorLmsDashboard(),
+      );
     }
 
     final double screenWidth = MediaQuery.of(context).size.width;
