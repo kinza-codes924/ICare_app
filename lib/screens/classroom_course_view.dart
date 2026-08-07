@@ -1366,6 +1366,69 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
     );
   }
 
+  void _editComment(String postId, String commentId, String current) {
+    final ctrl = TextEditingController(text: current);
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Edit comment', style: TextStyle(fontSize: 18)),
+        content: TextField(
+          controller: ctrl,
+          autofocus: true,
+          maxLines: 4,
+          minLines: 1,
+          decoration: const InputDecoration(hintText: 'Your comment...'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel', style: TextStyle(color: Color(0xFF5F6368))),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final text = ctrl.text.trim();
+              if (text.isEmpty) return;
+              Navigator.pop(ctx);
+              try {
+                await _lms.editComment(postId, commentId, text);
+                await _loadStream();
+              } catch (_) {}
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _deleteComment(String postId, String commentId) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete comment?', style: TextStyle(fontSize: 18)),
+        content: const Text('This cannot be undone.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel', style: TextStyle(color: Color(0xFF5F6368))),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(ctx);
+              try {
+                await _lms.deleteComment(postId, commentId);
+                await _loadStream();
+              } catch (_) {}
+            },
+            style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red, foregroundColor: Colors.white),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildCommentSection(dynamic item) {
     final comments = (item.data['comments'] as List?) ?? [];
     final ctrl = TextEditingController();
@@ -1391,6 +1454,38 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
                 Text(c['authorName'] ?? 'User', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12)),
                 Text(c['text'] ?? '', style: const TextStyle(fontSize: 13)),
               ])),
+              // Author can edit/delete their own comment; the instructor can
+              // delete any to moderate. Matches the post-level menu and the
+              // rules announcements.js enforces server-side.
+              if (widget.isInstructor ||
+                  (_currentUserId != null &&
+                      c['authorId']?.toString() == _currentUserId))
+                Builder(builder: (_) {
+                  final isAuthor = _currentUserId != null &&
+                      c['authorId']?.toString() == _currentUserId;
+                  return PopupMenuButton<String>(
+                    icon: const Icon(Icons.more_vert_rounded,
+                        size: 16, color: Color(0xFF70757A)),
+                    padding: EdgeInsets.zero,
+                    itemBuilder: (_) => [
+                      if (isAuthor)
+                        const PopupMenuItem(
+                            value: 'edit',
+                            child: Text('Edit', style: TextStyle(fontSize: 14))),
+                      const PopupMenuItem(
+                          value: 'delete',
+                          child: Text('Delete', style: TextStyle(fontSize: 14))),
+                    ],
+                    onSelected: (val) {
+                      final commentId = c['_id']?.toString() ?? '';
+                      if (commentId.isEmpty) return;
+                      if (val == 'edit') {
+                        _editComment(postId, commentId, c['text']?.toString() ?? '');
+                      }
+                      if (val == 'delete') _deleteComment(postId, commentId);
+                    },
+                  );
+                }),
             ]),
           )),
           // Add comment input

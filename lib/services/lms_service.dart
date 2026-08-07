@@ -221,6 +221,17 @@ class LmsService {
     });
   }
 
+  Future<void> editComment(
+      String announcementId, String commentId, String text) async {
+    await _api.put('/lms/announcements/$announcementId/comment/$commentId', {
+      'text': text,
+    });
+  }
+
+  Future<void> deleteComment(String announcementId, String commentId) async {
+    await _api.delete('/lms/announcements/$announcementId/comment/$commentId');
+  }
+
   // ═══════════════════════════════════════════════════════════════════════
   // ASSIGNMENTS (from existing routes)
   // ═══════════════════════════════════════════════════════════════════════

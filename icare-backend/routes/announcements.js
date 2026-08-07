@@ -25,6 +25,24 @@ router.get('/course/:courseId', authMiddleware, async (req, res) => {
         p.comments = p.comments.filter(c => c?.text && String(c.text).trim());
       }
     }
+
+    // Repair author names on posts saved before the POST route stopped
+    // trusting req.user.name (absent from the JWT, so it fell through to the
+    // literal 'Instructor' for everyone). Those rows stored the right
+    // authorRole but the wrong name, which showed a student's own post as
+    // the instructor's. Resolved from the User document at read time so old
+    // posts display correctly without a migration.
+    const stale = posts.filter(p => p.authorName === 'Instructor' && p.authorId);
+    if (stale.length) {
+      const users = await User.find({ _id: { $in: stale.map(p => p.authorId) } })
+        .select('name username').lean();
+      const nameById = new Map(users.map(u => [u._id.toString(), u.name || u.username]));
+      for (const p of stale) {
+        const real = nameById.get(p.authorId.toString());
+        if (real) p.authorName = real;
+      }
+    }
+
     res.json({ success: true, posts });
   } catch (e) {
     res.status(500).json({ success: false, message: e.message });
@@ -37,11 +55,18 @@ router.post('/', authMiddleware, async (req, res) => {
     await connectMongoDB();
     const { courseId, content, attachmentUrl, attachmentName } = req.body;
     if (!courseId || !content) return res.status(400).json({ success: false, message: 'courseId and content required' });
+    // Look the name up rather than trusting req.user.name: the JWT payload
+    // does not carry it, so this fell through to 'Instructor' for everyone —
+    // which mislabelled every student post as the instructor's now that
+    // students can post here. The comment route below already reads the User
+    // document for exactly this reason.
+    const userDoc = await User.findById(req.user.id).select('name username role').lean();
+    const roleStr = (userDoc?.role || req.user.role || '').toLowerCase();
     const post = await Announcement.create({
       courseId, content, attachmentUrl, attachmentName,
       authorId:   req.user.id,
-      authorName: req.user.name || 'Instructor',
-      authorRole: req.user.role?.toLowerCase() === 'instructor' || req.user.role?.toLowerCase() === 'doctor' ? 'instructor' : 'student',
+      authorName: userDoc?.name || userDoc?.username || 'User',
+      authorRole: roleStr === 'instructor' || roleStr === 'doctor' ? 'instructor' : 'student',
     });
     res.json({ success: true, post });
   } catch (e) {
@@ -122,6 +147,62 @@ router.delete('/:postId', authMiddleware, async (req, res) => {
 
     await Announcement.findByIdAndDelete(toId(req.params.postId));
     res.json({ success: true });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+// ── Edit a comment ────────────────────────────────────────────────────────────
+// Author only. Same ownership rule as editing a post.
+router.put('/:postId/comment/:commentId', authMiddleware, async (req, res) => {
+  try {
+    await connectMongoDB();
+    const text = req.body.text ?? req.body.comment;
+    if (!text || !String(text).trim()) {
+      return res.status(400).json({ success: false, message: 'Comment text is required' });
+    }
+    const post = await Announcement.findById(toId(req.params.postId));
+    if (!post) return res.status(404).json({ success: false, message: 'Post not found' });
+    const comment = post.comments.id(toId(req.params.commentId));
+    if (!comment) return res.status(404).json({ success: false, message: 'Comment not found' });
+    if (comment.authorId?.toString() !== req.user.id?.toString()) {
+      return res.status(403).json({ success: false, message: 'You can only edit your own comment' });
+    }
+    comment.text = String(text).trim();
+    await post.save();
+    res.json({ success: true, post });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+// ── Delete a comment ──────────────────────────────────────────────────────────
+// The comment's author, or the course instructor (so they can moderate).
+router.delete('/:postId/comment/:commentId', authMiddleware, async (req, res) => {
+  try {
+    await connectMongoDB();
+    const post = await Announcement.findById(toId(req.params.postId));
+    if (!post) return res.status(404).json({ success: false, message: 'Post not found' });
+    const comment = post.comments.id(toId(req.params.commentId));
+    if (!comment) return res.status(404).json({ success: false, message: 'Comment not found' });
+
+    const isAuthor = comment.authorId?.toString() === req.user.id?.toString();
+    let isCourseInstructor = false;
+    if (!isAuthor) {
+      const Course = require('../models/Course');
+      const course = await Course.findById(post.courseId).select('instructor_id coTeachers').lean();
+      const uid = req.user.id?.toString();
+      isCourseInstructor = course?.instructor_id?.toString() === uid
+        || (course?.coTeachers || []).some(t =>
+             t.userId?.toString() === uid && (t.status ?? 'accepted') === 'accepted');
+    }
+    if (!isAuthor && !isCourseInstructor) {
+      return res.status(403).json({ success: false, message: 'Not allowed to delete this comment' });
+    }
+
+    post.comments.pull({ _id: toId(req.params.commentId) });
+    await post.save();
+    res.json({ success: true, post });
   } catch (e) {
     res.status(500).json({ success: false, message: e.message });
   }
