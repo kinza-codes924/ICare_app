@@ -3,8 +3,10 @@ workflows:
   android-apk:
     name: Android APK
     max_build_duration: 60
+
     environment:
       flutter: 3.44.0
+
     scripts:
       - name: Get dependencies
         script: flutter pub get
