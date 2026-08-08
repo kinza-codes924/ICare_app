@@ -1,10 +1,11 @@
 workflows:
-
   android-apk:
     name: Android APK
     max_build_duration: 60
+
     environment:
       flutter: 3.44.0
+
     scripts:
       - name: Get dependencies
         script: flutter pub get
@@ -25,7 +26,7 @@ workflows:
 
     environment:
       flutter: 3.44.0
-      xcode: 26.4
+      xcode: latest
 
       ios_signing:
         distribution_type: app_store
@@ -33,8 +34,7 @@ workflows:
 
     scripts:
       - name: Get Flutter packages
-        script: |
-          flutter pub get
+        script: flutter pub get
 
       - name: Install CocoaPods
         script: |
@@ -43,8 +43,7 @@ workflows:
           cd ..
 
       - name: Set up iOS code signing
-        script: |
-          xcode-project use-profiles
+        script: xcode-project use-profiles
 
       - name: Build IPA
         script: |
