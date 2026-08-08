@@ -30,10 +30,8 @@ workflows:
       xcode: 26.4
 
       ios_signing:
-        provisioning_profiles:
-          - icare_appstore
-        certificates:
-          - RMHealth
+        distribution_type: app_store
+        bundle_identifier: com.cartzlinkv2.icare
 
     scripts:
       - name: Get Flutter packages
@@ -48,7 +46,7 @@ workflows:
 
       - name: Set up iOS code signing
         script: |
-          xcode-project use-profiles --project ios/Runner.xcodeproj
+          xcode-project use-profiles
 
       - name: Build IPA
         script: |
