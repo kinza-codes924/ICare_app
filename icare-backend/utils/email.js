@@ -26,18 +26,33 @@ async function sendViaResend({ to, subject, html }) {
 }
 
 async function sendViaSmtp({ to, subject, html }) {
+  // Host/port are configurable so the app can send through the project's own
+  // Plesk mail server (e.g. noreply@icare.com.co) instead of Gmail. Set
+  // SMTP_HOST / SMTP_PORT / SMTP_SECURE on Vercel; they default to Gmail's
+  // submission settings if unset, so the existing Gmail creds keep working.
+  //   port 465 -> SMTP_SECURE=true  (implicit TLS)
+  //   port 587 -> SMTP_SECURE=false (STARTTLS; requireTLS is set below)
+  const host = process.env.SMTP_HOST || 'smtp.gmail.com';
+  const port = parseInt(process.env.SMTP_PORT || '587', 10);
+  const secure = process.env.SMTP_SECURE
+    ? process.env.SMTP_SECURE === 'true'
+    : port === 465;
+  // Plesk mailboxes commonly reject a From whose address isn't the
+  // authenticated mailbox, so default the From to the login user.
+  const fromAddress = process.env.EMAIL_FROM || process.env.EMAIL_USER;
+
   const transporter = nodemailer.createTransport({
-    host: 'smtp.gmail.com',
-    port: 587,
-    secure: false,
-    requireTLS: true,
+    host,
+    port,
+    secure,
+    requireTLS: !secure,
     auth: {
       user: process.env.EMAIL_USER,
       pass: process.env.EMAIL_PASS,
     },
   });
   await transporter.sendMail({
-    from: `"iCare" <${process.env.EMAIL_USER}>`,
+    from: `"iCare" <${fromAddress}>`,
     to,
     subject,
     html,
