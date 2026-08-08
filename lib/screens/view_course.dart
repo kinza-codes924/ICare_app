@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:icare/services/lms_service.dart';
 import 'package:icare/models/course.dart';
 import 'package:icare/screens/lesson_player.dart';
-import 'package:icare/screens/lms_course_page.dart';
+import 'package:icare/screens/classroom_course_view.dart';
 import 'package:icare/screens/lms_purchase_flow.dart';
 import 'package:icare/screens/quiz_screen.dart';
 import 'package:icare/services/course_service.dart';
@@ -711,8 +711,13 @@ class _ViewCourseState extends ConsumerState<ViewCourse> {
               icon: Icon(isLocked ? Icons.lock_open_rounded : Icons.open_in_new_rounded, color: Colors.white),
               label: Text(isLocked ? 'Pay Now to Unlock' : 'Open Course',
                   style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+              // Opens the classroom view (Announcement / Course Content /
+              // Grades / People) — the same screen "Open Classroom" leads to.
+              // This used to push LmsCoursePage, the blue-banner layout, so
+              // one enrolled course looked like two different products
+              // depending on which button the student pressed to reach it.
               onPressed: () => Navigator.push(context, MaterialPageRoute(
-                builder: (_) => LmsCoursePage(
+                builder: (_) => ClassroomCourseView(
                   course: widget.courseData ?? {},
                   enrollmentId: _currentEnrollmentId,
                   isInstructor: _isInstructor,
@@ -1129,48 +1134,12 @@ class _ViewCourseState extends ConsumerState<ViewCourse> {
                         },
                 );
               }),
-              // Mark Module Complete button (students, unlocked modules, enrolled)
-              if (!isModuleLocked && isPurchased && !_isInstructor && _currentEnrollmentId != null) ...[
-                const Divider(height: 1),
-                Builder(builder: (ctx) {
-                  final moduleId = module['_id']?.toString() ?? '';
-                  final isDone = _completedModuleIds.contains(moduleId);
-                  return ListTile(
-                    leading: Icon(
-                      isDone ? Icons.check_circle_rounded : Icons.check_circle_outline_rounded,
-                      color: isDone ? const Color(0xFF10B981) : const Color(0xFF64748B),
-                    ),
-                    title: Text(
-                      isDone ? 'Module Completed' : 'Mark Module as Complete',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w600,
-                        color: isDone ? const Color(0xFF10B981) : const Color(0xFF14B1FF),
-                      ),
-                    ),
-                    onTap: isDone ? null : () async {
-                      if (moduleId.isEmpty) return;
-                      final result = await _lms.markModuleComplete(
-                        enrollmentId: _currentEnrollmentId!,
-                        moduleId: moduleId,
-                      );
-                      if (mounted) {
-                        if (result['success'] != false) {
-                          setState(() => _completedModuleIds.add(moduleId));
-                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                            content: Text('Module marked as complete!'),
-                            backgroundColor: Color(0xFF10B981),
-                          ));
-                        } else {
-                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                            content: Text(result['message']?.toString() ?? 'Failed'),
-                            backgroundColor: Colors.red,
-                          ));
-                        }
-                      }
-                    },
-                  );
-                }),
-              ],
+              // NOTE: the "Mark Module as Complete" row used to sit here.
+              // Removed at the client's request — the curriculum list on this
+              // screen should show only the module's own contents. Progress is
+              // still recorded: lessons mark themselves complete as they're
+              // finished, and courseProgress.js derives module completion from
+              // those, so nothing depends on this manual button.
               if (!isModuleLocked && module['quiz'] != null) ...[
                 const Divider(height: 1),
                 ListTile(

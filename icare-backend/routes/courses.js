@@ -586,7 +586,9 @@ router.get('/:courseId/student-progress/:studentId', authMiddleware, async (req,
       if (!modId) continue;
       const beforeLessons = (enrollmentDoc.lessonCompletions || []).length;
       const beforeModules = (enrollmentDoc.moduleCompletions || []).length;
-      await recheckModuleCompletion(enrollmentDoc, modId);
+      // `course` is already in memory here — pass it so this loop doesn't
+      // re-fetch the same document once per module.
+      await recheckModuleCompletion(enrollmentDoc, modId, course);
       if ((enrollmentDoc.lessonCompletions || []).length > beforeLessons) progressChanged = true;
       if ((enrollmentDoc.moduleCompletions || []).length > beforeModules) progressChanged = true;
     }
@@ -773,7 +775,8 @@ router.get('/:id', authMiddleware, async (req, res) => {
         if (!modId) continue;
         const beforeLessons = (enrollmentDoc.lessonCompletions || []).length;
         const beforeModules = (enrollmentDoc.moduleCompletions || []).length;
-        const result = await recheckModuleCompletion(enrollmentDoc, modId);
+        // Same as the GET /:id loop — reuse the course already loaded above.
+        const result = await recheckModuleCompletion(enrollmentDoc, modId, course);
         if ((enrollmentDoc.lessonCompletions || []).length > beforeLessons) changed = true;
         if ((enrollmentDoc.moduleCompletions || []).length > beforeModules) changed = true;
         if (result?.justCompletedCourse) justCompletedCourse = true;
@@ -1510,5 +1513,283 @@ async function setEnrollmentLock(req, res, locked) {
 
 router.post('/admin/enrollment/:id/lock', authMiddleware, (req, res) => setEnrollmentLock(req, res, true));
 router.post('/admin/enrollment/:id/unlock', authMiddleware, (req, res) => setEnrollmentLock(req, res, false));
+
+// POST /api/courses/admin/reset-student-progress
+// Admin-only bulk reset used when a cohort must retake a course: deletes their
+// certificates and zeroes progress, keeping the enrollment so students can
+// restart immediately without re-purchasing.
+//
+// Defaults to a DRY RUN. Nothing is written unless the caller passes
+// confirm:true, so the exact set of affected records can be reviewed first —
+// certificates and progress are not recoverable once deleted.
+//
+// Body: {
+//   emails: string[],              // students to reset
+//   resetCourseTitle: string,      // course whose progress+certificate is cleared
+//   unenrollCourseTitles?: string[],// courses to remove the student from entirely
+//   confirm?: boolean              // false/absent = dry run
+// }
+router.post('/admin/reset-student-progress', authMiddleware, async (req, res) => {
+  try {
+    await connectMongoDB();
+    if ((req.user.role || '').toLowerCase() !== 'admin') {
+      return res.status(403).json({ success: false, message: 'Admin only' });
+    }
+
+    const { emails, resetCourseTitle, unenrollCourseTitles, unenrollCourseIds, confirm } = req.body || {};
+    if (!Array.isArray(emails) || emails.length === 0) {
+      return res.status(400).json({ success: false, message: 'emails[] is required' });
+    }
+    if (!resetCourseTitle) {
+      return res.status(400).json({ success: false, message: 'resetCourseTitle is required' });
+    }
+
+    const User = require('../models/User');
+    const Certificate = require('../models/Certificate');
+
+    const esc = (s) => String(s).trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const findCourseByTitle = async (title) => Course.findOne({
+      title: { $regex: `^${esc(title)}$`, $options: 'i' },
+    }).select('_id title').lean();
+
+    const resetCourse = await findCourseByTitle(resetCourseTitle);
+    if (!resetCourse) {
+      return res.status(404).json({ success: false, message: `Course not found: ${resetCourseTitle}` });
+    }
+
+    // Titles are not unique — the same name can exist on several Course
+    // documents (a re-created or duplicated course keeps its old name). A
+    // findOne here matched only one of them, so a student enrolled in a
+    // different course of the SAME name was reported "not enrolled" and
+    // silently skipped. Match every course sharing the title instead.
+    const unenrollCourses = [];
+    for (const t of (unenrollCourseTitles || [])) {
+      const matches = await Course.find({
+        title: { $regex: `^${esc(t)}$`, $options: 'i' },
+      }).select('_id title').lean();
+      if (matches.length) unenrollCourses.push(...matches);
+      else unenrollCourses.push({ _id: null, title: t, notFound: true });
+    }
+    // Explicit ids win over title guessing when the caller already knows
+    // exactly which course document to detach.
+    for (const id of (unenrollCourseIds || [])) {
+      const cid = toId(id);
+      if (!cid) { unenrollCourses.push({ _id: null, title: String(id), notFound: true }); continue; }
+      const c = await Course.findById(cid).select('_id title').lean();
+      unenrollCourses.push(c || { _id: cid, title: `(course ${id} — no longer exists)` });
+    }
+
+    const report = [];
+    for (const rawEmail of emails) {
+      const email = String(rawEmail).trim().toLowerCase();
+      const user = await User.findOne({ email: { $regex: `^${email.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, $options: 'i' } })
+        .select('_id name email').lean();
+      if (!user) {
+        report.push({ email, found: false, note: 'No user with this email' });
+        continue;
+      }
+
+      const enrollment = await Enrollment.findOne({ userId: user._id, courseId: resetCourse._id })
+        .select('_id progress moduleCompletions lessonCompletions isCompleted').lean();
+      const certs = await Certificate.find({ studentId: user._id, courseId: resetCourse._id })
+        .select('_id certificateNumber approvalStatus issuedAt').lean();
+
+      const unenrollHits = [];
+      for (const c of unenrollCourses) {
+        if (!c._id) { unenrollHits.push({ title: c.title, notFound: true }); continue; }
+        const e = await Enrollment.findOne({ userId: user._id, courseId: c._id }).select('_id').lean();
+        unenrollHits.push({ title: c.title, enrolled: !!e, enrollmentId: e?._id });
+      }
+
+      const entry = {
+        email: user.email,
+        name: user.name,
+        userId: user._id,
+        resetCourse: {
+          title: resetCourse.title,
+          enrolled: !!enrollment,
+          currentProgress: enrollment
+            ? {
+                completedVideos: enrollment.progress?.completedVideos ?? 0,
+                quizResults: (enrollment.progress?.quizResults || []).length,
+                modulesCompleted: (enrollment.moduleCompletions || []).length,
+                lessonsCompleted: (enrollment.lessonCompletions || []).length,
+                isCompleted: !!enrollment.isCompleted,
+              }
+            : null,
+        },
+        certificatesToDelete: certs.map(c => ({
+          id: c._id,
+          number: c.certificateNumber,
+          approvalStatus: c.approvalStatus,
+          issuedAt: c.issuedAt,
+        })),
+        unenrollFrom: unenrollHits,
+      };
+
+      if (confirm === true) {
+        const actions = [];
+        if (certs.length) {
+          await Certificate.deleteMany({ studentId: user._id, courseId: resetCourse._id });
+          actions.push(`deleted ${certs.length} certificate(s)`);
+        }
+        if (enrollment) {
+          await Enrollment.updateOne(
+            { _id: enrollment._id },
+            {
+              $set: {
+                'progress.completedVideos': 0,
+                'progress.quizResults': [],
+                'progress.completed': false,
+                moduleCompletions: [],
+                lessonCompletions: [],
+                isCompleted: false,
+              },
+              $unset: { completedAt: '' },
+            },
+          );
+          actions.push('progress reset to 0');
+        }
+        for (const h of unenrollHits) {
+          if (h.enrolled && h.enrollmentId) {
+            await Enrollment.deleteOne({ _id: h.enrollmentId });
+            actions.push(`unenrolled from "${h.title}"`);
+          }
+        }
+        entry.applied = actions;
+      }
+
+      report.push(entry);
+    }
+
+    res.json({
+      success: true,
+      dryRun: confirm !== true,
+      message: confirm === true
+        ? 'Changes applied.'
+        : 'DRY RUN — nothing was changed. Re-send with confirm:true to apply.',
+      resetCourse: resetCourse.title,
+      report,
+    });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+// POST /api/courses/admin/list-student-enrollments
+// Admin-only, read-only. Lists every course each given student is enrolled in,
+// so unwanted enrollments can be identified before anything is deleted —
+// unlike the reset route, this never needs course titles supplied up front.
+// Body: { emails: string[] }
+router.post('/admin/list-student-enrollments', authMiddleware, async (req, res) => {
+  try {
+    await connectMongoDB();
+    if ((req.user.role || '').toLowerCase() !== 'admin') {
+      return res.status(403).json({ success: false, message: 'Admin only' });
+    }
+    const { emails } = req.body || {};
+    if (!Array.isArray(emails) || emails.length === 0) {
+      return res.status(400).json({ success: false, message: 'emails[] is required' });
+    }
+
+    const User = require('../models/User');
+    const esc = (s) => String(s).trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const report = [];
+
+    for (const rawEmail of emails) {
+      const email = String(rawEmail).trim().toLowerCase();
+      const user = await User.findOne({ email: { $regex: `^${esc(email)}$`, $options: 'i' } })
+        .select('_id name email').lean();
+      if (!user) {
+        report.push({ email, found: false, note: 'No user with this email' });
+        continue;
+      }
+      const enrollments = await Enrollment.find({ userId: user._id })
+        .select('_id courseId isCompleted moduleCompletions lessonCompletions createdAt').lean();
+      const courses = await Course.find({ _id: { $in: enrollments.map(e => e.courseId) } })
+        .select('_id title').lean();
+      const titleById = new Map(courses.map(c => [c._id.toString(), c.title]));
+
+      report.push({
+        email: user.email,
+        name: user.name,
+        userId: user._id,
+        enrollmentCount: enrollments.length,
+        enrollments: enrollments.map(e => ({
+          enrollmentId: e._id,
+          courseId: e.courseId,
+          courseTitle: titleById.get(e.courseId?.toString()) || '(course deleted)',
+          isCompleted: !!e.isCompleted,
+          modulesCompleted: (e.moduleCompletions || []).length,
+          lessonsCompleted: (e.lessonCompletions || []).length,
+          enrolledAt: e.createdAt,
+        })),
+      });
+    }
+
+    res.json({ success: true, report });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+// POST /api/courses/admin/purge-orphan-enrollments
+// Admin-only. Deletes enrollments whose course no longer exists. These can't
+// be removed by title (the Course document is gone, so there is no title to
+// match), yet they still count toward a student's course list. Dry run by
+// default, same as the reset route.
+// Body: { emails: string[], confirm?: boolean }
+router.post('/admin/purge-orphan-enrollments', authMiddleware, async (req, res) => {
+  try {
+    await connectMongoDB();
+    if ((req.user.role || '').toLowerCase() !== 'admin') {
+      return res.status(403).json({ success: false, message: 'Admin only' });
+    }
+    const { emails, confirm } = req.body || {};
+    if (!Array.isArray(emails) || emails.length === 0) {
+      return res.status(400).json({ success: false, message: 'emails[] is required' });
+    }
+
+    const User = require('../models/User');
+    const esc = (s) => String(s).trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const report = [];
+
+    for (const rawEmail of emails) {
+      const email = String(rawEmail).trim().toLowerCase();
+      const user = await User.findOne({ email: { $regex: `^${esc(email)}$`, $options: 'i' } })
+        .select('_id name email').lean();
+      if (!user) {
+        report.push({ email, found: false, note: 'No user with this email' });
+        continue;
+      }
+      const enrollments = await Enrollment.find({ userId: user._id }).select('_id courseId').lean();
+      const existing = await Course.find({ _id: { $in: enrollments.map(e => e.courseId) } })
+        .select('_id').lean();
+      const existingIds = new Set(existing.map(c => c._id.toString()));
+      const orphans = enrollments.filter(e => !existingIds.has(e.courseId?.toString()));
+
+      const entry = {
+        email: user.email,
+        name: user.name,
+        orphanCount: orphans.length,
+        orphans: orphans.map(o => ({ enrollmentId: o._id, missingCourseId: o.courseId })),
+      };
+      if (confirm === true && orphans.length) {
+        await Enrollment.deleteMany({ _id: { $in: orphans.map(o => o._id) } });
+        entry.applied = `deleted ${orphans.length} orphan enrollment(s)`;
+      }
+      report.push(entry);
+    }
+
+    res.json({
+      success: true,
+      dryRun: confirm !== true,
+      message: confirm === true ? 'Orphans deleted.' : 'DRY RUN — re-send with confirm:true to apply.',
+      report,
+    });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
 
 module.exports = router;

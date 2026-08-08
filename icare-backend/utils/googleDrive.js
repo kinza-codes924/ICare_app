@@ -38,7 +38,12 @@
 // If these aren't set, uploadRecordingToDrive() is a no-op (returns null)
 // so recording-finalize still succeeds normally without Drive configured.
 
-const { google } = require('googleapis');
+// googleapis is required lazily in getDriveClient() rather than here. It
+// costs ~1.5s to load, and this module is pulled in by live-sessions.js,
+// which api/index.js loads at startup — so every cold start of ANY endpoint
+// paid that 1.5s even though Drive is only touched when a session recording
+// is backed up. Measured: all 53 route files took 2.3s to require, 1.3s of
+// it this single transitive import.
 const { Readable } = require('stream');
 
 function isConfigured() {
@@ -51,6 +56,7 @@ function isConfigured() {
 }
 
 function getDriveClient() {
+  const { google } = require('googleapis');
   const oauth2Client = new google.auth.OAuth2(
     process.env.GOOGLE_DRIVE_CLIENT_ID,
     process.env.GOOGLE_DRIVE_CLIENT_SECRET

@@ -20,9 +20,10 @@ dependencies:
   path: ^1.9.1
   flutter_svg: ^2.2.1
   agora_rtc_engine: 6.5.3
-  zego_uikit_prebuilt_call: ^4.23.0
-  zego_uikit_signaling_plugin: 2.8.6
-  zego_zim: 2.16.0
+  # Zego removed: calls run on Jitsi now and no Dart file imports zego_*,
+  # but the packages still shipped ~7MB of web assets (copyrighted-music.js,
+  # ZegoExpressWebFlutterWrapper.js, voice-changer.js, zim/index.js) that
+  # every page load had to fetch.
   flutter_size_matters: ^1.0.8
   flutter_riverpod: ^3.0.3
   pin_code_fields: ^8.0.1
@@ -71,17 +72,20 @@ dev_dependencies:
   flutter_lints: ^6.0.0
   flutter_launcher_icons: ^0.14.4
 
-dependency_overrides:
-  zego_zim: 2.16.0
-  zego_uikit_signaling_plugin: 2.8.6
+# For information on the generic Dart part of this file, see the
+# following page: https://dart.dev/tools/pub/pubspec
 
+# The following section is specific to Flutter packages.
 flutter:
   uses-material-design: true
 
   assets:
     - assets/
     - assets/images/
-    - assets/images/screenshots/
+    # assets/images/screenshots/ removed: 5MB of documentation screenshots
+    # that no Dart file references, but which every user downloaded because
+    # declaring the directory bundles it whole. The files stay in the repo
+    # for docs — they just no longer ship in the app.
     - assets/images/splash_web_bg.png
     - assets/images/web_splash.jpeg
     - assets/translations/

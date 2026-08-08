@@ -199,6 +199,10 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
       _showError('An error occurred. Please check your connection and try again.');
     } finally {
       if (mounted) setState(() => _isLoading = false);
+      // reCAPTCHA tokens are single-use — see login.dart. Without this a
+      // failed signup left the checkbox ticked but returning an empty
+      // token, and re-clicking the tick did nothing.
+      if (kIsWeb) resetRecaptcha();
     }
   }
 

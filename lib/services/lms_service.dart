@@ -213,9 +213,23 @@ class LmsService {
   }
 
   Future<void> addComment(String announcementId, String comment) async {
+    // 'text' is what the route reads and the schema stores. This sent
+    // 'comment', which the route ignored, so every comment saved empty and
+    // the feed showed the author's name above a blank line.
     await _api.post('/lms/announcements/$announcementId/comment', {
-      'comment': comment,
+      'text': comment,
     });
+  }
+
+  Future<void> editComment(
+      String announcementId, String commentId, String text) async {
+    await _api.put('/lms/announcements/$announcementId/comment/$commentId', {
+      'text': text,
+    });
+  }
+
+  Future<void> deleteComment(String announcementId, String commentId) async {
+    await _api.delete('/lms/announcements/$announcementId/comment/$commentId');
   }
 
   // ═══════════════════════════════════════════════════════════════════════

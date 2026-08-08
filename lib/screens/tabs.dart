@@ -412,6 +412,12 @@ class _TabsScreenState extends ConsumerState<TabsScreen> {
 
     // Instructor gets the full Google Classroom LMS as their main interface
     if (role == 'Instructor') {
+      // NOT deferred, deliberately. This sits in a build() method that
+      // re-runs on every rebuild, and DeferredScreen creates its load Future
+      // in State.initState — so a new DeferredScreen instance each rebuild
+      // remounted the whole dashboard and refetched its data, leaving the
+      // instructor staring at a spinner. Deferring here saved ~0KB anyway,
+      // since classroom_course_view.dart imports the same screens eagerly.
       return const InstructorLmsDashboard();
     }
 

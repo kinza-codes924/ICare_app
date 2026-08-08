@@ -2400,6 +2400,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
       _showError('An error occurred. Please try again.');
     } finally {
       if (mounted) setState(() => isLoading = false);
+      // A reCAPTCHA token is single-use: once submitted, Google will not
+      // return it again from getResponse(). Without this reset a failed
+      // login (wrong password, unapproved account, network error) left the
+      // checkbox stuck showing its green tick while handing back an empty
+      // token on every retry — and clicking the tick did nothing, because
+      // to the widget it was already checked. Resetting clears the tick so
+      // the user can solve it again for the next attempt.
+      if (kIsWeb) resetRecaptcha();
     }
   }
 

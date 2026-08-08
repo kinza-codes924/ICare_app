@@ -13,6 +13,7 @@ import 'package:icare/screens/lesson_detail_page.dart';
 import 'package:icare/screens/doctor_notifications.dart';
 import 'package:icare/screens/instructor_assignments_list_screen.dart';
 import 'package:icare/services/lms_service.dart';
+import 'package:icare/utils/shared_pref.dart';
 import 'package:icare/services/notification_service.dart';
 import 'package:icare/screens/lms_live_session_screen.dart';
 import 'package:icare/screens/installment_schedule_screen.dart';
@@ -49,6 +50,9 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
   final LmsService _lms = LmsService();
 
   List<dynamic> _announcements = [];
+  // Needed to decide who may edit/delete a post now that students can
+  // post here — the menu shows for a post's own author.
+  String? _currentUserId;
   bool _loadingStream = true;
   final TextEditingController _postCtrl = TextEditingController();
 
@@ -137,8 +141,11 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
       initialIndex: widget.initialTab.clamp(0, widget.isInstructor ? 4 : 3),
     );
     _tabs.addListener(() => setState(() {}));
+    SharedPref().getUserId().then((id) {
+      if (mounted) setState(() => _currentUserId = id);
+    });
     _loadStream();
-    _loadClasswork();
+    _loadClasswork(refreshModules: false);
     _loadPeople();
     _loadModules();
     // Poll for live session every 10s (students only)
@@ -208,23 +215,35 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
     }
   }
 
-  Future<void> _loadClasswork() async {
+  /// [refreshModules] must stay false for the initState call only, where
+  /// _loadModules already runs alongside this. Every other caller is a
+  /// post-create/delete refresh that needs the assignment/quiz/session
+  /// lists re-fetched — and since those now come from _loadModules, they
+  /// have to trigger it explicitly or the new item wouldn't appear.
+  Future<void> _loadClasswork({bool refreshModules = true}) async {
     if (_courseId.isEmpty) { setState(() => _loadingClasswork = false); return; }
     setState(() => _loadingClasswork = true);
+    if (refreshModules) unawaited(_loadModules());
     try {
-      final a = await _lms.getCourseAssignments(_courseId);
-      final q = await _lms.getCourseQuizzes(_courseId);
-      final s = await _lms.getCourseSessions(_courseId);
-      List<dynamic> readyForCert = [];
-      List<dynamic> pendingCerts = [];
-      if (widget.isInstructor) {
-        readyForCert = await _lms.getReadyForCertificate(_courseId);
-        pendingCerts = await _lms.getPendingCertificates(_courseId);
+      // Assignments/quizzes/sessions are deliberately NOT fetched here:
+      // _loadModules already requests all three (it needs them to annotate
+      // module lessons) and assigns the same three fields. Both ran from
+      // initState, so opening a course fired six redundant requests and the
+      // screen waited on whichever finished last. Only the certificate
+      // calls are unique to this loader, and they're instructor-only —
+      // for a student there is now nothing left to fetch.
+      if (!widget.isInstructor) {
+        if (mounted) setState(() => _loadingClasswork = false);
+        return;
       }
+      final results = await Future.wait([
+        _lms.getReadyForCertificate(_courseId),
+        _lms.getPendingCertificates(_courseId),
+      ]);
       if (mounted) {
         setState(() {
-          _assignments = a; _quizzes = q; _sessions = s;
-          _readyForCert = readyForCert; _pendingCerts = pendingCerts;
+          _readyForCert = results[0];
+          _pendingCerts = results[1];
           _loadingClasswork = false;
         });
       }
@@ -684,8 +703,13 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
                   Expanded(
                     child: Column(
                       children: [
-                        if (widget.isInstructor) _buildAnnouncementInput(),
-                        if (widget.isInstructor) const SizedBox(height: 12),
+                        // Open to students too — this tab doubles as the
+                        // course discussion forum. The backend already
+                        // accepted student posts (announcements.js stamps
+                        // authorRole from the caller's own role); only this
+                        // UI gate kept them from ever reaching it.
+                        _buildAnnouncementInput(),
+                        const SizedBox(height: 12),
                         _buildAnnouncementFeed(),
                       ],
                     ),
@@ -700,8 +724,8 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
                 children: [
                   _buildUpcomingWidget(),
                   const SizedBox(height: 16),
-                  if (widget.isInstructor) _buildAnnouncementInput(),
-                  if (widget.isInstructor) const SizedBox(height: 12),
+                  _buildAnnouncementInput(),
+                  const SizedBox(height: 12),
                   _buildAnnouncementFeed(),
                 ],
               ),
@@ -930,9 +954,11 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
                   borderRadius: BorderRadius.circular(4),
                 ),
                 padding: const EdgeInsets.symmetric(horizontal: 12),
-                child: const Text(
-                  'Announce something to your class...',
-                  style: TextStyle(
+                child: Text(
+                  widget.isInstructor
+                      ? 'Announce something to your class...'
+                      : 'Share something or ask a question...',
+                  style: const TextStyle(
                       fontSize: 14, color: Color(0xFF9AA0A6)),
                 ),
               ),
@@ -947,8 +973,8 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('New announcement',
-            style: TextStyle(
+        title: Text(widget.isInstructor ? 'New announcement' : 'New post',
+            style: const TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.w400,
                 color: Color(0xFF202124))),
@@ -1085,9 +1111,12 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
     }
 
     if (isAnnouncement) {
+      // Falls back to 'User', not 'Instructor' — students post here too now,
+      // and labelling an unnamed student's post as the instructor's would
+      // misattribute it.
       authorName = (item.data['author'] as Map?)?['name']?.toString() ??
           item.data['authorName']?.toString() ??
-          'Instructor';
+          'User';
       content = item.data['content']?.toString() ??
           item.data['message']?.toString() ??
           '';
@@ -1139,6 +1168,44 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        // Who posted. Needed now that the tab is a two-way
+                        // discussion — without it a student's question and an
+                        // instructor's announcement look identical.
+                        if (isAnnouncement)
+                          Row(
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  authorName,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w700,
+                                      color: Color(0xFF202124)),
+                                ),
+                              ),
+                              if (item.data['authorRole']?.toString() ==
+                                  'instructor') ...[
+                                const SizedBox(width: 6),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 6, vertical: 1),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFE8F0FE),
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: const Text(
+                                    'Instructor',
+                                    style: TextStyle(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w700,
+                                        color: Color(0xFF1A73E8)),
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        if (isAnnouncement) const SizedBox(height: 3),
                         Text(
                           content,
                           style: const TextStyle(
@@ -1153,26 +1220,38 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
                       ],
                     ),
                   ),
-                  // Three-dot menu — instructor only, announcements only
-                  if (widget.isInstructor && isAnnouncement)
-                    PopupMenuButton<String>(
-                      icon: const Icon(Icons.more_vert_rounded,
-                          size: 18, color: Color(0xFF70757A)),
-                      padding: EdgeInsets.zero,
-                      itemBuilder: (_) => [
-                        const PopupMenuItem(
-                            value: 'edit',
-                            child: Text('Edit', style: TextStyle(fontSize: 14))),
-                        const PopupMenuItem(
-                            value: 'delete',
-                            child: Text('Delete', style: TextStyle(fontSize: 14))),
-                      ],
-                      onSelected: (val) {
-                        final postId = item.data['_id']?.toString() ?? '';
-                        if (val == 'edit') _editAnnouncement(postId, content);
-                        if (val == 'delete') _deleteAnnouncement(postId);
-                      },
-                    ),
+                  // Three-dot menu, announcements only. Now that students can
+                  // post, it shows for a post's own author as well as for the
+                  // instructor, who can delete any post to moderate. Edit
+                  // stays author-only — the same rule announcements.js
+                  // enforces on PUT/DELETE.
+                  if (isAnnouncement &&
+                      (widget.isInstructor ||
+                          (_currentUserId != null &&
+                              item.data['authorId']?.toString() == _currentUserId)))
+                    Builder(builder: (_) {
+                      final isAuthor = _currentUserId != null &&
+                          item.data['authorId']?.toString() == _currentUserId;
+                      return PopupMenuButton<String>(
+                        icon: const Icon(Icons.more_vert_rounded,
+                            size: 18, color: Color(0xFF70757A)),
+                        padding: EdgeInsets.zero,
+                        itemBuilder: (_) => [
+                          if (isAuthor)
+                            const PopupMenuItem(
+                                value: 'edit',
+                                child: Text('Edit', style: TextStyle(fontSize: 14))),
+                          const PopupMenuItem(
+                              value: 'delete',
+                              child: Text('Delete', style: TextStyle(fontSize: 14))),
+                        ],
+                        onSelected: (val) {
+                          final postId = item.data['_id']?.toString() ?? '';
+                          if (val == 'edit') _editAnnouncement(postId, content);
+                          if (val == 'delete') _deleteAnnouncement(postId);
+                        },
+                      );
+                    }),
                 ],
               ),
             ),
@@ -1287,6 +1366,69 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
     );
   }
 
+  void _editComment(String postId, String commentId, String current) {
+    final ctrl = TextEditingController(text: current);
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Edit comment', style: TextStyle(fontSize: 18)),
+        content: TextField(
+          controller: ctrl,
+          autofocus: true,
+          maxLines: 4,
+          minLines: 1,
+          decoration: const InputDecoration(hintText: 'Your comment...'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel', style: TextStyle(color: Color(0xFF5F6368))),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final text = ctrl.text.trim();
+              if (text.isEmpty) return;
+              Navigator.pop(ctx);
+              try {
+                await _lms.editComment(postId, commentId, text);
+                await _loadStream();
+              } catch (_) {}
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _deleteComment(String postId, String commentId) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete comment?', style: TextStyle(fontSize: 18)),
+        content: const Text('This cannot be undone.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel', style: TextStyle(color: Color(0xFF5F6368))),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(ctx);
+              try {
+                await _lms.deleteComment(postId, commentId);
+                await _loadStream();
+              } catch (_) {}
+            },
+            style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red, foregroundColor: Colors.white),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildCommentSection(dynamic item) {
     final comments = (item.data['comments'] as List?) ?? [];
     final ctrl = TextEditingController();
@@ -1300,8 +1442,9 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Existing comments
-          ...comments.take(3).map((c) => Padding(
+          // Existing comments — all of them. This used to take(3), which
+          // silently hid the rest of a thread once a discussion got going.
+          ...comments.map((c) => Padding(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
             child: Row(children: [
               CircleAvatar(radius: 12, backgroundColor: const Color(0xFF1A73E8),
@@ -1311,6 +1454,38 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
                 Text(c['authorName'] ?? 'User', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12)),
                 Text(c['text'] ?? '', style: const TextStyle(fontSize: 13)),
               ])),
+              // Author can edit/delete their own comment; the instructor can
+              // delete any to moderate. Matches the post-level menu and the
+              // rules announcements.js enforces server-side.
+              if (widget.isInstructor ||
+                  (_currentUserId != null &&
+                      c['authorId']?.toString() == _currentUserId))
+                Builder(builder: (_) {
+                  final isAuthor = _currentUserId != null &&
+                      c['authorId']?.toString() == _currentUserId;
+                  return PopupMenuButton<String>(
+                    icon: const Icon(Icons.more_vert_rounded,
+                        size: 16, color: Color(0xFF70757A)),
+                    padding: EdgeInsets.zero,
+                    itemBuilder: (_) => [
+                      if (isAuthor)
+                        const PopupMenuItem(
+                            value: 'edit',
+                            child: Text('Edit', style: TextStyle(fontSize: 14))),
+                      const PopupMenuItem(
+                          value: 'delete',
+                          child: Text('Delete', style: TextStyle(fontSize: 14))),
+                    ],
+                    onSelected: (val) {
+                      final commentId = c['_id']?.toString() ?? '';
+                      if (commentId.isEmpty) return;
+                      if (val == 'edit') {
+                        _editComment(postId, commentId, c['text']?.toString() ?? '');
+                      }
+                      if (val == 'delete') _deleteComment(postId, commentId);
+                    },
+                  );
+                }),
             ]),
           )),
           // Add comment input

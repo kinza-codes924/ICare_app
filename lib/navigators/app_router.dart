@@ -12,23 +12,24 @@ import 'package:icare/screens/tabs.dart';
 import 'package:icare/screens/doctor_appointments.dart';
 import 'package:icare/screens/doctor_dashboard.dart';
 import 'package:icare/screens/student_profile_setup.dart';
-import 'package:icare/screens/admin_dashboard.dart';
+import 'package:icare/navigators/deferred_route.dart';
+import 'package:icare/screens/admin_dashboard.dart' deferred as admin_dashboard;
 import 'package:icare/screens/profile.dart';
 import 'package:icare/screens/work_with_us_signup.dart';
 import 'package:icare/screens/lms_public_catalog.dart';
-import 'package:icare/screens/admin_verification_panel.dart';
-import 'package:icare/screens/instructor_lms_dashboard.dart';
-import 'package:icare/screens/instructor_lms_courses.dart';
-import 'package:icare/screens/instructor_lms_create_course.dart';
-import 'package:icare/screens/instructor_create_quiz_screen.dart';
-import 'package:icare/screens/instructor_create_assignment_screen.dart';
-import 'package:icare/screens/instructor_grading_screen.dart';
-import 'package:icare/screens/instructor_schedule_session_screen.dart';
-import 'package:icare/screens/instructor_student_progress_screen.dart';
-import 'package:icare/screens/instructor_course_content_screen.dart';
-import 'package:icare/screens/instructor_course_analytics_screen.dart';
-import 'package:icare/screens/instructor_course_stream_screen.dart';
-import 'package:icare/screens/instructor_feedback_screen.dart';
+import 'package:icare/screens/admin_verification_panel.dart' deferred as admin_verification;
+import 'package:icare/screens/instructor_lms_dashboard.dart' deferred as i_lms_dash;
+import 'package:icare/screens/instructor_lms_courses.dart' deferred as i_lms_courses;
+import 'package:icare/screens/instructor_lms_create_course.dart' deferred as i_create_course;
+import 'package:icare/screens/instructor_create_quiz_screen.dart' deferred as i_quiz;
+import 'package:icare/screens/instructor_create_assignment_screen.dart' deferred as i_assign;
+import 'package:icare/screens/instructor_grading_screen.dart' deferred as i_grading;
+import 'package:icare/screens/instructor_schedule_session_screen.dart' deferred as i_session;
+import 'package:icare/screens/instructor_student_progress_screen.dart' deferred as i_progress;
+import 'package:icare/screens/instructor_course_content_screen.dart' deferred as i_content;
+import 'package:icare/screens/instructor_course_analytics_screen.dart' deferred as i_analytics;
+import 'package:icare/screens/instructor_course_stream_screen.dart' deferred as i_stream;
+import 'package:icare/screens/instructor_feedback_screen.dart' deferred as i_feedback;
 import 'package:icare/screens/certificate_verification_page.dart';
 import 'package:icare/screens/otp_verification_screen.dart';
 import 'package:icare/screens/lms_public_course_detail.dart';
@@ -338,7 +339,15 @@ final routerProvider = Provider<GoRouter>((ref) {
           return CertificateVerificationPage(initialCode: code);
         },
       ),
-      GoRoute(path: '/admin/verifications', builder: (_, _) => const AdminVerificationPanel()),
+      GoRoute(
+        path: '/admin/verifications',
+        builder: (_, _) => DeferredScreen(
+          loader: admin_verification.loadLibrary,
+          // Not const: a deferred class isn't available at compile time, so
+          // its constructor can't be evaluated as a constant expression.
+          builder: () => admin_verification.AdminVerificationPanel(),
+        ),
+      ),
       GoRoute(path: '/admin/lms-payments', builder: (_, _) => const AdminLmsPaymentsScreen()),
       GoRoute(path: '/admin/payments', builder: (_, _) => const AdminPaymentsScreen()),
       GoRoute(path: '/admin/panel', builder: (_, _) => const AdminPanelScreen()),
@@ -473,32 +482,65 @@ final routerProvider = Provider<GoRouter>((ref) {
           // Admin
           GoRoute(
             path: '/admin/dashboard',
-            builder: (_, state) => AdminDashboard(
-              initialTab: state.uri.queryParameters['adminTab'] ?? 'Pending',
+            builder: (_, state) => DeferredScreen(
+              loader: admin_dashboard.loadLibrary,
+              builder: () => admin_dashboard.AdminDashboard(
+                initialTab: state.uri.queryParameters['adminTab'] ?? 'Pending',
+              ),
             ),
           ),
           GoRoute(path: '/admin/profile', builder: (_, _) => ProfileScreen()),
         ],
       ),
       // Instructor LMS Routes
-      GoRoute(path: '/instructor/lms', builder: (_, _) => const InstructorLmsDashboard()),
-      GoRoute(path: '/instructor/lms/feedback', builder: (_, _) => const InstructorFeedbackScreen()),
-      GoRoute(path: '/instructor/lms/courses', builder: (_, _) => const InstructorLmsCoursesScreen()),
-      GoRoute(path: '/instructor/lms/create-course', builder: (_, _) => const InstructorLmsCreateCourseScreen()),
+      GoRoute(
+        path: '/instructor/lms',
+        builder: (_, _) => DeferredScreen(
+          loader: i_lms_dash.loadLibrary,
+          builder: () => i_lms_dash.InstructorLmsDashboard(),
+        ),
+      ),
+      GoRoute(
+        path: '/instructor/lms/feedback',
+        builder: (_, _) => DeferredScreen(
+          loader: i_feedback.loadLibrary,
+          builder: () => i_feedback.InstructorFeedbackScreen(),
+        ),
+      ),
+      GoRoute(
+        path: '/instructor/lms/courses',
+        builder: (_, _) => DeferredScreen(
+          loader: i_lms_courses.loadLibrary,
+          builder: () => i_lms_courses.InstructorLmsCoursesScreen(),
+        ),
+      ),
+      GoRoute(
+        path: '/instructor/lms/create-course',
+        builder: (_, _) => DeferredScreen(
+          loader: i_create_course.loadLibrary,
+          builder: () => i_create_course.InstructorLmsCreateCourseScreen(),
+        ),
+      ),
       
       // Quiz routes
       GoRoute(
         path: '/instructor/lms/create-quiz',
         builder: (context, state) {
           final courseId = state.uri.queryParameters['courseId'];
-          return InstructorCreateQuizScreen(courseId: courseId);
+          return DeferredScreen(
+            loader: i_quiz.loadLibrary,
+            builder: () => i_quiz.InstructorCreateQuizScreen(courseId: courseId),
+          );
         },
       ),
       GoRoute(
         path: '/instructor/lms/edit-quiz/:id',
         builder: (context, state) {
           final quizId = state.pathParameters['id'];
-          return InstructorCreateQuizScreen(quizId: quizId);
+          return DeferredScreen(
+            loader: i_quiz.loadLibrary,
+            builder: () => i_quiz.InstructorCreateQuizScreen(quizId: quizId),
+          );
         },
       ),
       
@@ -507,7 +549,10 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/instructor/lms/create-assignment',
         builder: (context, state) {
           final courseId = state.uri.queryParameters['courseId'];
-          return InstructorCreateAssignmentScreen(courseId: courseId);
+          return DeferredScreen(
+            loader: i_assign.loadLibrary,
+            builder: () => i_assign.InstructorCreateAssignmentScreen(courseId: courseId),
+          );
         },
       ),
       GoRoute(
@@ -515,9 +560,12 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) {
           final assignmentId = state.pathParameters['id']!;
           final title = state.uri.queryParameters['title'] ?? 'Assignment';
-          return InstructorGradingScreen(
-            assignmentId: assignmentId,
-            assignmentTitle: title,
+          return DeferredScreen(
+            loader: i_grading.loadLibrary,
+            builder: () => i_grading.InstructorGradingScreen(
+              assignmentId: assignmentId,
+              assignmentTitle: title,
+            ),
           );
         },
       ),
@@ -527,7 +575,10 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/instructor/lms/schedule-session',
         builder: (context, state) {
           final courseId = state.uri.queryParameters['courseId'];
-          return InstructorScheduleSessionScreen(courseId: courseId);
+          return DeferredScreen(
+            loader: i_session.loadLibrary,
+            builder: () => i_session.InstructorScheduleSessionScreen(courseId: courseId),
+          );
         },
       ),
       
@@ -537,9 +588,12 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) {
           final courseId = state.pathParameters['id']!;
           final title = state.uri.queryParameters['title'] ?? 'Course';
-          return InstructorStudentProgressScreen(
-            courseId: courseId,
-            courseTitle: title,
+          return DeferredScreen(
+            loader: i_progress.loadLibrary,
+            builder: () => i_progress.InstructorStudentProgressScreen(
+              courseId: courseId,
+              courseTitle: title,
+            ),
           );
         },
       ),
@@ -549,7 +603,10 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/instructor/lms/course/:id/content',
         builder: (context, state) {
           final courseId = state.pathParameters['id']!;
-          return InstructorCourseContentScreen(courseId: courseId);
+          return DeferredScreen(
+            loader: i_content.loadLibrary,
+            builder: () => i_content.InstructorCourseContentScreen(courseId: courseId),
+          );
         },
       ),
       
@@ -559,9 +616,12 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) {
           final courseId = state.pathParameters['id']!;
           final title = state.uri.queryParameters['title'] ?? 'Course';
-          return InstructorCourseAnalyticsScreen(
-            courseId: courseId,
-            courseTitle: title,
+          return DeferredScreen(
+            loader: i_analytics.loadLibrary,
+            builder: () => i_analytics.InstructorCourseAnalyticsScreen(
+              courseId: courseId,
+              courseTitle: title,
+            ),
           );
         },
       ),
@@ -572,9 +632,12 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) {
           final courseId = state.pathParameters['id']!;
           final title = state.uri.queryParameters['title'] ?? 'Course';
-          return InstructorCourseStreamScreen(
-            courseId: courseId,
-            courseTitle: title,
+          return DeferredScreen(
+            loader: i_stream.loadLibrary,
+            builder: () => i_stream.InstructorCourseStreamScreen(
+              courseId: courseId,
+              courseTitle: title,
+            ),
           );
         },
       ),
@@ -585,7 +648,10 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) {
           final courseId = state.pathParameters['id']!;
           // This will need the course data - for now redirect to content
-          return InstructorCourseContentScreen(courseId: courseId);
+          return DeferredScreen(
+            loader: i_content.loadLibrary,
+            builder: () => i_content.InstructorCourseContentScreen(courseId: courseId),
+          );
         },
       ),
     ],

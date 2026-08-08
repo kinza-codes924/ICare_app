@@ -96,7 +96,7 @@ router.put('/profile', authMiddleware, async (req, res) => {
       name, phoneNumber, phone, profilePicture, cnic, age, gender,
       height, weight, address, existingConditions, healthGoals,
       emergencyContacts, specialization, conditionsTreated,
-      bloodGroup, blood_group,
+      bloodGroup, blood_group, verificationDetails,
     } = req.body;
     const finalBloodGroup = bloodGroup || blood_group;
     
@@ -116,10 +116,27 @@ router.put('/profile', authMiddleware, async (req, res) => {
     if (emergencyContacts !== undefined) update.emergency_contacts = emergencyContacts;
     if (finalBloodGroup !== undefined && finalBloodGroup !== null) update.blood_group = finalBloodGroup;
 
+    // verificationDetails was not read from the body at all, so it was
+    // silently dropped here. Work-with-us signup registers first (storing
+    // only the document *names*) and then uploads each file and PUTs the
+    // resulting *URLs* back through this route — so the URLs never landed,
+    // and the admin approval screen showed no documents for any role. Merged
+    // key-by-key rather than replaced, because that second call carries only
+    // the document fields and would otherwise wipe the qualification,
+    // institution, etc. saved at registration.
+    if (verificationDetails && typeof verificationDetails === 'object') {
+      for (const [k, v] of Object.entries(verificationDetails)) {
+        update[`verificationDetails.${k}`] = v;
+      }
+    }
+
+    // strict:false is required — verificationDetails is not declared on the
+    // User schema, so Mongoose would strip those paths otherwise. This is the
+    // same reason authController.js passes it when saving them at signup.
     const user = await User.findByIdAndUpdate(
       toId(req.user.id),
       { $set: update },
-      { new: true }
+      { new: true, strict: false }
     ).select('-password').lean();
 
     if (!user) return res.status(404).json({ success: false, message: 'User not found' });
