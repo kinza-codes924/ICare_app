@@ -476,6 +476,48 @@ class _QuizTakeScreenState extends State<QuizTakeScreen> {
                         style: const TextStyle(
                             fontSize: 16, fontWeight: FontWeight.w700, color: Color(0xFF0F172A), height: 1.5),
                       ),
+                      // OSCE station instructions — what the candidate is asked
+                      // to do. The instructor fills this in but it was never
+                      // shown to the student, so an OSCE station appeared as
+                      // just a bare title and an answer box. The marking rubric
+                      // is deliberately NOT shown: it's the grading key.
+                      if (qType == 'OSCE_STATION' &&
+                          (question['instructions']?.toString().trim().isNotEmpty ?? false)) ...[
+                        const SizedBox(height: 14),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF0F7FF),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: const Color(0xFFBFDBFE)),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Row(
+                                children: [
+                                  Icon(Icons.assignment_outlined,
+                                      size: 16, color: Color(0xFF1A73E8)),
+                                  SizedBox(width: 6),
+                                  Text('Station Instructions',
+                                      style: TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w700,
+                                          color: Color(0xFF1A73E8))),
+                                ],
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                question['instructions'].toString(),
+                                textDirection: TextDirection.ltr,
+                                style: const TextStyle(
+                                    fontSize: 14, color: Color(0xFF0F172A), height: 1.5),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),
