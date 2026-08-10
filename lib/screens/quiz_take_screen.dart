@@ -31,6 +31,11 @@ class _QuizTakeScreenState extends State<QuizTakeScreen> {
   // State
   int _currentIndex = 0;
   final Map<int, dynamic> _answers = {}; // questionIndex -> answer (int for MCQ, String for text)
+  // One persistent controller per text question. A fresh TextEditingController
+  // was being built inside build() on every setState (i.e. every keystroke),
+  // which reset the cursor to the start each time — so typing "abc" landed as
+  // "cba". Keeping the controller alive fixes that.
+  final Map<int, TextEditingController> _answerControllers = {};
   bool _isLoading = true;
   bool _isSubmitting = false;
   bool _showPalette = false;
@@ -108,7 +113,19 @@ class _QuizTakeScreenState extends State<QuizTakeScreen> {
   void dispose() {
     _timer?.cancel();
     _stopwatch.stop();
+    for (final c in _answerControllers.values) {
+      c.dispose();
+    }
     super.dispose();
+  }
+
+  /// One controller per text question, seeded once from any saved answer.
+  /// Reused on later builds so typing doesn't reset the cursor.
+  TextEditingController _controllerFor(int index) {
+    return _answerControllers.putIfAbsent(
+      index,
+      () => TextEditingController(text: _answers[index]?.toString() ?? ''),
+    );
   }
 
   void _startTimerAndStopwatch() {
@@ -538,9 +555,15 @@ class _QuizTakeScreenState extends State<QuizTakeScreen> {
                   const SizedBox(height: 10),
                   TextField(
                     maxLines: 5,
-                    onChanged: (v) => setState(() => _answers[_currentIndex] = v.trim()),
-                    controller: TextEditingController(
-                        text: _answers[_currentIndex]?.toString() ?? ''),
+                    // Force left-to-right: the app's default locale is Urdu
+                    // (RTL), so an unset direction made English answers render
+                    // right-aligned and appear reversed while typing.
+                    textDirection: TextDirection.ltr,
+                    // Persistent controller (built once per question in
+                    // _controllerFor), not recreated every keystroke — that
+                    // recreation is what jumped the cursor and reversed input.
+                    controller: _controllerFor(_currentIndex),
+                    onChanged: (v) => _answers[_currentIndex] = v.trim(),
                     decoration: InputDecoration(
                       hintText: 'Write your answer here...',
                       hintStyle: const TextStyle(color: Color(0xFF94A3B8)),

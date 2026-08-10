@@ -10,6 +10,40 @@ function toId(id) {
   try { return new mongoose.Types.ObjectId(id); } catch { return null; }
 }
 
+// Notify everyone connected to a course's discussion about a new post or
+// comment, except the person who wrote it. Recipients = the course
+// instructor + accepted co-teachers + every enrolled student. Best-effort:
+// a failure here must never block the post/comment itself, so callers wrap
+// this in try/catch and ignore errors.
+async function notifyCourseParticipants({ courseId, actorId, title, message, data }) {
+  const Enrollment = require('../models/Enrollment');
+  const Course = require('../models/Course');
+  const Notification = require('../models/Notification');
+
+  const course = await Course.findById(courseId).select('instructor_id coTeachers').lean();
+  const recipientIds = new Set();
+  if (course?.instructor_id) recipientIds.add(course.instructor_id.toString());
+  for (const t of (course?.coTeachers || [])) {
+    if (t.userId && (t.status ?? 'accepted') === 'accepted') {
+      recipientIds.add(t.userId.toString());
+    }
+  }
+  const enrollments = await Enrollment.find({ courseId }).select('userId').lean();
+  for (const e of enrollments) {
+    if (e.userId) recipientIds.add(e.userId.toString());
+  }
+  recipientIds.delete(actorId?.toString());
+
+  if (!recipientIds.size) return;
+  await Notification.insertMany([...recipientIds].map(uid => ({
+    userId: uid,
+    type: 'general',
+    title,
+    message,
+    data,
+  })));
+}
+
 // ── Get stream (announcements) for a course ───────────────────────────────────
 router.get('/course/:courseId', authMiddleware, async (req, res) => {
   try {
@@ -62,12 +96,26 @@ router.post('/', authMiddleware, async (req, res) => {
     // document for exactly this reason.
     const userDoc = await User.findById(req.user.id).select('name username role').lean();
     const roleStr = (userDoc?.role || req.user.role || '').toLowerCase();
+    const authorName = userDoc?.name || userDoc?.username || 'User';
     const post = await Announcement.create({
       courseId, content, attachmentUrl, attachmentName,
       authorId:   req.user.id,
-      authorName: userDoc?.name || userDoc?.username || 'User',
+      authorName,
       authorRole: roleStr === 'instructor' || roleStr === 'doctor' ? 'instructor' : 'student',
     });
+
+    // Tell the rest of the course a new post is up. Best-effort — never let
+    // a notification failure fail the post itself.
+    try {
+      await notifyCourseParticipants({
+        courseId,
+        actorId: req.user.id,
+        title: `${authorName} posted in the discussion`,
+        message: content.length > 120 ? `${content.slice(0, 120)}…` : content,
+        data: { type: 'announcement', courseId: courseId.toString(), postId: post._id.toString() },
+      });
+    } catch (e) { console.error('announcement notify failed:', e.message); }
+
     res.json({ success: true, post });
   } catch (e) {
     res.status(500).json({ success: false, message: e.message });
@@ -92,6 +140,18 @@ router.post('/:postId/comment', authMiddleware, async (req, res) => {
     const authorName = userDoc?.name || userDoc?.username || 'User';
     post.comments.push({ authorId: req.user.id, authorName, text: String(text).trim() });
     await post.save();
+
+    // Notify the course about the new comment. Best-effort.
+    try {
+      await notifyCourseParticipants({
+        courseId: post.courseId,
+        actorId: req.user.id,
+        title: `${authorName} commented in the discussion`,
+        message: text.length > 120 ? `${String(text).slice(0, 120)}…` : String(text).trim(),
+        data: { type: 'announcement', courseId: post.courseId.toString(), postId: post._id.toString() },
+      });
+    } catch (e) { console.error('comment notify failed:', e.message); }
+
     res.json({ success: true, post });
   } catch (e) {
     res.status(500).json({ success: false, message: e.message });

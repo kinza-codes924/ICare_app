@@ -942,37 +942,34 @@ class _QuestionDialogState extends State<_QuestionDialog> {
                 ),
               ] else if (_type == 'osce_station') ...[
                 TextField(
-                  controller: TextEditingController(text: _options.isNotEmpty ? _options[0] : ''),
+                  // Reuse the persistent option controllers (_options reads
+                  // from these). Building a throwaway TextEditingController
+                  // here reset the cursor on every keystroke — text came out
+                  // reversed — and its onChanged fought the getter-backed
+                  // list. textDirection.ltr stops the Urdu-locale flip.
+                  controller: _optionControllers[0],
+                  textDirection: TextDirection.ltr,
                   decoration: const InputDecoration(
                     labelText: 'Station Instructions',
                     hintText: 'Detailed instructions for the OSCE/TOACS station',
                     border: OutlineInputBorder(),
                   ),
                   maxLines: 4,
-                  onChanged: (value) {
-                    if (_options.isEmpty) {
-                      _options.add(value);
-                    } else {
-                      _options[0] = value;
-                    }
-                  },
                 ),
                 const SizedBox(height: 12),
                 TextField(
-                  controller: TextEditingController(text: _options.length > 1 ? _options[1] : ''),
+                  controller: _optionControllers[1],
+                  textDirection: TextDirection.ltr,
                   decoration: const InputDecoration(
                     labelText: 'Marking Rubric',
                     hintText: 'Key points to assess',
                     border: OutlineInputBorder(),
                   ),
                   maxLines: 3,
-                  onChanged: (value) {
-                    if (_options.length < 2) {
-                      _options.add(value);
-                    } else {
-                      _options[1] = value;
-                    }
-                  },
+                  // No onChanged needed: _options is a getter over
+                  // _optionControllers, so the controller's own text IS the
+                  // value read at save time. The old handler pushed into that
+                  // throwaway list and did nothing.
                 ),
               ],
 
