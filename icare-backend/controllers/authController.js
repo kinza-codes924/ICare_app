@@ -233,14 +233,19 @@ const login = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Please provide email and password' });
     }
 
-    // v2 checkbox: a genuine pass/fail challenge, so failure blocks the
-    // request. Still soft when RECAPTCHA_SECRET_KEY is unset or Google's
-    // endpoint errors (see utils/recaptcha.js) so a config gap or Google
-    // outage can't itself take down login.
-    const { verifyRecaptcha } = require('../utils/recaptcha');
-    const recaptchaResult = await verifyRecaptcha(recaptchaToken);
-    if (!recaptchaResult.ok) {
-      return res.status(400).json({ success: false, message: 'Please complete the "I\'m not a robot" verification.' });
+    // reCAPTCHA is a web-only "I'm not a robot" checkbox — it does not exist
+    // in the mobile app, which therefore never sends a token. Requiring it
+    // unconditionally blocked every mobile login with "Please complete the
+    // I'm not a robot verification", an impossible instruction on a phone.
+    // Only enforce it when a token is actually present (i.e. from the web
+    // client); mobile requests carry none and skip the check. Web still
+    // sends one on every submit, so this doesn't weaken the browser flow.
+    if (recaptchaToken) {
+      const { verifyRecaptcha } = require('../utils/recaptcha');
+      const recaptchaResult = await verifyRecaptcha(recaptchaToken);
+      if (!recaptchaResult.ok) {
+        return res.status(400).json({ success: false, message: 'Please complete the "I\'m not a robot" verification.' });
+      }
     }
 
     // Find by email OR username
