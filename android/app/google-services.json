@@ -58,6 +58,30 @@
       },
       "oauth_client": [
         {
+          "client_id": "564788374793-feef5t2rn8pf7rj4i03j1ke68u1ggq9s.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.cartzlinkv2.icare",
+            "certificate_hash": "e4c8748d8066de6e129ed65f6461fb35c8e1f2e3"
+          }
+        },
+        {
+          "client_id": "564788374793-tn7pihhqhdk5glpmsv80rf6enuiqvnj9.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.cartzlinkv2.icare",
+            "certificate_hash": "3f846c263f3aca4ea1bf771cd090c398d702a78f"
+          }
+        },
+        {
+          "client_id": "564788374793-uqaao80sn61u199apkrepta5o7okb4g5.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.cartzlinkv2.icare",
+            "certificate_hash": "5c841e432a6089638ae8a61c3d6680530efc0946"
+          }
+        },
+        {
           "client_id": "564788374793-1eptqsl65ohkvsquqhc4qnhlia592v2f.apps.googleusercontent.com",
           "client_type": 3
         }

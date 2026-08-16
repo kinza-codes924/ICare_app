@@ -64,3 +64,10 @@ build.bat
 
 .vercel
 .env*
+
+# Android signing secrets — keystore + its passwords. Must never be committed:
+# anyone with these can publish updates as this app.
+android/key.properties
+android/keystore/
+*.jks
+*.keystore

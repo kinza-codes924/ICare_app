@@ -33,8 +33,13 @@ android {
         applicationId = "com.cartzlinkv2.icare"
         minSdk = flutter.minSdkVersion
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0.0"
+        // Read from pubspec.yaml's `version:` (the `+N` suffix is the code)
+        // rather than hardcoding. These were pinned at 1 / "1.0.0", which
+        // silently overrode every pubspec bump — so bumping pubspec to +2 and
+        // rebuilding still produced versionCode 1, and Play kept rejecting the
+        // upload with "Version code 1 has already been used".
+        versionCode = flutter.versionCode
+        versionName = flutter.versionName
         multiDexEnabled = true
     }
 
