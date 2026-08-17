@@ -77,16 +77,27 @@ class ClinicDetailScreen extends StatelessWidget {
                       const SizedBox(height: 4),
                       Container(width: 48, height: 3, color: clinic.accentColor),
                       const SizedBox(height: 20),
-                      GridView.count(
-                        crossAxisCount: isMobile ? 1 : 2,
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        crossAxisSpacing: 16,
-                        mainAxisSpacing: 16,
-                        childAspectRatio: isMobile ? 3.4 : 2.6,
-                        children: clinic.services
-                            .map((s) => _ServiceCard(service: s, accent: clinic.accentColor))
-                            .toList(),
+                      // Wrap, not GridView.count — a fixed childAspectRatio
+                      // stretched every card to a set height regardless of
+                      // its actual (usually 2-line) description, leaving
+                      // large empty space under short entries.
+                      LayoutBuilder(
+                        builder: (context, constraints) {
+                          final columns = isMobile ? 1 : 2;
+                          const spacing = 16.0;
+                          final cardWidth =
+                              (constraints.maxWidth - spacing * (columns - 1)) / columns;
+                          return Wrap(
+                            spacing: spacing,
+                            runSpacing: spacing,
+                            children: clinic.services
+                                .map((s) => SizedBox(
+                                      width: cardWidth,
+                                      child: _ServiceCard(service: s, accent: clinic.accentColor),
+                                    ))
+                                .toList(),
+                          );
+                        },
                       ),
                       const SizedBox(height: 36),
                       Row(

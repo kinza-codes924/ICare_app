@@ -53,14 +53,23 @@ class ICareClinicsListScreen extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 24),
-            GridView.count(
-              crossAxisCount: isMobile ? 2 : 3,
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              crossAxisSpacing: 14,
-              mainAxisSpacing: 14,
-              childAspectRatio: isMobile ? 0.85 : 1.05,
-              children: kICareClinics.map((c) => _ClinicCard(clinic: c)).toList(),
+            // Wrap, not GridView.count — a fixed childAspectRatio forced
+            // every card to a set height regardless of its actual content,
+            // which is what left large empty space under the short
+            // name/tagline. Each card here sizes to its own content instead.
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final columns = isMobile ? 2 : 3;
+                const spacing = 14.0;
+                final cardWidth = (constraints.maxWidth - spacing * (columns - 1)) / columns;
+                return Wrap(
+                  spacing: spacing,
+                  runSpacing: spacing,
+                  children: kICareClinics
+                      .map((c) => SizedBox(width: cardWidth, child: _ClinicCard(clinic: c)))
+                      .toList(),
+                );
+              },
             ),
           ],
         ),
@@ -111,6 +120,7 @@ class _ClinicCardState extends State<_ClinicCard> {
             ],
           ),
           child: Column(
+            mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Container(
@@ -141,7 +151,7 @@ class _ClinicCardState extends State<_ClinicCard> {
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
               ),
-              const Spacer(),
+              const SizedBox(height: 12),
               Row(
                 children: [
                   Text(
