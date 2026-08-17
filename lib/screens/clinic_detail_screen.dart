@@ -134,6 +134,8 @@ class ClinicDetailScreen extends StatelessWidget {
                           ),
                         ],
                       ),
+                      const SizedBox(height: 36),
+                      _TrustStrip(accent: clinic.accentColor),
                       const SizedBox(height: 24),
                     ],
                   ),
@@ -143,6 +145,64 @@ class ClinicDetailScreen extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Small trust-badges strip shown under the CTA buttons. Purely to give the
+/// page a finished feel below an odd-numbered services grid (which otherwise
+/// leaves the last row half-empty) — not tied to any one clinic's content.
+class _TrustStrip extends StatelessWidget {
+  final Color accent;
+  const _TrustStrip({required this.accent});
+
+  static const _items = [
+    (Icons.verified_user_rounded, 'Verified Doctors'),
+    (Icons.calendar_month_rounded, 'Easy Online Booking'),
+    (Icons.chat_rounded, 'WhatsApp Support'),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final isMobile = MediaQuery.of(context).size.width < 700;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final columns = isMobile ? 1 : 3;
+        const spacing = 14.0;
+        final cardWidth = (constraints.maxWidth - spacing * (columns - 1)) / columns;
+        return Wrap(
+          spacing: spacing,
+          runSpacing: spacing,
+          children: _items
+              .map((item) => SizedBox(
+                    width: cardWidth,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 14),
+                      decoration: BoxDecoration(
+                        color: accent.withValues(alpha: 0.06),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(item.$1, color: accent, size: 22),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              item.$2,
+                              style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFF0F172A),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ))
+              .toList(),
+        );
+      },
     );
   }
 }
