@@ -141,6 +141,17 @@ class _ClinicCardState extends State<_ClinicCard> {
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
               ),
+              const Spacer(),
+              Row(
+                children: [
+                  Text(
+                    'Learn More',
+                    style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: c.accentColor),
+                  ),
+                  const SizedBox(width: 4),
+                  Icon(Icons.arrow_forward_rounded, size: 14, color: c.accentColor),
+                ],
+              ),
             ],
           ),
         ),

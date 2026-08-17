@@ -1493,7 +1493,7 @@ class _ICareClinicsSectionState extends State<_ICareClinicsSection> {
   @override
   Widget build(BuildContext context) {
     return Container(
-      color: const Color(0xFFF6F8FB),
+      color: Colors.white,
       padding: const EdgeInsets.symmetric(vertical: 40),
       child: _CenteredSection(
         child: Column(
