@@ -927,6 +927,15 @@ router.get('/:id', authMiddleware, async (req, res) => {
     course.installmentLocked = enrollment?.installmentLocked || false;
     course.effectivePrice = computeEffectivePrice(course);
     course.earlyBirdActive = isEarlyBirdActive(course);
+    // Real per-course ownership (instructor_id match or accepted co-teacher),
+    // computed above for the content gate — surfaced here too so the client
+    // can stop inferring "is this an instructor view" from the caller's
+    // account role. Role alone is wrong: a doctor account (role=='doctor')
+    // was being treated as an instructor on every course, so a doctor who
+    // was neither enrolled in nor teaching a course still got the Go Live /
+    // edit Course Content / Student Progress controls, which then 403'd the
+    // instant they were used, since the backend correctly checks ownership.
+    course.isOwner = isOwner;
     res.json({ success: true, course });
   } catch (e) {
     res.status(500).json({ success: false, message: e.message });

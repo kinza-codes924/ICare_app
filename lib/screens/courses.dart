@@ -467,6 +467,10 @@ class _WebCoursesListState extends State<_WebCoursesList> {
   final CourseService _courseService = CourseService();
   List<dynamic> _courses = [];
   bool _isLoading = true;
+  // A failed fetch used to fall through to the empty-list "No courses
+  // found" message with the real error only in debugPrint — indistinguishable
+  // from genuinely having none.
+  String? _error;
 
   @override
   void initState() {
@@ -496,6 +500,7 @@ class _WebCoursesListState extends State<_WebCoursesList> {
   }
 
   Future<void> _fetchCourses() async {
+    setState(() => _error = null);
     try {
       final data = widget.myPurchased
           ? await _courseService.myPurchases()
@@ -509,7 +514,10 @@ class _WebCoursesListState extends State<_WebCoursesList> {
     } catch (e) {
       debugPrint('Error fetching web courses: $e');
       if (mounted) {
-        setState(() => _isLoading = false);
+        setState(() {
+          _error = e.toString().replaceAll('Exception: ', '');
+          _isLoading = false;
+        });
       }
     }
   }
@@ -518,6 +526,24 @@ class _WebCoursesListState extends State<_WebCoursesList> {
   Widget build(BuildContext context) {
     if (_isLoading) {
       return const Center(child: CircularProgressIndicator());
+    }
+
+    if (_error != null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.error_outline_rounded, size: 40, color: Color(0xFFEF4444)),
+              const SizedBox(height: 12),
+              Text(_error!, textAlign: TextAlign.center),
+              const SizedBox(height: 12),
+              TextButton(onPressed: _fetchCourses, child: const Text('Retry')),
+            ],
+          ),
+        ),
+      );
     }
 
     final filteredCourses = _courses.where((item) {

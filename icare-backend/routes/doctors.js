@@ -180,13 +180,17 @@ router.get('/get_all_doctors', async (req, res) => {
     }).select('_id username name email phone profilePicture role is_active').lean();
 
     // Profile pictures are stored as base64 data URIs on the User document.
-    // Inlining those in a LIST response makes it enormous — one 100KB avatar
-    // per doctor, none of it cacheable, re-sent on every poll (public_home
-    // re-fetches this route every 30s). Hosted URLs stay as-is; oversized
-    // data URIs are dropped so the client falls back to initials, which
-    // buildProfileImageProvider already does for a null picture. Detail
-    // screens fetch the full user record separately and still show the photo.
-    const MAX_INLINE_PICTURE = 4096;
+    // Inlining a large one in a LIST response is wasteful — none of it is
+    // cacheable, and public_home re-fetches this route every 30s. But the
+    // cutoff was previously set to 4096 bytes (4KB), while a normal upload
+    // (picked at maxWidth:600, imageQuality:80 — see doctor_profile_setup.dart)
+    // typically base64-encodes to 40-110KB: the limit was ~25x smaller than
+    // a real photo, so it silently dropped every doctor's actual picture on
+    // this page and the "Consult Available Doctors" home list rendered the
+    // generic person icon for everyone with a real, working profile photo.
+    // 200KB comfortably covers a normally-sized upload while still catching
+    // the pathological case (an uncompressed multi-MB camera photo).
+    const MAX_INLINE_PICTURE = 200 * 1024;
     doctors.forEach(d => {
       if (typeof d.profilePicture === 'string'
         && d.profilePicture.startsWith('data:')

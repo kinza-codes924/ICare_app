@@ -9,7 +9,6 @@ import 'package:icare/screens/quiz_screen.dart';
 import 'package:icare/services/course_service.dart';
 import 'package:icare/services/course_question_service.dart';
 import 'package:icare/utils/imagePaths.dart';
-import 'package:icare/utils/shared_pref.dart';
 import 'package:icare/utils/theme.dart';
 import 'package:icare/widgets/back_button.dart';
 
@@ -45,36 +44,32 @@ class _ViewCourseState extends ConsumerState<ViewCourse> {
         widget.enrollmentId != null;
     _currentEnrollmentId = widget.enrollmentId;
     _loadQuestions();
-    _checkRole();
-    _loadLockStatus();
+    _loadCourseAccess();
   }
 
-  // The "Enrolled — active access" card otherwise stays green/openable even
-  // after an installment goes overdue and the classroom itself locks — this
-  // pulls the same lockReason the classroom uses so the card can reflect it
-  // here too, instead of only surfacing the lock once the student taps in.
-  Future<void> _loadLockStatus() async {
+  // Loads lock status AND real per-course ownership together, from the one
+  // GET that has both (course.isOwner, added alongside lockReason). This
+  // replaces a role-name guess that used to decide "is this an instructor
+  // view": any account with role=='doctor' was flagged as an instructor on
+  // EVERY course, so a doctor who was neither enrolled in nor teaching a
+  // given course still saw Go Live / edit Course Content / Student Progress
+  // — controls that only work for the course's actual instructor_id or an
+  // accepted co-teacher, and 403'd the moment the doctor tapped them.
+  Future<void> _loadCourseAccess() async {
     final courseId = widget.courseData?['_id']?.toString();
     if (courseId == null || courseId.isEmpty) return;
     try {
       final result = await _lms.getCourseDetails(courseId);
       final course = result['course'] ?? result;
       if (mounted && course is Map) {
-        setState(() => _lockReason = course['lockReason']?.toString());
+        setState(() {
+          _lockReason = course['lockReason']?.toString();
+          final isOwner = course['isOwner'] == true;
+          _isInstructor = isOwner;
+          if (isOwner) _isPurchased = true;
+        });
       }
     } catch (_) {}
-  }
-
-  Future<void> _checkRole() async {
-    final role = await SharedPref().getUserRole();
-    if (mounted) {
-      final isInstr = role != null &&
-          (role.toLowerCase() == 'instructor' || role.toLowerCase() == 'doctor');
-      setState(() {
-        _isInstructor = isInstr;
-        if (isInstr) _isPurchased = true; // instructors always have access
-      });
-    }
   }
 
   @override
