@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:icare/models/doctor.dart';
 import 'package:icare/providers/auth_provider.dart';
 import 'package:icare/screens/book_appointment.dart';
-import 'package:icare/screens/login.dart';
 import 'package:icare/utils/theme.dart';
 import 'package:icare/utils/utils.dart';
 import 'package:icare/widgets/back_button.dart';
@@ -355,9 +355,7 @@ class DoctorDetailScreen extends ConsumerWidget {
                               ElevatedButton(
                                 onPressed: () {
                                   Navigator.pop(ctx);
-                                  Navigator.of(context).push(
-                                    MaterialPageRoute(builder: (_) => LoginScreen()),
-                                  );
+                                  context.go('/login');
                                 },
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: const Color(0xFF0036BC),
@@ -1010,9 +1008,7 @@ class DoctorDetailScreen extends ConsumerWidget {
                                 ElevatedButton(
                                   onPressed: () {
                                     Navigator.pop(ctx);
-                                    Navigator.of(context).push(
-                                      MaterialPageRoute(builder: (_) => LoginScreen()),
-                                    );
+                                    context.go('/login');
                                   },
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: const Color(0xFF0036BC),
