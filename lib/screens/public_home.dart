@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:icare/screens/consultation_details_screen.dart';
 import 'package:icare/screens/doctors_list.dart';
+import 'package:icare/screens/icare_clinics_list_screen.dart';
 import 'package:icare/screens/pharmacies.dart';
 import 'package:icare/screens/lab_list.dart';
 import 'package:icare/utils/theme.dart';
@@ -312,6 +313,11 @@ class PublicHome extends StatelessWidget {
                     ),
                   ),
                 ),
+
+                const SizedBox(height: 24),
+
+                // iCare Clinics — client's branded specialty clinic network
+                const _ICareClinicsSection(),
 
                 const SizedBox(height: 24),
 
@@ -1465,6 +1471,138 @@ class _HomeSuggestion {
   final bool isTest;
   final Map<String, dynamic> raw;
   const _HomeSuggestion({required this.label, required this.sublabel, required this.isTest, required this.raw});
+}
+
+// ── iCare Clinics Section ───────────────────────────────────────────────────
+// Expandable card: tapping the header reveals the "Premium Multi-Speciality /
+// Presently Available Only Karachi" description and a CTA into the 6-clinic
+// grid (icare_clinics_list_screen.dart). Data-driven (icare_clinics_data.dart)
+// so a future clinic (client already named 5 more) is a data addition, not a
+// new screen.
+class _ICareClinicsSection extends StatefulWidget {
+  const _ICareClinicsSection();
+
+  @override
+  State<_ICareClinicsSection> createState() => _ICareClinicsSectionState();
+}
+
+class _ICareClinicsSectionState extends State<_ICareClinicsSection> {
+  bool _expanded = false;
+  static const _accent = Color(0xFF0D9488);
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: const Color(0xFFF6F8FB),
+      padding: const EdgeInsets.symmetric(vertical: 40),
+      child: _CenteredSection(
+        child: Column(
+          children: [
+            InkWell(
+              onTap: () => setState(() => _expanded = !_expanded),
+              borderRadius: BorderRadius.circular(16),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.03),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 48,
+                      height: 48,
+                      decoration: BoxDecoration(
+                        color: _accent.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Icon(Icons.local_hospital_rounded, color: _accent, size: 26),
+                    ),
+                    const SizedBox(width: 16),
+                    const Expanded(
+                      child: Text(
+                        'iCare Clinics',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w900,
+                          fontFamily: 'Gilroy-Bold',
+                          color: Color(0xFF0036BC),
+                        ),
+                      ),
+                    ),
+                    AnimatedRotation(
+                      turns: _expanded ? 0.5 : 0,
+                      duration: const Duration(milliseconds: 200),
+                      child: const Icon(Icons.keyboard_arrow_down_rounded, color: Color(0xFF64748B)),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            AnimatedCrossFade(
+              duration: const Duration(milliseconds: 220),
+              crossFadeState: _expanded ? CrossFadeState.showSecond : CrossFadeState.showFirst,
+              firstChild: const SizedBox(width: double.infinity),
+              secondChild: Container(
+                width: double.infinity,
+                margin: const EdgeInsets.only(top: 12),
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Premium Multi-Speciality',
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
+                    ),
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        const Icon(Icons.location_on_rounded, size: 15, color: Color(0xFF64748B)),
+                        const SizedBox(width: 4),
+                        Text('Presently Available Only Karachi', style: TextStyle(fontSize: 13, color: Colors.grey[600])),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: () => Navigator.of(context).push(
+                          MaterialPageRoute(builder: (_) => const ICareClinicsListScreen()),
+                        ),
+                        icon: const Icon(Icons.arrow_forward_rounded, size: 18),
+                        label: const Text('View Clinics'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: _accent,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          elevation: 0,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 // ── Courses Section ───────────────────────────────────────────────────────────
@@ -3943,6 +4081,9 @@ class PublicHomeBody extends StatelessWidget {
             ),
           ),
         ),
+        const SizedBox(height: 24),
+        // iCare Clinics — client's branded specialty clinic network
+        const _ICareClinicsSection(),
         const SizedBox(height: 24),
         // 5. Courses Section
         _CoursesSection(),
