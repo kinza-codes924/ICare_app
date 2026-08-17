@@ -4,6 +4,7 @@
 import 'dart:async';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:icare/models/consultation_timer.dart';
 import 'package:icare/models/consultation_message.dart';
@@ -501,6 +502,19 @@ class _ConsultationChatScreenV2State extends State<ConsultationChatScreenV2> {
     );
   }
 
+  // Navigator.pop leaves the screen exactly where it was whenever this
+  // route is the bottom of the stack — which is always the case after a
+  // page refresh (or opening the /consultation/:id URL directly), since
+  // GoRouter rebuilds the whole navigator from that one location. With
+  // no route underneath to pop back to, "end consultation" silently did
+  // nothing and the user was stuck staring at a blank page. Going to the
+  // role's dashboard by location always lands somewhere real, regardless
+  // of what (if anything) is under this route on the stack.
+  void _exitToDashboard() {
+    if (!mounted) return;
+    context.go(widget.isDoctor ? '/doctor/dashboard' : '/patient/home');
+  }
+
   Future<void> _endConsultation() async {
     // Validate minimum duration
     final validationError = _timer.validateEndConsultation();
@@ -605,7 +619,11 @@ class _ConsultationChatScreenV2State extends State<ConsultationChatScreenV2> {
                                 const Text('Consultation completed successfully'),
                                 const SizedBox(height: 24),
                                 ElevatedButton(
-                                  onPressed: () => Navigator.of(context).popUntil((route) => route.isFirst),
+                                  // popUntil((route) => route.isFirst) is a
+                                  // no-op when THIS route already is first —
+                                  // the case after a refresh — leaving the
+                                  // user stuck here. Go by location instead.
+                                  onPressed: _exitToDashboard,
                                   child: const Text('Go to Dashboard'),
                                 ),
                               ],
@@ -626,11 +644,11 @@ class _ConsultationChatScreenV2State extends State<ConsultationChatScreenV2> {
               );
             } else {
               // No prescription - just show success and go back
-              if (mounted) Navigator.pop(context);
+              _exitToDashboard();
             }
           } else {
             // Doctor side - just go back
-            if (mounted) Navigator.pop(context);
+            _exitToDashboard();
           }
         } else if (mounted) {
           // Backend returned success: false — show error with force-exit option
@@ -658,7 +676,7 @@ class _ConsultationChatScreenV2State extends State<ConsultationChatScreenV2> {
           if (forceEnd == true && mounted) {
             _timer.stop();
             await _clearConsultationState();
-            Navigator.pop(context);
+            _exitToDashboard();
           }
         }
       } catch (e) {
