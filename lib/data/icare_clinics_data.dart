@@ -44,7 +44,9 @@ const List<Clinic> kICareClinics = [
     specialtyFilter: 'Dentist',
     doctorId: '6a83634c9a3050a3d62f9a22',
     hoursLabel: 'Mon – Sat, 10:00 AM – 8:00 PM',
-    mapQuery: 'iCare Dental & Aesthetic Centre Karachi',
+    mapQuery: 'iCare Clinics, Mezzanine Floor, Mall Square, Zamzama Boulevard, DHA Phase 5, Clifton, Karachi',
+    address: 'Mezzanine Floor, Mall Square, Zamzama Boulevard, DHA Phase 5, '
+        'Clifton, Zamzama Commercial Area, Defence V, Karachi, 75600',
     services: [
       ClinicService(
         name: 'Dental Implants',
@@ -150,7 +152,9 @@ const List<Clinic> kICareClinics = [
     specialtyFilter: 'Dermatologist',
     doctorId: '6a83634d9a3050a3d62f9a24',
     hoursLabel: 'Mon – Sat, 11:00 AM – 8:00 PM',
-    mapQuery: 'iCare Derma & Skin Care Karachi',
+    mapQuery: 'iCare Clinics, Mezzanine Floor, Mall Square, Zamzama Boulevard, DHA Phase 5, Clifton, Karachi',
+    address: 'Mezzanine Floor, Mall Square, Zamzama Boulevard, DHA Phase 5, '
+        'Clifton, Zamzama Commercial Area, Defence V, Karachi, 75600',
     services: [
       ClinicService(
         name: 'Laser Hair Removal',
@@ -256,7 +260,9 @@ const List<Clinic> kICareClinics = [
     specialtyFilter: 'Gynecologist',
     doctorId: '6a83634e9a3050a3d62f9a26',
     hoursLabel: 'Mon – Sat, 9:00 AM – 7:00 PM',
-    mapQuery: 'iCare Mother & Child Care Centre Karachi',
+    mapQuery: 'iCare Clinics, Mezzanine Floor, Mall Square, Zamzama Boulevard, DHA Phase 5, Clifton, Karachi',
+    address: 'Mezzanine Floor, Mall Square, Zamzama Boulevard, DHA Phase 5, '
+        'Clifton, Zamzama Commercial Area, Defence V, Karachi, 75600',
     services: [
       ClinicService(
         name: 'Prenatal Care',
@@ -358,7 +364,9 @@ const List<Clinic> kICareClinics = [
     specialtyFilter: 'Physiotherapist',
     doctorId: '6a83634f9a3050a3d62f9a28',
     hoursLabel: 'Mon – Sat, 9:00 AM – 8:00 PM',
-    mapQuery: 'iCare Physiotherapy & Rehabilitation Centre Karachi',
+    mapQuery: 'iCare Clinics, Mezzanine Floor, Mall Square, Zamzama Boulevard, DHA Phase 5, Clifton, Karachi',
+    address: 'Mezzanine Floor, Mall Square, Zamzama Boulevard, DHA Phase 5, '
+        'Clifton, Zamzama Commercial Area, Defence V, Karachi, 75600',
     services: [
       ClinicService(
         name: 'Sports Injury Rehab',
@@ -460,7 +468,9 @@ const List<Clinic> kICareClinics = [
     specialtyFilter: 'Psychiatrist',
     doctorId: '6a8363509a3050a3d62f9a2a',
     hoursLabel: 'Mon – Sat, 11:00 AM – 7:00 PM',
-    mapQuery: 'iCare Psychiatry Mental Health Centre Karachi',
+    mapQuery: 'iCare Clinics, Mezzanine Floor, Mall Square, Zamzama Boulevard, DHA Phase 5, Clifton, Karachi',
+    address: 'Mezzanine Floor, Mall Square, Zamzama Boulevard, DHA Phase 5, '
+        'Clifton, Zamzama Commercial Area, Defence V, Karachi, 75600',
     services: [
       ClinicService(
         name: 'Counseling & Therapy',
@@ -560,7 +570,9 @@ const List<Clinic> kICareClinics = [
     specialtyFilter: 'Nutritionist',
     doctorId: '6a83637418f9abf9de617493',
     hoursLabel: 'Mon – Sat, 9:00 AM – 6:00 PM',
-    mapQuery: 'iCare Lifestyle and Wellness Centre Karachi',
+    mapQuery: 'iCare Clinics, Mezzanine Floor, Mall Square, Zamzama Boulevard, DHA Phase 5, Clifton, Karachi',
+    address: 'Mezzanine Floor, Mall Square, Zamzama Boulevard, DHA Phase 5, '
+        'Clifton, Zamzama Commercial Area, Defence V, Karachi, 75600',
     services: [
       ClinicService(
         name: 'Nutrition Counseling',

@@ -82,9 +82,11 @@ class Clinic {
   final List<ClinicTestimonial> testimonials;
   final List<ClinicFaq> faqs;
   final String hoursLabel;
-  // Free-text query for "Get Directions" (Google Maps search) — not a fixed
-  // lat/lng, since clinics don't have a single fixed street address yet.
+  // Free-text query for "Get Directions" (Google Maps search).
   final String mapQuery;
+  // Full street address, shown in the "Visit Our Clinic" section. All
+  // clinics currently share iCare's one registered location.
+  final String address;
 
   const Clinic({
     required this.id,
@@ -102,5 +104,6 @@ class Clinic {
     required this.faqs,
     required this.hoursLabel,
     required this.mapQuery,
+    required this.address,
   });
 }

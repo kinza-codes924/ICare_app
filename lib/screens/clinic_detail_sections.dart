@@ -231,9 +231,8 @@ class _FaqTile extends StatelessWidget {
   }
 }
 
-/// Hours + location + "Get Directions" link. Uses a Google Maps search URL
-/// rather than an embedded map, since clinics don't have a single fixed
-/// street address yet (Karachi-wide network).
+/// Address + hours + "Get Directions" link. Uses a Google Maps search URL
+/// rather than an embedded map.
 class VisitClinicSection extends StatelessWidget {
   final Clinic clinic;
 
@@ -261,7 +260,7 @@ class VisitClinicSection extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _InfoRow(icon: Icons.location_on_rounded, accent: clinic.accentColor, text: 'Presently Available Only ${clinic.location}'),
+          _InfoRow(icon: Icons.location_on_rounded, accent: clinic.accentColor, text: clinic.address),
           const SizedBox(height: 12),
           _InfoRow(icon: Icons.access_time_rounded, accent: clinic.accentColor, text: clinic.hoursLabel),
           const SizedBox(height: 18),

@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:icare/models/clinic.dart';
 import 'package:icare/models/doctor.dart';
-import 'package:icare/screens/doctor_detail.dart';
+import 'package:icare/providers/auth_provider.dart';
+import 'package:icare/screens/book_appointment.dart';
 import 'package:icare/screens/doctors_list.dart';
 import 'package:icare/screens/clinic_detail_sections.dart';
 import 'package:icare/services/doctor_service.dart';
@@ -11,24 +14,62 @@ import 'package:icare/widgets/whatsapp_button.dart';
 /// Generic detail page for one iCare specialty clinic. One screen for all
 /// clinics (data-driven from Clinic) rather than 6 hardcoded files, so a
 /// future clinic is just a new entry in icare_clinics_data.dart.
-class ClinicDetailScreen extends StatelessWidget {
+class ClinicDetailScreen extends ConsumerWidget {
   final Clinic clinic;
   const ClinicDetailScreen({super.key, required this.clinic});
 
-  Future<void> _bookAppointment(BuildContext context) async {
-    // When the clinic has a designated department account, book straight
-    // into that doctor's profile — the patient sees the clinic's branded
-    // name (e.g. "iCare Derma & Skin Care"), not an individual doctor,
-    // since that account's User.name IS the clinic name. Falls back to a
-    // specialty search if doctorId isn't set yet or the fetch fails, so
-    // this never dead-ends.
+  Future<void> _bookAppointment(BuildContext context, WidgetRef ref) async {
+    final isLoggedIn = ref.read(authProvider).isLoggedIn;
+    if (!isLoggedIn) {
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: const Row(
+            children: [
+              Icon(Icons.lock_rounded, color: Color(0xFF0036BC)),
+              SizedBox(width: 10),
+              Text('Login Required', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+            ],
+          ),
+          content: const Text(
+            'You need to be logged in to book an appointment. Please sign in to continue.',
+            style: TextStyle(fontSize: 14, color: Color(0xFF64748B)),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(ctx);
+                context.go('/login');
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF0036BC),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              child: const Text('Sign In', style: TextStyle(color: Colors.white)),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
+    // When the clinic has a designated department account, skip straight to
+    // the slot picker (BookAppointmentScreen) instead of DoctorDetailScreen
+    // — DoctorDetailScreen shows individual-doctor stats (Experience,
+    // Rating, Reviews, Availability) that read oddly for a clinic brand.
+    // The slot picker's doctor card just shows an avatar + name, and that
+    // name IS the clinic's branded name, so it reads correctly as-is.
+    // Falls back to a specialty search if doctorId isn't set yet or the
+    // fetch fails, so this never dead-ends.
     if (clinic.doctorId != null) {
       final result = await DoctorService().getDoctorById(clinic.doctorId!);
       if (result['success'] == true && result['doctor'] != null) {
         final doctor = Doctor.fromJson(result['doctor']);
         if (context.mounted) {
           Navigator.of(context).push(
-            MaterialPageRoute(builder: (_) => DoctorDetailScreen(doctor: doctor)),
+            MaterialPageRoute(builder: (_) => BookAppointmentScreen(doctor: doctor)),
           );
         }
         return;
@@ -60,7 +101,7 @@ class ClinicDetailScreen extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final width = MediaQuery.of(context).size.width;
     final isMobile = width < 700;
 
@@ -165,7 +206,7 @@ class ClinicDetailScreen extends StatelessWidget {
             ],
           ),
           child: ElevatedButton.icon(
-            onPressed: () => _bookAppointment(context),
+            onPressed: () => _bookAppointment(context, ref),
             icon: const Icon(Icons.calendar_month_rounded, size: 18),
             label: const Text('Book Appointment'),
             style: ElevatedButton.styleFrom(
