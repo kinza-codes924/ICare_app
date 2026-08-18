@@ -23,7 +23,9 @@ class _ClinicMapEmbedState extends State<ClinicMapEmbed> {
     ui_web.platformViewRegistry.registerViewFactory(_viewId, (int id) {
       final query = Uri.encodeComponent(widget.address);
       return html.IFrameElement()
-        ..src = 'https://maps.google.com/maps?q=$query&output=embed'
+        // www.google.com (not maps.google.com) — matches the app's CSP
+        // frame-src allowlist in web/index.html.
+        ..src = 'https://www.google.com/maps?q=$query&output=embed'
         ..style.border = 'none'
         ..style.width = '100%'
         ..style.height = '100%';
