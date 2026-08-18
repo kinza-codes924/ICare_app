@@ -8,11 +8,16 @@ class ClinicService {
   // Longer procedure detail shown on the clinic detail page. `description`
   // stays short for the list-screen teaser.
   final String longDescription;
+  // Optional asset path for a real photo illustrating this specific
+  // service (e.g. assets/clinic_photos/dental_implant.jpg). Null when no
+  // photo is available yet for this service.
+  final String? imagePath;
 
   const ClinicService({
     required this.name,
     required this.description,
     required this.longDescription,
+    this.imagePath,
   });
 }
 
@@ -87,6 +92,13 @@ class Clinic {
   // Full street address, shown in the "Visit Our Clinic" section. All
   // clinics currently share iCare's one registered location.
   final String address;
+  // Optional real photo for the detail page hero (replaces the plain
+  // gradient background when available). Null for clinics without a
+  // photo yet — those keep the gradient-only header.
+  final String? heroImage;
+  // Optional real reception/treatment-room photos for the "Visit Our
+  // Clinic" section. Empty for clinics without photos yet.
+  final List<String> facilityPhotos;
 
   const Clinic({
     required this.id,
@@ -105,5 +117,7 @@ class Clinic {
     required this.hoursLabel,
     required this.mapQuery,
     required this.address,
+    this.heroImage,
+    this.facilityPhotos = const [],
   });
 }

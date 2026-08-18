@@ -268,6 +268,19 @@ class _Header extends StatelessWidget {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
+        image: clinic.heroImage == null
+            ? null
+            : DecorationImage(
+                image: AssetImage(clinic.heroImage!),
+                fit: BoxFit.cover,
+                // Darkens/tints the photo so the accent gradient still reads
+                // as this clinic's brand color and the white header text
+                // stays legible over it.
+                colorFilter: ColorFilter.mode(
+                  clinic.accentColor.withValues(alpha: 0.55),
+                  BlendMode.multiply,
+                ),
+              ),
       ),
       child: SafeArea(
         bottom: false,
@@ -356,15 +369,26 @@ class _ServiceCard extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: accent.withValues(alpha: 0.12),
-              shape: BoxShape.circle,
+          if (service.imagePath != null)
+            ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: Image.asset(
+                service.imagePath!,
+                width: 52,
+                height: 52,
+                fit: BoxFit.cover,
+              ),
+            )
+          else
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: accent.withValues(alpha: 0.12),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(Icons.check_circle_rounded, color: accent, size: 22),
             ),
-            child: Icon(Icons.check_circle_rounded, color: accent, size: 22),
-          ),
           const SizedBox(width: 14),
           Expanded(
             child: Column(

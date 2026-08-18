@@ -264,6 +264,26 @@ class VisitClinicSection extends StatelessWidget {
           _InfoRow(icon: Icons.location_on_rounded, accent: clinic.accentColor, text: clinic.address),
           const SizedBox(height: 12),
           _InfoRow(icon: Icons.access_time_rounded, accent: clinic.accentColor, text: clinic.hoursLabel),
+          if (clinic.facilityPhotos.isNotEmpty) ...[
+            const SizedBox(height: 18),
+            SizedBox(
+              height: 140,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: clinic.facilityPhotos.length,
+                separatorBuilder: (_, _) => const SizedBox(width: 10),
+                itemBuilder: (context, i) => ClipRRect(
+                  borderRadius: BorderRadius.circular(14),
+                  child: Image.asset(
+                    clinic.facilityPhotos[i],
+                    width: 180,
+                    height: 140,
+                    fit: BoxFit.cover,
+                  ),
+                ),
+              ),
+            ),
+          ],
           const SizedBox(height: 18),
           ClipRRect(
             borderRadius: BorderRadius.circular(14),

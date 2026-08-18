@@ -47,6 +47,11 @@ const List<Clinic> kICareClinics = [
     mapQuery: 'iCare Clinics, Mezzanine Floor, Mall Square, Zamzama Boulevard, DHA Phase 5, Clifton, Karachi',
     address: 'Mezzanine Floor, Mall Square, Zamzama Boulevard, DHA Phase 5, '
         'Clifton, Zamzama Commercial Area, Defence V, Karachi, 75600',
+    heroImage: 'assets/clinic_photos/dental_implant.jpg',
+    facilityPhotos: [
+      'assets/clinic_photos/dental_reception.jpg',
+      'assets/clinic_photos/dental_room.jpg',
+    ],
     services: [
       ClinicService(
         name: 'Dental Implants',
@@ -55,6 +60,7 @@ const List<Clinic> kICareClinics = [
             'Titanium implants act as an artificial tooth root, topped with a '
             'natural-looking crown — a permanent, durable fix for missing '
             'teeth that protects your jawbone and bite alignment.',
+        imagePath: 'assets/clinic_photos/dental_implant.jpg',
       ),
       ClinicService(
         name: 'Teeth Whitening',
@@ -71,6 +77,7 @@ const List<Clinic> kICareClinics = [
             'Straighten misaligned teeth with metal braces or nearly-invisible '
             'clear aligners, tailored to your bite and lifestyle, with regular '
             'progress checkups throughout treatment.',
+        imagePath: 'assets/clinic_photos/dental_braces.jpg',
       ),
       ClinicService(
         name: 'Root Canal Treatment',
