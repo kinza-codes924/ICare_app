@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:icare/models/clinic.dart';
+import 'package:icare/models/doctor.dart';
+import 'package:icare/screens/doctor_detail.dart';
 import 'package:icare/screens/doctors_list.dart';
+import 'package:icare/screens/clinic_detail_sections.dart';
+import 'package:icare/services/doctor_service.dart';
 import 'package:icare/widgets/whatsapp_button.dart';
 
 /// Generic detail page for one iCare specialty clinic. One screen for all
@@ -11,18 +15,32 @@ class ClinicDetailScreen extends StatelessWidget {
   final Clinic clinic;
   const ClinicDetailScreen({super.key, required this.clinic});
 
-  Future<void> _bookAppointment(BuildContext context) {
-    // Routes into the existing, already-working doctor -> appointment ->
-    // payment flow (DoctorsList -> doctor_detail.dart -> book_appointment.dart
-    // -> select_payment_method.dart) rather than a new clinic-specific
-    // booking path. DoctorsList already shows "No doctors found" if the
-    // filter comes back empty, so this degrades gracefully for specialties
-    // that don't have a registered doctor yet.
-    return Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => DoctorsList(initialSpecialty: clinic.specialtyFilter),
-      ),
-    );
+  Future<void> _bookAppointment(BuildContext context) async {
+    // When the clinic has a designated department account, book straight
+    // into that doctor's profile — the patient sees the clinic's branded
+    // name (e.g. "iCare Derma & Skin Care"), not an individual doctor,
+    // since that account's User.name IS the clinic name. Falls back to a
+    // specialty search if doctorId isn't set yet or the fetch fails, so
+    // this never dead-ends.
+    if (clinic.doctorId != null) {
+      final result = await DoctorService().getDoctorById(clinic.doctorId!);
+      if (result['success'] == true && result['doctor'] != null) {
+        final doctor = Doctor.fromJson(result['doctor']);
+        if (context.mounted) {
+          Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => DoctorDetailScreen(doctor: doctor)),
+          );
+        }
+        return;
+      }
+    }
+    if (context.mounted) {
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => DoctorsList(initialSpecialty: clinic.specialtyFilter),
+        ),
+      );
+    }
   }
 
   Future<void> _enquireOnWhatsApp(BuildContext context) async {
@@ -65,17 +83,11 @@ class ClinicDetailScreen extends StatelessWidget {
                         style: const TextStyle(fontSize: 15, color: Color(0xFF475569), height: 1.6),
                       ),
                       const SizedBox(height: 36),
-                      const Text(
-                        'Our Services',
-                        style: TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.w900,
-                          fontFamily: 'Gilroy-Bold',
-                          color: Color(0xFF0F172A),
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Container(width: 48, height: 3, color: clinic.accentColor),
+                      _SectionTitle(title: 'Your Care Journey', accent: clinic.accentColor),
+                      const SizedBox(height: 20),
+                      JourneyTimeline(steps: clinic.journey, accent: clinic.accentColor, isMobile: isMobile),
+                      const SizedBox(height: 36),
+                      _SectionTitle(title: 'Our Services', accent: clinic.accentColor),
                       const SizedBox(height: 20),
                       // Wrap, not GridView.count — a fixed childAspectRatio
                       // stretched every card to a set height regardless of
@@ -100,24 +112,22 @@ class ClinicDetailScreen extends StatelessWidget {
                         },
                       ),
                       const SizedBox(height: 36),
+                      _TrustStrip(accent: clinic.accentColor),
+                      const SizedBox(height: 36),
+                      _SectionTitle(title: 'Patient Testimonials', accent: clinic.accentColor),
+                      const SizedBox(height: 20),
+                      TestimonialsSection(testimonials: clinic.testimonials),
+                      const SizedBox(height: 36),
+                      _SectionTitle(title: 'Visit Our Clinic', accent: clinic.accentColor),
+                      const SizedBox(height: 20),
+                      VisitClinicSection(clinic: clinic),
+                      const SizedBox(height: 36),
+                      _SectionTitle(title: 'Frequently Asked Questions', accent: clinic.accentColor),
+                      const SizedBox(height: 20),
+                      FaqAccordion(faqs: clinic.faqs, accent: clinic.accentColor),
+                      const SizedBox(height: 24),
                       Row(
                         children: [
-                          Expanded(
-                            child: ElevatedButton.icon(
-                              onPressed: () => _bookAppointment(context),
-                              icon: const Icon(Icons.calendar_month_rounded, size: 18),
-                              label: const Text('Book Appointment'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: clinic.accentColor,
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(vertical: 16),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                elevation: 0,
-                                textStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 14),
                           Expanded(
                             child: OutlinedButton.icon(
                               onPressed: () => _enquireOnWhatsApp(context),
@@ -134,9 +144,9 @@ class ClinicDetailScreen extends StatelessWidget {
                           ),
                         ],
                       ),
-                      const SizedBox(height: 36),
-                      _TrustStrip(accent: clinic.accentColor),
-                      const SizedBox(height: 24),
+                      // Extra bottom padding so content doesn't sit flush
+                      // under the sticky Book Appointment bar.
+                      const SizedBox(height: 90),
                     ],
                   ),
                 ),
@@ -145,64 +155,57 @@ class ClinicDetailScreen extends StatelessWidget {
           ],
         ),
       ),
+      bottomNavigationBar: SafeArea(
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            boxShadow: [
+              BoxShadow(color: Colors.black.withValues(alpha: 0.06), blurRadius: 12, offset: const Offset(0, -4)),
+            ],
+          ),
+          child: ElevatedButton.icon(
+            onPressed: () => _bookAppointment(context),
+            icon: const Icon(Icons.calendar_month_rounded, size: 18),
+            label: const Text('Book Appointment'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: clinic.accentColor,
+              foregroundColor: Colors.white,
+              minimumSize: const Size(double.infinity, 52),
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              elevation: 0,
+              textStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
 
-/// Small trust-badges strip shown under the CTA buttons. Purely to give the
-/// page a finished feel below an odd-numbered services grid (which otherwise
-/// leaves the last row half-empty) — not tied to any one clinic's content.
-class _TrustStrip extends StatelessWidget {
+class _SectionTitle extends StatelessWidget {
+  final String title;
   final Color accent;
-  const _TrustStrip({required this.accent});
-
-  static const _items = [
-    (Icons.verified_user_rounded, 'Verified Doctors'),
-    (Icons.calendar_month_rounded, 'Easy Online Booking'),
-    (Icons.chat_rounded, 'WhatsApp Support'),
-  ];
+  const _SectionTitle({required this.title, required this.accent});
 
   @override
   Widget build(BuildContext context) {
-    final isMobile = MediaQuery.of(context).size.width < 700;
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final columns = isMobile ? 1 : 3;
-        const spacing = 14.0;
-        final cardWidth = (constraints.maxWidth - spacing * (columns - 1)) / columns;
-        return Wrap(
-          spacing: spacing,
-          runSpacing: spacing,
-          children: _items
-              .map((item) => SizedBox(
-                    width: cardWidth,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 14),
-                      decoration: BoxDecoration(
-                        color: accent.withValues(alpha: 0.06),
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(item.$1, color: accent, size: 22),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Text(
-                              item.$2,
-                              style: const TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w700,
-                                color: Color(0xFF0F172A),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ))
-              .toList(),
-        );
-      },
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: const TextStyle(
+            fontSize: 22,
+            fontWeight: FontWeight.w900,
+            fontFamily: 'Gilroy-Bold',
+            color: Color(0xFF0F172A),
+          ),
+        ),
+        const SizedBox(height: 4),
+        Container(width: 48, height: 3, color: accent),
+      ],
     );
   }
 }
@@ -294,8 +297,7 @@ class _Header extends StatelessWidget {
   }
 }
 
-/// A single service — round tinted icon, name, description. Matches the
-/// client's reference screenshots (icare-derma.com service cards).
+/// A single service — round tinted icon, name, expanded procedure detail.
 class _ServiceCard extends StatelessWidget {
   final ClinicService service;
   final Color accent;
@@ -333,16 +335,72 @@ class _ServiceCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 3),
                 Text(
-                  service.description,
+                  service.longDescription,
                   style: const TextStyle(fontSize: 12.5, color: Color(0xFF64748B), height: 1.4),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
                 ),
               ],
             ),
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Small trust-badges strip shown under the services grid. Purely to give
+/// the page a finished feel below an odd-numbered services grid — not tied
+/// to any one clinic's content.
+class _TrustStrip extends StatelessWidget {
+  final Color accent;
+  const _TrustStrip({required this.accent});
+
+  static const _items = [
+    (Icons.verified_user_rounded, 'Verified Doctors'),
+    (Icons.calendar_month_rounded, 'Easy Online Booking'),
+    (Icons.chat_rounded, 'WhatsApp Support'),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final isMobile = MediaQuery.of(context).size.width < 700;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final columns = isMobile ? 1 : 3;
+        const spacing = 14.0;
+        final cardWidth = (constraints.maxWidth - spacing * (columns - 1)) / columns;
+        return Wrap(
+          spacing: spacing,
+          runSpacing: spacing,
+          children: _items
+              .map((item) => SizedBox(
+                    width: cardWidth,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 14),
+                      decoration: BoxDecoration(
+                        color: accent.withValues(alpha: 0.06),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(item.$1, color: accent, size: 22),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              item.$2,
+                              style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFF0F172A),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ))
+              .toList(),
+        );
+      },
     );
   }
 }

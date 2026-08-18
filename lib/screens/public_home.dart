@@ -5,6 +5,9 @@ import 'package:go_router/go_router.dart';
 import 'package:icare/screens/consultation_details_screen.dart';
 import 'package:icare/screens/doctors_list.dart';
 import 'package:icare/screens/icare_clinics_list_screen.dart';
+import 'package:icare/screens/clinic_detail_screen.dart';
+import 'package:icare/data/icare_clinics_data.dart';
+import 'package:icare/models/clinic.dart';
 import 'package:icare/screens/pharmacies.dart';
 import 'package:icare/screens/lab_list.dart';
 import 'package:icare/utils/theme.dart';
@@ -1474,129 +1477,122 @@ class _HomeSuggestion {
 }
 
 // ── iCare Clinics Section ───────────────────────────────────────────────────
-// Expandable card: tapping the header reveals the "Premium Multi-Speciality /
-// Presently Available Only Karachi" description and a CTA into the 6-clinic
-// grid (icare_clinics_list_screen.dart). Data-driven (icare_clinics_data.dart)
-// so a future clinic (client already named 5 more) is a data addition, not a
-// new screen.
-class _ICareClinicsSection extends StatefulWidget {
+// Always-visible, bold section (matches the Book Lab Test section's visual
+// weight) — shared _SectionHeader + a preview strip of clinic tiles, so it
+// reads as content on first paint instead of a quiet collapsed accordion.
+// Data-driven (icare_clinics_data.dart) so a future clinic (client already
+// named 5 more) is a data addition, not a new screen.
+class _ICareClinicsSection extends StatelessWidget {
   const _ICareClinicsSection();
-
-  @override
-  State<_ICareClinicsSection> createState() => _ICareClinicsSectionState();
-}
-
-class _ICareClinicsSectionState extends State<_ICareClinicsSection> {
-  bool _expanded = false;
   static const _accent = Color(0xFF0D9488);
 
   @override
   Widget build(BuildContext context) {
+    final isMobile = MediaQuery.of(context).size.width < 700;
+    final preview = kICareClinics.take(3).toList();
+
     return Container(
       color: Colors.white,
       padding: const EdgeInsets.symmetric(vertical: 40),
       child: _CenteredSection(
         child: Column(
           children: [
-            InkWell(
-              onTap: () => setState(() => _expanded = !_expanded),
-              borderRadius: BorderRadius.circular(16),
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: const Color(0xFFE2E8F0)),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.03),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
+            _SectionHeader(
+              title: 'iCare Clinics',
+              subtitle: 'Premium multi-speciality clinics — presently available only in Karachi',
+              titleColor: _accent,
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const ICareClinicsListScreen()),
+              ),
+            ),
+            const SizedBox(height: 24),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final columns = isMobile ? 1 : 3;
+                const spacing = 16.0;
+                final cardWidth = (constraints.maxWidth - spacing * (columns - 1)) / columns;
+                return Wrap(
+                  spacing: spacing,
+                  runSpacing: spacing,
+                  children: preview
+                      .map((c) => SizedBox(width: cardWidth, child: _ClinicPreviewTile(clinic: c)))
+                      .toList(),
+                );
+              },
+            ),
+            const SizedBox(height: 20),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const ICareClinicsListScreen()),
                 ),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 48,
-                      height: 48,
-                      decoration: BoxDecoration(
-                        color: _accent.withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: const Icon(Icons.local_hospital_rounded, color: _accent, size: 26),
-                    ),
-                    const SizedBox(width: 16),
-                    const Expanded(
-                      child: Text(
-                        'iCare Clinics',
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w900,
-                          fontFamily: 'Gilroy-Bold',
-                          color: Color(0xFF0036BC),
-                        ),
-                      ),
-                    ),
-                    AnimatedRotation(
-                      turns: _expanded ? 0.5 : 0,
-                      duration: const Duration(milliseconds: 200),
-                      child: const Icon(Icons.keyboard_arrow_down_rounded, color: Color(0xFF64748B)),
-                    ),
-                  ],
+                icon: const Icon(Icons.arrow_forward_rounded, size: 18),
+                label: const Text('View All Clinics'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _accent,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  elevation: 0,
+                  textStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
                 ),
               ),
             ),
-            AnimatedCrossFade(
-              duration: const Duration(milliseconds: 220),
-              crossFadeState: _expanded ? CrossFadeState.showSecond : CrossFadeState.showFirst,
-              firstChild: const SizedBox(width: double.infinity),
-              secondChild: Container(
-                width: double.infinity,
-                margin: const EdgeInsets.only(top: 12),
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: const Color(0xFFE2E8F0)),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Premium Multi-Speciality',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
-                    ),
-                    const SizedBox(height: 6),
-                    Row(
-                      children: [
-                        const Icon(Icons.location_on_rounded, size: 15, color: Color(0xFF64748B)),
-                        const SizedBox(width: 4),
-                        Text('Presently Available Only Karachi', style: TextStyle(fontSize: 13, color: Colors.grey[600])),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton.icon(
-                        onPressed: () => Navigator.of(context).push(
-                          MaterialPageRoute(builder: (_) => const ICareClinicsListScreen()),
-                        ),
-                        icon: const Icon(Icons.arrow_forward_rounded, size: 18),
-                        label: const Text('View Clinics'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: _accent,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                          elevation: 0,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ClinicPreviewTile extends StatelessWidget {
+  final Clinic clinic;
+  const _ClinicPreviewTile({required this.clinic});
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(16),
+      onTap: () => Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => ClinicDetailScreen(clinic: clinic)),
+      ),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: const Color(0xFFE2E8F0)),
+          boxShadow: [
+            BoxShadow(color: clinic.accentColor.withValues(alpha: 0.1), blurRadius: 14, offset: const Offset(0, 6)),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 52,
+              height: 52,
+              decoration: BoxDecoration(
+                color: clinic.accentColor.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(14),
               ),
+              child: Icon(clinic.icon, color: clinic.accentColor, size: 26),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              clinic.name,
+              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, fontFamily: 'Gilroy-Bold', color: Color(0xFF0F172A)),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              clinic.tagline,
+              style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
             ),
           ],
         ),

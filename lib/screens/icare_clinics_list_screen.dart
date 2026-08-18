@@ -124,13 +124,13 @@ class _ClinicCardState extends State<_ClinicCard> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Container(
-                width: 46,
-                height: 46,
+                width: 52,
+                height: 52,
                 decoration: BoxDecoration(
                   color: c.accentColor.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(14),
                 ),
-                child: Icon(c.icon, color: c.accentColor, size: 24),
+                child: Icon(c.icon, color: c.accentColor, size: 26),
               ),
               const SizedBox(height: 10),
               Text(
