@@ -2,13 +2,13 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:icare/providers/auth_provider.dart';
+import 'package:icare/services/api_service.dart';
 import 'package:icare/services/laboratory_service.dart';
 import 'package:icare/widgets/back_button.dart';
 import 'package:icare/widgets/date_filter_bar.dart';
 import 'package:icare/screens/lab_booking_details.dart';
 import 'package:intl/intl.dart';
 import 'package:icare/utils/error_handler.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 class PatientLabOrdersScreen extends ConsumerStatefulWidget {
   const PatientLabOrdersScreen({super.key});
@@ -123,37 +123,36 @@ class _PatientLabOrdersScreenState extends ConsumerState<PatientLabOrdersScreen>
                 if (subjectCtrl.text.trim().isEmpty || messageCtrl.text.trim().isEmpty) return;
                 setSt(() => sending = true);
                 final user = ref.read(authProvider).user;
-                final body = '''
-Complaint Category: $category
+                final message = '''
 Booking Number: #$bookingNumber
 Test Name: $testName
 Lab: $labName
-
-Patient Details:
-Name: ${user?.name ?? 'N/A'}
-Email: ${user?.email ?? 'N/A'}
 Phone: ${user?.phoneNumber ?? 'N/A'}
-User ID: ${user?.id ?? 'N/A'}
 
-Subject: ${subjectCtrl.text.trim()}
-
-Message:
 ${messageCtrl.text.trim()}
 ''';
-                final mailUri = Uri(
-                  scheme: 'mailto',
-                  path: 'icareofficialapp@gmail.com',
-                  queryParameters: {
-                    'subject': '[Lab Complaint] $category - Booking #$bookingNumber',
-                    'body': body,
-                  },
-                );
                 if (ctx.mounted) Navigator.pop(ctx);
-                await launchUrl(mailUri, mode: LaunchMode.externalApplication);
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Complaint submitted. Our team will respond within 24 hours.'), backgroundColor: Color(0xFF10B981)),
-                  );
+                try {
+                  await ApiService().post('/support', {
+                    'category': 'Lab Booking Complaint: $category',
+                    'subject': '${subjectCtrl.text.trim()} (Booking #$bookingNumber)',
+                    'message': message,
+                    'name': user?.name ?? '',
+                    'email': user?.email ?? '',
+                    'role': 'Patient',
+                    'userId': user?.id ?? '',
+                  });
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Complaint submitted. Our team will respond within 24 hours.'), backgroundColor: Color(0xFF10B981)),
+                    );
+                  }
+                } catch (_) {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text("Couldn't submit your complaint right now. Please try again later."), backgroundColor: Color(0xFFEF4444)),
+                    );
+                  }
                 }
               },
               style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFEF4444), foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),

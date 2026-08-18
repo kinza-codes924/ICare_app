@@ -603,26 +603,27 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           onPressed: () async {
             if (!fk.currentState!.validate()) return;
             Navigator.pop(dc);
-            final subject = Uri.encodeComponent('[ICare Issue] ${titleC.text.trim()}');
-            final body = Uri.encodeComponent(
-              'Account Type: $userRole\n'
-              'Name: $userName\n'
-              'Email: $userEmail\n'
-              'Phone: ${phoneC.text.trim()}\n\n'
-              'Issue Title: ${titleC.text.trim()}\n\n'
-              'Description:\n${descC.text.trim()}',
-            );
-            final mailUri = Uri.parse('mailto:icareofficialapp@gmail.com?subject=$subject&body=$body');
-            if (await canLaunchUrl(mailUri)) {
-              await launchUrl(mailUri);
-            } else {
+            try {
+              await ApiService().post('/support', {
+                'category': 'General',
+                'subject': titleC.text.trim(),
+                'message': 'Phone: ${phoneC.text.trim()}\n\n${descC.text.trim()}',
+                'name': userName,
+                'email': userEmail,
+                'role': userRole,
+                'userId': user?.id ?? '',
+              });
               if (ctx.mounted) {
-                ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(content: Text('Could not open email app. Please email icareofficialapp@gmail.com directly.'), duration: Duration(seconds: 4)));
+                ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(content: Text('Your issue has been submitted. Our team will get back to you shortly.'), backgroundColor: Color(0xFF10B981), duration: Duration(seconds: 4)));
+              }
+            } catch (_) {
+              if (ctx.mounted) {
+                ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(content: Text("Couldn't submit your issue right now. Please try again later."), backgroundColor: Color(0xFFEF4444), duration: Duration(seconds: 4)));
               }
             }
           },
           icon: const Icon(Icons.send_rounded, size: 16),
-          label: const Text('Send via Email'),
+          label: const Text('Submit'),
           style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryColor, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
         ),
       ],
