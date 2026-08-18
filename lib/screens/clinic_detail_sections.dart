@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:icare/models/clinic.dart';
 import 'package:icare/widgets/review_card.dart';
+import 'package:icare/widgets/clinic_map.dart';
 
 /// Numbered step timeline (Consultation -> Diagnosis -> Treatment ->
 /// Follow-up), horizontal on desktop and stacked on mobile.
@@ -231,8 +232,8 @@ class _FaqTile extends StatelessWidget {
   }
 }
 
-/// Address + hours + "Get Directions" link. Uses a Google Maps search URL
-/// rather than an embedded map.
+/// Embedded map + address + hours + "Get Directions" link — matches the
+/// reference site's in-page map with an "Open in Maps" fallback.
 class VisitClinicSection extends StatelessWidget {
   final Clinic clinic;
 
@@ -264,6 +265,15 @@ class VisitClinicSection extends StatelessWidget {
           const SizedBox(height: 12),
           _InfoRow(icon: Icons.access_time_rounded, accent: clinic.accentColor, text: clinic.hoursLabel),
           const SizedBox(height: 18),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(14),
+            child: SizedBox(
+              height: 260,
+              width: double.infinity,
+              child: ClinicMapEmbed(address: clinic.mapQuery),
+            ),
+          ),
+          const SizedBox(height: 14),
           SizedBox(
             width: double.infinity,
             child: OutlinedButton.icon(
