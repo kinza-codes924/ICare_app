@@ -88,7 +88,7 @@ class _MobilePolicySection extends StatelessWidget {
 const List<List<String>> _sections = [
   [
     "REFUND POLICY",
-    "Due to the digital nature of services:\n• Telehealth consultations are generally non-refundable once completed.\n• Course purchases may not be refundable once access to materials has been granted.",
+    "Due to the digital nature of services:\n• Course purchases may not be refundable once access to materials has been granted.",
   ],
 ];
 

@@ -59,6 +59,21 @@ class ClinicFaq {
   const ClinicFaq({required this.question, required this.answer});
 }
 
+/// "Care & Maintenance" tips banner shown on the detail page — a short
+/// title, a few bullet-point tips, and an optional photo (e.g. "Proper
+/// Brushing, Daily Flossing..." for Dental).
+class ClinicCareTips {
+  final String title;
+  final List<String> tips;
+  final String? imagePath;
+
+  const ClinicCareTips({
+    required this.title,
+    required this.tips,
+    this.imagePath,
+  });
+}
+
 /// One of iCare's branded specialty clinics (Dental, Derma, etc). Data-driven
 /// on purpose — the client has already named 5 more clinics he wants added
 /// later (Gynaecology, Physiotherapy, General Physician, Digital X-ray,
@@ -99,6 +114,9 @@ class Clinic {
   // Optional real reception/treatment-room photos for the "Visit Our
   // Clinic" section. Empty for clinics without photos yet.
   final List<String> facilityPhotos;
+  // Optional "Care & Maintenance" tips banner shown after the services
+  // grid. Null for clinics without tips written yet.
+  final ClinicCareTips? careTips;
 
   const Clinic({
     required this.id,
@@ -119,5 +137,6 @@ class Clinic {
     required this.address,
     this.heroImage,
     this.facilityPhotos = const [],
+    this.careTips,
   });
 }

@@ -177,7 +177,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           scheduleDailyReminder('medication', 'Medication Reminder ðŸ’Š', 'Time to take your medication. Stay on track!', _medReminderTime!.hour, _medReminderTime!.minute);
         }
         if (_healthCheckReminderTime != null) {
-          scheduleDailyReminder('health_check', 'Health Check Reminder â¤ï¸', 'Time to log your health metrics (BP, weight, etc.).', _healthCheckReminderTime!.hour, _healthCheckReminderTime!.minute);
+          scheduleDailyReminder('health_check', 'Health Check Reminder ❤️', 'Time to log your health metrics (BP, weight, etc.).', _healthCheckReminderTime!.hour, _healthCheckReminderTime!.minute);
         }
       }
     } catch (_) {}
@@ -866,11 +866,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     String selected = currentLang;
     final langs = [
       {'code': 'en', 'label': 'English', 'native': 'English'},
-      {'code': 'ur', 'label': 'Ø§Ø±Ø¯Ùˆ', 'native': 'Urdu'},
+      {'code': 'ur', 'label': 'اردو', 'native': 'Urdu'},
     ];
     showDialog(context: ctx, builder: (dc) => StatefulBuilder(builder: (_, setS) => AlertDialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      title: const Row(children: [Icon(Icons.translate_rounded, color: Color(0xFF64748B), size: 22), SizedBox(width: 10), Text('Language / Ø²Ø¨Ø§Ù†', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16))]),
+      title: const Row(children: [Icon(Icons.translate_rounded, color: Color(0xFF64748B), size: 22), SizedBox(width: 10), Text('Language / زبان', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16))]),
       content: SizedBox(width: double.maxFinite,child: Column(mainAxisSize: MainAxisSize.min, children: [
         ...langs.map((lang) {
           final isSel = selected == lang['code'];
@@ -907,10 +907,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             Navigator.pop(dc);
             final locale = selected == 'ur' ? const Locale('ur') : const Locale('en');
             await ctx.setLocale(locale);
-            setState(() => _selectedLanguage = selected == 'ur' ? 'Ø§Ø±Ø¯Ùˆ' : 'English');
+            setState(() => _selectedLanguage = selected == 'ur' ? 'اردو' : 'English');
             if (mounted) {
               ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                content: Text(selected == 'ur' ? 'Ø²Ø¨Ø§Ù† Ø§Ø±Ø¯Ùˆ Ù…ÛŒÚº ØªØ¨Ø¯ÛŒÙ„ ÛÙˆ Ú¯Ø¦ÛŒ' : 'Language set to English'),
+                content: Text(selected == 'ur' ? 'زبان اردو میں تبدیل ہو گئی' : 'Language set to English'),
                 backgroundColor: Colors.green,
                 duration: const Duration(seconds: 2),
               ));
@@ -1528,7 +1528,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       if (time != null) {
         await prefs.setString('health_check_reminder_time', '${time.hour}:${time.minute}');
         await ReminderService().createReminder({'title': 'Log your health metrics', 'type': 'health_check', 'time': '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}', 'isRecurring': true});
-        scheduleDailyReminder('health_check', 'Health Check Reminder â¤ï¸', 'Time to log your health metrics (BP, weight, etc.).', time.hour, time.minute);
+        scheduleDailyReminder('health_check', 'Health Check Reminder ❤️', 'Time to log your health metrics (BP, weight, etc.).', time.hour, time.minute);
       } else {
         await prefs.remove('health_check_reminder_time');
         cancelDailyReminder('health_check');
@@ -2334,14 +2334,20 @@ class _WebSettingsLayout extends StatelessWidget {
 
   // â”€â”€ ABOUT â”€â”€
   Widget _aboutCard(BuildContext context) {
+    // DRAP Guidelines / Drug Policy are only relevant to Doctor and Patient
+    // accounts (drug regulatory info) — other roles (Instructor, Pharmacy,
+    // Lab, Student, Admin) don't need these tiles cluttering their settings.
+    final showDrugInfo = p.isDoctor || p.isPatient;
     return Card(elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Padding(padding: const EdgeInsets.all(20), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         _sectionLabel('About & Legal'), const SizedBox(height: 16),
         _settingsTile(icon: Icons.info_outline, iconColor: const Color(0xFF64748B), title: 'About Us', subtitle: 'Learn more about iCare', onTap: () async { try { await launchUrl(Uri.parse('https://rmhealthsolutions.co.uk/'), mode: LaunchMode.externalApplication); } catch (_) {} }),
-        const Divider(height: 1),
-        _settingsTile(icon: Icons.verified_outlined, iconColor: const Color(0xFF10B981), title: 'DRAP Guidelines', subtitle: 'Drug Regulatory Authority of Pakistan', onTap: () async { try { await launchUrl(Uri.parse('https://www.dra.gov.pk'), mode: LaunchMode.externalApplication); } catch (_) {} }),
-        const Divider(height: 1),
-        _settingsTile(icon: Icons.policy_outlined, iconColor: const Color(0xFF3B82F6), title: 'Drug Policy', subtitle: 'National drug laws & regulations', onTap: () async { try { await launchUrl(Uri.parse('https://www.dra.gov.pk/therapeutic-goods/drugs/pharmaceuticals/'), mode: LaunchMode.externalApplication); } catch (_) {} }),
+        if (showDrugInfo) ...[
+          const Divider(height: 1),
+          _settingsTile(icon: Icons.verified_outlined, iconColor: const Color(0xFF10B981), title: 'DRAP Guidelines', subtitle: 'Drug Regulatory Authority of Pakistan', onTap: () async { try { await launchUrl(Uri.parse('https://www.dra.gov.pk'), mode: LaunchMode.externalApplication); } catch (_) {} }),
+          const Divider(height: 1),
+          _settingsTile(icon: Icons.policy_outlined, iconColor: const Color(0xFF3B82F6), title: 'Drug Policy', subtitle: 'National drug laws & regulations', onTap: () async { try { await launchUrl(Uri.parse('https://www.dra.gov.pk/therapeutic-goods/drugs/pharmaceuticals/'), mode: LaunchMode.externalApplication); } catch (_) {} }),
+        ],
       ])));
   }
 
@@ -2766,14 +2772,17 @@ class _MobileSettingsLayout extends StatelessWidget {
   }
 
   Widget _aboutCard(BuildContext context) {
+    final showDrugInfo = p.isDoctor || p.isPatient;
     return Card(elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Padding(padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         _sectionLabel('About & Legal'), const SizedBox(height: 12),
         _settingsTile(icon: Icons.info_outline, iconColor: const Color(0xFF64748B), title: 'About Us', subtitle: 'Learn about iCare', onTap: () async { try { await launchUrl(Uri.parse('https://rmhealthsolutions.co.uk/'), mode: LaunchMode.externalApplication); } catch (_) {} }),
-        const Divider(height: 1),
-        _settingsTile(icon: Icons.verified_outlined, iconColor: const Color(0xFF10B981), title: 'DRAP Guidelines', subtitle: 'Drug Regulatory Authority of Pakistan', onTap: () async { try { await launchUrl(Uri.parse('https://www.dra.gov.pk'), mode: LaunchMode.externalApplication); } catch (_) {} }),
-        const Divider(height: 1),
-        _settingsTile(icon: Icons.policy_outlined, iconColor: const Color(0xFF3B82F6), title: 'Drug Policy', subtitle: 'National drug laws & regulations', onTap: () async { try { await launchUrl(Uri.parse('https://www.dra.gov.pk/therapeutic-goods/drugs/pharmaceuticals/'), mode: LaunchMode.externalApplication); } catch (_) {} }),
+        if (showDrugInfo) ...[
+          const Divider(height: 1),
+          _settingsTile(icon: Icons.verified_outlined, iconColor: const Color(0xFF10B981), title: 'DRAP Guidelines', subtitle: 'Drug Regulatory Authority of Pakistan', onTap: () async { try { await launchUrl(Uri.parse('https://www.dra.gov.pk'), mode: LaunchMode.externalApplication); } catch (_) {} }),
+          const Divider(height: 1),
+          _settingsTile(icon: Icons.policy_outlined, iconColor: const Color(0xFF3B82F6), title: 'Drug Policy', subtitle: 'National drug laws & regulations', onTap: () async { try { await launchUrl(Uri.parse('https://www.dra.gov.pk/therapeutic-goods/drugs/pharmaceuticals/'), mode: LaunchMode.externalApplication); } catch (_) {} }),
+        ],
       ])));
   }
 

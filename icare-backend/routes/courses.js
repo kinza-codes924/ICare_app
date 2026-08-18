@@ -743,7 +743,9 @@ router.get('/:courseId/student-progress/:studentId', authMiddleware, async (req,
 router.get('/:id', authMiddleware, async (req, res) => {
   try {
     await connectMongoDB();
-    const course = await Course.findById(toId(req.params.id)).lean();
+    const course = await Course.findById(toId(req.params.id))
+      .populate('modules.lessons.createdBy', 'name username')
+      .lean();
     if (!course) return res.status(404).json({ success: false, message: 'Course not found' });
 
     // Attach module unlock info for student view
@@ -1041,7 +1043,15 @@ router.put('/:id', authMiddleware, async (req, res) => {
         ...mod,
         order: mIdx,
         lessons: Array.isArray(mod.lessons)
-          ? mod.lessons.map((lesson, lIdx) => ({ ...lesson, order: lIdx }))
+          ? mod.lessons.map((lesson, lIdx) => ({
+              ...lesson,
+              order: lIdx,
+              // Stamp who created this lesson (session/assignment/quiz/content
+              // item), for the "Created by" label — only on first save, so
+              // re-editing an existing lesson never overwrites the original
+              // creator with whoever happens to save next.
+              createdBy: lesson.createdBy || req.user.id,
+            }))
           : mod.lessons,
       }));
     }

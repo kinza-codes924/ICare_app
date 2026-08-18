@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:icare/screens/consultation_details_screen.dart';
 import 'package:icare/screens/doctors_list.dart';
 import 'package:icare/screens/icare_clinics_list_screen.dart';
@@ -1499,7 +1500,7 @@ class _ICareClinicsSection extends StatelessWidget {
           children: [
             _SectionHeader(
               title: 'iCare Clinics',
-              subtitle: 'Premium multi-speciality clinics — presently available only in Karachi',
+              subtitle: 'Premium multi-speciality clinics — presently available at Karachi only',
               titleColor: _accent,
               onTap: () => Navigator.of(context).push(
                 MaterialPageRoute(builder: (_) => const ICareClinicsListScreen()),
@@ -3797,7 +3798,7 @@ class _Footer extends StatelessWidget {
                 'Contact Us',
               ],
               taps: {
-                'About Us': () => context.go('/about-us'),
+                'About Us': () async { try { await launchUrl(Uri.parse('https://rmhealthsolutions.co.uk/'), mode: LaunchMode.externalApplication); } catch (_) {} },
                 'Work With Us': () => context.go('/work-with-us'),
                 'Privacy Policy': () => context.go('/privacypolicy'),
                 'Terms of Service': () => context.go('/terms'),
@@ -3851,7 +3852,7 @@ class _Footer extends StatelessWidget {
           'Contact Us',
         ],
         taps: {
-          'About Us': () => context.go('/about-us'),
+          'About Us': () async { try { await launchUrl(Uri.parse('https://rmhealthsolutions.co.uk/'), mode: LaunchMode.externalApplication); } catch (_) {} },
           'Work With Us': () => context.go('/work-with-us'),
           'Privacy Policy': () => context.go('/privacypolicy'),
           'Terms of Service': () => context.go('/terms'),

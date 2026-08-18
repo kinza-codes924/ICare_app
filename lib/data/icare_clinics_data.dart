@@ -96,6 +96,16 @@ const List<Clinic> kICareClinics = [
             'you want.',
       ),
     ],
+    careTips: ClinicCareTips(
+      title: 'Patient Care & Maintenance',
+      tips: [
+        'Proper Brushing',
+        'Daily Flossing',
+        'Regular Checkups',
+        'Post-Treatment Maintenance',
+      ],
+      imagePath: 'assets/clinic_photos/dental_implant.jpg',
+    ),
     journey: _defaultJourney,
     testimonials: [
       ClinicTestimonial(
@@ -162,6 +172,7 @@ const List<Clinic> kICareClinics = [
     mapQuery: 'iCare Clinics, Mezzanine Floor, Mall Square, Zamzama Boulevard, DHA Phase 5, Clifton, Karachi',
     address: 'Mezzanine Floor, Mall Square, Zamzama Boulevard, DHA Phase 5, '
         'Clifton, Zamzama Commercial Area, Defence V, Karachi, 75600',
+    heroImage: 'https://images.unsplash.com/photo-1761718210089-ba3bb5ccb54f?w=1200&q=80&auto=format&fit=crop',
     services: [
       ClinicService(
         name: 'Laser Hair Removal',
@@ -170,6 +181,7 @@ const List<Clinic> kICareClinics = [
             'Medical-grade laser technology targets hair follicles for '
             'long-lasting reduction, safe for all skin tones, with sessions '
             'spaced for optimal results.',
+        imagePath: 'https://images.unsplash.com/photo-1700760933574-9f0f4ea9aa3b?w=800&q=80&auto=format&fit=crop',
       ),
       ClinicService(
         name: 'PRP Therapy',
@@ -178,6 +190,7 @@ const List<Clinic> kICareClinics = [
             'Your own platelet-rich plasma is used to stimulate collagen and '
             'hair follicle activity — a natural option for skin rejuvenation '
             'and hair thinning.',
+        imagePath: 'https://images.unsplash.com/photo-1616394584738-fc6e612e71b9?w=800&q=80&auto=format&fit=crop',
       ),
       ClinicService(
         name: 'HydraFacial',
@@ -186,6 +199,7 @@ const List<Clinic> kICareClinics = [
             'A multi-step facial that cleanses, exfoliates, and infuses the '
             'skin with hydrating serums for an instant, glowing refresh — no '
             'downtime required.',
+        imagePath: 'https://images.unsplash.com/photo-1761718210089-ba3bb5ccb54f?w=800&q=80&auto=format&fit=crop',
       ),
       ClinicService(
         name: 'Acne Treatment',
@@ -194,6 +208,7 @@ const List<Clinic> kICareClinics = [
             'Personalized treatment plans combining topical care, in-clinic '
             'procedures, and lifestyle guidance to control active breakouts '
             'and reduce scarring over time.',
+        imagePath: 'https://images.unsplash.com/photo-1552693673-1bf958298935?w=800&q=80&auto=format&fit=crop',
       ),
       ClinicService(
         name: 'Botox & Fillers',
@@ -202,8 +217,19 @@ const List<Clinic> kICareClinics = [
             'Smooth fine lines and restore volume with precise, non-surgical '
             'injectable treatments — administered by trained dermatologists '
             'for a natural-looking result.',
+        imagePath: 'https://images.unsplash.com/photo-1746708810803-722593e53772?w=800&q=80&auto=format&fit=crop',
       ),
     ],
+    careTips: ClinicCareTips(
+      title: 'Skin Care & Maintenance',
+      tips: [
+        'Daily Sunscreen (SPF 30+)',
+        'Gentle Cleansing Routine',
+        'Stay Hydrated',
+        'Follow-up Skin Checks',
+      ],
+      imagePath: 'https://images.unsplash.com/photo-1552693673-1bf958298935?w=800&q=80&auto=format&fit=crop',
+    ),
     journey: _defaultJourney,
     testimonials: [
       ClinicTestimonial(
@@ -270,6 +296,7 @@ const List<Clinic> kICareClinics = [
     mapQuery: 'iCare Clinics, Mezzanine Floor, Mall Square, Zamzama Boulevard, DHA Phase 5, Clifton, Karachi',
     address: 'Mezzanine Floor, Mall Square, Zamzama Boulevard, DHA Phase 5, '
         'Clifton, Zamzama Commercial Area, Defence V, Karachi, 75600',
+    heroImage: 'https://images.unsplash.com/photo-1691139600923-8fba078704b0?w=1200&q=80&auto=format&fit=crop',
     services: [
       ClinicService(
         name: 'Prenatal Care',
@@ -278,6 +305,7 @@ const List<Clinic> kICareClinics = [
             'Scheduled checkups, ultrasounds, and monitoring throughout your '
             'pregnancy to track your baby\'s development and catch any '
             'concerns early.',
+        imagePath: 'https://images.unsplash.com/photo-1691139600923-8fba078704b0?w=800&q=80&auto=format&fit=crop',
       ),
       ClinicService(
         name: 'Vaccination',
@@ -285,6 +313,7 @@ const List<Clinic> kICareClinics = [
         longDescription:
             'Age-appropriate immunization schedules for infants and children, '
             'tracked and reminded so no dose is ever missed.',
+        imagePath: 'https://images.unsplash.com/photo-1594051182587-0bd78bba36e7?w=800&q=80&auto=format&fit=crop',
       ),
       ClinicService(
         name: 'Well-Baby Checkups',
@@ -293,6 +322,7 @@ const List<Clinic> kICareClinics = [
             'Routine checkups that track your baby\'s growth, milestones, and '
             'nutrition — giving you an early heads-up on anything that needs '
             'attention.',
+        imagePath: 'https://images.unsplash.com/photo-1632053002928-1919605ee6f7?w=800&q=80&auto=format&fit=crop',
       ),
       ClinicService(
         name: 'Lactation Support',
@@ -300,6 +330,7 @@ const List<Clinic> kICareClinics = [
         longDescription:
             'One-on-one guidance on breastfeeding technique, latch, and '
             'supply concerns from experienced lactation consultants.',
+        imagePath: 'https://images.unsplash.com/photo-1576758412641-3b89a82e1043?w=800&q=80&auto=format&fit=crop',
       ),
       ClinicService(
         name: 'Postnatal Care',
@@ -307,8 +338,19 @@ const List<Clinic> kICareClinics = [
         longDescription:
             'Physical recovery checkups and emotional wellness support for '
             'new mothers in the weeks and months after delivery.',
+        imagePath: 'https://images.unsplash.com/photo-1759802147227-d9b32bd34996?w=800&q=80&auto=format&fit=crop',
       ),
     ],
+    careTips: ClinicCareTips(
+      title: 'Mother & Baby Wellness',
+      tips: [
+        'Keep All Prenatal Appointments',
+        'Track Vaccination Schedule',
+        'Balanced Nutrition & Rest',
+        'Reach Out for Postnatal Support',
+      ],
+      imagePath: 'https://images.unsplash.com/photo-1691139600923-8fba078704b0?w=800&q=80&auto=format&fit=crop',
+    ),
     journey: _defaultJourney,
     testimonials: [
       ClinicTestimonial(
@@ -374,6 +416,7 @@ const List<Clinic> kICareClinics = [
     mapQuery: 'iCare Clinics, Mezzanine Floor, Mall Square, Zamzama Boulevard, DHA Phase 5, Clifton, Karachi',
     address: 'Mezzanine Floor, Mall Square, Zamzama Boulevard, DHA Phase 5, '
         'Clifton, Zamzama Commercial Area, Defence V, Karachi, 75600',
+    heroImage: 'https://images.unsplash.com/photo-1649751361457-01d3a696c7e6?w=1200&q=80&auto=format&fit=crop',
     services: [
       ClinicService(
         name: 'Sports Injury Rehab',
@@ -382,6 +425,7 @@ const List<Clinic> kICareClinics = [
             'Targeted rehab programs to safely restore strength and '
             'mobility after sports injuries, built around your specific '
             'sport and recovery timeline.',
+        imagePath: 'https://images.unsplash.com/photo-1649751361457-01d3a696c7e6?w=800&q=80&auto=format&fit=crop',
       ),
       ClinicService(
         name: 'Post-Surgical Rehab',
@@ -389,6 +433,7 @@ const List<Clinic> kICareClinics = [
         longDescription:
             'Structured, staged recovery plans following orthopedic surgery '
             'to rebuild strength and range of motion safely.',
+        imagePath: 'https://images.unsplash.com/photo-1768507423533-b87b62769758?w=800&q=80&auto=format&fit=crop',
       ),
       ClinicService(
         name: 'Chronic Pain Management',
@@ -397,6 +442,7 @@ const List<Clinic> kICareClinics = [
             'Long-term management plans combining manual therapy and '
             'guided exercise to reduce chronic pain and improve daily '
             'function.',
+        imagePath: 'https://images.unsplash.com/photo-1540205895360-4ad4cffb3aa8?w=800&q=80&auto=format&fit=crop',
       ),
       ClinicService(
         name: 'Manual Therapy',
@@ -404,6 +450,7 @@ const List<Clinic> kICareClinics = [
         longDescription:
             'Hands-on joint and soft-tissue techniques to relieve pain, '
             'reduce stiffness, and improve movement quality.',
+        imagePath: 'https://images.unsplash.com/photo-1706353399656-210cca727a33?w=800&q=80&auto=format&fit=crop',
       ),
       ClinicService(
         name: 'Neuro Rehabilitation',
@@ -412,8 +459,19 @@ const List<Clinic> kICareClinics = [
             'Specialized rehabilitation support for patients recovering '
             'from stroke or other neurological conditions, focused on '
             'regaining independence.',
+        imagePath: 'https://images.unsplash.com/photo-1753698280805-bd08176ca4a8?w=800&q=80&auto=format&fit=crop',
       ),
     ],
+    careTips: ClinicCareTips(
+      title: 'Recovery & Movement Care',
+      tips: [
+        'Do Home Exercises as Prescribed',
+        'Apply Ice/Heat as Advised',
+        'Avoid Overexertion',
+        'Track Progress at Follow-ups',
+      ],
+      imagePath: 'https://images.unsplash.com/photo-1649751361457-01d3a696c7e6?w=800&q=80&auto=format&fit=crop',
+    ),
     journey: _defaultJourney,
     testimonials: [
       ClinicTestimonial(
@@ -478,6 +536,7 @@ const List<Clinic> kICareClinics = [
     mapQuery: 'iCare Clinics, Mezzanine Floor, Mall Square, Zamzama Boulevard, DHA Phase 5, Clifton, Karachi',
     address: 'Mezzanine Floor, Mall Square, Zamzama Boulevard, DHA Phase 5, '
         'Clifton, Zamzama Commercial Area, Defence V, Karachi, 75600',
+    heroImage: 'https://images.unsplash.com/photo-1714976694810-85add1a29c96?w=1200&q=80&auto=format&fit=crop',
     services: [
       ClinicService(
         name: 'Counseling & Therapy',
@@ -485,6 +544,7 @@ const List<Clinic> kICareClinics = [
         longDescription:
             'Confidential one-on-one sessions to work through stress, '
             'anxiety, grief, or life transitions, at a pace that suits you.',
+        imagePath: 'https://images.unsplash.com/photo-1714976694810-85add1a29c96?w=800&q=80&auto=format&fit=crop',
       ),
       ClinicService(
         name: 'CBT (Cognitive Behavioral Therapy)',
@@ -492,6 +552,7 @@ const List<Clinic> kICareClinics = [
         longDescription:
             'A structured, evidence-based approach that helps identify and '
             'reshape unhelpful thought patterns for lasting change.',
+        imagePath: 'https://images.unsplash.com/photo-1714976694867-bc0e012fab70?w=800&q=80&auto=format&fit=crop',
       ),
       ClinicService(
         name: 'Medication Management',
@@ -499,6 +560,7 @@ const List<Clinic> kICareClinics = [
         longDescription:
             'Careful psychiatric evaluation and ongoing medication review to '
             'find the right treatment with the fewest side effects.',
+        imagePath: 'https://images.unsplash.com/photo-1631549916768-4119b2e5f926?w=800&q=80&auto=format&fit=crop',
       ),
       ClinicService(
         name: 'Family Therapy',
@@ -506,6 +568,7 @@ const List<Clinic> kICareClinics = [
         longDescription:
             'Guided sessions that help families communicate better and work '
             'through conflict in a supportive, neutral setting.',
+        imagePath: 'https://images.unsplash.com/photo-1604881991720-f91add269bed?w=800&q=80&auto=format&fit=crop',
       ),
       ClinicService(
         name: 'Adolescent Counseling',
@@ -514,8 +577,19 @@ const List<Clinic> kICareClinics = [
             'A safe space for teens to talk through school stress, identity, '
             'and emotional challenges with a counselor trained in '
             'adolescent care.',
+        imagePath: 'https://images.unsplash.com/photo-1758273240331-745ccab011a2?w=800&q=80&auto=format&fit=crop',
       ),
     ],
+    careTips: ClinicCareTips(
+      title: 'Mental Wellness Habits',
+      tips: [
+        'Attend Sessions Consistently',
+        'Practice Daily Mindfulness',
+        'Maintain a Regular Sleep Routine',
+        'Stay Connected with Support Systems',
+      ],
+      imagePath: 'https://images.unsplash.com/photo-1714976694810-85add1a29c96?w=800&q=80&auto=format&fit=crop',
+    ),
     journey: _defaultJourney,
     testimonials: [
       ClinicTestimonial(
@@ -580,6 +654,7 @@ const List<Clinic> kICareClinics = [
     mapQuery: 'iCare Clinics, Mezzanine Floor, Mall Square, Zamzama Boulevard, DHA Phase 5, Clifton, Karachi',
     address: 'Mezzanine Floor, Mall Square, Zamzama Boulevard, DHA Phase 5, '
         'Clifton, Zamzama Commercial Area, Defence V, Karachi, 75600',
+    heroImage: 'https://images.unsplash.com/photo-1644704170910-a0cdf183649b?w=1200&q=80&auto=format&fit=crop',
     services: [
       ClinicService(
         name: 'Nutrition Counseling',
@@ -588,6 +663,7 @@ const List<Clinic> kICareClinics = [
             'A personalized diet plan built around your health goals, food '
             'preferences, and lifestyle — with regular check-ins to adjust '
             'as you progress.',
+        imagePath: 'https://images.unsplash.com/photo-1644704170910-a0cdf183649b?w=800&q=80&auto=format&fit=crop',
       ),
       ClinicService(
         name: 'Weight Management',
@@ -595,6 +671,7 @@ const List<Clinic> kICareClinics = [
         longDescription:
             'A structured, sustainable program combining diet and habit '
             'changes — designed for long-term results, not quick fixes.',
+        imagePath: 'https://images.unsplash.com/photo-1522844990619-4951c40f7eda?w=800&q=80&auto=format&fit=crop',
       ),
       ClinicService(
         name: 'Diabetes Care',
@@ -602,6 +679,7 @@ const List<Clinic> kICareClinics = [
         longDescription:
             'Lifestyle and nutrition-based support to help manage blood '
             'sugar levels alongside your existing medical care.',
+        imagePath: 'https://images.unsplash.com/photo-1683727186226-910f31a9da45?w=800&q=80&auto=format&fit=crop',
       ),
       ClinicService(
         name: 'Fitness Planning',
@@ -610,6 +688,7 @@ const List<Clinic> kICareClinics = [
             'Custom exercise plans built for your current fitness level and '
             'goals, whether starting from scratch or training for '
             'performance.',
+        imagePath: 'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=800&q=80&auto=format&fit=crop',
       ),
       ClinicService(
         name: 'Wellness Checkups',
@@ -617,8 +696,19 @@ const List<Clinic> kICareClinics = [
         longDescription:
             'Preventive screening and lifestyle guidance to catch potential '
             'health concerns early and keep you on track.',
+        imagePath: 'https://images.unsplash.com/photo-1666887360680-9dc27a1d2753?w=800&q=80&auto=format&fit=crop',
       ),
     ],
+    careTips: ClinicCareTips(
+      title: 'Healthy Living Habits',
+      tips: [
+        'Follow Your Nutrition Plan',
+        'Stay Active Daily',
+        'Monitor Health Metrics Regularly',
+        'Keep Follow-up Checkups',
+      ],
+      imagePath: 'https://images.unsplash.com/photo-1644704170910-a0cdf183649b?w=800&q=80&auto=format&fit=crop',
+    ),
     journey: _defaultJourney,
     testimonials: [
       ClinicTestimonial(

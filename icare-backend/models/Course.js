@@ -17,6 +17,10 @@ const lessonSchema = new mongoose.Schema({
   // Feature 2: live session scheduled for this lesson (reminder only, not auto-start)
   liveSessionDateTime: { type: Date, default: null },
   liveSessionNote: { type: String, default: '' },
+  // Who created this lesson (session/assignment/quiz/content item) — for
+  // the "Created by" accountability label. Stamped once on first save by
+  // PUT /courses/:id, never overwritten on later edits.
+  createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
 }, { strict: false });
 
 const moduleSchema = new mongoose.Schema({

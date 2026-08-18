@@ -47,7 +47,7 @@ class ICareClinicsListScreen extends StatelessWidget {
                 const Icon(Icons.location_on_rounded, size: 16, color: Color(0xFF64748B)),
                 const SizedBox(width: 4),
                 Text(
-                  'Presently Available Only Karachi',
+                  'Presently Available At Karachi Only',
                   style: TextStyle(fontSize: 13, color: Colors.grey[600]),
                 ),
               ],

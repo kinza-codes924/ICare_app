@@ -3,6 +3,86 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:icare/models/clinic.dart';
 import 'package:icare/widgets/review_card.dart';
 import 'package:icare/widgets/clinic_map.dart';
+import 'package:icare/widgets/clinic_image.dart';
+
+/// "Care & Maintenance" banner — accent-colored strip with a photo (when
+/// available) and a short bullet list of aftercare tips.
+class CareTipsSection extends StatelessWidget {
+  final ClinicCareTips careTips;
+  final Color accent;
+
+  const CareTipsSection({super.key, required this.careTips, required this.accent});
+
+  @override
+  Widget build(BuildContext context) {
+    final isMobile = MediaQuery.of(context).size.width < 700;
+    final tipsColumn = Padding(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: careTips.tips
+            .map((tip) => Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(Icons.check_circle_rounded, color: accent, size: 18),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          tip,
+                          style: const TextStyle(fontSize: 13.5, color: Color(0xFF334155), height: 1.4),
+                        ),
+                      ),
+                    ],
+                  ),
+                ))
+            .toList(),
+      ),
+    );
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(16),
+      child: Column(
+        children: [
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+            color: accent,
+            child: Text(
+              careTips.title,
+              style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w800),
+            ),
+          ),
+          Container(
+            decoration: const BoxDecoration(color: Color(0xFFF8FAFC)),
+            child: careTips.imagePath == null
+                ? tipsColumn
+                : (isMobile
+                    ? Column(
+                        children: [
+                          ClinicImage(path: careTips.imagePath!, height: 160, width: double.infinity),
+                          tipsColumn,
+                        ],
+                      )
+                    : IntrinsicHeight(
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Expanded(
+                              child: ClinicImage(path: careTips.imagePath!),
+                            ),
+                            Expanded(child: tipsColumn),
+                          ],
+                        ),
+                      )),
+          ),
+        ],
+      ),
+    );
+  }
+}
 
 /// Numbered step timeline (Consultation -> Diagnosis -> Treatment ->
 /// Follow-up), horizontal on desktop and stacked on mobile.

@@ -10,6 +10,7 @@ import 'package:icare/screens/doctors_list.dart';
 import 'package:icare/screens/clinic_detail_sections.dart';
 import 'package:icare/services/doctor_service.dart';
 import 'package:icare/widgets/whatsapp_button.dart';
+import 'package:icare/widgets/clinic_image.dart';
 
 /// Generic detail page for one iCare specialty clinic. One screen for all
 /// clinics (data-driven from Clinic) rather than 6 hardcoded files, so a
@@ -152,6 +153,10 @@ class ClinicDetailScreen extends ConsumerWidget {
                           );
                         },
                       ),
+                      if (clinic.careTips != null) ...[
+                        const SizedBox(height: 24),
+                        CareTipsSection(careTips: clinic.careTips!, accent: clinic.accentColor),
+                      ],
                       const SizedBox(height: 36),
                       _TrustStrip(accent: clinic.accentColor),
                       const SizedBox(height: 36),
@@ -271,7 +276,9 @@ class _Header extends StatelessWidget {
         image: clinic.heroImage == null
             ? null
             : DecorationImage(
-                image: AssetImage(clinic.heroImage!),
+                image: clinic.heroImage!.startsWith('http')
+                    ? NetworkImage(clinic.heroImage!)
+                    : AssetImage(clinic.heroImage!) as ImageProvider,
                 fit: BoxFit.cover,
                 // Darkens/tints the photo so the accent gradient still reads
                 // as this clinic's brand color and the white header text
@@ -338,7 +345,7 @@ class _Header extends StatelessWidget {
                   Icon(Icons.location_on_rounded, size: 16, color: Colors.white.withValues(alpha: 0.85)),
                   const SizedBox(width: 4),
                   Text(
-                    'Presently Available Only ${clinic.location}',
+                    'Presently Available At ${clinic.location} Only',
                     style: TextStyle(fontSize: 13, color: Colors.white.withValues(alpha: 0.85)),
                   ),
                 ],
@@ -372,11 +379,10 @@ class _ServiceCard extends StatelessWidget {
           if (service.imagePath != null)
             ClipRRect(
               borderRadius: BorderRadius.circular(12),
-              child: Image.asset(
-                service.imagePath!,
+              child: ClinicImage(
+                path: service.imagePath!,
                 width: 52,
                 height: 52,
-                fit: BoxFit.cover,
               ),
             )
           else

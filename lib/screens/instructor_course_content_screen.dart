@@ -1443,6 +1443,8 @@ class InstructorCourseContentScreenState extends State<InstructorCourseContentSc
                     Text(_fmtDate(lesson['scheduledAt'].toString()), style: const TextStyle(fontSize: 12, color: Color(0xFFF59E0B))),
                   ],
                 ]),
+                if (_creatorLabel(lesson, 'createdBy').isNotEmpty)
+                  Text(_creatorLabel(lesson, 'createdBy'), style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8))),
               ],
             ),
           ),
