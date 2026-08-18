@@ -69,6 +69,7 @@ const List<Clinic> kICareClinics = [
             'Professional-grade bleaching that lifts years of staining from '
             'coffee, tea, or smoking — done safely under supervision, with a '
             'take-home kit option to maintain your results.',
+        imagePath: 'https://images.unsplash.com/photo-1567516364473-233c4b6fcfbe?w=800&q=80&auto=format&fit=crop',
       ),
       ClinicService(
         name: 'Braces & Aligners',
@@ -176,8 +177,8 @@ const List<Clinic> kICareClinics = [
         'Clifton, Zamzama Commercial Area, Defence V, Karachi, 75600',
     heroImage: 'https://images.unsplash.com/photo-1761718210089-ba3bb5ccb54f?w=1200&q=80&auto=format&fit=crop',
     facilityPhotos: [
-      'https://images.unsplash.com/photo-1665231795856-769fb08a90bc?w=800&q=80&auto=format&fit=crop',
-      'https://images.unsplash.com/photo-1704455306925-1401c3012117?w=800&q=80&auto=format&fit=crop',
+      'assets/clinic_photos/dental_reception.jpg',
+      'assets/clinic_photos/dental_room.jpg',
     ],
     services: [
       ClinicService(
@@ -304,8 +305,8 @@ const List<Clinic> kICareClinics = [
         'Clifton, Zamzama Commercial Area, Defence V, Karachi, 75600',
     heroImage: 'https://images.unsplash.com/photo-1691139600923-8fba078704b0?w=1200&q=80&auto=format&fit=crop',
     facilityPhotos: [
-      'https://images.unsplash.com/photo-1758691462126-2ee47c8bf9e7?w=800&q=80&auto=format&fit=crop',
-      'https://images.unsplash.com/photo-1766299893052-107053bc92a1?w=800&q=80&auto=format&fit=crop',
+      'assets/clinic_photos/dental_reception.jpg',
+      'assets/clinic_photos/dental_room.jpg',
     ],
     services: [
       ClinicService(
@@ -428,8 +429,8 @@ const List<Clinic> kICareClinics = [
         'Clifton, Zamzama Commercial Area, Defence V, Karachi, 75600',
     heroImage: 'https://images.unsplash.com/photo-1649751361457-01d3a696c7e6?w=1200&q=80&auto=format&fit=crop',
     facilityPhotos: [
-      'https://images.unsplash.com/photo-1761912915676-74c7d63105a3?w=800&q=80&auto=format&fit=crop',
-      'https://images.unsplash.com/photo-1771270786606-f5a0e57db762?w=800&q=80&auto=format&fit=crop',
+      'assets/clinic_photos/dental_reception.jpg',
+      'assets/clinic_photos/dental_room.jpg',
     ],
     services: [
       ClinicService(
@@ -552,8 +553,8 @@ const List<Clinic> kICareClinics = [
         'Clifton, Zamzama Commercial Area, Defence V, Karachi, 75600',
     heroImage: 'https://images.unsplash.com/photo-1714976694810-85add1a29c96?w=1200&q=80&auto=format&fit=crop',
     facilityPhotos: [
-      'https://images.unsplash.com/photo-1637580679542-5c7ca60c6fae?w=800&q=80&auto=format&fit=crop',
-      'https://images.unsplash.com/photo-1637580681839-6e3ed197ca93?w=800&q=80&auto=format&fit=crop',
+      'assets/clinic_photos/dental_reception.jpg',
+      'assets/clinic_photos/dental_room.jpg',
     ],
     services: [
       ClinicService(
@@ -674,8 +675,8 @@ const List<Clinic> kICareClinics = [
         'Clifton, Zamzama Commercial Area, Defence V, Karachi, 75600',
     heroImage: 'https://images.unsplash.com/photo-1644704170910-a0cdf183649b?w=1200&q=80&auto=format&fit=crop',
     facilityPhotos: [
-      'https://images.unsplash.com/photo-1675270882554-ab6817fb44f3?w=800&q=80&auto=format&fit=crop',
-      'https://images.unsplash.com/photo-1767531309781-b61fe1edfe86?w=800&q=80&auto=format&fit=crop',
+      'assets/clinic_photos/dental_reception.jpg',
+      'assets/clinic_photos/dental_room.jpg',
     ],
     services: [
       ClinicService(

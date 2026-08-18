@@ -602,31 +602,6 @@ class _WorkWithUsSignupState extends State<WorkWithUsSignup> {
           (resData is Map && resData['success'] == true);
       final isPendingRoleRequest = resData is Map && resData['pendingRoleRequest'] == true;
 
-      if (isSuccess && isPendingRoleRequest) {
-        // This email already has an approved account under a different role
-        // (e.g. an approved doctor applying as a student) — no new session
-        // was created, so there's nothing to poll for on this device. Just
-        // confirm the request was sent for admin approval.
-        if (mounted) {
-          await showDialog(
-            context: context,
-            builder: (ctx) => AlertDialog(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              title: const Text('Request Sent'),
-              content: Text((resData['message'] ?? 'Your request has been sent to admin for approval.').toString()),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(ctx).pop(),
-                  child: const Text('OK'),
-                ),
-              ],
-            ),
-          );
-          if (mounted) Navigator.of(context).pop();
-        }
-        return;
-      }
-
       if (isSuccess) {
         // Save role-specific details using the returned auth token
         final regToken = resData is Map
@@ -705,6 +680,7 @@ class _WorkWithUsSignupState extends State<WorkWithUsSignup> {
                 role: _selectedRole!,
                 applicantName: capturedName,
                 token: regToken,
+                requestedBackendRole: isPendingRoleRequest ? backendRole : null,
               ),
             ),
           );

@@ -171,12 +171,24 @@ const register = async (req, res) => {
         }
 
         await User.findByIdAndUpdate(existing._id, { $addToSet: { pendingRoles: role } });
+        // Issue a token for the EXISTING account (same as login would) so
+        // the frontend can carry on exactly like a fresh registration —
+        // upload the role's supporting documents, hit /users/profile with
+        // verificationDetails, and land on the same verification-status
+        // screen — instead of dead-ending with only a "request sent" toast
+        // and no way to attach documents to the pending role request.
+        const roleRequestToken = jwt.sign(
+          { id: existing._id.toString(), email: existing.email, role: existing.role },
+          process.env.JWT_SECRET,
+          { expiresIn: '30d' }
+        );
         return res.status(200).json({
           success: true,
           message: 'You already have an approved account with this email. Your request for a new role has been sent to admin for approval — you\'ll be notified once approved.',
           pendingRoleRequest: true,
           existingRoles: existingRolesArr,
           availableRoles: availableRoles.filter(r => r !== role),
+          data: { token: roleRequestToken },
         });
       }
 
@@ -419,6 +431,7 @@ const getUserProfile = async (req, res) => {
         phone: user.phone,
         role: user.role,
         roles: [...new Set([user.role, ...(user.roles || [])].filter(Boolean))],
+        pendingRoles: user.pendingRoles || [],
         isApproved: user.is_approved !== false,
         mrNumber: user.mrNumber || null,
         prescriptionEmailEnabled: user.prescriptionEmailEnabled !== false,

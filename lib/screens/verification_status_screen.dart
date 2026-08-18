@@ -14,12 +14,21 @@ class VerificationStatusScreen extends StatefulWidget {
   // session), so it's passed explicitly here rather than relying on
   // SharedPref, which never had a token to persist in the first place.
   final String? token;
+  // Set when this is a role REQUEST on an already-approved account (Work
+  // With Us hitting "email already has an account") rather than a brand
+  // new registration. In that case the account's top-level isApproved is
+  // already true (from the OTHER role it holds) — polling that flag alone
+  // would flip this screen to "Activated" immediately, before admin has
+  // actually approved the new role. Instead this checks whether
+  // [requestedBackendRole] shows up in the account's approved `roles` list.
+  final String? requestedBackendRole;
 
   const VerificationStatusScreen({
     super.key,
     required this.role,
     required this.applicantName,
     this.token,
+    this.requestedBackendRole,
   });
 
   @override
@@ -71,8 +80,14 @@ class _VerificationStatusScreenState extends State<VerificationStatusScreen> {
       if (response.statusCode == 200) {
         // Profile payload nests fields under `user`, not at the top level.
         final user = (response.data['user'] as Map?) ?? response.data;
-        final isApproved = user['isApproved'] == true || user['is_approved'] == true;
-        if (isApproved && mounted) {
+        final approved = widget.requestedBackendRole != null
+            // Role-request case: the account itself is already approved
+            // (for its other role) — only count this as "done" once the
+            // SPECIFIC requested role has been moved into the approved
+            // roles list by admin.
+            ? (user['roles'] as List?)?.contains(widget.requestedBackendRole) == true
+            : (user['isApproved'] == true || user['is_approved'] == true);
+        if (approved && mounted) {
           setState(() => _currentStep = 2);
         }
       }
