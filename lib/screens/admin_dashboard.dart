@@ -348,11 +348,11 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
     });
   }
 
-  Future<void> _approveUser(String userId) async {
+  Future<void> _approveUser(String userId, {String? role}) async {
     try {
       final response = await _apiService.post(
         '/admin/approve-user/$userId',
-        {},
+        role != null ? {'role': role} : {},
       );
       if (response.statusCode == 200) {
         if (mounted) {
@@ -662,7 +662,16 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
                                 borderRadius: BorderRadius.circular(20),
                               ),
                               child: Text(
-                                user['role'] ?? 'Unspecified',
+                                // For a role-request on an already-approved
+                                // account, `role` is the OLD active role —
+                                // the role actually awaiting a decision is
+                                // the first entry in pendingRoles.
+                                _currentTab == 'Pending' &&
+                                        user['isExistingAccount'] == true &&
+                                        List<String>.from(user['pendingRoles'] ?? []).isNotEmpty
+                                    ? List<String>.from(user['pendingRoles'])
+                                        .first
+                                    : (user['role'] ?? 'Unspecified'),
                                 style: TextStyle(
                                   color: _currentTab == 'Pending'
                                       ? Colors.orange.shade800
@@ -961,7 +970,13 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
                               ),
                               const SizedBox(width: 8),
                               ElevatedButton.icon(
-                                onPressed: () => _approveUser(user['_id']),
+                                onPressed: () => _approveUser(
+                                  user['_id'],
+                                  role: user['isExistingAccount'] == true &&
+                                          List<String>.from(user['pendingRoles'] ?? []).isNotEmpty
+                                      ? List<String>.from(user['pendingRoles']).first
+                                      : null,
+                                ),
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: Colors.green,
                                   shape: RoundedRectangleBorder(
