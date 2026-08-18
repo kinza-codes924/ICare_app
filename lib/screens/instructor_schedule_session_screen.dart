@@ -7,11 +7,16 @@ import 'package:intl/intl.dart';
 class InstructorScheduleSessionScreen extends StatefulWidget {
   final String? courseId;
   final String? sessionId; // For editing
+  // The session's own data, already loaded by the caller (e.g. the course
+  // content screen already has it in memory from the sessions list) — avoids
+  // a redundant fetch-by-id round trip just to pre-fill the edit form.
+  final Map<String, dynamic>? initialData;
 
   const InstructorScheduleSessionScreen({
     super.key,
     this.courseId,
     this.sessionId,
+    this.initialData,
   });
 
   @override
@@ -55,7 +60,7 @@ class _InstructorScheduleSessionScreenState extends State<InstructorScheduleSess
     _selectedCourseId = widget.courseId;
     _loadCourses();
     if (widget.sessionId != null) {
-      _loadSession();
+      _prefillFromInitialData();
     }
   }
 
@@ -82,16 +87,29 @@ class _InstructorScheduleSessionScreenState extends State<InstructorScheduleSess
     }
   }
 
-  Future<void> _loadSession() async {
-    setState(() => _isLoading = true);
-    try {
-      // TODO: Implement get session by ID
-      setState(() => _isLoading = false);
-    } catch (e) {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
+  // Pre-fills the form from the session data the caller already has (e.g.
+  // the course content screen already holds the full session object from
+  // its sessions list) — this is what makes the module dropdown (and other
+  // fields) actually reflect the session being edited, instead of always
+  // opening blank.
+  void _prefillFromInitialData() {
+    final data = widget.initialData;
+    if (data == null) return;
+    _titleController.text = data['title']?.toString() ?? '';
+    _descriptionController.text = data['description']?.toString() ?? '';
+    _meetingLinkController.text = data['meetingLink']?.toString() ?? '';
+    _meetingIdController.text = data['meetingId']?.toString() ?? '';
+    _meetingPasswordController.text = data['meetingPassword']?.toString() ?? '';
+    _selectedModuleId = data['linkedModuleId']?.toString();
+    if (_selectedModuleId != null && _selectedModuleId!.isEmpty) _selectedModuleId = null;
+    final scheduledRaw = data['scheduledAt']?.toString() ?? data['liveSessionDateTime']?.toString();
+    if (scheduledRaw != null && scheduledRaw.isNotEmpty) {
+      _scheduledAt = DateTime.tryParse(scheduledRaw)?.toLocal();
     }
+    final duration = data['duration'];
+    if (duration is int) _duration = duration;
+    final maxParticipants = data['maxParticipants'];
+    if (maxParticipants is int) _maxParticipants = maxParticipants;
   }
 
   Future<void> _selectDateTime() async {

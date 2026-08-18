@@ -184,7 +184,7 @@ async function notifyLeadInstructorCourseComplete(enrollment) {
     const course = await Course.findById(enrollment.courseId).select('title instructor_id coTeachers').lean();
     if (!course) return;
     const User = require('../models/User');
-    const Notification = require('../models/Notification');
+    const { notifyOnce } = require('./notify');
     const student = await User.findById(enrollment.userId).select('name username').lean();
 
     const leadCoTeacher = (course.coTeachers || []).find(t => {
@@ -197,8 +197,9 @@ async function notifyLeadInstructorCourseComplete(enrollment) {
     const lead = await User.findById(leadUserId).select('name email').lean();
     const studentName = student?.name || student?.username || 'A student';
 
-    await Notification.create({
+    await notifyOnce({
       userId: leadUserId,
+      dedupKey: `cert_ready:${enrollment._id}`,
       type: 'general',
       title: 'Certificate Ready to Issue',
       message: `${studentName} completed all modules in "${course.title}" — issue their certificate.`,

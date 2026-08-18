@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:icare/providers/auth_provider.dart';
+import 'package:icare/services/api_service.dart';
 import 'package:icare/utils/theme.dart';
 import 'package:icare/widgets/back_button.dart';
 import 'package:icare/widgets/custom_text.dart';
@@ -833,42 +834,31 @@ class _InquiryFormDialogState extends ConsumerState<_InquiryFormDialog> {
     final message = _messageCtrl.text.trim();
     final category = _category;
 
-    final body = '''
-Category: $category
-Subject: $subject
-
-Account Details:
-  Name: $userName
-  Email: $userEmail
-  Account Type: $role
-  User ID: ${userId.isNotEmpty ? userId : 'N/A'}
-
-Message:
-$message
-''';
-
-    final mailUri = Uri(
-      scheme: 'mailto',
-      path: 'icareofficialapp@gmail.com',
-      queryParameters: {
-        'subject': '[$category] $subject',
-        'body': body,
-      },
-    );
+    String snackMessage = "Your issue has been submitted. Our team will get back to you shortly.";
+    Color snackColor = const Color(0xFF10B981);
 
     try {
-      if (await canLaunchUrl(mailUri)) {
-        await launchUrl(mailUri, mode: LaunchMode.externalApplication);
-      }
-    } catch (_) {}
+      await ApiService().post('/support', {
+        'category': category,
+        'subject': subject,
+        'message': message,
+        'name': userName,
+        'email': userEmail,
+        'role': role,
+        'userId': userId,
+      });
+    } catch (_) {
+      snackMessage = "Couldn't submit your issue right now. Please try again later.";
+      snackColor = const Color(0xFFEF4444);
+    }
 
     if (!mounted) return;
     setState(() => _submitting = false);
     Navigator.pop(context);
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-      content: Text("Your email client has been opened. Please send the message to complete your inquiry."),
-      backgroundColor: Color(0xFF10B981),
-      duration: Duration(seconds: 5),
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(snackMessage),
+      backgroundColor: snackColor,
+      duration: const Duration(seconds: 5),
     ));
   }
 

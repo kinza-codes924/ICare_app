@@ -199,6 +199,7 @@ app.use('/api/quizzes', quizzesRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/reminders', reminderRoutes);
 app.use('/api/credentials', require('./routes/credentials'));
+app.use('/api/support', require('./routes/support'));
 app.use('/api/lesson-notes', lessonNotesRoutes);
 app.use('/api/certificates', certificatesRoutes);
 app.use('/api/live-session-polls', liveSessionPollsRoutes);

@@ -36,6 +36,7 @@ const questionSchema = new mongoose.Schema({
 const quizSchema = new mongoose.Schema({
   courseId: { type: mongoose.Schema.Types.ObjectId, ref: 'Course', required: true },
   moduleId: String,
+  createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
   title: { type: String, required: true },
   description: String,
   questions: [questionSchema],

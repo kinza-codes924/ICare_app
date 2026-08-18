@@ -77,7 +77,7 @@ router.get('/course/:courseId', authMiddleware, async (req, res) => {
     await connectMongoDB();
     const assignments = await Assignment.find({
       courseId: toId(req.params.courseId), isPublished: true,
-    }).sort({ createdAt: -1 }).lean();
+    }).sort({ createdAt: -1 }).populate('instructorId', 'name username').lean();
 
     // Attach submission + graded counts to each assignment (so the
     // instructor "To Review" list can compute pending = submitted - graded)

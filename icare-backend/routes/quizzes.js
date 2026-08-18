@@ -16,7 +16,7 @@ function toId(id) {
 router.post('/', authMiddleware, async (req, res) => {
   try {
     await connectMongoDB();
-    const quiz = await Quiz.create(req.body);
+    const quiz = await Quiz.create({ ...req.body, createdBy: req.user.id });
     res.status(201).json({ success: true, quiz });
   } catch (e) {
     res.status(500).json({ success: false, message: e.message });
@@ -27,10 +27,10 @@ router.post('/', authMiddleware, async (req, res) => {
 router.get('/course/:courseId', authMiddleware, async (req, res) => {
   try {
     await connectMongoDB();
-    const quizzes = await Quiz.find({ 
-      courseId: toId(req.params.courseId), 
-      isPublished: true 
-    }).select('-questions.correctAnswer').lean();
+    const quizzes = await Quiz.find({
+      courseId: toId(req.params.courseId),
+      isPublished: true
+    }).select('-questions.correctAnswer').populate('createdBy', 'name username').lean();
     
     res.json({ success: true, quizzes });
   } catch (e) {

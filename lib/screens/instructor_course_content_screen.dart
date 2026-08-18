@@ -7,6 +7,7 @@ import 'package:icare/services/lms_service.dart';
 import 'package:icare/services/api_service.dart';
 import 'package:icare/utils/theme.dart';
 import 'package:icare/screens/lms_live_session_screen.dart';
+import 'package:icare/screens/instructor_schedule_session_screen.dart';
 import 'package:icare/screens/instructor_create_assignment_screen.dart';
 import 'package:icare/screens/instructor_create_quiz_screen.dart';
 import 'package:icare/screens/instructor_quiz_attempts_screen.dart';
@@ -866,6 +867,17 @@ class InstructorCourseContentScreenState extends State<InstructorCourseContentSc
     } catch (_) { return raw; }
   }
 
+  // Renders the ObjectId-populated instructorId/createdBy field (a Map with
+  // name/username once the backend .populate()s it) as "by <name>", or ''
+  // if the field is unpopulated/missing (e.g. older quizzes with no
+  // createdBy stamp).
+  String _creatorLabel(dynamic doc, String field) {
+    final creator = doc[field];
+    if (creator is! Map) return '';
+    final name = creator['name']?.toString() ?? creator['username']?.toString() ?? '';
+    return name.isEmpty ? '' : 'by $name';
+  }
+
   Widget _buildStandaloneSessionTile(dynamic session) {
     final title = session['title']?.toString() ?? 'Live Session';
     final status = session['status']?.toString() ?? 'scheduled';
@@ -905,6 +917,8 @@ class InstructorCourseContentScreenState extends State<InstructorCourseContentSc
           Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF0F172A))),
           if (scheduledAt.isNotEmpty)
             Text(_fmtDate(scheduledAt), style: TextStyle(fontSize: 12, color: isEnded ? const Color(0xFF64748B) : const Color(0xFFF59E0B))),
+          if (_creatorLabel(session, 'instructorId').isNotEmpty)
+            Text(_creatorLabel(session, 'instructorId'), style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8))),
         ])),
         if (isEnded)
           GestureDetector(
@@ -951,6 +965,20 @@ class InstructorCourseContentScreenState extends State<InstructorCourseContentSc
               ]),
             ),
           ),
+        const SizedBox(width: 8),
+        GestureDetector(
+          onTap: id.isEmpty ? null : () async {
+            await Navigator.push(context, MaterialPageRoute(
+              builder: (_) => InstructorScheduleSessionScreen(
+                courseId: widget.courseId,
+                sessionId: id,
+                initialData: Map<String, dynamic>.from(session as Map),
+              ),
+            ));
+            _loadCourse();
+          },
+          child: const Icon(Icons.edit_outlined, color: Color(0xFF64748B), size: 20),
+        ),
         const SizedBox(width: 8),
         GestureDetector(
           onTap: () async {
@@ -1010,6 +1038,8 @@ class InstructorCourseContentScreenState extends State<InstructorCourseContentSc
           Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF0F172A))),
           Text('$marks marks${dueDate.isNotEmpty ? ' · Due: ${_fmtDate(dueDate)}' : ''}',
             style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+          if (_creatorLabel(assignment, 'instructorId').isNotEmpty)
+            Text(_creatorLabel(assignment, 'instructorId'), style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8))),
         ])),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
@@ -1080,6 +1110,8 @@ class InstructorCourseContentScreenState extends State<InstructorCourseContentSc
           Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF0F172A))),
           Text('${timeLimit.isNotEmpty ? '$timeLimit min' : ''}${passingScore.isNotEmpty ? ' · Pass: $passingScore%' : ''}',
             style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+          if (_creatorLabel(quiz, 'createdBy').isNotEmpty)
+            Text(_creatorLabel(quiz, 'createdBy'), style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8))),
         ])),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
