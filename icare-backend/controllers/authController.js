@@ -225,10 +225,18 @@ const register = async (req, res) => {
       ...(mrNumber && { mrNumber }),
     });
 
-    // Save verificationDetails to user document
+    // Save verificationDetails to user document, namespaced by role so a
+    // later role-request on the same account (via /users/profile) can't
+    // silently overwrite this role's saved details — every Work-With-Us
+    // role form reuses the same field names (organizationName, location,
+    // credentials, etc.).
     const vd = req.body.verificationDetails || {};
     if (Object.keys(vd).length > 0) {
-      await User.findByIdAndUpdate(user._id, { $set: { verificationDetails: vd } }, { strict: false });
+      await User.findByIdAndUpdate(
+        user._id,
+        { $set: { [`verificationDetails.byRole.${role}`]: vd } },
+        { strict: false }
+      );
     }
 
     // Create role-specific profile, seeding fields from verificationDetails

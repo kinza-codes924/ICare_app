@@ -43,7 +43,12 @@ router.get('/profile', authMiddleware, async (req, res) => {
       height: user.height || null,
       weight: user.weight || null,
       emergencyContacts: user.emergency_contacts || [],
-      verificationDetails: user.verificationDetails || null,
+      // Prefer this account's active-role bucket; fall back to the old flat
+      // shape for accounts saved before verificationDetails was namespaced.
+      verificationDetails:
+        user.verificationDetails?.byRole?.[(user.role || '').toLowerCase()] ||
+        user.verificationDetails ||
+        null,
       blood_group: user.blood_group || null,
       bloodGroup: user.blood_group || null,
       existing_conditions: user.existing_conditions || null,
@@ -92,11 +97,11 @@ router.get('/profile', authMiddleware, async (req, res) => {
 router.put('/profile', authMiddleware, async (req, res) => {
   try {
     await connectMongoDB();
-    const { 
+    const {
       name, phoneNumber, phone, profilePicture, cnic, age, gender,
       height, weight, address, existingConditions, healthGoals,
       emergencyContacts, specialization, conditionsTreated,
-      bloodGroup, blood_group, verificationDetails,
+      bloodGroup, blood_group, verificationDetails, verificationRole,
     } = req.body;
     const finalBloodGroup = bloodGroup || blood_group;
     
@@ -124,9 +129,25 @@ router.put('/profile', authMiddleware, async (req, res) => {
     // key-by-key rather than replaced, because that second call carries only
     // the document fields and would otherwise wipe the qualification,
     // institution, etc. saved at registration.
+    //
+    // verificationRole namespaces the write under verificationDetails.byRole.<role>
+    // instead of the flat top-level object. Every Work-With-Us role's form uses
+    // the same field names (organizationName, location, credentials, comments,
+    // etc.), so on a multi-role account a second role's submission used to
+    // silently overwrite the first role's saved details — the exact bug where
+    // admin could no longer see an earlier role's application after a new one
+    // came in. Old single-role accounts/rows keep working via the flat fallback
+    // in the read path (GET /profile and admin's pending-users).
     if (verificationDetails && typeof verificationDetails === 'object') {
-      for (const [k, v] of Object.entries(verificationDetails)) {
-        update[`verificationDetails.${k}`] = v;
+      if (verificationRole) {
+        const roleKey = verificationRole.toString().toLowerCase();
+        for (const [k, v] of Object.entries(verificationDetails)) {
+          update[`verificationDetails.byRole.${roleKey}.${k}`] = v;
+        }
+      } else {
+        for (const [k, v] of Object.entries(verificationDetails)) {
+          update[`verificationDetails.${k}`] = v;
+        }
       }
     }
 

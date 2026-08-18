@@ -105,20 +105,37 @@ router.get('/pending-users', authMiddleware, adminOnly, async (req, res) => {
     2
     );
 
-    const result = users.map(u => ({
-      _id: u._id.toString(),
-      name: u.name || u.username || '',
-      email: u.email || '',
-      role: u.role || '',
-      roles: u.roles || [],
-      pendingRoles: u.pendingRoles || [],
-      // true when this is an already-approved account requesting an extra
-      // role, rather than a brand-new unapproved account.
-      isExistingAccount: u.is_approved === true,
-      phone: u.phone || '',
-      createdAt: u.createdAt,
-      verificationDetails: u.verificationDetails || {},
-    }));
+    const result = users.map(u => {
+      const vd = u.verificationDetails || {};
+      const byRole = vd.byRole || {};
+      // Every role this card needs a document set for: the account's base
+      // role (brand-new accounts) plus any roles still pending. Namespaced
+      // per role so a second role's application never masks the first's —
+      // falls back to the legacy flat vd for accounts saved before this.
+      const rolesNeedingDetails = [...new Set([u.role, ...(u.pendingRoles || [])])].filter(Boolean);
+      const verificationDetailsByRole = {};
+      for (const r of rolesNeedingDetails) {
+        verificationDetailsByRole[r] = byRole[r] || vd;
+      }
+      return {
+        _id: u._id.toString(),
+        name: u.name || u.username || '',
+        email: u.email || '',
+        role: u.role || '',
+        roles: u.roles || [],
+        pendingRoles: u.pendingRoles || [],
+        // true when this is an already-approved account requesting an extra
+        // role, rather than a brand-new unapproved account.
+        isExistingAccount: u.is_approved === true,
+        phone: u.phone || '',
+        createdAt: u.createdAt,
+        // Legacy flat shape, kept for any caller still reading this directly.
+        verificationDetails: vd,
+        // Per-role lookup — admin UI should prefer this to show the right
+        // application's documents when a card represents a role request.
+        verificationDetailsByRole,
+      };
+    });
 
     res.json({ success: true, users: result, count: result.length, pendingUsers: result });
   } catch (err) {

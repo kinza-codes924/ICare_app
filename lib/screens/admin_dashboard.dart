@@ -373,9 +373,12 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
     }
   }
 
-  Future<void> _rejectUser(String userId) async {
+  Future<void> _rejectUser(String userId, {String? role}) async {
     try {
-      final response = await _apiService.post('/admin/reject-user/$userId', {});
+      final response = await _apiService.post(
+        '/admin/reject-user/$userId',
+        role != null ? {'role': role} : {},
+      );
       if (response.statusCode == 200) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -650,37 +653,62 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
                                 ],
                               ),
                             ),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 6,
-                              ),
-                              decoration: BoxDecoration(
-                                color: _currentTab == 'Pending'
-                                    ? Colors.orange.shade100
-                                    : Colors.green.shade100,
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                              child: Text(
-                                // For a role-request on an already-approved
-                                // account, `role` is the OLD active role —
-                                // the role actually awaiting a decision is
-                                // the first entry in pendingRoles.
-                                _currentTab == 'Pending' &&
-                                        user['isExistingAccount'] == true &&
-                                        List<String>.from(user['pendingRoles'] ?? []).isNotEmpty
-                                    ? List<String>.from(user['pendingRoles'])
-                                        .first
-                                    : (user['role'] ?? 'Unspecified'),
-                                style: TextStyle(
-                                  color: _currentTab == 'Pending'
-                                      ? Colors.orange.shade800
-                                      : Colors.green.shade800,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 12,
-                                ),
-                              ),
-                            ),
+                            // For a role-request on an already-approved
+                            // account, `role` is the OLD active role — the
+                            // role(s) actually awaiting a decision live in
+                            // pendingRoles, and there can be more than one
+                            // queued up (e.g. an old unresolved request plus
+                            // a newer one), so show every pending role, not
+                            // just the first.
+                            Builder(builder: (context) {
+                              final pending = List<String>.from(user['pendingRoles'] ?? []);
+                              final showPending = _currentTab == 'Pending' &&
+                                  user['isExistingAccount'] == true &&
+                                  pending.isNotEmpty;
+                              if (!showPending) {
+                                return Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                  decoration: BoxDecoration(
+                                    color: _currentTab == 'Pending'
+                                        ? Colors.orange.shade100
+                                        : Colors.green.shade100,
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                  child: Text(
+                                    user['role'] ?? 'Unspecified',
+                                    style: TextStyle(
+                                      color: _currentTab == 'Pending'
+                                          ? Colors.orange.shade800
+                                          : Colors.green.shade800,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                );
+                              }
+                              return Wrap(
+                                spacing: 6,
+                                runSpacing: 6,
+                                alignment: WrapAlignment.end,
+                                children: pending
+                                    .map((r) => Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                          decoration: BoxDecoration(
+                                            color: Colors.orange.shade100,
+                                            borderRadius: BorderRadius.circular(20),
+                                          ),
+                                          child: Text(
+                                            r,
+                                            style: TextStyle(
+                                              color: Colors.orange.shade800,
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 12,
+                                            ),
+                                          ),
+                                        ))
+                                    .toList(),
+                              );
+                            }),
                           ],
                         ),
                         if (user['isExistingAccount'] == true &&
@@ -710,232 +738,32 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
                                 .toList(),
                           ),
                         ],
-                        if (user['verificationDetails'] != null) ...[
-                          const SizedBox(height: 12),
-                          Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: Colors.blueGrey.shade50,
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Column(
-                              children: [
-                                if (user['verificationDetails']['organizationName'] !=
-                                        null &&
-                                    user['verificationDetails']['organizationName']
-                                        .toString()
-                                        .isNotEmpty)
-                                  _buildDetailRow(
-                                    Icons.business_rounded,
-                                    "Organization",
-                                    user['verificationDetails']['organizationName'],
-                                  ),
-                                if (user['verificationDetails']['location'] !=
-                                        null &&
-                                    user['verificationDetails']['location']
-                                        .toString()
-                                        .isNotEmpty)
-                                  _buildDetailRow(
-                                    Icons.location_on_rounded,
-                                    "Location",
-                                    user['verificationDetails']['location'],
-                                  ),
-                                if (user['verificationDetails']['licenseNumber'] !=
-                                        null &&
-                                    user['verificationDetails']['licenseNumber']
-                                        .toString()
-                                        .isNotEmpty)
-                                  _buildDetailRow(
-                                    Icons.badge_rounded,
-                                    "License/Accreditation",
-                                    user['verificationDetails']['licenseNumber'],
-                                  ),
-                                if (user['verificationDetails']['credentials'] !=
-                                        null &&
-                                    user['verificationDetails']['credentials']
-                                        .toString()
-                                        .isNotEmpty)
-                                  _buildDetailRow(
-                                    Icons.school_rounded,
-                                    "Specialty/Credentials",
-                                    user['verificationDetails']['credentials'],
-                                  ),
-                              ],
-                            ),
-                          ),
-                        ],
-                        // ── Registration details block ───────────────────
+                        // ── Registration details block(s) ────────────────
+                        // One block per role this card needs a decision on:
+                        // the account's base role for a brand-new signup, or
+                        // every pending role for a multi-role account (each
+                        // stored under its own verificationDetailsByRole[role]
+                        // bucket so a second role's application never masks
+                        // the first's saved details/documents).
                         Builder(builder: (ctx) {
-                          final userId = user['_id']?.toString() ?? '';
-                          // Merge verificationDetails + extra profile data fetched per-user
-                          final vd = <String, dynamic>{
-                            ...?user['verificationDetails'] as Map?,
-                            ...?_extraDetails[userId],
-                          };
-                          final role = user['role']?.toString() ?? '';
-                          final rows = <Widget>[];
-
-                          void addRow(IconData icon, String label, dynamic val) {
-                            final s = val?.toString() ?? '';
-                            if (s.isEmpty || s == 'null') return;
-                            rows.add(Padding(
-                              padding: const EdgeInsets.only(bottom: 5),
-                              child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                                Icon(icon, size: 13, color: const Color(0xFF64748B)),
-                                const SizedBox(width: 6),
-                                Text('$label: ', style: const TextStyle(fontSize: 12, color: Color(0xFF64748B), fontWeight: FontWeight.w600)),
-                                Expanded(child: Text(s, style: const TextStyle(fontSize: 12, color: Color(0xFF0F172A)))),
-                              ]),
-                            ));
-                          }
-
-                          addRow(Icons.phone_outlined, 'Phone', user['phone']);
-                          addRow(Icons.location_city_outlined, 'City', user['city'] ?? vd['location']);
-                          addRow(Icons.location_on_outlined, 'Address', user['address']);
-
-                          // Registration date (always available from backend)
-                          final createdAt = user['createdAt']?.toString() ?? '';
-                          if (createdAt.isNotEmpty) {
-                            try {
-                              final dt = DateTime.parse(createdAt).toLocal();
-                              addRow(Icons.calendar_today_outlined, 'Registered', '${dt.day}/${dt.month}/${dt.year}');
-                            } catch (_) {}
-                          }
-
-                          if (role == 'doctor') {
-                            // Fields from Doctor model (fetched via GET /doctors/$id)
-                            addRow(Icons.school_outlined, 'Qualification', vd['qualification']);
-                            addRow(Icons.psychology_outlined, 'Specialization', vd['specialization'] ?? (vd['specialties'] as List?)?.join(', '));
-                            addRow(Icons.numbers_rounded, 'PMDC No.', vd['pmdcNumber'] ?? vd['licenseNumber']);
-                            addRow(Icons.timeline_outlined, 'Experience', vd['experience'] != null ? '${vd['experience']} yrs' : null);
-                            addRow(Icons.local_hospital_outlined, 'Clinic/Workplace', vd['clinicName'] ?? vd['organizationName']);
-                            addRow(Icons.location_on_outlined, 'Clinic Address', vd['clinicAddress']);
-                            addRow(Icons.schedule_outlined, 'Timings', vd['availableTimings']);
-                            final days = vd['availableDays'];
-                            if (days != null && (days as List).isNotEmpty) addRow(Icons.event_outlined, 'Available Days', days.join(', '));
-                          } else if (role == 'pharmacy') {
-                            addRow(Icons.local_pharmacy_outlined, 'Pharmacy Name', vd['pharmacyName'] ?? vd['organizationName'] ?? vd['name']);
-                            addRow(Icons.badge_outlined, 'Drug License', vd['drugLicenseNumber'] ?? vd['licenseNumber']);
-                            addRow(Icons.person_outline, 'Pharmacist', vd['pharmacistName'] ?? vd['credentials']);
-                            addRow(Icons.timeline_outlined, 'Years Operating', vd['yearsOfOperation']);
-                            addRow(Icons.schedule_outlined, 'Operating Hours', vd['operatingHours']);
-                            final days = vd['operatingDays'];
-                            if (days != null && (days as List).isNotEmpty) addRow(Icons.event_outlined, 'Operating Days', days.join(', '));
-                          } else if (role == 'lab') {
-                            addRow(Icons.biotech_outlined, 'Lab Name', vd['labName'] ?? vd['organizationName'] ?? vd['name']);
-                            addRow(Icons.badge_outlined, 'License No.', vd['labLicenseNumber'] ?? vd['licenseNumber']);
-                            addRow(Icons.timeline_outlined, 'Years Operating', vd['yearsOfOperation']);
-                            addRow(Icons.schedule_outlined, 'Operating Hours', vd['operatingHours']);
-                          } else if (role == 'student') {
-                            addRow(Icons.account_balance_outlined, 'University', vd['university'] ?? vd['organizationName']);
-                            addRow(Icons.menu_book_outlined, 'Program', vd['program'] ?? vd['credentials']);
-                            addRow(Icons.timeline_outlined, 'Current Year', vd['currentYear']);
-                            addRow(Icons.badge_outlined, 'Student ID', vd['studentId']);
-                          } else if (role == 'instructor') {
-                            addRow(Icons.school_outlined, 'Qualification', vd['qualification']);
-                            addRow(Icons.psychology_outlined, 'Specialization', vd['specialization']);
-                            addRow(Icons.timeline_outlined, 'Experience', vd['experience'] != null ? '${vd['experience']} yrs' : null);
-                            addRow(Icons.account_balance_outlined, 'Institution', vd['institution'] ?? vd['organizationName']);
-                            addRow(Icons.menu_book_outlined, 'Proposed Courses', vd['proposedCourses']);
-                          }
-                          addRow(Icons.comment_outlined, 'Comments', vd['comments']);
-
-                          // Collect documents
-                          final docEntries = <Map<String, String>>[];
-                          void addDoc(String label, String? dataKey, String? nameKey) {
-                            final data = vd[dataKey]?.toString() ?? '';
-                            if (data.isEmpty) return;
-                            docEntries.add({'label': label, 'data': data, 'name': vd[nameKey]?.toString() ?? label});
-                          }
-                          addDoc('CNIC / ID', 'cnicDocument', 'cnicDocumentName');
-                          addDoc('PMDC Certificate', 'pmdcCertDocument', 'pmdcCertDocumentName');
-                          addDoc('Experience Certificate', 'experienceCertDocument', 'experienceCertDocumentName');
-                          addDoc('Drug License', 'drugLicenseDocument', 'drugLicenseDocumentName');
-                          addDoc('Registration Certificate', 'regCertDocument', 'regCertDocumentName');
-                          addDoc('Lab License', 'labLicenseDocument', 'labLicenseDocumentName');
-                          addDoc('Accreditation Certificate', 'accredCertDocument', 'accredCertDocumentName');
-                          addDoc('Tests List', 'testsListDocument', 'testsListDocumentName');
-                          addDoc('Student ID', 'studentIdDocument', 'studentIdDocumentName');
-                          addDoc('CV / Resume', 'cvDocument', 'cvDocumentName');
-
-                          // LMS course-purchase verification documents (uploaded via
-                          // POST /verification/upload, a separate flow from signup).
-                          final lmsVerification = _lmsVerifications[userId];
-                          if (lmsVerification != null) {
-                            final lmsDocs = List<dynamic>.from(lmsVerification['documents'] ?? []);
-                            for (final d in lmsDocs) {
-                              final url = d['url']?.toString() ?? '';
-                              if (url.isEmpty) continue;
-                              docEntries.add({
-                                'label': 'LMS: ${d['type']?.toString() ?? 'Document'}',
-                                'data': url,
-                                'name': d['fileName']?.toString() ?? 'Document',
-                              });
-                            }
-                          }
-
-                          if (rows.isEmpty && docEntries.isEmpty) return const SizedBox.shrink();
+                          final pendingRoles = user['isExistingAccount'] == true
+                              ? List<String>.from(user['pendingRoles'] ?? [])
+                              : <String>[];
+                          final rolesToShow = pendingRoles.isNotEmpty
+                              ? pendingRoles
+                              : [user['role']?.toString() ?? ''];
+                          final vdByRole = (user['verificationDetailsByRole'] as Map?) ?? {};
                           return Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              if (rows.isNotEmpty)
-                                Container(
-                                  margin: const EdgeInsets.only(top: 12),
-                                  padding: const EdgeInsets.all(12),
-                                  decoration: BoxDecoration(
-                                    color: Colors.indigo.shade50,
-                                    borderRadius: BorderRadius.circular(12),
-                                    border: Border.all(color: Colors.indigo.shade100),
-                                  ),
-                                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                                    const Text('Registration Details', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Color(0xFF3B4DA8))),
-                                    const SizedBox(height: 8),
-                                    ...rows,
-                                  ]),
-                                ),
-                              if (docEntries.isNotEmpty) ...[
-                                const SizedBox(height: 10),
-                                Container(
-                                  padding: const EdgeInsets.all(12),
-                                  decoration: BoxDecoration(
-                                    color: Colors.orange.shade50,
-                                    borderRadius: BorderRadius.circular(12),
-                                    border: Border.all(color: Colors.orange.shade100),
-                                  ),
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      const Text('Submitted Documents', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Color(0xFFB45309))),
-                                      const SizedBox(height: 8),
-                                      Wrap(
-                                        spacing: 8, runSpacing: 8,
-                                        children: docEntries.map((doc) => GestureDetector(
-                                          onTap: () => _openDocument(ctx, doc['data']!, doc['label']!),
-                                          child: Container(
-                                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                            decoration: BoxDecoration(
-                                              color: Colors.white,
-                                              borderRadius: BorderRadius.circular(8),
-                                              border: Border.all(color: Colors.orange.shade200),
-                                            ),
-                                            child: Row(
-                                              mainAxisSize: MainAxisSize.min,
-                                              children: [
-                                                const Icon(Icons.insert_drive_file_outlined, size: 14, color: Color(0xFFB45309)),
-                                                const SizedBox(width: 5),
-                                                Text(doc['label']!, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFFB45309))),
-                                                const SizedBox(width: 4),
-                                                const Icon(Icons.open_in_new_rounded, size: 11, color: Color(0xFFB45309)),
-                                              ],
-                                            ),
-                                          ),
-                                        )).toList(),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ],
+                            children: rolesToShow
+                                .map((r) => _buildRoleDetailsSection(
+                                      ctx,
+                                      user,
+                                      r,
+                                      (vdByRole[r] as Map?) ?? (user['verificationDetails'] as Map?) ?? {},
+                                      showRoleHeader: rolesToShow.length > 1,
+                                    ))
+                                .toList(),
                           );
                         }),
                         const SizedBox(height: 12),
@@ -957,44 +785,82 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
                           const SizedBox(height: 16),
                           const Divider(),
                           const SizedBox(height: 8),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.end,
-                            children: [
-                              TextButton.icon(
-                                onPressed: () => _rejectUser(user['_id']),
-                                style: TextButton.styleFrom(
-                                  foregroundColor: Colors.red,
-                                ),
-                                icon: const Icon(Icons.close, size: 18),
-                                label: const Text('Reject & Delete'),
-                              ),
-                              const SizedBox(width: 8),
-                              ElevatedButton.icon(
-                                onPressed: () => _approveUser(
-                                  user['_id'],
-                                  role: user['isExistingAccount'] == true &&
-                                          List<String>.from(user['pendingRoles'] ?? []).isNotEmpty
-                                      ? List<String>.from(user['pendingRoles']).first
-                                      : null,
-                                ),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.green,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(8),
+                          Builder(builder: (context) {
+                            final pending = user['isExistingAccount'] == true
+                                ? List<String>.from(user['pendingRoles'] ?? [])
+                                : <String>[];
+                            // A brand-new (never-approved) account has no
+                            // pendingRoles to disambiguate — one approve/
+                            // reject pair for the whole account is correct.
+                            if (pending.isEmpty) {
+                              return Row(
+                                mainAxisAlignment: MainAxisAlignment.end,
+                                children: [
+                                  TextButton.icon(
+                                    onPressed: () => _rejectUser(user['_id']),
+                                    style: TextButton.styleFrom(foregroundColor: Colors.red),
+                                    icon: const Icon(Icons.close, size: 18),
+                                    label: const Text('Reject & Delete'),
                                   ),
-                                ),
-                                icon: const Icon(
-                                  Icons.check,
-                                  size: 18,
-                                  color: Colors.white,
-                                ),
-                                label: const Text(
-                                  'Approve Access',
-                                  style: TextStyle(color: Colors.white),
-                                ),
-                              ),
-                            ],
-                          ),
+                                  const SizedBox(width: 8),
+                                  ElevatedButton.icon(
+                                    onPressed: () => _approveUser(user['_id']),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.green,
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                    ),
+                                    icon: const Icon(Icons.check, size: 18, color: Colors.white),
+                                    label: const Text('Approve Access', style: TextStyle(color: Colors.white)),
+                                  ),
+                                ],
+                              );
+                            }
+                            // An already-approved account can have more than
+                            // one role queued (e.g. an older unresolved
+                            // request plus a new one) — decide each role
+                            // independently instead of one button guessing
+                            // which role it applies to.
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              children: pending
+                                  .map((r) => Padding(
+                                        padding: const EdgeInsets.only(bottom: 8),
+                                        child: Row(
+                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            Text(
+                                              'Requested: $r',
+                                              style: const TextStyle(
+                                                fontWeight: FontWeight.w600,
+                                                color: Color(0xFF334155),
+                                              ),
+                                            ),
+                                            Row(
+                                              children: [
+                                                TextButton.icon(
+                                                  onPressed: () => _rejectUser(user['_id'], role: r),
+                                                  style: TextButton.styleFrom(foregroundColor: Colors.red),
+                                                  icon: const Icon(Icons.close, size: 18),
+                                                  label: const Text('Reject'),
+                                                ),
+                                                const SizedBox(width: 8),
+                                                ElevatedButton.icon(
+                                                  onPressed: () => _approveUser(user['_id'], role: r),
+                                                  style: ElevatedButton.styleFrom(
+                                                    backgroundColor: Colors.green,
+                                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                                  ),
+                                                  icon: const Icon(Icons.check, size: 18, color: Colors.white),
+                                                  label: Text('Approve $r', style: const TextStyle(color: Colors.white)),
+                                                ),
+                                              ],
+                                            ),
+                                          ],
+                                        ),
+                                      ))
+                                  .toList(),
+                            );
+                          }),
                         ],
                       ],
                     ),
@@ -1385,17 +1251,195 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
     );
   }
 
-  Widget _buildDetailRow(IconData icon, String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        children: [
-          Icon(icon, size: 16, color: AppColors.primary500),
-          const SizedBox(width: 8),
-          Text("$label: ", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-          Expanded(child: Text(value, style: const TextStyle(fontSize: 13))),
+  // Renders one role's registration details + submitted documents. Called
+  // once per role a pending card needs a decision on — a multi-role account
+  // can have more than one role queued, each with its own saved
+  // verificationDetails bucket, so this can't just read user['role'] once.
+  Widget _buildRoleDetailsSection(
+    BuildContext ctx,
+    Map<String, dynamic> user,
+    String role,
+    Map rawVd, {
+    required bool showRoleHeader,
+  }) {
+    final userId = user['_id']?.toString() ?? '';
+    // _extraDetails is fetched per-user (not per-role), so only merge it in
+    // when this section is for the account's current active role — mixing
+    // it into a different pending role's section would misattribute data.
+    final vd = <String, dynamic>{
+      ...rawVd,
+      if (role == user['role']?.toString()) ...?_extraDetails[userId],
+    };
+    final rows = <Widget>[];
+
+    void addRow(IconData icon, String label, dynamic val) {
+      final s = val?.toString() ?? '';
+      if (s.isEmpty || s == 'null') return;
+      rows.add(Padding(
+        padding: const EdgeInsets.only(bottom: 5),
+        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Icon(icon, size: 13, color: const Color(0xFF64748B)),
+          const SizedBox(width: 6),
+          Text('$label: ', style: const TextStyle(fontSize: 12, color: Color(0xFF64748B), fontWeight: FontWeight.w600)),
+          Expanded(child: Text(s, style: const TextStyle(fontSize: 12, color: Color(0xFF0F172A)))),
+        ]),
+      ));
+    }
+
+    addRow(Icons.phone_outlined, 'Phone', user['phone']);
+    addRow(Icons.location_city_outlined, 'City', user['city'] ?? vd['location']);
+    addRow(Icons.location_on_outlined, 'Address', user['address']);
+
+    final createdAt = user['createdAt']?.toString() ?? '';
+    if (createdAt.isNotEmpty) {
+      try {
+        final dt = DateTime.parse(createdAt).toLocal();
+        addRow(Icons.calendar_today_outlined, 'Registered', '${dt.day}/${dt.month}/${dt.year}');
+      } catch (_) {}
+    }
+
+    if (role == 'doctor') {
+      addRow(Icons.school_outlined, 'Qualification', vd['qualification']);
+      addRow(Icons.psychology_outlined, 'Specialization', vd['specialization'] ?? (vd['specialties'] as List?)?.join(', '));
+      addRow(Icons.numbers_rounded, 'PMDC No.', vd['pmdcNumber'] ?? vd['licenseNumber']);
+      addRow(Icons.timeline_outlined, 'Experience', vd['experience'] != null ? '${vd['experience']} yrs' : null);
+      addRow(Icons.local_hospital_outlined, 'Clinic/Workplace', vd['clinicName'] ?? vd['organizationName']);
+      addRow(Icons.location_on_outlined, 'Clinic Address', vd['clinicAddress']);
+      addRow(Icons.schedule_outlined, 'Timings', vd['availableTimings']);
+      final days = vd['availableDays'];
+      if (days != null && (days as List).isNotEmpty) addRow(Icons.event_outlined, 'Available Days', days.join(', '));
+    } else if (role == 'pharmacy') {
+      addRow(Icons.local_pharmacy_outlined, 'Pharmacy Name', vd['pharmacyName'] ?? vd['organizationName'] ?? vd['name']);
+      addRow(Icons.badge_outlined, 'Drug License', vd['drugLicenseNumber'] ?? vd['licenseNumber']);
+      addRow(Icons.person_outline, 'Pharmacist', vd['pharmacistName'] ?? vd['credentials']);
+      addRow(Icons.timeline_outlined, 'Years Operating', vd['yearsOfOperation']);
+      addRow(Icons.schedule_outlined, 'Operating Hours', vd['operatingHours']);
+      final days = vd['operatingDays'];
+      if (days != null && (days as List).isNotEmpty) addRow(Icons.event_outlined, 'Operating Days', days.join(', '));
+    } else if (role == 'lab') {
+      addRow(Icons.biotech_outlined, 'Lab Name', vd['labName'] ?? vd['organizationName'] ?? vd['name']);
+      addRow(Icons.badge_outlined, 'License No.', vd['labLicenseNumber'] ?? vd['licenseNumber']);
+      addRow(Icons.timeline_outlined, 'Years Operating', vd['yearsOfOperation']);
+      addRow(Icons.schedule_outlined, 'Operating Hours', vd['operatingHours']);
+    } else if (role == 'student') {
+      addRow(Icons.account_balance_outlined, 'University', vd['university'] ?? vd['organizationName']);
+      addRow(Icons.menu_book_outlined, 'Program', vd['program'] ?? vd['credentials']);
+      addRow(Icons.timeline_outlined, 'Current Year', vd['currentYear']);
+      addRow(Icons.badge_outlined, 'Student ID', vd['studentId']);
+    } else if (role == 'instructor') {
+      addRow(Icons.school_outlined, 'Qualification', vd['qualification']);
+      addRow(Icons.psychology_outlined, 'Specialization', vd['specialization']);
+      addRow(Icons.timeline_outlined, 'Experience', vd['experience'] != null ? '${vd['experience']} yrs' : null);
+      addRow(Icons.account_balance_outlined, 'Institution', vd['institution'] ?? vd['organizationName']);
+      addRow(Icons.menu_book_outlined, 'Proposed Courses', vd['proposedCourses']);
+    }
+    addRow(Icons.comment_outlined, 'Comments', vd['comments']);
+
+    final docEntries = <Map<String, String>>[];
+    void addDoc(String label, String? dataKey, String? nameKey) {
+      final data = vd[dataKey]?.toString() ?? '';
+      if (data.isEmpty) return;
+      docEntries.add({'label': label, 'data': data, 'name': vd[nameKey]?.toString() ?? label});
+    }
+    addDoc('CNIC / ID', 'cnicDocument', 'cnicDocumentName');
+    addDoc('PMDC Certificate', 'pmdcCertDocument', 'pmdcCertDocumentName');
+    addDoc('Experience Certificate', 'experienceCertDocument', 'experienceCertDocumentName');
+    addDoc('Drug License', 'drugLicenseDocument', 'drugLicenseDocumentName');
+    addDoc('Registration Certificate', 'regCertDocument', 'regCertDocumentName');
+    addDoc('Lab License', 'labLicenseDocument', 'labLicenseDocumentName');
+    addDoc('Accreditation Certificate', 'accredCertDocument', 'accredCertDocumentName');
+    addDoc('Tests List', 'testsListDocument', 'testsListDocumentName');
+    addDoc('Student ID', 'studentIdDocument', 'studentIdDocumentName');
+    addDoc('CV / Resume', 'cvDocument', 'cvDocumentName');
+
+    // LMS course-purchase verification documents (uploaded via
+    // POST /verification/upload, a separate flow from signup).
+    if (role == user['role']?.toString()) {
+      final lmsVerification = _lmsVerifications[userId];
+      if (lmsVerification != null) {
+        final lmsDocs = List<dynamic>.from(lmsVerification['documents'] ?? []);
+        for (final d in lmsDocs) {
+          final url = d['url']?.toString() ?? '';
+          if (url.isEmpty) continue;
+          docEntries.add({
+            'label': 'LMS: ${d['type']?.toString() ?? 'Document'}',
+            'data': url,
+            'name': d['fileName']?.toString() ?? 'Document',
+          });
+        }
+      }
+    }
+
+    if (rows.isEmpty && docEntries.isEmpty) return const SizedBox.shrink();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (showRoleHeader)
+          Padding(
+            padding: const EdgeInsets.only(top: 12),
+            child: Text(
+              'Requested role: ${role[0].toUpperCase()}${role.substring(1)}',
+              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: Color(0xFF0036BC)),
+            ),
+          ),
+        if (rows.isNotEmpty)
+          Container(
+            margin: const EdgeInsets.only(top: 12),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.indigo.shade50,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.indigo.shade100),
+            ),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              const Text('Registration Details', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Color(0xFF3B4DA8))),
+              const SizedBox(height: 8),
+              ...rows,
+            ]),
+          ),
+        if (docEntries.isNotEmpty) ...[
+          const SizedBox(height: 10),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.orange.shade50,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.orange.shade100),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Submitted Documents', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Color(0xFFB45309))),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8, runSpacing: 8,
+                  children: docEntries.map((doc) => GestureDetector(
+                    onTap: () => _openDocument(ctx, doc['data']!, doc['label']!),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.orange.shade200),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.insert_drive_file_outlined, size: 14, color: Color(0xFFB45309)),
+                          const SizedBox(width: 5),
+                          Text(doc['label']!, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFFB45309))),
+                          const SizedBox(width: 4),
+                          const Icon(Icons.open_in_new_rounded, size: 11, color: Color(0xFFB45309)),
+                        ],
+                      ),
+                    ),
+                  )).toList(),
+                ),
+              ],
+            ),
+          ),
         ],
-      ),
+      ],
     );
   }
 

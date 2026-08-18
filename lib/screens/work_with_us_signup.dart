@@ -655,7 +655,11 @@ class _WorkWithUsSignupState extends State<WorkWithUsSignup> {
           }
 
           try {
-            await api.put('/users/profile', {'verificationDetails': vd}, token: regToken);
+            await api.put(
+              '/users/profile',
+              {'verificationDetails': vd, 'verificationRole': backendRole},
+              token: regToken,
+            );
           } catch (_) {}
           // For doctors, also hit the doctor-specific details endpoint
           if (backendRole == 'doctor') {
