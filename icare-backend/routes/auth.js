@@ -1,9 +1,10 @@
 const express = require('express');
 const router = express.Router();
-const { register, login, getUserProfile, forgotPassword, verifyOTP, resetPassword, googleLogin, appleLogin } = require('../controllers/authController');
+const { register, login, getUserProfile, forgotPassword, verifyOTP, resetPassword, googleLogin, appleLogin, checkEmail } = require('../controllers/authController');
 const { authMiddleware } = require('../middleware/auth');
 
 // Public routes
+router.get('/check-email', checkEmail);
 router.post('/register', register);
 router.post('/login', login);
 router.post('/google', googleLogin);

@@ -62,20 +62,31 @@ class CareTipsSection extends StatelessWidget {
                 : (isMobile
                     ? Column(
                         children: [
-                          ClinicImage(path: careTips.imagePath!, height: 160, width: double.infinity),
+                          GestureDetector(
+                            onTap: () => showImagePreview(context, [careTips.imagePath!]),
+                            child: ClinicImage(path: careTips.imagePath!, height: 160, width: double.infinity),
+                          ),
                           tipsColumn,
                         ],
                       )
-                    : IntrinsicHeight(
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            Expanded(
-                              child: ClinicImage(path: careTips.imagePath!),
+                    : Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Fixed height on both axes — without it, an
+                          // image whose natural aspect ratio is tall
+                          // (portrait) tries to size the whole row to match,
+                          // stretching this banner far taller than intended.
+                          Expanded(
+                            child: GestureDetector(
+                              onTap: () => showImagePreview(context, [careTips.imagePath!]),
+                              child: SizedBox(
+                                height: 220,
+                                child: ClinicImage(path: careTips.imagePath!, height: 220, width: double.infinity),
+                              ),
                             ),
-                            Expanded(child: tipsColumn),
-                          ],
-                        ),
+                          ),
+                          Expanded(child: tipsColumn),
+                        ],
                       )),
           ),
         ],
@@ -352,13 +363,15 @@ class VisitClinicSection extends StatelessWidget {
                 scrollDirection: Axis.horizontal,
                 itemCount: clinic.facilityPhotos.length,
                 separatorBuilder: (_, _) => const SizedBox(width: 10),
-                itemBuilder: (context, i) => ClipRRect(
-                  borderRadius: BorderRadius.circular(14),
-                  child: Image.asset(
-                    clinic.facilityPhotos[i],
-                    width: 180,
-                    height: 140,
-                    fit: BoxFit.cover,
+                itemBuilder: (context, i) => GestureDetector(
+                  onTap: () => showImagePreview(context, clinic.facilityPhotos, initialIndex: i),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(14),
+                    child: ClinicImage(
+                      path: clinic.facilityPhotos[i],
+                      width: 180,
+                      height: 140,
+                    ),
                   ),
                 ),
               ),

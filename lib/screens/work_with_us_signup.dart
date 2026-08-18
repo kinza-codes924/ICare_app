@@ -37,6 +37,11 @@ class _WorkWithUsSignupState extends State<WorkWithUsSignup> {
 
   // ── Step 2: Partner Type ─────────────────────────────────────────────────
   String? _selectedRole;
+  // Non-null once the backend has told us this email already has an
+  // approved account — restricts the role picker (_buildStep1) to only the
+  // roles that email can still request, instead of showing all 5.
+  Set<String>? _availableBackendRoles;
+  String? _existingRolesLabel;
 
   // ── Step 3: Doctor Fields ────────────────────────────────────────────────
   final _qualificationCtrl = TextEditingController();
@@ -306,8 +311,96 @@ class _WorkWithUsSignupState extends State<WorkWithUsSignup> {
     } else if (_step == 1) {
       // Step 1: Basic Info — validate form
       if (!_step1Key.currentState!.validate()) return;
-      setState(() => _step = 2);
+      _checkEmailThenProceed();
     }
+  }
+
+  // Checks whether this email already has an approved account under a
+  // different role BEFORE the user fills out the (often lengthy,
+  // document-upload-heavy) Step 2 detail form for a role they may not
+  // actually be able to register. If it does, shows the existing role(s)
+  // and lets them pick from the roles still available instead of a
+  // dead-end "email already taken" only discovered after submitting.
+  Future<void> _checkEmailThenProceed() async {
+    final email = _emailCtrl.text.trim().toLowerCase();
+    setState(() => _submitting = true);
+    try {
+      final api = ApiService();
+      final response = await api.get('/auth/check-email', queryParameters: {'email': email});
+      final data = response.data;
+      if (data is Map && data['exists'] == true) {
+        final existingRoles = (data['existingRoles'] as List? ?? []).map((r) => r.toString()).toList();
+        final availableRoles = (data['availableRoles'] as List? ?? []).map((r) => r.toString()).toList();
+        // Work With Us only ever offers these 5 partner roles — patient/admin
+        // (also part of the backend's full role enum) are never selectable
+        // here, so filter them out of "available" before showing the picker.
+        const partnerRoles = {'doctor', 'pharmacy', 'lab', 'student', 'instructor'};
+        final availablePartnerRoles = availableRoles.where(partnerRoles.contains).toSet();
+
+        if (mounted) setState(() => _submitting = false);
+        if (!mounted) return;
+
+        if (availablePartnerRoles.isEmpty) {
+          await showDialog(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              title: const Text('No Additional Roles Available'),
+              content: Text(
+                'This email already has an account as ${_formatRoleList(existingRoles)}, '
+                'and there are no other partner roles left to request.',
+              ),
+              actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('OK'))],
+            ),
+          );
+          return;
+        }
+
+        final picked = await showDialog<String>(
+          context: context,
+          builder: (ctx) => _ExistingAccountRoleDialog(
+            existingRolesLabel: _formatRoleList(existingRoles),
+            availableRoles: availablePartnerRoles,
+            roles: _roles,
+          ),
+        );
+        if (picked == null) return; // user cancelled
+        setState(() {
+          _selectedRole = picked;
+          _availableBackendRoles = availablePartnerRoles;
+          _existingRolesLabel = _formatRoleList(existingRoles);
+          _step = 2;
+        });
+        return;
+      }
+    } catch (_) {
+      // check-email is a courtesy pre-check — if it fails (network hiccup,
+      // etc.) fall through to the normal flow; register() still enforces
+      // the same rule server-side and will surface the same messaging via
+      // the pendingRoleRequest/400 branches in _submit().
+    }
+    if (mounted) setState(() => _submitting = false);
+    if (mounted) setState(() => _step = 2);
+  }
+
+  static String _roleDisplayName(String backendRole) {
+    const labels = {
+      'doctor': 'Doctor',
+      'pharmacy': 'Pharmacy',
+      'lab': 'Laboratory',
+      'student': 'Student',
+      'instructor': 'Instructor',
+      'patient': 'Patient',
+      'admin': 'Admin',
+    };
+    return labels[backendRole] ?? backendRole;
+  }
+
+  static String _formatRoleList(List<String> backendRoles) {
+    final labels = backendRoles.map(_roleDisplayName).toList();
+    if (labels.isEmpty) return 'a role';
+    if (labels.length == 1) return labels.first;
+    return '${labels.sublist(0, labels.length - 1).join(', ')} and ${labels.last}';
   }
 
   void _prevStep() {
@@ -812,12 +905,28 @@ class _WorkWithUsSignupState extends State<WorkWithUsSignup> {
   // STEP 1 — Select Partner Type (shown FIRST)
   // ════════════════════════════════════════════════════════════════════════════
   Widget _buildStep1() {
+    // Once check-email has told us which roles this email can still apply
+    // for, only show those — prevents picking a role back on Step 0 that
+    // the account already holds/has pending after the dialog already ran.
+    final visibleRoles = _availableBackendRoles == null
+        ? _roles
+        : _roles.where((r) {
+            const backendRoleMap = {
+              'Doctor': 'doctor', 'Pharmacy': 'pharmacy', 'Laboratory': 'lab',
+              'Student': 'student', 'Instructor': 'instructor',
+            };
+            return _availableBackendRoles!.contains(backendRoleMap[r['role']]);
+          }).toList();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _stepTitle('Select Partner Type', 'Choose how you want to work with iCare'),
         const SizedBox(height: 24),
-        ..._roles.map((r) => _roleCard(r)),
+        if (_existingRolesLabel != null) ...[
+          _existingAccountBanner(),
+          const SizedBox(height: 16),
+        ],
+        ...visibleRoles.map((r) => _roleCard(r)),
         const SizedBox(height: 28),
         _primaryButton('Continue', Icons.arrow_forward_rounded, _nextStep),
       ],
@@ -970,7 +1079,42 @@ class _WorkWithUsSignupState extends State<WorkWithUsSignup> {
     else if (_selectedRole == 'Student') inner = _buildStudentForm();
     else if (_selectedRole == 'Instructor') inner = _buildInstructorForm();
     else return const SizedBox.shrink();
+    if (_existingRolesLabel != null) {
+      inner = Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [_existingAccountBanner(), const SizedBox(height: 20), inner],
+      );
+    }
     return Form(key: _step2Key, child: inner);
+  }
+
+  // Reminder banner shown while filling the role-specific form after the
+  // user picked a new role from the "account already exists" dialog — so
+  // it's clear this application is for an ADDITIONAL role on the same
+  // email, not a fresh account.
+  Widget _existingAccountBanner() {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFEFF6FF),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFBFDBFE)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.info_outline_rounded, color: Color(0xFF0036BC), size: 20),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              'This email already has an approved account as $_existingRolesLabel. '
+              'You\'re applying for the $_selectedRole role in addition to that.',
+              style: const TextStyle(fontSize: 13, color: Color(0xFF1E3A8A)),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   // ── Doctor Form ─────────────────────────────────────────────────────────────
@@ -1933,6 +2077,122 @@ class _StepIndicator extends StatelessWidget {
           ],
         );
       }),
+    );
+  }
+}
+
+/// Shown when Work With Us detects the entered email already has an
+/// approved account under another role. Surfaces the existing role(s) by
+/// name (instead of a flat "email already taken") and lets the user pick
+/// one of the roles still available to request — selecting one pops this
+/// dialog with the picked role's Title Case label (e.g. "Doctor"), which
+/// the caller feeds straight into the normal role-picker state.
+class _ExistingAccountRoleDialog extends StatefulWidget {
+  final String existingRolesLabel;
+  final Set<String> availableRoles; // backend lowercase role strings
+  final List<Map<String, dynamic>> roles; // the screen's static _roles list
+
+  const _ExistingAccountRoleDialog({
+    required this.existingRolesLabel,
+    required this.availableRoles,
+    required this.roles,
+  });
+
+  @override
+  State<_ExistingAccountRoleDialog> createState() => _ExistingAccountRoleDialogState();
+}
+
+class _ExistingAccountRoleDialogState extends State<_ExistingAccountRoleDialog> {
+  String? _picked;
+
+  static const _backendRoleMap = {
+    'Doctor': 'doctor',
+    'Pharmacy': 'pharmacy',
+    'Laboratory': 'lab',
+    'Student': 'student',
+    'Instructor': 'instructor',
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    final selectable = widget.roles.where((r) {
+      final backend = _backendRoleMap[r['role'] as String];
+      return backend != null && widget.availableRoles.contains(backend);
+    }).toList();
+
+    return AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      title: const Text('Account Already Exists'),
+      content: SizedBox(
+        width: 420,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'An account already exists with this email address as '
+              '${widget.existingRolesLabel}. You can apply for another '
+              'available role below:',
+              style: const TextStyle(fontSize: 14, color: Color(0xFF475569)),
+            ),
+            const SizedBox(height: 16),
+            ...selectable.map((r) {
+              final color = r['color'] as Color;
+              final role = r['role'] as String;
+              final isSelected = _picked == role;
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: GestureDetector(
+                  onTap: () => setState(() => _picked = role),
+                  child: Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: isSelected ? color.withValues(alpha: 0.08) : Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: isSelected ? color : const Color(0xFFE2E8F0),
+                        width: isSelected ? 2 : 1,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 36,
+                          height: 36,
+                          decoration: BoxDecoration(
+                            color: color.withValues(alpha: isSelected ? 0.18 : 0.08),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Icon(r['icon'] as IconData, color: color, size: 18),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            r['title'] as String,
+                            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
+                          ),
+                        ),
+                        if (isSelected) Icon(Icons.check_circle_rounded, color: color, size: 20),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            }),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+        ElevatedButton(
+          onPressed: _picked == null ? null : () => Navigator.pop(context, _picked),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppColors.primaryColor,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          ),
+          child: const Text('Continue', style: TextStyle(color: Colors.white)),
+        ),
+      ],
     );
   }
 }

@@ -15,6 +15,11 @@ const GOOGLE_CLIENT_IDS = [
 ];
 const googleClient = new OAuth2Client();
 
+// Kept in sync with User.js's role enum. Shared by checkEmail() and
+// register()'s existing-account branch so both report the same "still
+// available to apply for" role set.
+const ALL_ROLES = ['doctor', 'lab', 'pharmacy', 'instructor', 'student', 'patient'];
+
 function detectDevice(req) {
   const platform = (req.headers['x-platform'] || '').toLowerCase();
   if (platform === 'android') return 'Android';
@@ -67,6 +72,41 @@ const generateMrNumber = async () => {
   return `MR-${Date.now().toString(36).toUpperCase().slice(-6)}`;
 };
 
+// ─── CHECK EMAIL ────────────────────────────────────────────────────────────────
+// GET /auth/check-email?email=... — lets the frontend show "this email
+// already has an approved <role> account, here are the roles still
+// available to request" BEFORE the user fills out and submits the whole
+// Work With Us form, instead of only finding out after submit.
+const checkEmail = async (req, res) => {
+  try {
+    await connectMongoDB();
+    const email = (req.query.email || '').toString().trim().toLowerCase();
+    if (!email) return res.status(400).json({ success: false, message: 'email is required' });
+
+    const existing = await User.findOne({ email });
+    if (!existing || existing.is_approved !== true) {
+      // No account, or an unapproved one — normal new-registration flow
+      // applies, nothing to report.
+      return res.json({ success: true, exists: false });
+    }
+
+    const existingRolesArr = [...new Set([existing.role, ...(existing.roles || [])])].filter(Boolean);
+    const existingRoles = new Set(existingRolesArr);
+    const pendingRolesArr = existing.pendingRoles || [];
+    const availableRoles = ALL_ROLES.filter(r => !existingRoles.has(r) && !pendingRolesArr.includes(r));
+
+    res.json({
+      success: true,
+      exists: true,
+      existingRoles: existingRolesArr,
+      pendingRoles: pendingRolesArr,
+      availableRoles,
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
 // ─── REGISTER ─────────────────────────────────────────────────────────────────
 const register = async (req, res) => {
   try {
@@ -101,18 +141,42 @@ const register = async (req, res) => {
       // Work-With-Us or normal signup) — instead of hard-rejecting, request
       // the new role on the SAME account via the existing multi-role system.
       // Admin still explicitly approves it from the pending-users list.
-      const existingRoles = new Set([existing.role, ...(existing.roles || [])]);
+      const existingRolesArr = [...new Set([existing.role, ...(existing.roles || [])])].filter(Boolean);
+      const existingRoles = new Set(existingRolesArr);
+      const pendingRolesArr = existing.pendingRoles || [];
       const alreadyHasRole = existingRoles.has(role);
-      const alreadyPending = (existing.pendingRoles || []).includes(role);
+      const alreadyPending = pendingRolesArr.includes(role);
 
-      if (existing.email?.toLowerCase() === email.toLowerCase() && existing.is_approved === true && !alreadyHasRole) {
-        if (!alreadyPending) {
-          await User.findByIdAndUpdate(existing._id, { $addToSet: { pendingRoles: role } });
+      if (existing.email?.toLowerCase() === email.toLowerCase() && existing.is_approved === true) {
+        // Roles neither approved nor already requested — what the client
+        // wants surfaced as "still available to apply for" instead of a
+        // flat "email already taken" rejection.
+        const availableRoles = ALL_ROLES.filter(r => !existingRoles.has(r) && !pendingRolesArr.includes(r));
+
+        if (alreadyHasRole) {
+          return res.status(400).json({
+            success: false,
+            message: `This email already has an approved ${role} account — no need to request that role again.`,
+            existingRoles: existingRolesArr,
+            availableRoles,
+          });
         }
+        if (alreadyPending) {
+          return res.status(400).json({
+            success: false,
+            message: `A request for the ${role} role on this email is already pending admin approval.`,
+            existingRoles: existingRolesArr,
+            availableRoles,
+          });
+        }
+
+        await User.findByIdAndUpdate(existing._id, { $addToSet: { pendingRoles: role } });
         return res.status(200).json({
           success: true,
           message: 'You already have an approved account with this email. Your request for a new role has been sent to admin for approval — you\'ll be notified once approved.',
           pendingRoleRequest: true,
+          existingRoles: existingRolesArr,
+          availableRoles: availableRoles.filter(r => r !== role),
         });
       }
 
@@ -649,4 +713,4 @@ const appleLogin = async (req, res) => {
   }
 };
 
-module.exports = { register, login, getUserProfile, forgotPassword, verifyOTP, resetPassword, googleLogin, appleLogin };
+module.exports = { register, login, getUserProfile, forgotPassword, verifyOTP, resetPassword, googleLogin, appleLogin, checkEmail };

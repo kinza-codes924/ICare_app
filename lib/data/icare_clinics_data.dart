@@ -86,6 +86,7 @@ const List<Clinic> kICareClinics = [
             'Removes infected pulp to relieve pain and save a tooth that '
             'would otherwise need extraction — completed comfortably under '
             'local anesthesia in one to two visits.',
+        imagePath: 'https://images.unsplash.com/photo-1664530837411-0c2e8a3d4dca?w=800&q=80&auto=format&fit=crop',
       ),
       ClinicService(
         name: 'Cosmetic Dentistry',
@@ -94,6 +95,7 @@ const List<Clinic> kICareClinics = [
             'Veneers, bonding, and full smile design to reshape, brighten, or '
             'close gaps in your teeth — a custom plan built around the smile '
             'you want.',
+        imagePath: 'https://images.unsplash.com/photo-1663182234283-28941e7612da?w=800&q=80&auto=format&fit=crop',
       ),
     ],
     careTips: ClinicCareTips(
@@ -104,7 +106,7 @@ const List<Clinic> kICareClinics = [
         'Regular Checkups',
         'Post-Treatment Maintenance',
       ],
-      imagePath: 'assets/clinic_photos/dental_implant.jpg',
+      imagePath: 'https://images.unsplash.com/photo-1606811971618-4486d14f3f99?w=1200&q=80&auto=format&fit=crop',
     ),
     journey: _defaultJourney,
     testimonials: [
@@ -173,6 +175,10 @@ const List<Clinic> kICareClinics = [
     address: 'Mezzanine Floor, Mall Square, Zamzama Boulevard, DHA Phase 5, '
         'Clifton, Zamzama Commercial Area, Defence V, Karachi, 75600',
     heroImage: 'https://images.unsplash.com/photo-1761718210089-ba3bb5ccb54f?w=1200&q=80&auto=format&fit=crop',
+    facilityPhotos: [
+      'https://images.unsplash.com/photo-1665231795856-769fb08a90bc?w=800&q=80&auto=format&fit=crop',
+      'https://images.unsplash.com/photo-1704455306925-1401c3012117?w=800&q=80&auto=format&fit=crop',
+    ],
     services: [
       ClinicService(
         name: 'Laser Hair Removal',
@@ -297,6 +303,10 @@ const List<Clinic> kICareClinics = [
     address: 'Mezzanine Floor, Mall Square, Zamzama Boulevard, DHA Phase 5, '
         'Clifton, Zamzama Commercial Area, Defence V, Karachi, 75600',
     heroImage: 'https://images.unsplash.com/photo-1691139600923-8fba078704b0?w=1200&q=80&auto=format&fit=crop',
+    facilityPhotos: [
+      'https://images.unsplash.com/photo-1758691462126-2ee47c8bf9e7?w=800&q=80&auto=format&fit=crop',
+      'https://images.unsplash.com/photo-1766299893052-107053bc92a1?w=800&q=80&auto=format&fit=crop',
+    ],
     services: [
       ClinicService(
         name: 'Prenatal Care',
@@ -417,6 +427,10 @@ const List<Clinic> kICareClinics = [
     address: 'Mezzanine Floor, Mall Square, Zamzama Boulevard, DHA Phase 5, '
         'Clifton, Zamzama Commercial Area, Defence V, Karachi, 75600',
     heroImage: 'https://images.unsplash.com/photo-1649751361457-01d3a696c7e6?w=1200&q=80&auto=format&fit=crop',
+    facilityPhotos: [
+      'https://images.unsplash.com/photo-1761912915676-74c7d63105a3?w=800&q=80&auto=format&fit=crop',
+      'https://images.unsplash.com/photo-1771270786606-f5a0e57db762?w=800&q=80&auto=format&fit=crop',
+    ],
     services: [
       ClinicService(
         name: 'Sports Injury Rehab',
@@ -537,6 +551,10 @@ const List<Clinic> kICareClinics = [
     address: 'Mezzanine Floor, Mall Square, Zamzama Boulevard, DHA Phase 5, '
         'Clifton, Zamzama Commercial Area, Defence V, Karachi, 75600',
     heroImage: 'https://images.unsplash.com/photo-1714976694810-85add1a29c96?w=1200&q=80&auto=format&fit=crop',
+    facilityPhotos: [
+      'https://images.unsplash.com/photo-1637580679542-5c7ca60c6fae?w=800&q=80&auto=format&fit=crop',
+      'https://images.unsplash.com/photo-1637580681839-6e3ed197ca93?w=800&q=80&auto=format&fit=crop',
+    ],
     services: [
       ClinicService(
         name: 'Counseling & Therapy',
@@ -655,6 +673,10 @@ const List<Clinic> kICareClinics = [
     address: 'Mezzanine Floor, Mall Square, Zamzama Boulevard, DHA Phase 5, '
         'Clifton, Zamzama Commercial Area, Defence V, Karachi, 75600',
     heroImage: 'https://images.unsplash.com/photo-1644704170910-a0cdf183649b?w=1200&q=80&auto=format&fit=crop',
+    facilityPhotos: [
+      'https://images.unsplash.com/photo-1675270882554-ab6817fb44f3?w=800&q=80&auto=format&fit=crop',
+      'https://images.unsplash.com/photo-1767531309781-b61fe1edfe86?w=800&q=80&auto=format&fit=crop',
+    ],
     services: [
       ClinicService(
         name: 'Nutrition Counseling',

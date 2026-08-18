@@ -377,12 +377,15 @@ class _ServiceCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (service.imagePath != null)
-            ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: ClinicImage(
-                path: service.imagePath!,
-                width: 52,
-                height: 52,
+            GestureDetector(
+              onTap: () => showImagePreview(context, [service.imagePath!]),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: ClinicImage(
+                  path: service.imagePath!,
+                  width: 52,
+                  height: 52,
+                ),
               ),
             )
           else
