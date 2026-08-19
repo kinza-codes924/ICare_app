@@ -32,9 +32,9 @@ function drawInvoiceHeader(doc, { invoiceNumber, date }) {
     doc.fontSize(10).fillColor('#666666').text('Your Trusted Healthcare Platform', 50, 80);
   }
 
-  doc.fontSize(20).fillColor('#0036BC').text('INVOICE', 400, 50, { align: 'right' });
-  doc.fontSize(10).fillColor('#333333').text(`Invoice #${invoiceNumber}`, 400, 80, { align: 'right' });
-  doc.fontSize(9).fillColor('#666666').text(`Date: ${date}`, 400, 95, { align: 'right' });
+  doc.fontSize(20).fillColor('#0036BC').text('INVOICE', 350, 40, { align: 'right', width: 200 });
+  doc.fontSize(10).fillColor('#333333').text(`Invoice #${invoiceNumber}`, 350, 68, { align: 'right', width: 200 });
+  doc.fontSize(9).fillColor('#666666').text(`Date: ${date}`, 350, 83, { align: 'right', width: 200 });
 
   doc.moveTo(50, 120).lineTo(550, 120).strokeColor('#E0E0E0').stroke();
 }

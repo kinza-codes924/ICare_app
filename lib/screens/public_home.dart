@@ -1510,7 +1510,7 @@ class _ICareClinicsSection extends StatelessWidget {
                   children: [
                     Image.asset(
                       'assets/clinic_photos/080fba59-23f8-4cff-b8dd-0757fec9c7b2.jpg',
-                      height: 72,
+                      height: 140,
                       fit: BoxFit.contain,
                       filterQuality: FilterQuality.high,
                     ),
