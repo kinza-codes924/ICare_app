@@ -42,7 +42,11 @@ class ClinicDetailScreen extends ConsumerWidget {
             ElevatedButton(
               onPressed: () {
                 Navigator.pop(ctx);
-                context.go('/login');
+                context.go(
+                  clinic.doctorId != null
+                      ? '/login?redirectDoctorId=${clinic.doctorId}'
+                      : '/login',
+                );
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF0036BC),

@@ -355,7 +355,7 @@ class DoctorDetailScreen extends ConsumerWidget {
                               ElevatedButton(
                                 onPressed: () {
                                   Navigator.pop(ctx);
-                                  context.go('/login');
+                                  context.go('/login?redirectDoctorId=${doctor.id}');
                                 },
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: const Color(0xFF0036BC),
@@ -1008,7 +1008,7 @@ class DoctorDetailScreen extends ConsumerWidget {
                                 ElevatedButton(
                                   onPressed: () {
                                     Navigator.pop(ctx);
-                                    context.go('/login');
+                                    context.go('/login?redirectDoctorId=${doctor.id}');
                                   },
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: const Color(0xFF0036BC),

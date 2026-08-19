@@ -284,7 +284,13 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(path: '/splash', builder: (_, _) => const SplashScreen()),
       GoRoute(path: '/home', builder: (_, _) => const PublicHome()),
-      GoRoute(path: '/login', builder: (_, _) => const LoginScreen()),
+      GoRoute(
+        path: '/login',
+        builder: (_, state) {
+          final redirectDoctorId = state.uri.queryParameters['redirectDoctorId'];
+          return LoginScreen(redirectDoctorId: redirectDoctorId);
+        },
+      ),
       GoRoute(
         path: '/signup',
         builder: (_, state) {

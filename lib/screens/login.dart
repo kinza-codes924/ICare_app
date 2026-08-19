@@ -7,6 +7,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_size_matters/flutter_size_matters.dart';
 import 'package:go_router/go_router.dart';
 import 'package:icare/providers/auth_provider.dart';
+import 'package:icare/models/doctor.dart';
+import 'package:icare/screens/book_appointment.dart';
+import 'package:icare/services/doctor_service.dart';
 import 'package:icare/screens/forget_password.dart';
 import 'package:icare/screens/lab_profile_setup.dart';
 import 'package:icare/screens/pharmacy_profile_setup.dart';
@@ -27,7 +30,12 @@ import 'package:icare/widgets/custom_text.dart';
 import 'package:icare/widgets/custom_text_input.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
-  const LoginScreen({super.key});
+  // Set when the user was bounced here from "Book Appointment" on a clinic/
+  // doctor page while logged out — carries them straight to that doctor's
+  // slot picker after login instead of dropping them on the generic
+  // dashboard, where the clinic they came from is lost.
+  final String? redirectDoctorId;
+  const LoginScreen({super.key, this.redirectDoctorId});
   @override
   ConsumerState<LoginScreen> createState() => _LoginScreenState();
 }
@@ -109,6 +117,28 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     super.dispose();
   }
 
+  // Single post-login destination used by every sign-in path (password,
+  // biometric, face, 2FA, Google/Apple) — replaces the old hardcoded
+  // context.go('/dashboard') so a doctor/clinic "Book Appointment while
+  // logged out" redirect isn't silently dropped after login.
+  Future<void> _navigateAfterLogin() async {
+    if (!mounted) return;
+    final doctorId = widget.redirectDoctorId;
+    if (doctorId != null && doctorId.isNotEmpty) {
+      try {
+        final result = await DoctorService().getDoctorById(doctorId);
+        if (mounted && result['success'] == true && result['doctor'] != null) {
+          final doctor = Doctor.fromJson(result['doctor']);
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(builder: (_) => BookAppointmentScreen(doctor: doctor)),
+          );
+          return;
+        }
+      } catch (_) {}
+    }
+    if (mounted) context.go('/dashboard');
+  }
+
   Future<void> _checkExistingRole() async {
     final authState = ref.read(authProvider);
     final existingRole = authState.userRole;
@@ -166,7 +196,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
             if (user != null && mounted) {
               await ref.read(authProvider.notifier).setUserToken(token);
               await ref.read(authProvider.notifier).setUser(user);
-              if (mounted) context.go('/dashboard');
+              if (mounted) await _navigateAfterLogin();
             } else {
               _showError('Session expired. Please sign in with your password.');
             }
@@ -220,7 +250,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
           if (token != null && token.isNotEmpty && user != null && mounted) {
             await ref.read(authProvider.notifier).setUserToken(token);
             await ref.read(authProvider.notifier).setUser(user);
-            if (mounted) context.go('/dashboard');
+            if (mounted) await _navigateAfterLogin();
           } else {
             _showError('Session expired. Please sign in with your password first.');
           }
@@ -377,7 +407,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
       final user = app_user.User.fromJson(profileResult['user'] as Map<String, dynamic>);
       await ref.read(authProvider.notifier).setUserToken(token);
       await ref.read(authProvider.notifier).setUser(user);
-      if (mounted) context.go('/dashboard');
+      if (mounted) await _navigateAfterLogin();
     } else {
       _showError('Could not load profile: ${profileResult['message']}');
     }
@@ -2323,7 +2353,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
             final loginEmail = usernameController.text.trim();
             await _offerFaceSetup(loginEmail);
             if (mounted) await _offerBiometricSetup(loginEmail);
-            if (mounted) context.go('/dashboard');
+            if (mounted) await _navigateAfterLogin();
           } else {
             debugPrint("❌ Failed to fetch profile: ${profileResult['message']}");
             _showError(
@@ -2516,7 +2546,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                     final user = app_user.User.fromJson(profileResult['user']);
                     await ref.read(authProvider.notifier).setUserToken(token);
                     await ref.read(authProvider.notifier).setUser(user);
-                    if (mounted) context.go('/dashboard');
+                    if (mounted) await _navigateAfterLogin();
                   }
                 } else {
                   setModal(() => verifying = false);
