@@ -54,10 +54,19 @@ const referralFollowUpSchema = new mongoose.Schema({
 
 // Main Enhanced Prescription Schema
 const enhancedPrescriptionSchema = new mongoose.Schema({
+  // Optional — null for a walk-in front-desk prescription, whose
+  // Consultation has no patient User account (guest entry).
   patientId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
-    required: true
+    default: null
+  },
+  // Set only when patientId is null — carries the walk-in guest's name
+  // (from Consultation.patientName) so the PDF/print view can still show a
+  // real name instead of a generic "Patient" placeholder.
+  patientName: {
+    type: String,
+    default: null
   },
   doctorId: {
     type: mongoose.Schema.Types.ObjectId,

@@ -64,7 +64,18 @@ class _NewNotificationListenerState extends State<NewNotificationListener> {
         (n) => n is Map && newIds.contains(n['_id']?.toString()),
         orElse: () => null,
       );
-      if (newest is Map) _showBanner(newest);
+      if (newest is Map) {
+        _showBanner(newest);
+        // Mark read once shown — otherwise this notification stays unread
+        // server-side and can resurface as "new" on a later poll cycle
+        // (e.g. after this listener's in-memory _seenIds/_firstPoll reset,
+        // which happens on things like a fresh app launch), showing the
+        // same old banner again even though the user already saw it.
+        final id = newest['_id']?.toString();
+        if (id != null && id.isNotEmpty) {
+          NotificationService().markAsRead(id).catchError((_) {});
+        }
+      }
     } catch (_) {}
   }
 

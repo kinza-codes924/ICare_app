@@ -48,6 +48,7 @@ exports.savePrescriptionDraft = async (req, res) => {
         ...prescriptionData,
         consultationId,
         patientId: consultation.patientId,
+        patientName: consultation.patientId ? null : (consultation.patientName || null),
         doctorId: consultation.doctorId,
         status: 'draft',
         isComplete: false,
@@ -149,6 +150,7 @@ exports.completePrescription = async (req, res) => {
       prescription = new EnhancedPrescription({
         consultationId,
         patientId: consultation.patientId,
+        patientName: consultation.patientId ? null : (consultation.patientName || null),
         doctorId: consultation.doctorId,
         prescribedAt: new Date(),
         status: 'draft',

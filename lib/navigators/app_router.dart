@@ -6,6 +6,8 @@ import 'package:icare/models/auth.dart';
 import 'package:icare/providers/auth_provider.dart';
 import 'package:icare/screens/login.dart';
 import 'package:icare/screens/book_appointment.dart';
+import 'package:icare/screens/reception_dashboard.dart';
+import 'package:icare/screens/admin_receptionist_management.dart';
 import 'package:icare/screens/public_home.dart';
 import 'package:icare/screens/signup.dart';
 import 'package:icare/screens/splash.dart';
@@ -326,6 +328,7 @@ final routerProvider = Provider<GoRouter>((ref) {
             'Instructor' => '/instructor/dashboard',
             'Laboratory' => '/lab/dashboard',
             'Pharmacy' => '/pharmacy/dashboard',
+            'Receptionist' => '/reception/dashboard',
             'Admin' => adminTab != null ? '/admin/dashboard?adminTab=$adminTab' : '/admin/dashboard',
             _ => '/patient/home',
           };
@@ -362,6 +365,7 @@ final routerProvider = Provider<GoRouter>((ref) {
           builder: () => admin_verification.AdminVerificationPanel(),
         ),
       ),
+      GoRoute(path: '/admin/receptionists', builder: (_, _) => const AdminReceptionistManagement()),
       GoRoute(path: '/admin/lms-payments', builder: (_, _) => const AdminLmsPaymentsScreen()),
       GoRoute(path: '/admin/payments', builder: (_, _) => const AdminPaymentsScreen()),
       GoRoute(path: '/admin/panel', builder: (_, _) => const AdminPanelScreen()),
@@ -413,6 +417,8 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(path: '/student/courses', builder: (_, _) => Courses()),
           GoRoute(path: '/student/browse', builder: (_, _) => const Courses(browse: true)),
           GoRoute(path: '/student/profile', builder: (_, _) => const StudentProfileSetup()),
+          // Reception (front-desk) routes
+          GoRoute(path: '/reception/dashboard', builder: (_, _) => const ReceptionDashboard()),
           // Laboratory routes
           GoRoute(path: '/lab/dashboard', builder: (_, _) => const LaboratoryDashboard()),
           GoRoute(

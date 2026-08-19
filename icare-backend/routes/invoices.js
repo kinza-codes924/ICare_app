@@ -131,4 +131,103 @@ router.get('/:orderId/pdf', authMiddleware, async (req, res) => {
   }
 });
 
+// ─── GENERATE RECEPTION (WALK-IN VISIT) INVOICE PDF ───────────────────────────
+// Public (no authMiddleware) — same trust model as the existing prescription
+// PDF route (prescription-v2.js): an unguessable Mongo ObjectId in the URL is
+// the access control, so the app can open it directly via url_launcher
+// without needing to carry an Authorization header into a new browser tab.
+router.get('/reception/:consultationId/pdf', async (req, res) => {
+  try {
+    await connectMongoDB();
+    const Consultation = require('../models/Consultation');
+    const { consultationId } = req.params;
+
+    const consultation = await Consultation.findById(toId(consultationId)).lean();
+    if (!consultation) {
+      return res.status(404).json({ success: false, message: 'Consultation not found' });
+    }
+
+    const doctor = await User.findById(consultation.doctorId).lean();
+
+    // items = the doctor's base consultation fee (if set) + any billable
+    // procedures added by reception — deliberately allowed to be empty/zero,
+    // this must render as a valid "blank" invoice for a payment-only visit.
+    const items = [];
+    if (consultation.consultationFee > 0) {
+      items.push({ name: 'Consultation Fee', quantity: 1, price: consultation.consultationFee });
+    }
+    for (const p of (consultation.procedures || [])) {
+      items.push({ name: p.name, quantity: 1, price: p.price || 0 });
+    }
+    const totalAmount = items.reduce((sum, i) => sum + (i.price * i.quantity), 0);
+
+    const PDFDocument = require('pdfkit');
+    const doc = new PDFDocument({ margin: 50, size: 'A4' });
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename=icare-invoice-${consultationId}.pdf`);
+    doc.pipe(res);
+
+    doc.fontSize(24).fillColor('#0036BC').text('iCare', 50, 50, { bold: true });
+    doc.fontSize(10).fillColor('#666666').text('Your Trusted Healthcare Platform', 50, 80);
+    doc.fontSize(20).fillColor('#0036BC').text('INVOICE', 400, 50, { align: 'right' });
+    doc.fontSize(10).fillColor('#333333').text(`Invoice #${consultationId}`, 400, 80, { align: 'right' });
+    doc.fontSize(9).fillColor('#666666').text(`Date: ${new Date(consultation.createdAt).toLocaleDateString('en-PK')}`, 400, 95, { align: 'right' });
+
+    doc.moveTo(50, 120).lineTo(550, 120).strokeColor('#E0E0E0').stroke();
+
+    let yPos = 140;
+    doc.fontSize(11).fillColor('#0036BC').text('PATIENT INFORMATION', 50, yPos);
+    yPos += 20;
+    doc.fontSize(10).fillColor('#333333').text(`Name: ${consultation.patientName || 'Walk-in Patient'}`, 50, yPos);
+    yPos += 15;
+    if (consultation.patientAge) { doc.text(`Age: ${consultation.patientAge}`, 50, yPos); yPos += 15; }
+    if (consultation.patientGender) { doc.text(`Gender: ${consultation.patientGender}`, 50, yPos); }
+
+    yPos = 140;
+    doc.fontSize(10).fillColor('#666666').text('Doctor:', 350, yPos);
+    yPos += 15;
+    doc.fontSize(9).fillColor('#333333').text(doctor?.name || doctor?.username || 'N/A', 350, yPos);
+
+    yPos = 280;
+    doc.rect(50, yPos, 500, 25).fillAndStroke('#0036BC', '#0036BC');
+    doc.fontSize(10).fillColor('#FFFFFF')
+      .text('Item', 60, yPos + 8, { width: 200 })
+      .text('Qty', 280, yPos + 8, { width: 50 })
+      .text('Price (PKR)', 350, yPos + 8, { width: 80 })
+      .text('Total (PKR)', 450, yPos + 8, { width: 90, align: 'right' });
+    yPos += 25;
+
+    if (items.length === 0) {
+      doc.rect(50, yPos, 500, 30).fillAndStroke('#F9F9F9', '#E0E0E0');
+      doc.fontSize(9).fillColor('#666666').text('No items recorded', 60, yPos + 10, { width: 480 });
+      yPos += 30;
+    } else {
+      items.forEach((item, index) => {
+        const bgColor = index % 2 === 0 ? '#F9F9F9' : '#FFFFFF';
+        doc.rect(50, yPos, 500, 30).fillAndStroke(bgColor, '#E0E0E0');
+        doc.fontSize(9).fillColor('#333333')
+          .text(item.name, 60, yPos + 10, { width: 200 })
+          .text(String(item.quantity), 280, yPos + 10, { width: 50 })
+          .text(item.price.toFixed(2), 350, yPos + 10, { width: 80 })
+          .text((item.price * item.quantity).toFixed(2), 450, yPos + 10, { width: 90, align: 'right' });
+        yPos += 30;
+      });
+    }
+
+    yPos += 10;
+    doc.fontSize(12).fillColor('#0036BC')
+      .text('Total Amount:', 350, yPos, { bold: true })
+      .text(`PKR ${totalAmount.toFixed(2)}`, 450, yPos, { width: 90, align: 'right', bold: true });
+
+    doc.fontSize(8).fillColor('#999999')
+      .text('Thank you for choosing iCare - Your Trusted Healthcare Platform', 50, 700, { align: 'center', width: 500 })
+      .text('For support, contact: support@icare.com', 50, 715, { align: 'center', width: 500 });
+
+    doc.end();
+  } catch (error) {
+    console.error('Generate reception invoice PDF error:', error);
+    res.status(500).json({ success: false, message: 'Failed to generate invoice' });
+  }
+});
+
 module.exports = router;

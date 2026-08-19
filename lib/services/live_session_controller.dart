@@ -212,21 +212,14 @@ class LiveSessionController {
   }
 
   // ── PUBLIC: toggle recording ──────────────────────────────────────────────
+  // Recording now auto-starts on join (Jibri, configured server-side) — this
+  // only ever needs to stop it early; there's no separate start call any more.
   Future<void> toggleRecording(String sessionDocId) async {
     if (!kIsWeb) {
       return;
     }
-    if (!isRecording) {
-      lmsStartRecording();
-      isRecording = true;
-      onStateChanged?.call();
-    } else {
-      final token = await SharedPref().getToken();
-      lmsStopRecordingAndUpload(
-        sessionDocId,
-        'https://icare-backend-inky.vercel.app/api',
-        token ?? '',
-      );
+    if (isRecording) {
+      lmsStopRecording();
       isRecording = false;
       onStateChanged?.call();
     }
@@ -246,14 +239,10 @@ class LiveSessionController {
     }
 
     if (isInstructor) {
-      // Stop recording + upload
+      // Stop recording — Jibri finalizes + uploads server-side once it gets
+      // this explicit stop command.
       if (kIsWeb && isRecording && sessionDocId.isNotEmpty) {
-        final token = await SharedPref().getToken();
-        lmsStopRecordingAndUpload(
-          sessionDocId,
-          'https://icare-backend-inky.vercel.app/api',
-          token ?? '',
-        );
+        lmsStopRecording();
       }
 
       // Save session to backend
@@ -337,9 +326,9 @@ class LiveSessionController {
       try {
         await lmsJoinChannel(
           roomName,
-          agoraAppId,
-          agoraToken,
+          currentUserName,
           isInstructor,
+          jwt: agoraToken,
         );
         debugPrint('LMS Agora join: room=$roomName');
       } catch (e) {
@@ -351,9 +340,9 @@ class LiveSessionController {
       lmsSetCallbacks(onJoined: () {});
       await lmsJoinChannel(
         roomName,
-        agoraAppId,
-        agoraToken,
+        currentUserName,
         isInstructor,
+        jwt: agoraToken,
       );
       await Future.delayed(const Duration(seconds: 2));
     }

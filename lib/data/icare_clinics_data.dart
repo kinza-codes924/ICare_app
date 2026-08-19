@@ -47,7 +47,7 @@ const List<Clinic> kICareClinics = [
     mapQuery: 'iCare Clinics, Mezzanine Floor, Mall Square, Zamzama Boulevard, DHA Phase 5, Clifton, Karachi',
     address: 'Mezzanine Floor, Mall Square, Zamzama Boulevard, DHA Phase 5, '
         'Clifton, Zamzama Commercial Area, Defence V, Karachi, 75600',
-    heroImage: 'assets/clinic_photos/dental_implant.jpg',
+    heroImage: 'https://images.unsplash.com/photo-1606811841689-23dfddce3e95?w=1200&q=80&auto=format&fit=crop',
     facilityPhotos: [
       'assets/clinic_photos/dental_reception.jpg',
       'assets/clinic_photos/dental_room.jpg',
@@ -107,7 +107,7 @@ const List<Clinic> kICareClinics = [
         'Regular Checkups',
         'Post-Treatment Maintenance',
       ],
-      imagePath: 'https://images.unsplash.com/photo-1606811971618-4486d14f3f99?w=1200&q=80&auto=format&fit=crop',
+      imagePath: 'https://images.unsplash.com/photo-1629909613654-28e377c37b09?w=1200&q=80&auto=format&fit=crop',
     ),
     journey: _defaultJourney,
     testimonials: [

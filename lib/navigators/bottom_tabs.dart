@@ -52,6 +52,17 @@ List<Widget> _patientTabs(BuildContext context, String location) {
   ];
 }
 
+List<Widget> _receptionTabs(BuildContext context, String location) {
+  return [
+    CustomTabButton(
+      onPressed: () => context.go('/reception/dashboard'),
+      iconColor: _tint(location, '/reception/dashboard'),
+      image: ImagePaths.home,
+      title: 'home'.tr(),
+    ),
+  ];
+}
+
 List<Widget> _labTabs(BuildContext context, String location) {
   return [
     CustomTabButton(
@@ -211,6 +222,8 @@ List<Widget>? buildTabs({
       return _studentTabs(context, location);
     case "Admin":
       return _adminTabs(context, location);
+    case "Receptionist":
+      return _receptionTabs(context, location);
     default:
       return _doctorTabs(context, location);
   }

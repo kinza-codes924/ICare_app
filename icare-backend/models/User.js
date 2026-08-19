@@ -8,7 +8,7 @@ const userSchema = new mongoose.Schema({
   password: { type: String, required: true },
   role: {
     type: String,
-    enum: ['patient', 'doctor', 'lab', 'pharmacy', 'admin', 'instructor', 'student'],
+    enum: ['patient', 'doctor', 'lab', 'pharmacy', 'admin', 'instructor', 'student', 'receptionist'],
     default: 'patient',
   },
   // Multi-role support: all roles this account is approved for.

@@ -5,10 +5,14 @@ const consultationSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Appointment'
   },
+  // Optional — a walk-in front-desk consultation (isWalkIn:true) has no
+  // patient User account at all (guest entry, identity carried entirely by
+  // patientName/patientAge/patientGender below). Required for every other
+  // consultation type, which always has a real logged-in patient.
   patientId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
-    required: true
+    default: null
   },
   doctorId: {
     type: mongoose.Schema.Types.ObjectId,
@@ -49,6 +53,34 @@ const consultationSchema = new mongoose.Schema({
   doctorNotes: {
     type: String,
     default: ''
+  },
+  // Walk-in front-desk fields — a receptionist creates these directly with
+  // no video Appointment behind them (appointmentId/channelName stay null).
+  isWalkIn: {
+    type: Boolean,
+    default: false
+  },
+  receptionistId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    default: null
+  },
+  // Doctor's base visit fee, snapshotted at walk-in creation time so later
+  // consultation_fee changes on the doctor's profile don't alter past bills.
+  consultationFee: {
+    type: Number,
+    default: 0
+  },
+  procedures: [{
+    name: { type: String, required: true },
+    price: { type: Number, default: 0 },
+    addedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    addedAt: { type: Date, default: Date.now },
+  }],
+  paymentStatus: {
+    type: String,
+    enum: ['unpaid', 'paid'],
+    default: 'unpaid'
   }
 }, {
   timestamps: true

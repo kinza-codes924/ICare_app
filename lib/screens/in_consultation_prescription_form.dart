@@ -13,15 +13,21 @@ import 'package:icare/services/icd_service.dart';
 import '../data/pakistan_drugs_data.dart';
 
 class InConsultationPrescriptionForm extends StatefulWidget {
-  final AppointmentDetail appointment;
+  // Null for a walk-in front-desk visit (reception_service.dart), which has
+  // no video Appointment behind it — walkInPatientName carries the guest
+  // patient's name instead in that case. Every other call site (normal
+  // video consultation) always passes a real AppointmentDetail.
+  final AppointmentDetail? appointment;
   final String consultationId;
   final Function(bool)? onPrescriptionComplete;
+  final String? walkInPatientName;
 
   const InConsultationPrescriptionForm({
     super.key,
-    required this.appointment,
+    this.appointment,
     required this.consultationId,
     this.onPrescriptionComplete,
+    this.walkInPatientName,
   });
 
   @override
@@ -339,8 +345,8 @@ class _InConsultationPrescriptionFormState
 
   EnhancedPrescription _buildPrescriptionObject({required bool isComplete}) {
     return EnhancedPrescription(
-      patientId: widget.appointment.patient?.id ?? '',
-      doctorId: widget.appointment.doctor?.id ?? '',
+      patientId: widget.appointment?.patient?.id ?? '',
+      doctorId: widget.appointment?.doctor?.id ?? '',
       consultationId: widget.consultationId,
       patientHistoryId: _patientHistoryId,
       soapNotes: SOAPNotes(
@@ -536,7 +542,7 @@ class _InConsultationPrescriptionFormState
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
-                      '${widget.appointment.patient?.name ?? 'Patient'}  •  Consultation ID: ${widget.consultationId.length >= 6 ? widget.consultationId.substring(widget.consultationId.length - 6).toUpperCase() : widget.consultationId}',
+                      '${widget.appointment?.patient?.name ?? widget.walkInPatientName ?? 'Patient'}  •  Consultation ID: ${widget.consultationId.length >= 6 ? widget.consultationId.substring(widget.consultationId.length - 6).toUpperCase() : widget.consultationId}',
                       style: const TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w700,
@@ -566,14 +572,18 @@ class _InConsultationPrescriptionFormState
             ),
 
             // ── 1. Patient History ──────────────────────────────────────
-            _accordion(
-              index: 0,
-              icon: Icons.history_edu_rounded,
-              color: const Color(0xFF6366F1),
-              title: '1. Patient History',
-              subtitle: _patientHistoryId != null ? 'Completed ✓' : 'Complete patient history form',
-              child: _buildHistoryContent(),
-            ),
+            // Skipped for a walk-in visit (no appointment) — the history
+            // form flow requires a full AppointmentDetail this session
+            // doesn't have; not required for the core walk-in flow.
+            if (widget.appointment != null)
+              _accordion(
+                index: 0,
+                icon: Icons.history_edu_rounded,
+                color: const Color(0xFF6366F1),
+                title: '1. Patient History',
+                subtitle: _patientHistoryId != null ? 'Completed ✓' : 'Complete patient history form',
+                child: _buildHistoryContent(),
+              ),
 
             // ── 2. Doctor's Notes (SOAP) — Required ────────────────────
             _accordion(
@@ -705,6 +715,10 @@ class _InConsultationPrescriptionFormState
   }
 
   Future<void> _openHistoryForm() async {
+    // Only reachable via the button hidden for walk-ins (widget.appointment
+    // == null there), so this is always non-null in practice — asserted
+    // rather than left as a static type error.
+    if (widget.appointment == null) return;
     Map<String, dynamic>? existingHistory;
     String? existingHistoryId = _patientHistoryId;
 
@@ -722,7 +736,7 @@ class _InConsultationPrescriptionFormState
       barrierDismissible: false,
       barrierColor: Colors.black54,
       pageBuilder: (ctx, _, _) => PatientHistoryFormScreen(
-        appointment: widget.appointment,
+        appointment: widget.appointment!,
         consultationId: widget.consultationId,
         existingHistoryId: existingHistoryId,
         initialData: existingHistory,

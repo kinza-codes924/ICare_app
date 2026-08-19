@@ -312,7 +312,7 @@ router.post('/approve-user/:userId', authMiddleware, adminOnly, async (req, res)
 router.put('/users/:userId/roles', authMiddleware, adminOnly, async (req, res) => {
   try {
     await connectMongoDB();
-    const allowed = ['patient', 'doctor', 'lab', 'pharmacy', 'instructor', 'student'];
+    const allowed = ['patient', 'doctor', 'lab', 'pharmacy', 'instructor', 'student', 'receptionist'];
     const roles = [...new Set((req.body.roles || [])
       .map(r => r.toString().toLowerCase())
       .filter(r => allowed.includes(r)))];
@@ -325,6 +325,84 @@ router.put('/users/:userId/roles', authMiddleware, adminOnly, async (req, res) =
     res.json({ success: true, message: 'Roles updated', roles: [...new Set([user.role, ...roles])] });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// ─── RECEPTIONISTS (walk-in front-desk staff, tied to one or more doctors) ────
+// Created with is_approved:false so the account surfaces in the existing
+// Pending Users list/approval flow above — no new approval UI needed.
+router.post('/receptionists', authMiddleware, adminOnly, async (req, res) => {
+  try {
+    await connectMongoDB();
+    const ReceptionistProfile = require('../models/ReceptionistProfile');
+    const { name, email, password, doctorIds } = req.body;
+    if (!name || !email || !password) {
+      return res.status(400).json({ success: false, message: 'name, email and password are required' });
+    }
+    const existing = await User.findOne({ email: email.toLowerCase() });
+    if (existing) {
+      return res.status(400).json({ success: false, message: 'A user with this email already exists' });
+    }
+    const hashed = await bcrypt.hash(password, 10);
+    const user = await User.create({
+      username: name,
+      name,
+      email: email.toLowerCase(),
+      password: hashed,
+      role: 'receptionist',
+      is_approved: false,
+      is_active: true,
+    });
+    const doctorIdList = Array.isArray(doctorIds) ? doctorIds.map(toId).filter(Boolean) : [];
+    await ReceptionistProfile.create({ user_id: user._id, doctorIds: doctorIdList });
+    res.status(201).json({ success: true, message: 'Receptionist created — pending approval', user: { _id: user._id.toString(), email: user.email } });
+  } catch (err) {
+    console.error('create receptionist error:', err);
+    res.status(500).json({ success: false, message: 'Failed to create receptionist' });
+  }
+});
+
+router.get('/receptionists', authMiddleware, adminOnly, async (req, res) => {
+  try {
+    await connectMongoDB();
+    const ReceptionistProfile = require('../models/ReceptionistProfile');
+    const users = await User.find({ role: 'receptionist' }).select('-password').lean();
+    const profiles = await ReceptionistProfile.find({ user_id: { $in: users.map(u => u._id) } })
+      .populate('doctorIds', 'name username email')
+      .lean();
+    const profileByUser = new Map(profiles.map(p => [p.user_id.toString(), p]));
+    const result = users.map(u => ({
+      _id: u._id.toString(),
+      name: u.name || u.username || '',
+      email: u.email || '',
+      isApproved: u.is_approved === true,
+      createdAt: u.createdAt,
+      doctors: (profileByUser.get(u._id.toString())?.doctorIds || []).map(d => ({
+        _id: d._id.toString(),
+        name: d.name || d.username || '',
+      })),
+    }));
+    res.json({ success: true, receptionists: result });
+  } catch (err) {
+    console.error('list receptionists error:', err);
+    res.status(500).json({ success: false, message: 'Failed to load receptionists' });
+  }
+});
+
+router.put('/receptionists/:userId/doctors', authMiddleware, adminOnly, async (req, res) => {
+  try {
+    await connectMongoDB();
+    const ReceptionistProfile = require('../models/ReceptionistProfile');
+    const doctorIdList = Array.isArray(req.body.doctorIds) ? req.body.doctorIds.map(toId).filter(Boolean) : [];
+    const profile = await ReceptionistProfile.findOneAndUpdate(
+      { user_id: toId(req.params.userId) },
+      { $set: { doctorIds: doctorIdList } },
+      { new: true, upsert: true }
+    );
+    res.json({ success: true, message: 'Doctors updated', doctorIds: profile.doctorIds.map(id => id.toString()) });
+  } catch (err) {
+    console.error('update receptionist doctors error:', err);
+    res.status(500).json({ success: false, message: 'Failed to update doctors' });
   }
 });
 

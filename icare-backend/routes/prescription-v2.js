@@ -44,11 +44,11 @@ router.get('/prescriptions/:prescriptionId/view', async (req, res) => {
     if (!rx) return res.status(404).send('<h2>Prescription not found</h2>');
 
     const [patient, doctor] = await Promise.all([
-      User.findById(rx.patientId).select('name username').lean().catch(() => null),
+      rx.patientId ? User.findById(rx.patientId).select('name username').lean().catch(() => null) : null,
       User.findById(rx.doctorId).select('name username').lean().catch(() => null),
     ]);
 
-    const patientName = patient?.name || patient?.username || 'Patient';
+    const patientName = patient?.name || patient?.username || rx.patientName || 'Patient';
     const doctorName = doctor?.name || doctor?.username || 'Doctor';
     const dateObj = new Date(rx.createdAt || Date.now());
     const dateStr = dateObj.toLocaleDateString('en-PK', { day: 'numeric', month: 'long', year: 'numeric' });
@@ -198,11 +198,11 @@ router.get('/prescriptions/:prescriptionId/pdf', async (req, res) => {
     if (!rx) return res.status(404).json({ success: false, message: 'Prescription not found' });
 
     const [patient, doctor] = await Promise.all([
-      User.findById(rx.patientId).select('name username').lean().catch(() => null),
+      rx.patientId ? User.findById(rx.patientId).select('name username').lean().catch(() => null) : null,
       User.findById(rx.doctorId).select('name username').lean().catch(() => null),
     ]);
 
-    const patientName = patient?.name || patient?.username || 'Patient';
+    const patientName = patient?.name || patient?.username || rx.patientName || 'Patient';
     const doctorName = doctor?.name || doctor?.username || 'Doctor';
     const dateObj = new Date(rx.createdAt || Date.now());
     const dateStr = dateObj.toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric' });

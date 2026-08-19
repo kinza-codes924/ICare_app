@@ -8,8 +8,8 @@ const paymentSchema = new mongoose.Schema({
   userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
 
   // What is being paid for
-  type: { type: String, enum: ['course', 'appointment', 'lab', 'pharmacy', 'course_installment'], required: true },
-  refId: { type: mongoose.Schema.Types.ObjectId, required: true }, // courseId / appointmentId / labBookingId / orderId
+  type: { type: String, enum: ['course', 'appointment', 'lab', 'pharmacy', 'course_installment', 'reception'], required: true },
+  refId: { type: mongoose.Schema.Types.ObjectId, required: true }, // courseId / appointmentId / labBookingId / orderId / consultationId
 
   // Only set when type === 'course_installment' — which installment (1-based)
   // this payment is for. The Enrollment already has one for this course.
@@ -19,10 +19,15 @@ const paymentSchema = new mongoose.Schema({
   // lab (lab test) or pharmacy (order). Powers the admin per-entity report.
   payeeId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null, index: true },
 
-  // How the payment is made: Safepay gateway (card/wallet/GPay) or cash
-  // (lab: cash at collection; pharmacy: cash on delivery). Cash payments are
-  // fulfilled when staff marks the cash as collected.
-  method: { type: String, enum: ['safepay', 'cash'], default: 'safepay', index: true },
+  // How the payment is made: Safepay gateway (card/wallet/GPay), cash
+  // (lab: cash at collection; pharmacy: cash on delivery), or card (a
+  // receptionist swiping a physical card at the front desk — distinct from
+  // 'safepay', which is the online gateway flow). Cash/card payments are
+  // fulfilled when staff marks them as collected.
+  method: { type: String, enum: ['safepay', 'cash', 'card'], default: 'safepay', index: true },
+  // Also doubles as the in-person "collected" marker for method:'card' —
+  // not renamed, to avoid a migration; a card swipe at reception is just as
+  // much a staff-confirmed in-person collection as cash is.
   cashCollectedAt: { type: Date, default: null },
   cashCollectedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
 

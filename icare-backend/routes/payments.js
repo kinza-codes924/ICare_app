@@ -213,6 +213,26 @@ async function calculateAmount({ type, refId, voucherCode, userId, installmentIn
     };
   }
 
+  if (type === 'reception') {
+    const Consultation = require('../models/Consultation');
+    const consultation = await Consultation.findById(refId).lean();
+    if (!consultation) throw new Error('Consultation not found');
+    // Ownership check differs from every other type: the payer here is the
+    // receptionist who ran the walk-in visit, not a patient (a walk-in guest
+    // has no patient User account at all) — so check receptionistId instead
+    // of a patient_id/userId match.
+    if (consultation.receptionistId?.toString() !== String(userId)) throw new Error('Not your consultation');
+    if (consultation.paymentStatus === 'paid') throw new Error('This visit is already paid');
+    const proceduresTotal = (consultation.procedures || []).reduce((sum, p) => sum + (Number(p.price) || 0), 0);
+    const total = (Number(consultation.consultationFee) || 0) + proceduresTotal;
+    return {
+      amount: total, originalAmount: total,
+      payeeId: consultation.doctorId || null,
+      description: `Walk-in visit: ${consultation.patientName || refId}`,
+      voucherCode: null,
+    };
+  }
+
   throw new Error(`Payment type '${type}' not supported yet`);
 }
 
@@ -362,6 +382,16 @@ async function fulfillPayment(payment) {
     return {};
   }
 
+  if (payment.type === 'reception') {
+    const Consultation = require('../models/Consultation');
+    await Consultation.findByIdAndUpdate(payment.refId, { paymentStatus: 'paid' });
+    payment.fulfilled = true;
+    payment.fulfilledAt = new Date();
+    await payment.save();
+    await plog({ paymentId: payment._id, tracker: payment.safepayTracker, userId: payment.userId, step: 'FULFILLED', message: `Walk-in visit ${payment.refId} marked paid` });
+    return {};
+  }
+
   throw new Error(`No fulfillment handler for type '${payment.type}'`);
 }
 
@@ -393,23 +423,27 @@ async function markPaidAndFulfill(payment, safepayData, source) {
 }
 
 // ─── POST /api/payments/create ────────────────────────────────────────────────
-// Body: { type: 'course'|'appointment'|'lab'|'pharmacy', refId, voucherCode?,
-//         method?: 'safepay'|'cash', redirectUrl, cancelUrl }
-// method 'cash' (lab: cash at collection / pharmacy: cash on delivery) skips
-// the gateway; staff later confirms via POST /:id/cash-collected.
+// Body: { type: 'course'|'appointment'|'lab'|'pharmacy'|'reception', refId, voucherCode?,
+//         method?: 'safepay'|'cash'|'card', redirectUrl, cancelUrl }
+// method 'cash'/'card' (lab: cash at collection / pharmacy: cash on delivery /
+// reception: cash or card collected in-person at the front desk) skips the
+// gateway; staff later confirms via POST /:id/cash-collected.
 router.post('/create', authMiddleware, async (req, res) => {
   let payment = null;
   try {
     await connectMongoDB();
     const { type, refId, voucherCode, redirectUrl, cancelUrl, installmentIndex } = req.body;
-    const method = req.body.method === 'cash' ? 'cash' : 'safepay';
+    const method = ['cash', 'card'].includes(req.body.method) ? req.body.method : 'safepay';
     const userId = toId(req.user.id);
 
     if (!type || !refId) return res.status(400).json({ success: false, message: 'type and refId required' });
     const rId = toId(refId);
     if (!rId) return res.status(400).json({ success: false, message: 'Invalid refId' });
-    if (method === 'cash' && !['lab', 'pharmacy'].includes(type)) {
-      return res.status(400).json({ success: false, message: 'Cash payment is only available for lab tests and pharmacy orders' });
+    if (method !== 'safepay' && !['lab', 'pharmacy', 'reception'].includes(type)) {
+      return res.status(400).json({ success: false, message: 'Cash/card payment is only available for lab tests, pharmacy orders, and reception visits' });
+    }
+    if (method === 'card' && type !== 'reception') {
+      return res.status(400).json({ success: false, message: 'Card payment is only available for reception visits' });
     }
     if (method === 'safepay' && (!process.env.SAFEPAY_API_KEY || !process.env.SAFEPAY_SECRET_KEY)) {
       await plog({ userId, step: 'ERROR', level: 'ERROR', message: 'SAFEPAY keys not configured in env' });
@@ -434,22 +468,27 @@ router.post('/create', authMiddleware, async (req, res) => {
     const amountLowest = Math.round(amount * 100); // PKR lowest denomination
     const discountAmount = Math.max(0, (Number(originalAmount) || amount) - amount);
 
-    // ── CASH: record the pending payment + flag the booking/order ────────────
-    if (method === 'cash') {
+    // ── CASH / CARD: record the pending payment + flag the booking/order ─────
+    if (method === 'cash' || method === 'card') {
       payment = await Payment.create({
         userId, type, refId: rId, payeeId: payeeId || null,
-        method: 'cash',
+        method,
         currency: 'PKR', amount, amountLowest,
         originalAmount: originalAmount ?? amount, discountAmount,
         voucherCode: appliedVoucher || null,
-        safepayTracker: `cash_${new mongoose.Types.ObjectId().toString()}`,
+        safepayTracker: `${method}_${new mongoose.Types.ObjectId().toString()}`,
         safepayEnvironment: null,
         status: 'pending',
-        notes: `${description} (cash)`,
+        notes: `${description} (${method})`,
       });
-      const Model = type === 'lab' ? LabTestRequest : PharmacyOrder;
-      await Model.findByIdAndUpdate(rId, { paymentMethod: 'cash', paymentStatus: 'cash_pending' });
-      await plog({ paymentId: payment._id, userId, step: 'STATUS_CHANGED', message: `cash payment registered — awaiting collection (${type})` });
+      if (type === 'reception') {
+        const Consultation = require('../models/Consultation');
+        await Consultation.findByIdAndUpdate(rId, { paymentStatus: 'unpaid' });
+      } else {
+        const Model = type === 'lab' ? LabTestRequest : PharmacyOrder;
+        await Model.findByIdAndUpdate(rId, { paymentMethod: method, paymentStatus: 'cash_pending' });
+      }
+      await plog({ paymentId: payment._id, userId, step: 'STATUS_CHANGED', message: `${method} payment registered — awaiting collection (${type})` });
       return res.json({ success: true, cash: true, paymentId: payment._id, amount, currency: 'PKR' });
     }
 
@@ -638,14 +677,23 @@ router.post('/:id/cash-collected', authMiddleware, async (req, res) => {
     await connectMongoDB();
     const payment = await Payment.findById(toId(req.params.id));
     if (!payment) return res.status(404).json({ success: false, message: 'Payment not found' });
-    if (payment.method !== 'cash') {
-      return res.status(400).json({ success: false, message: 'Not a cash payment' });
+    if (!['cash', 'card'].includes(payment.method)) {
+      return res.status(400).json({ success: false, message: 'Not a cash or card payment' });
     }
     const isAdmin = (req.user.role || '').toLowerCase() === 'admin';
     const isPayee = payment.payeeId && payment.payeeId.toString() === String(req.user.id);
-    if (!isAdmin && !isPayee) {
+    // A reception payment's payeeId is the doctor, but it's the receptionist
+    // who ran the visit and confirms in-person collection — check the
+    // Consultation's receptionistId too, not just payeeId.
+    let isReceptionist = false;
+    if (payment.type === 'reception') {
+      const Consultation = require('../models/Consultation');
+      const consultation = await Consultation.findById(payment.refId).select('receptionistId').lean();
+      isReceptionist = consultation?.receptionistId?.toString() === String(req.user.id);
+    }
+    if (!isAdmin && !isPayee && !isReceptionist) {
       await plog({ paymentId: payment._id, userId: toId(req.user.id), step: 'ERROR', level: 'ALERT', message: 'cash-collected attempted by non-payee' });
-      return res.status(403).json({ success: false, message: 'Only the receiving lab/pharmacy can confirm cash collection' });
+      return res.status(403).json({ success: false, message: 'Only the receiving staff can confirm collection' });
     }
     if (payment.status === 'paid' && payment.fulfilled) {
       return res.json({ success: true, status: 'paid', message: 'Already collected' });

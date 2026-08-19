@@ -29,6 +29,7 @@ class _CustomDrawerState extends ConsumerState<CustomDrawer> {
     'lab': 'Laboratory',
     'laboratory': 'Laboratory',
     'pharmacy': 'Pharmacy',
+    'receptionist': 'Receptionist',
   };
 
   static const _roleIcons = {
@@ -39,6 +40,7 @@ class _CustomDrawerState extends ConsumerState<CustomDrawer> {
     'lab': Icons.biotech_rounded,
     'laboratory': Icons.biotech_rounded,
     'pharmacy': Icons.local_pharmacy_rounded,
+    'receptionist': Icons.support_agent_rounded,
   };
 
   @override

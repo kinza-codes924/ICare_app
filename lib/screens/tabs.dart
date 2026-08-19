@@ -1223,6 +1223,12 @@ class _WebSidebarState extends ConsumerState<_WebSidebar> {
                   ),
                   _buildExtraNavItem(
                     context,
+                    Icons.support_agent_outlined,
+                    'Manage Receptionists',
+                    () => context.go('/admin/receptionists'),
+                  ),
+                  _buildExtraNavItem(
+                    context,
                     Icons.analytics_outlined,
                     'Platform Analytics',
                     () {
