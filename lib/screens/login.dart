@@ -7,9 +7,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_size_matters/flutter_size_matters.dart';
 import 'package:go_router/go_router.dart';
 import 'package:icare/providers/auth_provider.dart';
-import 'package:icare/models/doctor.dart';
-import 'package:icare/screens/book_appointment.dart';
-import 'package:icare/services/doctor_service.dart';
 import 'package:icare/screens/forget_password.dart';
 import 'package:icare/screens/lab_profile_setup.dart';
 import 'package:icare/screens/pharmacy_profile_setup.dart';
@@ -121,22 +118,21 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
   // biometric, face, 2FA, Google/Apple) — replaces the old hardcoded
   // context.go('/dashboard') so a doctor/clinic "Book Appointment while
   // logged out" redirect isn't silently dropped after login.
+  //
+  // Must go through GoRouter (context.go), not an imperative Navigator.push:
+  // the router's redirect callback re-runs on every auth-state change
+  // (refreshListenable) and force-bounces a logged-in user still sitting on
+  // the public /login path to /dashboard. A Navigator.push fired right after
+  // setUser() was winning the race for one frame and then getting silently
+  // overridden back to /dashboard by that redirect.
   Future<void> _navigateAfterLogin() async {
     if (!mounted) return;
     final doctorId = widget.redirectDoctorId;
     if (doctorId != null && doctorId.isNotEmpty) {
-      try {
-        final result = await DoctorService().getDoctorById(doctorId);
-        if (mounted && result['success'] == true && result['doctor'] != null) {
-          final doctor = Doctor.fromJson(result['doctor']);
-          Navigator.of(context).pushReplacement(
-            MaterialPageRoute(builder: (_) => BookAppointmentScreen(doctor: doctor)),
-          );
-          return;
-        }
-      } catch (_) {}
+      context.go('/book-appointment?doctorId=$doctorId');
+      return;
     }
-    if (mounted) context.go('/dashboard');
+    context.go('/dashboard');
   }
 
   Future<void> _checkExistingRole() async {

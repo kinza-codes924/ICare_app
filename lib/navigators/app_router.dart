@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:icare/models/auth.dart';
 import 'package:icare/providers/auth_provider.dart';
 import 'package:icare/screens/login.dart';
+import 'package:icare/screens/book_appointment.dart';
 import 'package:icare/screens/public_home.dart';
 import 'package:icare/screens/signup.dart';
 import 'package:icare/screens/splash.dart';
@@ -296,6 +297,13 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (_, state) {
           final role = state.uri.queryParameters['role'] ?? 'Patient';
           return SignupScreen(role: role);
+        },
+      ),
+      GoRoute(
+        path: '/book-appointment',
+        builder: (_, state) {
+          final doctorId = state.uri.queryParameters['doctorId'] ?? '';
+          return BookAppointmentRouteLoader(doctorId: doctorId);
         },
       ),
       GoRoute(path: '/work-with-us', builder: (_, _) => const WorkWithUsSignup()),

@@ -1112,3 +1112,55 @@ class _BookAppointmentScreenState extends ConsumerState<BookAppointmentScreen> {
     );
   }
 }
+
+// GoRoute-backed entry point for /book-appointment?doctorId=... — needed
+// because BookAppointmentScreen used to only be reachable via an imperative
+// Navigator.push. That's invisible to GoRouter's redirect callback, which
+// runs on every auth-state change (refreshListenable) and force-bounces a
+// logged-in user sitting on a public path like /login back to /dashboard —
+// so a Navigator.push fired right after login was winning the race for one
+// frame and then getting silently overridden. Going through an actual
+// GoRoute means the router's own state reflects where the user is meant to
+// end up, so the redirect has nothing to fight.
+class BookAppointmentRouteLoader extends StatefulWidget {
+  final String doctorId;
+  const BookAppointmentRouteLoader({super.key, required this.doctorId});
+
+  @override
+  State<BookAppointmentRouteLoader> createState() => _BookAppointmentRouteLoaderState();
+}
+
+class _BookAppointmentRouteLoaderState extends State<BookAppointmentRouteLoader> {
+  Doctor? _doctor;
+  bool _failed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final result = await DoctorService().getDoctorById(widget.doctorId);
+    if (!mounted) return;
+    if (result['success'] == true && result['doctor'] != null) {
+      setState(() => _doctor = Doctor.fromJson(result['doctor']));
+    } else {
+      setState(() => _failed = true);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_failed) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Book Appointment')),
+        body: const Center(child: Text('Could not load this doctor. Please try again from Find Doctors.')),
+      );
+    }
+    if (_doctor == null) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+    return BookAppointmentScreen(doctor: _doctor!);
+  }
+}
