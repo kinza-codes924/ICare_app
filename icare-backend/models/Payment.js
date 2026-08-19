@@ -8,8 +8,8 @@ const paymentSchema = new mongoose.Schema({
   userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
 
   // What is being paid for
-  type: { type: String, enum: ['course', 'appointment', 'lab', 'pharmacy', 'course_installment', 'reception'], required: true },
-  refId: { type: mongoose.Schema.Types.ObjectId, required: true }, // courseId / appointmentId / labBookingId / orderId / consultationId
+  type: { type: String, enum: ['course', 'appointment', 'lab', 'pharmacy', 'course_installment', 'reception', 'standalone_invoice'], required: true },
+  refId: { type: mongoose.Schema.Types.ObjectId, required: true }, // courseId / appointmentId / labBookingId / orderId / consultationId / standaloneInvoiceId
 
   // Only set when type === 'course_installment' — which installment (1-based)
   // this payment is for. The Enrollment already has one for this course.

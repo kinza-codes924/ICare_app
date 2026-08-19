@@ -39,6 +39,26 @@ function drawInvoiceHeader(doc, { invoiceNumber, date }) {
   doc.moveTo(50, 120).lineTo(550, 120).strokeColor('#E0E0E0').stroke();
 }
 
+// Shared Subtotal / SRB Sales Tax / Grand Total block, drawn under the
+// items table. Same x=350 (label) / x=450 (value, right-aligned) columns
+// the pharmacy route's older single "Total Amount:" line already used, so
+// no other layout changes are needed. Renders correctly with taxRate 0
+// (subtotal line only would be redundant, so the tax line just reads 0.00
+// rather than being hidden — keeps the SRB compliance line always visible).
+function drawInvoiceTotals(doc, { yPos, subtotal, taxRate, taxAmount, totalAmount }) {
+  doc.fontSize(10).fillColor('#666666')
+    .text('Subtotal:', 350, yPos, { width: 100 })
+    .text(`PKR ${subtotal.toFixed(2)}`, 450, yPos, { width: 90, align: 'right' });
+  yPos += 18;
+  doc.text(`SRB Sales Tax (${taxRate}%):`, 350, yPos, { width: 100 })
+    .text(`PKR ${taxAmount.toFixed(2)}`, 450, yPos, { width: 90, align: 'right' });
+  yPos += 20;
+  doc.fontSize(12).fillColor('#0036BC')
+    .text('Grand Total:', 350, yPos, { bold: true })
+    .text(`PKR ${totalAmount.toFixed(2)}`, 450, yPos, { width: 90, align: 'right', bold: true });
+  return yPos;
+}
+
 // ─── GENERATE INVOICE PDF ─────────────────────────────────────────────────────
 router.get('/:orderId/pdf', authMiddleware, async (req, res) => {
   try {
@@ -182,7 +202,14 @@ router.get('/reception/:consultationId/pdf', async (req, res) => {
     for (const p of (consultation.procedures || [])) {
       items.push({ name: p.name, quantity: 1, price: p.price || 0 });
     }
-    const totalAmount = items.reduce((sum, i) => sum + (i.price * i.quantity), 0);
+    const subtotal = items.reduce((sum, i) => sum + (i.price * i.quantity), 0);
+    const taxRate = Number(consultation.taxRate) || 0;
+    // Prefer the persisted taxAmount (set at payment time by
+    // calculateAmount() in payments.js, the authoritative charged figure)
+    // — fall back to a fresh computation for an unpaid/not-yet-charged visit
+    // so the invoice is still previewable before payment.
+    const taxAmount = consultation.taxAmount > 0 ? consultation.taxAmount : subtotal * (taxRate / 100);
+    const totalAmount = subtotal + taxAmount;
 
     const PDFDocument = require('pdfkit');
     const doc = new PDFDocument({ margin: 50, size: 'A4' });
@@ -235,9 +262,7 @@ router.get('/reception/:consultationId/pdf', async (req, res) => {
     }
 
     yPos += 10;
-    doc.fontSize(12).fillColor('#0036BC')
-      .text('Total Amount:', 350, yPos, { bold: true })
-      .text(`PKR ${totalAmount.toFixed(2)}`, 450, yPos, { width: 90, align: 'right', bold: true });
+    drawInvoiceTotals(doc, { yPos, subtotal, taxRate, taxAmount, totalAmount });
 
     doc.fontSize(8).fillColor('#999999')
       .text('Thank you for choosing iCare - Your Trusted Healthcare Platform', 50, 700, { align: 'center', width: 500 })
@@ -246,6 +271,82 @@ router.get('/reception/:consultationId/pdf', async (req, res) => {
     doc.end();
   } catch (error) {
     console.error('Generate reception invoice PDF error:', error);
+    res.status(500).json({ success: false, message: 'Failed to generate invoice' });
+  }
+});
+
+// ─── GENERATE STANDALONE INVOICE PDF ────────────────────────────────────────
+// Public (no authMiddleware) — same unguessable-ObjectId trust model as the
+// reception invoice route above.
+router.get('/standalone/:invoiceId/pdf', async (req, res) => {
+  try {
+    await connectMongoDB();
+    const StandaloneInvoice = require('../models/StandaloneInvoice');
+    const { invoiceId } = req.params;
+
+    const invoice = await StandaloneInvoice.findById(toId(invoiceId)).lean();
+    if (!invoice) {
+      return res.status(404).json({ success: false, message: 'Invoice not found' });
+    }
+
+    const items = (invoice.items || []).map(i => ({ name: i.name, quantity: 1, price: i.price || 0 }));
+    const subtotal = invoice.subtotal ?? items.reduce((sum, i) => sum + i.price, 0);
+    const taxRate = Number(invoice.taxRate) || 0;
+    const taxAmount = invoice.taxAmount ?? subtotal * (taxRate / 100);
+    const totalAmount = invoice.totalAmount ?? subtotal + taxAmount;
+
+    const PDFDocument = require('pdfkit');
+    const doc = new PDFDocument({ margin: 50, size: 'A4' });
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename=icare-invoice-${invoiceId}.pdf`);
+    doc.pipe(res);
+
+    drawInvoiceHeader(doc, {
+      invoiceNumber: invoiceId,
+      date: new Date(invoice.createdAt).toLocaleDateString('en-PK'),
+    });
+
+    let yPos = 140;
+    doc.fontSize(11).fillColor('#0036BC').text('BILLED TO', 50, yPos);
+    yPos += 20;
+    doc.fontSize(10).fillColor('#333333').text(`Name: ${invoice.clientName}`, 50, yPos);
+
+    yPos = 280;
+    doc.rect(50, yPos, 500, 25).fillAndStroke('#0036BC', '#0036BC');
+    doc.fontSize(10).fillColor('#FFFFFF')
+      .text('Item', 60, yPos + 8, { width: 200 })
+      .text('Qty', 280, yPos + 8, { width: 50 })
+      .text('Price (PKR)', 350, yPos + 8, { width: 80 })
+      .text('Total (PKR)', 450, yPos + 8, { width: 90, align: 'right' });
+    yPos += 25;
+
+    if (items.length === 0) {
+      doc.rect(50, yPos, 500, 30).fillAndStroke('#F9F9F9', '#E0E0E0');
+      doc.fontSize(9).fillColor('#666666').text('No items recorded', 60, yPos + 10, { width: 480 });
+      yPos += 30;
+    } else {
+      items.forEach((item, index) => {
+        const bgColor = index % 2 === 0 ? '#F9F9F9' : '#FFFFFF';
+        doc.rect(50, yPos, 500, 30).fillAndStroke(bgColor, '#E0E0E0');
+        doc.fontSize(9).fillColor('#333333')
+          .text(item.name, 60, yPos + 10, { width: 200 })
+          .text(String(item.quantity), 280, yPos + 10, { width: 50 })
+          .text(item.price.toFixed(2), 350, yPos + 10, { width: 80 })
+          .text((item.price * item.quantity).toFixed(2), 450, yPos + 10, { width: 90, align: 'right' });
+        yPos += 30;
+      });
+    }
+
+    yPos += 10;
+    drawInvoiceTotals(doc, { yPos, subtotal, taxRate, taxAmount, totalAmount });
+
+    doc.fontSize(8).fillColor('#999999')
+      .text('Thank you for choosing iCare - Your Trusted Healthcare Platform', 50, 700, { align: 'center', width: 500 })
+      .text('For support, contact: support@icare.com', 50, 715, { align: 'center', width: 500 });
+
+    doc.end();
+  } catch (error) {
+    console.error('Generate standalone invoice PDF error:', error);
     res.status(500).json({ success: false, message: 'Failed to generate invoice' });
   }
 });

@@ -400,6 +400,9 @@ class _CustomDrawerState extends ConsumerState<CustomDrawer> {
         _drawerItem('Front Desk', Icons.dashboard_outlined, () {
           context.go('/reception/dashboard');
         }),
+        _drawerItem('Records', Icons.receipt_long_outlined, () {
+          context.go('/reception/records');
+        }),
         _drawerItem('Help & Support', Icons.help_outline_rounded, () {
           context.go('/help');
         }),

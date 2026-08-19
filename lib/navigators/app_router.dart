@@ -7,6 +7,7 @@ import 'package:icare/providers/auth_provider.dart';
 import 'package:icare/screens/login.dart';
 import 'package:icare/screens/book_appointment.dart';
 import 'package:icare/screens/reception_dashboard.dart';
+import 'package:icare/screens/reception_records_screen.dart';
 import 'package:icare/screens/admin_receptionist_management.dart';
 import 'package:icare/screens/public_home.dart';
 import 'package:icare/screens/signup.dart';
@@ -419,6 +420,7 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(path: '/student/profile', builder: (_, _) => const StudentProfileSetup()),
           // Reception (front-desk) routes
           GoRoute(path: '/reception/dashboard', builder: (_, _) => const ReceptionDashboard()),
+          GoRoute(path: '/reception/records', builder: (_, _) => const ReceptionRecordsScreen()),
           // Laboratory routes
           GoRoute(path: '/lab/dashboard', builder: (_, _) => const LaboratoryDashboard()),
           GoRoute(

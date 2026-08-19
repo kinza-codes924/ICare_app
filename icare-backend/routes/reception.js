@@ -6,6 +6,7 @@ const Consultation = require('../models/Consultation');
 const DoctorProfile = require('../models/DoctorProfile');
 const ReceptionistProfile = require('../models/ReceptionistProfile');
 const EnhancedPrescription = require('../models/EnhancedPrescription');
+const StandaloneInvoice = require('../models/StandaloneInvoice');
 const { authMiddleware, roleMiddleware } = require('../middleware/auth');
 
 function toId(id) {
@@ -128,6 +129,106 @@ router.get('/consultations/:consultationId', ...receptionistOnly, async (req, re
   } catch (err) {
     console.error('reception get consultation error:', err);
     res.status(500).json({ success: false, message: 'Failed to load consultation' });
+  }
+});
+
+// Sets the SRB tax rate on a walk-in consultation before payment — the
+// actual taxAmount is (re)computed server-side by payments.js's
+// calculateAmount() at payment time, this just records the requested rate.
+router.put('/consultations/:consultationId/tax', ...receptionistOnly, async (req, res) => {
+  try {
+    await connectMongoDB();
+    const taxRate = Number(req.body.taxRate);
+    if (!Number.isFinite(taxRate) || taxRate < 0) {
+      return res.status(400).json({ success: false, message: 'taxRate must be a non-negative number' });
+    }
+    const consultation = await Consultation.findByIdAndUpdate(
+      toId(req.params.consultationId),
+      { $set: { taxRate } },
+      { new: true }
+    ).lean();
+    if (!consultation) return res.status(404).json({ success: false, message: 'Consultation not found' });
+    res.json({ success: true, taxRate: consultation.taxRate });
+  } catch (err) {
+    console.error('reception set tax error:', err);
+    res.status(500).json({ success: false, message: 'Failed to update tax rate' });
+  }
+});
+
+// ─── STANDALONE INVOICES (not tied to any walk-in visit) ───────────────────
+router.post('/invoices', ...receptionistOnly, async (req, res) => {
+  try {
+    await connectMongoDB();
+    const { clientName, items, taxRate } = req.body;
+    if (!clientName) return res.status(400).json({ success: false, message: 'clientName is required' });
+    const cleanItems = (Array.isArray(items) ? items : [])
+      .map(i => ({ name: (i?.name || '').toString().trim(), price: Number(i?.price) || 0 }))
+      .filter(i => i.name);
+    if (cleanItems.length === 0) {
+      return res.status(400).json({ success: false, message: 'At least one item is required' });
+    }
+    const rate = Number.isFinite(Number(taxRate)) ? Number(taxRate) : 15;
+    // Server always computes the real totals — never trust client-sent sums.
+    const subtotal = cleanItems.reduce((sum, i) => sum + i.price, 0);
+    const taxAmount = subtotal * (rate / 100);
+    const totalAmount = subtotal + taxAmount;
+    const invoice = await StandaloneInvoice.create({
+      receptionistId: toId(req.user.id),
+      clientName,
+      items: cleanItems,
+      taxRate: rate,
+      subtotal,
+      taxAmount,
+      totalAmount,
+    });
+    res.status(201).json({ success: true, invoice });
+  } catch (err) {
+    console.error('reception create invoice error:', err);
+    res.status(500).json({ success: false, message: 'Failed to create invoice' });
+  }
+});
+
+router.get('/invoices/:invoiceId', ...receptionistOnly, async (req, res) => {
+  try {
+    await connectMongoDB();
+    const invoice = await StandaloneInvoice.findById(toId(req.params.invoiceId)).lean();
+    if (!invoice) return res.status(404).json({ success: false, message: 'Invoice not found' });
+    res.json({ success: true, invoice });
+  } catch (err) {
+    console.error('reception get invoice error:', err);
+    res.status(500).json({ success: false, message: 'Failed to load invoice' });
+  }
+});
+
+// ─── RECORDS (paid walk-ins + paid standalone invoices, merged) ────────────
+router.get('/records', ...receptionistOnly, async (req, res) => {
+  try {
+    await connectMongoDB();
+    const receptionistId = toId(req.user.id);
+    const [visits, invoices] = await Promise.all([
+      Consultation.find({ receptionistId, isWalkIn: true, paymentStatus: 'paid' }).lean(),
+      StandaloneInvoice.find({ receptionistId, paymentStatus: 'paid' }).lean(),
+    ]);
+    const records = [
+      ...visits.map(v => ({
+        recordType: 'visit',
+        id: v._id.toString(),
+        title: v.patientName || 'Walk-in Patient',
+        amount: (v.consultationFee || 0) + (v.procedures || []).reduce((s, p) => s + (p.price || 0), 0) + (v.taxAmount || 0),
+        createdAt: v.createdAt,
+      })),
+      ...invoices.map(i => ({
+        recordType: 'invoice',
+        id: i._id.toString(),
+        title: i.clientName,
+        amount: i.totalAmount,
+        createdAt: i.createdAt,
+      })),
+    ].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    res.json({ success: true, records });
+  } catch (err) {
+    console.error('reception records error:', err);
+    res.status(500).json({ success: false, message: 'Failed to load records' });
   }
 });
 

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:icare/screens/reception_walkin_form.dart';
+import 'package:icare/screens/reception_create_invoice_screen.dart';
 import 'package:icare/utils/theme.dart';
 
 class ReceptionDashboard extends StatelessWidget {
@@ -46,6 +47,25 @@ class ReceptionDashboard extends StatelessWidget {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primaryColor,
                     foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const ReceptionCreateInvoiceScreen()),
+                    );
+                  },
+                  icon: const Icon(Icons.receipt_long_outlined),
+                  label: const Text('Create Invoice'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.primaryColor,
+                    side: BorderSide(color: AppColors.primaryColor),
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                   ),

@@ -36,6 +36,11 @@ class ClinicCardThumbnail extends StatelessWidget {
             width: double.infinity,
             height: 100,
             fit: BoxFit.cover,
+            // Several hero images (e.g. Dental's wide letterbox banner) have
+            // their actual subject off to one side with plain background in
+            // the middle — centered cover crops straight into that blank
+            // area on a narrow card. Biasing right shows the subject instead.
+            alignment: Alignment.centerRight,
             errorBuilder: (context, error, stackTrace) => Container(
               width: double.infinity,
               height: 100,

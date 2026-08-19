@@ -271,6 +271,12 @@ class _Header extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
+      // Some hero images (e.g. Dental's wide letterbox banner) are much
+      // wider than tall — on mobile the header's height comes purely from
+      // its (short) text content, so BoxFit.cover crops down to a sliver of
+      // mostly-blank background. A minimum height on mobile gives the image
+      // enough room to actually show its subject instead of just a crop.
+      constraints: BoxConstraints(minHeight: isMobile ? 220 : 0),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [clinic.accentColor, clinic.accentColor.withValues(alpha: 0.82)],
@@ -284,6 +290,7 @@ class _Header extends StatelessWidget {
                     ? NetworkImage(clinic.heroImage!)
                     : AssetImage(clinic.heroImage!) as ImageProvider,
                 fit: BoxFit.cover,
+                alignment: Alignment.centerRight,
                 // Darkens/tints the photo so the accent gradient still reads
                 // as this clinic's brand color and the white header text
                 // stays legible over it.

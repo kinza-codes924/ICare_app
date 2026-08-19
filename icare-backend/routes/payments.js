@@ -224,11 +224,40 @@ async function calculateAmount({ type, refId, voucherCode, userId, installmentIn
     if (consultation.receptionistId?.toString() !== String(userId)) throw new Error('Not your consultation');
     if (consultation.paymentStatus === 'paid') throw new Error('This visit is already paid');
     const proceduresTotal = (consultation.procedures || []).reduce((sum, p) => sum + (Number(p.price) || 0), 0);
-    const total = (Number(consultation.consultationFee) || 0) + proceduresTotal;
+    const subtotal = (Number(consultation.consultationFee) || 0) + proceduresTotal;
+    // SRB (Sindh Revenue Board) sales tax on services — not FBR. Rate is
+    // whatever the receptionist set via PUT /reception/consultations/:id/tax
+    // (defaults to 15 on the schema); recomputed here, never trusted from
+    // the client, and persisted back onto the consultation so the invoice
+    // PDF shows the exact figure that was actually charged.
+    const taxRate = Number(consultation.taxRate) || 0;
+    const taxAmount = subtotal * (taxRate / 100);
+    const total = subtotal + taxAmount;
+    await Consultation.findByIdAndUpdate(refId, { $set: { taxAmount } });
     return {
       amount: total, originalAmount: total,
       payeeId: consultation.doctorId || null,
       description: `Walk-in visit: ${consultation.patientName || refId}`,
+      voucherCode: null,
+    };
+  }
+
+  if (type === 'standalone_invoice') {
+    const StandaloneInvoice = require('../models/StandaloneInvoice');
+    const invoice = await StandaloneInvoice.findById(refId).lean();
+    if (!invoice) throw new Error('Invoice not found');
+    // Same ownership shape as reception — the payer is the receptionist who
+    // created the invoice, there's no patient/doctor involved at all.
+    if (invoice.receptionistId?.toString() !== String(userId)) throw new Error('Not your invoice');
+    if (invoice.paymentStatus === 'paid') throw new Error('This invoice is already paid');
+    // Totals were already computed server-side at creation time
+    // (POST /reception/invoices) — reuse them rather than recomputing, so
+    // a later items/tax-rate change (there isn't one, but this keeps the
+    // charged amount pinned to what the printed invoice actually shows).
+    return {
+      amount: invoice.totalAmount, originalAmount: invoice.totalAmount,
+      payeeId: null,
+      description: `Invoice: ${invoice.clientName}`,
       voucherCode: null,
     };
   }
@@ -392,6 +421,16 @@ async function fulfillPayment(payment) {
     return {};
   }
 
+  if (payment.type === 'standalone_invoice') {
+    const StandaloneInvoice = require('../models/StandaloneInvoice');
+    await StandaloneInvoice.findByIdAndUpdate(payment.refId, { paymentStatus: 'paid' });
+    payment.fulfilled = true;
+    payment.fulfilledAt = new Date();
+    await payment.save();
+    await plog({ paymentId: payment._id, tracker: payment.safepayTracker, userId: payment.userId, step: 'FULFILLED', message: `Invoice ${payment.refId} marked paid` });
+    return {};
+  }
+
   throw new Error(`No fulfillment handler for type '${payment.type}'`);
 }
 
@@ -439,11 +478,11 @@ router.post('/create', authMiddleware, async (req, res) => {
     if (!type || !refId) return res.status(400).json({ success: false, message: 'type and refId required' });
     const rId = toId(refId);
     if (!rId) return res.status(400).json({ success: false, message: 'Invalid refId' });
-    if (method !== 'safepay' && !['lab', 'pharmacy', 'reception'].includes(type)) {
-      return res.status(400).json({ success: false, message: 'Cash/card payment is only available for lab tests, pharmacy orders, and reception visits' });
+    if (method !== 'safepay' && !['lab', 'pharmacy', 'reception', 'standalone_invoice'].includes(type)) {
+      return res.status(400).json({ success: false, message: 'Cash/card payment is only available for lab tests, pharmacy orders, reception visits, and standalone invoices' });
     }
-    if (method === 'card' && type !== 'reception') {
-      return res.status(400).json({ success: false, message: 'Card payment is only available for reception visits' });
+    if (method === 'card' && !['reception', 'standalone_invoice'].includes(type)) {
+      return res.status(400).json({ success: false, message: 'Card payment is only available for reception visits and standalone invoices' });
     }
     if (method === 'safepay' && (!process.env.SAFEPAY_API_KEY || !process.env.SAFEPAY_SECRET_KEY)) {
       await plog({ userId, step: 'ERROR', level: 'ERROR', message: 'SAFEPAY keys not configured in env' });
@@ -484,6 +523,9 @@ router.post('/create', authMiddleware, async (req, res) => {
       if (type === 'reception') {
         const Consultation = require('../models/Consultation');
         await Consultation.findByIdAndUpdate(rId, { paymentStatus: 'unpaid' });
+      } else if (type === 'standalone_invoice') {
+        // Already 'unpaid' by default — nothing to flag here, fulfillPayment
+        // flips it to 'paid' once the receptionist confirms collection.
       } else {
         const Model = type === 'lab' ? LabTestRequest : PharmacyOrder;
         await Model.findByIdAndUpdate(rId, { paymentMethod: method, paymentStatus: 'cash_pending' });
@@ -690,6 +732,10 @@ router.post('/:id/cash-collected', authMiddleware, async (req, res) => {
       const Consultation = require('../models/Consultation');
       const consultation = await Consultation.findById(payment.refId).select('receptionistId').lean();
       isReceptionist = consultation?.receptionistId?.toString() === String(req.user.id);
+    } else if (payment.type === 'standalone_invoice') {
+      const StandaloneInvoice = require('../models/StandaloneInvoice');
+      const invoice = await StandaloneInvoice.findById(payment.refId).select('receptionistId').lean();
+      isReceptionist = invoice?.receptionistId?.toString() === String(req.user.id);
     }
     if (!isAdmin && !isPayee && !isReceptionist) {
       await plog({ paymentId: payment._id, userId: toId(req.user.id), step: 'ERROR', level: 'ALERT', message: 'cash-collected attempted by non-payee' });

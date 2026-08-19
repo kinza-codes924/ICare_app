@@ -789,6 +789,7 @@ class _WebSidebarState extends ConsumerState<_WebSidebar> {
     } else if (role == 'Receptionist') {
       items = [
         _SidebarItem(icon: Icons.home_outlined, label: 'Front Desk', path: '/reception/dashboard'),
+        _SidebarItem(icon: Icons.receipt_long_outlined, label: 'Records', path: '/reception/records'),
         _SidebarItem(icon: Icons.help_outline_rounded, label: 'Help & Support', path: '/help'),
         _SidebarItem(icon: Icons.settings_outlined, label: 'Settings', path: '/settings'),
       ];

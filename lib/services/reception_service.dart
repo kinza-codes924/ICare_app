@@ -144,4 +144,75 @@ class ReceptionService {
       return {'success': false, 'message': e.toString()};
     }
   }
+
+  Future<Map<String, dynamic>> setConsultationTax({
+    required String consultationId,
+    required double taxRate,
+  }) async {
+    try {
+      final response = await _dio.put(
+        '/reception/consultations/$consultationId/tax',
+        data: {'taxRate': taxRate},
+        options: await _authOptions(),
+      );
+      final data = response.data;
+      if (data is Map && data['success'] == true) {
+        return {'success': true, 'taxRate': data['taxRate']};
+      }
+      return {'success': false, 'message': data is Map ? data['message'] : 'Failed to update tax rate'};
+    } catch (e) {
+      return {'success': false, 'message': e.toString()};
+    }
+  }
+
+  // items: List<{'name': String, 'price': num}>
+  Future<Map<String, dynamic>> createInvoice({
+    required String clientName,
+    required List<Map<String, dynamic>> items,
+    required double taxRate,
+  }) async {
+    try {
+      final response = await _dio.post(
+        '/reception/invoices',
+        data: {'clientName': clientName, 'items': items, 'taxRate': taxRate},
+        options: await _authOptions(),
+      );
+      final data = response.data;
+      if (data is Map && data['success'] == true) {
+        return {'success': true, 'invoice': data['invoice']};
+      }
+      return {'success': false, 'message': data is Map ? data['message'] : 'Failed to create invoice'};
+    } catch (e) {
+      return {'success': false, 'message': e.toString()};
+    }
+  }
+
+  Future<Map<String, dynamic>> getInvoice(String invoiceId) async {
+    try {
+      final response = await _dio.get(
+        '/reception/invoices/$invoiceId',
+        options: await _authOptions(),
+      );
+      final data = response.data;
+      if (data is Map && data['success'] == true) {
+        return {'success': true, 'invoice': data['invoice']};
+      }
+      return {'success': false, 'message': data is Map ? data['message'] : 'Failed to load invoice'};
+    } catch (e) {
+      return {'success': false, 'message': e.toString()};
+    }
+  }
+
+  Future<Map<String, dynamic>> getRecords() async {
+    try {
+      final response = await _dio.get('/reception/records', options: await _authOptions());
+      final data = response.data;
+      if (data is Map && data['success'] == true) {
+        return {'success': true, 'records': data['records'] ?? []};
+      }
+      return {'success': false, 'message': data is Map ? data['message'] : 'Failed to load records', 'records': []};
+    } catch (e) {
+      return {'success': false, 'message': e.toString(), 'records': []};
+    }
+  }
 }

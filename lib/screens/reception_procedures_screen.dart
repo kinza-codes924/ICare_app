@@ -21,11 +21,18 @@ class _ReceptionProceduresScreenState extends State<ReceptionProceduresScreen> {
   final ReceptionService _service = ReceptionService();
   List<Map<String, dynamic>> _procedures = [];
   bool _loading = true;
+  final _taxRateCtrl = TextEditingController(text: '15');
 
   @override
   void initState() {
     super.initState();
     _load();
+  }
+
+  @override
+  void dispose() {
+    _taxRateCtrl.dispose();
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -34,8 +41,16 @@ class _ReceptionProceduresScreenState extends State<ReceptionProceduresScreen> {
     final consultation = result['consultation'] as Map?;
     setState(() {
       _procedures = List<Map<String, dynamic>>.from(consultation?['procedures'] ?? []);
+      final taxRate = (consultation?['taxRate'] as num?)?.toDouble();
+      if (taxRate != null) _taxRateCtrl.text = taxRate.toStringAsFixed(taxRate == taxRate.roundToDouble() ? 0 : 2);
       _loading = false;
     });
+  }
+
+  Future<void> _saveTaxRate() async {
+    final rate = double.tryParse(_taxRateCtrl.text.trim());
+    if (rate == null) return;
+    await _service.setConsultationTax(consultationId: widget.consultationId, taxRate: rate);
   }
 
   static const _commonProcedures = [
@@ -231,10 +246,22 @@ class _ReceptionProceduresScreenState extends State<ReceptionProceduresScreen> {
                   label: const Text('Add Procedure'),
                 ),
                 const SizedBox(height: 24),
+                const Text('SRB Sales Tax Rate (%)', style: TextStyle(fontWeight: FontWeight.w600)),
+                const SizedBox(height: 6),
+                TextField(
+                  controller: _taxRateCtrl,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(border: OutlineInputBorder()),
+                  onEditingComplete: _saveTaxRate,
+                  onTapOutside: (_) => _saveTaxRate(),
+                ),
+                const SizedBox(height: 24),
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
-                    onPressed: () {
+                    onPressed: () async {
+                      await _saveTaxRate();
+                      if (!context.mounted) return;
                       Navigator.of(context).pushReplacement(
                         MaterialPageRoute(
                           builder: (_) => ReceptionPaymentScreen(
