@@ -786,6 +786,10 @@ class _WebSidebarState extends ConsumerState<_WebSidebar> {
       items = [
         _SidebarItem(icon: Icons.home_outlined, label: 'Home', path: '/patient/home'),
       ];
+    } else if (role == 'Receptionist') {
+      items = [
+        _SidebarItem(icon: Icons.home_outlined, label: 'Front Desk', path: '/reception/dashboard'),
+      ];
     } else if (role == 'Doctor') {
       items = [
         _SidebarItem(

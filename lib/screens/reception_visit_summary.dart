@@ -61,6 +61,16 @@ class _ReceptionVisitSummaryState extends State<ReceptionVisitSummary> {
         backgroundColor: AppColors.primaryColor,
         foregroundColor: Colors.white,
         automaticallyImplyLeading: false,
+        leading: IconButton(
+          icon: const Icon(Icons.home_outlined),
+          tooltip: 'Back to Front Desk',
+          onPressed: () {
+            Navigator.of(context).pushAndRemoveUntil(
+              MaterialPageRoute(builder: (_) => const ReceptionDashboard()),
+              (route) => false,
+            );
+          },
+        ),
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())

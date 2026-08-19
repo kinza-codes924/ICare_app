@@ -395,6 +395,18 @@ class _CustomDrawerState extends ConsumerState<CustomDrawer> {
       ];
     } else if (selectedRole == 'Admin') {
       drawerItems = []; // Clear other items for Admin
+    } else if (selectedRole == 'Receptionist') {
+      drawerItems = [
+        _drawerItem('Front Desk', Icons.dashboard_outlined, () {
+          context.go('/reception/dashboard');
+        }),
+        _drawerItem('Help & Support', Icons.help_outline_rounded, () {
+          context.go('/help');
+        }),
+        _drawerItem('Settings', Icons.settings_outlined, () {
+          context.go('/settings');
+        }),
+      ];
     }
 
     return ClipRRect(

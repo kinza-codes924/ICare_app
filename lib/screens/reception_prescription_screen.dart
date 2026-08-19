@@ -47,7 +47,9 @@ class ReceptionPrescriptionScreen extends StatelessWidget {
           },
         ),
         Positioned(
-          bottom: 24,
+          // Sits above the app-wide WhatsApp floating button (bottom: 20,
+          // right: 20, 64px tall) so the two never overlap.
+          bottom: 100,
           right: 24,
           child: FloatingActionButton.extended(
             heroTag: 'reception_skip_prescription',

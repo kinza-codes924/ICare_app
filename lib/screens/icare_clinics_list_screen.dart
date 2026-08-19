@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:icare/data/icare_clinics_data.dart';
 import 'package:icare/models/clinic.dart';
 import 'package:icare/screens/clinic_detail_screen.dart';
+import 'package:icare/widgets/clinic_card_thumbnail.dart';
 
 /// Landing screen shown after tapping into the "iCare Clinics" home-page
 /// section — grid of the 6 branded specialty clinics.
@@ -123,15 +124,7 @@ class _ClinicCardState extends State<_ClinicCard> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                width: 52,
-                height: 52,
-                decoration: BoxDecoration(
-                  color: c.accentColor.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: Icon(c.icon, color: c.accentColor, size: 26),
-              ),
+              ClinicCardThumbnail(clinic: c),
               const SizedBox(height: 10),
               Text(
                 c.name,

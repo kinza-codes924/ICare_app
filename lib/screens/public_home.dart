@@ -13,6 +13,7 @@ import 'package:icare/screens/pharmacies.dart';
 import 'package:icare/screens/lab_list.dart';
 import 'package:icare/utils/theme.dart';
 import 'package:icare/widgets/whatsapp_button.dart';
+import 'package:icare/widgets/clinic_card_thumbnail.dart';
 import 'package:icare/utils/shared_pref.dart';
 import 'package:icare/widgets/doctor_search_bar.dart';
 import 'package:icare/services/doctor_service.dart';
@@ -1498,12 +1499,29 @@ class _ICareClinicsSection extends StatelessWidget {
       child: _CenteredSection(
         child: Column(
           children: [
-            _SectionHeader(
-              title: 'iCare Clinics',
-              subtitle: 'Premium multi-speciality clinics — presently available at Karachi only',
-              titleColor: _accent,
+            InkWell(
               onTap: () => Navigator.of(context).push(
                 MaterialPageRoute(builder: (_) => const ICareClinicsListScreen()),
+              ),
+              borderRadius: BorderRadius.circular(12),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 20),
+                child: Column(
+                  children: [
+                    Image.asset(
+                      'assets/clinic_photos/080fba59-23f8-4cff-b8dd-0757fec9c7b2.jpg',
+                      height: 72,
+                      fit: BoxFit.contain,
+                      filterQuality: FilterQuality.high,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Premium multi-speciality clinics — presently available at Karachi only',
+                      style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
               ),
             ),
             const SizedBox(height: 24),
@@ -1572,15 +1590,7 @@ class _ClinicPreviewTile extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(
-              width: 52,
-              height: 52,
-              decoration: BoxDecoration(
-                color: clinic.accentColor.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: Icon(clinic.icon, color: clinic.accentColor, size: 26),
-            ),
+            ClinicCardThumbnail(clinic: clinic),
             const SizedBox(height: 12),
             Text(
               clinic.name,

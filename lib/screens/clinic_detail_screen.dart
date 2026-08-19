@@ -305,54 +305,57 @@ class _Header extends StatelessWidget {
                 icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
               ),
               const SizedBox(height: 8),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  Container(
-                    width: 56,
-                    height: 56,
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.18),
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white.withValues(alpha: 0.5), width: 1.5),
+              Center(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Container(
+                      width: 56,
+                      height: 56,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.18),
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white.withValues(alpha: 0.5), width: 1.5),
+                      ),
+                      child: Icon(clinic.icon, color: Colors.white, size: 28),
                     ),
-                    child: Icon(clinic.icon, color: Colors.white, size: 28),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                    const SizedBox(height: 12),
+                    Text(
+                      clinic.name,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 24,
+                        fontWeight: FontWeight.w900,
+                        fontFamily: 'Gilroy-Bold',
+                        height: 1.2,
+                        shadows: [Shadow(color: Colors.black38, blurRadius: 8, offset: Offset(0, 2))],
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      clinic.tagline,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.95),
+                        fontSize: 14,
+                        shadows: const [Shadow(color: Colors.black38, blurRadius: 6, offset: Offset(0, 1))],
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
                       children: [
+                        Icon(Icons.location_on_rounded, size: 16, color: Colors.white.withValues(alpha: 0.9)),
+                        const SizedBox(width: 4),
                         Text(
-                          clinic.name,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 22,
-                            fontWeight: FontWeight.w900,
-                            fontFamily: 'Gilroy-Bold',
-                            height: 1.2,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          clinic.tagline,
-                          style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: 14),
+                          'Presently Available At ${clinic.location} Only',
+                          style: TextStyle(fontSize: 13, color: Colors.white.withValues(alpha: 0.9)),
                         ),
                       ],
                     ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 14),
-              Row(
-                children: [
-                  Icon(Icons.location_on_rounded, size: 16, color: Colors.white.withValues(alpha: 0.85)),
-                  const SizedBox(width: 4),
-                  Text(
-                    'Presently Available At ${clinic.location} Only',
-                    style: TextStyle(fontSize: 13, color: Colors.white.withValues(alpha: 0.85)),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ],
           ),

@@ -209,8 +209,10 @@ class _StepTile extends StatelessWidget {
   }
 }
 
-/// Static patient testimonials for a clinic. Placeholder-but-realistic
-/// content — text only, no photos, per the client's explicit instruction.
+/// Patient testimonials for a clinic. Renders the real Google-review
+/// screenshot directly (t.imagePath set) rather than re-typed text, or
+/// falls back to the older text-only ReviewCard for any testimonial
+/// without a screenshot yet.
 class TestimonialsSection extends StatelessWidget {
   final List<ClinicTestimonial> testimonials;
 
@@ -220,13 +222,43 @@ class TestimonialsSection extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: testimonials
-          .map((t) => ReviewCard(
-                name: t.patientName,
-                rating: t.rating,
-                comment: t.comment,
-                dateLabel: t.dateLabel,
-              ))
+          .map((t) => t.imagePath != null
+              ? _ReviewScreenshotCard(imagePath: t.imagePath!)
+              : ReviewCard(
+                  name: t.patientName,
+                  rating: t.rating,
+                  comment: t.comment,
+                  dateLabel: t.dateLabel,
+                ))
           .toList(),
+    );
+  }
+}
+
+/// A real review, shown as its own screenshot rather than re-typed text —
+/// same card chrome (white, rounded, bordered) as ReviewCard for a
+/// consistent look in the list, sized responsively for mobile vs desktop.
+class _ReviewScreenshotCard extends StatelessWidget {
+  final String imagePath;
+  const _ReviewScreenshotCard({required this.imagePath});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8, offset: const Offset(0, 2)),
+        ],
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 520),
+        child: Image.asset(imagePath, fit: BoxFit.contain, width: double.infinity),
+      ),
     );
   }
 }

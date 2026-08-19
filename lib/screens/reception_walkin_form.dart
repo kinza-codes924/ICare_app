@@ -90,6 +90,13 @@ class _ReceptionWalkinFormState extends State<ReceptionWalkinForm> {
         title: const Text('New Walk-In Patient'),
         backgroundColor: AppColors.primaryColor,
         foregroundColor: Colors.white,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.home_outlined),
+            tooltip: 'Back to Front Desk',
+            onPressed: () => Navigator.of(context).popUntil((route) => route.isFirst),
+          ),
+        ],
       ),
       body: _loadingDoctors
           ? const Center(child: CircularProgressIndicator())

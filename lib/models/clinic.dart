@@ -35,20 +35,25 @@ class JourneyStep {
   });
 }
 
-/// A placeholder-but-realistic patient testimonial — text only, no photos,
-/// per the client's explicit instruction. A starting point the client can
-/// replace with real reviews later.
+/// A patient testimonial. Either a real Google-review screenshot
+/// (imagePath set — rendered as-is, no re-typed text) or, for a clinic
+/// without a screenshot yet, the older text-only fields as a fallback.
 class ClinicTestimonial {
   final String patientName;
   final double rating;
   final String comment;
   final String dateLabel;
+  // Local asset path to a real review screenshot (assets/clinic_photos/
+  // reviews/...). When set, the UI renders this image directly instead of
+  // the text fields above.
+  final String? imagePath;
 
   const ClinicTestimonial({
     required this.patientName,
     required this.rating,
     required this.comment,
     required this.dateLabel,
+    this.imagePath,
   });
 }
 

@@ -83,6 +83,7 @@ flutter:
     - assets/
     - assets/images/
     - assets/clinic_photos/
+    - assets/clinic_photos/reviews/
     # assets/images/screenshots/ removed: 5MB of documentation screenshots
     # that no Dart file references, but which every user downloaded because
     # declaring the directory bundles it whole. The files stay in the repo

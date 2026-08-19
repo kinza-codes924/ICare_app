@@ -13,6 +13,32 @@ function toId(id) {
   try { return new mongoose.Types.ObjectId(id); } catch { return null; }
 }
 
+// Shared iCare-branded header (logo + name, "INVOICE" heading + number/date),
+// mirroring prescription-v2.js's PDF header so every generated document
+// looks consistent. Falls back to a text-only wordmark if the logo file is
+// missing rather than failing the whole PDF.
+function drawInvoiceHeader(doc, { invoiceNumber, date }) {
+  const path = require('path');
+  const fs = require('fs');
+  const logoPath = path.join(__dirname, '../assets/logo.png');
+  const logoExists = fs.existsSync(logoPath);
+
+  if (logoExists) {
+    doc.image(logoPath, 50, 40, { height: 44 });
+    doc.fontSize(18).fillColor('#0036BC').text('iCare', 100, 46);
+    doc.fontSize(8.5).fillColor('#666666').text('Your Trusted Healthcare Platform', 100, 68);
+  } else {
+    doc.fontSize(24).fillColor('#0036BC').text('iCare', 50, 50, { bold: true });
+    doc.fontSize(10).fillColor('#666666').text('Your Trusted Healthcare Platform', 50, 80);
+  }
+
+  doc.fontSize(20).fillColor('#0036BC').text('INVOICE', 400, 50, { align: 'right' });
+  doc.fontSize(10).fillColor('#333333').text(`Invoice #${invoiceNumber}`, 400, 80, { align: 'right' });
+  doc.fontSize(9).fillColor('#666666').text(`Date: ${date}`, 400, 95, { align: 'right' });
+
+  doc.moveTo(50, 120).lineTo(550, 120).strokeColor('#E0E0E0').stroke();
+}
+
 // ─── GENERATE INVOICE PDF ─────────────────────────────────────────────────────
 router.get('/:orderId/pdf', authMiddleware, async (req, res) => {
   try {
@@ -45,13 +71,10 @@ router.get('/:orderId/pdf', authMiddleware, async (req, res) => {
     doc.pipe(res);
 
     // ─── HEADER ───────────────────────────────────────────────────────────────
-    doc.fontSize(24).fillColor('#0036BC').text('iCare', 50, 50, { bold: true });
-    doc.fontSize(10).fillColor('#666666').text('Your Trusted Healthcare Platform', 50, 80);
-    doc.fontSize(20).fillColor('#0036BC').text('INVOICE', 400, 50, { align: 'right' });
-    doc.fontSize(10).fillColor('#333333').text(`Invoice #${order.order_number || orderId}`, 400, 80, { align: 'right' });
-    doc.fontSize(9).fillColor('#666666').text(`Date: ${new Date(order.createdAt).toLocaleDateString('en-PK')}`, 400, 95, { align: 'right' });
-
-    doc.moveTo(50, 120).lineTo(550, 120).strokeColor('#E0E0E0').stroke();
+    drawInvoiceHeader(doc, {
+      invoiceNumber: order.order_number || orderId,
+      date: new Date(order.createdAt).toLocaleDateString('en-PK'),
+    });
 
     // ─── PATIENT & PHARMACY INFO ──────────────────────────────────────────────
     let yPos = 140;
@@ -167,13 +190,10 @@ router.get('/reception/:consultationId/pdf', async (req, res) => {
     res.setHeader('Content-Disposition', `attachment; filename=icare-invoice-${consultationId}.pdf`);
     doc.pipe(res);
 
-    doc.fontSize(24).fillColor('#0036BC').text('iCare', 50, 50, { bold: true });
-    doc.fontSize(10).fillColor('#666666').text('Your Trusted Healthcare Platform', 50, 80);
-    doc.fontSize(20).fillColor('#0036BC').text('INVOICE', 400, 50, { align: 'right' });
-    doc.fontSize(10).fillColor('#333333').text(`Invoice #${consultationId}`, 400, 80, { align: 'right' });
-    doc.fontSize(9).fillColor('#666666').text(`Date: ${new Date(consultation.createdAt).toLocaleDateString('en-PK')}`, 400, 95, { align: 'right' });
-
-    doc.moveTo(50, 120).lineTo(550, 120).strokeColor('#E0E0E0').stroke();
+    drawInvoiceHeader(doc, {
+      invoiceNumber: consultationId,
+      date: new Date(consultation.createdAt).toLocaleDateString('en-PK'),
+    });
 
     let yPos = 140;
     doc.fontSize(11).fillColor('#0036BC').text('PATIENT INFORMATION', 50, yPos);

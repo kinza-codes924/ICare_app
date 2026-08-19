@@ -47,7 +47,7 @@ const List<Clinic> kICareClinics = [
     mapQuery: 'iCare Clinics, Mezzanine Floor, Mall Square, Zamzama Boulevard, DHA Phase 5, Clifton, Karachi',
     address: 'Mezzanine Floor, Mall Square, Zamzama Boulevard, DHA Phase 5, '
         'Clifton, Zamzama Commercial Area, Defence V, Karachi, 75600',
-    heroImage: 'https://images.unsplash.com/photo-1606811841689-23dfddce3e95?w=1200&q=80&auto=format&fit=crop',
+    heroImage: 'assets/clinic_photos/c93a69b2-14fb-4ec6-b34f-89e2c6c59c3e.png',
     facilityPhotos: [
       'assets/clinic_photos/dental_reception.jpg',
       'assets/clinic_photos/dental_room.jpg',
@@ -78,7 +78,7 @@ const List<Clinic> kICareClinics = [
             'Straighten misaligned teeth with metal braces or nearly-invisible '
             'clear aligners, tailored to your bite and lifestyle, with regular '
             'progress checkups throughout treatment.',
-        imagePath: 'assets/clinic_photos/dental_braces.jpg',
+        imagePath: 'assets/clinic_photos/033bce00-815f-4208-8c45-bd44c9676c4c.jpg',
       ),
       ClinicService(
         name: 'Root Canal Treatment',
@@ -107,34 +107,23 @@ const List<Clinic> kICareClinics = [
         'Regular Checkups',
         'Post-Treatment Maintenance',
       ],
-      imagePath: 'https://images.unsplash.com/photo-1629909613654-28e377c37b09?w=1200&q=80&auto=format&fit=crop',
+      imagePath: 'https://periosciences.com/cdn/shop/articles/shutterstock_1974784538.jpg?v=1773748754',
     ),
     journey: _defaultJourney,
     testimonials: [
       ClinicTestimonial(
-        patientName: 'Ayesha K.',
+        patientName: 'Almas Anjum',
         rating: 5,
-        comment:
-            'Got my root canal done here — completely painless and the staff '
-            'explained every step. My smile after the whitening session is '
-            'unbelievable!',
-        dateLabel: 'June 2026',
+        comment: '',
+        dateLabel: '3 weeks ago',
+        imagePath: 'assets/clinic_photos/reviews/review_almas_anjum.png',
       ),
       ClinicTestimonial(
-        patientName: 'Bilal S.',
+        patientName: 'Abdullah Dars',
         rating: 5,
-        comment:
-            'Started my Invisalign treatment last month. Clean clinic, easy '
-            'online booking, and the dentist actually listens.',
-        dateLabel: 'May 2026',
-      ),
-      ClinicTestimonial(
-        patientName: 'Fatima R.',
-        rating: 4.5,
-        comment:
-            'Great experience with my dental implant. A bit of a wait for the '
-            'appointment but worth it for the quality of care.',
-        dateLabel: 'April 2026',
+        comment: '',
+        dateLabel: '2 weeks ago',
+        imagePath: 'assets/clinic_photos/reviews/review_abdullah_dars.png',
       ),
     ],
     faqs: [
@@ -240,29 +229,18 @@ const List<Clinic> kICareClinics = [
     journey: _defaultJourney,
     testimonials: [
       ClinicTestimonial(
-        patientName: 'Sana M.',
+        patientName: 'Khushbakht Zulfiqar',
         rating: 5,
-        comment:
-            'My acne scars have visibly faded after just 3 PRP sessions. '
-            'The dermatologist genuinely cares about long-term results, not '
-            'just quick fixes.',
-        dateLabel: 'June 2026',
+        comment: '',
+        dateLabel: '3 weeks ago',
+        imagePath: 'assets/clinic_photos/reviews/review_khushbakht_zulfiqar.png',
       ),
       ClinicTestimonial(
-        patientName: 'Hamza T.',
-        rating: 4.5,
-        comment:
-            'Did laser hair removal here — professional setup and the staff '
-            'made sure I was comfortable throughout.',
-        dateLabel: 'May 2026',
-      ),
-      ClinicTestimonial(
-        patientName: 'Zainab A.',
+        patientName: 'Tayyaba Rasheed',
         rating: 5,
-        comment:
-            'HydraFacial left my skin glowing for weeks. Booking online was '
-            'super easy too.',
-        dateLabel: 'March 2026',
+        comment: '',
+        dateLabel: 'a week ago',
+        imagePath: 'assets/clinic_photos/reviews/review_tayyaba_rasheed.png',
       ),
     ],
     faqs: [
@@ -365,28 +343,18 @@ const List<Clinic> kICareClinics = [
     journey: _defaultJourney,
     testimonials: [
       ClinicTestimonial(
-        patientName: 'Mahnoor I.',
+        patientName: 'Huda Noman',
         rating: 5,
-        comment:
-            'Followed my entire pregnancy here. Every appointment was '
-            'reassuring and the doctor always had time for my questions.',
-        dateLabel: 'June 2026',
+        comment: '',
+        dateLabel: '3 weeks ago',
+        imagePath: 'assets/clinic_photos/reviews/review_huda_noman.png',
       ),
       ClinicTestimonial(
-        patientName: 'Sarah W.',
+        patientName: 'Bushra Noman',
         rating: 5,
-        comment:
-            'The lactation support after delivery made such a difference. '
-            'Very patient and knowledgeable team.',
-        dateLabel: 'April 2026',
-      ),
-      ClinicTestimonial(
-        patientName: 'Nida F.',
-        rating: 4.5,
-        comment:
-            'Take my daughter here for all her vaccinations. Clean, '
-            'organized, and they send reminders which I love.',
-        dateLabel: 'February 2026',
+        comment: '',
+        dateLabel: '3 weeks ago',
+        imagePath: 'assets/clinic_photos/reviews/review_bushra_noman.png',
       ),
     ],
     faqs: [
@@ -490,28 +458,18 @@ const List<Clinic> kICareClinics = [
     journey: _defaultJourney,
     testimonials: [
       ClinicTestimonial(
-        patientName: 'Owais N.',
+        patientName: 'waqas lodhi',
         rating: 5,
-        comment:
-            'Tore a ligament playing football — the sports rehab program '
-            'here got me back on the field in weeks, not months.',
-        dateLabel: 'May 2026',
+        comment: '',
+        dateLabel: 'a day ago',
+        imagePath: 'assets/clinic_photos/reviews/review_waqas_lodhi.png',
       ),
       ClinicTestimonial(
-        patientName: 'Rabia H.',
-        rating: 4.5,
-        comment:
-            'Chronic back pain that nothing else fixed. A few weeks of '
-            'manual therapy and I finally have relief.',
-        dateLabel: 'March 2026',
-      ),
-      ClinicTestimonial(
-        patientName: 'Imran Q.',
+        patientName: 'Samiullah Khan',
         rating: 5,
-        comment:
-            'Post-surgery rehab was structured and the therapist tracked my '
-            'progress every session. Highly recommend.',
-        dateLabel: 'February 2026',
+        comment: '',
+        dateLabel: '3 weeks ago',
+        imagePath: 'assets/clinic_photos/reviews/review_samiullah_khan.png',
       ),
     ],
     faqs: [
@@ -612,28 +570,11 @@ const List<Clinic> kICareClinics = [
     journey: _defaultJourney,
     testimonials: [
       ClinicTestimonial(
-        patientName: 'Areeba J.',
+        patientName: 'Dr Ahmed Bux',
         rating: 5,
-        comment:
-            'Finally found a therapist who I feel truly listens. The whole '
-            'process from booking to session felt private and respectful.',
-        dateLabel: 'June 2026',
-      ),
-      ClinicTestimonial(
-        patientName: 'Danish K.',
-        rating: 5,
-        comment:
-            'CBT sessions here genuinely changed how I handle anxiety at '
-            'work. Grateful I gave it a try.',
-        dateLabel: 'April 2026',
-      ),
-      ClinicTestimonial(
-        patientName: 'Laila P.',
-        rating: 4.5,
-        comment:
-            'Brought my teenager in for counseling — she opened up more '
-            'than I expected. Kind, patient staff.',
-        dateLabel: 'March 2026',
+        comment: '',
+        dateLabel: '3 weeks ago',
+        imagePath: 'assets/clinic_photos/reviews/review_dr_ahmed_bux.png',
       ),
     ],
     faqs: [
@@ -735,28 +676,11 @@ const List<Clinic> kICareClinics = [
     journey: _defaultJourney,
     testimonials: [
       ClinicTestimonial(
-        patientName: 'Kamran L.',
+        patientName: 'Sumbul Arif',
         rating: 5,
-        comment:
-            'Lost 8kg in 3 months following the nutrition plan here — '
-            'practical advice, not a crash diet.',
-        dateLabel: 'June 2026',
-      ),
-      ClinicTestimonial(
-        patientName: 'Hina D.',
-        rating: 4.5,
-        comment:
-            'The diabetes lifestyle program helped me get my sugar levels '
-            'under control alongside my regular medication.',
-        dateLabel: 'April 2026',
-      ),
-      ClinicTestimonial(
-        patientName: 'Tariq B.',
-        rating: 5,
-        comment:
-            'Booked a wellness checkup and got a clear, honest breakdown of '
-            'where I stood. Booking and payment was smooth too.',
-        dateLabel: 'March 2026',
+        comment: '',
+        dateLabel: '2 weeks ago',
+        imagePath: 'assets/clinic_photos/reviews/review_sumbul_arif.png',
       ),
     ],
     faqs: [
