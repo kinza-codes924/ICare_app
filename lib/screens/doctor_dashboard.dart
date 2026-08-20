@@ -9,6 +9,7 @@ import 'package:icare/services/doctor_service.dart';
 import 'package:icare/utils/theme.dart';
 import 'package:icare/utils/utils.dart';
 import 'package:icare/screens/doctor_appointments.dart';
+import 'package:icare/screens/doctor_walkin_patients_screen.dart';
 import 'package:icare/screens/settings.dart';
 import 'package:icare/screens/doctor_availability.dart';
 import 'package:icare/screens/courses.dart';
@@ -39,6 +40,7 @@ class _DoctorDashboardState extends ConsumerState<DoctorDashboard> {
   List<AppointmentDetail> _appointments = [];
   Map<String, dynamic> _stats = {};
   List<Map<String, dynamic>> _clinicalRejectionFlags = [];
+  int _walkinCount = 0;
   bool _isLoading = true;
   bool _availableForInstantConsultation = true;
   final bool _isInConsultation = false;
@@ -85,6 +87,10 @@ class _DoctorDashboardState extends ConsumerState<DoctorDashboard> {
           const Duration(seconds: 25),
           onTimeout: () => {'success': false, 'flags': []},
         ),
+        _doctorService.getWalkinPatients().catchError((_) => <String, dynamic>{'success': false, 'walkins': []}).timeout(
+          const Duration(seconds: 25),
+          onTimeout: () => {'success': false, 'walkins': []},
+        ),
       ]);
 
       if (mounted) {
@@ -92,6 +98,7 @@ class _DoctorDashboardState extends ConsumerState<DoctorDashboard> {
           final appResult = results[0];
           final statsResult = results[1];
           final rejResult = results[2];
+          final walkinResult = results[3];
           if (appResult['success'] == true) {
             _appointments = appResult['appointments'] as List<AppointmentDetail>;
           }
@@ -103,6 +110,9 @@ class _DoctorDashboardState extends ConsumerState<DoctorDashboard> {
                 List<Map<String, dynamic>>.from(rejResult['flags'] ?? []);
           } else {
             _clinicalRejectionFlags = [];
+          }
+          if (walkinResult['success'] == true) {
+            _walkinCount = List.from(walkinResult['walkins'] ?? []).length;
           }
           _isLoading = false;
         });
@@ -185,6 +195,10 @@ class _DoctorDashboardState extends ConsumerState<DoctorDashboard> {
 
                         // 1b. Instant Consultation Toggle
                         _buildInstantConsultToggle(),
+                        const SizedBox(height: 24),
+
+                        // 1c. Walk-In Patients (front-desk visits, no video appointment)
+                        _buildWalkinPatientsCard(),
                         const SizedBox(height: 24),
 
                         // 2. Appointment Requests (pending — Accept/Decline)
@@ -607,6 +621,61 @@ class _DoctorDashboardState extends ConsumerState<DoctorDashboard> {
         ));
       }
     }
+  }
+
+  Widget _buildWalkinPatientsCard() {
+    return InkWell(
+      borderRadius: BorderRadius.circular(16),
+      onTap: () {
+        Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const DoctorWalkinPatientsScreen()),
+        ).then((_) => _loadData());
+      },
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: const Color(0xFFE2E8F0)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: AppColors.primaryColor.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(Icons.storefront_outlined, color: AppColors.primaryColor, size: 22),
+            ),
+            const SizedBox(width: 14),
+            const Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Walk-In Patients', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: Color(0xFF0F172A))),
+                  Text('Front-desk patients referred to you', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                ],
+              ),
+            ),
+            if (_walkinCount > 0)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: AppColors.primaryColor,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  '$_walkinCount',
+                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.white),
+                ),
+              ),
+            const SizedBox(width: 8),
+            const Icon(Icons.chevron_right_rounded, color: Color(0xFF94A3B8)),
+          ],
+        ),
+      ),
+    );
   }
 
   Widget _buildAppointmentRequests() {

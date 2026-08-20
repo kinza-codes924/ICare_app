@@ -300,6 +300,21 @@ class DoctorService {
     }
   }
 
+  /// Walk-in front-desk patients a receptionist created under this doctor —
+  /// these never appear in the normal appointments list (no appointmentId).
+  Future<Map<String, dynamic>> getWalkinPatients() async {
+    try {
+      final response = await _apiService.get('/doctors/walkins');
+      if (response.statusCode == 200 && response.data is Map) {
+        return Map<String, dynamic>.from(response.data as Map);
+      }
+      return {'success': false, 'walkins': <dynamic>[]};
+    } catch (e) {
+      debugPrint('getWalkinPatients: $e');
+      return {'success': false, 'walkins': <dynamic>[]};
+    }
+  }
+
   /// Pharmacy rejections on this doctor's prescriptions (excludes "No referrer" — admin-only).
   Future<Map<String, dynamic>> getClinicalRejectionFlags() async {
     try {

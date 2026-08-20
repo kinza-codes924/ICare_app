@@ -147,17 +147,18 @@ class ReceptionService {
 
   Future<Map<String, dynamic>> setConsultationTax({
     required String consultationId,
+    required bool taxEnabled,
     required double taxRate,
   }) async {
     try {
       final response = await _dio.put(
         '/reception/consultations/$consultationId/tax',
-        data: {'taxRate': taxRate},
+        data: {'taxEnabled': taxEnabled, 'taxRate': taxRate},
         options: await _authOptions(),
       );
       final data = response.data;
       if (data is Map && data['success'] == true) {
-        return {'success': true, 'taxRate': data['taxRate']};
+        return {'success': true, 'taxEnabled': data['taxEnabled'], 'taxRate': data['taxRate']};
       }
       return {'success': false, 'message': data is Map ? data['message'] : 'Failed to update tax rate'};
     } catch (e) {
@@ -169,12 +170,13 @@ class ReceptionService {
   Future<Map<String, dynamic>> createInvoice({
     required String clientName,
     required List<Map<String, dynamic>> items,
+    required bool taxEnabled,
     required double taxRate,
   }) async {
     try {
       final response = await _dio.post(
         '/reception/invoices',
-        data: {'clientName': clientName, 'items': items, 'taxRate': taxRate},
+        data: {'clientName': clientName, 'items': items, 'taxEnabled': taxEnabled, 'taxRate': taxRate},
         options: await _authOptions(),
       );
       final data = response.data;

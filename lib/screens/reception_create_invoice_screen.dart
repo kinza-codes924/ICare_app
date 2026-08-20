@@ -20,6 +20,7 @@ class _ReceptionCreateInvoiceScreenState extends State<ReceptionCreateInvoiceScr
   final ReceptionService _service = ReceptionService();
   final _clientNameCtrl = TextEditingController();
   final _taxRateCtrl = TextEditingController(text: '15');
+  bool _taxEnabled = true;
   final List<Map<String, dynamic>> _items = [];
   bool _submitting = false;
   String? _error;
@@ -32,7 +33,7 @@ class _ReceptionCreateInvoiceScreenState extends State<ReceptionCreateInvoiceScr
   }
 
   double get _subtotal => _items.fold<double>(0, (sum, i) => sum + ((i['price'] as num?)?.toDouble() ?? 0));
-  double get _taxRate => double.tryParse(_taxRateCtrl.text.trim()) ?? 0;
+  double get _taxRate => _taxEnabled ? (double.tryParse(_taxRateCtrl.text.trim()) ?? 0) : 0;
   double get _taxAmount => _subtotal * (_taxRate / 100);
   double get _total => _subtotal + _taxAmount;
 
@@ -140,6 +141,7 @@ class _ReceptionCreateInvoiceScreenState extends State<ReceptionCreateInvoiceScr
     final result = await _service.createInvoice(
       clientName: _clientNameCtrl.text.trim(),
       items: _items,
+      taxEnabled: _taxEnabled,
       taxRate: _taxRate,
     );
     if (!mounted) return;
@@ -226,14 +228,37 @@ class _ReceptionCreateInvoiceScreenState extends State<ReceptionCreateInvoiceScr
             label: const Text('Add Item'),
           ),
           const SizedBox(height: 24),
-          const Text('SRB Sales Tax Rate (%)', style: TextStyle(fontWeight: FontWeight.w600)),
-          const SizedBox(height: 6),
-          TextField(
-            controller: _taxRateCtrl,
-            keyboardType: TextInputType.number,
-            decoration: const InputDecoration(border: OutlineInputBorder()),
-            onChanged: (_) => setState(() {}),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text('SRB Sales Tax', style: TextStyle(fontWeight: FontWeight.w600)),
+              Switch(
+                value: _taxEnabled,
+                onChanged: (v) => setState(() => _taxEnabled = v),
+              ),
+            ],
           ),
+          if (_taxEnabled) ...[
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              children: [8, 15].map((preset) {
+                final selected = double.tryParse(_taxRateCtrl.text.trim()) == preset.toDouble();
+                return ChoiceChip(
+                  label: Text('$preset%'),
+                  selected: selected,
+                  onSelected: (_) => setState(() => _taxRateCtrl.text = preset.toString()),
+                );
+              }).toList(),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: _taxRateCtrl,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(labelText: 'Custom rate (%)', border: OutlineInputBorder()),
+              onChanged: (_) => setState(() {}),
+            ),
+          ],
           const SizedBox(height: 20),
           Card(
             child: Padding(
@@ -241,7 +266,7 @@ class _ReceptionCreateInvoiceScreenState extends State<ReceptionCreateInvoiceScr
               child: Column(
                 children: [
                   _summaryRow('Subtotal', _subtotal),
-                  _summaryRow('SRB Sales Tax (${_taxRate.toStringAsFixed(0)}%)', _taxAmount),
+                  if (_taxEnabled) _summaryRow('SRB Sales Tax (${_taxRate.toStringAsFixed(0)}%)', _taxAmount),
                   const Divider(),
                   _summaryRow('Total', _total, bold: true),
                 ],

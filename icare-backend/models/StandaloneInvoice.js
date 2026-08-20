@@ -11,8 +11,9 @@ const standaloneInvoiceSchema = new mongoose.Schema({
     name: { type: String, required: true },
     price: { type: Number, default: 0 },
   }],
-  // SRB (Sindh Revenue Board) sales tax on services — not FBR. Defaults to
-  // 15%, editable per-invoice by the receptionist.
+  // SRB (Sindh Revenue Board) sales tax on services — not FBR. Optional:
+  // receptionist can disable it entirely, or pick 8%/15%/custom when on.
+  taxEnabled: { type: Boolean, default: true },
   taxRate: { type: Number, default: 15 },
   subtotal: { type: Number, default: 0 },
   taxAmount: { type: Number, default: 0 },

@@ -442,6 +442,38 @@ router.post('/leave-requests', authMiddleware, async (req, res) => {
   } catch (e) { console.error('leave-requests POST error:', e); res.status(500).json({ success: false, message: e.message }); }
 });
 
+// ─── WALK-IN PATIENTS (front-desk visits under this doctor) ───────────────────
+// Lets the doctor see/refer/add-to walk-ins a receptionist created on their
+// behalf — these have appointmentId:null so they never show up in the normal
+// appointments list.
+router.get('/walkins', authMiddleware, async (req, res) => {
+  try {
+    await connectMongoDB();
+    const doctorId = toId(req.user.id);
+    const walkins = await Consultation.find({ doctorId, isWalkIn: true })
+      .sort({ createdAt: -1 })
+      .limit(50)
+      .lean();
+    res.json({
+      success: true,
+      walkins: walkins.map(w => ({
+        _id: w._id.toString(),
+        patientName: w.patientName || '',
+        patientAge: w.patientAge || '',
+        patientGender: w.patientGender || '',
+        reason: w.reason || '',
+        status: w.status,
+        paymentStatus: w.paymentStatus,
+        hasPrescription: w.hasPrescription,
+        createdAt: w.createdAt,
+      })),
+    });
+  } catch (error) {
+    console.error('Get doctor walkins error:', error);
+    res.status(500).json({ success: false, message: 'Failed to fetch walk-in patients' });
+  }
+});
+
 // ─── GET DOCTOR BY ID ─────────────────────────────────────────────────────────
 router.get('/:id', async (req, res) => {
   try {

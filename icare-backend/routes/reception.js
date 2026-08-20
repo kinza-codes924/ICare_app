@@ -120,7 +120,9 @@ router.delete('/consultations/:consultationId/procedures/:procedureId', ...recep
 router.get('/consultations/:consultationId', ...receptionistOnly, async (req, res) => {
   try {
     await connectMongoDB();
-    const consultation = await Consultation.findById(toId(req.params.consultationId)).lean();
+    const consultation = await Consultation.findById(toId(req.params.consultationId))
+      .populate('doctorId', 'name username')
+      .lean();
     if (!consultation) return res.status(404).json({ success: false, message: 'Consultation not found' });
     const prescription = consultation.prescriptionId
       ? await EnhancedPrescription.findById(consultation.prescriptionId).lean()
@@ -138,17 +140,18 @@ router.get('/consultations/:consultationId', ...receptionistOnly, async (req, re
 router.put('/consultations/:consultationId/tax', ...receptionistOnly, async (req, res) => {
   try {
     await connectMongoDB();
+    const taxEnabled = req.body.taxEnabled !== false;
     const taxRate = Number(req.body.taxRate);
-    if (!Number.isFinite(taxRate) || taxRate < 0) {
+    if (taxEnabled && (!Number.isFinite(taxRate) || taxRate < 0)) {
       return res.status(400).json({ success: false, message: 'taxRate must be a non-negative number' });
     }
     const consultation = await Consultation.findByIdAndUpdate(
       toId(req.params.consultationId),
-      { $set: { taxRate } },
+      { $set: { taxEnabled, taxRate: taxEnabled ? taxRate : 0 } },
       { new: true }
     ).lean();
     if (!consultation) return res.status(404).json({ success: false, message: 'Consultation not found' });
-    res.json({ success: true, taxRate: consultation.taxRate });
+    res.json({ success: true, taxEnabled: consultation.taxEnabled, taxRate: consultation.taxRate });
   } catch (err) {
     console.error('reception set tax error:', err);
     res.status(500).json({ success: false, message: 'Failed to update tax rate' });
@@ -159,7 +162,7 @@ router.put('/consultations/:consultationId/tax', ...receptionistOnly, async (req
 router.post('/invoices', ...receptionistOnly, async (req, res) => {
   try {
     await connectMongoDB();
-    const { clientName, items, taxRate } = req.body;
+    const { clientName, items, taxRate, taxEnabled } = req.body;
     if (!clientName) return res.status(400).json({ success: false, message: 'clientName is required' });
     const cleanItems = (Array.isArray(items) ? items : [])
       .map(i => ({ name: (i?.name || '').toString().trim(), price: Number(i?.price) || 0 }))
@@ -167,7 +170,8 @@ router.post('/invoices', ...receptionistOnly, async (req, res) => {
     if (cleanItems.length === 0) {
       return res.status(400).json({ success: false, message: 'At least one item is required' });
     }
-    const rate = Number.isFinite(Number(taxRate)) ? Number(taxRate) : 15;
+    const enabled = taxEnabled !== false;
+    const rate = enabled && Number.isFinite(Number(taxRate)) ? Number(taxRate) : 0;
     // Server always computes the real totals — never trust client-sent sums.
     const subtotal = cleanItems.reduce((sum, i) => sum + i.price, 0);
     const taxAmount = subtotal * (rate / 100);
@@ -176,6 +180,7 @@ router.post('/invoices', ...receptionistOnly, async (req, res) => {
       receptionistId: toId(req.user.id),
       clientName,
       items: cleanItems,
+      taxEnabled: enabled,
       taxRate: rate,
       subtotal,
       taxAmount,

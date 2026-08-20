@@ -77,9 +77,14 @@ const consultationSchema = new mongoose.Schema({
     addedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     addedAt: { type: Date, default: Date.now },
   }],
-  // SRB (Sindh Revenue Board) sales tax on services — not FBR. Defaults to
-  // 15%, editable by the receptionist before payment. taxAmount is
-  // recomputed server-side whenever the payment is calculated.
+  // SRB (Sindh Revenue Board) sales tax on services — not FBR. Optional per
+  // client request: receptionist can turn it off entirely, or pick 8%/15%
+  // (or any custom rate) when on. taxAmount is recomputed server-side
+  // whenever the payment is calculated, and is forced to 0 when disabled.
+  taxEnabled: {
+    type: Boolean,
+    default: true
+  },
   taxRate: {
     type: Number,
     default: 15

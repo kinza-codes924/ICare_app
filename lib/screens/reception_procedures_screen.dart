@@ -21,6 +21,7 @@ class _ReceptionProceduresScreenState extends State<ReceptionProceduresScreen> {
   final ReceptionService _service = ReceptionService();
   List<Map<String, dynamic>> _procedures = [];
   bool _loading = true;
+  bool _taxEnabled = true;
   final _taxRateCtrl = TextEditingController(text: '15');
 
   @override
@@ -41,16 +42,22 @@ class _ReceptionProceduresScreenState extends State<ReceptionProceduresScreen> {
     final consultation = result['consultation'] as Map?;
     setState(() {
       _procedures = List<Map<String, dynamic>>.from(consultation?['procedures'] ?? []);
+      _taxEnabled = consultation?['taxEnabled'] != false;
       final taxRate = (consultation?['taxRate'] as num?)?.toDouble();
-      if (taxRate != null) _taxRateCtrl.text = taxRate.toStringAsFixed(taxRate == taxRate.roundToDouble() ? 0 : 2);
+      if (taxRate != null && taxRate > 0) {
+        _taxRateCtrl.text = taxRate.toStringAsFixed(taxRate == taxRate.roundToDouble() ? 0 : 2);
+      }
       _loading = false;
     });
   }
 
   Future<void> _saveTaxRate() async {
-    final rate = double.tryParse(_taxRateCtrl.text.trim());
-    if (rate == null) return;
-    await _service.setConsultationTax(consultationId: widget.consultationId, taxRate: rate);
+    final rate = double.tryParse(_taxRateCtrl.text.trim()) ?? 0;
+    await _service.setConsultationTax(
+      consultationId: widget.consultationId,
+      taxEnabled: _taxEnabled,
+      taxRate: rate,
+    );
   }
 
   static const _commonProcedures = [
@@ -246,15 +253,45 @@ class _ReceptionProceduresScreenState extends State<ReceptionProceduresScreen> {
                   label: const Text('Add Procedure'),
                 ),
                 const SizedBox(height: 24),
-                const Text('SRB Sales Tax Rate (%)', style: TextStyle(fontWeight: FontWeight.w600)),
-                const SizedBox(height: 6),
-                TextField(
-                  controller: _taxRateCtrl,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(border: OutlineInputBorder()),
-                  onEditingComplete: _saveTaxRate,
-                  onTapOutside: (_) => _saveTaxRate(),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('SRB Sales Tax', style: TextStyle(fontWeight: FontWeight.w600)),
+                    Switch(
+                      value: _taxEnabled,
+                      onChanged: (v) {
+                        setState(() => _taxEnabled = v);
+                        _saveTaxRate();
+                      },
+                    ),
+                  ],
                 ),
+                if (_taxEnabled) ...[
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    children: [8, 15].map((preset) {
+                      final selected = double.tryParse(_taxRateCtrl.text.trim()) == preset.toDouble();
+                      return ChoiceChip(
+                        label: Text('$preset%'),
+                        selected: selected,
+                        onSelected: (_) {
+                          setState(() => _taxRateCtrl.text = preset.toString());
+                          _saveTaxRate();
+                        },
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: _taxRateCtrl,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(labelText: 'Custom rate (%)', border: OutlineInputBorder()),
+                    onChanged: (_) => setState(() {}),
+                    onEditingComplete: _saveTaxRate,
+                    onTapOutside: (_) => _saveTaxRate(),
+                  ),
+                ],
                 const SizedBox(height: 24),
                 SizedBox(
                   width: double.infinity,
