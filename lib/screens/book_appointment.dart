@@ -79,8 +79,8 @@ class _BookAppointmentScreenState extends ConsumerState<BookAppointmentScreen> {
     super.initState();
     // Generate next 30 days and keep only those matching the doctor's available days
     final today = DateTime.now();
-    final allDays = List.generate(30, (i) => today.add(Duration(days: i)));
-    _dateRange = allDays.where(_isDayAvailable).take(14).toList();
+    final allDays = List.generate(45, (i) => today.add(Duration(days: i)));
+    _dateRange = allDays.where(_isDayAvailable).take(30).toList();
     if (_dateRange.isEmpty) {
       // Fallback: show all days if none matched (safety net)
       _dateRange = List.generate(8, (i) => today.add(Duration(days: i)));
@@ -524,7 +524,8 @@ class _BookAppointmentScreenState extends ConsumerState<BookAppointmentScreen> {
               width: double.infinity,
               height: 52,
               child: ElevatedButton(
-                onPressed: (_selectedSlot != null || _isEmergency) ? () => setState(() => _step = 1) : null,
+                // Reviews step skipped per client request — go straight to checkout.
+                onPressed: (_selectedSlot != null || _isEmergency) ? () => setState(() => _step = 2) : null,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primaryColor,
                   foregroundColor: Colors.white,
@@ -532,7 +533,7 @@ class _BookAppointmentScreenState extends ConsumerState<BookAppointmentScreen> {
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   elevation: 0,
                 ),
-                child: Text('Continue to Book'.tr(), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+                child: Text('Continue to Book Appointment'.tr(), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
               ),
             ),
           ),
@@ -705,7 +706,7 @@ class _BookAppointmentScreenState extends ConsumerState<BookAppointmentScreen> {
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   elevation: 0,
                 ),
-                child: Text('Continue to Book'.tr(), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+                child: Text('Continue to Book Appointment'.tr(), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
               ),
             ),
           ),

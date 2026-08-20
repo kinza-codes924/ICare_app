@@ -30,6 +30,18 @@ Copy-Item -Recurse -Force "build\web\canvaskit"  ".vercel\output\static\canvaski
 # "max-age=0, must-revalidate", so browsers kept replaying a stale index.html
 # after a deploy and users ran old JS against a new backend. Hashed assets
 # under /assets, /canvaskit and /icons are excluded so they stay cacheable.
+#
+# main.dart.js / flutter.js / flutter_bootstrap.js are a THIRD category:
+# unlike index.html (no cache — must always reflect the latest deploy) and
+# /assets|/canvaskit|/icons (content-hashed filenames — cache forever), these
+# keep the SAME filename across deploys but their content changes every time.
+# They were caught by the index.html catch-all above (no-store), which meant
+# every single page navigation re-downloaded the ~10MB main.dart.js bundle
+# from scratch with zero browser caching — this was the main cause of the
+# "every tab takes forever to load" complaint. A short max-age with
+# must-revalidate lets the browser reuse it within a session/across quick
+# navigations while still picking up a new deploy's version within minutes
+# (never indefinitely stale, unlike a long/immutable cache would be).
 $config = @'
 {
   "version": 3,
@@ -48,7 +60,14 @@ $config = @'
       "continue": true
     },
     {
-      "src": "^(?!/(?:assets|canvaskit|icons)/).*$",
+      "src": "^/(?:main\\.dart\\.js|flutter\\.js|flutter_bootstrap\\.js|flutter_service_worker\\.js)$",
+      "headers": {
+        "Cache-Control": "public, max-age=300, must-revalidate"
+      },
+      "continue": true
+    },
+    {
+      "src": "^(?!/(?:assets|canvaskit|icons|main\\.dart\\.js|flutter\\.js|flutter_bootstrap\\.js|flutter_service_worker\\.js)).*$",
       "headers": {
         "Cache-Control": "no-store, no-cache, must-revalidate"
       },

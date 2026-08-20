@@ -114,7 +114,7 @@ async function safepayGet(path) {
 // Returns { amount, originalAmount, payeeId, description, voucherCode } or throws.
 // payeeId = who receives the money (instructor/doctor/lab/pharmacy) — powers
 // the admin per-entity revenue report.
-async function calculateAmount({ type, refId, voucherCode, userId, installmentIndex }) {
+async function calculateAmount({ type, refId, voucherCode, userId, installmentIndex, method }) {
   if (type === 'course') {
     const course = await Course.findById(refId).lean();
     if (!course) throw new Error('Course not found');
@@ -177,8 +177,11 @@ async function calculateAmount({ type, refId, voucherCode, userId, installmentIn
     if (appt.paymentStatus === 'paid') throw new Error('This appointment is already paid');
     const profile = await DoctorProfile.findOne({ user_id: appt.doctor_id }).lean();
     const fee = Number(profile?.consultation_fee) || 0;
+    // 5% online-payment discount — cash-at-clinic payers pay full price,
+    // Pay Now (safepay) gets the discount as an incentive to pay upfront.
+    const amount = method === 'safepay' ? Math.round(fee * 0.95 * 100) / 100 : fee;
     return {
-      amount: fee, originalAmount: fee,
+      amount, originalAmount: fee,
       payeeId: appt.doctor_id || null,
       description: 'Doctor consultation fee',
       voucherCode: null,
@@ -374,7 +377,7 @@ async function fulfillPayment(payment) {
     // 'in_progress' — paying for it must NOT downgrade it back to
     // 'confirmed' (that status is only for scheduled bookings awaiting
     // their time slot). Only bump 'pending' -> 'confirmed'.
-    const appt = await Appointment.findById(payment.refId).select('status').lean();
+    const appt = await Appointment.findById(payment.refId).lean();
     const update = { paymentStatus: 'paid' };
     if (!appt || appt.status === 'pending') update.status = 'confirmed';
     await Appointment.findByIdAndUpdate(payment.refId, update);
@@ -382,6 +385,39 @@ async function fulfillPayment(payment) {
     payment.fulfilledAt = new Date();
     await payment.save();
     await plog({ paymentId: payment._id, tracker: payment.safepayTracker, userId: payment.userId, step: 'FULFILLED', message: `Appointment ${payment.refId} confirmed & marked paid` });
+
+    // Client requested a clear "new booking" alert on the doctor's side —
+    // previously only the patient got an email/notification, the doctor had
+    // to happen to open the dashboard. Fire both in-app + email here, once,
+    // right when the booking actually becomes real (paid/confirmed), not at
+    // creation time when it could still be abandoned mid-payment.
+    if (appt?.doctor_id) {
+      try {
+        const [doctor, patient] = await Promise.all([
+          User.findById(appt.doctor_id).select('email name').lean(),
+          User.findById(appt.patient_id).select('name').lean(),
+        ]);
+        const patientName = appt.patient_name || patient?.name || 'A patient';
+        const dateStr = appt.appointment_date || '';
+        const timeStr = appt.appointment_time || '';
+        await Notification.create({
+          userId: appt.doctor_id,
+          type: 'appointment',
+          title: 'New Appointment Booked',
+          message: `${patientName} booked an appointment${dateStr ? ` for ${dateStr}${timeStr ? ` at ${timeStr}` : ''}` : ''} and payment is confirmed.`,
+          data: { appointmentId: payment.refId.toString() },
+        }).catch(() => {});
+        if (doctor?.email) {
+          sendEmail({
+            to: doctor.email,
+            subject: 'New Appointment Booked — iCare',
+            html: `<p>Hi Dr. ${doctor.name || ''},</p><p><b>${patientName}</b> has booked an appointment${dateStr ? ` for <b>${dateStr}${timeStr ? ` at ${timeStr}` : ''}</b>` : ''} and the payment has been confirmed.</p><p>Please check your iCare dashboard for details.</p>`,
+          }).catch(() => {});
+        }
+      } catch (notifErr) {
+        console.error('Appointment booked doctor-notify error:', notifErr.message);
+      }
+    }
     return {};
   }
 
@@ -478,8 +514,8 @@ router.post('/create', authMiddleware, async (req, res) => {
     if (!type || !refId) return res.status(400).json({ success: false, message: 'type and refId required' });
     const rId = toId(refId);
     if (!rId) return res.status(400).json({ success: false, message: 'Invalid refId' });
-    if (method !== 'safepay' && !['lab', 'pharmacy', 'reception', 'standalone_invoice'].includes(type)) {
-      return res.status(400).json({ success: false, message: 'Cash/card payment is only available for lab tests, pharmacy orders, reception visits, and standalone invoices' });
+    if (method !== 'safepay' && !['lab', 'pharmacy', 'reception', 'standalone_invoice', 'appointment'].includes(type)) {
+      return res.status(400).json({ success: false, message: 'Cash/card payment is only available for lab tests, pharmacy orders, reception visits, standalone invoices, and appointments' });
     }
     if (method === 'card' && !['reception', 'standalone_invoice'].includes(type)) {
       return res.status(400).json({ success: false, message: 'Card payment is only available for reception visits and standalone invoices' });
@@ -496,7 +532,7 @@ router.post('/create', authMiddleware, async (req, res) => {
 
     // 1. Server-side amount
     const { amount, originalAmount, payeeId, description, voucherCode: appliedVoucher } =
-      await calculateAmount({ type, refId: rId, voucherCode, userId, installmentIndex: Number(installmentIndex) || undefined });
+      await calculateAmount({ type, refId: rId, voucherCode, userId, installmentIndex: Number(installmentIndex) || undefined, method });
     await plog({ userId, step: 'AMOUNT_CALCULATED', message: `${description} = PKR ${amount} (original ${originalAmount})` });
 
     // Free (or 100% voucher) — no gateway needed; client should call the normal endpoint.
@@ -526,6 +562,27 @@ router.post('/create', authMiddleware, async (req, res) => {
       } else if (type === 'standalone_invoice') {
         // Already 'unpaid' by default — nothing to flag here, fulfillPayment
         // flips it to 'paid' once the receptionist confirms collection.
+      } else if (type === 'appointment') {
+        // Cash-at-clinic: the booking isn't "paid" yet, but the doctor still
+        // needs to know it exists so they can expect the patient and confirm
+        // cash on arrival — payment confirmation (fulfillPayment) won't fire
+        // until then, so notify here at booking time instead.
+        try {
+          const appt = await Appointment.findById(rId).lean();
+          if (appt?.doctor_id) {
+            const patient = await User.findById(appt.patient_id).select('name').lean();
+            const patientName = appt.patient_name || patient?.name || 'A patient';
+            await Notification.create({
+              userId: appt.doctor_id,
+              type: 'appointment',
+              title: 'New Appointment Booked — Pay at Clinic',
+              message: `${patientName} booked an appointment${appt.appointment_date ? ` for ${appt.appointment_date}${appt.appointment_time ? ` at ${appt.appointment_time}` : ''}` : ''} and will pay in cash at the clinic.`,
+              data: { appointmentId: rId.toString() },
+            }).catch(() => {});
+          }
+        } catch (notifErr) {
+          console.error('Cash appointment doctor-notify error:', notifErr.message);
+        }
       } else {
         const Model = type === 'lab' ? LabTestRequest : PharmacyOrder;
         await Model.findByIdAndUpdate(rId, { paymentMethod: method, paymentStatus: 'cash_pending' });

@@ -60,7 +60,11 @@ class _SelectPaymentMethodState extends State<SelectPaymentMethod> {
   String? _appliedVoucherCode;
   double? _discountedAmount; // null = no voucher applied, use widget.amount
 
-  double get _finalAmount => _discountedAmount ?? (widget.amount ?? 0);
+  double get _finalAmount {
+    if (_discountedAmount != null) return _discountedAmount!;
+    if (_onlineDiscountApplies && _selectedMethod == 'online') return _onlineDiscountedAmount;
+    return widget.amount ?? 0;
+  }
 
   String get _paymentType => widget.installmentIndex != null
       ? 'course_installment'
@@ -73,8 +77,15 @@ class _SelectPaymentMethodState extends State<SelectPaymentMethod> {
   String get _refId =>
       widget.courseId ?? widget.appointmentId ?? widget.labBookingId ?? '';
 
-  // Cash is only offered for lab bookings (pay the collector / pay at the lab).
-  bool get _cashAvailable => widget.labBookingId != null;
+  // Cash is offered for lab bookings (pay the collector / pay at the lab)
+  // and appointments (pay at the clinic — doctor confirms collection).
+  bool get _cashAvailable => widget.labBookingId != null || widget.appointmentId != null;
+
+  // 5% online-payment incentive — appointments only, matches the backend's
+  // calculateAmount() discount for method:'safepay' on type:'appointment'.
+  bool get _onlineDiscountApplies => widget.appointmentId != null;
+  double get _onlineDiscountedAmount =>
+      _onlineDiscountApplies ? (widget.amount ?? 0) * 0.95 : (widget.amount ?? 0);
 
   Future<void> _applyVoucher() async {
     final code = _voucherController.text.trim();
@@ -181,8 +192,9 @@ class _SelectPaymentMethodState extends State<SelectPaymentMethod> {
     }
   }
 
-  /// Cash flow (lab only): backend records a pending cash payment and flags
-  /// the booking — the lab marks "cash collected" before sample collection.
+  /// Cash flow (lab bookings and appointments): backend records a pending
+  /// cash payment and flags the booking — the lab/doctor marks "cash
+  /// collected" before sample collection / at the clinic visit.
   Future<void> _startCashFlow() async {
     final res = await _paymentService.createPayment(
       type: _paymentType,
@@ -190,12 +202,19 @@ class _SelectPaymentMethodState extends State<SelectPaymentMethod> {
       method: 'cash',
     );
     if (res['success'] == true && mounted) {
-      _showSuccessDialog(
-        "Booking Placed — Pay Cash",
-        "Your lab booking is placed. Please pay PKR ${_finalAmount.toStringAsFixed(0)} in cash "
-        "when your sample is collected (or at the lab). The lab will confirm your payment "
-        "before collecting the sample.",
-      );
+      final (title, message) = widget.appointmentId != null
+          ? (
+              "Appointment Booked — Pay at Clinic",
+              "Your appointment is booked. Please pay PKR ${_finalAmount.toStringAsFixed(0)} in cash "
+              "at the clinic. The doctor will confirm your payment.",
+            )
+          : (
+              "Booking Placed — Pay Cash",
+              "Your lab booking is placed. Please pay PKR ${_finalAmount.toStringAsFixed(0)} in cash "
+              "when your sample is collected (or at the lab). The lab will confirm your payment "
+              "before collecting the sample.",
+            );
+      _showSuccessDialog(title, message);
     }
   }
 
@@ -456,7 +475,7 @@ class _SelectPaymentMethodState extends State<SelectPaymentMethod> {
         id: 'online',
         icon: Icons.credit_card_rounded,
         color: const Color(0xFF0036BC),
-        title: 'Pay Online',
+        title: _onlineDiscountApplies ? 'Pay Now to avail 5% Discount' : 'Pay Online',
         subtitle: 'Credit / Debit Card  •  Wallet  •  Google Pay — secure Safepay checkout',
       ),
       if (_cashAvailable)
@@ -464,8 +483,10 @@ class _SelectPaymentMethodState extends State<SelectPaymentMethod> {
           id: 'cash',
           icon: Icons.payments_rounded,
           color: const Color(0xFF059669),
-          title: 'Pay Cash at Collection',
-          subtitle: 'Pay in cash when your sample is collected — at home or at the lab',
+          title: widget.appointmentId != null ? 'Pay at the Clinic' : 'Pay Cash at Collection',
+          subtitle: widget.appointmentId != null
+              ? 'Pay in cash when you arrive at the clinic — full price, no discount'
+              : 'Pay in cash when your sample is collected — at home or at the lab',
         ),
     ];
   }
@@ -698,6 +719,11 @@ class _SelectPaymentMethodState extends State<SelectPaymentMethod> {
                                     _buildSummaryItem(
                                       "Voucher ($_appliedVoucherCode)",
                                       "- PKR ${((widget.amount ?? 0) - _finalAmount).toStringAsFixed(0)}",
+                                    ),
+                                  if (_appliedVoucherCode == null && _onlineDiscountApplies && _selectedMethod == 'online')
+                                    _buildSummaryItem(
+                                      "5% Online Payment Discount",
+                                      "- PKR ${((widget.amount ?? 0) - _onlineDiscountedAmount).toStringAsFixed(0)}",
                                     ),
                                   _buildSummaryItem("Processing Fee", "PKR 0.00"),
                                   const Divider(height: 32, color: Color(0xFFF1F5F9)),
