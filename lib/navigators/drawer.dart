@@ -583,6 +583,22 @@ class _CustomDrawerState extends ConsumerState<CustomDrawer> {
 
                       _drawerActionItem(
                         context,
+                        'Manage Receptionists',
+                        const Color(0xFF14B8A6),
+                        Icons.support_agent_outlined,
+                        () => context.go('/admin/receptionists'),
+                      ),
+
+                      _drawerActionItem(
+                        context,
+                        'iCare Clinics',
+                        const Color(0xFFEC4899),
+                        Icons.storefront_outlined,
+                        () => context.go('/admin/clinics'),
+                      ),
+
+                      _drawerActionItem(
+                        context,
                         'LMS Payments',
                         const Color(0xFF10B981),
                         Icons.receipt_long_outlined,
