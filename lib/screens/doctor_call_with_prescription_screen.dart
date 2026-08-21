@@ -2,7 +2,6 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:icare/screens/in_consultation_prescription_form.dart';
 import 'package:icare/screens/video_call.dart';
-import 'package:icare/services/consultation_service.dart';
 import 'package:icare/utils/prescription_toggle_bridge.dart';
 
 // Doctor's side of a walk-in "Call Doctor" (reception's front-desk flow) —
@@ -32,28 +31,17 @@ class DoctorCallWithPrescriptionScreen extends StatefulWidget {
 }
 
 class _DoctorCallWithPrescriptionScreenState extends State<DoctorCallWithPrescriptionScreen> {
-  bool _callEnded = false;
   bool _showForm = false;
   final PrescriptionToggleBridge _toggleBridge = PrescriptionToggleBridge();
-  final ConsultationService _consultationService = ConsultationService();
 
-  Future<void> _onCallEnded() async {
+  void _onCallEnded() {
     _toggleBridge.hide();
-    if (!mounted) return;
-    // If the doctor already completed (and submitted) the prescription live
-    // during the call, there's nothing left to do here — go straight back
-    // to the dashboard instead of showing the form again.
-    bool alreadyComplete = false;
-    try {
-      final draft = await _consultationService.getPrescriptionDraft(widget.consultationId);
-      alreadyComplete = draft != null && (draft['isComplete'] == true || draft['status'] == 'active');
-    } catch (_) {}
-    if (!mounted) return;
-    if (alreadyComplete) {
-      Navigator.of(context).pop();
-    } else {
-      setState(() => _callEnded = true);
-    }
+    // The prescription form only exists as the in-call panel — once the
+    // call ends (however it ends: hangup, "End Consultation for All", the
+    // other side leaving), go straight back to the dashboard. Per the
+    // client's explicit instruction: no post-call fallback form, whether or
+    // not the doctor completed it live during the call.
+    if (mounted) Navigator.of(context).pop();
   }
 
   void _togglePanel() {
@@ -71,15 +59,11 @@ class _DoctorCallWithPrescriptionScreenState extends State<DoctorCallWithPrescri
   }
 
   void _onPrescriptionComplete(bool isComplete) {
-    if (!isComplete) return;
+    if (!isComplete || !_showForm) return;
+    // Just close the panel — the call keeps going, ending it is a separate,
+    // explicit action (hangup / "End Consultation for All").
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!context.mounted) return;
-      if (_callEnded) {
-        Navigator.of(context).pop();
-      } else if (_showForm) {
-        // Call is still going — just close the panel, don't leave the call.
-        _togglePanel();
-      }
+      if (context.mounted) _togglePanel();
     });
   }
 
@@ -104,16 +88,6 @@ class _DoctorCallWithPrescriptionScreenState extends State<DoctorCallWithPrescri
 
   @override
   Widget build(BuildContext context) {
-    if (_callEnded) {
-      // Call ended (Jitsi hangup or the other side left) — the
-      // prescription form is still exactly where it was, uninterrupted;
-      // the doctor just finishes writing it full-width with no video.
-      return InConsultationPrescriptionForm(
-        consultationId: widget.consultationId,
-        onPrescriptionComplete: _onPrescriptionComplete,
-      );
-    }
-
     // The panel is laid out SIDE-BY-SIDE with the video (a Row that shrinks
     // the video), never stacked on top of it. A Flutter widget overlaid
     // directly over VideoCall's live Jitsi iframe (via Positioned/Stack)

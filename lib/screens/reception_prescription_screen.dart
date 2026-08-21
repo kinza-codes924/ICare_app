@@ -1,6 +1,5 @@
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
-import 'package:icare/screens/in_consultation_prescription_form.dart';
 import 'package:icare/screens/reception_procedures_screen.dart';
 import 'package:icare/screens/video_call.dart';
 import 'package:icare/services/call_service.dart';
@@ -12,9 +11,11 @@ import 'package:icare/utils/theme.dart';
 import 'package:icare/widgets/reception_prescription_live_preview.dart';
 
 // Walk-in flow's prescription step.
-//   1. Form-only (this screen, inside the reception ShellRoute) —
-//      InConsultationPrescriptionForm full width, "Call Doctor" FAB
-//      available if the receptionist wants to loop the doctor in.
+//   1. This screen is NOT an editable form — the receptionist never writes
+//      a prescription herself, only the doctor does (client's explicit
+//      correction: "receptionist prescription form kabhi na dekhe/fill
+//      kare, sirf doctor call ke dauran likhta hai"). Just a plain info
+//      card plus "Call Doctor" / "Skip Prescription".
 //   2. Once "Call Doctor" is pressed, _ReceptionCallScreen (below) is
 //      PUSHED on the root navigator — genuinely full-screen, no sidebar/
 //      dashboard chrome — with the video full-width and a dismissible
@@ -137,19 +138,37 @@ class _ReceptionPrescriptionScreenState extends State<ReceptionPrescriptionScree
     }
   }
 
-  Widget _buildPrescriptionForm() {
-    return InConsultationPrescriptionForm(
-      consultationId: widget.consultationId,
-      walkInPatientName: widget.patientName,
-      onPrescriptionComplete: (isComplete) {
-        if (isComplete) {
-          // The form pops itself on completion — schedule the forward
-          // navigation for right after that pop finishes.
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (context.mounted) _goToProcedures();
-          });
-        }
-      },
+  Widget _buildPrescriptionPlaceholder() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: AppColors.primaryColor.withValues(alpha: 0.08),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(Icons.medical_information_outlined, color: AppColors.primaryColor, size: 40),
+            ),
+            const SizedBox(height: 20),
+            Text(
+              widget.patientName,
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Only the doctor writes the prescription — call the doctor to '
+              'have it filled in during the consultation, or skip it for now.',
+              style: TextStyle(fontSize: 13, color: Color(0xFF64748B)),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -160,7 +179,7 @@ class _ReceptionPrescriptionScreenState extends State<ReceptionPrescriptionScree
     }
     return Stack(
       children: [
-        _buildPrescriptionForm(),
+        _buildPrescriptionPlaceholder(),
         Positioned(
           bottom: 168,
           right: 24,
