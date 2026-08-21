@@ -464,6 +464,45 @@ router.get('/clinic-admins', authMiddleware, adminOnly, async (req, res) => {
   }
 });
 
+// Reassigns an existing clinic admin to a different clinic.
+router.put('/clinic-admins/:userId', authMiddleware, adminOnly, async (req, res) => {
+  try {
+    await connectMongoDB();
+    const ClinicAdminProfile = require('../models/ClinicAdminProfile');
+    const clinicId = (req.body.clinicId || '').toString().trim();
+    if (!clinicId) return res.status(400).json({ success: false, message: 'clinicId is required' });
+    const profile = await ClinicAdminProfile.findOneAndUpdate(
+      { user_id: toId(req.params.userId) },
+      { $set: { clinicId } },
+      { new: true }
+    );
+    if (!profile) return res.status(404).json({ success: false, message: 'Clinic admin not found' });
+    res.json({ success: true, clinicId: profile.clinicId });
+  } catch (err) {
+    console.error('update clinic admin error:', err);
+    res.status(500).json({ success: false, message: 'Failed to update clinic admin' });
+  }
+});
+
+// Removes a clinic admin account entirely (both the User login and the
+// clinic scoping) — the same deactivation shape used elsewhere in this
+// file (soft-disable the User, not a hard delete, so audit/payment history
+// referencing this userId stays intact).
+router.delete('/clinic-admins/:userId', authMiddleware, adminOnly, async (req, res) => {
+  try {
+    await connectMongoDB();
+    const ClinicAdminProfile = require('../models/ClinicAdminProfile');
+    await Promise.all([
+      ClinicAdminProfile.deleteOne({ user_id: toId(req.params.userId) }),
+      User.findByIdAndUpdate(toId(req.params.userId), { is_active: false }),
+    ]);
+    res.json({ success: true, message: 'Clinic admin removed' });
+  } catch (err) {
+    console.error('delete clinic admin error:', err);
+    res.status(500).json({ success: false, message: 'Failed to remove clinic admin' });
+  }
+});
+
 // Doctors + their current clinic assignment, for the admin's clinic
 // management screen (the general /approved-users endpoint returns User
 // fields only — clinicId lives on DoctorProfile).

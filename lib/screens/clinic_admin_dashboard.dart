@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import 'package:icare/providers/auth_provider.dart';
 import 'package:icare/services/api_service.dart';
 import 'package:icare/utils/theme.dart';
 
@@ -8,18 +11,19 @@ import 'package:icare/utils/theme.dart';
 // the "hamare paas kaise information aayegi" visibility the client asked
 // for, specific to standalone clinics (independent telehealth doctors
 // still just get their own personal notification).
-class ClinicAdminDashboard extends StatefulWidget {
+class ClinicAdminDashboard extends ConsumerStatefulWidget {
   const ClinicAdminDashboard({super.key});
 
   @override
-  State<ClinicAdminDashboard> createState() => _ClinicAdminDashboardState();
+  ConsumerState<ClinicAdminDashboard> createState() => _ClinicAdminDashboardState();
 }
 
-class _ClinicAdminDashboardState extends State<ClinicAdminDashboard> {
+class _ClinicAdminDashboardState extends ConsumerState<ClinicAdminDashboard> {
   final ApiService _api = ApiService();
   bool _loading = true;
   String? _error;
   List<dynamic> _bookings = [];
+  String _filter = 'all'; // all | appointment | telehealth | walk-in
 
   @override
   void initState() {
@@ -54,6 +58,29 @@ class _ClinicAdminDashboardState extends State<ClinicAdminDashboard> {
     }
   }
 
+  Future<void> _confirmLogout() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Log Out?'),
+        content: const Text('You will need to sign in again to access the clinic dashboard.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+            child: const Text('Log Out'),
+          ),
+        ],
+      ),
+    );
+    if (confirm == true) {
+      await ref.read(authProvider.notifier).setUserLogout();
+      if (mounted) context.go('/login');
+    }
+  }
+
   Color _typeColor(String type) => switch (type) {
         'telehealth' => Colors.indigo,
         'walk-in' => Colors.teal,
@@ -72,14 +99,32 @@ class _ClinicAdminDashboardState extends State<ClinicAdminDashboard> {
         _ => 'Appointment',
       };
 
+  List<dynamic> get _filteredBookings =>
+      _filter == 'all' ? _bookings : _bookings.where((b) => b['bookingType'] == _filter).toList();
+
+  int _countOf(String type) => _bookings.where((b) => b['bookingType'] == type).length;
+  int get _paidCount => _bookings.where((b) => b['paymentStatus'] == 'paid').length;
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_rounded),
+          onPressed: () => Navigator.of(context).maybePop(),
+        ),
         title: const Text('Clinic Dashboard'),
         backgroundColor: AppColors.primaryColor,
         foregroundColor: Colors.white,
+        elevation: 0,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.logout_rounded),
+            tooltip: 'Log Out',
+            onPressed: _confirmLogout,
+          ),
+        ],
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
@@ -87,67 +132,177 @@ class _ClinicAdminDashboardState extends State<ClinicAdminDashboard> {
               ? Center(child: Text(_error!, style: const TextStyle(color: Colors.red)))
               : RefreshIndicator(
                   onRefresh: _load,
-                  child: _bookings.isEmpty
-                      ? ListView(
-                          children: const [
-                            Padding(
-                              padding: EdgeInsets.only(top: 80),
-                              child: Center(child: Text('No bookings yet.', style: TextStyle(color: Color(0xFF64748B)))),
+                  child: CustomScrollView(
+                    slivers: [
+                      SliverToBoxAdapter(child: _buildStatsHeader()),
+                      SliverToBoxAdapter(child: _buildFilterChips()),
+                      _filteredBookings.isEmpty
+                          ? SliverFillRemaining(
+                              hasScrollBody: false,
+                              child: Padding(
+                                padding: const EdgeInsets.only(top: 60),
+                                child: Column(
+                                  children: [
+                                    const Icon(Icons.inbox_outlined, size: 48, color: Color(0xFFCBD5E1)),
+                                    const SizedBox(height: 12),
+                                    const Text('No bookings yet.', style: TextStyle(color: Color(0xFF64748B))),
+                                  ],
+                                ),
+                              ),
+                            )
+                          : SliverPadding(
+                              padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
+                              sliver: SliverList(
+                                delegate: SliverChildBuilderDelegate(
+                                  (context, index) {
+                                    final b = _filteredBookings[index];
+                                    final type = b['bookingType']?.toString() ?? 'appointment';
+                                    final color = _typeColor(type);
+                                    final createdAt = DateTime.tryParse(b['createdAt']?.toString() ?? '');
+                                    return TweenAnimationBuilder<double>(
+                                      tween: Tween(begin: 0, end: 1),
+                                      duration: Duration(milliseconds: 220 + (index.clamp(0, 10)) * 35),
+                                      curve: Curves.easeOutCubic,
+                                      builder: (context, value, child) => Opacity(
+                                        opacity: value,
+                                        child: Transform.translate(offset: Offset(0, (1 - value) * 10), child: child),
+                                      ),
+                                      child: Container(
+                                        margin: const EdgeInsets.only(bottom: 10),
+                                        decoration: BoxDecoration(
+                                          color: Colors.white,
+                                          borderRadius: BorderRadius.circular(14),
+                                          border: Border.all(color: const Color(0xFFE2E8F0)),
+                                        ),
+                                        child: ListTile(
+                                          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                                          leading: Container(
+                                            padding: const EdgeInsets.all(10),
+                                            decoration: BoxDecoration(
+                                              color: color.withValues(alpha: 0.1),
+                                              borderRadius: BorderRadius.circular(10),
+                                            ),
+                                            child: Icon(_typeIcon(type), color: color, size: 20),
+                                          ),
+                                          title: Text(
+                                            b['patientName']?.toString() ?? '',
+                                            style: const TextStyle(fontWeight: FontWeight.w700),
+                                          ),
+                                          subtitle: Text(
+                                            '${_typeLabel(type)} · Dr. ${b['doctorName'] ?? ''} · ${b['status'] ?? ''}'
+                                            '${createdAt != null ? ' · ${createdAt.day}/${createdAt.month}/${createdAt.year}' : ''}',
+                                            style: const TextStyle(fontSize: 12.5),
+                                          ),
+                                          trailing: Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                            decoration: BoxDecoration(
+                                              color: (b['paymentStatus'] == 'paid' ? Colors.green : Colors.orange).withValues(alpha: 0.1),
+                                              borderRadius: BorderRadius.circular(8),
+                                            ),
+                                            child: Text(
+                                              b['paymentStatus'] == 'paid' ? 'Paid' : 'Unpaid',
+                                              style: TextStyle(
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.w700,
+                                                color: b['paymentStatus'] == 'paid' ? Colors.green : Colors.orange,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                  childCount: _filteredBookings.length,
+                                ),
+                              ),
                             ),
-                          ],
-                        )
-                      : ListView.builder(
-                          padding: const EdgeInsets.all(16),
-                          itemCount: _bookings.length,
-                          itemBuilder: (context, index) {
-                            final b = _bookings[index];
-                            final type = b['bookingType']?.toString() ?? 'appointment';
-                            final color = _typeColor(type);
-                            final createdAt = DateTime.tryParse(b['createdAt']?.toString() ?? '');
-                            return Card(
-                              margin: const EdgeInsets.only(bottom: 10),
-                              elevation: 0,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                side: const BorderSide(color: Color(0xFFE2E8F0)),
-                              ),
-                              child: ListTile(
-                                leading: Container(
-                                  padding: const EdgeInsets.all(8),
-                                  decoration: BoxDecoration(
-                                    color: color.withValues(alpha: 0.1),
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: Icon(_typeIcon(type), color: color, size: 18),
-                                ),
-                                title: Text(
-                                  b['patientName']?.toString() ?? '',
-                                  style: const TextStyle(fontWeight: FontWeight.w600),
-                                ),
-                                subtitle: Text(
-                                  '${_typeLabel(type)} · Dr. ${b['doctorName'] ?? ''} · ${b['status'] ?? ''}'
-                                  '${createdAt != null ? ' · ${createdAt.day}/${createdAt.month}/${createdAt.year}' : ''}',
-                                ),
-                                trailing: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                  decoration: BoxDecoration(
-                                    color: (b['paymentStatus'] == 'paid' ? Colors.green : Colors.orange).withValues(alpha: 0.1),
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: Text(
-                                    b['paymentStatus'] == 'paid' ? 'Paid' : 'Unpaid',
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w700,
-                                      color: b['paymentStatus'] == 'paid' ? Colors.green : Colors.orange,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            );
-                          },
-                        ),
+                    ],
+                  ),
                 ),
+    );
+  }
+
+  Widget _buildStatsHeader() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+      child: Row(
+        children: [
+          Expanded(child: _statCard('Total', _bookings.length.toString(), Icons.event_note_outlined, AppColors.primaryColor)),
+          const SizedBox(width: 10),
+          Expanded(child: _statCard('Paid', _paidCount.toString(), Icons.check_circle_outline, Colors.green)),
+          const SizedBox(width: 10),
+          Expanded(child: _statCard('Walk-in', _countOf('walk-in').toString(), Icons.storefront_outlined, Colors.teal)),
+        ],
+      ),
+    );
+  }
+
+  Widget _statCard(String label, String value, IconData icon, Color color) {
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0, end: 1),
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeOutCubic,
+      builder: (context, v, child) => Opacity(opacity: v, child: Transform.scale(scale: 0.9 + 0.1 * v, child: child)),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: const Color(0xFFE2E8F0)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(icon, color: color, size: 18),
+            const SizedBox(height: 8),
+            Text(value, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: Color(0xFF0F172A))),
+            Text(label, style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFilterChips() {
+    final options = [
+      ('all', 'All'),
+      ('appointment', 'Appointments'),
+      ('telehealth', 'Telehealth'),
+      ('walk-in', 'Walk-in'),
+    ];
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+      child: SizedBox(
+        height: 34,
+        child: ListView.separated(
+          scrollDirection: Axis.horizontal,
+          itemCount: options.length,
+          separatorBuilder: (_, _) => const SizedBox(width: 8),
+          itemBuilder: (context, i) {
+            final (value, label) = options[i];
+            final selected = _filter == value;
+            return AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              child: ChoiceChip(
+                label: Text(label),
+                selected: selected,
+                onSelected: (_) => setState(() => _filter = value),
+                selectedColor: AppColors.primaryColor,
+                labelStyle: TextStyle(
+                  color: selected ? Colors.white : const Color(0xFF334155),
+                  fontWeight: FontWeight.w600,
+                  fontSize: 12.5,
+                ),
+                backgroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20),
+                  side: BorderSide(color: selected ? AppColors.primaryColor : const Color(0xFFE2E8F0)),
+                ),
+              ),
+            );
+          },
+        ),
+      ),
     );
   }
 }

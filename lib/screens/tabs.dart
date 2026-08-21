@@ -97,6 +97,16 @@ class _TabsScreenState extends ConsumerState<TabsScreen> {
   int _notifUnreadCount = 0;
   final Set<String> _shownNotifIds = {}; // banner-shown ids, so a notification never redisplays
   bool _notifInitialized = false; // suppress banners for pre-existing unread on first load
+  // Authoritative guard against old unread notifications resurfacing as a
+  // banner on every fresh login (e.g. "Certificate Ready to Issue" from
+  // days ago reappearing each time). _notifInitialized alone only covers
+  // the very first poll of a session — a notification that was still
+  // unread by the time of any LATER poll in that same session (network
+  // hiccup on markAsRead, etc.) could still slip through. Comparing
+  // against session start time is unconditional: no notification created
+  // before this screen mounted can ever trigger a banner, no matter how
+  // polling/timing plays out.
+  final DateTime _sessionStartedAt = DateTime.now();
   OverlayEntry? _bannerEntry;
 
   // Per-course snooze state:
@@ -194,7 +204,13 @@ class _TabsScreenState extends ConsumerState<TabsScreen> {
 
       final newOnes = unread.where((n) {
         final id = n['_id']?.toString();
-        return id != null && id.isNotEmpty && !_shownNotifIds.contains(id);
+        if (id == null || id.isEmpty || _shownNotifIds.contains(id)) return false;
+        final createdAt = DateTime.tryParse(n['createdAt']?.toString() ?? '');
+        // No createdAt to compare against — err toward NOT showing an old
+        // notification as if it were fresh, rather than risk a resurfaced
+        // banner for something that happened days ago.
+        if (createdAt == null) return false;
+        return createdAt.isAfter(_sessionStartedAt);
       }).toList();
 
       if (_notifInitialized && newOnes.isNotEmpty) {

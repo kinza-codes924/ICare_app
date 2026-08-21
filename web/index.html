@@ -584,21 +584,33 @@
       window.dispatchEvent(new CustomEvent('icare-recaptcha-ready'));
     };
 
-    window.addEventListener('icare-recaptcha-mount', function(e) {
+    // Retries a few times before giving up — the container div is created
+    // by Flutter's HtmlElementView platform view, which can attach to the
+    // DOM slightly after this event fires (especially under CanvasKit,
+    // where platform views compose asynchronously). Without this, a mount
+    // request that arrives even a frame too early hit "if (!el) return;"
+    // and silently never rendered anything — no error, just a permanently
+    // empty box, which is exactly what was reported.
+    function _mountRecaptcha(containerId, retriesLeft) {
+      if (!window.grecaptcha || !grecaptcha.render) {
+        if (retriesLeft > 0) setTimeout(function() { _mountRecaptcha(containerId, retriesLeft - 1); }, 300);
+        return;
+      }
+      var el = document.getElementById(containerId);
+      if (!el) {
+        if (retriesLeft > 0) setTimeout(function() { _mountRecaptcha(containerId, retriesLeft - 1); }, 300);
+        return;
+      }
+      // This is a SPA (go_router, no full page reload between screens) —
+      // navigating from e.g. /signup to /work-with-us reuses the same
+      // container element id in a brand-new DOM node, but the previous
+      // widget id was never cleared, so this early-returned forever and
+      // the checkbox silently never rendered on any screen visited after
+      // the first one in a session. If the element grecaptcha last
+      // rendered into is no longer actually attached to the document,
+      // it's safe (and necessary) to render a fresh widget here.
+      if (_icareRecaptchaWidgetId !== null && el.childElementCount > 0) return;
       try {
-        if (!window.grecaptcha || !grecaptcha.render) return;
-        var containerId = (e.detail && JSON.parse(e.detail).containerId) || 'icare-recaptcha-container';
-        var el = document.getElementById(containerId);
-        if (!el) return;
-        // This is a SPA (go_router, no full page reload between screens) —
-        // navigating from e.g. /signup to /work-with-us reuses the same
-        // container element id in a brand-new DOM node, but the previous
-        // widget id was never cleared, so this early-returned forever and
-        // the checkbox silently never rendered on any screen visited after
-        // the first one in a session. If the element grecaptcha last
-        // rendered into is no longer actually attached to the document,
-        // it's safe (and necessary) to render a fresh widget here.
-        if (_icareRecaptchaWidgetId !== null && el.childElementCount > 0) return;
         _icareRecaptchaWidgetId = grecaptcha.render(containerId, {
           sitekey: ICARE_RECAPTCHA_SITE_KEY,
           callback: function(token) { _icareRecaptchaEmit(token); },
@@ -606,6 +618,11 @@
           'error-callback': function() { _icareRecaptchaEmit(null); },
         });
       } catch (err) { _icareRecaptchaEmit(null); }
+    }
+
+    window.addEventListener('icare-recaptcha-mount', function(e) {
+      var containerId = (e.detail && JSON.parse(e.detail).containerId) || 'icare-recaptcha-container';
+      _mountRecaptcha(containerId, 15); // up to ~4.5s of retrying
     });
 
     // Dart calls this on submit to read the current checkbox response
