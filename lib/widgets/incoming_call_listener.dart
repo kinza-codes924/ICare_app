@@ -6,6 +6,7 @@ import '../utils/shared_pref.dart';
 import '../utils/app_keys.dart';
 import '../screens/video_call.dart';
 import '../screens/consultation_chat_screen_v2.dart';
+import '../screens/doctor_call_with_prescription_screen.dart';
 
 // Conditional import for web-only dart:js_interop
 import '../utils/js_interop_stub.dart'
@@ -117,6 +118,21 @@ class _IncomingCallListenerState extends State<IncomingCallListener> {
                     currentUserName: userData?.name ?? 'User',
                     consultationId: channelName,
                     remoteUserName: callerName, // e.g. "Dr. Ahmed"
+                  ),
+                ),
+              );
+            } else if (callType == 'reception') {
+              // Walk-in front-desk call — channelName is the walk-in
+              // Consultation id. Doctor sees the same prescription form
+              // they'd otherwise fill in after the call, split alongside
+              // the video so they can write it live.
+              nav.push(
+                MaterialPageRoute(
+                  builder: (_) => DoctorCallWithPrescriptionScreen(
+                    consultationId: channelName,
+                    callerName: callerName,
+                    currentUserId: userData?.id ?? '',
+                    currentUserName: userData?.name ?? 'User',
                   ),
                 ),
               );

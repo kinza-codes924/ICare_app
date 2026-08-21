@@ -8,20 +8,19 @@ import 'package:icare/utils/shared_pref.dart';
 import 'package:icare/utils/theme.dart';
 
 // Walk-in flow's prescription step. Two states on the SAME screen (no
-// navigation between them — a prior version pushed VideoCall as a separate
-// route, which took the receptionist out of this screen's state entirely
-// and lost the walk-in details/dashboard underneath):
+// navigation between them — an earlier version pushed VideoCall as a
+// separate route, which took the receptionist out of this screen's state
+// entirely and lost the walk-in details/dashboard underneath):
 //   1. Form-only — InConsultationPrescriptionForm full width, "Call Doctor"
 //      FAB available if the receptionist wants to loop the doctor in.
-//   2. Call + form split — once "Call Doctor" is pressed, Jitsi (VideoCall)
-//      takes the left ~60% and the SAME prescription form takes the right
-//      ~40%, so the doctor can dictate/the receptionist can write the
-//      prescription live during the call, not after it ends. Per client's
-//      explicit request: "during the call he doctor prescription likh kar
-//      deta rahe... video call ke andar hi prescription form dedo".
+//   2. Full-screen call — once "Call Doctor" is pressed, this screen shows
+//      ONLY Jitsi, same as the doctor's own call screen. The prescription
+//      form only appears on the DOCTOR's side (incoming_call_listener.dart,
+//      callType 'reception') split alongside their video — per client's
+//      correction: "receptionist ki side ghalat hai, doctor ki sahi... jo
+//      prescription likh kar dega ussi ke screen ke side me aa jaye form".
 // Either state finishes the same way: onPrescriptionComplete(true) moves on
-// to Procedures — completing mid-call also ends the call (VideoCall gets
-// disposed when this screen swaps away).
+// to Procedures.
 class ReceptionPrescriptionScreen extends StatefulWidget {
   final String consultationId;
   final String patientName;
@@ -40,8 +39,8 @@ class _ReceptionPrescriptionScreenState extends State<ReceptionPrescriptionScree
   final ReceptionService _receptionService = ReceptionService();
   bool _calling = false;
 
-  // Set once the call actually starts — switches the layout to the split
-  // view. Carries what VideoCall needs so it isn't refetched mid-call.
+  // Set once the call actually starts — switches to the full-screen call
+  // layout. Carries what VideoCall needs so it isn't refetched mid-call.
   String? _doctorId;
   String? _doctorName;
   String? _myId;
@@ -77,16 +76,20 @@ class _ReceptionPrescriptionScreenState extends State<ReceptionPrescriptionScree
       final myId = user?.id ?? '';
       final myName = user?.name ?? 'Front Desk';
 
+      // 'reception' — not the generic 'video' type — is how the doctor's
+      // incoming-call screen knows to show the prescription form split
+      // alongside the video (see incoming_call_listener.dart).
       await CallService().initiateCall(
         receiverId: doctorId,
         channelName: widget.consultationId,
         callerName: myName,
-        callType: 'video',
+        callType: 'reception',
       );
       if (!mounted) return;
-      // No navigation — just swap this same screen's layout to the split
-      // view. Staying on one screen/one route is what keeps the walk-in
-      // form state and the reception dashboard underneath intact.
+      // No navigation — just swap this same screen's layout to the
+      // full-screen call. Staying on one screen/one route is what keeps
+      // the walk-in form state and the reception dashboard underneath
+      // intact.
       setState(() {
         _doctorId = doctorId;
         _doctorName = doctorName ?? 'Doctor';
@@ -122,59 +125,45 @@ class _ReceptionPrescriptionScreenState extends State<ReceptionPrescriptionScree
   Widget build(BuildContext context) {
     final inCall = _doctorId != null;
 
+    if (inCall) {
+      return VideoCall(
+        channelName: widget.consultationId,
+        remoteUserName: _doctorName ?? 'Doctor',
+        currentUserId: _myId ?? '',
+        currentUserName: _myName ?? 'Front Desk',
+        consultationId: widget.consultationId,
+        onCallEnded: _onCallEnded,
+        popOnCallEnded: false,
+      );
+    }
+
     return Stack(
       children: [
-        if (inCall)
-          Row(
-            children: [
-              Expanded(
-                flex: 6,
-                child: VideoCall(
-                  channelName: widget.consultationId,
-                  remoteUserName: _doctorName ?? 'Doctor',
-                  currentUserId: _myId ?? '',
-                  currentUserName: _myName ?? 'Front Desk',
-                  consultationId: widget.consultationId,
-                  onCallEnded: _onCallEnded,
-                  popOnCallEnded: false,
-                ),
-              ),
-              Expanded(
-                flex: 4,
-                child: Material(
-                  color: const Color(0xFFF8FAFC),
-                  child: _buildPrescriptionForm(),
-                ),
-              ),
-            ],
-          )
-        else ...[
-          _buildPrescriptionForm(),
-          Positioned(
-            bottom: 168,
-            right: 24,
-            child: FloatingActionButton.extended(
-              heroTag: 'reception_call_doctor',
-              onPressed: _calling ? null : _callDoctor,
-              label: Text(_calling ? 'Calling…' : 'Call Doctor'),
-              icon: const Icon(Icons.video_call_rounded),
-              backgroundColor: AppColors.primaryColor,
-            ),
+        _buildPrescriptionForm(),
+        Positioned(
+          bottom: 168,
+          right: 24,
+          child: FloatingActionButton.extended(
+            heroTag: 'reception_call_doctor',
+            onPressed: _calling ? null : _callDoctor,
+            label: Text(_calling ? 'Calling…' : 'Call Doctor'),
+            icon: const Icon(Icons.video_call_rounded),
+            backgroundColor: AppColors.primaryColor,
           ),
-          Positioned(
-            // Sits above the app-wide WhatsApp floating button (bottom: 20,
-            // right: 20, 64px tall) so the two never overlap.
-            bottom: 100,
-            right: 24,
-            child: FloatingActionButton.extended(
-              heroTag: 'reception_skip_prescription',
-              onPressed: _goToProcedures,
-              label: const Text('Skip Prescription'),
-              icon: const Icon(Icons.arrow_forward_rounded),
-              backgroundColor: const Color(0xFF64748B),
-            ),
+        ),
+        Positioned(
+          // Sits above the app-wide WhatsApp floating button (bottom: 20,
+          // right: 20, 64px tall) so the two never overlap.
+          bottom: 100,
+          right: 24,
+          child: FloatingActionButton.extended(
+            heroTag: 'reception_skip_prescription',
+            onPressed: _goToProcedures,
+            label: const Text('Skip Prescription'),
+            icon: const Icon(Icons.arrow_forward_rounded),
+            backgroundColor: const Color(0xFF64748B),
           ),
-        ],
+        ),
       ],
     );
   }
