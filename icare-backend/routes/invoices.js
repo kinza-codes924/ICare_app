@@ -39,26 +39,6 @@ function drawInvoiceHeader(doc, { invoiceNumber, date }) {
   doc.moveTo(50, 120).lineTo(550, 120).strokeColor('#E0E0E0').stroke();
 }
 
-// Shared Subtotal / SRB Sales Tax / Grand Total block, drawn under the
-// items table. Same x=350 (label) / x=450 (value, right-aligned) columns
-// the pharmacy route's older single "Total Amount:" line already used, so
-// no other layout changes are needed. Renders correctly with taxRate 0
-// (subtotal line only would be redundant, so the tax line just reads 0.00
-// rather than being hidden — keeps the SRB compliance line always visible).
-function drawInvoiceTotals(doc, { yPos, subtotal, taxRate, taxAmount, totalAmount }) {
-  doc.fontSize(10).fillColor('#666666')
-    .text('Subtotal:', 350, yPos, { width: 100 })
-    .text(`PKR ${subtotal.toFixed(2)}`, 450, yPos, { width: 90, align: 'right' });
-  yPos += 18;
-  doc.text(`SRB Sales Tax (${taxRate}%):`, 350, yPos, { width: 100 })
-    .text(`PKR ${taxAmount.toFixed(2)}`, 450, yPos, { width: 90, align: 'right' });
-  yPos += 20;
-  doc.fontSize(12).fillColor('#0036BC')
-    .text('Grand Total:', 350, yPos, { bold: true })
-    .text(`PKR ${totalAmount.toFixed(2)}`, 450, yPos, { width: 90, align: 'right', bold: true });
-  return yPos;
-}
-
 // ─── GENERATE INVOICE PDF ─────────────────────────────────────────────────────
 router.get('/:orderId/pdf', authMiddleware, async (req, res) => {
   try {
@@ -183,6 +163,11 @@ router.get('/reception/:consultationId/pdf', async (req, res) => {
   try {
     await connectMongoDB();
     const Consultation = require('../models/Consultation');
+    const DoctorProfile = require('../models/DoctorProfile');
+    const { resolveClinicAddress } = require('../utils/clinicAddresses');
+    const {
+      newReceiptDoc, drawReceiptHeader, drawInfoLine, drawItemsList, drawReceiptTotals, drawReceiptFooter,
+    } = require('../utils/thermalReceipt');
     const { consultationId } = req.params;
 
     const consultation = await Consultation.findById(toId(consultationId)).lean();
@@ -190,7 +175,11 @@ router.get('/reception/:consultationId/pdf', async (req, res) => {
       return res.status(404).json({ success: false, message: 'Consultation not found' });
     }
 
-    const doctor = await User.findById(consultation.doctorId).lean();
+    const [doctor, doctorProfile] = await Promise.all([
+      User.findById(consultation.doctorId).lean(),
+      DoctorProfile.findOne({ user_id: consultation.doctorId }).lean(),
+    ]);
+    const clinicAddress = resolveClinicAddress(doctorProfile);
 
     // items = the doctor's base consultation fee (if set) + any billable
     // procedures added by reception — deliberately allowed to be empty/zero,
@@ -211,62 +200,25 @@ router.get('/reception/:consultationId/pdf', async (req, res) => {
     const taxAmount = consultation.taxAmount > 0 ? consultation.taxAmount : subtotal * (taxRate / 100);
     const totalAmount = subtotal + taxAmount;
 
-    const PDFDocument = require('pdfkit');
-    const doc = new PDFDocument({ margin: 50, size: 'A4' });
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename=icare-invoice-${consultationId}.pdf`);
-    doc.pipe(res);
+    // Thermal-printer receipt (80mm roll) — client's explicit format
+    // request for invoices, as opposed to prescriptions which stay A4.
+    const doc = newReceiptDoc(res, `icare-invoice-${consultationId}.pdf`);
 
-    drawInvoiceHeader(doc, {
-      invoiceNumber: consultationId,
+    let y = drawReceiptHeader(doc, {
+      invoiceNumber: consultationId.slice(-8).toUpperCase(),
       date: new Date(consultation.createdAt).toLocaleDateString('en-PK'),
+      clinicAddress,
     });
 
-    let yPos = 140;
-    doc.fontSize(11).fillColor('#0036BC').text('PATIENT INFORMATION', 50, yPos);
-    yPos += 20;
-    doc.fontSize(10).fillColor('#333333').text(`Name: ${consultation.patientName || 'Walk-in Patient'}`, 50, yPos);
-    yPos += 15;
-    if (consultation.patientAge) { doc.text(`Age: ${consultation.patientAge}`, 50, yPos); yPos += 15; }
-    if (consultation.patientGender) { doc.text(`Gender: ${consultation.patientGender}`, 50, yPos); }
+    y = drawInfoLine(doc, y, 'Patient', consultation.patientName || 'Walk-in Patient');
+    if (consultation.patientAge) y = drawInfoLine(doc, y, 'Age', String(consultation.patientAge));
+    if (consultation.patientGender) y = drawInfoLine(doc, y, 'Gender', consultation.patientGender);
+    y = drawInfoLine(doc, y, 'Doctor', doctor?.name || doctor?.username || 'N/A');
+    y += 4;
 
-    yPos = 140;
-    doc.fontSize(10).fillColor('#666666').text('Doctor:', 350, yPos);
-    yPos += 15;
-    doc.fontSize(9).fillColor('#333333').text(doctor?.name || doctor?.username || 'N/A', 350, yPos);
-
-    yPos = 280;
-    doc.rect(50, yPos, 500, 25).fillAndStroke('#0036BC', '#0036BC');
-    doc.fontSize(10).fillColor('#FFFFFF')
-      .text('Item', 60, yPos + 8, { width: 200 })
-      .text('Qty', 280, yPos + 8, { width: 50 })
-      .text('Price (PKR)', 350, yPos + 8, { width: 80 })
-      .text('Total (PKR)', 450, yPos + 8, { width: 90, align: 'right' });
-    yPos += 25;
-
-    if (items.length === 0) {
-      doc.rect(50, yPos, 500, 30).fillAndStroke('#F9F9F9', '#E0E0E0');
-      doc.fontSize(9).fillColor('#666666').text('No items recorded', 60, yPos + 10, { width: 480 });
-      yPos += 30;
-    } else {
-      items.forEach((item, index) => {
-        const bgColor = index % 2 === 0 ? '#F9F9F9' : '#FFFFFF';
-        doc.rect(50, yPos, 500, 30).fillAndStroke(bgColor, '#E0E0E0');
-        doc.fontSize(9).fillColor('#333333')
-          .text(item.name, 60, yPos + 10, { width: 200 })
-          .text(String(item.quantity), 280, yPos + 10, { width: 50 })
-          .text(item.price.toFixed(2), 350, yPos + 10, { width: 80 })
-          .text((item.price * item.quantity).toFixed(2), 450, yPos + 10, { width: 90, align: 'right' });
-        yPos += 30;
-      });
-    }
-
-    yPos += 10;
-    drawInvoiceTotals(doc, { yPos, subtotal, taxRate, taxAmount, totalAmount });
-
-    doc.fontSize(8).fillColor('#999999')
-      .text('Thank you for choosing iCare - Your Trusted Healthcare Platform', 50, 700, { align: 'center', width: 500 })
-      .text('For support, contact: support@icare.com', 50, 715, { align: 'center', width: 500 });
+    y = drawItemsList(doc, y, items);
+    y = drawReceiptTotals(doc, y, { subtotal, taxRate, taxAmount, totalAmount });
+    drawReceiptFooter(doc, y);
 
     doc.end();
   } catch (error) {
@@ -282,11 +234,29 @@ router.get('/standalone/:invoiceId/pdf', async (req, res) => {
   try {
     await connectMongoDB();
     const StandaloneInvoice = require('../models/StandaloneInvoice');
+    const ReceptionistProfile = require('../models/ReceptionistProfile');
+    const DoctorProfile = require('../models/DoctorProfile');
+    const { resolveClinicAddress } = require('../utils/clinicAddresses');
+    const {
+      newReceiptDoc, drawReceiptHeader, drawInfoLine, drawItemsList, drawReceiptTotals, drawReceiptFooter,
+    } = require('../utils/thermalReceipt');
     const { invoiceId } = req.params;
 
     const invoice = await StandaloneInvoice.findById(toId(invoiceId)).lean();
     if (!invoice) {
       return res.status(404).json({ success: false, message: 'Invoice not found' });
+    }
+
+    // No direct doctor/clinic link on a standalone invoice — resolve via
+    // the receptionist's own assigned doctor(s) (a receptionist works for
+    // one clinic in practice, so the first assigned doctor's clinicId is
+    // the invoice's clinic).
+    let clinicAddress = null;
+    const receptionistProfile = await ReceptionistProfile.findOne({ user_id: invoice.receptionistId }).lean();
+    const firstDoctorId = receptionistProfile?.doctorIds?.[0];
+    if (firstDoctorId) {
+      const doctorProfile = await DoctorProfile.findOne({ user_id: firstDoctorId }).lean();
+      clinicAddress = resolveClinicAddress(doctorProfile);
     }
 
     const items = (invoice.items || []).map(i => ({ name: i.name, quantity: 1, price: i.price || 0 }));
@@ -295,54 +265,22 @@ router.get('/standalone/:invoiceId/pdf', async (req, res) => {
     const taxAmount = invoice.taxAmount ?? subtotal * (taxRate / 100);
     const totalAmount = invoice.totalAmount ?? subtotal + taxAmount;
 
-    const PDFDocument = require('pdfkit');
-    const doc = new PDFDocument({ margin: 50, size: 'A4' });
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename=icare-invoice-${invoiceId}.pdf`);
-    doc.pipe(res);
+    // Thermal-printer receipt (80mm roll) — same format as the reception
+    // invoice above, per client's explicit request for invoices.
+    const doc = newReceiptDoc(res, `icare-invoice-${invoiceId}.pdf`);
 
-    drawInvoiceHeader(doc, {
-      invoiceNumber: invoiceId,
+    let y = drawReceiptHeader(doc, {
+      invoiceNumber: invoiceId.slice(-8).toUpperCase(),
       date: new Date(invoice.createdAt).toLocaleDateString('en-PK'),
+      clinicAddress,
     });
 
-    let yPos = 140;
-    doc.fontSize(11).fillColor('#0036BC').text('BILLED TO', 50, yPos);
-    yPos += 20;
-    doc.fontSize(10).fillColor('#333333').text(`Name: ${invoice.clientName}`, 50, yPos);
+    y = drawInfoLine(doc, y, 'Billed To', invoice.clientName);
+    y += 4;
 
-    yPos = 280;
-    doc.rect(50, yPos, 500, 25).fillAndStroke('#0036BC', '#0036BC');
-    doc.fontSize(10).fillColor('#FFFFFF')
-      .text('Item', 60, yPos + 8, { width: 200 })
-      .text('Qty', 280, yPos + 8, { width: 50 })
-      .text('Price (PKR)', 350, yPos + 8, { width: 80 })
-      .text('Total (PKR)', 450, yPos + 8, { width: 90, align: 'right' });
-    yPos += 25;
-
-    if (items.length === 0) {
-      doc.rect(50, yPos, 500, 30).fillAndStroke('#F9F9F9', '#E0E0E0');
-      doc.fontSize(9).fillColor('#666666').text('No items recorded', 60, yPos + 10, { width: 480 });
-      yPos += 30;
-    } else {
-      items.forEach((item, index) => {
-        const bgColor = index % 2 === 0 ? '#F9F9F9' : '#FFFFFF';
-        doc.rect(50, yPos, 500, 30).fillAndStroke(bgColor, '#E0E0E0');
-        doc.fontSize(9).fillColor('#333333')
-          .text(item.name, 60, yPos + 10, { width: 200 })
-          .text(String(item.quantity), 280, yPos + 10, { width: 50 })
-          .text(item.price.toFixed(2), 350, yPos + 10, { width: 80 })
-          .text((item.price * item.quantity).toFixed(2), 450, yPos + 10, { width: 90, align: 'right' });
-        yPos += 30;
-      });
-    }
-
-    yPos += 10;
-    drawInvoiceTotals(doc, { yPos, subtotal, taxRate, taxAmount, totalAmount });
-
-    doc.fontSize(8).fillColor('#999999')
-      .text('Thank you for choosing iCare - Your Trusted Healthcare Platform', 50, 700, { align: 'center', width: 500 })
-      .text('For support, contact: support@icare.com', 50, 715, { align: 'center', width: 500 });
+    y = drawItemsList(doc, y, items);
+    y = drawReceiptTotals(doc, y, { subtotal, taxRate, taxAmount, totalAmount });
+    drawReceiptFooter(doc, y);
 
     doc.end();
   } catch (error) {

@@ -197,10 +197,14 @@ router.get('/prescriptions/:prescriptionId/pdf', async (req, res) => {
     const rx = await EnhancedPrescription.findById(new mongoose.Types.ObjectId(req.params.prescriptionId)).lean();
     if (!rx) return res.status(404).json({ success: false, message: 'Prescription not found' });
 
-    const [patient, doctor] = await Promise.all([
+    const DoctorProfile = require('../models/DoctorProfile');
+    const { resolveClinicAddress } = require('../utils/clinicAddresses');
+    const [patient, doctor, doctorProfile] = await Promise.all([
       rx.patientId ? User.findById(rx.patientId).select('name username').lean().catch(() => null) : null,
       User.findById(rx.doctorId).select('name username').lean().catch(() => null),
+      DoctorProfile.findOne({ user_id: rx.doctorId }).lean().catch(() => null),
     ]);
+    const clinicAddress = resolveClinicAddress(doctorProfile);
 
     const patientName = patient?.name || patient?.username || rx.patientName || 'Patient';
     const doctorName = doctor?.name || doctor?.username || 'Doctor';
@@ -283,6 +287,12 @@ router.get('/prescriptions/:prescriptionId/pdf', async (req, res) => {
     }
     if (rx.doctorPhone) {
       doc.fontSize(9).fillColor(GREY).font('Helvetica').text(`Phone: ${rx.doctorPhone}`, drX, drY);
+      drY += 13;
+    }
+    if (clinicAddress) {
+      const addrColW = pageWidth - colW - 20;
+      doc.fontSize(8).fillColor(GREY).font('Helvetica').text(clinicAddress, drX, drY, { width: addrColW });
+      drY += doc.heightOfString(clinicAddress, { width: addrColW });
     }
 
     // thin divider after patient/doctor block
