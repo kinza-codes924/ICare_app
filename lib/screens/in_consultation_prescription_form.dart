@@ -1,6 +1,7 @@
 // In-Consultation Prescription Form — Single Page Accordion
 // Updated: May 11, 2026
 
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:icare/models/appointment_detail.dart';
 import 'package:icare/models/enhanced_prescription.dart';
@@ -21,6 +22,13 @@ class InConsultationPrescriptionForm extends StatefulWidget {
   final String consultationId;
   final Function(bool)? onPrescriptionComplete;
   final String? walkInPatientName;
+  // When true, auto-saves a draft every few seconds while the doctor is
+  // typing (silently — no "Draft saved" snackbar) so a read-only viewer
+  // polling getPrescriptionDraft elsewhere (e.g. the receptionist's split
+  // view during a walk-in call) sees near-live updates. Off by default —
+  // only the walk-in call flow needs this; every other consultation still
+  // only saves on the explicit "Save Draft" button / on complete.
+  final bool liveSync;
 
   const InConsultationPrescriptionForm({
     super.key,
@@ -28,6 +36,7 @@ class InConsultationPrescriptionForm extends StatefulWidget {
     required this.consultationId,
     this.onPrescriptionComplete,
     this.walkInPatientName,
+    this.liveSync = false,
   });
 
   @override
@@ -91,11 +100,15 @@ class _InConsultationPrescriptionFormState
 
   bool _isSaving = false;
   bool _isComplete = false;
+  Timer? _liveSyncTimer;
 
   @override
   void initState() {
     super.initState();
     _loadDraftIfExists();
+    if (widget.liveSync) {
+      _liveSyncTimer = Timer.periodic(const Duration(seconds: 5), (_) => _saveDraft(silent: true));
+    }
   }
 
   Future<void> _loadDraftIfExists() async {
@@ -133,8 +146,10 @@ class _InConsultationPrescriptionFormState
     });
   }
 
-  Future<void> _saveDraft() async {
-    setState(() => _isSaving = true);
+  // silent: true for the periodic liveSync autosave — no "isSaving" spinner
+  // state change (would flicker the UI every 5s) and no snackbar.
+  Future<void> _saveDraft({bool silent = false}) async {
+    if (!silent) setState(() => _isSaving = true);
     try {
       final prescription = _buildPrescriptionObject(isComplete: false);
       // Use same minimal payload as complete — avoids 500 from complex nested objects
@@ -146,7 +161,7 @@ class _InConsultationPrescriptionFormState
         consultationId: widget.consultationId,
         prescriptionData: payload,
       );
-      if ((result['success'] == true) && mounted) {
+      if (!silent && (result['success'] == true) && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Draft saved'), backgroundColor: Colors.green, duration: Duration(seconds: 2)),
         );
@@ -155,7 +170,7 @@ class _InConsultationPrescriptionFormState
       // Silent fail for draft — don't disturb the doctor
       debugPrint('Draft save error: $e');
     } finally {
-      if (mounted) setState(() => _isSaving = false);
+      if (!silent && mounted) setState(() => _isSaving = false);
     }
   }
 
@@ -372,6 +387,7 @@ class _InConsultationPrescriptionFormState
 
   @override
   void dispose() {
+    _liveSyncTimer?.cancel();
     _subjectiveController.dispose();
     _objectiveController.dispose();
     _assessmentController.dispose();

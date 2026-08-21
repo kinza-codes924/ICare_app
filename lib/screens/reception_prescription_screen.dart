@@ -6,6 +6,7 @@ import 'package:icare/services/call_service.dart';
 import 'package:icare/services/reception_service.dart';
 import 'package:icare/utils/shared_pref.dart';
 import 'package:icare/utils/theme.dart';
+import 'package:icare/widgets/reception_prescription_live_preview.dart';
 
 // Walk-in flow's prescription step. Two states on the SAME screen (no
 // navigation between them — an earlier version pushed VideoCall as a
@@ -13,12 +14,13 @@ import 'package:icare/utils/theme.dart';
 // entirely and lost the walk-in details/dashboard underneath):
 //   1. Form-only — InConsultationPrescriptionForm full width, "Call Doctor"
 //      FAB available if the receptionist wants to loop the doctor in.
-//   2. Full-screen call — once "Call Doctor" is pressed, this screen shows
-//      ONLY Jitsi, same as the doctor's own call screen. The prescription
-//      form only appears on the DOCTOR's side (incoming_call_listener.dart,
-//      callType 'reception') split alongside their video — per client's
-//      correction: "receptionist ki side ghalat hai, doctor ki sahi... jo
-//      prescription likh kar dega ussi ke screen ke side me aa jaye form".
+//   2. Call split view — once "Call Doctor" is pressed: video on the left,
+//      a READ-ONLY live preview of the doctor's prescription draft on the
+//      right (doctor_call_with_prescription_screen.dart is where the
+//      doctor actually writes it — that screen autosaves every 5s, this
+//      one polls the same draft on the same interval). Per client's
+//      explicit request: "jab doctor fill kare to receptionist ke paas
+//      bhi aa jaye... sync sahi se karna".
 // Either state finishes the same way: onPrescriptionComplete(true) moves on
 // to Procedures.
 class ReceptionPrescriptionScreen extends StatefulWidget {
@@ -126,14 +128,25 @@ class _ReceptionPrescriptionScreenState extends State<ReceptionPrescriptionScree
     final inCall = _doctorId != null;
 
     if (inCall) {
-      return VideoCall(
-        channelName: widget.consultationId,
-        remoteUserName: _doctorName ?? 'Doctor',
-        currentUserId: _myId ?? '',
-        currentUserName: _myName ?? 'Front Desk',
-        consultationId: widget.consultationId,
-        onCallEnded: _onCallEnded,
-        popOnCallEnded: false,
+      return Row(
+        children: [
+          Expanded(
+            flex: 6,
+            child: VideoCall(
+              channelName: widget.consultationId,
+              remoteUserName: _doctorName ?? 'Doctor',
+              currentUserId: _myId ?? '',
+              currentUserName: _myName ?? 'Front Desk',
+              consultationId: widget.consultationId,
+              onCallEnded: _onCallEnded,
+              popOnCallEnded: false,
+            ),
+          ),
+          Expanded(
+            flex: 4,
+            child: ReceptionPrescriptionLivePreview(consultationId: widget.consultationId),
+          ),
+        ],
       );
     }
 

@@ -230,7 +230,16 @@ class _VideoCallWebState extends State<VideoCall> {
     } catch (_) {}
     _startRemoteJoinPoller();
     _startDeclinePoller(); // detect patient decline immediately
-    if (!_isDoctor) _startRemoteLeftPoller(); // patient detects when doctor leaves mid-call
+    // "Doctor switching audio->video" only applies to a real doctor-patient
+    // appointment call. A walk-in front-desk call (reception_prescription_
+    // screen.dart) has no appointmentId and is never an audio/video
+    // conversion — running this poller there caused a false-positive
+    // "Doctor is switching to video call..." + auto-hangup mid-consultation
+    // whenever _jitsiIsRemoteLeft briefly flickered true (e.g. the doctor
+    // toggling their camera), which is exactly what was reported.
+    if (!_isDoctor && widget.appointmentId != null && widget.appointmentId!.isNotEmpty) {
+      _startRemoteLeftPoller();
+    }
   }
 
   /// Poll for decline status — if patient declines, show dialog and go back to chat

@@ -72,6 +72,10 @@ class _DoctorCallWithPrescriptionScreenState extends State<DoctorCallWithPrescri
             color: const Color(0xFFF8FAFC),
             child: InConsultationPrescriptionForm(
               consultationId: widget.consultationId,
+              // Autosaves every 5s while the doctor types, so the
+              // receptionist's read-only preview (reception_prescription_
+              // screen.dart) can poll the same draft and show it live.
+              liveSync: true,
               onPrescriptionComplete: (isComplete) {
                 if (isComplete) {
                   WidgetsBinding.instance.addPostFrameCallback((_) {
