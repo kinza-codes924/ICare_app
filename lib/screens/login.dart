@@ -882,7 +882,16 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                               ),
                               Expanded(
                                 child: GestureDetector(
-                                  onTap: () => context.push('/signup'),
+                                  // go, not push — pushing left the Login screen's own
+                                  // RecaptchaCheckbox mounted underneath Signup's, and since
+                                  // both share the same static container id/widget id in
+                                  // recaptcha_web.dart, whichever one grecaptcha.render()
+                                  // happened to attach to on Login could end up being the
+                                  // element Signup's mount request found too — sometimes the
+                                  // real (visible, top-of-stack) checkbox never got the
+                                  // actual widget. Replacing the route disposes Login's
+                                  // checkbox first, so there's only ever one instance alive.
+                                  onTap: () => context.go('/signup'),
                                   child: AnimatedContainer(
                                     duration: const Duration(milliseconds: 250),
                                     curve: Curves.easeInOut,
@@ -1440,7 +1449,16 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                           ),
                           Expanded(
                             child: GestureDetector(
-                              onTap: () => context.push('/signup'),
+                              // go, not push — pushing left the Login screen's own
+                                  // RecaptchaCheckbox mounted underneath Signup's, and since
+                                  // both share the same static container id/widget id in
+                                  // recaptcha_web.dart, whichever one grecaptcha.render()
+                                  // happened to attach to on Login could end up being the
+                                  // element Signup's mount request found too — sometimes the
+                                  // real (visible, top-of-stack) checkbox never got the
+                                  // actual widget. Replacing the route disposes Login's
+                                  // checkbox first, so there's only ever one instance alive.
+                                  onTap: () => context.go('/signup'),
                               child: Container(
                                 padding: EdgeInsets.symmetric(vertical: 15),
                                 decoration: BoxDecoration(

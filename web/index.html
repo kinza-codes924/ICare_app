@@ -570,6 +570,7 @@
   <script>
     var ICARE_RECAPTCHA_SITE_KEY = '6LdJj3ctAAAAALkUpo1t1ZRodsIsrxnj0Qg-N6wR';
     var _icareRecaptchaWidgetId = null;
+    var _icareRecaptchaRenderedGeneration = null; // last Dart-side generation actually rendered
 
     function _icareRecaptchaEmit(token) {
       window.dispatchEvent(new CustomEvent('icare-recaptcha-result', {
@@ -591,25 +592,29 @@
     // request that arrives even a frame too early hit "if (!el) return;"
     // and silently never rendered anything — no error, just a permanently
     // empty box, which is exactly what was reported.
-    function _mountRecaptcha(containerId, retriesLeft) {
+    function _mountRecaptcha(containerId, generation, retriesLeft) {
       if (!window.grecaptcha || !grecaptcha.render) {
-        if (retriesLeft > 0) setTimeout(function() { _mountRecaptcha(containerId, retriesLeft - 1); }, 300);
+        if (retriesLeft > 0) setTimeout(function() { _mountRecaptcha(containerId, generation, retriesLeft - 1); }, 300);
         return;
       }
       var el = document.getElementById(containerId);
       if (!el) {
-        if (retriesLeft > 0) setTimeout(function() { _mountRecaptcha(containerId, retriesLeft - 1); }, 300);
+        if (retriesLeft > 0) setTimeout(function() { _mountRecaptcha(containerId, generation, retriesLeft - 1); }, 300);
         return;
       }
       // This is a SPA (go_router, no full page reload between screens) —
-      // navigating from e.g. /signup to /work-with-us reuses the same
-      // container element id in a brand-new DOM node, but the previous
-      // widget id was never cleared, so this early-returned forever and
-      // the checkbox silently never rendered on any screen visited after
-      // the first one in a session. If the element grecaptcha last
-      // rendered into is no longer actually attached to the document,
-      // it's safe (and necessary) to render a fresh widget here.
-      if (_icareRecaptchaWidgetId !== null && el.childElementCount > 0) return;
+      // navigating between screens with their own RecaptchaCheckbox (e.g.
+      // Login -> Signup) is NOT reliably detectable from the JS side by
+      // comparing DOM element identity: Flutter Web can recycle the exact
+      // same underlying container element across a HtmlElementView being
+      // disposed and a new one created right after (confirmed live — some
+      // Login->Signup navigations handed this function the identical node
+      // Login had already rendered into, which made every "is this a new
+      // element" check occasionally say no when it should have said yes).
+      // The `generation` counter comes from Dart and increments once per
+      // widget instance's initState, so it's the one source of truth that
+      // can't be fooled by DOM recycling — only render once per generation.
+      if (_icareRecaptchaWidgetId !== null && _icareRecaptchaRenderedGeneration === generation) return;
       try {
         _icareRecaptchaWidgetId = grecaptcha.render(containerId, {
           sitekey: ICARE_RECAPTCHA_SITE_KEY,
@@ -617,12 +622,28 @@
           'expired-callback': function() { _icareRecaptchaEmit(null); },
           'error-callback': function() { _icareRecaptchaEmit(null); },
         });
-      } catch (err) { _icareRecaptchaEmit(null); }
+        _icareRecaptchaRenderedGeneration = generation;
+      } catch (err) {
+        // grecaptcha.render() throws if, say, Flutter tore down and
+        // recreated the platform view's DOM node between getElementById
+        // above and this call (a real race — Dart-side rebuilds can
+        // replace the HtmlElementView's element at any point). Retrying
+        // instead of swallowing the error here was part of the fix for
+        // the desktop-intermittent report: previously any throw here was
+        // a silent permanent failure with no second attempt.
+        if (retriesLeft > 0) {
+          setTimeout(function() { _mountRecaptcha(containerId, generation, retriesLeft - 1); }, 300);
+        } else {
+          _icareRecaptchaEmit(null);
+        }
+      }
     }
 
     window.addEventListener('icare-recaptcha-mount', function(e) {
-      var containerId = (e.detail && JSON.parse(e.detail).containerId) || 'icare-recaptcha-container';
-      _mountRecaptcha(containerId, 15); // up to ~4.5s of retrying
+      var detail = e.detail ? JSON.parse(e.detail) : {};
+      var containerId = detail.containerId || 'icare-recaptcha-container';
+      var generation = detail.generation != null ? detail.generation : 0;
+      _mountRecaptcha(containerId, generation, 15); // up to ~4.5s of retrying
     });
 
     // Dart calls this on submit to read the current checkbox response

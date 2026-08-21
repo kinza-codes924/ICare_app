@@ -883,6 +883,8 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                       children: [
                         ..._buildFields(),
                         const SizedBox(height: 8),
+                        const Center(child: RecaptchaCheckbox()),
+                        const SizedBox(height: 16),
                         _submitBtn(height: 50),
                         const SizedBox(height: 20),
                         _signInLink(),

@@ -13,6 +13,17 @@ const String recaptchaContainerId = 'icare-recaptcha-container';
 const String _recaptchaViewType = 'icare-recaptcha-view';
 bool _viewFactoryRegistered = false;
 
+// Bumped once per registerRecaptchaView() call (i.e. once per widget
+// instance's initState). Flutter Web can recycle the SAME underlying DOM
+// element across a HtmlElementView being disposed and a new one created
+// right after (confirmed live: navigating Login -> Signup sometimes handed
+// the JS side the identical container node Login had already rendered
+// into) — so element-identity checks on the JS side are not a reliable way
+// to tell "this is a genuinely new screen's checkbox" from "the same one
+// re-firing its mount timer". A monotonic generation number from the Dart
+// side is unambiguous: JS always renders fresh for a new generation.
+int _recaptchaGeneration = 0;
+
 /// Registers the platform view that hosts the checkbox <div>, and asks the
 /// JS side to render the widget into it once the container exists in the
 /// DOM and grecaptcha has loaded. Safe to call multiple times — the view
@@ -22,6 +33,8 @@ bool _viewFactoryRegistered = false;
 /// container element) can appear later in the same page load without
 /// index.html's onload callback ever firing again.
 void registerRecaptchaView() {
+  final generation = ++_recaptchaGeneration;
+
   if (!_viewFactoryRegistered) {
     _viewFactoryRegistered = true;
     ui_web.platformViewRegistry.registerViewFactory(_recaptchaViewType, (int viewId) {
@@ -36,7 +49,7 @@ void registerRecaptchaView() {
   void mount() {
     html.window.dispatchEvent(html.CustomEvent(
       'icare-recaptcha-mount',
-      detail: jsonEncode({'containerId': recaptchaContainerId}),
+      detail: jsonEncode({'containerId': recaptchaContainerId, 'generation': generation}),
     ));
   }
 
