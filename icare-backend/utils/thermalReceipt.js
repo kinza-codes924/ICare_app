@@ -29,13 +29,20 @@ function drawReceiptHeader(doc, { invoiceNumber, date, clinicAddress }) {
 
   let y = MARGIN;
   if (logoExists) {
-    const logoW = 40;
+    // logo.png already has the "icare" wordmark baked into the image
+    // itself (visible below the icon) — a separate "iCare" text label
+    // here duplicated it and visually overlapped, so it's logo-only when
+    // the image is available, text-only fallback otherwise.
+    const logoW = 60;
+    // logo.png is 192x213px (h/w ≈ 1.11) — used here, not assumed, so the
+    // header spacing tracks the image's real proportions.
     doc.image(logoPath, (WIDTH - logoW) / 2, y, { width: logoW });
-    y += logoW + 4;
+    y += logoW * (213 / 192) + 6;
+  } else {
+    doc.fontSize(13).fillColor('#0036BC').font('Helvetica-Bold')
+      .text('iCare', MARGIN, y, { width: CONTENT_WIDTH, align: 'center' });
+    y += 16;
   }
-  doc.fontSize(13).fillColor('#0036BC').font('Helvetica-Bold')
-    .text('iCare', MARGIN, y, { width: CONTENT_WIDTH, align: 'center' });
-  y += 16;
   doc.fontSize(7).fillColor('#666666').font('Helvetica')
     .text('Your Trusted Healthcare Platform', MARGIN, y, { width: CONTENT_WIDTH, align: 'center' });
   y += 12;

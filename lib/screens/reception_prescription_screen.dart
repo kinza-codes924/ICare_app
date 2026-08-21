@@ -71,7 +71,14 @@ class _ReceptionPrescriptionScreenState extends State<ReceptionPrescriptionScree
         callType: 'video',
       );
       if (!mounted) return;
-      await Navigator.of(context).push(
+      // rootNavigator: true — this screen lives inside the reception
+      // ShellRoute (sidebar + dashboard chrome), so a plain
+      // Navigator.of(context).push stays nested inside that shell instead
+      // of covering the whole viewport: the sidebar and the app-wide
+      // WhatsApp button stayed visible around the call the whole time,
+      // which is exactly what was reported. Pushing on the root navigator
+      // escapes the shell so the call is genuinely full-screen.
+      await Navigator.of(context, rootNavigator: true).push(
         MaterialPageRoute(
           builder: (_) => VideoCall(
             channelName: widget.consultationId,
