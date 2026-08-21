@@ -293,43 +293,66 @@
       try { window.dispatchEvent(new CustomEvent('jitsiEnded', { detail: { reason: reason } })); } catch(_) {}
     }
 
-    // ── Prescription tab toggle button — real DOM element, NOT a Flutter
-    // widget. A Flutter FAB stacked in a Positioned over VideoCall's
+    // ── In-call tab toggle buttons — real DOM elements, NOT Flutter
+    // widgets. A Flutter FAB stacked in a Positioned over VideoCall's
     // HtmlElementView(Jitsi iframe) turned out to be unclickable in
     // practice (platform-view/glass-pane click routing is unreliable once
     // Jitsi's own iframe is live) — exactly the same class of problem
     // already solved for the LMS chat toast (_lmsBuildToast) by building
     // the element directly in the parent page's real DOM instead of
-    // relying on Flutter's compositing. Dart calls
-    // showPrescriptionToggle(side)/hidePrescriptionToggle() and listens
-    // for the 'icarePrescriptionToggle' window event to know when it's
-    // clicked, instead of trying to receive the click through Flutter.
-    var _rxToggleBtn = null;
-    window.showPrescriptionToggle = function(side) {
+    // relying on Flutter's compositing.
+    //
+    // showCallTabButtons(buttons) takes an array of
+    // {id, label, side ('left'|'right'), top (px, optional stacking offset)}
+    // and renders one button per entry. Clicking a button dispatches
+    // 'icareCallTabToggle' with detail={id}. hideCallTabButtons() removes
+    // them all. Used for both the single "Prescription" button (walk-in
+    // calls) and the two-button "Prescription"/"Patient History" stack
+    // (normal consultations).
+    var _callTabBtns = [];
+    window.showCallTabButtons = function(buttons) {
       try {
-        _removePrescriptionToggle();
-        var btn = document.createElement('button');
-        btn.id = 'icare-rx-toggle';
-        btn.type = 'button';
-        btn.textContent = '📄  Prescription';
-        var sidePos = side === 'right' ? 'right:16px;' : 'left:16px;';
-        btn.style.cssText =
-          'position:fixed;top:16px;' + sidePos +
-          'z-index:2147483000;pointer-events:auto;' +
-          'background:#0036BC;color:#fff;border:none;border-radius:24px;' +
-          'padding:12px 20px;font-size:14px;font-weight:700;font-family:system-ui,sans-serif;' +
-          'box-shadow:0 4px 14px rgba(0,0,0,.35);cursor:pointer;';
-        btn.addEventListener('click', function() {
-          try { window.dispatchEvent(new CustomEvent('icarePrescriptionToggle')); } catch(_) {}
+        _removeCallTabButtons();
+        (buttons || []).forEach(function(b) {
+          var btn = document.createElement('button');
+          btn.id = 'icare-calltab-' + b.id;
+          btn.type = 'button';
+          btn.textContent = b.label || b.id;
+          var sidePos = b.side === 'right' ? 'right:16px;' : 'left:16px;';
+          var topPos = 'top:' + (b.top != null ? b.top : 16) + 'px;';
+          btn.style.cssText =
+            'position:fixed;' + topPos + sidePos +
+            'z-index:2147483000;pointer-events:auto;' +
+            'background:#0036BC;color:#fff;border:none;border-radius:24px;' +
+            'padding:12px 20px;font-size:14px;font-weight:700;font-family:system-ui,sans-serif;' +
+            'box-shadow:0 4px 14px rgba(0,0,0,.35);cursor:pointer;';
+          (function(id) {
+            btn.addEventListener('click', function() {
+              // detail is a JSON STRING, not a raw object — dart:html's
+              // CustomEvent.detail interop for plain JS objects is
+              // unreliable across dart2js/dartdevc; a string payload
+              // decoded with dart:convert is the same proven pattern
+              // already used for icare-recaptcha-result etc.
+              try { window.dispatchEvent(new CustomEvent('icareCallTabToggle', { detail: JSON.stringify({ id: id }) })); } catch(_) {}
+            });
+          })(b.id);
+          document.body.appendChild(btn);
+          _callTabBtns.push(btn);
         });
-        document.body.appendChild(btn);
-        _rxToggleBtn = btn;
       } catch(_) {}
     };
-    window.hidePrescriptionToggle = function() { _removePrescriptionToggle(); };
-    function _removePrescriptionToggle() {
-      try { if (_rxToggleBtn) { _rxToggleBtn.remove(); _rxToggleBtn = null; } } catch(_) {}
+    window.hideCallTabButtons = function() { _removeCallTabButtons(); };
+    function _removeCallTabButtons() {
+      try { _callTabBtns.forEach(function(b) { b.remove(); }); } catch(_) {}
+      _callTabBtns = [];
     }
+    // Back-compat single-button aliases — still used by the walk-in call
+    // screens (reception_prescription_screen.dart, doctor_call_with_
+    // prescription_screen.dart).
+    window.showPrescriptionToggle = function(side) {
+      window.showCallTabButtons([{ id: 'prescription', label: '📄  Prescription', side: side }]);
+    };
+    window.hidePrescriptionToggle = function() { _removeCallTabButtons(); };
 
     window.jitsiJoin = function(roomName, displayName, audioOnly, jwt, subject, authToken, chatChannelName) {
       // Store for consultation file upload

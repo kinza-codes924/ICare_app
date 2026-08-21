@@ -11,8 +11,7 @@ import 'package:icare/models/consultation_message.dart';
 import 'package:icare/models/appointment_detail.dart';
 import 'package:icare/models/enhanced_prescription.dart';
 import 'package:icare/screens/video_call.dart';
-import 'package:icare/screens/in_consultation_prescription_form.dart';
-import 'package:icare/screens/patient_history_form_screen.dart';
+import 'package:icare/screens/doctor_consultation_call_screen.dart';
 import 'package:icare/screens/patient_history_view.dart';
 import 'package:icare/screens/prescription_pdf_view_screen.dart';
 import 'package:icare/services/consultation_service.dart';
@@ -57,7 +56,6 @@ class _ConsultationChatScreenV2State extends State<ConsultationChatScreenV2> {
   List<ConsultationMessage> _messages = [];
   bool _isLoading = true;
   bool _isSending = false;
-  bool _prescriptionComplete = false;
   bool _timerSynced = false;
   String? _consultationId;
 
@@ -400,6 +398,34 @@ class _ConsultationChatScreenV2State extends State<ConsultationChatScreenV2> {
       }
     });
 
+    if (!mounted) return;
+
+    // Doctor's own call screen carries the Prescription/History in-call
+    // panels (client's explicit instruction: those no longer live as chat-
+    // screen buttons, only inside the live call — see
+    // doctor_consultation_call_screen.dart). Needs a real appointment +
+    // consultationId to embed PatientHistoryFormScreen (which requires a
+    // non-null AppointmentDetail); the patient side never had those panels
+    // and keeps the plain call screen.
+    if (widget.isDoctor && widget.appointment != null && _consultationId != null && _consultationId!.isNotEmpty) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (ctx) => DoctorConsultationCallScreen(
+            appointment: widget.appointment!,
+            consultationId: _consultationId!,
+            remoteUserName: remoteUserName,
+            isAudioOnly: audioOnly,
+            currentUserId: widget.currentUserId,
+            currentUserName: widget.currentUserName,
+            consultationElapsedSeconds: _timer.elapsed.inSeconds,
+            outgoingSignalId: signalId,
+          ),
+        ),
+      );
+      return;
+    }
+
     // Open call screen for the caller immediately
     Navigator.push(
       context,
@@ -440,68 +466,6 @@ class _ConsultationChatScreenV2State extends State<ConsultationChatScreenV2> {
     );
   }
 
-  Future<void> _openHistoryForm() async {
-    if (!widget.isDoctor) return;
-    if (_consultationId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Consultation not initialized yet')),
-      );
-      return;
-    }
-    if (widget.appointment == null) return;
-    print('🩺 OPEN HISTORY FORM — consultationId: $_consultationId');
-    final existingHistory = await _consultationService.getHistoryByConsultation(_consultationId!);
-    print('🩺 existingHistory: ${existingHistory != null ? "loaded (keys: ${existingHistory.keys.toList()})" : "NULL — form will open blank"}');
-    final existingHistoryId = existingHistory?['_id']?.toString();
-    print('🩺 existingHistoryId: $existingHistoryId');
-    if (!mounted) return;
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (ctx) => PatientHistoryFormScreen(
-          appointment: widget.appointment!,
-          consultationId: _consultationId!,
-          existingHistoryId: existingHistoryId,
-          initialData: existingHistory,
-        ),
-      ),
-    );
-  }
-
-  void _openPrescriptionForm() {
-    if (!widget.isDoctor) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Only doctors can create prescriptions')),
-      );
-      return;
-    }
-    if (widget.appointment == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Appointment not initialized'), backgroundColor: Colors.red),
-      );
-      return;
-    }
-    if (_consultationId == null || _consultationId!.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Consultation session not ready. Please wait a moment.'), backgroundColor: Colors.orange),
-      );
-      return;
-    }
-
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (ctx) => InConsultationPrescriptionForm(
-          appointment: widget.appointment!,
-          consultationId: _consultationId!,
-          onPrescriptionComplete: (isComplete) {
-            setState(() => _prescriptionComplete = isComplete);
-          },
-        ),
-      ),
-    );
-  }
-
   // Navigator.pop leaves the screen exactly where it was whenever this
   // route is the bottom of the stack — which is always the case after a
   // page refresh (or opening the /consultation/:id URL directly), since
@@ -515,7 +479,7 @@ class _ConsultationChatScreenV2State extends State<ConsultationChatScreenV2> {
     context.go(widget.isDoctor ? '/doctor/dashboard' : '/patient/home');
   }
 
-  Future<void> _endConsultation() async {
+  Future<void> _endConsultation({bool skipPrescriptionCheck = false}) async {
     // Validate minimum duration
     final validationError = _timer.validateEndConsultation();
     if (validationError != null) {
@@ -528,10 +492,25 @@ class _ConsultationChatScreenV2State extends State<ConsultationChatScreenV2> {
       return;
     }
 
-    // Check prescription completion (doctor only)
-    if (widget.isDoctor && !_prescriptionComplete) {
-      _showPrescriptionIncompleteDialog();
-      return;
+    // Check prescription completion (doctor only). Prescription now only
+    // exists as an in-call panel (DoctorConsultationCallScreen), a separate
+    // screen instance — so completion is checked against the backend
+    // instead of a local flag, which would otherwise always read false here
+    // even after a prescription was genuinely completed during the call.
+    // skipPrescriptionCheck is set when the doctor already chose "End
+    // Without Rx" on the incomplete-prescription dialog below — without it,
+    // re-checking here would find the backend still says incomplete and
+    // loop straight back into the same dialog.
+    if (!skipPrescriptionCheck && widget.isDoctor && _consultationId != null && _consultationId!.isNotEmpty) {
+      bool complete = false;
+      try {
+        final draft = await _consultationService.getPrescriptionDraft(_consultationId!);
+        complete = draft != null && (draft['isComplete'] == true || draft['status'] == 'active');
+      } catch (_) {}
+      if (!complete) {
+        _showPrescriptionIncompleteDialog();
+        return;
+      }
     }
 
     // Show confirmation dialog
@@ -754,7 +733,9 @@ class _ConsultationChatScreenV2State extends State<ConsultationChatScreenV2> {
           ],
         ),
         content: const Text(
-          'You have not completed a prescription for this consultation. Would you like to add one, or end without a prescription?',
+          'You have not completed a prescription for this consultation. '
+          'Prescription can only be filled in during the video/audio call — '
+          'start a call to add it, or end the consultation without one.',
         ),
         actions: [
           TextButton(
@@ -764,18 +745,10 @@ class _ConsultationChatScreenV2State extends State<ConsultationChatScreenV2> {
           TextButton(
             onPressed: () {
               Navigator.pop(ctx);
-              setState(() => _prescriptionComplete = true);
-              _endConsultation();
+              _endConsultation(skipPrescriptionCheck: true);
             },
             style: TextButton.styleFrom(foregroundColor: Colors.red),
             child: const Text('End Without Rx'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              _openPrescriptionForm();
-            },
-            child: const Text('Add Prescription'),
           ),
         ],
       ),
@@ -849,28 +822,16 @@ class _ConsultationChatScreenV2State extends State<ConsultationChatScreenV2> {
                       ],
                     ),
                   ),
-                  // Doctor action buttons (past consultations + history + prescription)
+                  // Prescription and History Form moved into the in-call
+                  // panel (DoctorConsultationCallScreen) — only accessible
+                  // during the live call now, per client's explicit
+                  // instruction. Past Consultations stays here.
                   if (widget.isDoctor) ...[
                     IconButton(
                       icon: const Icon(Icons.history_rounded, size: 22),
                       color: AppColors.primaryColor,
                       onPressed: _openPastConsultations,
                       tooltip: 'Past Consultations',
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.history_edu_rounded, size: 22),
-                      color: AppColors.primaryColor,
-                      onPressed: _openHistoryForm,
-                      tooltip: 'History Form',
-                    ),
-                    IconButton(
-                      icon: Icon(
-                        Icons.description_rounded,
-                        size: 22,
-                        color: _prescriptionComplete ? Colors.green : AppColors.primaryColor,
-                      ),
-                      onPressed: _openPrescriptionForm,
-                      tooltip: 'Prescription',
                     ),
                   ],
                 ],

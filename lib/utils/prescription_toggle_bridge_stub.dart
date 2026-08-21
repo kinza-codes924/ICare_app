@@ -10,3 +10,12 @@ class PrescriptionToggleBridge {
   void hide() {}
   void dispose() {}
 }
+
+class CallTabButtonsBridge {
+  void show({
+    required List<Map<String, dynamic>> buttons,
+    required void Function(String id) onToggle,
+  }) {}
+  void hide() {}
+  void dispose() {}
+}

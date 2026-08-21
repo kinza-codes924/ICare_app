@@ -16,6 +16,12 @@ class PatientHistoryFormScreen extends StatefulWidget {
   final String? existingHistoryId;
   /// If provided, pre-fills all form fields with this data
   final Map<String, dynamic>? initialData;
+  // When set, this form is embedded in a dismissible side panel (e.g. an
+  // in-call consultation screen) rather than being its own pushed route —
+  // the back button and the post-save navigation must close the panel via
+  // this callback instead of Navigator.pop, which would otherwise pop the
+  // whole call screen and drop the live call.
+  final VoidCallback? onClose;
 
   const PatientHistoryFormScreen({
     super.key,
@@ -24,6 +30,7 @@ class PatientHistoryFormScreen extends StatefulWidget {
     this.onHistoryComplete,
     this.existingHistoryId,
     this.initialData,
+    this.onClose,
   });
 
   @override
@@ -483,7 +490,11 @@ class _PatientHistoryFormScreenState extends State<PatientHistoryFormScreen> {
             backgroundColor: Colors.green,
           ),
         );
-        Navigator.pop(context);
+        if (widget.onClose != null) {
+          widget.onClose!();
+        } else {
+          Navigator.pop(context);
+        }
       } else if (mounted) {
         final msg = result['message']?.toString() ?? result['error']?.toString() ?? 'Save failed';
         ScaffoldMessenger.of(context).showSnackBar(
@@ -527,7 +538,12 @@ class _PatientHistoryFormScreenState extends State<PatientHistoryFormScreen> {
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
-        leading: const CustomBackButton(),
+        leading: widget.onClose != null
+            ? IconButton(
+                icon: const Icon(Icons.close_rounded),
+                onPressed: widget.onClose,
+              )
+            : const CustomBackButton(),
         title: const Text(
           'Patient History',
           style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Color(0xFF0F172A)),
