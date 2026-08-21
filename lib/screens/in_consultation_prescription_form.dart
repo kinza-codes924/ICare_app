@@ -217,11 +217,19 @@ class _InConsultationPrescriptionFormState
 
       if (result['success'] == true && mounted) {
         setState(() => _isComplete = true);
-        widget.onPrescriptionComplete?.call(true);
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Prescription completed successfully'), backgroundColor: Colors.green),
         );
-        if (widget.onClose != null) {
+        // onPrescriptionComplete is the single hook callers use to react to
+        // completion (embedded-panel callers close the panel themselves in
+        // there; standalone-route callers pop). Also calling onClose here
+        // would double-toggle a panel's open/closed state in embedded
+        // callers that treat both as "flip visibility" — net effect: the
+        // panel silently stayed open after Complete, which is exactly what
+        // was reported.
+        if (widget.onPrescriptionComplete != null) {
+          widget.onPrescriptionComplete!(true);
+        } else if (widget.onClose != null) {
           widget.onClose!();
         } else {
           Navigator.pop(context);
