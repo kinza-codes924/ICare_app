@@ -8,21 +8,23 @@ import 'package:icare/utils/shared_pref.dart';
 import 'package:icare/utils/theme.dart';
 import 'package:icare/widgets/reception_prescription_live_preview.dart';
 
-// Walk-in flow's prescription step. Two states on the SAME screen (no
-// navigation between them — an earlier version pushed VideoCall as a
-// separate route, which took the receptionist out of this screen's state
-// entirely and lost the walk-in details/dashboard underneath):
-//   1. Form-only — InConsultationPrescriptionForm full width, "Call Doctor"
-//      FAB available if the receptionist wants to loop the doctor in.
-//   2. Call split view — once "Call Doctor" is pressed: video on the left,
-//      a READ-ONLY live preview of the doctor's prescription draft on the
-//      right (doctor_call_with_prescription_screen.dart is where the
-//      doctor actually writes it — that screen autosaves every 5s, this
-//      one polls the same draft on the same interval). Per client's
-//      explicit request: "jab doctor fill kare to receptionist ke paas
-//      bhi aa jaye... sync sahi se karna".
-// Either state finishes the same way: onPrescriptionComplete(true) moves on
-// to Procedures.
+// Walk-in flow's prescription step.
+//   1. Form-only (this screen, inside the reception ShellRoute) —
+//      InConsultationPrescriptionForm full width, "Call Doctor" FAB
+//      available if the receptionist wants to loop the doctor in.
+//   2. Once "Call Doctor" is pressed, _ReceptionCallScreen (below) is
+//      PUSHED on the root navigator — genuinely full-screen, no sidebar/
+//      dashboard chrome — with the video full-width and a dismissible
+//      READ-ONLY live preview panel of the doctor's prescription draft
+//      (doctor_call_with_prescription_screen.dart is where the doctor
+//      actually writes it — that screen autosaves every 5s, this one polls
+//      the same draft on the same interval; the receptionist can close/
+//      reopen the panel at will). Per client's explicit requests: full-
+//      screen with no dashboard visible during the call, live sync, and a
+//      panel the receptionist can toggle rather than a fixed permanent split.
+// Ending the call pops back to this exact screen/state — walk-in details
+// and the dashboard underneath were never touched, nothing is lost.
+// Completing the prescription (on either side) moves on to Procedures.
 class ReceptionPrescriptionScreen extends StatefulWidget {
   final String consultationId;
   final String patientName;
@@ -40,13 +42,6 @@ class ReceptionPrescriptionScreen extends StatefulWidget {
 class _ReceptionPrescriptionScreenState extends State<ReceptionPrescriptionScreen> {
   final ReceptionService _receptionService = ReceptionService();
   bool _calling = false;
-
-  // Set once the call actually starts — switches to the full-screen call
-  // layout. Carries what VideoCall needs so it isn't refetched mid-call.
-  String? _doctorId;
-  String? _doctorName;
-  String? _myId;
-  String? _myName;
 
   void _goToProcedures() {
     Navigator.of(context).pushReplacement(
@@ -88,23 +83,28 @@ class _ReceptionPrescriptionScreenState extends State<ReceptionPrescriptionScree
         callType: 'reception',
       );
       if (!mounted) return;
-      // No navigation — just swap this same screen's layout to the
-      // full-screen call. Staying on one screen/one route is what keeps
-      // the walk-in form state and the reception dashboard underneath
-      // intact.
-      setState(() {
-        _doctorId = doctorId;
-        _doctorName = doctorName ?? 'Doctor';
-        _myId = myId;
-        _myName = myName;
-      });
+      // Pushed on the ROOT navigator, not swapped into this screen's own
+      // body: this screen lives inside the reception ShellRoute (sidebar +
+      // dashboard chrome), so a plain setState-driven layout swap still
+      // renders underneath/around that chrome — that's exactly the
+      // "dashboard dikh raha hai during the call" bug that was reported.
+      // Escaping to the root navigator here gives a genuinely bare
+      // full-screen call+preview with nothing else on screen, and popping
+      // back on call-end returns to this exact screen/state (walk-in
+      // details, dashboard underneath — all still intact, nothing lost).
+      await Navigator.of(context, rootNavigator: true).push(
+        MaterialPageRoute(
+          builder: (_) => _ReceptionCallScreen(
+            consultationId: widget.consultationId,
+            doctorName: doctorName ?? 'Doctor',
+            myId: myId,
+            myName: myName,
+          ),
+        ),
+      );
     } finally {
       if (mounted) setState(() => _calling = false);
     }
-  }
-
-  void _onCallEnded() {
-    if (mounted) setState(() => _doctorId = null);
   }
 
   Widget _buildPrescriptionForm() {
@@ -125,31 +125,6 @@ class _ReceptionPrescriptionScreenState extends State<ReceptionPrescriptionScree
 
   @override
   Widget build(BuildContext context) {
-    final inCall = _doctorId != null;
-
-    if (inCall) {
-      return Row(
-        children: [
-          Expanded(
-            flex: 6,
-            child: VideoCall(
-              channelName: widget.consultationId,
-              remoteUserName: _doctorName ?? 'Doctor',
-              currentUserId: _myId ?? '',
-              currentUserName: _myName ?? 'Front Desk',
-              consultationId: widget.consultationId,
-              onCallEnded: _onCallEnded,
-              popOnCallEnded: false,
-            ),
-          ),
-          Expanded(
-            flex: 4,
-            child: ReceptionPrescriptionLivePreview(consultationId: widget.consultationId),
-          ),
-        ],
-      );
-    }
-
     return Stack(
       children: [
         _buildPrescriptionForm(),
@@ -178,6 +153,94 @@ class _ReceptionPrescriptionScreenState extends State<ReceptionPrescriptionScree
           ),
         ),
       ],
+    );
+  }
+}
+
+// Genuinely full-screen — pushed on the root navigator by _callDoctor()
+// above, no ShellRoute chrome (sidebar/dashboard) anywhere in this tree.
+// Video is always full-width; the live prescription preview is a
+// dismissible overlay panel the receptionist can open/close at will (per
+// client's request — "receptionist ke paas woh hata bhi sake, dobara laga
+// bhi sake"), not a fixed split that eats screen space permanently.
+class _ReceptionCallScreen extends StatefulWidget {
+  final String consultationId;
+  final String doctorName;
+  final String myId;
+  final String myName;
+
+  const _ReceptionCallScreen({
+    required this.consultationId,
+    required this.doctorName,
+    required this.myId,
+    required this.myName,
+  });
+
+  @override
+  State<_ReceptionCallScreen> createState() => _ReceptionCallScreenState();
+}
+
+class _ReceptionCallScreenState extends State<_ReceptionCallScreen> {
+  bool _showPreview = true;
+
+  void _onCallEnded() {
+    if (mounted) Navigator.of(context).pop();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: Stack(
+        children: [
+          Positioned.fill(
+            child: VideoCall(
+              channelName: widget.consultationId,
+              remoteUserName: widget.doctorName,
+              currentUserId: widget.myId,
+              currentUserName: widget.myName,
+              consultationId: widget.consultationId,
+              onCallEnded: _onCallEnded,
+              popOnCallEnded: false,
+            ),
+          ),
+          if (_showPreview)
+            Positioned(
+              top: 0,
+              bottom: 0,
+              right: 0,
+              width: 340,
+              child: Material(
+                elevation: 8,
+                child: Stack(
+                  children: [
+                    ReceptionPrescriptionLivePreview(consultationId: widget.consultationId),
+                    Positioned(
+                      top: 8,
+                      right: 8,
+                      child: IconButton(
+                        icon: const Icon(Icons.close_rounded),
+                        tooltip: 'Hide prescription preview',
+                        onPressed: () => setState(() => _showPreview = false),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          else
+            Positioned(
+              top: 16,
+              right: 16,
+              child: FloatingActionButton.small(
+                heroTag: 'reception_show_preview',
+                tooltip: 'Show prescription preview',
+                onPressed: () => setState(() => _showPreview = true),
+                child: const Icon(Icons.description_outlined),
+              ),
+            ),
+        ],
+      ),
     );
   }
 }
