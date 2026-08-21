@@ -251,26 +251,17 @@ class _ReceptionCallScreenState extends State<_ReceptionCallScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Side-by-side, not stacked over the video — see doctor_call_with_
+    // prescription_screen.dart's build() for why: any Flutter widget
+    // overlaid directly on top of VideoCall's live Jitsi iframe (via
+    // Positioned/Stack) can silently fail to receive clicks, including this
+    // panel's own close (X) button.
     return Scaffold(
       backgroundColor: Colors.black,
-      body: Stack(
+      body: Row(
         children: [
-          Positioned.fill(
-            child: VideoCall(
-              channelName: widget.consultationId,
-              remoteUserName: widget.doctorName,
-              currentUserId: widget.myId,
-              currentUserName: widget.myName,
-              consultationId: widget.consultationId,
-              onCallEnded: _onCallEnded,
-              popOnCallEnded: false,
-            ),
-          ),
           if (_showPreview)
-            Positioned(
-              top: 0,
-              bottom: 0,
-              left: 0,
+            SizedBox(
               width: 340,
               child: Material(
                 elevation: 8,
@@ -289,18 +280,35 @@ class _ReceptionCallScreenState extends State<_ReceptionCallScreen> {
                   ],
                 ),
               ),
-            )
-          else if (!kIsWeb)
-            Positioned(
-              top: 16,
-              left: 16,
-              child: FloatingActionButton.extended(
-                heroTag: 'reception_show_preview',
-                onPressed: _togglePreview,
-                icon: const Icon(Icons.description_outlined),
-                label: const Text('Prescription'),
-              ),
             ),
+          Expanded(
+            child: Stack(
+              children: [
+                Positioned.fill(
+                  child: VideoCall(
+                    channelName: widget.consultationId,
+                    remoteUserName: widget.doctorName,
+                    currentUserId: widget.myId,
+                    currentUserName: widget.myName,
+                    consultationId: widget.consultationId,
+                    onCallEnded: _onCallEnded,
+                    popOnCallEnded: false,
+                  ),
+                ),
+                if (!_showPreview && !kIsWeb)
+                  Positioned(
+                    top: 16,
+                    left: 16,
+                    child: FloatingActionButton.extended(
+                      heroTag: 'reception_show_preview',
+                      onPressed: _togglePreview,
+                      icon: const Icon(Icons.description_outlined),
+                      label: const Text('Prescription'),
+                    ),
+                  ),
+              ],
+            ),
+          ),
         ],
       ),
     );

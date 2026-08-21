@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:icare/screens/in_consultation_prescription_form.dart';
 import 'package:icare/screens/video_call.dart';
+import 'package:icare/services/consultation_service.dart';
 import 'package:icare/utils/prescription_toggle_bridge.dart';
 
 // Doctor's side of a walk-in "Call Doctor" (reception's front-desk flow) —
@@ -34,10 +35,25 @@ class _DoctorCallWithPrescriptionScreenState extends State<DoctorCallWithPrescri
   bool _callEnded = false;
   bool _showForm = false;
   final PrescriptionToggleBridge _toggleBridge = PrescriptionToggleBridge();
+  final ConsultationService _consultationService = ConsultationService();
 
-  void _onCallEnded() {
+  Future<void> _onCallEnded() async {
     _toggleBridge.hide();
-    if (mounted) setState(() => _callEnded = true);
+    if (!mounted) return;
+    // If the doctor already completed (and submitted) the prescription live
+    // during the call, there's nothing left to do here — go straight back
+    // to the dashboard instead of showing the form again.
+    bool alreadyComplete = false;
+    try {
+      final draft = await _consultationService.getPrescriptionDraft(widget.consultationId);
+      alreadyComplete = draft != null && (draft['isComplete'] == true || draft['status'] == 'active');
+    } catch (_) {}
+    if (!mounted) return;
+    if (alreadyComplete) {
+      Navigator.of(context).pop();
+    } else {
+      setState(() => _callEnded = true);
+    }
   }
 
   void _togglePanel() {
@@ -98,26 +114,21 @@ class _DoctorCallWithPrescriptionScreenState extends State<DoctorCallWithPrescri
       );
     }
 
+    // The panel is laid out SIDE-BY-SIDE with the video (a Row that shrinks
+    // the video), never stacked on top of it. A Flutter widget overlaid
+    // directly over VideoCall's live Jitsi iframe (via Positioned/Stack)
+    // doesn't just fail to receive clicks — text fields inside it never
+    // get focus either, so typing silently went nowhere. Giving the panel
+    // its own non-overlapping region of the page is the only reliable fix;
+    // the toggle button has the same constraint, hence the real-DOM-button
+    // approach in PrescriptionToggleBridge on web (that button also needs
+    // to sit outside the video's rectangle once it's shrunk).
     return Scaffold(
       backgroundColor: Colors.black,
-      body: Stack(
+      body: Row(
         children: [
-          Positioned.fill(
-            child: VideoCall(
-              channelName: widget.consultationId,
-              remoteUserName: widget.callerName,
-              currentUserId: widget.currentUserId,
-              currentUserName: widget.currentUserName,
-              consultationId: widget.consultationId,
-              onCallEnded: _onCallEnded,
-              popOnCallEnded: false,
-            ),
-          ),
           if (_showForm)
-            Positioned(
-              top: 0,
-              bottom: 0,
-              left: 0,
+            SizedBox(
               width: 380,
               child: Material(
                 elevation: 8,
@@ -134,18 +145,35 @@ class _DoctorCallWithPrescriptionScreenState extends State<DoctorCallWithPrescri
                   onClose: _togglePanel,
                 ),
               ),
-            )
-          else if (!kIsWeb)
-            Positioned(
-              top: 16,
-              left: 16,
-              child: FloatingActionButton.extended(
-                heroTag: 'doctor_show_prescription',
-                onPressed: _togglePanel,
-                icon: const Icon(Icons.description_outlined),
-                label: const Text('Prescription'),
-              ),
             ),
+          Expanded(
+            child: Stack(
+              children: [
+                Positioned.fill(
+                  child: VideoCall(
+                    channelName: widget.consultationId,
+                    remoteUserName: widget.callerName,
+                    currentUserId: widget.currentUserId,
+                    currentUserName: widget.currentUserName,
+                    consultationId: widget.consultationId,
+                    onCallEnded: _onCallEnded,
+                    popOnCallEnded: false,
+                  ),
+                ),
+                if (!_showForm && !kIsWeb)
+                  Positioned(
+                    top: 16,
+                    left: 16,
+                    child: FloatingActionButton.extended(
+                      heroTag: 'doctor_show_prescription',
+                      onPressed: _togglePanel,
+                      icon: const Icon(Icons.description_outlined),
+                      label: const Text('Prescription'),
+                    ),
+                  ),
+              ],
+            ),
+          ),
         ],
       ),
     );
