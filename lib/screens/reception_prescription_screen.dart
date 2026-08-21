@@ -44,7 +44,33 @@ class ReceptionPrescriptionScreen extends StatefulWidget {
 
 class _ReceptionPrescriptionScreenState extends State<ReceptionPrescriptionScreen> {
   final ReceptionService _receptionService = ReceptionService();
+  final ConsultationService _consultationService = ConsultationService();
   bool _calling = false;
+  bool _checkingExisting = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkAlreadyComplete();
+  }
+
+  // If the doctor already completed the prescription (e.g. live during a
+  // walk-in call, or a previous visit to this screen), skip the form
+  // entirely instead of showing it again — that empty-looking form
+  // reappearing after completion is what was confusing the receptionist.
+  Future<void> _checkAlreadyComplete() async {
+    bool alreadyComplete = false;
+    try {
+      final draft = await _consultationService.getPrescriptionDraft(widget.consultationId);
+      alreadyComplete = draft != null && (draft['isComplete'] == true || draft['status'] == 'active');
+    } catch (_) {}
+    if (!mounted) return;
+    if (alreadyComplete) {
+      _goToProcedures();
+    } else {
+      setState(() => _checkingExisting = false);
+    }
+  }
 
   void _goToProcedures() {
     Navigator.of(context).pushReplacement(
@@ -129,6 +155,9 @@ class _ReceptionPrescriptionScreenState extends State<ReceptionPrescriptionScree
 
   @override
   Widget build(BuildContext context) {
+    if (_checkingExisting) {
+      return const Center(child: CircularProgressIndicator());
+    }
     return Stack(
       children: [
         _buildPrescriptionForm(),

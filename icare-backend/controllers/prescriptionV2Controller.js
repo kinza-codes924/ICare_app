@@ -73,16 +73,19 @@ exports.savePrescriptionDraft = async (req, res) => {
   }
 };
 
-// Get prescription draft
+// Get prescription draft (or the completed prescription, if it's since been
+// completed — callers polling this to detect "has the doctor finished yet"
+// need to see status:'active' records too, not just status:'draft' ones,
+// since completePrescription() flips status away from 'draft' the moment
+// it's done. Most recent by consultationId either way, since there's at
+// most one prescription per consultation in practice.)
 exports.getPrescriptionDraft = async (req, res) => {
   try {
     await connectMongoDB();
     const { consultationId } = req.params;
 
-    const prescription = await EnhancedPrescription.findOne({
-      consultationId,
-      status: 'draft'
-    })
+    const prescription = await EnhancedPrescription.findOne({ consultationId })
+      .sort({ updatedAt: -1 })
       .populate('patientHistoryId')
       .populate('lifestyleAdviceId');
 
