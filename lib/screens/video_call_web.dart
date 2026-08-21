@@ -62,6 +62,13 @@ class VideoCall extends StatefulWidget {
   final String? outgoingSignalId;
   /// Callback when call ends (to return to chat)
   final VoidCallback? onCallEnded;
+  /// False when this widget is embedded directly in a caller's own layout
+  /// (e.g. reception_prescription_screen.dart's call+form split view)
+  /// instead of being pushed as its own route — in that case Navigator.pop
+  /// on call-end would incorrectly pop the CALLER's screen (there's no
+  /// separate VideoCall route to pop), so the caller handles navigation
+  /// itself via onCallEnded and this flag skips the pop.
+  final bool popOnCallEnded;
 
   const VideoCall({
     super.key,
@@ -76,6 +83,7 @@ class VideoCall extends StatefulWidget {
     this.consultationElapsedSeconds = 0,
     this.outgoingSignalId,
     this.onCallEnded,
+    this.popOnCallEnded = true,
   });
 
   @override
@@ -176,7 +184,7 @@ class _VideoCallWebState extends State<VideoCall> {
       }
       if (mounted) {
         widget.onCallEnded?.call();
-        Navigator.pop(context);
+        if (widget.popOnCallEnded) Navigator.pop(context);
       }
     });
   }
@@ -270,7 +278,10 @@ class _VideoCallWebState extends State<VideoCall> {
             ),
           );
           await Future.delayed(const Duration(seconds: 2));
-          if (mounted) Navigator.pop(context);
+          if (mounted) {
+            widget.onCallEnded?.call();
+            if (widget.popOnCallEnded) Navigator.pop(context);
+          }
         }
       } catch (_) {}
     });

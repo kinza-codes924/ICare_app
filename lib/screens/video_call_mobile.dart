@@ -27,6 +27,10 @@ class VideoCall extends StatefulWidget {
   final String? outgoingSignalId;
   /// Callback when call ends (to return to chat)
   final VoidCallback? onCallEnded;
+  /// Web-only concern (see video_call_web.dart) — kept here purely so
+  /// callers that pass it compile identically on mobile; unused on this
+  /// platform since mobile VideoCall is always pushed as its own route.
+  final bool popOnCallEnded;
 
   const VideoCall({
     super.key,
@@ -41,6 +45,7 @@ class VideoCall extends StatefulWidget {
     this.consultationElapsedSeconds = 0,
     this.outgoingSignalId,
     this.onCallEnded,
+    this.popOnCallEnded = true,
   });
 
   @override
