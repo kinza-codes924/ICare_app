@@ -529,7 +529,14 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
         label: 'Confirm Password'.tr(),
         icon: Icons.lock_outline_rounded,
         obscure: _obscureConfirm,
-        autofillHints: const [AutofillHints.newPassword],
+        // No autofillHints here — sharing AutofillHints.newPassword with the
+        // Password field above made Flutter Web's autofill engine collapse
+        // both into a SINGLE underlying native <input id="new-password">
+        // element (confirmed live: typing in either field landed in the
+        // same DOM input), so Confirm Password visually existed but never
+        // actually received keystrokes of its own. This field doesn't need
+        // browser autofill assistance anyway — it exists for the user to
+        // manually retype what they just entered above.
         onToggle: () => setState(() => _obscureConfirm = !_obscureConfirm),
         validator: (v) {
           if (v == null || v.isEmpty) return 'Required';
