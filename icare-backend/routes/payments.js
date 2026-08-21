@@ -110,6 +110,67 @@ async function safepayGet(path) {
   return json;
 }
 
+// Notifies a doctor (in-app + email) about a new appointment booking, and —
+// if that doctor belongs to a standalone iCare Clinic (DoctorProfile.clinicId
+// set) — also notifies every admin scoped to that clinic. Client's explicit
+// requirement: standalone clinics need a clinic-level alert, not just the
+// individual doctor's personal inbox, since front-desk/admin staff manage
+// bookings for the whole clinic. Independent telehealth doctors (no
+// clinicId) only get their own notification, unchanged from before.
+async function notifyAppointmentBooked(appt, { cashPending = false } = {}) {
+  if (!appt?.doctor_id) return;
+  try {
+    const DoctorProfile = require('../models/DoctorProfile');
+    const ClinicAdminProfile = require('../models/ClinicAdminProfile');
+    const [doctor, patient, doctorProfile] = await Promise.all([
+      User.findById(appt.doctor_id).select('email name').lean(),
+      User.findById(appt.patient_id).select('name').lean(),
+      DoctorProfile.findOne({ user_id: appt.doctor_id }).select('clinicId').lean(),
+    ]);
+    const patientName = appt.patient_name || patient?.name || 'A patient';
+    const dateStr = appt.appointment_date || '';
+    const timeStr = appt.appointment_time || '';
+    const whenStr = dateStr ? ` for ${dateStr}${timeStr ? ` at ${timeStr}` : ''}` : '';
+    const title = cashPending ? 'New Appointment Booked — Pay at Clinic' : 'New Appointment Booked';
+    const message = cashPending
+      ? `${patientName} booked an appointment${whenStr} and will pay in cash at the clinic.`
+      : `${patientName} booked an appointment${whenStr} and payment is confirmed.`;
+
+    const recipients = [{ userId: appt.doctor_id, email: doctor?.email, name: doctor?.name }];
+
+    const clinicId = doctorProfile?.clinicId;
+    if (clinicId) {
+      const clinicAdminProfiles = await ClinicAdminProfile.find({ clinicId }).lean();
+      if (clinicAdminProfiles.length) {
+        const admins = await User.find({ _id: { $in: clinicAdminProfiles.map(p => p.user_id) } })
+          .select('email name').lean();
+        for (const admin of admins) {
+          recipients.push({ userId: admin._id, email: admin.email, name: admin.name });
+        }
+      }
+    }
+
+    await Promise.all(recipients.map(r => Promise.all([
+      Notification.create({
+        userId: r.userId,
+        type: 'appointment',
+        title,
+        message,
+        data: { appointmentId: appt._id.toString() },
+      }).catch(() => {}),
+      r.email
+        ? sendEmail({
+            to: r.email,
+            subject: `${title} — iCare`,
+            html: `<p>Hi ${r.name || ''},</p><p><b>${patientName}</b> has booked an appointment${whenStr}${cashPending ? ' and will pay in cash at the clinic.' : ' and the payment has been confirmed.'}</p><p>Please check your iCare dashboard for details.</p>`,
+          }).catch(() => {})
+        : Promise.resolve(),
+    ])));
+  } catch (notifErr) {
+    console.error('notifyAppointmentBooked error:', notifErr.message);
+  }
+}
+
 // ─── Server-side amount calculation per payment type ──────────────────────────
 // Returns { amount, originalAmount, payeeId, description, voucherCode } or throws.
 // payeeId = who receives the money (instructor/doctor/lab/pharmacy) — powers
@@ -388,36 +449,11 @@ async function fulfillPayment(payment) {
 
     // Client requested a clear "new booking" alert on the doctor's side —
     // previously only the patient got an email/notification, the doctor had
-    // to happen to open the dashboard. Fire both in-app + email here, once,
-    // right when the booking actually becomes real (paid/confirmed), not at
-    // creation time when it could still be abandoned mid-payment.
-    if (appt?.doctor_id) {
-      try {
-        const [doctor, patient] = await Promise.all([
-          User.findById(appt.doctor_id).select('email name').lean(),
-          User.findById(appt.patient_id).select('name').lean(),
-        ]);
-        const patientName = appt.patient_name || patient?.name || 'A patient';
-        const dateStr = appt.appointment_date || '';
-        const timeStr = appt.appointment_time || '';
-        await Notification.create({
-          userId: appt.doctor_id,
-          type: 'appointment',
-          title: 'New Appointment Booked',
-          message: `${patientName} booked an appointment${dateStr ? ` for ${dateStr}${timeStr ? ` at ${timeStr}` : ''}` : ''} and payment is confirmed.`,
-          data: { appointmentId: payment.refId.toString() },
-        }).catch(() => {});
-        if (doctor?.email) {
-          sendEmail({
-            to: doctor.email,
-            subject: 'New Appointment Booked — iCare',
-            html: `<p>Hi Dr. ${doctor.name || ''},</p><p><b>${patientName}</b> has booked an appointment${dateStr ? ` for <b>${dateStr}${timeStr ? ` at ${timeStr}` : ''}</b>` : ''} and the payment has been confirmed.</p><p>Please check your iCare dashboard for details.</p>`,
-          }).catch(() => {});
-        }
-      } catch (notifErr) {
-        console.error('Appointment booked doctor-notify error:', notifErr.message);
-      }
-    }
+    // to happen to open the dashboard. Fire here, once, right when the
+    // booking actually becomes real (paid/confirmed), not at creation time
+    // when it could still be abandoned mid-payment. For standalone-clinic
+    // doctors this also alerts the clinic's admin(s), per client request.
+    await notifyAppointmentBooked(appt);
     return {};
   }
 
@@ -563,26 +599,13 @@ router.post('/create', authMiddleware, async (req, res) => {
         // Already 'unpaid' by default — nothing to flag here, fulfillPayment
         // flips it to 'paid' once the receptionist confirms collection.
       } else if (type === 'appointment') {
-        // Cash-at-clinic: the booking isn't "paid" yet, but the doctor still
-        // needs to know it exists so they can expect the patient and confirm
-        // cash on arrival — payment confirmation (fulfillPayment) won't fire
-        // until then, so notify here at booking time instead.
-        try {
-          const appt = await Appointment.findById(rId).lean();
-          if (appt?.doctor_id) {
-            const patient = await User.findById(appt.patient_id).select('name').lean();
-            const patientName = appt.patient_name || patient?.name || 'A patient';
-            await Notification.create({
-              userId: appt.doctor_id,
-              type: 'appointment',
-              title: 'New Appointment Booked — Pay at Clinic',
-              message: `${patientName} booked an appointment${appt.appointment_date ? ` for ${appt.appointment_date}${appt.appointment_time ? ` at ${appt.appointment_time}` : ''}` : ''} and will pay in cash at the clinic.`,
-              data: { appointmentId: rId.toString() },
-            }).catch(() => {});
-          }
-        } catch (notifErr) {
-          console.error('Cash appointment doctor-notify error:', notifErr.message);
-        }
+        // Cash-at-clinic: the booking isn't "paid" yet, but the doctor (and
+        // clinic admin, if standalone-clinic) still need to know it exists
+        // so they can expect the patient and confirm cash on arrival —
+        // payment confirmation (fulfillPayment) won't fire until then, so
+        // notify here at booking time instead.
+        const appt = await Appointment.findById(rId).lean();
+        await notifyAppointmentBooked(appt, { cashPending: true });
       } else {
         const Model = type === 'lab' ? LabTestRequest : PharmacyOrder;
         await Model.findByIdAndUpdate(rId, { paymentMethod: method, paymentStatus: 'cash_pending' });

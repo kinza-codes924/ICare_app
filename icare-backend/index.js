@@ -28,6 +28,7 @@ const callChatRoutes = require('./routes/call-chat');
 const clinicalRoutes = require('./routes/clinical');
 const adminRoutes = require('./routes/admin');
 const receptionRoutes = require('./routes/reception');
+const clinicAdminRoutes = require('./routes/clinic-admin');
 
 const healthRoutes = require('./routes/healthRoutes');
 const consultationRoutes = require('./routes/consultationRoutes');
@@ -180,6 +181,7 @@ app.use('/api/users', usersRoutes);
 app.use('/api/clinical', clinicalRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/reception', receptionRoutes);
+app.use('/api/clinic-admin', clinicAdminRoutes);
 
 app.use('/api/health', healthRoutes);
 app.use('/api/consultations', consultationRoutes);

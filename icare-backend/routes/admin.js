@@ -406,6 +406,108 @@ router.put('/receptionists/:userId/doctors', authMiddleware, adminOnly, async (r
   }
 });
 
+// ─── CLINIC ADMINS (scoped to one standalone iCare Clinic) ─────────────────
+// A clinic admin is a normal 'admin' role User, scoped by ClinicAdminProfile
+// to one clinicId — they see/get notified about bookings for every doctor
+// assigned to that clinic (DoctorProfile.clinicId), not the whole platform.
+router.post('/clinic-admins', authMiddleware, adminOnly, async (req, res) => {
+  try {
+    await connectMongoDB();
+    const ClinicAdminProfile = require('../models/ClinicAdminProfile');
+    const { name, email, password, clinicId } = req.body;
+    if (!name || !email || !password || !clinicId) {
+      return res.status(400).json({ success: false, message: 'name, email, password and clinicId are required' });
+    }
+    const existing = await User.findOne({ email: email.toLowerCase() });
+    if (existing) {
+      return res.status(400).json({ success: false, message: 'A user with this email already exists' });
+    }
+    const hashed = await bcrypt.hash(password, 10);
+    const user = await User.create({
+      username: name,
+      name,
+      email: email.toLowerCase(),
+      password: hashed,
+      role: 'admin',
+      is_approved: true,
+      is_active: true,
+    });
+    await ClinicAdminProfile.create({ user_id: user._id, clinicId });
+    res.status(201).json({ success: true, message: 'Clinic admin created', user: { _id: user._id.toString(), email: user.email } });
+  } catch (err) {
+    console.error('create clinic admin error:', err);
+    res.status(500).json({ success: false, message: 'Failed to create clinic admin' });
+  }
+});
+
+router.get('/clinic-admins', authMiddleware, adminOnly, async (req, res) => {
+  try {
+    await connectMongoDB();
+    const ClinicAdminProfile = require('../models/ClinicAdminProfile');
+    const profiles = await ClinicAdminProfile.find().lean();
+    const users = await User.find({ _id: { $in: profiles.map(p => p.user_id) } }).select('-password').lean();
+    const userById = new Map(users.map(u => [u._id.toString(), u]));
+    const result = profiles.map(p => {
+      const u = userById.get(p.user_id.toString());
+      return {
+        _id: p.user_id.toString(),
+        name: u?.name || u?.username || '',
+        email: u?.email || '',
+        clinicId: p.clinicId,
+        createdAt: p.createdAt,
+      };
+    });
+    res.json({ success: true, clinicAdmins: result });
+  } catch (err) {
+    console.error('list clinic admins error:', err);
+    res.status(500).json({ success: false, message: 'Failed to load clinic admins' });
+  }
+});
+
+// Doctors + their current clinic assignment, for the admin's clinic
+// management screen (the general /approved-users endpoint returns User
+// fields only — clinicId lives on DoctorProfile).
+router.get('/doctors-with-clinic', authMiddleware, adminOnly, async (req, res) => {
+  try {
+    await connectMongoDB();
+    const DoctorProfile = require('../models/DoctorProfile');
+    const users = await User.find({ role: 'doctor' }).select('name username email is_approved is_active').lean();
+    const approved = users.filter(u => u.is_approved !== false && u.is_active !== false);
+    const profiles = await DoctorProfile.find({ user_id: { $in: approved.map(u => u._id) } })
+      .select('user_id clinicId').lean();
+    const clinicByUser = new Map(profiles.map(p => [p.user_id.toString(), p.clinicId || null]));
+    const result = approved.map(u => ({
+      _id: u._id.toString(),
+      name: u.name || u.username || '',
+      email: u.email || '',
+      clinicId: clinicByUser.get(u._id.toString()) || null,
+    }));
+    res.json({ success: true, doctors: result });
+  } catch (err) {
+    console.error('doctors-with-clinic error:', err);
+    res.status(500).json({ success: false, message: 'Failed to load doctors' });
+  }
+});
+
+// Assigns a doctor to a standalone clinic — drives clinic-admin
+// notifications/dashboard visibility for that doctor's bookings.
+router.put('/doctors/:userId/clinic', authMiddleware, adminOnly, async (req, res) => {
+  try {
+    await connectMongoDB();
+    const DoctorProfile = require('../models/DoctorProfile');
+    const clinicId = (req.body.clinicId || '').toString().trim() || null;
+    const profile = await DoctorProfile.findOneAndUpdate(
+      { user_id: toId(req.params.userId) },
+      { $set: { clinicId } },
+      { new: true, upsert: true }
+    );
+    res.json({ success: true, clinicId: profile.clinicId || null });
+  } catch (err) {
+    console.error('update doctor clinic error:', err);
+    res.status(500).json({ success: false, message: 'Failed to update doctor clinic' });
+  }
+});
+
 // ─── REJECT / DEACTIVATE USER ─────────────────────────────────────────────────
 router.put('/reject/:userId', authMiddleware, adminOnly, async (req, res) => {
   try {

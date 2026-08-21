@@ -9,6 +9,8 @@ import 'package:icare/screens/book_appointment.dart';
 import 'package:icare/screens/reception_dashboard.dart';
 import 'package:icare/screens/reception_records_screen.dart';
 import 'package:icare/screens/admin_receptionist_management.dart';
+import 'package:icare/screens/admin_clinic_management.dart';
+import 'package:icare/screens/clinic_admin_dashboard.dart';
 import 'package:icare/screens/public_home.dart';
 import 'package:icare/screens/signup.dart';
 import 'package:icare/screens/splash.dart';
@@ -232,6 +234,12 @@ final routerProvider = Provider<GoRouter>((ref) {
           'Pharmacy': '/pharmacy/',
           'Admin': '/admin/',
         };
+        // Clinic admins are still role:'admin' at the auth level (scoped by
+        // ClinicAdminProfile server-side, not by a distinct role string), so
+        // gate this route the same way as the rest of /admin/*.
+        if (path.startsWith('/clinic-admin/') && role != 'Admin') {
+          return '/dashboard';
+        }
         for (final entry in rolePrefixes.entries) {
           if (path.startsWith(entry.value) && role != entry.key) {
             return '/dashboard';
@@ -367,6 +375,8 @@ final routerProvider = Provider<GoRouter>((ref) {
         ),
       ),
       GoRoute(path: '/admin/receptionists', builder: (_, _) => const AdminReceptionistManagement()),
+      GoRoute(path: '/admin/clinics', builder: (_, _) => const AdminClinicManagement()),
+      GoRoute(path: '/clinic-admin/dashboard', builder: (_, _) => const ClinicAdminDashboard()),
       GoRoute(path: '/admin/lms-payments', builder: (_, _) => const AdminLmsPaymentsScreen()),
       GoRoute(path: '/admin/payments', builder: (_, _) => const AdminPaymentsScreen()),
       GoRoute(path: '/admin/panel', builder: (_, _) => const AdminPanelScreen()),

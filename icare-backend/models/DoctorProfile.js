@@ -16,6 +16,13 @@ const doctorProfileSchema = new mongoose.Schema({
   clinic_address: String,
   consultation_type: String,
   languages: [String],
+  // Which standalone iCare Clinic this doctor belongs to, if any — matches
+  // the static clinic ids in lib/data/icare_clinics_data.dart ('dental',
+  // 'derma', 'mother_child', 'physio', 'psychiatry', 'lifestyle_wellness').
+  // Drives clinic-admin notifications/dashboard visibility. Doctors not
+  // part of a standalone clinic (independent telehealth doctors) leave
+  // this unset.
+  clinicId: String,
 }, { timestamps: true, strict: false });
 
 module.exports = mongoose.models.DoctorProfile || mongoose.model('DoctorProfile', doctorProfileSchema);

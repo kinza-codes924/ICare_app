@@ -1236,6 +1236,12 @@ class _WebSidebarState extends ConsumerState<_WebSidebar> {
                   ),
                   _buildExtraNavItem(
                     context,
+                    Icons.storefront_outlined,
+                    'iCare Clinics',
+                    () => context.go('/admin/clinics'),
+                  ),
+                  _buildExtraNavItem(
+                    context,
                     Icons.analytics_outlined,
                     'Platform Analytics',
                     () {

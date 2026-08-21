@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:icare/models/consultation_timer.dart';
 import 'package:icare/services/api_service.dart';
 import 'package:icare/services/medical_record_service.dart';
@@ -109,6 +110,21 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
     super.initState();
     _currentTab = widget.initialTab;
     _fetchUsers();
+    _checkClinicScoped();
+  }
+
+  // A clinic-scoped admin (created via Admin > iCare Clinics > New Clinic
+  // Admin) is still role:'admin' at the auth level, but should land on the
+  // clinic-specific bookings dashboard instead of the platform-wide admin
+  // screen. Checked once on load, silently no-ops for regular admins.
+  Future<void> _checkClinicScoped() async {
+    try {
+      final response = await _apiService.get('/clinic-admin/me');
+      final data = response.data;
+      if (data is Map && data['clinicId'] != null && mounted) {
+        context.go('/clinic-admin/dashboard');
+      }
+    } catch (_) {}
   }
 
   @override
