@@ -1096,6 +1096,7 @@ class _WebSidebarState extends ConsumerState<_WebSidebar> {
                 if (role == 'Patient') ...[
                   const SizedBox(height: 8),
                   _buildExtraNavItem(context, Icons.calendar_month_outlined, 'My Appointments', () => context.go('/patient/bookings-history')),
+                  _buildExtraNavItem(context, Icons.storefront_outlined, 'iCare Clinics', () => context.go('/patient/icare-clinics')),
                   _buildExtraNavItem(context, Icons.medication_liquid_outlined, 'My Prescriptions', () => context.go('/patient/prescriptions')),
                   _buildExtraNavItem(context, Icons.medication_outlined, 'Order Medicines', () => context.go('/patient/pharmacies')),
                   _buildExtraNavItem(context, Icons.science_outlined, 'Book a Lab Test', () => context.go('/patient/book-lab')),

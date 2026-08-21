@@ -245,6 +245,9 @@ class _CustomDrawerState extends ConsumerState<CustomDrawer> {
         _drawerItem('My Appointments', Icons.calendar_month_outlined, () {
           context.go('/patient/bookings-history');
         }),
+        _drawerItem('iCare Clinics', Icons.storefront_outlined, () {
+          context.go('/patient/icare-clinics');
+        }),
         _drawerItem('My Prescriptions', Icons.medication_liquid_outlined, () {
           context.go('/patient/prescriptions');
         }),

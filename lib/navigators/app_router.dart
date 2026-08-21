@@ -11,6 +11,7 @@ import 'package:icare/screens/reception_records_screen.dart';
 import 'package:icare/screens/admin_receptionist_management.dart';
 import 'package:icare/screens/admin_clinic_management.dart';
 import 'package:icare/screens/clinic_admin_dashboard.dart';
+import 'package:icare/screens/icare_clinics_list_screen.dart';
 import 'package:icare/screens/public_home.dart';
 import 'package:icare/screens/signup.dart';
 import 'package:icare/screens/splash.dart';
@@ -450,6 +451,7 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(path: '/patient/prescriptions', builder: (_, _) => const PatientPrescriptions()),
           GoRoute(path: '/patient/pharmacies', builder: (_, _) => const PharmaciesScreen()),
           GoRoute(path: '/patient/book-lab', builder: (_, _) => const PatientBookLabFlow()),
+          GoRoute(path: '/patient/icare-clinics', builder: (_, _) => const ICareClinicsListScreen()),
           GoRoute(path: '/patient/my-learning', builder: (_, _) => const MyLearningScreen()),
           GoRoute(path: '/patient/health-journey', builder: (_, _) => const HealthJourneyScreen()),
           GoRoute(path: '/patient/health-tracker', builder: (_, _) => const LifestyleTrackerScreen()),

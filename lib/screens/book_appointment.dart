@@ -199,18 +199,6 @@ class _BookAppointmentScreenState extends ConsumerState<BookAppointmentScreen> {
   Future<void> _confirmBooking() async {
     if (_selectedSlot == null && !_isEmergency) return;
 
-    // Validate reason
-    if (_reasonController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Please enter Reason for Consultation'.tr()),
-          backgroundColor: Colors.red,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-      return;
-    }
-
     // Validate certification checkbox
     if (!_certifyChecked) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -956,7 +944,7 @@ class _BookAppointmentScreenState extends ConsumerState<BookAppointmentScreen> {
                 ],
               ),
               const SizedBox(height: 16),
-              // Reason for Consultation — MANDATORY
+              // Reason for Consultation — optional
               Row(
                 children: [
                   Text('Reason for Consultation'.tr(),
@@ -965,11 +953,11 @@ class _BookAppointmentScreenState extends ConsumerState<BookAppointmentScreen> {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                     decoration: BoxDecoration(
-                      color: Colors.red.withValues(alpha: 0.1),
+                      color: const Color(0xFF64748B).withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(4),
                     ),
-                    child: Text('Mandatory'.tr(),
-                        style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Colors.red)),
+                    child: Text('Optional'.tr(),
+                        style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Color(0xFF64748B))),
                   ),
                 ],
               ),
@@ -1069,14 +1057,16 @@ class _BookAppointmentScreenState extends ConsumerState<BookAppointmentScreen> {
       );
     }
 
-    // Mobile: stacked layout
+    // Mobile: stacked layout — form first, summary/Confirm Booking button
+    // last so the button sits at the bottom of the flow instead of above
+    // the very details the user is about to fill in.
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
         children: [
-          summaryCard,
-          const SizedBox(height: 16),
           formCard,
+          const SizedBox(height: 16),
+          summaryCard,
           const SizedBox(height: 24),
         ],
       ),
