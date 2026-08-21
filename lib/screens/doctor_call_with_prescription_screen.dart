@@ -1,6 +1,8 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:icare/screens/in_consultation_prescription_form.dart';
 import 'package:icare/screens/video_call.dart';
+import 'package:icare/utils/prescription_toggle_bridge.dart';
 
 // Doctor's side of a walk-in "Call Doctor" (reception's front-desk flow) —
 // full-screen video with a dismissible/reopenable prescription-form panel on
@@ -31,9 +33,25 @@ class DoctorCallWithPrescriptionScreen extends StatefulWidget {
 class _DoctorCallWithPrescriptionScreenState extends State<DoctorCallWithPrescriptionScreen> {
   bool _callEnded = false;
   bool _showForm = false;
+  final PrescriptionToggleBridge _toggleBridge = PrescriptionToggleBridge();
 
   void _onCallEnded() {
+    _toggleBridge.hide();
     if (mounted) setState(() => _callEnded = true);
+  }
+
+  void _togglePanel() {
+    setState(() => _showForm = !_showForm);
+    _syncToggleVisibility();
+  }
+
+  void _syncToggleVisibility() {
+    if (!kIsWeb) return;
+    if (_showForm) {
+      _toggleBridge.hide();
+    } else {
+      _toggleBridge.show(side: 'left', onToggle: _togglePanel);
+    }
   }
 
   void _onPrescriptionComplete(bool isComplete) {
@@ -42,11 +60,30 @@ class _DoctorCallWithPrescriptionScreenState extends State<DoctorCallWithPrescri
       if (!context.mounted) return;
       if (_callEnded) {
         Navigator.of(context).pop();
-      } else {
+      } else if (_showForm) {
         // Call is still going — just close the panel, don't leave the call.
-        setState(() => _showForm = false);
+        _togglePanel();
       }
     });
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    // On web, a Flutter widget stacked over VideoCall's live Jitsi iframe
+    // doesn't reliably receive clicks (platform-view/glass-pane click
+    // routing loses to the iframe once Jitsi has joined) — so the toggle
+    // button there is a real DOM element built by web/index.html's
+    // showPrescriptionToggle(), with taps reported back via a window
+    // CustomEvent (see PrescriptionToggleBridge). On mobile there's no such
+    // iframe (native Agora view), so the ordinary in-Flutter FAB works fine.
+    _syncToggleVisibility();
+  }
+
+  @override
+  void dispose() {
+    _toggleBridge.dispose();
+    super.dispose();
   }
 
   @override
@@ -94,17 +131,17 @@ class _DoctorCallWithPrescriptionScreenState extends State<DoctorCallWithPrescri
                   onPrescriptionComplete: _onPrescriptionComplete,
                   // Panel's own close (X) button — closes the panel, never
                   // navigates away from the live call.
-                  onClose: () => setState(() => _showForm = false),
+                  onClose: _togglePanel,
                 ),
               ),
             )
-          else
+          else if (!kIsWeb)
             Positioned(
               top: 16,
               left: 16,
               child: FloatingActionButton.extended(
                 heroTag: 'doctor_show_prescription',
-                onPressed: () => setState(() => _showForm = true),
+                onPressed: _togglePanel,
                 icon: const Icon(Icons.description_outlined),
                 label: const Text('Prescription'),
               ),

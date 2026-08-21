@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:icare/screens/in_consultation_prescription_form.dart';
 import 'package:icare/screens/reception_procedures_screen.dart';
@@ -5,6 +6,7 @@ import 'package:icare/screens/video_call.dart';
 import 'package:icare/services/call_service.dart';
 import 'package:icare/services/consultation_service.dart';
 import 'package:icare/services/reception_service.dart';
+import 'package:icare/utils/prescription_toggle_bridge.dart';
 import 'package:icare/utils/shared_pref.dart';
 import 'package:icare/utils/theme.dart';
 import 'package:icare/widgets/reception_prescription_live_preview.dart';
@@ -187,8 +189,40 @@ class _ReceptionCallScreen extends StatefulWidget {
 class _ReceptionCallScreenState extends State<_ReceptionCallScreen> {
   bool _showPreview = false;
   final ConsultationService _consultationService = ConsultationService();
+  final PrescriptionToggleBridge _toggleBridge = PrescriptionToggleBridge();
+
+  @override
+  void initState() {
+    super.initState();
+    // See doctor_call_with_prescription_screen.dart for why the open toggle
+    // is a real DOM button on web instead of a Flutter FAB — a Flutter
+    // widget stacked over VideoCall's live Jitsi iframe doesn't reliably
+    // receive clicks once Jitsi has joined.
+    _syncToggleVisibility();
+  }
+
+  @override
+  void dispose() {
+    _toggleBridge.dispose();
+    super.dispose();
+  }
+
+  void _togglePreview() {
+    setState(() => _showPreview = !_showPreview);
+    _syncToggleVisibility();
+  }
+
+  void _syncToggleVisibility() {
+    if (!kIsWeb) return;
+    if (_showPreview) {
+      _toggleBridge.hide();
+    } else {
+      _toggleBridge.show(side: 'left', onToggle: _togglePreview);
+    }
+  }
 
   Future<void> _onCallEnded() async {
+    _toggleBridge.hide();
     if (!mounted) return;
     // If the doctor already completed the prescription live during the
     // call, skip straight to Procedures instead of falling back to
@@ -249,20 +283,20 @@ class _ReceptionCallScreenState extends State<_ReceptionCallScreen> {
                       child: IconButton(
                         icon: const Icon(Icons.close_rounded),
                         tooltip: 'Hide prescription preview',
-                        onPressed: () => setState(() => _showPreview = false),
+                        onPressed: _togglePreview,
                       ),
                     ),
                   ],
                 ),
               ),
             )
-          else
+          else if (!kIsWeb)
             Positioned(
               top: 16,
               left: 16,
               child: FloatingActionButton.extended(
                 heroTag: 'reception_show_preview',
-                onPressed: () => setState(() => _showPreview = true),
+                onPressed: _togglePreview,
                 icon: const Icon(Icons.description_outlined),
                 label: const Text('Prescription'),
               ),

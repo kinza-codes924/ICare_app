@@ -289,7 +289,46 @@
       console.log('Jitsi: closed event', reason);
       try { if (_jitsiApi) { _jitsiApi.dispose(); _jitsiApi = null; } } catch(_) {}
       try { var cc = document.getElementById('jitsi-container'); if (cc) cc.innerHTML = ''; } catch(_) {}
+      _removePrescriptionToggle();
       try { window.dispatchEvent(new CustomEvent('jitsiEnded', { detail: { reason: reason } })); } catch(_) {}
+    }
+
+    // ── Prescription tab toggle button — real DOM element, NOT a Flutter
+    // widget. A Flutter FAB stacked in a Positioned over VideoCall's
+    // HtmlElementView(Jitsi iframe) turned out to be unclickable in
+    // practice (platform-view/glass-pane click routing is unreliable once
+    // Jitsi's own iframe is live) — exactly the same class of problem
+    // already solved for the LMS chat toast (_lmsBuildToast) by building
+    // the element directly in the parent page's real DOM instead of
+    // relying on Flutter's compositing. Dart calls
+    // showPrescriptionToggle(side)/hidePrescriptionToggle() and listens
+    // for the 'icarePrescriptionToggle' window event to know when it's
+    // clicked, instead of trying to receive the click through Flutter.
+    var _rxToggleBtn = null;
+    window.showPrescriptionToggle = function(side) {
+      try {
+        _removePrescriptionToggle();
+        var btn = document.createElement('button');
+        btn.id = 'icare-rx-toggle';
+        btn.type = 'button';
+        btn.textContent = '📄  Prescription';
+        var sidePos = side === 'right' ? 'right:16px;' : 'left:16px;';
+        btn.style.cssText =
+          'position:fixed;top:16px;' + sidePos +
+          'z-index:2147483000;pointer-events:auto;' +
+          'background:#0036BC;color:#fff;border:none;border-radius:24px;' +
+          'padding:12px 20px;font-size:14px;font-weight:700;font-family:system-ui,sans-serif;' +
+          'box-shadow:0 4px 14px rgba(0,0,0,.35);cursor:pointer;';
+        btn.addEventListener('click', function() {
+          try { window.dispatchEvent(new CustomEvent('icarePrescriptionToggle')); } catch(_) {}
+        });
+        document.body.appendChild(btn);
+        _rxToggleBtn = btn;
+      } catch(_) {}
+    };
+    window.hidePrescriptionToggle = function() { _removePrescriptionToggle(); };
+    function _removePrescriptionToggle() {
+      try { if (_rxToggleBtn) { _rxToggleBtn.remove(); _rxToggleBtn = null; } } catch(_) {}
     }
 
     window.jitsiJoin = function(roomName, displayName, audioOnly, jwt, subject, authToken, chatChannelName) {
