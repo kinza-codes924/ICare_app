@@ -3,6 +3,7 @@ import 'package:icare/screens/in_consultation_prescription_form.dart';
 import 'package:icare/screens/reception_procedures_screen.dart';
 import 'package:icare/screens/video_call.dart';
 import 'package:icare/services/call_service.dart';
+import 'package:icare/services/consultation_service.dart';
 import 'package:icare/services/reception_service.dart';
 import 'package:icare/utils/shared_pref.dart';
 import 'package:icare/utils/theme.dart';
@@ -96,6 +97,7 @@ class _ReceptionPrescriptionScreenState extends State<ReceptionPrescriptionScree
         MaterialPageRoute(
           builder: (_) => _ReceptionCallScreen(
             consultationId: widget.consultationId,
+            patientName: widget.patientName,
             doctorName: doctorName ?? 'Doctor',
             myId: myId,
             myName: myName,
@@ -165,12 +167,14 @@ class _ReceptionPrescriptionScreenState extends State<ReceptionPrescriptionScree
 // bhi sake"), not a fixed split that eats screen space permanently.
 class _ReceptionCallScreen extends StatefulWidget {
   final String consultationId;
+  final String patientName;
   final String doctorName;
   final String myId;
   final String myName;
 
   const _ReceptionCallScreen({
     required this.consultationId,
+    required this.patientName,
     required this.doctorName,
     required this.myId,
     required this.myName,
@@ -181,10 +185,34 @@ class _ReceptionCallScreen extends StatefulWidget {
 }
 
 class _ReceptionCallScreenState extends State<_ReceptionCallScreen> {
-  bool _showPreview = true;
+  bool _showPreview = false;
+  final ConsultationService _consultationService = ConsultationService();
 
-  void _onCallEnded() {
-    if (mounted) Navigator.of(context).pop();
+  Future<void> _onCallEnded() async {
+    if (!mounted) return;
+    // If the doctor already completed the prescription live during the
+    // call, skip straight to Procedures instead of falling back to
+    // ReceptionPrescriptionScreen's plain (still-empty-looking) form —
+    // that re-shown form is what looked like "the prescription form is
+    // coming back again" to the receptionist.
+    bool alreadyComplete = false;
+    try {
+      final draft = await _consultationService.getPrescriptionDraft(widget.consultationId);
+      alreadyComplete = draft != null && (draft['isComplete'] == true || draft['status'] == 'active');
+    } catch (_) {}
+    if (!mounted) return;
+    if (alreadyComplete) {
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (_) => ReceptionProceduresScreen(
+            consultationId: widget.consultationId,
+            patientName: widget.patientName,
+          ),
+        ),
+      );
+    } else {
+      Navigator.of(context).pop();
+    }
   }
 
   @override
@@ -208,7 +236,7 @@ class _ReceptionCallScreenState extends State<_ReceptionCallScreen> {
             Positioned(
               top: 0,
               bottom: 0,
-              right: 0,
+              left: 0,
               width: 340,
               child: Material(
                 elevation: 8,
@@ -231,12 +259,12 @@ class _ReceptionCallScreenState extends State<_ReceptionCallScreen> {
           else
             Positioned(
               top: 16,
-              right: 16,
-              child: FloatingActionButton.small(
+              left: 16,
+              child: FloatingActionButton.extended(
                 heroTag: 'reception_show_preview',
-                tooltip: 'Show prescription preview',
                 onPressed: () => setState(() => _showPreview = true),
-                child: const Icon(Icons.description_outlined),
+                icon: const Icon(Icons.description_outlined),
+                label: const Text('Prescription'),
               ),
             ),
         ],

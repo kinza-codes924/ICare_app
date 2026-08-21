@@ -29,6 +29,12 @@ class InConsultationPrescriptionForm extends StatefulWidget {
   // only the walk-in call flow needs this; every other consultation still
   // only saves on the explicit "Save Draft" button / on complete.
   final bool liveSync;
+  // When set, this form is embedded in a dismissible side panel (e.g. the
+  // doctor's walk-in call screen) rather than being its own pushed route —
+  // the back button and the post-"Complete" navigation must close the panel
+  // via this callback instead of Navigator.pop, which would otherwise pop
+  // the whole call screen and drop the live call.
+  final VoidCallback? onClose;
 
   const InConsultationPrescriptionForm({
     super.key,
@@ -37,6 +43,7 @@ class InConsultationPrescriptionForm extends StatefulWidget {
     this.onPrescriptionComplete,
     this.walkInPatientName,
     this.liveSync = false,
+    this.onClose,
   });
 
   @override
@@ -214,7 +221,11 @@ class _InConsultationPrescriptionFormState
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Prescription completed successfully'), backgroundColor: Colors.green),
         );
-        Navigator.pop(context);
+        if (widget.onClose != null) {
+          widget.onClose!();
+        } else {
+          Navigator.pop(context);
+        }
       } else if (mounted) {
         final msg = result['message']?.toString() ?? result['error']?.toString() ?? 'Server error — please try again';
         ScaffoldMessenger.of(context).showSnackBar(
@@ -506,7 +517,12 @@ class _InConsultationPrescriptionFormState
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
-        leading: const CustomBackButton(),
+        leading: widget.onClose != null
+            ? IconButton(
+                icon: const Icon(Icons.close_rounded),
+                onPressed: widget.onClose,
+              )
+            : const CustomBackButton(),
         title: const Text(
           'Prescription Form',
           style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Color(0xFF0F172A)),
