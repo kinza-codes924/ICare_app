@@ -135,6 +135,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     context.go('/dashboard');
   }
 
+  // Forwards redirectDoctorId (if this Login screen was itself reached via
+  // "Book Appointment while logged out") to Signup, so choosing "Sign up
+  // instead" doesn't lose that context — see SignupScreen.redirectDoctorId.
+  String get _signupRoute {
+    final doctorId = widget.redirectDoctorId;
+    if (doctorId != null && doctorId.isNotEmpty) {
+      return '/signup?redirectDoctorId=$doctorId';
+    }
+    return '/signup';
+  }
+
   Future<void> _checkExistingRole() async {
     final authState = ref.read(authProvider);
     final existingRole = authState.userRole;
@@ -891,7 +902,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                                   // real (visible, top-of-stack) checkbox never got the
                                   // actual widget. Replacing the route disposes Login's
                                   // checkbox first, so there's only ever one instance alive.
-                                  onTap: () => context.go('/signup'),
+                                  onTap: () => context.go(_signupRoute),
                                   child: AnimatedContainer(
                                     duration: const Duration(milliseconds: 250),
                                     curve: Curves.easeInOut,
@@ -1458,7 +1469,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                                   // real (visible, top-of-stack) checkbox never got the
                                   // actual widget. Replacing the route disposes Login's
                                   // checkbox first, so there's only ever one instance alive.
-                                  onTap: () => context.go('/signup'),
+                                  onTap: () => context.go(_signupRoute),
                               child: Container(
                                 padding: EdgeInsets.symmetric(vertical: 15),
                                 decoration: BoxDecoration(

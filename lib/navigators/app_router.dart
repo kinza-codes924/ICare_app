@@ -308,7 +308,8 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/signup',
         builder: (_, state) {
           final role = state.uri.queryParameters['role'] ?? 'Patient';
-          return SignupScreen(role: role);
+          final redirectDoctorId = state.uri.queryParameters['redirectDoctorId'];
+          return SignupScreen(role: role, redirectDoctorId: redirectDoctorId);
         },
       ),
       GoRoute(

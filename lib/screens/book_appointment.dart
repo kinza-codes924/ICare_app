@@ -762,19 +762,34 @@ class _BookAppointmentScreenState extends ConsumerState<BookAppointmentScreen> {
           ),
           const SizedBox(height: 8),
 
-          // Consultation type + fee
+          // Consultation type + fee — shows the 5% online-payment
+          // discounted price (the default path on SelectPaymentMethod,
+          // which _confirmBooking pushes next); "Pay at the Clinic" there
+          // charges the full fee instead.
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text('Consultation Fee'.tr(), style: const TextStyle(fontSize: 13, color: Color(0xFF64748B))),
-              Text(
-                fee > 0 ? 'PKR ${fee.toInt()}' : 'Free / As per clinic'.tr(),
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w800,
-                  color: fee > 0 ? const Color(0xFF0F172A) : const Color(0xFF10B981),
+              if (fee > 0)
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      'PKR ${(fee * 0.95).round()}',
+                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
+                    ),
+                    Text(
+                      '5% Instant Discount on Online Payment'.tr(),
+                      style: const TextStyle(fontSize: 10, color: Color(0xFF10B981), fontWeight: FontWeight.w600),
+                    ),
+                  ],
+                )
+              else
+                Text(
+                  'Free / As per clinic'.tr(),
+                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: Color(0xFF10B981)),
                 ),
-              ),
             ],
           ),
           const SizedBox(height: 16),
@@ -979,69 +994,35 @@ class _BookAppointmentScreenState extends ConsumerState<BookAppointmentScreen> {
             ],
           ),
         ),
-        const SizedBox(height: 16),
-
-        // Payment method
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: const Color(0xFFE2E8F0)),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Select Payment Method'.tr(),
-                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: Color(0xFF0F172A))),
-              const SizedBox(height: 12),
-              // Online Payment option
-              Container(
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: AppColors.primaryColor.withValues(alpha: 0.05),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: AppColors.primaryColor.withValues(alpha: 0.3)),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.radio_button_checked_rounded, color: AppColors.primaryColor, size: 20),
-                    const SizedBox(width: 10),
-                    Expanded(child: Text('Online Payment'.tr(), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700))),
-                    if (fee > 0)
-                      Text('PKR ${fee.toInt()}',
-                          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: Color(0xFF0F172A))),
-                  ],
-                ),
-              ),
-              if (fee == 0) ...[
-                const SizedBox(height: 10),
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFFFBEB),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: const Color(0xFFFDE68A)),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(Icons.info_outline_rounded, color: Color(0xFFF59E0B), size: 16),
-                      SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          'Consultation fee will be confirmed by the doctor.'.tr(),
-                          style: const TextStyle(fontSize: 12, color: Color(0xFF92400E)),
-                        ),
-                      ),
-                    ],
+        if (fee == 0) ...[
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFFBEB),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: const Color(0xFFFDE68A)),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.info_outline_rounded, color: Color(0xFFF59E0B), size: 16),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Consultation fee will be confirmed by the doctor.'.tr(),
+                    style: const TextStyle(fontSize: 12, color: Color(0xFF92400E)),
                   ),
                 ),
               ],
-            ],
+            ),
           ),
-        ),
+        ],
       ],
     );  // end formCard
+    // Payment method selection (cash vs 5% online discount) is NOT shown
+    // here — it's a duplicate of SelectPaymentMethod, which _confirmBooking
+    // pushes next with the real cash/online choice and the correct
+    // discounted amount. This form only shows a plain fee summary below.
 
     if (isDesktop) {
       return SingleChildScrollView(

@@ -15,7 +15,13 @@ import 'package:icare/widgets/recaptcha_checkbox.dart';
 
 class SignupScreen extends ConsumerStatefulWidget {
   final String role;
-  const SignupScreen({super.key, this.role = 'Patient'});
+  // Set when the user was bounced here from "Book Appointment" on a
+  // doctor/clinic page while logged out, via Login's "Sign up instead" link
+  // — carries them straight to that doctor's slot picker after signup
+  // instead of dropping them on the generic dashboard, same as
+  // LoginScreen.redirectDoctorId.
+  final String? redirectDoctorId;
+  const SignupScreen({super.key, this.role = 'Patient', this.redirectDoctorId});
 
   @override
   ConsumerState<SignupScreen> createState() => _SignupScreenState();
@@ -190,7 +196,16 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
         await ref.read(authProvider.notifier).setUser(newUser);
 
         if (!mounted) return;
-        context.go('/dashboard');
+        // Same pattern as LoginScreen._navigateAfterLogin — if signup was
+        // reached via "Book Appointment while logged out" → Login → "Sign
+        // up instead", carry the doctor context forward instead of
+        // dropping the user on the generic dashboard.
+        final doctorId = widget.redirectDoctorId;
+        if (doctorId != null && doctorId.isNotEmpty) {
+          context.go('/book-appointment?doctorId=$doctorId');
+        } else {
+          context.go('/dashboard');
+        }
       } else {
         _showError(result['message'] ?? 'Registration failed. Please try again.');
       }

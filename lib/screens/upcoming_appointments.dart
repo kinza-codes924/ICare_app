@@ -24,7 +24,10 @@ class UpcomingAppointments extends ConsumerStatefulWidget {
 
 class _UpcomingAppointmentsState extends ConsumerState<UpcomingAppointments> {
   final _appointmentService = AppointmentService();
-  DateTime? _selectedDate;
+  // Explicitly today, not left null — EasyDateTimeLinePicker's focusedDate
+  // falls back to its firstDate (30 days ago) when null, which is why the
+  // strip opened on a stale month (e.g. "stuck on July") instead of today.
+  DateTime? _selectedDate = DateTime.now();
   bool _loading = true;
   String? _error;
   List<AppointmentDetail> _appointments = [];

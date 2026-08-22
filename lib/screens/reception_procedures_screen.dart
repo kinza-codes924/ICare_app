@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:icare/data/procedures_data.dart';
 import 'package:icare/screens/reception_payment_screen.dart';
 import 'package:icare/services/reception_service.dart';
 import 'package:icare/utils/theme.dart';
@@ -60,16 +61,8 @@ class _ReceptionProceduresScreenState extends State<ReceptionProceduresScreen> {
     );
   }
 
-  static const _commonProcedures = [
-    'Consultation',
-    'Dressing',
-    'Injection',
-    'Minor Suture',
-    'X-Ray',
-    'Blood Pressure Check',
-  ];
-
   Future<void> _addProcedure() async {
+    final searchCtrl = TextEditingController();
     final nameCtrl = TextEditingController();
     final priceCtrl = TextEditingController();
     String? error;
@@ -78,111 +71,153 @@ class _ReceptionProceduresScreenState extends State<ReceptionProceduresScreen> {
     final added = await showDialog<bool>(
       context: context,
       builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setModal) => Dialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
+        builder: (ctx, setModal) {
+          final results = searchProcedures(searchCtrl.text);
+          return Dialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxHeight: 560),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: AppColors.primaryColor.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Icon(Icons.medical_services_outlined, color: AppColors.primaryColor, size: 22),
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: AppColors.primaryColor.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Icon(Icons.medical_services_outlined, color: AppColors.primaryColor, size: 22),
+                        ),
+                        const SizedBox(width: 12),
+                        const Text('Add Procedure', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+                      ],
                     ),
-                    const SizedBox(width: 12),
-                    const Text('Add Procedure', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+                    const SizedBox(height: 20),
+                    TextField(
+                      controller: searchCtrl,
+                      autofocus: true,
+                      onChanged: (_) => setModal(() {}),
+                      decoration: InputDecoration(
+                        hintText: 'Search procedures...',
+                        prefixIcon: const Icon(Icons.search_rounded),
+                        suffixIcon: searchCtrl.text.isNotEmpty
+                            ? IconButton(
+                                icon: const Icon(Icons.clear_rounded, size: 18),
+                                onPressed: () => setModal(() => searchCtrl.clear()),
+                              )
+                            : null,
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Flexible(
+                      child: results.isEmpty
+                          ? const Padding(
+                              padding: EdgeInsets.symmetric(vertical: 16),
+                              child: Text('No matching procedure — you can still type a custom name below.',
+                                  style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                            )
+                          : ListView.builder(
+                              shrinkWrap: true,
+                              itemCount: results.length,
+                              itemBuilder: (_, i) {
+                                final p = results[i];
+                                return ListTile(
+                                  dense: true,
+                                  contentPadding: EdgeInsets.zero,
+                                  leading: const Icon(Icons.medical_services_outlined, size: 18),
+                                  title: Text(p.name, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                                  trailing: Text('PKR ${p.defaultPrice.toInt()}',
+                                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.primaryColor)),
+                                  onTap: () => setModal(() {
+                                    nameCtrl.text = p.name;
+                                    priceCtrl.text = p.defaultPrice.toInt().toString();
+                                    searchCtrl.clear();
+                                  }),
+                                );
+                              },
+                            ),
+                    ),
+                    const SizedBox(height: 12),
+                    const Divider(height: 1),
+                    const SizedBox(height: 14),
+                    TextField(
+                      controller: nameCtrl,
+                      decoration: InputDecoration(
+                        labelText: 'Procedure name',
+                        prefixIcon: const Icon(Icons.edit_outlined),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    TextField(
+                      controller: priceCtrl,
+                      keyboardType: TextInputType.number,
+                      decoration: InputDecoration(
+                        labelText: 'Price (PKR)',
+                        helperText: 'Auto-filled from the list above — you can still edit it',
+                        prefixIcon: const Icon(Icons.payments_outlined),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                    ),
+                    if (error != null) ...[
+                      const SizedBox(height: 12),
+                      Text(error!, style: const TextStyle(color: Colors.red, fontSize: 13)),
+                    ],
+                    const SizedBox(height: 20),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+                        const SizedBox(width: 8),
+                        ElevatedButton(
+                          onPressed: submitting
+                              ? null
+                              : () async {
+                                  if (nameCtrl.text.trim().isEmpty) {
+                                    setModal(() => error = 'Procedure name is required');
+                                    return;
+                                  }
+                                  setModal(() {
+                                    submitting = true;
+                                    error = null;
+                                  });
+                                  final result = await _service.addProcedure(
+                                    consultationId: widget.consultationId,
+                                    name: nameCtrl.text.trim(),
+                                    price: double.tryParse(priceCtrl.text.trim()) ?? 0,
+                                  );
+                                  if (result['success'] == true) {
+                                    if (ctx.mounted) Navigator.pop(ctx, true);
+                                  } else {
+                                    setModal(() {
+                                      submitting = false;
+                                      error = result['message']?.toString() ?? 'Failed to add procedure';
+                                    });
+                                  }
+                                },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.primaryColor,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          ),
+                          child: submitting
+                              ? const SizedBox(height: 16, width: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                              : const Text('Add'),
+                        ),
+                      ],
+                    ),
                   ],
                 ),
-                const SizedBox(height: 20),
-                const Text('Quick select', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF64748B))),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: _commonProcedures
-                      .map((name) => ActionChip(
-                            label: Text(name, style: const TextStyle(fontSize: 12)),
-                            onPressed: () => setModal(() => nameCtrl.text = name),
-                          ))
-                      .toList(),
-                ),
-                const SizedBox(height: 20),
-                TextField(
-                  controller: nameCtrl,
-                  decoration: InputDecoration(
-                    labelText: 'Procedure name',
-                    prefixIcon: const Icon(Icons.edit_outlined),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                  ),
-                ),
-                const SizedBox(height: 14),
-                TextField(
-                  controller: priceCtrl,
-                  keyboardType: TextInputType.number,
-                  decoration: InputDecoration(
-                    labelText: 'Price (PKR)',
-                    prefixIcon: const Icon(Icons.payments_outlined),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                  ),
-                ),
-                if (error != null) ...[
-                  const SizedBox(height: 12),
-                  Text(error!, style: const TextStyle(color: Colors.red, fontSize: 13)),
-                ],
-                const SizedBox(height: 24),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-                    const SizedBox(width: 8),
-                    ElevatedButton(
-                      onPressed: submitting
-                          ? null
-                          : () async {
-                              if (nameCtrl.text.trim().isEmpty) {
-                                setModal(() => error = 'Procedure name is required');
-                                return;
-                              }
-                              setModal(() {
-                                submitting = true;
-                                error = null;
-                              });
-                              final result = await _service.addProcedure(
-                                consultationId: widget.consultationId,
-                                name: nameCtrl.text.trim(),
-                                price: double.tryParse(priceCtrl.text.trim()) ?? 0,
-                              );
-                              if (result['success'] == true) {
-                                if (ctx.mounted) Navigator.pop(ctx, true);
-                              } else {
-                                setModal(() {
-                                  submitting = false;
-                                  error = result['message']?.toString() ?? 'Failed to add procedure';
-                                });
-                              }
-                            },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primaryColor,
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                      ),
-                      child: submitting
-                          ? const SizedBox(height: 16, width: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                          : const Text('Add'),
-                    ),
-                  ],
-                ),
-              ],
+              ),
             ),
-          ),
-        ),
+          );
+        },
       ),
     );
     if (added == true) _load();
