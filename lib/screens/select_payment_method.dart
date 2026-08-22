@@ -379,7 +379,11 @@ class _SelectPaymentMethodState extends State<SelectPaymentMethod> {
                 child: ElevatedButton(
                   onPressed: () {
                     Navigator.pop(ctx);
-                    context.go('/dashboard');
+                    // For an appointment booking, land on My Appointments —
+                    // that's where the patient sees the booking status and
+                    // can join once the doctor connects — instead of the
+                    // generic dashboard.
+                    context.go(widget.appointmentId != null ? '/patient/bookings-history' : '/dashboard');
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primaryColor,
@@ -388,9 +392,9 @@ class _SelectPaymentMethodState extends State<SelectPaymentMethod> {
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                     elevation: 0,
                   ),
-                  child: const Text(
-                    "Go to Home",
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, fontFamily: "Gilroy-Bold"),
+                  child: Text(
+                    widget.appointmentId != null ? "View My Appointments" : "Go to Home",
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, fontFamily: "Gilroy-Bold"),
                   ),
                 ),
               ),
