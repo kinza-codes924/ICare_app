@@ -987,10 +987,26 @@ router.post('/:id/end-and-save', authMiddleware, async (req, res) => {
     // Use startedAt (set on go-live) — createdAt can be days old for reused session docs
     const durationMinutes = Math.round((Date.now() - new Date(session.startedAt || session.createdAt).getTime()) / 60000);
 
+    const resolvedLessonId = lessonId || session.linkedLessonId;
+    const resolvedModuleId = moduleId || session.linkedModuleId;
+
     // Mark session as completed
     await LiveSession.findByIdAndUpdate(toId(req.params.id), {
       status: 'completed',
       duration: durationMinutes,
+      // Persist the lesson link onto the session itself (not just used
+      // in-request below) — a session joined straight from a module-lesson
+      // tile (not pre-scheduled via syncLiveSessions) previously never got
+      // linkedLessonId set at all, so backupSessionRecordingToDrive's later
+      // async lesson-backfill (which only has the LiveSession doc to work
+      // from, long after this request has finished) silently found nothing
+      // to update — even though the LiveSession itself ended up with a
+      // working recordingUrl/driveBackupUrl. Confirmed live: a WEEK 5
+      // session had recordingUrl+driveBackupUrl set but its lesson stayed
+      // stuck on "Recording is processing" forever because linkedLessonId
+      // was never set on the session doc.
+      ...(resolvedLessonId ? { linkedLessonId: resolvedLessonId } : {}),
+      ...(resolvedModuleId ? { linkedModuleId: resolvedModuleId } : {}),
     });
 
     // Build chat transcript — prefer server-recorded chatMessages (has
@@ -1019,8 +1035,6 @@ router.post('/:id/end-and-save', authMiddleware, async (req, res) => {
     };
 
     const courseId = session.courseId?._id || session.courseId;
-    const resolvedLessonId = lessonId || session.linkedLessonId;
-    const resolvedModuleId = moduleId || session.linkedModuleId;
 
     // Update the lesson in the course document (if linked) — atomic
     // positional update so a concurrent /set-recording-url write (from the
