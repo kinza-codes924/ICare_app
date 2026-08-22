@@ -59,10 +59,6 @@ class _ConsultationDetailsScreenState
       _showError('Please enter patient name');
       return;
     }
-    if (_reasonController.text.trim().isEmpty) {
-      _showError('Please enter Reason for Consultation');
-      return;
-    }
     if (!_certifyChecked) {
       _showError('Please confirm that all details are correct');
       return;
@@ -328,7 +324,7 @@ class _ConsultationDetailsScreenState
                   ),
                   const SizedBox(height: 16),
 
-                  // Reason — Mandatory
+                  // Reason — Optional
                   Row(
                     children: [
                       _label('Reason for Consultation'),
@@ -337,14 +333,14 @@ class _ConsultationDetailsScreenState
                         padding: const EdgeInsets.symmetric(
                             horizontal: 6, vertical: 2),
                         decoration: BoxDecoration(
-                          color: Colors.red.withValues(alpha: 0.1),
+                          color: const Color(0xFF64748B).withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(4),
                         ),
-                        child: const Text('Mandatory',
+                        child: const Text('Optional',
                             style: TextStyle(
                                 fontSize: 10,
                                 fontWeight: FontWeight.w700,
-                                color: Colors.red)),
+                                color: Color(0xFF64748B))),
                       ),
                     ],
                   ),

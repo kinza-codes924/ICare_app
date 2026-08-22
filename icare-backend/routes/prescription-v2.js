@@ -375,8 +375,9 @@ router.get('/prescriptions/:prescriptionId/pdf', async (req, res) => {
     const sigLineX = doc.page.width - 50 - 180;
     doc.rect(sigLineX, curY, 180, 1).fill(DARK);
     curY += 6;
-    doc.fontSize(11).fillColor(DARK).font('Helvetica-Bold').text(`Dr. ${doctorName}`, sigLineX, curY, { width: 180, align: 'center' });
-    curY += 14;
+    const sigNameText = `Dr. ${doctorName}`;
+    doc.fontSize(11).fillColor(DARK).font('Helvetica-Bold').text(sigNameText, sigLineX, curY, { width: 180, align: 'center' });
+    curY += doc.heightOfString(sigNameText, { width: 180 }) + 3;
     if (rx.doctorPmdc) {
       doc.fontSize(9).fillColor(GREY).font('Helvetica').text(`PMDC Reg. No. ${rx.doctorPmdc}`, sigLineX, curY, { width: 180, align: 'center' });
       curY += 12;

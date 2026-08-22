@@ -2356,10 +2356,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
               "👤 User object created: ${user.name}, ${user.email}, ${user.role}",
             );
 
-            // Save token first and await
+            // Save token first and await — must be the (possibly
+            // post-switch-role) `token` var, not the original login
+            // response, or every subsequent authenticated call carries a
+            // stale role claim (e.g. doctor-only routes 403ing even though
+            // the UI correctly shows the switched-to role).
             await ref
                 .read(authProvider.notifier)
-                .setUserToken(result['data']['token']);
+                .setUserToken(token);
             debugPrint("✅ Token set in provider");
 
             // Save user and await

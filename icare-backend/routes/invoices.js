@@ -320,6 +320,12 @@ router.get('/appointment/:appointmentId/pdf', async (req, res) => {
 // Shared builder — used by the route above AND by payments.js's fulfillment
 // step (emailing the invoice right after payment confirms). Returns a
 // Buffer instead of piping to a response, since the email path has no `res`.
+//
+// Kept at A4 page size (this is emailed/viewed on-screen, not printed on a
+// thermal roll like the reception/standalone invoices), but follows the same
+// slim/compact visual language as thermalReceipt.js — small fonts, dashed
+// dividers, tight label:value lines, no bulky colored table — inside a
+// narrow centered content column so it doesn't look sparse on a full A4 page.
 async function buildAppointmentInvoiceBuffer(appt) {
   const Payment = require('../models/Payment');
   const [patient, doctor, payment] = await Promise.all([
@@ -334,57 +340,92 @@ async function buildAppointmentInvoiceBuffer(appt) {
   doc.on('data', (c) => chunks.push(c));
   const done = new Promise((resolve) => doc.on('end', () => resolve(Buffer.concat(chunks))));
 
-  drawInvoiceHeader(doc, {
-    invoiceNumber: appt._id.toString().slice(-8).toUpperCase(),
-    date: new Date(appt.createdAt).toLocaleDateString('en-PK'),
-  });
+  const path = require('path');
+  const fs = require('fs');
+  const CX = 156; // left edge of the narrow centered content column
+  const CW = 300; // content column width
+  const logoPath = path.join(__dirname, '../assets/logo.png');
+  const logoExists = fs.existsSync(logoPath);
+  const invoiceNumber = appt._id.toString().slice(-8).toUpperCase();
+  const dateStr = new Date(appt.createdAt).toLocaleDateString('en-PK');
 
-  let yPos = 140;
-  doc.fontSize(11).fillColor('#0036BC').text('PATIENT INFORMATION', 50, yPos);
-  yPos += 20;
-  doc.fontSize(10).fillColor('#333333').text(`Name: ${patient?.name || patient?.username || 'N/A'}`, 50, yPos);
-  yPos += 15;
-  doc.text(`Email: ${patient?.email || 'N/A'}`, 50, yPos);
+  let y = 40;
+  if (logoExists) {
+    const logoW = 60;
+    doc.image(logoPath, CX + (CW - logoW) / 2, y, { width: logoW });
+    y += logoW * (213 / 192) + 6;
+  } else {
+    doc.fontSize(16).fillColor('#0036BC').font('Helvetica-Bold').text('iCare', CX, y, { width: CW, align: 'center' });
+    y += 20;
+  }
+  doc.fontSize(8).fillColor('#666666').font('Helvetica').text('Your Trusted Healthcare Platform', CX, y, { width: CW, align: 'center' });
+  y += 16;
 
-  yPos = 140;
-  doc.fontSize(10).fillColor('#666666').text('Doctor:', 350, yPos);
-  yPos += 15;
-  doc.fontSize(9).fillColor('#333333').text(`Dr. ${doctor?.name || doctor?.username || 'N/A'}`, 350, yPos);
-  yPos += 12;
-  doc.text(`${appt.appointment_date || ''} ${appt.appointment_time || ''}`.trim(), 350, yPos);
+  doc.moveTo(CX, y).lineTo(CX + CW, y).dash(1, { space: 1 }).strokeColor('#999999').stroke();
+  doc.undash();
+  y += 10;
 
-  yPos = 220;
-  doc.rect(50, yPos, 500, 25).fillAndStroke('#0036BC', '#0036BC');
-  doc.fontSize(10).fillColor('#FFFFFF')
-    .text('Description', 60, yPos + 8, { width: 350 })
-    .text('Amount (PKR)', 450, yPos + 8, { width: 90, align: 'right' });
-  yPos += 25;
+  doc.fontSize(9).fillColor('#0F172A').font('Helvetica-Bold').text('INVOICE', CX, y, { width: CW, align: 'center' });
+  y += 13;
+  doc.fontSize(8).fillColor('#333333').font('Helvetica')
+    .text(`#${invoiceNumber}`, CX, y, { width: CW, align: 'center' });
+  y += 10;
+  doc.text(dateStr, CX, y, { width: CW, align: 'center' });
+  y += 16;
+
+  doc.moveTo(CX, y).lineTo(CX + CW, y).dash(1, { space: 1 }).strokeColor('#999999').stroke();
+  doc.undash();
+  y += 10;
+
+  function infoLine(label, value) {
+    doc.fontSize(8).fillColor('#666666').font('Helvetica').text(`${label}:`, CX, y);
+    const labelWidth = doc.widthOfString(`${label}: `);
+    doc.fontSize(8).fillColor('#0F172A').font('Helvetica-Bold').text(value, CX + labelWidth, y, { width: CW - labelWidth });
+    y += Math.max(12, doc.heightOfString(value, { width: CW - labelWidth }) + 3);
+  }
+
+  infoLine('Patient', patient?.name || patient?.username || 'N/A');
+  infoLine('Doctor', `Dr. ${doctor?.name || doctor?.username || 'N/A'}`);
+  const apptWhen = `${appt.appointment_date || ''} ${appt.appointment_time || ''}`.trim();
+  if (apptWhen) infoLine('Appointment', apptWhen);
+
+  y += 4;
+  doc.moveTo(CX, y).lineTo(CX + CW, y).dash(1, { space: 1 }).strokeColor('#999999').stroke();
+  doc.undash();
+  y += 10;
 
   const amount = payment?.amount ?? 0;
   const original = payment?.originalAmount;
   const discount = payment?.discountAmount ?? 0;
-  doc.rect(50, yPos, 500, 30).fillAndStroke('#F9F9F9', '#E0E0E0');
-  doc.fontSize(9).fillColor('#333333')
-    .text('Consultation Fee', 60, yPos + 10, { width: 350 })
-    .text((original ?? amount).toFixed(2), 450, yPos + 10, { width: 90, align: 'right' });
-  yPos += 30;
+
+  doc.fontSize(8.5).fillColor('#0F172A').font('Helvetica-Bold').text('Consultation Fee', CX, y, { width: CW / 2 })
+    .text(`PKR ${(original ?? amount).toFixed(2)}`, CX, y, { width: CW, align: 'right' });
+  y += 16;
 
   if (discount > 0) {
-    doc.rect(50, yPos, 500, 30).fillAndStroke('#F9F9F9', '#E0E0E0');
-    doc.fontSize(9).fillColor('#10B981')
-      .text('Online Payment Discount', 60, yPos + 10, { width: 350 })
-      .text(`-${discount.toFixed(2)}`, 450, yPos + 10, { width: 90, align: 'right' });
-    yPos += 30;
+    doc.fontSize(8.5).fillColor('#10B981').font('Helvetica')
+      .text('Online Payment Discount', CX, y, { width: CW / 2 })
+      .text(`-PKR ${discount.toFixed(2)}`, CX, y, { width: CW, align: 'right' });
+    y += 16;
   }
 
-  yPos += 10;
-  doc.fontSize(12).fillColor('#0036BC')
-    .text('Total Paid:', 350, yPos, { bold: true })
-    .text(`PKR ${amount.toFixed(2)}`, 450, yPos, { width: 90, align: 'right', bold: true });
+  y += 4;
+  doc.moveTo(CX, y).lineTo(CX + CW, y).strokeColor('#0F172A').stroke();
+  y += 8;
 
-  doc.fontSize(8).fillColor('#999999')
-    .text('Thank you for choosing iCare - Your Trusted Healthcare Platform', 50, 700, { align: 'center', width: 500 })
-    .text('For support, contact: support@icare.com', 50, 715, { align: 'center', width: 500 });
+  doc.fontSize(11).fillColor('#0036BC').font('Helvetica-Bold')
+    .text('TOTAL PAID', CX, y, { width: CW / 2 })
+    .text(`PKR ${amount.toFixed(2)}`, CX, y, { width: CW, align: 'right' });
+  y += 26;
+
+  doc.moveTo(CX, y).lineTo(CX + CW, y).dash(1, { space: 1 }).strokeColor('#999999').stroke();
+  doc.undash();
+  y += 10;
+
+  doc.fontSize(7.5).fillColor('#999999').font('Helvetica')
+    .text('Thank you for choosing iCare', CX, y, { width: CW, align: 'center' });
+  y += 10;
+  doc.text('support@icare.com', CX, y, { width: CW, align: 'center' });
 
   doc.end();
   return done;

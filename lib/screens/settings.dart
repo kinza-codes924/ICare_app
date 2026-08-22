@@ -117,6 +117,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   bool _billingLoading = false;
   final List<Map<String, String>> _savedCards = [];
 
+  // Doctor consultation fee (loaded so Settings reflects what's actually
+  // saved, instead of a static subtitle + an always-blank edit dialog that
+  // made a successful save look like it didn't persist).
+  double? _consultationFee;
+
   @override
   void initState() {
     super.initState();
@@ -128,6 +133,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     _loadPointsData();
     _loadReminderAndDiagnosticsPrefs();
     _loadNotifPrefs();
+    _loadConsultationFee();
+  }
+
+  Future<void> _loadConsultationFee() async {
+    try {
+      final result = await DoctorService().getMyDoctorProfile();
+      final fee = result['doctor']?['consultationFee'];
+      if (fee != null && mounted) {
+        setState(() => _consultationFee = (fee as num).toDouble());
+      }
+    } catch (_) {}
   }
 
   Future<void> _loadPointsData() async {
@@ -1582,7 +1598,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 
   void _showFeeDialog(BuildContext ctx) {
-    final ctrl = TextEditingController();
+    final ctrl = TextEditingController(
+      text: _consultationFee != null ? _consultationFee!.toInt().toString() : '',
+    );
     bool saving = false;
     showDialog(context: ctx, builder: (dc) => StatefulBuilder(builder: (dc2, setS) => AlertDialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
@@ -1591,7 +1609,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         const Text('Set your consultation fee (PKR)', style: TextStyle(fontSize: 13, color: Color(0xFF64748B))), const SizedBox(height: 12),
         TextField(controller: ctrl, keyboardType: TextInputType.number, autofocus: true, decoration: InputDecoration(hintText: 'e.g. 2000', prefixText: 'PKR ', border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)), filled: true, fillColor: const Color(0xFFF8FAFC))),
       ]),
-      actions: [TextButton(onPressed: () => Navigator.pop(dc), child: const Text('Cancel')), ElevatedButton(onPressed: saving ? null : () async { final fee = double.tryParse(ctrl.text.trim()); if (fee == null || fee < 0) return; setS(() => saving = true); try { final svc = DoctorService(); await svc.updateConsultationFee(fee); if (dc2.mounted) Navigator.pop(dc2); if (ctx.mounted) ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text('Consultation fee set to PKR ${fee.toInt()}'), backgroundColor: Colors.green)); } catch (e) { if (ctx.mounted) ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text('Failed: $e'), backgroundColor: Colors.red)); } setS(() => saving = false); }, style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF10B981), foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))), child: saving ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) : const Text('Save'))],
+      actions: [TextButton(onPressed: () => Navigator.pop(dc), child: const Text('Cancel')), ElevatedButton(onPressed: saving ? null : () async { final fee = double.tryParse(ctrl.text.trim()); if (fee == null || fee < 0) return; setS(() => saving = true); try { final svc = DoctorService(); await svc.updateConsultationFee(fee); if (mounted) setState(() => _consultationFee = fee); if (dc2.mounted) Navigator.pop(dc2); if (ctx.mounted) ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text('Consultation fee set to PKR ${fee.toInt()}'), backgroundColor: Colors.green)); } catch (e) { if (ctx.mounted) ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text('Failed: $e'), backgroundColor: Colors.red)); } setS(() => saving = false); }, style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF10B981), foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))), child: saving ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) : const Text('Save'))],
     )));
   }
 
@@ -1645,6 +1663,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       onToggleCourseNotifications: _toggleCourseNotifications,
       notifPrefs: _notifPrefs,
       onSaveNotifPref: _saveNotifPref,
+      consultationFee: _consultationFee,
     );
 
     if (isWide) return _WebSettingsLayout(p: params);
@@ -1680,6 +1699,7 @@ class _SettingsLayoutParams {
   // Learning
   final bool courseNotificationsEnabled;
   final void Function(bool) onToggleCourseNotifications;
+  final double? consultationFee;
   // Notification preferences
   final Map<String, bool> notifPrefs;
   final void Function(String, bool) onSaveNotifPref;
@@ -1737,6 +1757,7 @@ class _SettingsLayoutParams {
     required this.onTogglePreferHomeSample, required this.onSetReportDelivery,
     required this.courseNotificationsEnabled, required this.onToggleCourseNotifications,
     required this.notifPrefs, required this.onSaveNotifPref,
+    required this.consultationFee,
   });
 }
 
@@ -2251,7 +2272,9 @@ class _WebSettingsLayout extends StatelessWidget {
             icon: Icons.attach_money_rounded,
             iconColor: const Color(0xFF10B981),
             title: 'Consultation Fee',
-            subtitle: 'Set your consultation fee (PKR)',
+            subtitle: p.consultationFee != null
+                ? 'Currently PKR ${p.consultationFee!.toInt()}'
+                : 'Set your consultation fee (PKR)',
             onTap: () => p.onShowFeeDialog(context),
           ),
           const Divider(height: 1),
@@ -2730,7 +2753,9 @@ class _MobileSettingsLayout extends StatelessWidget {
             icon: Icons.attach_money_rounded,
             iconColor: const Color(0xFF10B981),
             title: 'Consultation Fee',
-            subtitle: 'Set your consultation fee (PKR)',
+            subtitle: p.consultationFee != null
+                ? 'Currently PKR ${p.consultationFee!.toInt()}'
+                : 'Set your consultation fee (PKR)',
             onTap: () => p.onShowFeeDialog(context),
           ),
           const Divider(height: 1),
