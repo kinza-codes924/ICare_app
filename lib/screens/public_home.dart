@@ -1914,7 +1914,9 @@ class _BannerState extends State<_Banner> with SingleTickerProviderStateMixin {
           child: Stack(
             fit: StackFit.expand,
             children: [
-          // 1. Background — mobile: gradient only, desktop: banner image
+          // 1. Background — mobile and desktop each get their own banner
+          // image (mobile's is a separate asset, framed for a narrow/tall
+          // container instead of being a crop of the wide desktop one).
           if (!isMobile)
             Image.asset(
               'assets/newban.png',
@@ -1931,18 +1933,23 @@ class _BannerState extends State<_Banner> with SingleTickerProviderStateMixin {
                 ),
               ),
             ),
-          // Mobile: pure gradient background
           if (isMobile)
-            Container(
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    Color(0xFF0026A0),
-                    Color(0xFF0036BC),
-                    Color(0xFF1565C0),
-                  ],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
+            Image.asset(
+              'assets/1f4a7e1d-a84a-4c8e-b5ac-ed681ff7ca28.png',
+              fit: BoxFit.cover,
+              alignment: Alignment.centerRight,
+              filterQuality: FilterQuality.high,
+              errorBuilder: (_, _, _) => Container(
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      Color(0xFF0026A0),
+                      Color(0xFF0036BC),
+                      Color(0xFF1565C0),
+                    ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
                 ),
               ),
             ),
@@ -1950,7 +1957,7 @@ class _BannerState extends State<_Banner> with SingleTickerProviderStateMixin {
           Padding(
             padding: EdgeInsets.only(
               left: isMobile ? 20 : 52,
-              right: isMobile ? w * 0.10 : w * 0.42,
+              right: isMobile ? w * 0.48 : w * 0.42,
               top: isMobile ? 24 : 44,
               bottom: isMobile ? 24 : 44,
             ),
@@ -2022,8 +2029,8 @@ class _BannerState extends State<_Banner> with SingleTickerProviderStateMixin {
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.white,
                               foregroundColor: const Color(0xFF0036BC),
-                              minimumSize: Size(isMobile ? 145 : 185, isMobile ? 46 : 52),
-                              padding: EdgeInsets.symmetric(horizontal: isMobile ? 14 : 28),
+                              minimumSize: Size(isMobile ? 125 : 185, isMobile ? 42 : 52),
+                              padding: EdgeInsets.symmetric(horizontal: isMobile ? 10 : 28),
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                               elevation: 0,
                             ),
@@ -2031,7 +2038,7 @@ class _BannerState extends State<_Banner> with SingleTickerProviderStateMixin {
                               'Connect to a Doctor Now',
                               style: TextStyle(
                                 fontWeight: FontWeight.w800,
-                                fontSize: isMobile ? 12 : 14,
+                                fontSize: isMobile ? 10.5 : 14,
                                 fontFamily: 'Gilroy-Bold',
                               ),
                             ),
