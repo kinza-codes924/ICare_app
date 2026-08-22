@@ -30,6 +30,12 @@ class SelectPaymentMethod extends StatefulWidget {
   // Set when this is paying a specific installment on an already-existing
   // enrollment (installment 2+), not a fresh course purchase.
   final int? installmentIndex;
+  // Connect-Now / instant online consultation — there's no clinic visit to
+  // pay for in cash at, so "Pay at Clinic" must never be offered here (it
+  // previously showed for every appointmentId, which left instant bookings
+  // permanently stuck at paymentStatus:'cash_pending' since nothing ever
+  // confirms cash collection for a purely-online consultation).
+  final bool isInstant;
 
   const SelectPaymentMethod({
     super.key,
@@ -39,6 +45,7 @@ class SelectPaymentMethod extends StatefulWidget {
     this.amount,
     this.onPaymentSuccess,
     this.installmentIndex,
+    this.isInstant = false,
   });
 
   @override
@@ -78,8 +85,11 @@ class _SelectPaymentMethodState extends State<SelectPaymentMethod> {
       widget.courseId ?? widget.appointmentId ?? widget.labBookingId ?? '';
 
   // Cash is offered for lab bookings (pay the collector / pay at the lab)
-  // and appointments (pay at the clinic — doctor confirms collection).
-  bool get _cashAvailable => widget.labBookingId != null || widget.appointmentId != null;
+  // and physical appointments (pay at the clinic — doctor confirms
+  // collection) — never for an instant online-only consultation, which has
+  // no clinic visit for cash to be collected at.
+  bool get _cashAvailable =>
+      widget.labBookingId != null || (widget.appointmentId != null && !widget.isInstant);
 
   // 5% online-payment incentive — appointments only, matches the backend's
   // calculateAmount() discount for method:'safepay' on type:'appointment'.

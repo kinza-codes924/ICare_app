@@ -207,6 +207,7 @@ class _ConnectNowWaitingScreenState extends State<ConnectNowWaitingScreen>
         builder: (_) => SelectPaymentMethod(
           appointmentId: appointmentId,
           amount: fee,
+          isInstant: true,
           onPaymentSuccess: (successContext, {voucherCode}) => openChat(successContext),
         ),
       ),
