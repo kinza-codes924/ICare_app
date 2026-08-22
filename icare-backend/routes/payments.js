@@ -18,7 +18,7 @@ const express = require('express');
 const crypto = require('crypto');
 const router = express.Router();
 const { connectMongoDB } = require('../config/mongodb');
-const { authMiddleware, roleMiddleware } = require('../middleware/auth');
+const { authMiddleware, roleMiddleware, platformAdminOnly } = require('../middleware/auth');
 const mongoose = require('mongoose');
 
 const Payment = require('../models/Payment');
@@ -962,7 +962,7 @@ router.get('/pending-cash', authMiddleware, async (req, res) => {
 //        from=ISO & to=ISO & minAmount= & maxAmount=
 // Returns the filtered payment list (with payer/payee names) PLUS per-payee
 // totals so admin can see "is pharmacy/doctor/lab/instructor ke kitne paise".
-router.get('/report', authMiddleware, roleMiddleware('admin'), async (req, res) => {
+router.get('/report', authMiddleware, platformAdminOnly, async (req, res) => {
   try {
     await connectMongoDB();
     const q = {};
@@ -1073,7 +1073,7 @@ router.get('/report', authMiddleware, roleMiddleware('admin'), async (req, res) 
 // underlying document (course/appointment/lab booking/pharmacy order) with
 // names populated, so admin can verify the payment against real order data
 // without needing role-specific screen access.
-router.get('/:id/order-details', authMiddleware, roleMiddleware('admin'), async (req, res) => {
+router.get('/:id/order-details', authMiddleware, platformAdminOnly, async (req, res) => {
   try {
     await connectMongoDB();
     const payment = await Payment.findById(toId(req.params.id)).lean();
@@ -1196,7 +1196,7 @@ router.get('/my', authMiddleware, async (req, res) => {
 
 // ─── GET /api/payments/logs — admin audit trail ───────────────────────────────
 // Query: ?paymentId=&tracker=&level=&limit=
-router.get('/logs', authMiddleware, roleMiddleware('admin'), async (req, res) => {
+router.get('/logs', authMiddleware, platformAdminOnly, async (req, res) => {
   try {
     await connectMongoDB();
     const q = {};
@@ -1212,7 +1212,7 @@ router.get('/logs', authMiddleware, roleMiddleware('admin'), async (req, res) =>
 });
 
 // ─── GET /api/payments/all — admin: list payments ────────────────────────────
-router.get('/all', authMiddleware, roleMiddleware('admin'), async (req, res) => {
+router.get('/all', authMiddleware, platformAdminOnly, async (req, res) => {
   try {
     await connectMongoDB();
     const q = {};

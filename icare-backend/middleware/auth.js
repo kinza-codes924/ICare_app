@@ -45,4 +45,39 @@ const roleMiddleware = (...allowedRoles) => {
   };
 };
 
-module.exports = { authMiddleware, roleMiddleware };
+// Platform-wide admin routes only. A clinic-admin account is literally
+// role:'admin' in the User model (see ClinicAdminProfile) — nothing about
+// the role string itself distinguishes it from the real platform admin.
+// This checks role:'admin' the same way roleMiddleware('admin') does, then
+// additionally rejects if a ClinicAdminProfile exists for that user, even
+// though the role matches. Every platform-admin-only route must use this,
+// not roleMiddleware('admin') directly, or a clinic-scoped admin can reach
+// platform-wide data (other clinics' doctors, the global user list, etc).
+const platformAdminOnly = async (req, res, next) => {
+  if (!req.user || String(req.user.role || '').toLowerCase() !== 'admin') {
+    return res.status(403).json({
+      success: false,
+      message: 'Admin access required',
+    });
+  }
+  try {
+    const { connectMongoDB } = require('../config/mongodb');
+    const ClinicAdminProfile = require('../models/ClinicAdminProfile');
+    await connectMongoDB();
+    const profile = await ClinicAdminProfile.findOne({ user_id: req.user.id }).select('_id').lean();
+    if (profile) {
+      return res.status(403).json({
+        success: false,
+        message: 'This admin account is scoped to a clinic and cannot access platform-wide admin routes.',
+      });
+    }
+    next();
+  } catch (error) {
+    return res.status(503).json({
+      success: false,
+      message: 'Could not verify admin scope — please retry.',
+    });
+  }
+};
+
+module.exports = { authMiddleware, roleMiddleware, platformAdminOnly };

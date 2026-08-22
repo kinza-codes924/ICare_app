@@ -109,22 +109,30 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
   void initState() {
     super.initState();
     _currentTab = widget.initialTab;
-    _fetchUsers();
+    // Sequenced, not concurrent: platform-wide admin routes now reject a
+    // clinic-scoped admin outright (see middleware/auth.js's
+    // platformAdminOnly), so this is no longer a security concern — but
+    // firing _fetchUsers() before the clinic-scope check resolves still
+    // means a clinic admin briefly sees this screen attempt (and fail) a
+    // platform-wide fetch before the redirect below fires. Checking first
+    // avoids that flash.
     _checkClinicScoped();
   }
 
   // A clinic-scoped admin (created via Admin > iCare Clinics > New Clinic
   // Admin) is still role:'admin' at the auth level, but should land on the
   // clinic-specific bookings dashboard instead of the platform-wide admin
-  // screen. Checked once on load, silently no-ops for regular admins.
+  // screen. Checked once on load; regular admins fall through to _fetchUsers().
   Future<void> _checkClinicScoped() async {
     try {
       final response = await _apiService.get('/clinic-admin/me');
       final data = response.data;
       if (data is Map && data['clinicId'] != null && mounted) {
         context.go('/clinic-admin/dashboard');
+        return;
       }
     } catch (_) {}
+    if (mounted) _fetchUsers();
   }
 
   @override

@@ -1,12 +1,11 @@
 const express = require('express');
 const router = express.Router();
 const FAQ = require('../models/FAQ');
-const { authMiddleware } = require('../middleware/auth');
+const { authMiddleware, platformAdminOnly } = require('../middleware/auth');
 
-function adminOnly(req, res, next) {
-  if (req.user?.role !== 'admin') return res.status(403).json({ success: false, message: 'Admin only' });
-  next();
-}
+// Platform-wide admin only — a clinic-scoped admin is rejected even with a
+// matching role; see middleware/auth.js's platformAdminOnly.
+const adminOnly = platformAdminOnly;
 
 // GET /api/faqs — public list (optionally filtered by accountType)
 router.get('/', async (req, res) => {

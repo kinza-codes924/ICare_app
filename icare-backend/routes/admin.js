@@ -5,7 +5,7 @@ const mongoose = require('mongoose');
 const { connectMongoDB } = require('../config/mongodb');
 const User = require('../models/User');
 const PharmacyOrder = require('../models/PharmacyOrder');
-const { authMiddleware } = require('../middleware/auth');
+const { authMiddleware, platformAdminOnly } = require('../middleware/auth');
 
 function toId(id) {
   try { return new mongoose.Types.ObjectId(id); } catch { return null; }
@@ -18,13 +18,10 @@ function isNoReferrerReason(raw) {
   return n === 'no referrer' || n.includes('no referrer');
 }
 
-// Admin-only middleware
-function adminOnly(req, res, next) {
-  if (req.user?.role !== 'admin') {
-    return res.status(403).json({ success: false, message: 'Admin access required' });
-  }
-  next();
-}
+// Admin-only middleware — platform-wide admin only. A clinic-scoped admin
+// (role:'admin' + a ClinicAdminProfile) is explicitly rejected by
+// platformAdminOnly even though the role matches; see middleware/auth.js.
+const adminOnly = platformAdminOnly;
 
 // ─── ENSURE ADMIN EXISTS (called on startup) ──────────────────────────────────
 async function ensureAdminExists() {

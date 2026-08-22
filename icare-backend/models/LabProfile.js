@@ -14,6 +14,9 @@ const labProfileSchema = new mongoose.Schema({
   drap_compliance: { type: Boolean, default: false },
   rating: { type: Number, default: 0 },
   total_reviews: { type: Number, default: 0 },
+  // Which standalone iCare Clinic this lab belongs to, if any — same
+  // convention as DoctorProfile.clinicId. Unset = platform-wide/independent lab.
+  clinicId: String,
 }, { timestamps: true, strict: false });
 
 module.exports = mongoose.models.LabProfile || mongoose.model('LabProfile', labProfileSchema);

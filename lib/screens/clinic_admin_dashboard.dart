@@ -2,15 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:icare/providers/auth_provider.dart';
+import 'package:icare/screens/clinic_admin_staff_tab.dart';
 import 'package:icare/services/api_service.dart';
 import 'package:icare/utils/theme.dart';
 
-// Dashboard for a clinic-scoped admin account — single view of every
-// booking (telehealth appointment, in-person appointment, or front-desk
-// walk-in) for all doctors under their standalone iCare Clinic. This is
-// the "hamare paas kaise information aayegi" visibility the client asked
-// for, specific to standalone clinics (independent telehealth doctors
-// still just get their own personal notification).
+// Dashboard for a clinic-scoped admin account. Tab 1 is the original
+// booking-visibility view (every telehealth appointment, in-person
+// appointment, or front-desk walk-in for doctors under their standalone
+// iCare Clinic — the "hamare paas kaise information aayegi" ask). Tabs 2-5
+// let the clinic admin create/manage their own clinic's Receptionist,
+// Doctor, Lab, and Pharmacy staff — every /clinic-admin/* endpoint derives
+// the clinic from the logged-in admin's own account server-side, so none of
+// these tabs ever need a clinic picker.
 class ClinicAdminDashboard extends ConsumerStatefulWidget {
   const ClinicAdminDashboard({super.key});
 
@@ -18,7 +21,122 @@ class ClinicAdminDashboard extends ConsumerStatefulWidget {
   ConsumerState<ClinicAdminDashboard> createState() => _ClinicAdminDashboardState();
 }
 
-class _ClinicAdminDashboardState extends ConsumerState<ClinicAdminDashboard> {
+class _ClinicAdminDashboardState extends ConsumerState<ClinicAdminDashboard> with SingleTickerProviderStateMixin {
+  late final TabController _tabController = TabController(length: 5, vsync: this);
+
+  Future<void> _confirmLogout() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Log Out?'),
+        content: const Text('You will need to sign in again to access the clinic dashboard.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+            child: const Text('Log Out'),
+          ),
+        ],
+      ),
+    );
+    if (confirm == true) {
+      await ref.read(authProvider.notifier).setUserLogout();
+      if (mounted) context.go('/login');
+    }
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFFF8FAFC),
+      appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_rounded),
+          onPressed: () => Navigator.of(context).maybePop(),
+        ),
+        title: const Text('Clinic Dashboard'),
+        backgroundColor: AppColors.primaryColor,
+        foregroundColor: Colors.white,
+        elevation: 0,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.logout_rounded),
+            tooltip: 'Log Out',
+            onPressed: _confirmLogout,
+          ),
+        ],
+        bottom: TabBar(
+          controller: _tabController,
+          isScrollable: true,
+          labelColor: Colors.white,
+          unselectedLabelColor: Colors.white70,
+          indicatorColor: Colors.white,
+          tabs: const [
+            Tab(text: 'Bookings'),
+            Tab(text: 'Receptionists'),
+            Tab(text: 'Doctors'),
+            Tab(text: 'Lab'),
+            Tab(text: 'Pharmacy'),
+          ],
+        ),
+      ),
+      body: TabBarView(
+        controller: _tabController,
+        children: const [
+          _BookingsTab(),
+          ClinicAdminStaffTab(
+            role: 'Receptionist',
+            listEndpoint: '/clinic-admin/receptionists',
+            createEndpoint: '/clinic-admin/receptionists',
+            listKey: 'receptionists',
+            extraFields: [StaffExtraField(key: 'speciality', label: 'Speciality')],
+            showDoctorAssignment: true,
+          ),
+          ClinicAdminStaffTab(
+            role: 'Doctor',
+            listEndpoint: '/clinic-admin/doctors',
+            createEndpoint: '/clinic-admin/doctors',
+            listKey: 'doctors',
+            extraFields: [StaffExtraField(key: 'specialization', label: 'Specialization')],
+          ),
+          ClinicAdminStaffTab(
+            role: 'Lab',
+            listEndpoint: '/clinic-admin/lab',
+            createEndpoint: '/clinic-admin/lab',
+            listKey: 'labs',
+            extraFields: [StaffExtraField(key: 'lab_name', label: 'Lab Name')],
+          ),
+          ClinicAdminStaffTab(
+            role: 'Pharmacy',
+            listEndpoint: '/clinic-admin/pharmacy',
+            createEndpoint: '/clinic-admin/pharmacy',
+            listKey: 'pharmacies',
+            extraFields: [StaffExtraField(key: 'pharmacy_name', label: 'Pharmacy Name')],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// Original bookings-visibility view, unchanged — now Tab 0 of
+// ClinicAdminDashboard instead of the whole screen.
+class _BookingsTab extends StatefulWidget {
+  const _BookingsTab();
+
+  @override
+  State<_BookingsTab> createState() => _BookingsTabState();
+}
+
+class _BookingsTabState extends State<_BookingsTab> {
   final ApiService _api = ApiService();
   bool _loading = true;
   String? _error;
@@ -58,29 +176,6 @@ class _ClinicAdminDashboardState extends ConsumerState<ClinicAdminDashboard> {
     }
   }
 
-  Future<void> _confirmLogout() async {
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Log Out?'),
-        content: const Text('You will need to sign in again to access the clinic dashboard.'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
-            child: const Text('Log Out'),
-          ),
-        ],
-      ),
-    );
-    if (confirm == true) {
-      await ref.read(authProvider.notifier).setUserLogout();
-      if (mounted) context.go('/login');
-    }
-  }
-
   Color _typeColor(String type) => switch (type) {
         'telehealth' => Colors.indigo,
         'walk-in' => Colors.teal,
@@ -107,26 +202,9 @@ class _ClinicAdminDashboardState extends ConsumerState<ClinicAdminDashboard> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
-      appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_rounded),
-          onPressed: () => Navigator.of(context).maybePop(),
-        ),
-        title: const Text('Clinic Dashboard'),
-        backgroundColor: AppColors.primaryColor,
-        foregroundColor: Colors.white,
-        elevation: 0,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.logout_rounded),
-            tooltip: 'Log Out',
-            onPressed: _confirmLogout,
-          ),
-        ],
-      ),
-      body: _loading
+    return Container(
+      color: const Color(0xFFF8FAFC),
+      child: _loading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
               ? Center(child: Text(_error!, style: const TextStyle(color: Colors.red)))
