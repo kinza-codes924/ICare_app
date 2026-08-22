@@ -124,11 +124,12 @@ router.get('/course/:courseId', authMiddleware, async (req, res) => {
     await connectMongoDB();
 
     // Opportunistic cleanup: a 'live' session that never received a graceful
-    // end signal (server crash, instructor closing the tab, etc) stays 'live'
-    // forever unless something happens to poll /active for it afterwards.
+    // end signal (server crash, instructor closing the tab, network drop
+    // right as the instructor tried to end it, etc) stays 'live' forever
+    // unless something happens to poll /active for it afterwards.
     const staleHeartbeatThreshold = new Date(Date.now() - 5 * 60 * 1000);
     const threeHoursAgo = new Date(Date.now() - 3 * 60 * 60 * 1000);
-    await LiveSession.updateMany(
+    const staleSessions = await LiveSession.find(
       {
         courseId: toId(req.params.courseId),
         status: 'live',
@@ -137,8 +138,33 @@ router.get('/course/:courseId', authMiddleware, async (req, res) => {
           { instructorHeartbeat: null, createdAt: { $lt: threeHoursAgo } },
         ],
       },
-      { status: 'ended' }
-    ).catch(() => {});
+      { linkedLessonId: 1 }
+    ).lean().catch(() => []);
+
+    if (staleSessions.length) {
+      await LiveSession.updateMany(
+        { _id: { $in: staleSessions.map(s => s._id) } },
+        { status: 'ended' }
+      ).catch(() => {});
+
+      // Same reason as end-and-save's own status write (courseProgress.js's
+      // recheckModuleCompletion only unlocks a module-embedded live lesson
+      // once status:'ended' is set) — but /end-and-save is a single
+      // fire-once call from the INSTRUCTOR's own device at the exact moment
+      // their connection may be dying (tab closing, network dropping). If
+      // that call never lands, this is the only other place that ever marks
+      // the lesson done, so a flaky-connection instructor no longer
+      // permanently strands every student's module unlock for that session.
+      const Course = require('../models/Course');
+      const lessonIds = staleSessions.map(s => s.linkedLessonId).filter(Boolean);
+      if (lessonIds.length) {
+        await Course.updateOne(
+          { _id: toId(req.params.courseId) },
+          { $set: { 'modules.$[].lessons.$[lesson].status': 'ended' } },
+          { arrayFilters: [{ 'lesson._id': { $in: lessonIds.map(toId).filter(Boolean) } }] }
+        ).catch(() => {});
+      }
+    }
 
     const sessions = await LiveSession.find({
       courseId: toId(req.params.courseId)
@@ -1399,21 +1425,21 @@ router.post('/jibri-recording-complete', jibriUpload.single('file'), async (req,
     session.isRecorded = true;
     await session.save();
 
-    // Google Drive backup — the in-app player keeps using finalUrl
-    // (Cloudinary/Blob) since large Drive files don't stream reliably in
-    // <video>; this just archives a copy for the client. No-ops silently
-    // if GOOGLE_DRIVE_* env vars aren't configured yet.
-    //
-    // MUST be awaited before responding, not fired-and-forgotten: this is a
-    // Vercel serverless function, and the process can be frozen or torn
-    // down as soon as res.json() sends the response — a detached
-    // `(async () => {...})()` here was never guaranteed to actually finish,
-    // which is why driveBackupUrl sometimes never got set and the student/
-    // instructor UI stayed stuck showing "Recording is processing" forever
-    // even though recordingUrl (finalUrl) had already saved successfully.
-    await backupSessionRecordingToDrive(session, { fileBuffer: req.file?.buffer, sourceUrl: finalUrl });
+    // Google Drive backup is intentionally NOT done here anymore. It used
+    // to be awaited in this same request, but downloading + re-uploading a
+    // real class-length recording (15-20+ min) routinely blew past this
+    // function's maxDuration (60s, vercel.json) — Vercel kills the function
+    // mid-upload, so driveBackupUrl never gets set even though the video is
+    // genuinely sitting in Drive by then (confirmed live: client checked
+    // Drive directly and found the file while the app was still stuck on
+    // "processing"). finalize.sh now calls the dedicated
+    // jibri-drive-backup endpoint as its own follow-up step, immediately
+    // after this response — same Jibri-secret auth, own fresh 60s budget,
+    // and finalize.sh already has no time pressure (--max-time 600 on its
+    // Blob upload proves that).
 
-    // Recordings are archived to Google Drive (above) and remain playable
+    // Recordings are archived to Google Drive (via finalize.sh's follow-up
+    // call to jibri-drive-backup) and remain playable
     // from the Live Sessions list via recordingUrl — per the client's
     // request, they're intentionally no longer auto-attached as a Course
     // Content lesson's video.
@@ -1422,6 +1448,44 @@ router.post('/jibri-recording-complete', jibriUpload.single('file'), async (req,
     res.json({ success: true, url: finalUrl });
   } catch (e) {
     console.error('jibri-recording-complete error:', e.message);
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+// POST /live-sessions/jibri-drive-backup — called by Jibri finalize.sh as a
+// separate follow-up step right after jibri-recording-complete, so the
+// Drive download+reupload gets its own fresh maxDuration budget instead of
+// competing with the recording-complete request's — see the comment on
+// jibri-recording-complete for why that was blowing the 60s limit on real
+// class-length recordings. Same X-Jibri-Secret auth as
+// jibri-recording-complete (no new secret needed on the Jitsi server).
+router.post('/jibri-drive-backup', async (req, res) => {
+  try {
+    const secret = (req.headers['x-jibri-secret'] || '').trim();
+    const expected = (process.env.JIBRI_UPLOAD_SECRET || '').trim();
+    if (!secret || !expected || secret !== expected) {
+      return res.status(401).json({ success: false, message: 'Invalid or missing secret' });
+    }
+    const sessionId = req.body.sessionId;
+    if (!sessionId) {
+      return res.status(400).json({ success: false, message: 'sessionId is required' });
+    }
+
+    await connectMongoDB();
+    const session = await LiveSession.findById(toId(sessionId));
+    if (!session) return res.status(404).json({ success: false, message: 'Session not found' });
+    if (!session.recordingUrl) {
+      return res.status(400).json({ success: false, message: 'No recordingUrl to back up yet' });
+    }
+    if (session.driveBackupUrl) {
+      return res.json({ success: true, alreadyBackedUp: true, url: session.driveBackupUrl });
+    }
+
+    const result = await backupSessionRecordingToDrive(session, { sourceUrl: session.recordingUrl });
+    if (!result.ok) return res.status(502).json({ success: false, message: result.reason || 'Drive backup failed' });
+    res.json({ success: true, url: result.url });
+  } catch (e) {
+    console.error('jibri-drive-backup error:', e.message);
     res.status(500).json({ success: false, message: e.message });
   }
 });
