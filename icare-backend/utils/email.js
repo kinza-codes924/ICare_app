@@ -4,7 +4,12 @@ const nodemailer = require('nodemailer');
 // Fallback: Nodemailer Gmail SMTP port 465
 // Last resort: Brevo HTTP API
 
-async function sendViaResend({ to, subject, html }) {
+// attachments: optional array of { filename, content (Buffer), contentType }
+// — same shape across all three providers below, just re-encoded per
+// provider's own expected format (Resend/Brevo want base64 strings,
+// nodemailer takes the Buffer directly).
+
+async function sendViaResend({ to, subject, html, attachments }) {
   const res = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: {
@@ -16,6 +21,12 @@ async function sendViaResend({ to, subject, html }) {
       to: Array.isArray(to) ? to : [to],
       subject,
       html,
+      ...(attachments && attachments.length ? {
+        attachments: attachments.map(a => ({
+          filename: a.filename,
+          content: a.content.toString('base64'),
+        })),
+      } : {}),
     }),
   });
   if (!res.ok) {
@@ -25,7 +36,7 @@ async function sendViaResend({ to, subject, html }) {
   return res.json();
 }
 
-async function sendViaSmtp({ to, subject, html }) {
+async function sendViaSmtp({ to, subject, html, attachments }) {
   // Host/port are configurable so the app can send through the project's own
   // Plesk mail server (e.g. noreply@icare.com.co) instead of Gmail. Set
   // SMTP_HOST / SMTP_PORT / SMTP_SECURE on Vercel; they default to Gmail's
@@ -56,10 +67,17 @@ async function sendViaSmtp({ to, subject, html }) {
     to,
     subject,
     html,
+    ...(attachments && attachments.length ? {
+      attachments: attachments.map(a => ({
+        filename: a.filename,
+        content: a.content,
+        contentType: a.contentType,
+      })),
+    } : {}),
   });
 }
 
-async function sendViaBrevo({ to, subject, html }) {
+async function sendViaBrevo({ to, subject, html, attachments }) {
   const res = await fetch('https://api.brevo.com/v3/smtp/email', {
     method: 'POST',
     headers: {
@@ -71,6 +89,12 @@ async function sendViaBrevo({ to, subject, html }) {
       to: [{ email: Array.isArray(to) ? to[0] : to }],
       subject,
       htmlContent: html,
+      ...(attachments && attachments.length ? {
+        attachment: attachments.map(a => ({
+          name: a.filename,
+          content: a.content.toString('base64'),
+        })),
+      } : {}),
     }),
   });
   if (!res.ok) {
@@ -80,7 +104,7 @@ async function sendViaBrevo({ to, subject, html }) {
   return res.json();
 }
 
-const sendEmail = async ({ to, subject, html }) => {
+const sendEmail = async ({ to, subject, html, attachments }) => {
   const errors = [];
 
   // 1. Try Gmail SMTP first — Resend's sandbox sender (onboarding@resend.dev,
@@ -92,7 +116,7 @@ const sendEmail = async ({ to, subject, html }) => {
   // until a verified sending domain is set up on Resend.
   if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
     try {
-      await sendViaSmtp({ to, subject, html });
+      await sendViaSmtp({ to, subject, html, attachments });
       return;
     } catch (e) {
       errors.push(`SMTP: ${e.message}`);
@@ -104,7 +128,7 @@ const sendEmail = async ({ to, subject, html }) => {
   // blocked on the hosting platform, but only reaches the sandbox owner).
   if (process.env.RESEND_API_KEY) {
     try {
-      await sendViaResend({ to, subject, html });
+      await sendViaResend({ to, subject, html, attachments });
       return;
     } catch (e) {
       errors.push(`Resend: ${e.message}`);
@@ -115,7 +139,7 @@ const sendEmail = async ({ to, subject, html }) => {
   // 3. Try Brevo
   if (process.env.BREVO_API_KEY) {
     try {
-      await sendViaBrevo({ to, subject, html });
+      await sendViaBrevo({ to, subject, html, attachments });
       return;
     } catch (e) {
       errors.push(`Brevo: ${e.message}`);

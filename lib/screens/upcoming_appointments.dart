@@ -6,11 +6,13 @@ import 'package:flutter_size_matters/flutter_size_matters.dart';
 import 'package:icare/models/appointment_detail.dart';
 import 'package:icare/providers/auth_provider.dart';
 import 'package:icare/screens/consultation_chat_screen_v2.dart';
+import 'package:icare/services/api_config.dart';
 import 'package:icare/services/appointment_service.dart';
 import 'package:icare/utils/theme.dart';
 import 'package:icare/utils/utils.dart';
 import 'package:icare/widgets/back_button.dart';
 import 'package:icare/widgets/custom_text.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 /// Real upcoming-appointments list — pick a date on the calendar strip to
 /// see that day's appointments (confirmed/pending only). Previously this
@@ -146,11 +148,40 @@ class _UpcomingAppointmentsState extends ConsumerState<UpcomingAppointments> {
               'This consultation will open here once your doctor starts the session — you\'ll be notified.',
               style: const TextStyle(fontSize: 12.5, color: _slate, height: 1.5),
             ),
+            const SizedBox(height: 16),
+            if (appt.status == 'confirmed' || appt.status == 'completed')
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () => _openInvoice(appt),
+                  icon: const Icon(Icons.receipt_long_rounded, size: 18),
+                  label: const Text('View Invoice'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.primaryColor,
+                    side: BorderSide(color: AppColors.primaryColor),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                ),
+              ),
             const SizedBox(height: 8),
           ],
         ),
       ),
     );
+  }
+
+  Future<void> _openInvoice(AppointmentDetail appt) async {
+    final url = '${ApiConfig.baseUrl}/invoices/appointment/${appt.id}/pdf';
+    try {
+      await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not open invoice — please try again')),
+        );
+      }
+    }
   }
 
   @override

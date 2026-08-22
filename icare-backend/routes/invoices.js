@@ -289,4 +289,106 @@ router.get('/standalone/:invoiceId/pdf', async (req, res) => {
   }
 });
 
+// ─── GENERATE APPOINTMENT INVOICE PDF ──────────────────────────────────────
+// A4 (not the reception/standalone thermal format) — this one is emailed as
+// an attachment and viewed in the patient's own record, not printed at a
+// clinic counter, so it follows prescription-v2.js's A4 convention instead.
+// Public (no authMiddleware) — same unguessable-ObjectId trust model as the
+// reception/standalone invoice routes above: the app opens this directly in
+// a new browser tab via url_launcher, which can't carry an Authorization
+// header, so an auth-gated route would just 401 every time.
+router.get('/appointment/:appointmentId/pdf', async (req, res) => {
+  try {
+    await connectMongoDB();
+    const { appointmentId } = req.params;
+    const Appointment = require('../models/Appointment');
+    const appt = await Appointment.findById(toId(appointmentId)).lean();
+    if (!appt) {
+      return res.status(404).json({ success: false, message: 'Appointment not found' });
+    }
+
+    const buffer = await buildAppointmentInvoiceBuffer(appt);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename=icare-invoice-${appointmentId}.pdf`);
+    res.send(buffer);
+  } catch (error) {
+    console.error('Generate appointment invoice PDF error:', error);
+    res.status(500).json({ success: false, message: 'Failed to generate invoice' });
+  }
+});
+
+// Shared builder — used by the route above AND by payments.js's fulfillment
+// step (emailing the invoice right after payment confirms). Returns a
+// Buffer instead of piping to a response, since the email path has no `res`.
+async function buildAppointmentInvoiceBuffer(appt) {
+  const Payment = require('../models/Payment');
+  const [patient, doctor, payment] = await Promise.all([
+    User.findById(appt.patient_id).lean(),
+    User.findById(appt.doctor_id).lean(),
+    Payment.findOne({ type: 'appointment', refId: appt._id, status: 'paid' }).sort({ paidAt: -1 }).lean(),
+  ]);
+
+  const PDFDocument = require('pdfkit');
+  const doc = new PDFDocument({ margin: 50, size: 'A4' });
+  const chunks = [];
+  doc.on('data', (c) => chunks.push(c));
+  const done = new Promise((resolve) => doc.on('end', () => resolve(Buffer.concat(chunks))));
+
+  drawInvoiceHeader(doc, {
+    invoiceNumber: appt._id.toString().slice(-8).toUpperCase(),
+    date: new Date(appt.createdAt).toLocaleDateString('en-PK'),
+  });
+
+  let yPos = 140;
+  doc.fontSize(11).fillColor('#0036BC').text('PATIENT INFORMATION', 50, yPos);
+  yPos += 20;
+  doc.fontSize(10).fillColor('#333333').text(`Name: ${patient?.name || patient?.username || 'N/A'}`, 50, yPos);
+  yPos += 15;
+  doc.text(`Email: ${patient?.email || 'N/A'}`, 50, yPos);
+
+  yPos = 140;
+  doc.fontSize(10).fillColor('#666666').text('Doctor:', 350, yPos);
+  yPos += 15;
+  doc.fontSize(9).fillColor('#333333').text(`Dr. ${doctor?.name || doctor?.username || 'N/A'}`, 350, yPos);
+  yPos += 12;
+  doc.text(`${appt.appointment_date || ''} ${appt.appointment_time || ''}`.trim(), 350, yPos);
+
+  yPos = 220;
+  doc.rect(50, yPos, 500, 25).fillAndStroke('#0036BC', '#0036BC');
+  doc.fontSize(10).fillColor('#FFFFFF')
+    .text('Description', 60, yPos + 8, { width: 350 })
+    .text('Amount (PKR)', 450, yPos + 8, { width: 90, align: 'right' });
+  yPos += 25;
+
+  const amount = payment?.amount ?? 0;
+  const original = payment?.originalAmount;
+  const discount = payment?.discountAmount ?? 0;
+  doc.rect(50, yPos, 500, 30).fillAndStroke('#F9F9F9', '#E0E0E0');
+  doc.fontSize(9).fillColor('#333333')
+    .text('Consultation Fee', 60, yPos + 10, { width: 350 })
+    .text((original ?? amount).toFixed(2), 450, yPos + 10, { width: 90, align: 'right' });
+  yPos += 30;
+
+  if (discount > 0) {
+    doc.rect(50, yPos, 500, 30).fillAndStroke('#F9F9F9', '#E0E0E0');
+    doc.fontSize(9).fillColor('#10B981')
+      .text('Online Payment Discount', 60, yPos + 10, { width: 350 })
+      .text(`-${discount.toFixed(2)}`, 450, yPos + 10, { width: 90, align: 'right' });
+    yPos += 30;
+  }
+
+  yPos += 10;
+  doc.fontSize(12).fillColor('#0036BC')
+    .text('Total Paid:', 350, yPos, { bold: true })
+    .text(`PKR ${amount.toFixed(2)}`, 450, yPos, { width: 90, align: 'right', bold: true });
+
+  doc.fontSize(8).fillColor('#999999')
+    .text('Thank you for choosing iCare - Your Trusted Healthcare Platform', 50, 700, { align: 'center', width: 500 })
+    .text('For support, contact: support@icare.com', 50, 715, { align: 'center', width: 500 });
+
+  doc.end();
+  return done;
+}
+
 module.exports = router;
+module.exports.buildAppointmentInvoiceBuffer = buildAppointmentInvoiceBuffer;

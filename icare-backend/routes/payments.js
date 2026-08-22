@@ -171,6 +171,33 @@ async function notifyAppointmentBooked(appt, { cashPending = false } = {}) {
   }
 }
 
+// Emails the patient a PDF invoice right after their appointment payment
+// confirms — client's explicit request: "jo online booking kar raha hai
+// uski RASEED (receipt) niklegi... PDF FORM mein uski email hum invoice
+// bhijwani hai". Best-effort: never breaks the payment flow if it fails
+// (matches notifyAppointmentBooked's own try/catch-and-log pattern).
+async function sendAppointmentInvoiceEmail(payment, appt) {
+  if (!appt) return;
+  try {
+    const patient = await User.findById(appt.patient_id).select('email name').lean();
+    if (!patient?.email) return;
+    const { buildAppointmentInvoiceBuffer } = require('./invoices');
+    const pdfBuffer = await buildAppointmentInvoiceBuffer(appt);
+    await sendEmail({
+      to: patient.email,
+      subject: 'Your iCare Appointment Invoice',
+      html: `<p>Hi ${patient.name || ''},</p><p>Thank you for your payment — your invoice for this appointment is attached as a PDF.</p><p>You can also view it anytime from your iCare dashboard record.</p>`,
+      attachments: [{
+        filename: `icare-invoice-${appt._id}.pdf`,
+        content: pdfBuffer,
+        contentType: 'application/pdf',
+      }],
+    });
+  } catch (e) {
+    console.error('sendAppointmentInvoiceEmail error:', e.message);
+  }
+}
+
 // ─── Server-side amount calculation per payment type ──────────────────────────
 // Returns { amount, originalAmount, payeeId, description, voucherCode } or throws.
 // payeeId = who receives the money (instructor/doctor/lab/pharmacy) — powers
@@ -454,6 +481,7 @@ async function fulfillPayment(payment) {
     // when it could still be abandoned mid-payment. For standalone-clinic
     // doctors this also alerts the clinic's admin(s), per client request.
     await notifyAppointmentBooked(appt);
+    await sendAppointmentInvoiceEmail(payment, appt);
     return {};
   }
 

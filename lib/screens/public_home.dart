@@ -1515,8 +1515,12 @@ class _ICareClinicsSection extends StatelessWidget {
                       filterQuality: FilterQuality.high,
                     ),
                     const SizedBox(height: 8),
+                    // SEO: search engines can't read the wordmark baked
+                    // into the logo image above — this real Text is the
+                    // only "iCare Clinics" a crawler sees here. Client's
+                    // exact requested copy, name first.
                     Text(
-                      'Premium multi-speciality clinics — presently available at Karachi only',
+                      'iCare Clinics : Premium Multi Speciality Clinics — Available at Karachi',
                       style: TextStyle(fontSize: 14, color: Colors.grey[600]),
                       textAlign: TextAlign.center,
                     ),

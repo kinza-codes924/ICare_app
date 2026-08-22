@@ -33,8 +33,14 @@ class ICareClinicsListScreen extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // SEO: search engines don't read text baked into images, and
+            // this screen's own logo image already carries no readable
+            // "iCare Clinics" wording of its own — this real Text is what a
+            // crawler (and screen readers) can actually pick up. Client's
+            // exact requested copy, "iCare Clinics" first: "iCare Clinics :
+            // Premium Multi Speciality Clinics — Available at Karachi".
             const Text(
-              'Premium Multi-Speciality',
+              'iCare Clinics : Premium Multi Speciality Clinics',
               style: TextStyle(
                 fontSize: 22,
                 fontWeight: FontWeight.w900,
@@ -48,7 +54,7 @@ class ICareClinicsListScreen extends StatelessWidget {
                 const Icon(Icons.location_on_rounded, size: 16, color: Color(0xFF64748B)),
                 const SizedBox(width: 4),
                 Text(
-                  'Presently Available At Karachi Only',
+                  'Available at Karachi',
                   style: TextStyle(fontSize: 13, color: Colors.grey[600]),
                 ),
               ],
