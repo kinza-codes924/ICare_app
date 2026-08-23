@@ -289,7 +289,13 @@
       console.log('Jitsi: closed event', reason);
       try { if (_jitsiApi) { _jitsiApi.dispose(); _jitsiApi = null; } } catch(_) {}
       try { var cc = document.getElementById('jitsi-container'); if (cc) cc.innerHTML = ''; } catch(_) {}
-      _removePrescriptionToggle();
+      // Was calling a function that was never defined (_removePrescriptionToggle
+      // — the real one is _removeCallTabButtons, defined further down). That
+      // threw a ReferenceError right here, which aborted this whole handler
+      // BEFORE the jitsiEnded dispatch below ever ran — so Flutter never found
+      // out the call had ended, leaving the doctor stuck on the video-call
+      // screen with no way back to the prescription/chat view.
+      try { _removeCallTabButtons(); } catch(_) {}
       try { window.dispatchEvent(new CustomEvent('jitsiEnded', { detail: { reason: reason } })); } catch(_) {}
     }
 

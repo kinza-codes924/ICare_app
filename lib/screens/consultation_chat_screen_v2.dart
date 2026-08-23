@@ -151,7 +151,18 @@ class _ConsultationChatScreenV2State extends State<ConsultationChatScreenV2> {
           await _sendConsentMessage().catchError((_) {});
         }
 
-        await _loadMessages();
+        // Same timeout safety net as the "already have a consultationId"
+        // branch above — this one was missing it, so a slow/loaded backend
+        // (confirmed live: doctor's own console showed repeated 30s+
+        // getNotifications timeouts around the same rejoin) left _isLoading
+        // stuck true with nothing on screen until Dio's own 30s connect/
+        // receive timeout eventually fired minutes later.
+        await _loadMessages().timeout(
+          const Duration(seconds: 10),
+          onTimeout: () {
+            // Timeout is fine — show empty chat, polling will catch up
+          },
+        );
         if (mounted) {
           setState(() => _isLoading = false);
           _startMessagePolling();
