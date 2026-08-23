@@ -143,6 +143,14 @@ class ConsultationService {
         print('❌ ERROR GETTING MESSAGES: ${e.message}');
       }
       return [];
+    } catch (e) {
+      // Non-DioException (e.g. response.data wasn't the expected shape) —
+      // must still be caught here, not left to propagate: this is called
+      // from a Timer.periodic poller every 8s, and an uncaught exception
+      // inside a polling tick can crash the whole widget tree to a blank
+      // white screen instead of just failing that one poll.
+      print('❌ UNEXPECTED ERROR GETTING MESSAGES: $e');
+      return [];
     }
   }
 
