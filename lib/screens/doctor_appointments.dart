@@ -721,6 +721,16 @@ class _DoctorAppointmentsScreenState extends State<DoctorAppointmentsScreen> {
                                     } catch (_) {} // non-blocking
                                   }
 
+                                  // The initiateCall await above can outlive this
+                                  // context: starting a consultation flips the
+                                  // doctor's online status, which rebuilds this
+                                  // list and defuncts the element. Pushing with a
+                                  // dead context threw a bare null-check error
+                                  // (blank white screen, no ErrorWidget, since it
+                                  // fails before any widget is built), so re-check
+                                  // mounted after the await, not just before it.
+                                  if (!context.mounted) return;
+
                                   Navigator.of(context).push(
                                     MaterialPageRoute(
                                       builder: (ctx) => ConsultationChatScreenV2(
