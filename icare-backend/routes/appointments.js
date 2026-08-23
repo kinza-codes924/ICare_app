@@ -189,7 +189,7 @@ router.post('/book_appointment', authMiddleware, async (req, res) => {
     const appt = await Appointment.create({
       patient_id: patientId,
       doctor_id: toId(doctorId),
-      appointment_date: new Date(date).toISOString().split('T')[0],
+      appointment_date: date.toString().split('T')[0],
       appointment_time: timeSlot,
       consultation_type: 'in-person',
       notes: reason || '',
