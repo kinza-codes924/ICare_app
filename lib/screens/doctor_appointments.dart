@@ -842,19 +842,13 @@ class _DoctorAppointmentsScreenState extends State<DoctorAppointmentsScreen> {
 
                                 if (context.mounted) Navigator.pop(context); // close loading
 
-                                if (result['success'] == true && context.mounted) {
-                                  final consultationId = result['consultation']?['_id']?.toString() ?? '';
+                                if (!context.mounted) return;
 
-                                  if (consultationId.isEmpty) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(
-                                        content: Text('Consultation not found. Please start a new consultation.'.tr()),
-                                        backgroundColor: Colors.orange,
-                                      ),
-                                    );
-                                    return;
-                                  }
+                                final consultationId = result['success'] == true
+                                    ? (result['consultation']?['_id']?.toString() ?? '')
+                                    : '';
 
+                                if (consultationId.isNotEmpty) {
                                   Navigator.of(context).push(
                                     MaterialPageRoute(
                                       builder: (ctx) => ConsultationChatScreenV2(
@@ -866,14 +860,28 @@ class _DoctorAppointmentsScreenState extends State<DoctorAppointmentsScreen> {
                                       ),
                                     ),
                                   ).then((_) => _loadAppointments());
-                                } else if (context.mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text(result['message']?.toString() ?? 'Failed to rejoin consultation'),
-                                      backgroundColor: Colors.red,
-                                    ),
-                                  );
+                                  return;
                                 }
+
+                                // No existing consultation found (404, or the
+                                // appointment was in_progress but a session was
+                                // never actually created) — same fallback the
+                                // patient side already had: let the chat screen
+                                // create one via startConsultationV2 instead of
+                                // dead-ending the doctor on a snackbar with no
+                                // way forward. A genuine PAYMENT_REQUIRED will
+                                // still be surfaced there with a clear message.
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (ctx) => ConsultationChatScreenV2(
+                                      appointment: appointment,
+                                      isDoctor: true,
+                                      currentUserId: currentUserId,
+                                      currentUserName: currentUserName,
+                                      consultationId: null,
+                                    ),
+                                  ),
+                                ).then((_) => _loadAppointments());
                               } catch (e) {
                                 if (context.mounted) {
                                   Navigator.pop(context);

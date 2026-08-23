@@ -158,8 +158,17 @@ class _ConsultationChatScreenV2State extends State<ConsultationChatScreenV2> {
         }
       } else if (mounted) {
         setState(() => _isLoading = false);
+        // PAYMENT_REQUIRED (402) means this Connect-Now appointment never
+        // got marked paid — often a stale/abandoned booking from before the
+        // cash-option-on-Connect-Now bug was fixed, not a real failure.
+        // Show a clear message instead of the raw backend text (which reads
+        // like a crash: "Waiting for patient to complete payment...").
+        final code = result['code']?.toString();
+        final message = code == 'PAYMENT_REQUIRED'
+            ? 'This booking was never paid for, so it can\'t be resumed. Please start a new consultation.'
+            : (result['message']?.toString() ?? 'Failed to start consultation');
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(result['message']?.toString() ?? 'Failed to start consultation')),
+          SnackBar(content: Text(message)),
         );
       }
     } catch (e) {
