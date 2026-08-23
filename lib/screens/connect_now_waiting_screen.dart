@@ -168,6 +168,13 @@ class _ConnectNowWaitingScreenState extends State<ConnectNowWaitingScreen>
               'currentUserName': patientName,
             },
           );
+        } else if (result['code']?.toString() == 'PAYMENT_REQUIRED') {
+          // Safepay confirmed on the client but the backend hasn't marked the
+          // appointment paid yet (webhook/verify still in flight). Retry for a
+          // few seconds instead of dead-ending the patient on a red error.
+          ScaffoldMessenger.of(ctx).showSnackBar(
+            const SnackBar(content: Text('Confirming your payment…')),
+          );
         } else {
           ScaffoldMessenger.of(ctx).showSnackBar(
             SnackBar(

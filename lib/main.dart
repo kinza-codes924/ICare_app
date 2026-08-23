@@ -28,7 +28,49 @@ void main() async {
   // so it never surfaces as "Uncaught (in promise)" in the browser console.
   PlatformDispatcher.instance.onError = (error, stack) {
     debugPrint('🚨 Unhandled error: $error');
+    // Minified release stacks are unreadable in the browser console (just
+    // "Uncaught Error at main.dart.js:NNNNN"), which made a build-phase
+    // crash on the consultation screens impossible to diagnose from a
+    // screenshot. Log the real Dart error + stack so it shows up as
+    // readable text in the console instead.
+    debugPrint('🚨 Stack: $stack');
     return true; // mark as handled — suppresses browser-level uncaught promise
+  };
+
+  // A widget that throws during build() renders as a blank white screen in
+  // release mode (Flutter's default release ErrorWidget draws nothing).
+  // Render the actual error text instead — a doctor hitting "Start
+  // Consultation" got a white screen with no way to tell what broke.
+  ErrorWidget.builder = (FlutterErrorDetails details) {
+    debugPrint('🚨 Widget build error: ${details.exception}');
+    debugPrint('🚨 Widget build stack: ${details.stack}');
+    return Material(
+      color: const Color(0xFFFFF1F2),
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Something went wrong on this screen',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xFF991B1B),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                '${details.exception}',
+                style: const TextStyle(fontSize: 12, color: Color(0xFF7F1D1D)),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   };
 
   // Use path-based URLs (no # hash) so /home, /login etc. work directly.

@@ -57,6 +57,12 @@ Future<void> _enterConsultation(
       },
     );
   } else {
+    // PAYMENT_REQUIRED (402) is not a failure — it just means the patient
+    // hasn't finished paying yet. _WaitingForPaymentScreen keeps polling and
+    // will call back in once paymentStatus flips to 'paid', so surfacing a
+    // red "Failed to start consultation" here was wrong and alarming.
+    final code = consultResult['code']?.toString();
+    if (code == 'PAYMENT_REQUIRED') return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(consultResult['message']?.toString() ?? 'Failed to start consultation'),

@@ -77,13 +77,18 @@ class ConsultationService {
     } on DioException catch (e) {
       final data = e.response?.data;
       String msg = e.message ?? 'Network error';
+      String? code;
       if (data is Map<String, dynamic>) {
         msg = data['message']?.toString() ?? msg;
+        // Pass the backend's error code through — callers need to tell a
+        // real failure apart from PAYMENT_REQUIRED (402), which just means
+        // "patient hasn't paid yet" and must not be shown as an error.
+        code = data['code']?.toString();
       } else if (data is String && data.isNotEmpty) {
         msg = data.length > 100 ? msg : data;
       }
       print('Error starting consultation: $msg');
-      return {'success': false, 'message': msg};
+      return {'success': false, 'message': msg, if (code != null) 'code': code};
     } catch (e) {
       print('Unexpected error starting consultation: $e');
       return {'success': false, 'message': e.toString()};
