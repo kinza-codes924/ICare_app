@@ -407,6 +407,8 @@ class _ConsultationChatScreenV2State extends State<ConsultationChatScreenV2> {
     // consultationId to embed PatientHistoryFormScreen (which requires a
     // non-null AppointmentDetail); the patient side never had those panels
     // and keeps the plain call screen.
+    debugPrint('🩺 _initiateCall panel-gate check: isDoctor=${widget.isDoctor} '
+        'appointment=${widget.appointment != null} consultationId=$_consultationId');
     if (widget.isDoctor && widget.appointment != null && _consultationId != null && _consultationId!.isNotEmpty) {
       Navigator.push(
         context,
