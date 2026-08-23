@@ -37,8 +37,15 @@ class ConsultationTimer {
     return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
   }
 
+  /// Always in 0.0–1.0. LinearProgressIndicator asserts on values outside
+  /// that range, and _elapsed CAN exceed maxDuration — a consultation that
+  /// runs past 30 minutes, or syncFromStartTime() picking up an older
+  /// session's first message. Without the clamp that assert threw inside
+  /// build(), which in release mode is a blank white screen, re-thrown
+  /// every second by the timer's own setState.
   double get progress {
-    return _elapsed.inSeconds / maxDuration.inSeconds;
+    if (maxDuration.inSeconds <= 0) return 0.0;
+    return (_elapsed.inSeconds / maxDuration.inSeconds).clamp(0.0, 1.0);
   }
 
   Duration get remainingTime {

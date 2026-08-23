@@ -37,6 +37,17 @@ void main() async {
     return true; // mark as handled — suppresses browser-level uncaught promise
   };
 
+  // Framework-level errors (the ones that produce the repeating
+  // "Uncaught Error" in the console when a failing build is re-triggered
+  // by a timer's setState every second) never reach PlatformDispatcher —
+  // they go through FlutterError.onError, which in release mode logs
+  // nothing useful. Print the real exception + stack here.
+  FlutterError.onError = (FlutterErrorDetails details) {
+    FlutterError.presentError(details);
+    debugPrint('🚨 FLUTTER ERROR: ${details.exceptionAsString()}');
+    debugPrintStack(stackTrace: details.stack);
+  };
+
   // A widget that throws during build() renders as a blank white screen in
   // release mode (Flutter's default release ErrorWidget draws nothing).
   // Render the actual error text instead — a doctor hitting "Start
