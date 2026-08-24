@@ -125,6 +125,11 @@ async function uploadRecordingToDrive(buffer, filename, mimeType = 'video/mp4', 
     fields: 'id, webViewLink',
   });
 
+  await drive.permissions.create({
+    fileId: res.data.id,
+    requestBody: { role: 'reader', type: 'anyone' },
+  });
+
   return { fileId: res.data.id, webViewLink: res.data.webViewLink };
 }
 
