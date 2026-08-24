@@ -1813,4 +1813,25 @@ router.post('/admin/purge-orphan-enrollments', authMiddleware, async (req, res) 
   }
 });
 
+// POST /api/courses/admin/unlock-all-modules — set unlockAfterDays=0 on all modules
+router.post('/admin/unlock-all-modules', authMiddleware, async (req, res) => {
+  try {
+    await connectMongoDB();
+    if ((req.user.role || '').toLowerCase() !== 'admin') {
+      return res.status(403).json({ success: false, message: 'Admin only' });
+    }
+    const { courseId } = req.body || {};
+    if (!courseId) return res.status(400).json({ success: false, message: 'courseId required' });
+    const course = await Course.findById(toId(courseId));
+    if (!course) return res.status(404).json({ success: false, message: 'Course not found' });
+    for (const mod of (course.modules || [])) {
+      mod.unlockAfterDays = 0;
+    }
+    await course.save();
+    res.json({ success: true, modulesUpdated: course.modules.length });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
 module.exports = router;
