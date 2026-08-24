@@ -65,6 +65,9 @@ const courseSchema = new mongoose.Schema({
   // Start date for pragmatic courses (timeline calculation base)
   startDate: { type: Date, default: null },
 
+  // When true, all modules are unlocked regardless of courseType progression rules
+  disableModuleLocking: { type: Boolean, default: false },
+
   // Visibility / publish status
   visibility: {
     type: String,

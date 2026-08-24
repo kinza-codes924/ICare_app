@@ -886,7 +886,9 @@ router.get('/:id', authMiddleware, async (req, res) => {
       let isLocked = false;
       let unlockDate = null;
 
-      if (course.courseType === 'pragmatic' && course.startDate) {
+      if (course.disableModuleLocking) {
+        // Module locking disabled for this course — all modules open
+      } else if (course.courseType === 'pragmatic' && course.startDate) {
         // Pragmatic: unlock needs BOTH the scheduled date to have arrived
         // AND (for modules after the first) the previous module actually
         // completed — reaching the date alone used to unlock it regardless
