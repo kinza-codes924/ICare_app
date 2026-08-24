@@ -1112,6 +1112,38 @@ router.delete('/categories/:id', authMiddleware, adminOnly, async (req, res) => 
   }
 });
 
+// POST /api/admin/reset-student-progress — reset all enrollment progress for a student by email
+router.post('/reset-student-progress', authMiddleware, adminOnly, async (req, res) => {
+  try {
+    await connectMongoDB();
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ success: false, message: 'email required' });
+    const user = await User.findOne({ email: email.toLowerCase().trim() });
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+
+    const Enrollment = require('../models/Enrollment');
+    const result = await Enrollment.updateMany(
+      { userId: user._id },
+      { $set: { isCompleted: false, completionPercentage: 0, moduleCompletions: [], lessonCompletions: [], quizResults: [] } }
+    );
+
+    // Also clear quiz attempts and assignment submissions
+    try {
+      const QuizAttempt = require('../models/QuizAttempt');
+      await QuizAttempt.deleteMany({ userId: user._id });
+    } catch (_) {}
+    try {
+      const Assignment = require('../models/Assignment');
+      const AssignmentSubmission = require('../models/AssignmentSubmission');
+      await AssignmentSubmission.deleteMany({ studentId: user._id });
+    } catch (_) {}
+
+    res.json({ success: true, message: `Progress reset for ${email}`, enrollmentsReset: result.modifiedCount });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
 router.all('/{*path}', (req, res) => {
   res.json({ success: true, users: [], data: [], count: 0 });
 });
