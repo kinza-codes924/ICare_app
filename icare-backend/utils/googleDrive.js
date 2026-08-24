@@ -139,11 +139,30 @@ async function uploadRecordingToDrive(buffer, filename, mimeType = 'video/mp4', 
 // (already-consumed) multipart stream.
 async function backupUrlToDrive(url, filename, mimeType = 'video/mp4', folderId) {
   if (!isConfigured()) return null;
-  // Node 18+ (Vercel's runtime) has a built-in global fetch — no extra dependency needed.
   const resp = await fetch(url);
   if (!resp.ok) throw new Error(`Fetch for Drive backup failed: ${resp.status}`);
-  const buffer = Buffer.from(await resp.arrayBuffer());
-  return uploadRecordingToDrive(buffer, filename, mimeType, folderId);
+
+  // Stream directly into Drive instead of buffering the whole file in memory —
+  // a 60-min class recording easily exceeds Vercel's 1GB function memory limit
+  // if loaded via arrayBuffer() first.
+  const { Readable } = require('stream');
+  const stream = Readable.fromWeb(resp.body);
+
+  const drive = getDriveClient();
+  const targetFolder = folderId || process.env.GOOGLE_DRIVE_FOLDER_ID;
+
+  const res = await drive.files.create({
+    requestBody: { name: filename, parents: [targetFolder] },
+    media: { mimeType, body: stream },
+    fields: 'id, webViewLink',
+  });
+
+  await drive.permissions.create({
+    fileId: res.data.id,
+    requestBody: { role: 'reader', type: 'anyone' },
+  });
+
+  return { fileId: res.data.id, webViewLink: res.data.webViewLink };
 }
 
 module.exports = { isConfigured, uploadRecordingToDrive, backupUrlToDrive, getOrCreateCourseFolder };
