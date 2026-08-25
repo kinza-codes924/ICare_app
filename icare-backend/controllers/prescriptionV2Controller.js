@@ -11,11 +11,33 @@ let _logoB64 = '';
 try { _logoB64 = fs.readFileSync(path.join(__dirname, '..', 'logo_b64.txt'), 'utf8').trim(); } catch (_) {}
 
 // Save prescription draft
+// Sanitize referralFollowUp before saving — unknown enum values from the
+// Flutter client (when frontend adds a new option before backend is updated)
+// would cause a Mongoose ValidationError 500. Instead, silently fall back to
+// 'none' so the save succeeds and only that one field is lost.
+const VALID_FOLLOW_UP_DURATIONS = new Set([
+  'none', 'threeDays', 'oneWeek', 'tenDays', 'twoWeeks',
+  'fifteenDays', 'oneMonth', 'twoMonths', 'threeMonths', 'sixMonths'
+]);
+const VALID_REFERRAL_TYPES = new Set(['none', 'emergency', 'hospital', 'specialist']);
+
+function sanitizeReferralFollowUp(data) {
+  if (!data || !data.referralFollowUp) return data;
+  const ref = data.referralFollowUp;
+  if (ref.followUpDuration && !VALID_FOLLOW_UP_DURATIONS.has(ref.followUpDuration)) {
+    ref.followUpDuration = 'none';
+  }
+  if (ref.referralType && !VALID_REFERRAL_TYPES.has(ref.referralType)) {
+    ref.referralType = 'none';
+  }
+  return data;
+}
+
 exports.savePrescriptionDraft = async (req, res) => {
   try {
     await connectMongoDB();
     const { consultationId } = req.params;
-    const prescriptionData = req.body;
+    const prescriptionData = sanitizeReferralFollowUp(req.body);
 
     // Verify consultation exists
     const consultation = await Consultation.findById(consultationId);
@@ -116,7 +138,7 @@ exports.completePrescription = async (req, res) => {
   try {
     await connectMongoDB();
     const { consultationId } = req.params;
-    const prescriptionData = req.body;
+    const prescriptionData = sanitizeReferralFollowUp(req.body);
 
     // Verify consultation exists
     const consultation = await Consultation.findById(consultationId);
