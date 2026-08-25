@@ -46,7 +46,7 @@ const referralFollowUpSchema = new mongoose.Schema({
   referralNotes: String,
   followUpDuration: {
     type: String,
-    enum: ['none', 'oneWeek', 'twoWeeks', 'oneMonth', 'twoMonths', 'threeMonths', 'sixMonths']
+    enum: ['none', 'threeDays', 'oneWeek', 'tenDays', 'twoWeeks', 'fifteenDays', 'oneMonth', 'twoMonths', 'threeMonths', 'sixMonths']
   },
   followUpDate: Date,
   followUpNotes: String
