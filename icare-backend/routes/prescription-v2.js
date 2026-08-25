@@ -33,6 +33,17 @@ router.get('/prescriptions/:prescriptionId/receipt', (req, res) => {
   res.redirect(301, `/api/prescriptions-v2/prescriptions/${req.params.prescriptionId}/pdf`);
 });
 
+// PKT = UTC+5 — Vercel runs in UTC so .toLocaleString() with 'en-PK' still
+// returns UTC on serverless. Hardcode the +5h shift instead.
+function pktDate(d) {
+  const pkt = new Date(d.getTime() + 5 * 60 * 60 * 1000);
+  return pkt.toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' });
+}
+function pktTime(d) {
+  const pkt = new Date(d.getTime() + 5 * 60 * 60 * 1000);
+  return pkt.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', timeZone: 'UTC' });
+}
+
 // ─── PRINTABLE PRESCRIPTION PAGE — kept for direct browser access ─────────────
 router.get('/prescriptions/:prescriptionId/view', async (req, res) => {
   try {
@@ -50,9 +61,9 @@ router.get('/prescriptions/:prescriptionId/view', async (req, res) => {
 
     const patientName = patient?.name || patient?.username || rx.patientName || 'Patient';
     const doctorName = doctor?.name || doctor?.username || 'Doctor';
-    const dateObj = new Date(rx.createdAt || Date.now());
-    const dateStr = dateObj.toLocaleDateString('en-PK', { day: 'numeric', month: 'long', year: 'numeric' });
-    const timeStr = dateObj.toLocaleTimeString('en-PK', { hour: '2-digit', minute: '2-digit' });
+    const dateObj = new Date(rx.prescribedAt || rx.createdAt || Date.now());
+    const dateStr = pktDate(dateObj);
+    const timeStr = pktTime(dateObj);
     const rxId = rx._id.toString().slice(-8).toUpperCase();
 
     const diagHtml = (rx.diagnoses || []).map(d => {
@@ -208,9 +219,9 @@ router.get('/prescriptions/:prescriptionId/pdf', async (req, res) => {
 
     const patientName = patient?.name || patient?.username || rx.patientName || 'Patient';
     const doctorName = doctor?.name || doctor?.username || 'Doctor';
-    const dateObj = new Date(rx.createdAt || Date.now());
-    const dateStr = dateObj.toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric' });
-    const timeStr = dateObj.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+    const dateObj = new Date(rx.prescribedAt || rx.createdAt || Date.now());
+    const dateStr = pktDate(dateObj);
+    const timeStr = pktTime(dateObj);
     const rxId = rx._id.toString().slice(-8).toUpperCase();
 
     // ── Build PDF ──────────────────────────────────────────────────────────────
