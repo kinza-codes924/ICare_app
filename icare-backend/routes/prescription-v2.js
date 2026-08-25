@@ -34,10 +34,15 @@ router.patch('/prescriptions/:prescriptionId/status', prescriptionV2Controller.u
 // PKT time as if it were UTC — every read then shifted it again (+5h), and a
 // 7:39 PM prescription displayed as 12:39 AM the next day.
 //
-// `createdAt` (Mongoose `timestamps: true`, server-side) was always correct
-// UTC, so it's the source of truth for repair. Only rows where the two differ
-// by more than a few minutes are touched — a correct row has them within
-// milliseconds of each other.
+// Neither field is reliably the good one — the drift runs in both directions
+// depending on when the row was written:
+//   • older rows: createdAt is +5h ahead of prescribedAt (createdAt is wrong)
+//   • recent rows: prescribedAt is +5h ahead of createdAt (prescribedAt wrong)
+// In both cases the *earlier* of the two is the true UTC instant, because the
+// corruption only ever adds the doctor's UTC offset — it never subtracts. So
+// the repair sets both fields to min(prescribedAt, createdAt).
+//
+// Rows whose two timestamps agree within a few minutes are left untouched.
 //
 // GET with ?secret=… → dry run (reports what would change, writes nothing).
 // POST with ?secret=…&apply=true → performs the update.
@@ -66,11 +71,29 @@ async function repairPrescribedAt(req, res) {
       r => Math.abs(new Date(r.prescribedAt) - new Date(r.createdAt)) > SKEW_MS
     );
 
-    const sample = drifted.slice(0, 10).map(r => ({
-      id: r._id.toString(),
-      prescribedAt: r.prescribedAt,
-      createdAt: r.createdAt,
-      driftHours: +((new Date(r.prescribedAt) - new Date(r.createdAt)) / 3600000).toFixed(2),
+    // The true instant is the earlier of the two — corruption only ever adds
+    // the doctor's UTC offset, so the inflated field is always the later one.
+    const plan = drifted.map(r => {
+      const p = new Date(r.prescribedAt);
+      const c = new Date(r.createdAt);
+      const truth = p < c ? p : c;
+      return {
+        _id: r._id,
+        truth,
+        fixes: p < c ? 'createdAt' : 'prescribedAt',
+        driftHours: +(Math.abs(p - c) / 3600000).toFixed(2),
+      };
+    });
+
+    // Drift histogram — a clean diagnosis shows one dominant bucket (5h)
+    const buckets = {};
+    for (const p of plan) buckets[p.driftHours] = (buckets[p.driftHours] || 0) + 1;
+
+    const sample = plan.slice(0, 10).map(p => ({
+      id: p._id.toString(),
+      correctedTo: p.truth,
+      fieldRepaired: p.fixes,
+      driftHours: p.driftHours,
     }));
 
     if (!apply) {
@@ -78,17 +101,18 @@ async function repairPrescribedAt(req, res) {
         success: true,
         dryRun: true,
         totalPrescriptions: rows.length,
-        wouldUpdate: drifted.length,
+        wouldUpdate: plan.length,
+        driftHistogram: buckets,
         sample,
         note: 'POST to this URL with &apply=true to write the changes.',
       });
     }
 
     let updated = 0;
-    for (const r of drifted) {
+    for (const p of plan) {
       await EnhancedPrescription.updateOne(
-        { _id: r._id },
-        { $set: { prescribedAt: r.createdAt } },
+        { _id: p._id },
+        { $set: { prescribedAt: p.truth, createdAt: p.truth } },
         { timestamps: false } // don't bump updatedAt on a repair write
       );
       updated++;
