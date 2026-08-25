@@ -753,7 +753,7 @@ router.post('/:id/admit/:studentId', authMiddleware, async (req, res) => {
     session.waitingStudents = session.waitingStudents.filter(id => !id.equals(studentId));
 
     // Add to attendees
-    if (!session.attendees.includes(studentId)) {
+    if (!session.attendees.some(a => a.toString() === studentId.toString())) {
       session.attendees.push(studentId);
     }
 

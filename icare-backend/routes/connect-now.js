@@ -280,10 +280,7 @@ router.post('/accept', authMiddleware, async (req, res) => {
     }
 
     if (!request || request.status !== 'pending') {
-      request = await ConnectNow.findOne({ status: 'pending' }).sort({ createdAt: -1 }).catch(() => null);
-      if (!request) {
-        return res.status(404).json({ success: false, message: 'No pending request found' });
-      }
+      return res.status(409).json({ success: false, message: 'This request is no longer available' });
     }
 
     request.status = 'accepted';

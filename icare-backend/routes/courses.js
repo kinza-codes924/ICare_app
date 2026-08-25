@@ -349,9 +349,13 @@ router.post('/enrollments', authMiddleware, async (req, res) => {
     res.status(201).json({ success: true, enrollment });
   } catch (e) {
     if (e.code === 11000) {
-      // Duplicate key — already enrolled
-      const existing = await Enrollment.findOne({ userId: toId(req.user.id), courseId: toId(req.body.courseId) }).lean();
-      return res.json({ success: true, message: 'Already enrolled', enrollment: existing });
+      // Duplicate key — already enrolled (race condition)
+      try {
+        const existing = await Enrollment.findOne({ userId: toId(req.user.id), courseId: toId(req.body.courseId) }).lean();
+        return res.json({ success: true, message: 'Already enrolled', enrollment: existing });
+      } catch (innerErr) {
+        return res.status(500).json({ success: false, message: innerErr.message });
+      }
     }
     res.status(500).json({ success: false, message: e.message });
   }

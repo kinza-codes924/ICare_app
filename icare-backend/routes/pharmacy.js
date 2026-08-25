@@ -751,8 +751,8 @@ router.put('/update_order_status/:id', authMiddleware, async (req, res) => {
       sendToUser(order.patient_id, { ...notifPayload, data: { orderId: String(order._id), type: notifPayload.type } }).catch(() => {});
     }
     if (status === 'delivered' || status === 'completed') {
-      _sendDeliveredEmail(order);
-      _settleCodOnDelivery(order, userId);
+      _sendDeliveredEmail(order).catch(e => console.error('[pharmacy] delivered email failed:', e.message));
+      _settleCodOnDelivery(order, userId).catch(e => console.error('[pharmacy] COD settlement failed:', e.message));
     }
 
     res.json({ success: true, message: 'Order updated successfully', order: { ...order.toObject(), _id: order._id.toString() } });
@@ -800,8 +800,8 @@ router.put('/orders/:id', authMiddleware, async (req, res) => {
       sendToUser(order.patient_id, { ...notifPayload2, data: { orderId: String(order._id), type: notifPayload2.type } }).catch(() => {});
     }
     if (status === 'delivered' || status === 'completed') {
-      _sendDeliveredEmail(order);
-      _settleCodOnDelivery(order, userId);
+      _sendDeliveredEmail(order).catch(e => console.error('[pharmacy] delivered email failed:', e.message));
+      _settleCodOnDelivery(order, userId).catch(e => console.error('[pharmacy] COD settlement failed:', e.message));
     }
 
     res.json({ success: true, message: 'Order updated', order: { ...order.toObject(), _id: order._id.toString() } });
@@ -834,6 +834,9 @@ router.get('/products', async (req, res) => {
   try {
     await connectMongoDB();
     const { pharmacyId, category, q } = req.query;
+    if (!pharmacyId && !req.user) {
+      return res.status(400).json({ success: false, message: 'pharmacyId required' });
+    }
     const uid = toId(pharmacyId || req.user.id);
     const query = { pharmacy_id: uid, is_active: true };
     if (category && category !== 'All') query.category = category;
@@ -917,6 +920,7 @@ router.put('/products/:id', authMiddleware, async (req, res) => {
     }
 
     const product = await Product.findByIdAndUpdate(req.params.id, { $set: update }, { new: true });
+    if (!product) return res.status(404).json({ success: false, message: 'Product not found' });
     res.json({ success: true, medicine: { ...product.toObject(), _id: product._id.toString() } });
   } catch (err) {
     console.error(err);
@@ -961,12 +965,13 @@ router.post('/orders/walk-in', authMiddleware, async (req, res) => {
       : medicines.split(',').map(m => m.trim().toLowerCase());
 
     // Find any matching product with medicine_category = Controlled
-    const controlledCheck = await Product.findOne({
+    // Guard: $or must not be empty — MongoDB rejects empty $or arrays
+    const controlledCheck = itemNames.length ? await Product.findOne({
       pharmacy_id: pharmacyUserId,
       is_active: true,
       medicine_category: 'Controlled',
       $or: itemNames.map(n => ({ name: { $regex: n.split(' ')[0], $options: 'i' } })),
-    }).lean().catch(() => null);
+    }).lean().catch(() => null) : null;
 
     if (controlledCheck) {
       if (!prescriptionId || !prescriptionId.toString().trim()) {

@@ -191,8 +191,9 @@ router.get('/profile', authMiddleware, async (req, res) => {
     console.log('🔍 LAB PROFILE - User ID:', userId);
     
     const user = await User.findById(userId).lean();
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
     console.log('🔍 LAB PROFILE - User found:', user?.username || user?.name);
-    
+
     const profile = await LabProfile.findOne({ user_id: userId }).lean() || {};
     console.log('🔍 LAB PROFILE - Profile found:', profile.lab_name);
 
@@ -515,7 +516,7 @@ router.put('/bookings/:bookingId', authMiddleware, async (req, res) => {
       try {
         const User = require('../models/User');
         const pat = await User.findById(booking.patient_id);
-        if (pat && pat.role === 'Patient') {
+        if (pat && pat.role?.toLowerCase() === 'patient') {
           if (!pat.gamification) pat.gamification = { points: 0, stats: {}, history: [] };
           pat.gamification.points = (pat.gamification.points || 0) + 15;
           pat.gamification.stats = pat.gamification.stats || {};

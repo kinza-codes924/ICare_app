@@ -424,7 +424,7 @@ function parseApptDateTime(dateStr, timeStr) {
 
 async function handleAppointmentReminders(req, res) {
   const cronSecret = req.headers['x-cron-secret'] || req.query.secret;
-  if (cronSecret !== process.env.CRON_SECRET && process.env.CRON_SECRET) {
+  if (!process.env.CRON_SECRET || cronSecret !== process.env.CRON_SECRET) {
     return res.status(403).json({ success: false, message: 'Forbidden' });
   }
   try {

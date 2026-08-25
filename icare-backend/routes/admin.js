@@ -243,7 +243,7 @@ router.put('/approve/:userId', authMiddleware, adminOnly, async (req, res) => {
     ).select('-password').lean();
 
     if (!user) return res.status(404).json({ success: false, message: 'User not found' });
-    notifyUserApproved(user);
+    notifyUserApproved(user).catch(e => console.error('notifyUserApproved failed:', e.message));
     res.json({ success: true, message: 'User approved', user: { _id: user._id.toString(), email: user.email, role: user.role } });
   } catch (err) {
     console.error('approve user error:', err);
@@ -295,7 +295,7 @@ router.post('/approve-user/:userId', authMiddleware, adminOnly, async (req, res)
     ).select('-password').lean();
 
     if (!user) return res.status(404).json({ success: false, message: 'User not found' });
-    notifyUserApproved(user);
+    notifyUserApproved(user).catch(e => console.error('notifyUserApproved failed:', e.message));
     res.json({ success: true, message: 'User approved', user: { _id: user._id.toString(), email: user.email, role: user.role } });
   } catch (err) {
     console.error('approve-user error:', err);
