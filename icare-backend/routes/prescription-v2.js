@@ -108,14 +108,17 @@ async function repairPrescribedAt(req, res) {
       });
     }
 
+    // Native driver, not the Mongoose model: `timestamps: true` marks
+    // createdAt immutable, so a model-level updateOne silently drops it and
+    // only prescribedAt gets written.
+    const col = EnhancedPrescription.collection;
     let updated = 0;
     for (const p of plan) {
-      await EnhancedPrescription.updateOne(
+      const r = await col.updateOne(
         { _id: p._id },
-        { $set: { prescribedAt: p.truth, createdAt: p.truth } },
-        { timestamps: false } // don't bump updatedAt on a repair write
+        { $set: { prescribedAt: p.truth, createdAt: p.truth } }
       );
-      updated++;
+      if (r.modifiedCount) updated++;
     }
 
     res.json({
