@@ -28,6 +28,85 @@ router.get('/doctors/:doctorId/prescriptions', prescriptionV2Controller.getDocto
 // Update prescription status
 router.patch('/prescriptions/:prescriptionId/status', prescriptionV2Controller.updatePrescriptionStatus);
 
+// ─── One-off migration: repair prescribedAt written as local wall-clock ──────
+// Until 2026-08-25 the Flutter client sent `prescribedAt: DateTime.now()`
+// serialised without a timezone marker, so Mongo stored the doctor's local
+// PKT time as if it were UTC — every read then shifted it again (+5h), and a
+// 7:39 PM prescription displayed as 12:39 AM the next day.
+//
+// `createdAt` (Mongoose `timestamps: true`, server-side) was always correct
+// UTC, so it's the source of truth for repair. Only rows where the two differ
+// by more than a few minutes are touched — a correct row has them within
+// milliseconds of each other.
+//
+// GET with ?secret=… → dry run (reports what would change, writes nothing).
+// POST with ?secret=…&apply=true → performs the update.
+async function repairPrescribedAt(req, res) {
+  const secret = req.query.secret || req.headers['x-migration-secret'];
+  if (!process.env.CRON_SECRET || secret !== process.env.CRON_SECRET) {
+    return res.status(403).json({ success: false, message: 'Forbidden' });
+  }
+
+  try {
+    await connectMongoDB();
+    const EnhancedPrescription = require('../models/EnhancedPrescription');
+
+    const apply = req.method === 'POST' && req.query.apply === 'true';
+    const SKEW_MS = 5 * 60 * 1000; // ignore sub-5-minute differences
+
+    const rows = await EnhancedPrescription.find({
+      prescribedAt: { $ne: null },
+      createdAt: { $ne: null },
+    }).select('_id prescribedAt createdAt').lean();
+
+    const drifted = rows.filter(
+      r => Math.abs(new Date(r.prescribedAt) - new Date(r.createdAt)) > SKEW_MS
+    );
+
+    const sample = drifted.slice(0, 10).map(r => ({
+      id: r._id.toString(),
+      prescribedAt: r.prescribedAt,
+      createdAt: r.createdAt,
+      driftHours: +((new Date(r.prescribedAt) - new Date(r.createdAt)) / 3600000).toFixed(2),
+    }));
+
+    if (!apply) {
+      return res.json({
+        success: true,
+        dryRun: true,
+        totalPrescriptions: rows.length,
+        wouldUpdate: drifted.length,
+        sample,
+        note: 'POST to this URL with &apply=true to write the changes.',
+      });
+    }
+
+    let updated = 0;
+    for (const r of drifted) {
+      await EnhancedPrescription.updateOne(
+        { _id: r._id },
+        { $set: { prescribedAt: r.createdAt } },
+        { timestamps: false } // don't bump updatedAt on a repair write
+      );
+      updated++;
+    }
+
+    res.json({
+      success: true,
+      dryRun: false,
+      totalPrescriptions: rows.length,
+      updated,
+      sample,
+    });
+  } catch (err) {
+    console.error('repairPrescribedAt error:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+}
+
+router.get('/admin/repair-prescribed-at', repairPrescribedAt);
+router.post('/admin/repair-prescribed-at', repairPrescribedAt);
+
 // ─── Old email link redirect: /receipt → /pdf ────────────────────────────────
 router.get('/prescriptions/:prescriptionId/receipt', (req, res) => {
   res.redirect(301, `/api/prescriptions-v2/prescriptions/${req.params.prescriptionId}/pdf`);
