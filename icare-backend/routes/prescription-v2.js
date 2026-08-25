@@ -42,8 +42,11 @@ router.patch('/prescriptions/:prescriptionId/status', prescriptionV2Controller.u
 // GET with ?secret=… → dry run (reports what would change, writes nothing).
 // POST with ?secret=…&apply=true → performs the update.
 async function repairPrescribedAt(req, res) {
-  const secret = req.query.secret || req.headers['x-migration-secret'];
-  if (!process.env.CRON_SECRET || secret !== process.env.CRON_SECRET) {
+  // Deliberately not CRON_SECRET — Vercel reserves that name for its own cron
+  // signing and rejects a build if its value has any surrounding whitespace.
+  const expected = (process.env.MIGRATION_SECRET || '').trim();
+  const secret = (req.query.secret || req.headers['x-migration-secret'] || '').toString().trim();
+  if (!expected || secret !== expected) {
     return res.status(403).json({ success: false, message: 'Forbidden' });
   }
 
