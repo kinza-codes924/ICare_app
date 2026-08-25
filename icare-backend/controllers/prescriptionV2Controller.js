@@ -59,6 +59,15 @@ exports.savePrescriptionDraft = async (req, res) => {
       prescriptionData.doctorNotes = '';
     }
 
+    // Timestamps are always the server's own UTC clock. A client-supplied
+    // value can carry no timezone marker (Dart's toIso8601String() on a local
+    // DateTime), which Mongo then stores as UTC — shifting every displayed
+    // time by the doctor's UTC offset.
+    delete prescriptionData.prescribedAt;
+    delete prescriptionData.createdAt;
+    delete prescriptionData.updatedAt;
+    delete prescriptionData.expiresAt;
+
     if (prescription) {
       // Update existing draft
       Object.assign(prescription, prescriptionData);
