@@ -77,6 +77,24 @@ const generateMrNumber = async () => {
 // already has an approved <role> account, here are the roles still
 // available to request" BEFORE the user fills out and submits the whole
 // Work With Us form, instead of only finding out after submit.
+// Plain "is this email free to sign up with?" — mirrors exactly what
+// register() will accept, so the signup form's live feedback can't disagree
+// with what happens on submit. checkEmail() below answers a different
+// question (which roles can this approved account still apply for) and
+// deliberately reports exists:false for unapproved accounts, which would
+// tell the user an already-taken email is available.
+const checkEmailAvailable = async (req, res) => {
+  try {
+    await connectMongoDB();
+    const email = (req.query.email || '').toString().trim().toLowerCase();
+    if (!email) return res.status(400).json({ success: false, message: 'email is required' });
+    const taken = await User.exists({ email });
+    res.json({ success: true, available: !taken, taken: !!taken });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
 const checkEmail = async (req, res) => {
   try {
     await connectMongoDB();
@@ -131,10 +149,10 @@ const register = async (req, res) => {
       console.warn(`reCAPTCHA failed on register for ${email}: ${recaptchaResult.reason}`);
     }
 
-    // Check existing
-    const existing = await User.findOne({
-      $or: [{ email: email.toLowerCase() }, { username }],
-    });
+    // Identity is the email alone — deliberately NOT the username. `username`
+    // falls back to the person's display name (see above), so two unrelated
+    // people who happen to share a name were being rejected as duplicates.
+    const existing = await User.findOne({ email: email.toLowerCase() });
     if (existing) {
       // Same email, different role, and the existing account is already
       // approved (e.g. an approved doctor now applying as a student via
@@ -192,7 +210,7 @@ const register = async (req, res) => {
         });
       }
 
-      return res.status(400).json({ success: false, message: 'User with this email or username already exists' });
+      return res.status(400).json({ success: false, message: 'An account with this email already exists' });
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
@@ -734,4 +752,4 @@ const appleLogin = async (req, res) => {
   }
 };
 
-module.exports = { register, login, getUserProfile, forgotPassword, verifyOTP, resetPassword, googleLogin, appleLogin, checkEmail };
+module.exports = { register, login, getUserProfile, forgotPassword, verifyOTP, resetPassword, googleLogin, appleLogin, checkEmail, checkEmailAvailable };

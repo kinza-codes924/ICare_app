@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
@@ -5,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:icare/providers/auth_provider.dart';
 import 'package:icare/services/auth_service.dart';
+import 'package:icare/services/user_service.dart';
 import 'package:icare/models/user.dart' as app_user;
 import 'package:icare/utils/imagePaths.dart';
 import 'package:icare/utils/theme.dart';
@@ -32,7 +35,13 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
   bool _obscurePass = true;
   bool _obscureConfirm = true;
   bool _isLoading = false;
+  bool _googleLoading = false;
   bool _agreedToTerms = false;
+  // Live email-availability state, driven by the debounced /auth/check-email call
+  bool _emailChecking = false;
+  bool _emailTaken = false;
+  bool _emailAvailable = false;
+  Timer? _emailDebounce;
   String? _selectedGender;
   DateTime? _dob;
 
@@ -51,10 +60,13 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
   void initState() {
     super.initState();
     _password.addListener(() => setState(() {}));
+    _email.addListener(_onEmailChanged);
   }
 
   @override
   void dispose() {
+    _emailDebounce?.cancel();
+    _email.removeListener(_onEmailChanged);
     _fullName.dispose();
     _email.dispose();
     _phone.dispose();
@@ -64,6 +76,39 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
     _password.dispose();
     _confirmPassword.dispose();
     super.dispose();
+  }
+
+  // Debounced so a request goes out once the user pauses, not per keystroke.
+  void _onEmailChanged() {
+    _emailDebounce?.cancel();
+    final email = _email.text.trim();
+
+    if (email.isEmpty || !email.contains('@') || !email.contains('.')) {
+      if (_emailTaken || _emailAvailable || _emailChecking) {
+        setState(() {
+          _emailTaken = false;
+          _emailAvailable = false;
+          _emailChecking = false;
+        });
+      }
+      return;
+    }
+
+    setState(() {
+      _emailChecking = true;
+      _emailTaken = false;
+      _emailAvailable = false;
+    });
+
+    _emailDebounce = Timer(const Duration(milliseconds: 600), () async {
+      final taken = await _authService.isEmailRegistered(email);
+      if (!mounted || _email.text.trim() != email) return;
+      setState(() {
+        _emailChecking = false;
+        _emailTaken = taken == true;
+        _emailAvailable = taken == false;
+      });
+    });
   }
 
   // ── Password strength ────────────────────────────────────────────────────
@@ -218,6 +263,51 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
       // failed signup left the checkbox ticked but returning an empty
       // token, and re-clicking the tick did nothing.
       if (kIsWeb) resetRecaptcha();
+    }
+  }
+
+  // Google sign-up. The backend's /auth/google endpoint creates the account
+  // on first use and logs in on subsequent ones, so the same call covers both
+  // — mirrors LoginScreen._handleGoogleSignIn.
+  Future<void> _handleGoogleSignUp() async {
+    if (_googleLoading) return;
+    setState(() => _googleLoading = true);
+    try {
+      final result = await _authService.loginWithGoogle();
+      if (!mounted) return;
+      if (result['success'] == true) {
+        final data = result['data'] as Map<String, dynamic>? ?? {};
+        final token = data['token']?.toString() ?? '';
+        if (token.isEmpty) {
+          _showError('Sign-up failed: no token received');
+          return;
+        }
+        await ref.read(authProvider.notifier).setUserToken(token);
+
+        final profileResult = await UserService().getUserProfile(token: token);
+        if (!mounted) return;
+        if (profileResult['success'] == true) {
+          final user = app_user.User.fromJson(
+            profileResult['user'] as Map<String, dynamic>,
+          );
+          await ref.read(authProvider.notifier).setUser(user);
+          if (!mounted) return;
+          final doctorId = widget.redirectDoctorId;
+          if (doctorId != null && doctorId.isNotEmpty) {
+            context.go('/book-appointment?doctorId=$doctorId');
+          } else {
+            context.go('/dashboard');
+          }
+        } else {
+          _showError('Could not load profile: ${profileResult['message']}');
+        }
+      } else {
+        _showError(result['message'] ?? 'Google sign-up failed');
+      }
+    } catch (e) {
+      if (mounted) _showError('Google sign-up error: $e');
+    } finally {
+      if (mounted) setState(() => _googleLoading = false);
     }
   }
 
@@ -505,9 +595,48 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
         validator: (v) {
           if (v == null || v.trim().isEmpty) return 'Required';
           if (!v.contains('@')) return 'Enter a valid email';
+          if (_emailTaken) return 'An account with this email already exists';
           return null;
         },
       ),
+      // Live feedback while typing — the client asked to be told the email is
+      // taken as it's entered, not after filling in the whole form.
+      if (_emailChecking || _emailTaken || _emailAvailable)
+        Padding(
+          padding: const EdgeInsets.only(left: 4, bottom: 12),
+          child: Row(
+            children: [
+              if (_emailChecking)
+                const SizedBox(
+                  width: 13, height: 13,
+                  child: CircularProgressIndicator(strokeWidth: 1.8, color: Color(0xFF94A3B8)),
+                )
+              else
+                Icon(
+                  _emailTaken ? Icons.error_outline_rounded : Icons.check_circle_outline_rounded,
+                  size: 15,
+                  color: _emailTaken ? const Color(0xFFEF4444) : const Color(0xFF10B981),
+                ),
+              const SizedBox(width: 7),
+              Text(
+                _emailChecking
+                    ? 'Checking…'
+                    : _emailTaken
+                        ? 'This email is already registered'
+                        : 'Email is available',
+                style: TextStyle(
+                  fontSize: 12.5,
+                  fontFamily: 'Gilroy-Medium',
+                  color: _emailChecking
+                      ? const Color(0xFF94A3B8)
+                      : _emailTaken
+                          ? const Color(0xFFEF4444)
+                          : const Color(0xFF10B981),
+                ),
+              ),
+            ],
+          ),
+        ),
       _field(
         controller: _phone,
         label: 'Phone Number'.tr(),
@@ -530,7 +659,10 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
         label: 'Password'.tr(),
         icon: Icons.lock_outline_rounded,
         obscure: _obscurePass,
-        autofillHints: const [AutofillHints.newPassword],
+        // No autofillHints — see the Confirm Password field below. On Flutter
+        // Web the browser's password manager latches onto a newPassword-hinted
+        // field and intermittently swallows keystrokes, so some users found
+        // this field simply wouldn't accept typing.
         onToggle: () => setState(() => _obscurePass = !_obscurePass),
         validator: (v) {
           if (v == null || v.isEmpty) return 'Required';
@@ -628,6 +760,68 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                 ),
         ),
       );
+
+  // "or" divider + Google button. Only for Patient signup — the professional
+  // roles carry licence/credential fields that a Google account can't supply,
+  // and they go through admin approval anyway.
+  Widget _googleSignUpBlock() {
+    if (widget.role.toLowerCase() != 'patient') return const SizedBox.shrink();
+    return Column(
+      children: [
+        const SizedBox(height: 18),
+        Row(
+          children: [
+            Expanded(child: Divider(color: Colors.grey[300], thickness: 1)),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: Text(
+                'or'.tr(),
+                style: const TextStyle(
+                  color: Color(0xFF94A3B8),
+                  fontSize: 13,
+                  fontFamily: 'Gilroy-Medium',
+                ),
+              ),
+            ),
+            Expanded(child: Divider(color: Colors.grey[300], thickness: 1)),
+          ],
+        ),
+        const SizedBox(height: 18),
+        GestureDetector(
+          onTap: _googleLoading ? null : _handleGoogleSignUp,
+          child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 14),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: const Color(0xFFE2E8F0), width: 1.5),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                if (_googleLoading)
+                  const SizedBox(
+                    width: 24, height: 24,
+                    child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF475569)),
+                  )
+                else
+                  Image.asset(ImagePaths.google_icon, width: 24, height: 24),
+                const SizedBox(width: 10),
+                Text(
+                  _googleLoading ? 'Signing up...' : 'Continue with Google',
+                  style: const TextStyle(
+                    color: Color(0xFF475569),
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
 
   Widget _signInLink() => Center(
         child: GestureDetector(
@@ -793,6 +987,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                     const Center(child: RecaptchaCheckbox()),
                     const SizedBox(height: 16),
                     _submitBtn(),
+                    _googleSignUpBlock(),
                     const SizedBox(height: 20),
                     _signInLink(),
                   ],
@@ -908,6 +1103,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                         const Center(child: RecaptchaCheckbox()),
                         const SizedBox(height: 16),
                         _submitBtn(height: 50),
+                        _googleSignUpBlock(),
                         const SizedBox(height: 20),
                         _signInLink(),
                         const SizedBox(height: 20),

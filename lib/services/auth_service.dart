@@ -260,6 +260,23 @@ class AuthService {
     }
   }
 
+  /// Is this email already registered? Returns null when the check couldn't
+  /// run (offline, server hiccup) so the caller can stay silent rather than
+  /// claim an email is free — register() is still the authority on submit.
+  Future<bool?> isEmailRegistered(String email) async {
+    try {
+      final response = await _apiService.get(
+        '/auth/email-available',
+        queryParameters: {'email': email.trim()},
+      );
+      final data = response.data;
+      if (data is Map && data['success'] == true) return data['taken'] == true;
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
   Future<Map<String, dynamic>> loginWithGoogle() async {
     try {
       final googleSignIn = GoogleSignIn(
