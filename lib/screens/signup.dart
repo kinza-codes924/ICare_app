@@ -8,6 +8,7 @@ import 'package:go_router/go_router.dart';
 import 'package:icare/providers/auth_provider.dart';
 import 'package:icare/services/auth_service.dart';
 import 'package:icare/services/user_service.dart';
+import 'package:icare/screens/email_otp_screen.dart';
 import 'package:icare/models/user.dart' as app_user;
 import 'package:icare/utils/imagePaths.dart';
 import 'package:icare/utils/theme.dart';
@@ -241,16 +242,28 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
         await ref.read(authProvider.notifier).setUser(newUser);
 
         if (!mounted) return;
-        // Same pattern as LoginScreen._navigateAfterLogin — if signup was
-        // reached via "Book Appointment while logged out" → Login → "Sign
-        // up instead", carry the doctor context forward instead of
-        // dropping the user on the generic dashboard.
-        final doctorId = widget.redirectDoctorId;
-        if (doctorId != null && doctorId.isNotEmpty) {
-          context.go('/book-appointment?doctorId=$doctorId');
-        } else {
-          context.go('/dashboard');
+
+        // Backend now emails a 6-digit code and refuses login until it's
+        // entered, so land on the code screen rather than the dashboard.
+        if (result['emailVerificationRequired'] == true) {
+          await Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => EmailOtpScreen(
+                email: capturedEmail,
+                onVerified: (verifiedToken) async {
+                  if (verifiedToken.isNotEmpty) {
+                    await ref.read(authProvider.notifier).setUserToken(verifiedToken);
+                  }
+                  if (!mounted) return;
+                  _goAfterSignup();
+                },
+              ),
+            ),
+          );
+          return;
         }
+
+        _goAfterSignup();
       } else {
         _showError(result['message'] ?? 'Registration failed. Please try again.');
       }
@@ -263,6 +276,19 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
       // failed signup left the checkbox ticked but returning an empty
       // token, and re-clicking the tick did nothing.
       if (kIsWeb) resetRecaptcha();
+    }
+  }
+
+  // Same pattern as LoginScreen._navigateAfterLogin — if signup was reached
+  // via "Book Appointment while logged out" → Login → "Sign up instead",
+  // carry the doctor context forward instead of dropping the user on the
+  // generic dashboard.
+  void _goAfterSignup() {
+    final doctorId = widget.redirectDoctorId;
+    if (doctorId != null && doctorId.isNotEmpty) {
+      context.go('/book-appointment?doctorId=$doctorId');
+    } else {
+      context.go('/dashboard');
     }
   }
 

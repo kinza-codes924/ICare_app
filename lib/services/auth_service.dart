@@ -127,6 +127,18 @@ class AuthService {
       final msg = (res.data as Map?)?['message']?.toString() ?? 'Login failed (${res.statusCode})';
       return {'success': false, 'message': msg};
     } on DioException catch (e) {
+      // A signup whose emailed code was never entered comes back 403 with
+      // emailVerificationRequired — pass that through so the caller can send
+      // the user to the code screen instead of showing a dead-end error.
+      final body = e.response?.data;
+      if (body is Map && body['emailVerificationRequired'] == true) {
+        return {
+          'success': false,
+          'emailVerificationRequired': true,
+          'email': body['email']?.toString() ?? email,
+          'message': body['message']?.toString() ?? 'Please verify your email',
+        };
+      }
       return {'success': false, 'message': _friendlyError(e)};
     } catch (e) {
       return {'success': false, 'message': 'Error: ${e.toString()}'};
@@ -380,6 +392,58 @@ class AuthService {
       return {'success': false, 'message': _friendlyError(e)};
     } catch (_) {
       return {'success': false, 'message': 'Unexpected error. Please try again.'};
+    }
+  }
+
+  /// Submit the 6-digit code emailed at signup. On success the backend
+  /// returns a fresh token for the now-verified account.
+  Future<Map<String, dynamic>> verifyEmailOtp({
+    required String email,
+    required String otp,
+  }) async {
+    try {
+      final response = await _apiService.post(
+        '/auth/verify-email-otp',
+        {'email': email.trim(), 'otp': otp.trim()},
+      );
+      final data = response.data as Map<String, dynamic>;
+      return {
+        'success': data['success'] == true,
+        'message': data['message'] ?? '',
+        'data': data['data'],
+      };
+    } on DioException catch (e) {
+      // 400/429 carry the real reason (wrong code, expired, attempts used up)
+      final body = e.response?.data;
+      if (body is Map && body['message'] != null) {
+        return {'success': false, 'message': body['message'].toString()};
+      }
+      return {'success': false, 'message': _friendlyError(e)};
+    } catch (e) {
+      return {'success': false, 'message': 'Error: $e'};
+    }
+  }
+
+  /// Ask for a new signup code. Backend enforces a 60s cooldown.
+  Future<Map<String, dynamic>> resendEmailOtp(String email) async {
+    try {
+      final response = await _apiService.post(
+        '/auth/resend-email-otp',
+        {'email': email.trim()},
+      );
+      final data = response.data as Map<String, dynamic>;
+      return {
+        'success': data['success'] == true,
+        'message': data['message'] ?? '',
+      };
+    } on DioException catch (e) {
+      final body = e.response?.data;
+      if (body is Map && body['message'] != null) {
+        return {'success': false, 'message': body['message'].toString()};
+      }
+      return {'success': false, 'message': _friendlyError(e)};
+    } catch (e) {
+      return {'success': false, 'message': 'Error: $e'};
     }
   }
 

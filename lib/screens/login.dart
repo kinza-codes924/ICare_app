@@ -16,6 +16,7 @@ import 'package:icare/services/biometric_service.dart';
 import 'package:icare/services/face_auth_service.dart';
 import 'package:icare/screens/face_capture_screen.dart';
 import 'package:icare/services/user_service.dart';
+import 'package:icare/screens/email_otp_screen.dart';
 import 'package:icare/utils/shared_pref.dart';
 import 'package:icare/models/user.dart' as app_user;
 import 'package:icare/utils/imagePaths.dart';
@@ -2305,6 +2306,32 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
           final tempToken = result['tempToken']?.toString() ?? '';
           if (mounted) await _show2FADialog(tempToken: tempToken);
           if (mounted) setState(() => isLoading = false);
+          return;
+        }
+
+        // Signed up but never entered the emailed code — finish that first
+        // rather than showing a dead-end "please verify" error.
+        if (result['emailVerificationRequired'] == true) {
+          if (mounted) setState(() => isLoading = false);
+          if (!mounted) return;
+          await Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => EmailOtpScreen(
+                email: result['email']?.toString() ?? usernameController.text.trim(),
+                onVerified: (verifiedToken) async {
+                  if (verifiedToken.isNotEmpty) {
+                    await ref.read(authProvider.notifier).setUserToken(verifiedToken);
+                    final profile = await _userService.getUserProfile(token: verifiedToken);
+                    if (profile['success'] == true) {
+                      final u = app_user.User.fromJson(profile['user'] as Map<String, dynamic>);
+                      await ref.read(authProvider.notifier).setUser(u);
+                    }
+                  }
+                  if (mounted) await _navigateAfterLogin();
+                },
+              ),
+            ),
+          );
           return;
         }
 
