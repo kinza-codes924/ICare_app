@@ -30,10 +30,28 @@ router.get('/doctors', ...receptionistOnly, async (req, res) => {
     const profile = await ReceptionistProfile.findOne({ user_id: toId(req.user.id) })
       .populate('doctorIds', 'name username email')
       .lean();
-    const doctors = (profile?.doctorIds || []).map(d => ({
+
+    const docs = profile?.doctorIds || [];
+
+    // Specialisation lives on DoctorProfile, not User — the front desk needs
+    // it to tell two doctors apart when picking one for a walk-in.
+    const DoctorProfile = require('../models/DoctorProfile');
+    const specById = {};
+    if (docs.length) {
+      const profiles = await DoctorProfile
+        .find({ user_id: { $in: docs.map(d => d._id) } })
+        .select('user_id specialization')
+        .lean();
+      for (const p of profiles) {
+        if (p.specialization) specById[p.user_id.toString()] = p.specialization;
+      }
+    }
+
+    const doctors = docs.map(d => ({
       _id: d._id.toString(),
       name: d.name || d.username || '',
       email: d.email || '',
+      specialization: specById[d._id.toString()] || '',
     }));
     res.json({ success: true, doctors });
   } catch (err) {

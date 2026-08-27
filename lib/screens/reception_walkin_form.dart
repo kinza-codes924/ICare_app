@@ -118,12 +118,37 @@ class _ReceptionWalkinFormState extends State<ReceptionWalkinForm> {
                       DropdownButtonFormField<String>(
                         initialValue: _selectedDoctorId,
                         decoration: const InputDecoration(border: OutlineInputBorder()),
-                        items: _doctors
-                            .map((d) => DropdownMenuItem<String>(
-                                  value: d['_id']?.toString(),
-                                  child: Text(d['name']?.toString() ?? ''),
-                                ))
-                            .toList(),
+                        items: _doctors.map((d) {
+                          final name = d['name']?.toString() ?? '';
+                          final spec = d['specialization']?.toString() ?? '';
+                          return DropdownMenuItem<String>(
+                            value: d['_id']?.toString(),
+                            // Specialisation on its own line — the front desk
+                            // picks by what the doctor treats, not just name.
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(name, style: const TextStyle(fontWeight: FontWeight.w600)),
+                                if (spec.isNotEmpty)
+                                  Text(
+                                    spec,
+                                    style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                                  ),
+                              ],
+                            ),
+                          );
+                        }).toList(),
+                        selectedItemBuilder: (context) => _doctors.map((d) {
+                          final name = d['name']?.toString() ?? '';
+                          final spec = d['specialization']?.toString() ?? '';
+                          // Collapsed state has a fixed height, so keep the
+                          // selected value on one line.
+                          return Align(
+                            alignment: Alignment.centerLeft,
+                            child: Text(spec.isEmpty ? name : '$name  ·  $spec'),
+                          );
+                        }).toList(),
                         onChanged: (v) => setState(() => _selectedDoctorId = v),
                       ),
                     ],
