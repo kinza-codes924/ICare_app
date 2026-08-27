@@ -1,11 +1,14 @@
 const express = require('express');
 const router = express.Router();
-const { register, login, getUserProfile, forgotPassword, verifyOTP, resetPassword, googleLogin, appleLogin, checkEmail, checkEmailAvailable } = require('../controllers/authController');
+const { register, login, getUserProfile, forgotPassword, verifyOTP, resetPassword, googleLogin, appleLogin, checkEmail, checkEmailAvailable, verifyEmailOtp, resendEmailOtp } = require('../controllers/authController');
 const { authMiddleware } = require('../middleware/auth');
 
 // Public routes
 router.get('/check-email', checkEmail);
 router.get('/email-available', checkEmailAvailable);
+// Email ownership verification at signup
+router.post('/verify-email-otp', verifyEmailOtp);
+router.post('/resend-email-otp', resendEmailOtp);
 router.post('/register', register);
 router.post('/login', login);
 router.post('/google', googleLogin);

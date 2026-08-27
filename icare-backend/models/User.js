@@ -20,6 +20,16 @@ const userSchema = new mongoose.Schema({
   // silently — admin must explicitly approve it via the pending-users flow.
   pendingRoles: [{ type: String }],
   mrNumber: { type: String, unique: true, sparse: true }, // Medical Record Number (auto-generated for patients)
+  // Email ownership check at signup. Accounts created before this existed
+  // have it undefined, which login treats as verified — only new signups
+  // are gated, so nobody gets locked out retroactively.
+  emailVerified: { type: Boolean },
+  // Stored as a SHA-256 hash, never the plain code: a database dump then
+  // can't be used to complete someone else's pending signup.
+  emailOtpHash: { type: String },
+  emailOtpExpiresAt: { type: Date },
+  emailOtpAttempts: { type: Number, default: 0 },
+  emailOtpLastSentAt: { type: Date },
   is_approved: { type: Boolean, default: true },
   is_active: { type: Boolean, default: true },
   // Virtual hospital compat fields

@@ -8,6 +8,15 @@ const User = require('../models/User');
 const DoctorProfile = require('../models/DoctorProfile');
 const LabProfile = require('../models/LabProfile');
 const PharmacyProfile = require('../models/PharmacyProfile');
+const {
+  OTP_TTL_MINUTES,
+  RESEND_COOLDOWN_SECONDS,
+  MAX_ATTEMPTS,
+  generateOtp,
+  hashOtp,
+  otpMatches,
+  sendOtpEmail,
+} = require('../utils/emailOtp');
 
 const GOOGLE_CLIENT_IDS = [
   '1076307742101-avj49igc93qipdcnqbqsk3u14gdcb2oh.apps.googleusercontent.com', // web
@@ -229,6 +238,11 @@ const register = async (req, res) => {
     const platform = (req.headers['x-platform'] || '').toLowerCase();
     const isWebPlatform = platform === 'web' || platform === '';
 
+    // Email ownership check. The account is created either way — otherwise a
+    // half-finished signup would leave the email free for someone else to
+    // claim mid-flow — but login refuses it until the code is entered.
+    const otp = generateOtp();
+
     const user = await User.create({
       username,
       name: username,
@@ -240,8 +254,18 @@ const register = async (req, res) => {
       is_active: true,
       isPhoneVerified: isWebPlatform,
       isEmailVerified: false,
+      emailVerified: false,
+      emailOtpHash: hashOtp(otp),
+      emailOtpExpiresAt: new Date(Date.now() + OTP_TTL_MINUTES * 60 * 1000),
+      emailOtpAttempts: 0,
+      emailOtpLastSentAt: new Date(),
       ...(mrNumber && { mrNumber }),
     });
+
+    // Fire-and-forget: a slow mail server shouldn't hold up the signup
+    // response. If it fails the user can hit /auth/resend-email-otp.
+    sendOtpEmail({ to: user.email, name: username, otp })
+      .catch(e => console.error('[signup] OTP email failed:', e.message));
 
     // Save verificationDetails to user document, namespaced by role so a
     // later role-request on the same account (via /users/profile) can't
@@ -287,7 +311,9 @@ const register = async (req, res) => {
 
     res.status(201).json({
       success: true,
-      message: 'Registration successful',
+      message: 'Registration successful. Check your email for the verification code.',
+      emailVerificationRequired: true,
+      email: user.email,
       data: {
         token,
         user: {
@@ -300,12 +326,136 @@ const register = async (req, res) => {
           mrNumber: user.mrNumber || null,
           isPhoneVerified: isWebPlatform,
           isEmailVerified: false,
+          emailVerified: false,
         },
       },
     });
   } catch (error) {
     console.error('Register error:', error);
     res.status(500).json({ success: false, message: 'Server error during registration' });
+  }
+};
+
+// ─── EMAIL VERIFICATION ───────────────────────────────────────────────────────
+// Confirms the person signing up controls the address they entered.
+const verifyEmailOtp = async (req, res) => {
+  try {
+    await connectMongoDB();
+    const email = (req.body.email || '').toString().trim().toLowerCase();
+    const otp = (req.body.otp || req.body.code || '').toString().trim();
+
+    if (!email || !otp) {
+      return res.status(400).json({ success: false, message: 'Email and code are required' });
+    }
+
+    const user = await User.findOne({ email });
+    // Same message whether the account is missing or the code is wrong —
+    // otherwise this endpoint doubles as a way to enumerate registered emails.
+    const generic = { success: false, message: 'Invalid or expired code' };
+    if (!user) return res.status(400).json(generic);
+
+    if (user.emailVerified === true) {
+      return res.json({ success: true, message: 'Email already verified', alreadyVerified: true });
+    }
+
+    if (!user.emailOtpExpiresAt || user.emailOtpExpiresAt.getTime() < Date.now()) {
+      return res.status(400).json({ success: false, message: 'This code has expired. Request a new one.', expired: true });
+    }
+
+    if ((user.emailOtpAttempts || 0) >= MAX_ATTEMPTS) {
+      return res.status(429).json({
+        success: false,
+        message: 'Too many incorrect attempts. Request a new code.',
+        attemptsExhausted: true,
+      });
+    }
+
+    if (!otpMatches(otp, user.emailOtpHash)) {
+      await User.updateOne({ _id: user._id }, { $inc: { emailOtpAttempts: 1 } });
+      const left = MAX_ATTEMPTS - ((user.emailOtpAttempts || 0) + 1);
+      return res.status(400).json({
+        success: false,
+        message: left > 0 ? `Incorrect code. ${left} attempt${left === 1 ? '' : 's'} left.` : 'Incorrect code. Request a new one.',
+        attemptsLeft: Math.max(left, 0),
+      });
+    }
+
+    // Correct — clear the challenge so the code can't be replayed.
+    await User.updateOne({ _id: user._id }, {
+      $set: { emailVerified: true, isEmailVerified: true },
+      $unset: { emailOtpHash: '', emailOtpExpiresAt: '', emailOtpAttempts: '' },
+    });
+
+    const token = jwt.sign(
+      { id: user._id.toString(), email: user.email, role: user.role },
+      process.env.JWT_SECRET,
+      { expiresIn: '30d' }
+    );
+
+    res.json({
+      success: true,
+      message: 'Email verified',
+      data: {
+        token,
+        user: {
+          id: user._id.toString(),
+          username: user.username,
+          email: user.email,
+          phone: user.phone,
+          role: user.role,
+          isApproved: user.is_approved,
+          mrNumber: user.mrNumber || null,
+          emailVerified: true,
+          isEmailVerified: true,
+        },
+      },
+    });
+  } catch (err) {
+    console.error('verifyEmailOtp error:', err);
+    res.status(500).json({ success: false, message: 'Server error verifying code' });
+  }
+};
+
+const resendEmailOtp = async (req, res) => {
+  try {
+    await connectMongoDB();
+    const email = (req.body.email || req.query.email || '').toString().trim().toLowerCase();
+    if (!email) return res.status(400).json({ success: false, message: 'Email is required' });
+
+    const user = await User.findOne({ email });
+    // Always report success — a differing response would reveal which
+    // addresses are registered.
+    const ok = { success: true, message: 'If that account needs verification, a new code has been sent.' };
+    if (!user || user.emailVerified === true) return res.json(ok);
+
+    // Rate limit: one code per minute, so this can't be used to spam an inbox.
+    const last = user.emailOtpLastSentAt?.getTime() || 0;
+    const waited = (Date.now() - last) / 1000;
+    if (waited < RESEND_COOLDOWN_SECONDS) {
+      return res.status(429).json({
+        success: false,
+        message: `Please wait ${Math.ceil(RESEND_COOLDOWN_SECONDS - waited)}s before requesting another code.`,
+        retryAfterSeconds: Math.ceil(RESEND_COOLDOWN_SECONDS - waited),
+      });
+    }
+
+    const otp = generateOtp();
+    await User.updateOne({ _id: user._id }, {
+      $set: {
+        emailOtpHash: hashOtp(otp),
+        emailOtpExpiresAt: new Date(Date.now() + OTP_TTL_MINUTES * 60 * 1000),
+        emailOtpAttempts: 0,
+        emailOtpLastSentAt: new Date(),
+      },
+    });
+
+    sendOtpEmail({ to: user.email, name: user.name || user.username, otp })
+      .catch(e => console.error('[resend] OTP email failed:', e.message));
+
+    res.json(ok);
+  } catch (err) {
+    console.error('resendEmailOtp error:', err);
+    res.status(500).json({ success: false, message: 'Server error sending code' });
   }
 };
 
@@ -369,6 +519,17 @@ const login = async (req, res) => {
     const rolesRequiringApproval = ['doctor', 'lab', 'pharmacy', 'instructor', 'student'];
     if (rolesRequiringApproval.includes(user.role?.toLowerCase()) && user.is_approved === false) {
       return res.status(403).json({ success: false, message: 'Your account is pending admin approval. Please wait for verification.' });
+    }
+
+    // Email verification gate. Explicitly `=== false` — accounts created
+    // before this feature have the field undefined and must keep working.
+    if (user.emailVerified === false) {
+      return res.status(403).json({
+        success: false,
+        message: 'Please verify your email to continue. Check your inbox for the code.',
+        emailVerificationRequired: true,
+        email: user.email,
+      });
     }
 
     // Verify password
@@ -626,6 +787,8 @@ const googleLogin = async (req, res) => {
         is_active: true,
         authProvider: 'google',
         mrNumber,
+        // Google already proved ownership of this address — no OTP needed.
+        emailVerified: true,
         isEmailVerified: true,
         isPhoneVerified: true,
       });
@@ -713,6 +876,8 @@ const appleLogin = async (req, res) => {
         is_active: true,
         authProvider: 'apple',
         mrNumber,
+        // Apple already proved ownership of this address — no OTP needed.
+        emailVerified: true,
         isEmailVerified: true,
         isPhoneVerified: true,
       });
@@ -752,4 +917,4 @@ const appleLogin = async (req, res) => {
   }
 };
 
-module.exports = { register, login, getUserProfile, forgotPassword, verifyOTP, resetPassword, googleLogin, appleLogin, checkEmail, checkEmailAvailable };
+module.exports = { register, login, getUserProfile, forgotPassword, verifyOTP, resetPassword, googleLogin, appleLogin, checkEmail, checkEmailAvailable, verifyEmailOtp, resendEmailOtp };
