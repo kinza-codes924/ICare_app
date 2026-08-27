@@ -2445,6 +2445,33 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
           // credentials: credentialsController.text.trim(),
         );
         if (result['success']) {
+          // Signup emails a 6-digit code and login is refused until it's
+          // entered, so verify before going anywhere. Same gate as
+          // SignupScreen._submit — this tab reaches register() too.
+          if (result['emailVerificationRequired'] == true) {
+            if (mounted) setState(() => isLoading = false);
+            if (!mounted) return;
+            await Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => EmailOtpScreen(
+                  email: result['email']?.toString() ?? emailController.text.trim(),
+                  onVerified: (verifiedToken) async {
+                    if (verifiedToken.isNotEmpty) {
+                      await ref.read(authProvider.notifier).setUserToken(verifiedToken);
+                      final p = await _userService.getUserProfile(token: verifiedToken);
+                      if (p['success'] == true) {
+                        final u = app_user.User.fromJson(p['user'] as Map<String, dynamic>);
+                        await ref.read(authProvider.notifier).setUser(u);
+                      }
+                    }
+                    if (mounted) await _navigateAfterLogin();
+                  },
+                ),
+              ),
+            );
+            return;
+          }
+
           // Set token in provider first and await
           final token = result['data']['token'];
           await ref.read(authProvider.notifier).setUserToken(token);
