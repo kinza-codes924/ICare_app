@@ -257,7 +257,7 @@ class _InConsultationPrescriptionFormState
       'consultationId': rx.consultationId,
       'isComplete': true,
       'status': 'active',
-      'prescribedAt': rx.prescribedAt.toIso8601String(),
+      'prescribedAt': rx.prescribedAt.toUtc().toIso8601String(),
     };
 
     // Only include IDs when non-empty — backend derives them from consultationId for instant consultations
@@ -398,9 +398,12 @@ class _InConsultationPrescriptionFormState
       assignedCourseIds: _assignedCourses,
       status: isComplete ? PrescriptionStatus.active : PrescriptionStatus.draft,
       isComplete: isComplete,
-      prescribedAt: DateTime.now(),
-      expiresAt: DateTime.now().add(const Duration(days: 30)),
-      createdAt: DateTime.now(),
+      // UTC, not local — toIso8601String() on a local DateTime emits no
+      // timezone marker, so the backend stores the doctor's wall-clock time
+      // as if it were UTC and every reader then shifts it again.
+      prescribedAt: DateTime.now().toUtc(),
+      expiresAt: DateTime.now().toUtc().add(const Duration(days: 30)),
+      createdAt: DateTime.now().toUtc(),
     );
   }
 
@@ -527,7 +530,7 @@ class _InConsultationPrescriptionFormState
         elevation: 0,
         leading: widget.onClose != null
             ? IconButton(
-                icon: const Icon(Icons.close_rounded),
+                icon: const Icon(Icons.close_rounded, color: AppColors.primaryColor),
                 onPressed: widget.onClose,
               )
             : const CustomBackButton(),
@@ -2205,20 +2208,22 @@ class _PharmaPickerSheetState extends State<_PharmaPickerSheet> {
               ),
               const SizedBox(height: 12),
 
-              // Add button
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: () => widget.onAdd(_buildMedicineName()),
-                  icon: const Icon(Icons.add_circle_outline_rounded),
-                  label: const Text('Add to Prescription'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF10B981),
-                    foregroundColor: Colors.white,
-                    minimumSize: const Size(double.infinity, 48),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              // Add button — left-aligned, not full-width, so it stays
+              // clickable even when Chrome's Live Caption bar overlays center.
+              Row(
+                children: [
+                  ElevatedButton.icon(
+                    onPressed: () => widget.onAdd(_buildMedicineName()),
+                    icon: const Icon(Icons.add_circle_outline_rounded, size: 18),
+                    label: const Text('Add to Prescription'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF10B981),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
                   ),
-                ),
+                ],
               ),
             ],
           ],

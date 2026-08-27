@@ -16,7 +16,7 @@ import 'package:flutter/foundation.dart';
 
 class CloudinaryUploadService {
   static const String cloudName = 'dzlcnyxgb';
-  static const String backendUrl = 'https://icare-backend-inky.vercel.app/api';
+  static const String backendUrl = 'https://icare.com.co/api';
 
   final ApiService _api = ApiService();
 

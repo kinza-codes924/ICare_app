@@ -115,7 +115,7 @@ class PrescriptionDetailScreen extends StatelessWidget {
       final dateStr = f['date']?.toString() ?? f['followUpDate']?.toString() ?? '';
       if (dateStr.isNotEmpty) {
         try {
-          return DateFormat('MMMM dd, yyyy').format(DateTime.parse(dateStr));
+          return DateFormat('MMMM dd, yyyy').format(_parsePkt(dateStr));
         } catch (_) {
           return dateStr;
         }
@@ -126,7 +126,7 @@ class PrescriptionDetailScreen extends StatelessWidget {
     final dateStr = prescription['followUpDate']?.toString() ?? '';
     if (dateStr.isNotEmpty) {
       try {
-        return DateFormat('MMMM dd, yyyy').format(DateTime.parse(dateStr));
+        return DateFormat('MMMM dd, yyyy').format(_parsePkt(dateStr));
       } catch (_) {}
     }
     if (days != null && days != 0) return 'In $days days';
@@ -140,12 +140,15 @@ class PrescriptionDetailScreen extends StatelessWidget {
     return prescription['referralSpecialty']?.toString() ?? '';
   }
 
+  DateTime _parsePkt(String s) {
+    final str = s.contains('Z') || s.contains('+') ? s : '${s}Z';
+    return DateTime.parse(str).toLocal();
+  }
+
   String get _prescriptionDate {
     final dateStr = prescription['createdAt']?.toString() ?? '';
     if (dateStr.isNotEmpty) {
-      try {
-        return DateFormat('MMMM dd, yyyy').format(DateTime.parse(dateStr));
-      } catch (_) {}
+      try { return DateFormat('MMMM dd, yyyy').format(_parsePkt(dateStr)); } catch (_) {}
     }
     return DateFormat('MMMM dd, yyyy').format(DateTime.now());
   }
@@ -153,9 +156,7 @@ class PrescriptionDetailScreen extends StatelessWidget {
   String get _prescriptionTime {
     final dateStr = prescription['createdAt']?.toString() ?? '';
     if (dateStr.isNotEmpty) {
-      try {
-        return DateFormat('hh:mm a').format(DateTime.parse(dateStr));
-      } catch (_) {}
+      try { return DateFormat('hh:mm a').format(_parsePkt(dateStr)); } catch (_) {}
     }
     return '';
   }

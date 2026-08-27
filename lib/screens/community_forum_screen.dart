@@ -328,7 +328,7 @@ class _CommunityForumScreenState extends State<CommunityForumScreen> {
     final likeCount = post['likeCount'] ?? (post['likes'] as List?)?.length ?? 0;
     final commentCount = post['commentCount'] ?? (post['comments'] as List?)?.length ?? 0;
     DateTime? timestamp;
-    try { timestamp = DateTime.parse(post['createdAt']?.toString() ?? ''); } catch (_) {}
+    try { final s = post['createdAt']?.toString() ?? ''; timestamp = DateTime.parse(s.contains('Z') || s.contains('+') ? s : '${s}Z').toLocal(); } catch (_) {}
 
     return GestureDetector(
       onTap: () => Navigator.push(

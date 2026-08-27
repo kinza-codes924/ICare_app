@@ -326,6 +326,10 @@ class AuthService {
         ],
         webAuthenticationOptions: WebAuthenticationOptions(
           clientId: 'com.rmhealthsolutions.icare',
+          // Deliberately still the Vercel host: this exact URL is registered
+          // in Apple's Developer Console as the Return URL. Changing it here
+          // alone breaks Apple sign-in — update Apple's console first, then
+          // point this at https://icare.com.co/api/auth/apple/callback.
           redirectUri: Uri.parse('https://icare-backend-inky.vercel.app/api/auth/apple/callback'),
         ),
       );

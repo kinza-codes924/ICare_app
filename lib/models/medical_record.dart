@@ -1,5 +1,17 @@
 import 'user.dart';
 
+// Parses a UTC ISO-8601 string from MongoDB and converts to device local time.
+DateTime _parsePkt(dynamic s) {
+  final str = s?.toString() ?? '';
+  if (str.isEmpty) return DateTime.now();
+  try {
+    final normalized = str.contains('Z') || str.contains('+') ? str : '${str}Z';
+    return DateTime.parse(normalized).toLocal();
+  } catch (_) {
+    return DateTime.now();
+  }
+}
+
 class MedicalRecord {
   final String id;
   final User patient;
@@ -145,8 +157,8 @@ class MedicalRecord {
       soapNotes: json['soapNotes'] != null && json['soapNotes'] is Map
           ? SoapNotes.fromJson(json['soapNotes'])
           : null,
-      createdAt: DateTime.parse(json['createdAt']),
-      updatedAt: DateTime.parse(json['updatedAt']),
+      createdAt: _parsePkt(json['createdAt']),
+      updatedAt: _parsePkt(json['updatedAt']),
     );
   }
 

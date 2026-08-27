@@ -139,7 +139,7 @@ class _PatientHistoryViewState extends State<PatientHistoryView> {
   Widget _rxCard(dynamic rx) {
     final rawDate = rx['prescribedAt'] ?? rx['createdAt'] ?? '';
     DateTime? date;
-    try { date = DateTime.parse(rawDate).toLocal(); } catch (_) {}
+    try { date = DateTime.parse(rawDate.toString().contains('Z') || rawDate.toString().contains('+') ? rawDate.toString() : '${rawDate}Z').toLocal(); } catch (_) {}
     final medicines = (rx['medicines'] as List?) ?? [];
     final diagnoses = (rx['diagnoses'] as List?) ?? [];
     final labTests = (rx['labTests'] as List?) ?? [];
@@ -234,7 +234,7 @@ class _PatientHistoryViewState extends State<PatientHistoryView> {
   void _showRxDetail(dynamic rx) {
     final rawDate = rx['prescribedAt'] ?? rx['createdAt'] ?? '';
     DateTime? date;
-    try { date = DateTime.parse(rawDate).toLocal(); } catch (_) {}
+    try { date = DateTime.parse(rawDate.toString().contains('Z') || rawDate.toString().contains('+') ? rawDate.toString() : '${rawDate}Z').toLocal(); } catch (_) {}
     final medicines = (rx['medicines'] as List?) ?? [];
     final diagnoses = (rx['diagnoses'] as List?) ?? [];
     final labTests = (rx['labTests'] as List?) ?? [];

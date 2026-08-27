@@ -74,7 +74,7 @@ class _PatientPrescriptionsState extends ConsumerState<PatientPrescriptions> {
       final diagnosis = (r['diagnosis'] ?? '').toString().toLowerCase();
       final doctorName = (r['doctor']?['name'] ?? '').toString().toLowerCase();
       final date = r['createdAt'] != null
-          ? (() { try { return DateFormat('MMM dd, yyyy').format(DateTime.parse(r['createdAt'].toString().replaceAll('/', '-')).toLocal()).toLowerCase(); } catch (_) { return ''; } })()
+          ? (() { try { final s = r['createdAt'].toString().replaceAll('/', '-'); return DateFormat('MMM dd, yyyy').format(DateTime.parse(s.contains('Z') || s.contains('+') ? s : '${s}Z').toLocal()).toLowerCase(); } catch (_) { return ''; } })()
           : '';
       final rawId = (r['_id'] ?? r['id'] ?? '').toString();
       final mrNumber = rawId.length >= 6
@@ -293,7 +293,7 @@ class _PatientPrescriptionsState extends ConsumerState<PatientPrescriptions> {
                       _filtered,
                       (r) {
                         final s = (r is Map ? (r['prescribedAt'] ?? r['createdAt'] ?? '') : '').toString();
-                        if (s.isNotEmpty) { try { return DateTime.parse(s); } catch (_) {} }
+                        if (s.isNotEmpty) { try { return _utcToPkt(s); } catch (_) {} }
                         return DateTime.now();
                       },
                       _dateFilter,
@@ -864,6 +864,15 @@ class _PatientPrescriptionsState extends ConsumerState<PatientPrescriptions> {
     );
   }
 
+  // Parse a UTC timestamp string from MongoDB and convert to device local time.
+  // MongoDB stores timestamps as UTC. Without normalising the 'Z' suffix,
+  // DateTime.parse() treats the string as local time — showing the wrong hour.
+  // Use .toLocal() so it works correctly for ALL timezones, not just PKT.
+  DateTime _utcToPkt(String s) {
+    final normalised = (s.contains('Z') || s.contains('+')) ? s : '${s}Z';
+    return DateTime.parse(normalised).toLocal();
+  }
+
   DateTime? _parseDateFromRecord(dynamic record) {
     final s = (record is Map
             ? (record['prescribedAt'] ?? record['createdAt'])
@@ -872,7 +881,7 @@ class _PatientPrescriptionsState extends ConsumerState<PatientPrescriptions> {
         '';
     if (s.isEmpty) return null;
     try {
-      return DateTime.parse(s);
+      return _utcToPkt(s);
     } catch (_) {
       return null;
     }
@@ -888,7 +897,7 @@ class _PatientPrescriptionsState extends ConsumerState<PatientPrescriptions> {
         '';
     if (s.isEmpty) return null;
     try {
-      return DateTime.parse(s);
+      return _utcToPkt(s);
     } catch (_) {
       return null;
     }
@@ -991,14 +1000,20 @@ class _PrescriptionPage extends StatelessWidget {
   String get _prescriptionDate {
     final s = record['prescribedAt']?.toString() ?? record['createdAt']?.toString() ?? '';
     if (s.isNotEmpty) {
-      try { return DateFormat('MMMM dd, yyyy').format(DateTime.parse(s).toLocal()); } catch (_) {}
+      try {
+        final local = DateTime.parse(s.contains('Z') || s.contains('+') ? s : '${s}Z').toLocal();
+        return DateFormat('MMMM dd, yyyy').format(local);
+      } catch (_) {}
     }
     return DateFormat('MMMM dd, yyyy').format(DateTime.now());
   }
   String get _prescriptionTime {
     final s = record['prescribedAt']?.toString() ?? record['createdAt']?.toString() ?? '';
     if (s.isNotEmpty) {
-      try { return DateFormat('hh:mm a').format(DateTime.parse(s).toLocal()); } catch (_) {}
+      try {
+        final local = DateTime.parse(s.contains('Z') || s.contains('+') ? s : '${s}Z').toLocal();
+        return DateFormat('hh:mm a').format(local);
+      } catch (_) {}
     }
     return '';
   }
@@ -1314,7 +1329,7 @@ class _PrescriptionPage extends StatelessWidget {
             pw.Expanded(child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
               pw.Text('PATIENT', style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold, color: PdfColors.grey)),
               pw.Text(_patientName, style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
-              if (_patientAge.isNotEmpty) pw.Text('$_patientAge  •  $_patientGender', style: const pw.TextStyle(fontSize: 10)),
+              if (_patientAge.isNotEmpty) pw.Text('$_patientAge  |  $_patientGender', style: const pw.TextStyle(fontSize: 10)),
               if (_mrNumber.isNotEmpty) pw.Text(_mrNumber, style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold)),
             ])),
             pw.SizedBox(width: 20),
@@ -2609,7 +2624,7 @@ class _FindPharmaciesSheetState extends State<_FindPharmaciesSheet> {
         final rx = _advisedPrescriptions[i] as Map<String, dynamic>;
         final doctorName = (rx['doctor']?['name'] ?? rx['doctorName'] ?? 'Doctor').toString();
         final dateStr = rx['createdAt'] != null
-            ? (() { try { return DateFormat('MMM dd, yyyy').format(DateTime.parse(rx['createdAt'].toString().replaceAll('/', '-')).toLocal()); } catch (_) { return ''; } })()
+            ? (() { try { final s = rx['createdAt'].toString().replaceAll('/', '-'); return DateFormat('MMM dd, yyyy').format(DateTime.parse(s.contains('Z') || s.contains('+') ? s : '${s}Z').toLocal()); } catch (_) { return ''; } })()
             : '';
         final meds = (rx['medicines'] as List?) ??
             (rx['prescription'] is Map ? (rx['prescription']['medicines'] as List?) : null) ?? [];

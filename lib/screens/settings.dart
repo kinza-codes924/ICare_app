@@ -698,7 +698,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   Future<void> _doDeleteAccount(BuildContext ctx) async {
     try {
       final token = await SharedPref().getToken();
-      final dio = Dio(BaseOptions(baseUrl: 'https://icare-backend-inky.vercel.app/api'));
+      final dio = Dio(BaseOptions(baseUrl: 'https://icare.com.co/api'));
       final resp = await dio.delete(
         '/users/me',
         options: Options(headers: {'Authorization': 'Bearer $token'}),

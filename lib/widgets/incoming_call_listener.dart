@@ -102,7 +102,10 @@ class _IncomingCallListenerState extends State<IncomingCallListener> {
           isAudioOnly: isAudioOnly,
           isConsultation: callType == 'consultation',
           onAccept: () async {
-            await _callService.respondToCall(signalId, 'accepted');
+            // Fire server ack in background — don't await it before navigating.
+            // The old flow awaited respondToCall() before popping, which added
+            // a full network round-trip of lag before the dialog even closed.
+            _callService.respondToCall(signalId, 'accepted').ignore();
             final userData = await _sharedPref.getUserData();
             nav.pop();
 
@@ -151,8 +154,9 @@ class _IncomingCallListenerState extends State<IncomingCallListener> {
               );
             }
           },
-          onDecline: () async {
-            await _callService.respondToCall(signalId, 'rejected');
+          onDecline: () {
+            // Same pattern: fire-and-forget the server ack, close immediately.
+            _callService.respondToCall(signalId, 'rejected').ignore();
             nav.pop();
           },
         ),

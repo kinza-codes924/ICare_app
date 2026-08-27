@@ -77,12 +77,12 @@ class Prescription {
       'status': status.toString().split('.').last,
       'pharmacyId': pharmacyId,
       'pharmacyAcceptedAt': pharmacyAcceptedAt?.toIso8601String(),
-      'pharmacyDispatchedAt': pharmacyDispatchedAt?.toIso8601String(),
-      'pharmacyDeliveredAt': pharmacyDeliveredAt?.toIso8601String(),
+      'pharmacyDispatchedAt': pharmacyDispatchedAt?.toUtc().toIso8601String(),
+      'pharmacyDeliveredAt': pharmacyDeliveredAt?.toUtc().toIso8601String(),
       'patientWantsFulfillment': patientWantsFulfillment,
       'deliveryAddress': deliveryAddress,
-      'prescribedAt': prescribedAt.toIso8601String(),
-      'expiresAt': expiresAt?.toIso8601String(),
+      'prescribedAt': prescribedAt.toUtc().toIso8601String(),
+      'expiresAt': expiresAt?.toUtc().toIso8601String(),
     };
   }
 }

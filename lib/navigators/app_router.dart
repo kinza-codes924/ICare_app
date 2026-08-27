@@ -286,8 +286,13 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/consultation/:consultationId',
         builder: (_, state) {
           final extra = state.extra as Map<String, dynamic>?;
+          final pathId = state.pathParameters['consultationId'];
+          // 'new' is a sentinel meaning no existing consultationId yet
+          final consultationId = (pathId == 'new')
+              ? (extra?['consultationId'] as String?)
+              : pathId;
           return ConsultationChatScreenV2(
-            consultationId: state.pathParameters['consultationId'],
+            consultationId: consultationId,
             appointment: extra?['appointment'] as AppointmentDetail?,
             isDoctor: extra?['isDoctor'] as bool? ?? false,
             currentUserId: extra?['currentUserId'] as String? ?? '',

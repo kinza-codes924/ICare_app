@@ -1113,7 +1113,7 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
                     final doctorName = r['doctor']?['name'] ?? 'Unknown';
                     final diagnosis = r['diagnosis'] ?? 'No diagnosis';
                     final date = r['createdAt'] != null
-                        ? DateFormat('MMM dd, yyyy').format(DateTime.parse(r['createdAt']))
+                        ? DateFormat('MMM dd, yyyy').format(DateTime.parse(r['createdAt'].toString().contains('Z') || r['createdAt'].toString().contains('+') ? r['createdAt'] : '${r['createdAt']}Z').toLocal())
                         : '';
                     return Container(
                       margin: const EdgeInsets.only(bottom: 12),

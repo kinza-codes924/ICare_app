@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:flutter_size_matters/flutter_size_matters.dart';
 import 'package:flutter_switch/flutter_switch.dart';
 import 'package:icare/models/appointment_detail.dart';
@@ -143,19 +144,15 @@ class BookingCard extends ConsumerWidget {
                         }
                       }
 
-                      // Navigate to chat screen (NOT video directly)
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => ConsultationChatScreenV2(
-                            appointment: appointment,
-                            isDoctor: isDoctor,
-                            currentUserId: currentUserId,
-                            currentUserName: currentUserName,
-                            consultationId: consultationId,
-                          ),
-                        ),
-                      );
+                      // Navigate to chat screen via GoRouter (no sidebar)
+                      final pathId = (consultationId != null && consultationId.isNotEmpty) ? consultationId : 'new';
+                      context.go('/consultation/$pathId', extra: {
+                        'appointment': appointment,
+                        'isDoctor': isDoctor,
+                        'currentUserId': currentUserId,
+                        'currentUserName': currentUserName,
+                        if (pathId == 'new') 'consultationId': null,
+                      });
                     } else {
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
@@ -850,17 +847,15 @@ class _WebBookingCardState extends State<_WebBookingCard> {
                                 if (context.mounted) Navigator.pop(context);
 
                                 if (result['success'] == true && context.mounted) {
-                                  Navigator.of(context).push(
-                                    MaterialPageRoute(
-                                      builder: (ctx) => ConsultationChatScreenV2(
-                                        appointment: widget.appointment,
-                                        isDoctor: true,
-                                        currentUserId: currentUserId,
-                                        currentUserName: currentUserName,
-                                        consultationId: result['consultationId']?.toString(),
-                                      ),
-                                    ),
-                                  );
+                                  final cid = result['consultationId']?.toString() ?? '';
+                                  final pathId = cid.isNotEmpty ? cid : 'new';
+                                  context.go('/consultation/$pathId', extra: {
+                                    'appointment': widget.appointment,
+                                    'isDoctor': true,
+                                    'currentUserId': currentUserId,
+                                    'currentUserName': currentUserName,
+                                    if (pathId == 'new') 'consultationId': null,
+                                  });
                                 } else if (context.mounted) {
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(
@@ -975,18 +970,14 @@ class _WebBookingCardState extends State<_WebBookingCard> {
                                 }
 
                                 if (mounted) {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (_) => ConsultationChatScreenV2(
-                                        appointment: widget.appointment,
-                                        isDoctor: isDoctor,
-                                        currentUserId: currentUserId,
-                                        currentUserName: currentUserName,
-                                        consultationId: consultationId,
-                                      ),
-                                    ),
-                                  );
+                                  final pathId = (consultationId != null && consultationId.isNotEmpty) ? consultationId : 'new';
+                                  context.go('/consultation/$pathId', extra: {
+                                    'appointment': widget.appointment,
+                                    'isDoctor': isDoctor,
+                                    'currentUserId': currentUserId,
+                                    'currentUserName': currentUserName,
+                                    if (pathId == 'new') 'consultationId': null,
+                                  });
                                 }
                               } else {
                                 if (mounted) {

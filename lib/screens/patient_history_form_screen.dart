@@ -540,7 +540,7 @@ class _PatientHistoryFormScreenState extends State<PatientHistoryFormScreen> {
         elevation: 0,
         leading: widget.onClose != null
             ? IconButton(
-                icon: const Icon(Icons.close_rounded),
+                icon: const Icon(Icons.close_rounded, color: AppColors.primaryColor),
                 onPressed: widget.onClose,
               )
             : const CustomBackButton(),
@@ -593,6 +593,8 @@ class _PatientHistoryFormScreenState extends State<PatientHistoryFormScreen> {
           Expanded(
             child: ListView.builder(
               controller: _scrollController,
+              primary: false,
+              physics: const ClampingScrollPhysics(),
               padding: const EdgeInsets.all(12),
               itemCount: sections.length + 1, // +1 for save button at bottom
               itemBuilder: (ctx, i) {

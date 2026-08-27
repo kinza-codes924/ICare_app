@@ -122,7 +122,7 @@ class _CertificatesScreenState extends ConsumerState<CertificatesScreen> {
         final course = certificate['course'];
         final createdAtStr = certificate['createdAt']?.toString();
         final issuedAt = createdAtStr != null
-            ? DateTime.tryParse(createdAtStr)
+            ? DateTime.tryParse(createdAtStr.contains('Z') || createdAtStr.contains('+') ? createdAtStr : '${createdAtStr}Z')?.toLocal()
             : null;
 
         return Container(

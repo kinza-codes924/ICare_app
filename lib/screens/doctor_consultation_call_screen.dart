@@ -5,6 +5,9 @@ import 'package:icare/screens/in_consultation_prescription_form.dart';
 import 'package:icare/screens/patient_history_form_screen.dart';
 import 'package:icare/screens/video_call.dart';
 import 'package:icare/utils/prescription_toggle_bridge.dart';
+// ignore: avoid_web_libraries_in_flutter
+import 'dart:html' as html show window, CustomEvent;
+
 
 // Doctor's call screen for a NORMAL (appointment-based) consultation — full-
 // screen video with a dismissible/reopenable panel on the left holding
@@ -65,13 +68,22 @@ class _DoctorConsultationCallScreenState extends State<DoctorConsultationCallScr
   }
 
   void _openPanel(_CallPanel panel) {
-    setState(() => _panel = _panel == panel ? _CallPanel.none : panel);
+    final willOpen = _panel != panel;
+    setState(() => _panel = willOpen ? panel : _CallPanel.none);
     _syncToggleVisibility();
+    if (kIsWeb) {
+      html.window.dispatchEvent(html.CustomEvent(
+        willOpen ? 'icare-panel-open' : 'icare-panel-close',
+      ));
+    }
   }
 
   void _closePanel() {
     setState(() => _panel = _CallPanel.none);
     _syncToggleVisibility();
+    if (kIsWeb) {
+      html.window.dispatchEvent(html.CustomEvent('icare-panel-close'));
+    }
   }
 
   void _syncToggleVisibility() {
@@ -81,8 +93,8 @@ class _DoctorConsultationCallScreenState extends State<DoctorConsultationCallScr
     } else {
       _toggleBridge.show(
         buttons: [
-          {'id': 'prescription', 'label': '📄  Prescription', 'side': 'left', 'top': 16},
-          {'id': 'history', 'label': '📋  Patient History', 'side': 'left', 'top': 72},
+          {'id': 'prescription', 'label': 'Prescription', 'side': 'center', 'top': 16},
+          {'id': 'history', 'label': 'Patient History', 'side': 'center', 'top': 72},
         ],
         onToggle: (id) => _openPanel(id == 'prescription' ? _CallPanel.prescription : _CallPanel.history),
       );

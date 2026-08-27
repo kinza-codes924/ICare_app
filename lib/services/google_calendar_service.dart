@@ -2,9 +2,11 @@ import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:dio/dio.dart';
 
-// ── Replace this with your real Web Client ID from Google Cloud Console ──────
-// Steps: console.cloud.google.com → APIs & Services → Credentials → OAuth 2.0
-// Authorized origins: https://icare-app-ten.vercel.app  and  http://localhost
+// Web Client ID from the Firebase project "icare" (project number 564788374793).
+// Its authorised JavaScript origins must list every host the web app is served
+// from — currently https://icare.com.co, https://www.icare.com.co, and
+// http://localhost for `flutter run -d chrome`.
+// console.cloud.google.com → APIs & Services → Credentials → OAuth 2.0
 const String _kGoogleClientId =
     '564788374793-1eptqsl65ohkvsquqhc4qnhlia592v2f.apps.googleusercontent.com';
 

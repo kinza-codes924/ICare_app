@@ -3569,7 +3569,10 @@ class _AppBadges extends StatelessWidget {
           ),
         ),
         _StoreBadgeButton(
-          onTap: () {},
+          onTap: () => launchUrl(
+            Uri.parse('https://play.google.com/store/apps/details?id=com.cartzlinkv2.icare'),
+            mode: LaunchMode.externalApplication,
+          ),
           child: Container(
             height: 56,
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),

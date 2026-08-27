@@ -58,6 +58,9 @@ class _ConsultationChatScreenV2State extends State<ConsultationChatScreenV2> {
   bool _isSending = false;
   bool _timerSynced = false;
   String? _consultationId;
+  bool _showPrescriptionPanel = false;
+  Map<String, dynamic>? _prescriptionDraft;
+  bool _prescriptionLoading = false;
 
   @override
   void initState() {
@@ -383,10 +386,11 @@ class _ConsultationChatScreenV2State extends State<ConsultationChatScreenV2> {
     final channelName = _consultationId ?? widget.appointment?.id ?? 'consultation';
     // For patients who joined via call notification, appointment may be null —
     // fall back to the remoteUserName passed into this screen (the caller's name).
+    final appointmentDoctorName = widget.appointment?.doctor?.name;
     final remoteUserName = widget.isDoctor
         ? (widget.appointment?.patient?.name ?? widget.remoteUserName ?? 'Patient')
-        : (widget.appointment?.doctor?.name != null
-            ? 'Dr. ${widget.appointment!.doctor!.name}'
+        : (appointmentDoctorName != null && appointmentDoctorName.isNotEmpty
+            ? 'Dr. $appointmentDoctorName'
             : (widget.remoteUserName ?? 'Dr. Doctor'));
 
     // Send ring signal to the other party via call signaling backend
@@ -697,6 +701,22 @@ class _ConsultationChatScreenV2State extends State<ConsultationChatScreenV2> {
     } catch (_) {}
   }
 
+  Future<void> _fetchAndTogglePrescription() async {
+    if (widget.isDoctor) return;
+    if (_showPrescriptionPanel) {
+      setState(() => _showPrescriptionPanel = false);
+      return;
+    }
+    setState(() { _prescriptionLoading = true; _showPrescriptionPanel = true; });
+    try {
+      final id = _consultationId;
+      if (id != null && id.isNotEmpty) {
+        _prescriptionDraft = await _consultationService.getPrescriptionDraft(id);
+      }
+    } catch (_) {}
+    if (mounted) setState(() => _prescriptionLoading = false);
+  }
+
   void _showWarningDialog() {
     showDialog(
       context: context,
@@ -786,6 +806,8 @@ class _ConsultationChatScreenV2State extends State<ConsultationChatScreenV2> {
           : Column(
               children: [
                 _buildConsultationHeader(),
+                if (!widget.isDoctor && _showPrescriptionPanel)
+                  _buildPatientPrescriptionPanel(),
                 Expanded(
                   child: ListView.builder(
                     controller: _scrollController,
@@ -797,6 +819,116 @@ class _ConsultationChatScreenV2State extends State<ConsultationChatScreenV2> {
                 _buildMessageInput(),
               ],
             ),
+    );
+  }
+
+  // ── Patient read-only prescription panel ────────────────────────────────
+  Widget _buildPatientPrescriptionPanel() {
+    final draft = _prescriptionDraft;
+    final diagnoses = (draft?['diagnoses'] as List? ?? []);
+    final medicines = (draft?['medicines'] as List? ??
+        draft?['prescription']?['medicines'] as List? ?? []);
+    final notes = draft?['notes']?.toString() ?? '';
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFF0049E6).withValues(alpha: 0.25)),
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.07), blurRadius: 8, offset: const Offset(0, 2))],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: const Color(0xFF0049E6).withValues(alpha: 0.07),
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.description_rounded, color: Color(0xFF0049E6), size: 18),
+                const SizedBox(width: 8),
+                const Text('Prescription (Live)', style: TextStyle(fontWeight: FontWeight.w700, color: Color(0xFF0049E6), fontSize: 14)),
+                const Spacer(),
+                GestureDetector(
+                  onTap: () => setState(() => _showPrescriptionPanel = false),
+                  child: const Icon(Icons.close_rounded, size: 18, color: Color(0xFF0049E6)),
+                ),
+              ],
+            ),
+          ),
+          // Body
+          _prescriptionLoading
+              ? const Padding(
+                  padding: EdgeInsets.all(16),
+                  child: Center(child: SizedBox(height: 24, width: 24, child: CircularProgressIndicator(strokeWidth: 2))),
+                )
+              : (draft == null || (diagnoses.isEmpty && medicines.isEmpty && notes.isEmpty))
+                  ? const Padding(
+                      padding: EdgeInsets.all(16),
+                      child: Text('No prescription added yet.', style: TextStyle(color: Colors.grey, fontSize: 13)),
+                    )
+                  : Padding(
+                      padding: const EdgeInsets.all(14),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (diagnoses.isNotEmpty) ...[
+                            const Text('Diagnoses', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: Color(0xFF374151))),
+                            const SizedBox(height: 4),
+                            ...diagnoses.map((d) {
+                              final name = d is Map ? (d['diagnosis']?.toString() ?? d['name']?.toString() ?? '') : d.toString();
+                              final code = d is Map ? (d['icd10Code']?.toString() ?? '') : '';
+                              return Padding(
+                                padding: const EdgeInsets.only(bottom: 2),
+                                child: Text('• $name${code.isNotEmpty ? " ($code)" : ""}', style: const TextStyle(fontSize: 13)),
+                              );
+                            }),
+                            const SizedBox(height: 8),
+                          ],
+                          if (medicines.isNotEmpty) ...[
+                            const Text('Medicines', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: Color(0xFF374151))),
+                            const SizedBox(height: 4),
+                            ...medicines.map((m) {
+                              final name = m is Map ? (m['medicineName']?.toString() ?? m['name']?.toString() ?? '') : m.toString();
+                              final dose = m is Map ? (m['dosage']?.toString() ?? m['dose']?.toString() ?? '') : '';
+                              final freq = m is Map ? (m['frequency']?.toString() ?? '') : '';
+                              final dur = m is Map ? (m['duration']?.toString() ?? '') : '';
+                              final detail = [if (dose.isNotEmpty) dose, if (freq.isNotEmpty) freq, if (dur.isNotEmpty) dur].join(' · ');
+                              return Padding(
+                                padding: const EdgeInsets.only(bottom: 4),
+                                child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text('• ', style: TextStyle(fontSize: 13)),
+                                    Expanded(child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(name, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+                                        if (detail.isNotEmpty)
+                                          Text(detail, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                                      ],
+                                    )),
+                                  ],
+                                ),
+                              );
+                            }),
+                            const SizedBox(height: 8),
+                          ],
+                          if (notes.isNotEmpty) ...[
+                            const Text('Notes', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: Color(0xFF374151))),
+                            const SizedBox(height: 4),
+                            Text(notes, style: const TextStyle(fontSize: 13)),
+                          ],
+                        ],
+                      ),
+                    ),
+        ],
+      ),
     );
   }
 
@@ -854,6 +986,19 @@ class _ConsultationChatScreenV2State extends State<ConsultationChatScreenV2> {
                       color: AppColors.primaryColor,
                       onPressed: _openPastConsultations,
                       tooltip: 'Past Consultations',
+                    ),
+                  ],
+                  if (!widget.isDoctor) ...[
+                    IconButton(
+                      icon: Icon(
+                        _showPrescriptionPanel
+                            ? Icons.description_rounded
+                            : Icons.description_outlined,
+                        size: 22,
+                      ),
+                      color: AppColors.primaryColor,
+                      onPressed: _fetchAndTogglePrescription,
+                      tooltip: 'View Prescription',
                     ),
                   ],
                 ],
@@ -972,6 +1117,9 @@ class _ConsultationChatScreenV2State extends State<ConsultationChatScreenV2> {
   }
 
   Widget _digitBox(String value, String label, Color color) {
+    // Keep this widget safe even if a future timer implementation supplies an
+    // empty/short value during an asynchronous rebuild.
+    final digits = value.padLeft(2, '0');
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -985,12 +1133,12 @@ class _ConsultationChatScreenV2State extends State<ConsultationChatScreenV2> {
           child: Row(
             children: [
               Text(
-                value[0],
+                digits[0],
                 style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: color),
               ),
               const SizedBox(width: 2),
               Text(
-                value[1],
+                digits[1],
                 style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: color),
               ),
             ],

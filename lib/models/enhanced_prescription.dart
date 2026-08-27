@@ -3,6 +3,14 @@
 
 import 'package:icare/models/lifestyle_advice.dart';
 
+// Parse a UTC ISO string from MongoDB and convert to device local time.
+DateTime _parseUtcToLocal(dynamic s) {
+  final str = s?.toString() ?? '';
+  if (str.isEmpty) return DateTime.now();
+  final normalised = str.contains('Z') || str.contains('+') ? str : '${str}Z';
+  return DateTime.parse(normalised).toLocal();
+}
+
 class EnhancedPrescription {
   final String? id;
   final String patientId;
@@ -96,10 +104,10 @@ class EnhancedPrescription {
         orElse: () => PrescriptionStatus.draft,
       ),
       isComplete: json['isComplete'] ?? false,
-      prescribedAt: DateTime.parse(json['prescribedAt']),
-      expiresAt: json['expiresAt'] != null ? DateTime.parse(json['expiresAt']) : null,
-      createdAt: DateTime.parse(json['createdAt']),
-      updatedAt: json['updatedAt'] != null ? DateTime.parse(json['updatedAt']) : null,
+      prescribedAt: _parseUtcToLocal(json['prescribedAt']),
+      expiresAt: json['expiresAt'] != null ? _parseUtcToLocal(json['expiresAt']) : null,
+      createdAt: _parseUtcToLocal(json['createdAt']),
+      updatedAt: json['updatedAt'] != null ? _parseUtcToLocal(json['updatedAt']) : null,
     );
   }
 
@@ -120,10 +128,12 @@ class EnhancedPrescription {
       'assignedCourseIds': assignedCourseIds,
       'status': status.toString().split('.').last,
       'isComplete': isComplete,
-      'prescribedAt': prescribedAt.toIso8601String(),
-      'expiresAt': expiresAt?.toIso8601String(),
-      'createdAt': createdAt.toIso8601String(),
-      'updatedAt': updatedAt?.toIso8601String(),
+      // Always serialise as UTC — a local DateTime's toIso8601String() has no
+      // timezone marker, so the backend would store wall-clock time as UTC.
+      'prescribedAt': prescribedAt.toUtc().toIso8601String(),
+      'expiresAt': expiresAt?.toUtc().toIso8601String(),
+      'createdAt': createdAt.toUtc().toIso8601String(),
+      'updatedAt': updatedAt?.toUtc().toIso8601String(),
     };
   }
 

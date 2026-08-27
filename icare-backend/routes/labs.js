@@ -10,6 +10,7 @@ const LabTestRequest = require('../models/LabTestRequest');
 const { authMiddleware } = require('../middleware/auth');
 const { sendToUser } = require('../services/notificationService');
 const { sendEmail } = require('../utils/email');
+const { PUBLIC_BASE_URL } = require('../utils/publicUrl');
 
 const _reportUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
@@ -502,7 +503,7 @@ router.put('/bookings/:bookingId', authMiddleware, async (req, res) => {
           const rNotes = booking.report_notes || update.report_notes || '';
           const patientName = patientUser?.name || patientUser?.username || 'Patient';
           const dateStr = new Date().toLocaleDateString('en-PK', { day: 'numeric', month: 'long', year: 'numeric' });
-          const reportPageUrl = `https://icare-backend-inky.vercel.app/api/labs/report/${booking._id}`;
+          const reportPageUrl = `${PUBLIC_BASE_URL}/api/labs/report/${booking._id}`;
           await sendEmail({
             to: patientEmail,
             subject: `iCare — Your ${testName} Report is Ready`,
@@ -847,7 +848,7 @@ router.post('/bookings/:bookingId/upload-report', authMiddleware, _reportUpload.
           const testName = booking.test_type || 'Lab Test';
           const patientName = patientUser?.name || patientUser?.username || 'Patient';
           const dateStr = new Date().toLocaleDateString('en-PK', { day: 'numeric', month: 'long', year: 'numeric' });
-          const reportPageUrl = `https://icare-backend-inky.vercel.app/api/labs/report/${booking._id}`;
+          const reportPageUrl = `${PUBLIC_BASE_URL}/api/labs/report/${booking._id}`;
           await sendEmail({
             to: patientEmail,
             subject: `iCare — Your ${testName} Report is Ready`,

@@ -1,8 +1,8 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:icare/models/appointment_detail.dart';
 import 'package:icare/widgets/date_filter_bar.dart';
-import 'package:icare/screens/consultation_chat_screen_v2.dart';
 import 'package:icare/screens/profile_or_appointement_view.dart';
 import 'package:icare/services/appointment_service.dart';
 import 'package:icare/services/consultation_service.dart';
@@ -28,6 +28,8 @@ class _DoctorAppointmentsScreenState extends State<DoctorAppointmentsScreen> {
   late String _selectedFilter;
   String _dateFilter = 'all';
   DateTime? _customDate;
+  String? _startingConsultationId; // tracks which appointment has a pending start
+  String? _joiningConsultationId;  // tracks which appointment is being rejoined
 
   @override
   void initState() {
@@ -124,16 +126,24 @@ class _DoctorAppointmentsScreenState extends State<DoctorAppointmentsScreen> {
     }
   }
 
-  String _capitalize(String s) =>
-      s.isEmpty ? s : s[0].toUpperCase() + s.substring(1).toLowerCase();
+  String _capitalize(String? value) {
+    final text = value?.trim() ?? '';
+    return text.isEmpty
+        ? ''
+        : text[0].toUpperCase() + text.substring(1).toLowerCase();
+  }
 
   /// Extract channel name from appointment (for video call rejoin)
   String _getChannelName(AppointmentDetail appointment) {
     final notes = appointment.reason ?? '';
     final match = RegExp(r'Channel:\s*(\S+)').firstMatch(notes);
-    if (match != null) return match.group(1)!;
-    return appointment.channelName?.isNotEmpty == true
-        ? appointment.channelName!
+    final channelFromNotes = match?.group(1);
+    if (channelFromNotes != null && channelFromNotes.isNotEmpty) {
+      return channelFromNotes;
+    }
+    final channelName = appointment.channelName;
+    return channelName != null && channelName.isNotEmpty
+        ? channelName
         : appointment.id;
   }
 
@@ -329,6 +339,21 @@ class _DoctorAppointmentsScreenState extends State<DoctorAppointmentsScreen> {
   }
 
   Widget _buildAppointmentCard(AppointmentDetail appointment) {
+    // API responses may omit the populated patient object or contain blank
+    // profile data. Resolve every nullable value once before building widgets
+    // so a rebuild (for example, when a loading dialog closes) cannot hit a
+    // null assertion or an empty-string index.
+    final patient = appointment.patient;
+    final patientName = patient?.name.trim() ?? '';
+    final profilePicture = patient?.profilePicture?.trim();
+    final hasProfilePicture = profilePicture?.isNotEmpty ?? false;
+    final patientInitial = patientName.isNotEmpty
+        ? patientName.substring(0, 1).toUpperCase()
+        : 'P';
+    final patientAge = patient?.age;
+    final patientGender = patient?.gender;
+    final reason = appointment.reason?.trim();
+
     if (_selectedFilter == 'missed') {
       return Container(
         margin: const EdgeInsets.only(bottom: 10),
@@ -500,18 +525,13 @@ class _DoctorAppointmentsScreenState extends State<DoctorAppointmentsScreen> {
                       children: [
                         CircleAvatar(
                           radius: 28,
-                          backgroundImage: appointment.patient?.profilePicture != null &&
-                                  appointment.patient!.profilePicture!.isNotEmpty
-                              ? buildProfileImageProvider(appointment.patient!.profilePicture)
+                          backgroundImage: hasProfilePicture
+                              ? buildProfileImageProvider(profilePicture ?? '')
                               : null,
                           backgroundColor: const Color(0xFF3B82F6),
-                          child: appointment.patient?.profilePicture == null ||
-                                  appointment.patient!.profilePicture!.isEmpty
+                          child: !hasProfilePicture
                               ? Text(
-                                  appointment.patient?.name
-                                          .substring(0, 1)
-                                          .toUpperCase() ??
-                                      'P',
+                                  patientInitial,
                                   style: const TextStyle(
                                     fontSize: 22,
                                     fontWeight: FontWeight.w900,
@@ -526,40 +546,37 @@ class _DoctorAppointmentsScreenState extends State<DoctorAppointmentsScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                appointment.patient?.name ?? 'Patient',
+                                patientName.isNotEmpty ? patientName : 'Patient',
                                 style: const TextStyle(
                                   fontSize: 17,
                                   fontWeight: FontWeight.w900,
                                   color: Color(0xFF0F172A),
                                 ),
                               ),
-                              if (appointment.patient?.age != null ||
-                                  appointment.patient?.gender != null) ...[
+                              if (patientAge != null || patientGender != null) ...[
                                 const SizedBox(height: 4),
                                 Row(
                                   children: [
-                                    if (appointment.patient?.age != null) ...[
+                                    if (patientAge != null) ...[
                                       const Icon(Icons.cake_rounded,
                                           size: 13, color: Color(0xFF64748B)),
                                       const SizedBox(width: 4),
                                       Text(
-                                        '${appointment.patient!.age} yrs',
+                                        '$patientAge yrs',
                                         style: const TextStyle(
                                             fontSize: 13,
                                             color: Color(0xFF64748B),
                                             fontWeight: FontWeight.w600),
                                       ),
                                     ],
-                                    if (appointment.patient?.age != null &&
-                                        appointment.patient?.gender != null)
+                                    if (patientAge != null && patientGender != null)
                                       const SizedBox(width: 10),
-                                    if (appointment.patient?.gender != null) ...[
+                                    if (patientGender != null) ...[
                                       const Icon(Icons.person_outline_rounded,
                                           size: 13, color: Color(0xFF64748B)),
                                       const SizedBox(width: 4),
                                       Text(
-                                        _capitalize(
-                                            appointment.patient!.gender!),
+                                        _capitalize(patientGender),
                                         style: const TextStyle(
                                             fontSize: 13,
                                             color: Color(0xFF64748B),
@@ -578,9 +595,9 @@ class _DoctorAppointmentsScreenState extends State<DoctorAppointmentsScreen> {
                   ),
 
                   // Reason Section — hide raw channel names from connect_now
-                  if (appointment.reason != null &&
-                      appointment.reason!.isNotEmpty &&
-                      !appointment.reason!.contains('Channel:')) ...[
+                  if (reason != null &&
+                      reason.isNotEmpty &&
+                      !reason.contains('Channel:')) ...[
                     const SizedBox(height: 16),
                     Container(
                       padding: const EdgeInsets.all(16),
@@ -612,7 +629,7 @@ class _DoctorAppointmentsScreenState extends State<DoctorAppointmentsScreen> {
                           ),
                           const SizedBox(height: 8),
                           Text(
-                            appointment.reason!,
+                            reason,
                             style: const TextStyle(
                               fontSize: 14,
                               color: Color(0xFF000000),
@@ -683,13 +700,9 @@ class _DoctorAppointmentsScreenState extends State<DoctorAppointmentsScreen> {
                       children: [
                         Expanded(
                           child: GestureDetector(
-                            onTap: () async {
-                              // Show loading
-                              showDialog(
-                                context: context,
-                                barrierDismissible: false,
-                                builder: (_) => const Center(child: CircularProgressIndicator()),
-                              );
+                            onTap: _startingConsultationId != null ? null : () async {
+                              if (!mounted) return;
+                              setState(() => _startingConsultationId = appointment.id);
                               try {
                                 final consultationService = ConsultationService();
                                 final sharedPref = SharedPref();
@@ -698,61 +711,51 @@ class _DoctorAppointmentsScreenState extends State<DoctorAppointmentsScreen> {
                                 final currentUserName = userData?.name ?? 'Doctor';
 
                                 final result = await consultationService.startConsultationV2(
-                                  appointmentId: appointment.id ?? '',
+                                  appointmentId: appointment.id,
                                   patientId: appointment.patient?.id ?? '',
                                   doctorId: appointment.doctor?.id ?? currentUserId,
                                 );
 
-                                if (context.mounted) Navigator.pop(context); // close loading
+                                if (!mounted) return;
+                                setState(() => _startingConsultationId = null);
 
-                                if (result['success'] == true && context.mounted) {
+                                if (result['success'] == true) {
                                   final consultationId = result['consultationId']?.toString() ?? '';
 
-                                  // ✅ Notify patient — send call signal so IncomingCallListener shows dialog
+                                  // Notify patient via call signal
                                   final patientId = appointment.patient?.id ?? '';
                                   if (patientId.isNotEmpty && consultationId.isNotEmpty) {
                                     try {
                                       await CallService().initiateCall(
                                         receiverId: patientId,
-                                        channelName: consultationId, // consultationId as channel
+                                        channelName: consultationId,
                                         callerName: 'Dr. $currentUserName',
-                                        callType: 'consultation', // special type for chat-first
+                                        callType: 'consultation',
                                       );
-                                    } catch (_) {} // non-blocking
+                                    } catch (_) {}
                                   }
 
-                                  // The initiateCall await above can outlive this
-                                  // context: starting a consultation flips the
-                                  // doctor's online status, which rebuilds this
-                                  // list and defuncts the element. Pushing with a
-                                  // dead context threw a bare null-check error
-                                  // (blank white screen, no ErrorWidget, since it
-                                  // fails before any widget is built), so re-check
-                                  // mounted after the await, not just before it.
-                                  if (!context.mounted) return;
+                                  if (!mounted) return;
 
-                                  Navigator.of(context).push(
-                                    MaterialPageRoute(
-                                      builder: (ctx) => ConsultationChatScreenV2(
-                                        appointment: appointment,
-                                        isDoctor: true,
-                                        currentUserId: currentUserId,
-                                        currentUserName: currentUserName,
-                                        consultationId: consultationId,
+                                  context.go('/consultation/$consultationId', extra: {
+                                    'appointment': appointment,
+                                    'isDoctor': true,
+                                    'currentUserId': currentUserId,
+                                    'currentUserName': currentUserName,
+                                  });
+                                } else {
+                                  if (mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text(result['message']?.toString() ?? 'Failed to start consultation'),
+                                        backgroundColor: Colors.red,
                                       ),
-                                    ),
-                                  );
-                                } else if (context.mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text(result['message']?.toString() ?? 'Failed to start consultation'),
-                                      backgroundColor: Colors.red,
-                                    ),
-                                  );
+                                    );
+                                  }
                                 }
                               } catch (e) {
-                                if (context.mounted) {
-                                  Navigator.pop(context);
+                                if (mounted) {
+                                  setState(() => _startingConsultationId = null);
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
                                   );
@@ -766,15 +769,21 @@ class _DoctorAppointmentsScreenState extends State<DoctorAppointmentsScreen> {
                                 borderRadius: BorderRadius.circular(10),
                               ),
                               alignment: Alignment.center,
-                              child: Text(
-                                'Start Consultation'.tr(),
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w700,
-                                  color: Colors.white,
-                                  fontFamily: 'Gilroy-Bold',
-                                ),
-                              ),
+                              child: _startingConsultationId == appointment.id
+                                  ? const SizedBox(
+                                      width: 20,
+                                      height: 20,
+                                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                    )
+                                  : Text(
+                                      'Start Consultation'.tr(),
+                                      style: const TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w700,
+                                        color: Colors.white,
+                                        fontFamily: 'Gilroy-Bold',
+                                      ),
+                                    ),
                             ),
                           ),
                         ),
@@ -822,14 +831,9 @@ class _DoctorAppointmentsScreenState extends State<DoctorAppointmentsScreen> {
                           ),
                           // Rejoin consultation (chat interface)
                           ElevatedButton.icon(
-                            onPressed: () async {
-                              // Show loading
-                              showDialog(
-                                context: context,
-                                barrierDismissible: false,
-                                builder: (_) => const Center(child: CircularProgressIndicator()),
-                              );
-
+                            onPressed: _joiningConsultationId != null ? null : () async {
+                              if (!mounted) return;
+                              setState(() => _joiningConsultationId = appointment.id);
                               try {
                                 final consultationService = ConsultationService();
                                 final sharedPref = SharedPref();
@@ -837,54 +841,36 @@ class _DoctorAppointmentsScreenState extends State<DoctorAppointmentsScreen> {
                                 final currentUserId = userData?.id ?? '';
                                 final currentUserName = userData?.name ?? 'Doctor';
 
-                                // Lookup existing consultation by appointmentId
-                                final result = await consultationService.getConsultationByAppointmentId(appointment.id ?? '');
+                                final result = await consultationService.getConsultationByAppointmentId(appointment.id);
 
-                                if (context.mounted) Navigator.pop(context); // close loading
-
-                                if (!context.mounted) return;
+                                if (!mounted) return;
+                                setState(() => _joiningConsultationId = null);
 
                                 final consultationId = result['success'] == true
                                     ? (result['consultation']?['_id']?.toString() ?? '')
                                     : '';
 
                                 if (consultationId.isNotEmpty) {
-                                  Navigator.of(context).push(
-                                    MaterialPageRoute(
-                                      builder: (ctx) => ConsultationChatScreenV2(
-                                        appointment: appointment,
-                                        isDoctor: true,
-                                        currentUserId: currentUserId,
-                                        currentUserName: currentUserName,
-                                        consultationId: consultationId,
-                                      ),
-                                    ),
-                                  ).then((_) => _loadAppointments());
+                                  context.go('/consultation/$consultationId', extra: {
+                                    'appointment': appointment,
+                                    'isDoctor': true,
+                                    'currentUserId': currentUserId,
+                                    'currentUserName': currentUserName,
+                                  });
                                   return;
                                 }
 
-                                // No existing consultation found (404, or the
-                                // appointment was in_progress but a session was
-                                // never actually created) — same fallback the
-                                // patient side already had: let the chat screen
-                                // create one via startConsultationV2 instead of
-                                // dead-ending the doctor on a snackbar with no
-                                // way forward. A genuine PAYMENT_REQUIRED will
-                                // still be surfaced there with a clear message.
-                                Navigator.of(context).push(
-                                  MaterialPageRoute(
-                                    builder: (ctx) => ConsultationChatScreenV2(
-                                      appointment: appointment,
-                                      isDoctor: true,
-                                      currentUserId: currentUserId,
-                                      currentUserName: currentUserName,
-                                      consultationId: null,
-                                    ),
-                                  ),
-                                ).then((_) => _loadAppointments());
+                                // No existing consultation — start fresh via GoRoute
+                                context.go('/consultation/new', extra: {
+                                  'appointment': appointment,
+                                  'isDoctor': true,
+                                  'currentUserId': currentUserId,
+                                  'currentUserName': currentUserName,
+                                  'consultationId': null,
+                                });
                               } catch (e) {
-                                if (context.mounted) {
-                                  Navigator.pop(context);
+                                if (mounted) {
+                                  setState(() => _joiningConsultationId = null);
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
                                   );
@@ -897,7 +883,9 @@ class _DoctorAppointmentsScreenState extends State<DoctorAppointmentsScreen> {
                               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                             ),
-                            icon: const Icon(Icons.chat_rounded, size: 18),
+                            icon: _joiningConsultationId == appointment.id
+                                ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                                : const Icon(Icons.chat_rounded, size: 18),
                             label: Text('Rejoin'.tr(), style: const TextStyle(fontWeight: FontWeight.w700)),
                           ),
                         ],

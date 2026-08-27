@@ -2,6 +2,8 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:js_interop';
+// ignore: avoid_web_libraries_in_flutter
+import 'dart:js' as js;
 import 'dart:typed_data';
 import 'dart:ui_web' as ui;
 // ignore: avoid_web_libraries_in_flutter
@@ -19,6 +21,7 @@ import '../utils/theme.dart';
 import '../screens/patient_history_form_screen.dart';
 import '../services/consultation_service.dart';
 import '../utils/shared_pref.dart';
+import '../utils/prescription_toggle_bridge.dart';
 import '../widgets/rating_dialog.dart';
 
 // JS interop — Jitsi Meet External API
@@ -103,6 +106,7 @@ class _VideoCallWebState extends State<VideoCall> {
   Timer? _declinePoller;
   Timer? _remoteLeftPoller;
   Timer? _closedPoller; // detects Jitsi hangup so this screen can close
+  CallTabButtonsBridge? _patientPrescriptionBridge; // patient-side "View Prescription" button
 
   // Side panel state
   bool _showChat = false;
@@ -226,7 +230,18 @@ class _VideoCallWebState extends State<VideoCall> {
   Future<void> _initRole() async {
     try {
       final user = await SharedPref().getUserData();
-      if (mounted) setState(() => _isDoctor = user?.role.toLowerCase() == 'doctor');
+      if (mounted) {
+        setState(() => _isDoctor = user?.role.toLowerCase() == 'doctor');
+        // Patient prescription view — show a read-only "View Prescription" button
+        // once the role is known and the call has started.
+        if (!_isDoctor && widget.consultationId != null && widget.consultationId!.isNotEmpty) {
+          _patientPrescriptionBridge = CallTabButtonsBridge();
+          _patientPrescriptionBridge!.show(
+            buttons: [{'id': 'rx', 'label': 'View Prescription', 'side': 'center', 'top': 16}],
+            onToggle: (_) => _showPatientPrescriptionDialog(),
+          );
+        }
+      }
     } catch (_) {}
     _startRemoteJoinPoller();
     _startDeclinePoller(); // detect patient decline immediately
@@ -240,6 +255,62 @@ class _VideoCallWebState extends State<VideoCall> {
     if (!_isDoctor && widget.appointmentId != null && widget.appointmentId!.isNotEmpty) {
       _startRemoteLeftPoller();
     }
+  }
+
+  /// Patient-side: fetch prescription draft and show DOM dialog (above Jitsi iframe).
+  Future<void> _showPatientPrescriptionDialog() async {
+    if (!mounted || widget.consultationId == null) return;
+    Map<String, dynamic>? draft;
+    try {
+      draft = await ConsultationService().getPrescriptionDraft(widget.consultationId!);
+    } catch (_) {}
+    if (!mounted) return;
+
+    // Build a plain data map for the JS DOM dialog
+    final Map<String, dynamic> dialogData = {};
+    if (draft != null && draft.isNotEmpty) {
+      // diagnoses list
+      final rawDx = draft['diagnoses'];
+      if (rawDx is List && rawDx.isNotEmpty) {
+        dialogData['diagnoses'] = rawDx.map((d) {
+          if (d is Map) {
+            final name = d['diagnosis']?.toString() ?? '';
+            final code = d['icd10Code']?.toString() ?? '';
+            return {'name': code.isNotEmpty ? '$name ($code)' : name};
+          }
+          return {'name': d.toString()};
+        }).toList();
+      }
+      // medicines list
+      final rawMeds = draft['medicines'] as List? ?? draft['prescription']?['medicines'] as List? ?? [];
+      if (rawMeds.isNotEmpty) {
+        dialogData['medicines'] = rawMeds.map((m) {
+          if (m is Map) return {
+            'medicineName': m['medicineName']?.toString() ?? m['name']?.toString() ?? '',
+            'dose': m['dosage']?.toString() ?? m['dose']?.toString() ?? '',
+            'frequency': m['frequency']?.toString() ?? '',
+            'duration': m['duration']?.toString() ?? '',
+          };
+          return {'medicineName': m.toString()};
+        }).toList();
+      }
+      // lab tests
+      final rawLabs = draft['labTests'] as List? ?? draft['prescription']?['labTests'] as List? ?? [];
+      if (rawLabs.isNotEmpty) {
+        dialogData['labTests'] = rawLabs.map((t) {
+          if (t is Map) return {'testName': t['testName']?.toString() ?? t['name']?.toString() ?? ''};
+          return {'testName': t.toString()};
+        }).toList();
+      }
+      // notes
+      final notes = draft['doctorNotes']?.toString() ?? draft['notes']?.toString() ?? '';
+      if (notes.isNotEmpty) dialogData['notes'] = notes;
+    }
+
+    // Call DOM-based dialog defined in web/index.html via dart:js
+    try {
+      js.context.callMethod('showRxPreviewDialog', [js.JsObject.jsify(dialogData)]);
+    } catch (_) {}
   }
 
   /// Poll for decline status — if patient declines, show dialog and go back to chat
@@ -1171,6 +1242,7 @@ class _VideoCallWebState extends State<VideoCall> {
     _declinePoller?.cancel();
     _remoteLeftPoller?.cancel();
     _closedPoller?.cancel();
+    _patientPrescriptionBridge?.dispose();
     _chatController.dispose();
     _chatScroll.dispose();
     _doctorNotesController.dispose();

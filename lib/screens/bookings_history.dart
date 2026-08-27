@@ -5,7 +5,7 @@ import 'package:icare/widgets/date_filter_bar.dart';
 import 'package:icare/screens/doctors_list.dart';
 import 'package:icare/screens/prescription_detail_screen.dart';
 import 'package:icare/screens/profile_or_appointement_view.dart';
-import 'package:icare/screens/consultation_chat_screen_v2.dart';
+import 'package:go_router/go_router.dart';
 import 'package:icare/services/appointment_service.dart';
 import 'package:icare/services/consultation_service.dart';
 import 'package:icare/utils/shared_pref.dart';
@@ -79,17 +79,11 @@ class _BookingsHistoryScreenState extends State<BookingsHistoryScreen> {
     return match?.group(1);
   }
 
-  /// Only show in_progress appointments that:
-  /// 1. Have a valid video channel (from channelName field OR reason text)
-  /// 2. Status was updated (set to in_progress) within the last 60 minutes
-  ///    — older sessions are considered stale/ended
+  /// Show all in_progress appointments — patient can always rejoin via consultationId lookup.
   List<AppointmentDetail> get _inProgress {
-    final now = DateTime.now();
-    return _displayAppointments.where((a) {
-      if (a.status.toLowerCase() != 'in_progress') return false;
-      if (_extractChannel(a) == null) return false;
-      return now.difference(a.updatedAt).inMinutes <= 60;
-    }).toList();
+    return _displayAppointments
+        .where((a) => a.status.toLowerCase() == 'in_progress')
+        .toList();
   }
 
   List<AppointmentDetail> get _upcoming => _displayAppointments
@@ -511,55 +505,25 @@ class _BookingsHistoryScreenState extends State<BookingsHistoryScreen> {
   void _rejoin(AppointmentDetail appt) async {
     if (!mounted) return;
 
+    String? consultationId;
     try {
-      // First, try to get the existing consultation by appointment ID
-      final consultationService = ConsultationService();
-      final result = await consultationService.getConsultationByAppointmentId(appt.id);
-
+      final result = await ConsultationService().getConsultationByAppointmentId(appt.id);
       if (result['success'] == true) {
-        // Found existing consultation, navigate with consultationId
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => ConsultationChatScreenV2(
-              appointment: appt,
-              isDoctor: false,
-              currentUserId: _currentUserId,
-              currentUserName: _currentUserName,
-              consultationId: result['consultationId'],
-            ),
-          ),
-        ).then((_) => _loadAppointments());
-      } else {
-        // No existing consultation, start new one
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => ConsultationChatScreenV2(
-              appointment: appt,
-              isDoctor: false,
-              currentUserId: _currentUserId,
-              currentUserName: _currentUserName,
-              consultationId: null, // let the screen create it
-            ),
-          ),
-        ).then((_) => _loadAppointments());
+        consultationId = result['consultation']?['_id']?.toString();
       }
-    } catch (e) {
-      // On error, fallback to creating new
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => ConsultationChatScreenV2(
-            appointment: appt,
-            isDoctor: false,
-            currentUserId: _currentUserId,
-            currentUserName: _currentUserName,
-            consultationId: null,
-          ),
-        ),
-      ).then((_) => _loadAppointments());
-    }
+    } catch (_) {}
+
+    if (!mounted) return;
+    final pathId = (consultationId != null && consultationId.isNotEmpty)
+        ? consultationId
+        : 'new';
+    context.go('/consultation/$pathId', extra: {
+      'appointment': appt,
+      'isDoctor': false,
+      'currentUserId': _currentUserId,
+      'currentUserName': _currentUserName,
+      if (pathId == 'new') 'consultationId': null,
+    });
   }
 
   // ── Category tile ─────────────────────────────────────────────────────────

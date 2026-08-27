@@ -290,13 +290,9 @@ router.get('/standalone/:invoiceId/pdf', async (req, res) => {
 });
 
 // ─── GENERATE APPOINTMENT INVOICE PDF ──────────────────────────────────────
-// A4 (not the reception/standalone thermal format) — this one is emailed as
-// an attachment and viewed in the patient's own record, not printed at a
-// clinic counter, so it follows prescription-v2.js's A4 convention instead.
-// Public (no authMiddleware) — same unguessable-ObjectId trust model as the
-// reception/standalone invoice routes above: the app opens this directly in
-// a new browser tab via url_launcher, which can't carry an Authorization
-// header, so an auth-gated route would just 401 every time.
+// Thermal 80mm receipt — same format as reception/standalone invoices, per
+// client's explicit request. Public (no authMiddleware) — unguessable ObjectId
+// in the URL is the access control, same trust model as the other invoice routes.
 router.get('/appointment/:appointmentId/pdf', async (req, res) => {
   try {
     await connectMongoDB();
@@ -307,10 +303,12 @@ router.get('/appointment/:appointmentId/pdf', async (req, res) => {
       return res.status(404).json({ success: false, message: 'Appointment not found' });
     }
 
-    const buffer = await buildAppointmentInvoiceBuffer(appt);
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename=icare-invoice-${appointmentId}.pdf`);
-    res.send(buffer);
+    const buffer = await buildAppointmentInvoiceBuffer(appt, res);
+    if (!res.headersSent) {
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename=icare-invoice-${appointmentId}.pdf`);
+      res.send(buffer);
+    }
   } catch (error) {
     console.error('Generate appointment invoice PDF error:', error);
     res.status(500).json({ success: false, message: 'Failed to generate invoice' });
@@ -318,114 +316,67 @@ router.get('/appointment/:appointmentId/pdf', async (req, res) => {
 });
 
 // Shared builder — used by the route above AND by payments.js's fulfillment
-// step (emailing the invoice right after payment confirms). Returns a
-// Buffer instead of piping to a response, since the email path has no `res`.
-//
-// Kept at A4 page size (this is emailed/viewed on-screen, not printed on a
-// thermal roll like the reception/standalone invoices), but follows the same
-// slim/compact visual language as thermalReceipt.js — small fonts, dashed
-// dividers, tight label:value lines, no bulky colored table — inside a
-// narrow centered content column so it doesn't look sparse on a full A4 page.
+// step (emailing the invoice right after payment confirms). Returns a Buffer.
+// Now uses the same 80mm thermal receipt format as reception/standalone invoices.
 async function buildAppointmentInvoiceBuffer(appt) {
   const Payment = require('../models/Payment');
-  const [patient, doctor, payment] = await Promise.all([
+  const DoctorProfile = require('../models/DoctorProfile');
+  const { resolveClinicAddress } = require('../utils/clinicAddresses');
+  const {
+    newReceiptDoc, drawReceiptHeader, drawInfoLine, drawItemsList, drawReceiptTotals, drawReceiptFooter,
+  } = require('../utils/thermalReceipt');
+
+  const [patient, doctor, doctorProfile, payment] = await Promise.all([
     User.findById(appt.patient_id).lean(),
     User.findById(appt.doctor_id).lean(),
+    DoctorProfile.findOne({ user_id: appt.doctor_id }).lean(),
     Payment.findOne({ type: 'appointment', refId: appt._id, status: 'paid' }).sort({ paidAt: -1 }).lean(),
   ]);
 
-  const PDFDocument = require('pdfkit');
-  const doc = new PDFDocument({ margin: 50, size: 'A4' });
-  const chunks = [];
-  doc.on('data', (c) => chunks.push(c));
-  const done = new Promise((resolve) => doc.on('end', () => resolve(Buffer.concat(chunks))));
-
-  const path = require('path');
-  const fs = require('fs');
-  const CX = 156; // left edge of the narrow centered content column
-  const CW = 300; // content column width
-  const logoPath = path.join(__dirname, '../assets/logo.png');
-  const logoExists = fs.existsSync(logoPath);
+  const clinicAddress = resolveClinicAddress(doctorProfile);
   const invoiceNumber = appt._id.toString().slice(-8).toUpperCase();
   const dateStr = new Date(appt.createdAt).toLocaleDateString('en-PK');
 
-  let y = 40;
-  if (logoExists) {
-    const logoW = 60;
-    doc.image(logoPath, CX + (CW - logoW) / 2, y, { width: logoW });
-    y += logoW * (213 / 192) + 6;
-  } else {
-    doc.fontSize(16).fillColor('#0036BC').font('Helvetica-Bold').text('iCare', CX, y, { width: CW, align: 'center' });
-    y += 20;
+  // Clean appointment date/time — appointment_date may be a raw JS Date
+  // string like "Wed Apr 29 2026 23:19:19 GMT+0000..." — parse it and
+  // reformat so the invoice shows "29 Apr 2026, 23:19" instead.
+  function cleanApptDate(raw) {
+    if (!raw) return '';
+    const d = new Date(raw);
+    if (isNaN(d.getTime())) return String(raw);
+    return d.toLocaleDateString('en-PK', { day: '2-digit', month: 'short', year: 'numeric' });
   }
-  doc.fontSize(8).fillColor('#666666').font('Helvetica').text('Your Trusted Healthcare Platform', CX, y, { width: CW, align: 'center' });
-  y += 16;
-
-  doc.moveTo(CX, y).lineTo(CX + CW, y).dash(1, { space: 1 }).strokeColor('#999999').stroke();
-  doc.undash();
-  y += 10;
-
-  doc.fontSize(9).fillColor('#0F172A').font('Helvetica-Bold').text('INVOICE', CX, y, { width: CW, align: 'center' });
-  y += 13;
-  doc.fontSize(8).fillColor('#333333').font('Helvetica')
-    .text(`#${invoiceNumber}`, CX, y, { width: CW, align: 'center' });
-  y += 10;
-  doc.text(dateStr, CX, y, { width: CW, align: 'center' });
-  y += 16;
-
-  doc.moveTo(CX, y).lineTo(CX + CW, y).dash(1, { space: 1 }).strokeColor('#999999').stroke();
-  doc.undash();
-  y += 10;
-
-  function infoLine(label, value) {
-    doc.fontSize(8).fillColor('#666666').font('Helvetica').text(`${label}:`, CX, y);
-    const labelWidth = doc.widthOfString(`${label}: `);
-    doc.fontSize(8).fillColor('#0F172A').font('Helvetica-Bold').text(value, CX + labelWidth, y, { width: CW - labelWidth });
-    y += Math.max(12, doc.heightOfString(value, { width: CW - labelWidth }) + 3);
-  }
-
-  infoLine('Patient', patient?.name || patient?.username || 'N/A');
-  infoLine('Doctor', `Dr. ${doctor?.name || doctor?.username || 'N/A'}`);
-  const apptWhen = `${appt.appointment_date || ''} ${appt.appointment_time || ''}`.trim();
-  if (apptWhen) infoLine('Appointment', apptWhen);
-
-  y += 4;
-  doc.moveTo(CX, y).lineTo(CX + CW, y).dash(1, { space: 1 }).strokeColor('#999999').stroke();
-  doc.undash();
-  y += 10;
+  const apptDate = cleanApptDate(appt.appointment_date);
+  const apptTime = appt.appointment_time || '';
+  const apptWhen = [apptDate, apptTime].filter(Boolean).join(', ');
 
   const amount = payment?.amount ?? 0;
   const original = payment?.originalAmount;
   const discount = payment?.discountAmount ?? 0;
-
-  doc.fontSize(8.5).fillColor('#0F172A').font('Helvetica-Bold').text('Consultation Fee', CX, y, { width: CW / 2 })
-    .text(`PKR ${(original ?? amount).toFixed(2)}`, CX, y, { width: CW, align: 'right' });
-  y += 16;
-
+  const consultationFee = original ?? amount;
+  const items = [{ name: 'Consultation Fee', quantity: 1, price: consultationFee }];
   if (discount > 0) {
-    doc.fontSize(8.5).fillColor('#10B981').font('Helvetica')
-      .text('Online Payment Discount', CX, y, { width: CW / 2 })
-      .text(`-PKR ${discount.toFixed(2)}`, CX, y, { width: CW, align: 'right' });
-    y += 16;
+    items.push({ name: 'Online Payment Discount', quantity: 1, price: -discount });
   }
+  const subtotal = consultationFee;
+  const totalAmount = amount;
 
+  // Build to buffer (email path has no res to pipe to)
+  const PDFDocument = require('pdfkit');
+  const { WIDTH, HEIGHT, MARGIN } = require('../utils/thermalReceipt');
+  const doc = new PDFDocument({ size: [WIDTH, HEIGHT], margin: MARGIN });
+  const chunks = [];
+  doc.on('data', (c) => chunks.push(c));
+  const done = new Promise((resolve) => doc.on('end', () => resolve(Buffer.concat(chunks))));
+
+  let y = drawReceiptHeader(doc, { invoiceNumber, date: dateStr, clinicAddress });
+  y = drawInfoLine(doc, y, 'Patient', patient?.name || patient?.username || 'N/A');
+  y = drawInfoLine(doc, y, 'Doctor', `Dr. ${doctor?.name || doctor?.username || 'N/A'}`);
+  if (apptWhen) y = drawInfoLine(doc, y, 'Appointment', apptWhen);
   y += 4;
-  doc.moveTo(CX, y).lineTo(CX + CW, y).strokeColor('#0F172A').stroke();
-  y += 8;
-
-  doc.fontSize(11).fillColor('#0036BC').font('Helvetica-Bold')
-    .text('TOTAL PAID', CX, y, { width: CW / 2 })
-    .text(`PKR ${amount.toFixed(2)}`, CX, y, { width: CW, align: 'right' });
-  y += 26;
-
-  doc.moveTo(CX, y).lineTo(CX + CW, y).dash(1, { space: 1 }).strokeColor('#999999').stroke();
-  doc.undash();
-  y += 10;
-
-  doc.fontSize(7.5).fillColor('#999999').font('Helvetica')
-    .text('Thank you for choosing iCare', CX, y, { width: CW, align: 'center' });
-  y += 10;
-  doc.text('support@icare.com', CX, y, { width: CW, align: 'center' });
+  y = drawItemsList(doc, y, items.map(i => ({ ...i, price: Math.abs(i.price) })));
+  y = drawReceiptTotals(doc, y, { subtotal, taxRate: 0, taxAmount: 0, totalAmount });
+  drawReceiptFooter(doc, y);
 
   doc.end();
   return done;

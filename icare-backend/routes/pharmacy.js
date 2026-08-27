@@ -11,6 +11,7 @@ const MedicalRecord = require('../models/MedicalRecord');
 const { authMiddleware } = require('../middleware/auth');
 const { sendToUser } = require('../services/notificationService');
 const { sendEmail } = require('../utils/email');
+const { PUBLIC_BASE_URL } = require('../utils/publicUrl');
 
 async function _sendDeliveredEmail(order) {
   try {
@@ -18,7 +19,7 @@ async function _sendDeliveredEmail(order) {
     if (!patient?.email) return;
     const orderNum = order.order_number || `#${order._id.toString().slice(-6).toUpperCase()}`;
     const dateStr = new Date().toLocaleDateString('en-PK', { day: 'numeric', month: 'long', year: 'numeric' });
-    const receiptUrl = `https://icare-backend-inky.vercel.app/api/pharmacy/receipt/${order._id}`;
+    const receiptUrl = `${PUBLIC_BASE_URL}/api/pharmacy/receipt/${order._id}`;
     const itemsHtml = (order.items || []).map(i => {
       const unitPrice = i.price || 0;
       const qty = i.quantity || 1;

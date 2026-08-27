@@ -22,11 +22,17 @@ class NewNotificationListener extends StatefulWidget {
 class _NewNotificationListenerState extends State<NewNotificationListener> {
   Timer? _poller;
   Set<String> _seenIds = {};
-  bool _firstPoll = true;
+  // Session start time — only notifications created AFTER this moment are shown
+  // as banners. This survives widget rebuilds within the same Dart isolate but
+  // resets on a real app restart, which is the correct behaviour (a fresh login
+  // should not replay yesterday's notifications as banners).
+  static DateTime? _sessionStart;
 
   @override
   void initState() {
     super.initState();
+    // Record when this listener first started (= effectively when user logged in).
+    _sessionStart ??= DateTime.now().toUtc();
     _poll();
     _poller = Timer.periodic(const Duration(seconds: 20), (_) => _poll());
   }
@@ -41,40 +47,56 @@ class _NewNotificationListenerState extends State<NewNotificationListener> {
     // Only poll once a session token exists — otherwise every unauthenticated
     // screen (login, signup, public catalog) would hit a 401 every 20s.
     final token = await SharedPref().getToken();
-    if (token == null || token.isEmpty) return;
+    if (token == null || token.isEmpty) {
+      // Token gone (logged out) — reset session so next login gets a fresh start.
+      _sessionStart = null;
+      _seenIds = {};
+      return;
+    }
     try {
       final result = await NotificationService().getNotifications();
       if (!mounted || result['success'] != true) return;
       final list = (result['notifications'] as List?) ?? [];
-      final currentIds = list.map((n) => (n is Map ? n['_id'] : null)?.toString() ?? '').where((id) => id.isNotEmpty).toSet();
 
-      if (_firstPoll) {
-        // First poll just establishes the baseline — nothing "new" yet,
-        // this just reflects whatever was already sitting in the inbox.
-        _firstPoll = false;
-        _seenIds = currentIds;
-        return;
-      }
+      final currentIds = list
+          .map((n) => (n is Map ? n['_id'] : null)?.toString() ?? '')
+          .where((id) => id.isNotEmpty)
+          .toSet();
 
+      // Find IDs that are genuinely new this poll cycle AND arrived after
+      // session start — this double-guard means:
+      //  • Old notifications already in the DB when the user logged in → skipped
+      //  • Notifications that arrived during this session but were already shown → skipped
       final newIds = currentIds.difference(_seenIds);
       _seenIds = currentIds;
       if (newIds.isEmpty) return;
 
-      final newest = list.firstWhere(
-        (n) => n is Map && newIds.contains(n['_id']?.toString()),
-        orElse: () => null,
-      );
-      if (newest is Map) {
-        _showBanner(newest);
-        // Mark read once shown — otherwise this notification stays unread
-        // server-side and can resurface as "new" on a later poll cycle
-        // (e.g. after this listener's in-memory _seenIds/_firstPoll reset,
-        // which happens on things like a fresh app launch), showing the
-        // same old banner again even though the user already saw it.
-        final id = newest['_id']?.toString();
-        if (id != null && id.isNotEmpty) {
-          NotificationService().markAsRead(id).catchError((_) {});
+      final sessionCutoff = _sessionStart ?? DateTime.now().toUtc();
+
+      for (final id in newIds) {
+        final notif = list.firstWhere(
+          (n) => n is Map && n['_id']?.toString() == id,
+          orElse: () => null,
+        );
+        if (notif is! Map) continue;
+
+        // Skip if the notification predates (or equals) session start —
+        // it was sitting in the inbox before the user logged in.
+        final createdAtStr = notif['createdAt']?.toString();
+        if (createdAtStr != null) {
+          try {
+            final createdAt = DateTime.parse(createdAtStr).toUtc();
+            if (!createdAt.isAfter(sessionCutoff)) continue;
+          } catch (_) {}
         }
+
+        // Skip already-read notifications.
+        if (notif['read'] == true) continue;
+
+        _showBanner(notif);
+        // Mark read so it won't resurface on next poll.
+        NotificationService().markAsRead(id).catchError((_) {});
+        break; // one banner at a time
       }
     } catch (_) {}
   }
