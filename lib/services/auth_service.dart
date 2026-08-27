@@ -60,6 +60,10 @@ class AuthService {
           'success': true,
           'data': data,
           'message': data['message'] ?? 'Registration successful',
+          // Signup now emails a 6-digit code; without passing this through,
+          // the caller can't tell it needs to show the verification screen.
+          'emailVerificationRequired': data['emailVerificationRequired'] == true,
+          'email': data['email']?.toString() ?? email,
         };
       }
       final msg = (res.data as Map?)?['message']?.toString() ?? 'Registration failed';
