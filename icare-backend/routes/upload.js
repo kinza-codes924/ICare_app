@@ -42,17 +42,24 @@ function uploadToCloudinary(buffer, folder, resourceType = 'image') {
   });
 }
 
-// POST /api/upload — consultation chat attachments (images + PDFs)
+// POST /api/upload — consultation chat attachments (images + PDFs/docs)
 router.post('/', protect, upload.single('file'), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ success: false, message: 'No file provided' });
     }
-    const isPdf = req.file.mimetype === 'application/pdf';
-    const resourceType = isPdf ? 'auto' : 'image';
-    const folder = req.body.folder || 'icare/consultation-attachments';
-    const result = await uploadToCloudinary(req.file.buffer, folder, resourceType);
-    res.json({ success: true, url: result.secure_url, publicId: result.public_id, resourceType });
+    const mt = req.file.mimetype || '';
+    if (mt.startsWith('image/')) {
+      // Images: Cloudinary (it delivers/transforms images fine).
+      const folder = req.body.folder || 'icare/consultation-attachments';
+      const result = await uploadToCloudinary(req.file.buffer, folder, 'image');
+      return res.json({ success: true, url: result.secure_url, publicId: result.public_id, resourceType: 'image' });
+    }
+    // PDFs and other documents: server disk (nginx /uploads/). Cloudinary's
+    // free tier blocks raw-file delivery, which was 500'ing every PDF sent in
+    // consultation chat. Local disk serves them as a plain public link.
+    const saved = saveBuffer(req.file.buffer, req.file.originalname, 'chat-docs');
+    res.json({ success: true, url: saved.url, name: req.file.originalname, resourceType: 'raw' });
   } catch (err) {
     console.error('Upload error:', err);
     res.status(500).json({ success: false, message: err.message });
