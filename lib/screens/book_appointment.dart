@@ -185,11 +185,22 @@ class _BookAppointmentScreenState extends ConsumerState<BookAppointmentScreen> {
     super.dispose();
   }
 
+  // Normalise whatever the account stored ('male', 'M', 'Female', …) to one of
+  // the dropdown's exact values, so a "Myself" booking shows the patient's own
+  // gender automatically instead of a blank field.
+  String _normaliseGender(String? raw) {
+    final g = (raw ?? '').trim().toLowerCase();
+    if (g == 'male' || g == 'm') return 'Male';
+    if (g == 'female' || g == 'f') return 'Female';
+    if (g.isEmpty) return '';
+    return 'Other';
+  }
+
   void _fillMyselfDetails() {
     final user = ref.read(authProvider).user;
     if (user != null && _appointmentForMyself) {
       _nameController.text = user.name;
-      _genderController.text = user.gender ?? '';
+      _genderController.text = _normaliseGender(user.gender);
       _ageController.text = user.age ?? '';
     }
   }
