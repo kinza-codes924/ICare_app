@@ -210,6 +210,9 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
         recaptchaToken: recaptchaToken,
       );
 
+      debugPrint('[signup] register keys: ${result.keys.toList()}');
+      debugPrint('[signup] emailVerificationRequired = ${result['emailVerificationRequired']}');
+
       if (result['success']) {
         final rawData = result['data'] as Map<String, dynamic>? ?? {};
         final token = rawData['token']?.toString()
@@ -238,6 +241,11 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
           role: widget.role,
           gender: _isPatient ? capturedGender : null,
           age: _isPatient ? _computeAgeFrom(capturedDob) : null,
+          // Both default to true in the model, so omitting them told the
+          // router this account was already verified and it redirected
+          // straight to /dashboard — replacing the OTP screen we push below.
+          isEmailVerified: result['emailVerificationRequired'] != true,
+          isPhoneVerified: true,
         );
         await ref.read(authProvider.notifier).setUser(newUser);
 

@@ -1,4 +1,5 @@
 ﻿import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:dio/dio.dart';
@@ -2119,41 +2120,28 @@ class _LessonDialogState extends State<_LessonDialog> {
 
       setState(() { _uploadingDocument = true; _uploadDocProgress = 0; });
 
-      // Step 1: get Cloudinary signature for a raw (document) upload
-      final signRes = await ApiService().get('/upload/sign?resource_type=raw&folder=icare/lesson-docs');
-      final signature = signRes.data['signature']?.toString() ?? '';
-      final timestamp  = signRes.data['timestamp']?.toString() ?? '';
-      final apiKey     = signRes.data['api_key']?.toString() ?? '';
-      final cloudName  = signRes.data['cloud_name']?.toString() ?? 'dzlcnyxgb';
-      final folder     = signRes.data['folder']?.toString() ?? 'icare/lesson-docs';
-      if (signature.isEmpty) throw Exception('Could not get upload signature from server');
-
-      // Step 2: upload directly to Cloudinary raw endpoint — no CORS issues,
-      // no Vercel size limit, no private-store errors
-      final dio2 = Dio();
-      final res = await dio2.post(
-        'https://api.cloudinary.com/v1_1/$cloudName/raw/upload',
-        data: FormData.fromMap({
+      // Documents go through our own backend, which writes them to the
+      // server's disk (served at icare.com.co/uploads/). Cloudinary's raw
+      // upload returned 401 for PDFs — its free tier blocks raw-file
+      // delivery — and Vercel Blob is gone, so the /upload/blob-doc route
+      // (now backed by local disk) is the one path that works for documents.
+      final res = await ApiService().postMultipart(
+        '/upload/blob-doc',
+        FormData.fromMap({
           'file': MultipartFile.fromBytes(file.bytes!, filename: file.name),
-          'signature': signature,
-          'timestamp': timestamp,
-          'api_key': apiKey,
-          'folder': folder,
         }),
-        options: Options(validateStatus: (s) => s != null && s < 600),
-        onSendProgress: (sent, total) {
-          if (total > 0 && mounted) setState(() => _uploadDocProgress = sent / total);
-        },
       );
 
-      if (res.statusCode != 200 || res.data['secure_url'] == null) {
-        final msg = res.data is Map
-            ? (res.data['error']?['message'] ?? res.data['message'] ?? 'Upload failed (${res.statusCode})')
-            : 'Upload failed (${res.statusCode})';
-        throw Exception(msg);
+      // responseType is plain on postMultipart, so decode the JSON body.
+      final Map<String, dynamic> body = res.data is String
+          ? (jsonDecode(res.data as String) as Map<String, dynamic>)
+          : (res.data as Map<String, dynamic>);
+
+      if (res.statusCode != 200 || body['url'] == null) {
+        throw Exception(body['message']?.toString() ?? 'Upload failed (${res.statusCode})');
       }
 
-      final docUrl = res.data['secure_url'] as String;
+      final docUrl = body['url'] as String;
 
       setState(() {
         _documentUrl = docUrl;

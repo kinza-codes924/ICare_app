@@ -1,7 +1,9 @@
+import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:icare/models/course.dart';
+import 'package:icare/services/api_service.dart';
 import 'package:icare/screens/instructor_assign_course_screen.dart';
 import 'package:icare/services/instructor_service.dart';
 import 'package:icare/utils/theme.dart';
@@ -1224,10 +1226,17 @@ class _InlineLessonFormWidgetState extends State<_InlineLessonFormWidget> {
         return;
       }
       setState(() => _isUploadingDoc = true);
-      final formData = FormData.fromMap({'file': MultipartFile.fromBytes(file.bytes!, filename: file.name), 'upload_preset': _uploadPreset, 'resource_type': 'raw'});
-      final response = await Dio().post('https://api.cloudinary.com/v1_1/$_cloudName/raw/upload', data: formData);
-      if (response.statusCode == 200) {
-        final url = response.data['secure_url'] as String;
+      // Documents go through our backend to the server's disk. Cloudinary raw
+      // upload 401'd on PDFs and Vercel Blob is gone.
+      final response = await ApiService().postMultipart(
+        '/upload/blob-doc',
+        FormData.fromMap({'file': MultipartFile.fromBytes(file.bytes!, filename: file.name)}),
+      );
+      final Map<String, dynamic> body = response.data is String
+          ? (jsonDecode(response.data as String) as Map<String, dynamic>)
+          : (response.data as Map<String, dynamic>);
+      if (response.statusCode == 200 && body['url'] != null) {
+        final url = body['url'] as String;
         setState(() {
           widget.formData.documentUrl = url;
           widget.formData.documentName = file.name;
@@ -1646,12 +1655,17 @@ class _LessonEditorScreenState extends State<LessonEditorScreen> {
         return;
       }
       setState(() => _isUploadingDoc = true);
-      const cloudName = 'dzlcnyxgb';
-      const uploadPreset = 'icare_videos';
-      final formData = FormData.fromMap({'file': MultipartFile.fromBytes(file.bytes!, filename: file.name), 'upload_preset': uploadPreset, 'resource_type': 'raw'});
-      final response = await Dio().post('https://api.cloudinary.com/v1_1/$cloudName/raw/upload', data: formData);
-      if (response.statusCode == 200) {
-        final url = response.data['secure_url'] as String;
+      // Documents go through our backend to the server's disk. Cloudinary raw
+      // upload 401'd on PDFs and Vercel Blob is gone.
+      final response = await ApiService().postMultipart(
+        '/upload/blob-doc',
+        FormData.fromMap({'file': MultipartFile.fromBytes(file.bytes!, filename: file.name)}),
+      );
+      final Map<String, dynamic> body = response.data is String
+          ? (jsonDecode(response.data as String) as Map<String, dynamic>)
+          : (response.data as Map<String, dynamic>);
+      if (response.statusCode == 200 && body['url'] != null) {
+        final url = body['url'] as String;
         setState(() { _documentUrl = url; _documentName = file.name; _isUploadingDoc = false; });
         if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✅ Document uploaded!'), backgroundColor: Colors.green));
       }

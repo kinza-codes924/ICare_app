@@ -4,6 +4,7 @@ import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:go_router/go_router.dart';
 import 'package:icare/models/auth.dart';
 import 'package:icare/providers/auth_provider.dart';
+import 'package:icare/screens/email_otp_screen.dart';
 import 'package:icare/screens/login.dart';
 import 'package:icare/screens/book_appointment.dart';
 import 'package:icare/screens/reception_dashboard.dart';
@@ -201,11 +202,17 @@ final routerProvider = Provider<GoRouter>((ref) {
         final needsVerification =
             !user.isPhoneVerified || !user.isEmailVerified;
 
-        // Unverified user → force to OTP screen (unless already there).
-        if (needsVerification && path != '/verify-otp') return '/verify-otp';
+        // Email and phone have separate screens, so route to the one that
+        // actually needs doing. Email is checked first: web signup verifies
+        // by emailed code, and the backend refuses login until it's entered.
+        if (!user.isEmailVerified && path != '/verify-email') return '/verify-email';
+        if (!user.isPhoneVerified && path != '/verify-otp') return '/verify-otp';
 
-        // Fully verified user landing on OTP screen → send to dashboard.
-        if (!needsVerification && path == '/verify-otp') return '/dashboard';
+        // Fully verified user landing on either OTP screen → dashboard.
+        if (!needsVerification &&
+            (path == '/verify-otp' || path == '/verify-email')) {
+          return '/dashboard';
+        }
 
         // Logged in visiting any other public route → dashboard.
         // /lms/catalog, /lms/course/*, /verify, and the legal pages remain
@@ -351,6 +358,34 @@ final routerProvider = Provider<GoRouter>((ref) {
         },
       ),
       GoRoute(path: '/verify-otp', builder: (_, _) => const OtpVerificationScreen()),
+      // Email verification lives on its own route so the router's redirect
+      // can land on it directly. Pushing it from signup.dart alone did not
+      // survive: setUserToken() runs first, the router then sees a logged-in
+      // user and calls go(), which replaces the whole navigator stack.
+      GoRoute(
+        path: '/verify-email',
+        builder: (context, state) {
+          final email = (state.extra as Map<String, dynamic>?)?['email']?.toString()
+              ?? ref.read(authProvider).user?.email
+              ?? '';
+          return EmailOtpScreen(
+            email: email,
+            onVerified: (verifiedToken) async {
+              final notifier = ref.read(authProvider.notifier);
+              if (verifiedToken.isNotEmpty) {
+                await notifier.setUserToken(verifiedToken);
+              }
+              // Flip the local flag, otherwise the redirect above bounces
+              // straight back here and the screen never lets go.
+              final u = ref.read(authProvider).user;
+              if (u != null) {
+                await notifier.setUser(u.copyWith(isEmailVerified: true));
+              }
+              if (context.mounted) context.go('/dashboard');
+            },
+          );
+        },
+      ),
       GoRoute(
         path: '/lms/catalog',
         builder: (_, state) {

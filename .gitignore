@@ -71,3 +71,13 @@ android/key.properties
 android/keystore/
 *.jks
 *.keystore
+
+# Firebase service-account keys — secret, never commit
+*firebase-adminsdk*.json
+icare-5c82d-*.json
+
+# junk / secrets — never commit
+build-v3.tar.gz
+google-services (*).json
+icare-invoice-*.html
+icare-web.tgz

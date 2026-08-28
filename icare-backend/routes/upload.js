@@ -4,6 +4,7 @@ const crypto = require('crypto');
 const multer = require('multer');
 const cloudinary = require('../config/cloudinary');
 const { put, head } = require('@vercel/blob');
+const { saveBuffer } = require('../utils/localStorage');
 const { handleUpload } = require('@vercel/blob/client');
 const { authMiddleware: protect } = require('../middleware/auth');
 
@@ -373,17 +374,11 @@ router.post('/blob-handle', protect, express.json({ limit: '1mb' }), async (req,
 router.post('/blob-doc', protect, docUpload.single('file'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ success: false, message: 'No file provided' });
-    const safeName = req.file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_');
-    const blobPath = `quiz/docs/${Date.now()}-${safeName}`;
-
-    const blob = await put(blobPath, req.file.buffer, {
-      access: 'private',
-      contentType: req.file.mimetype,
-      addRandomSuffix: false,
-    });
-
-    console.log(`blob-doc: uploaded ${safeName} → ${blob.url}`);
-    res.json({ success: true, url: blob.url, name: req.file.originalname });
+    // Local disk (nginx serves /uploads/) instead of Vercel Blob — the stored
+    // URL is a plain public link, no token needed to open it.
+    const saved = saveBuffer(req.file.buffer, req.file.originalname, 'quiz-docs');
+    console.log(`blob-doc: uploaded ${saved.name} -> ${saved.url}`);
+    res.json({ success: true, url: saved.url, name: req.file.originalname });
   } catch (err) {
     console.error('blob-doc error:', err);
     res.status(500).json({ success: false, message: err.message });

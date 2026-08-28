@@ -67,34 +67,20 @@ class _InstructorCreateAssignmentScreenState extends State<InstructorCreateAssig
 
   Future<String?> _cloudinaryRawUpload(Uint8List bytes, String filename) async {
     final token = await SharedPref().getToken() ?? '';
-    // Step 1: get Cloudinary signature for a raw (document) upload
-    final signRes = await Dio().get(
-      '${ApiConstants.baseUrl}/upload/sign',
-      queryParameters: {'resource_type': 'raw', 'folder': 'icare/assignment-docs'},
-      options: Options(headers: {'Authorization': 'Bearer $token'}, validateStatus: (s) => s != null && s < 600),
-    );
-    if (signRes.statusCode != 200) throw Exception('Could not get upload signature');
-    final signature = signRes.data['signature']?.toString() ?? '';
-    final timestamp  = signRes.data['timestamp']?.toString() ?? '';
-    final apiKey     = signRes.data['api_key']?.toString() ?? '';
-    final cloudName  = signRes.data['cloud_name']?.toString() ?? 'dzlcnyxgb';
-    final folder     = signRes.data['folder']?.toString() ?? 'icare/assignment-docs';
-    if (signature.isEmpty) throw Exception('Empty signature from server');
-
-    // Step 2: upload directly to Cloudinary — no CORS, no private-store errors
+    // Documents go through our backend to the server's disk (icare.com.co/
+    // uploads/). Cloudinary raw upload 401'd on PDFs and Vercel Blob is gone.
     final res = await Dio().post(
-      'https://api.cloudinary.com/v1_1/$cloudName/raw/upload',
+      '${ApiConstants.baseUrl}/upload/blob-doc',
       data: FormData.fromMap({
         'file': MultipartFile.fromBytes(bytes, filename: filename),
-        'signature': signature,
-        'timestamp': timestamp,
-        'api_key': apiKey,
-        'folder': folder,
       }),
-      options: Options(validateStatus: (s) => s != null && s < 600),
+      options: Options(
+        headers: {'Authorization': 'Bearer $token'},
+        validateStatus: (s) => s != null && s < 600,
+      ),
     );
-    if (res.statusCode == 200 && res.data['secure_url'] != null) {
-      return res.data['secure_url'] as String;
+    if (res.statusCode == 200 && res.data['url'] != null) {
+      return res.data['url'] as String;
     }
     throw Exception('Upload failed: ${res.data}');
   }

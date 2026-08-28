@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const mongoose = require('mongoose');
 const multer = require('multer');
-const { put } = require('@vercel/blob');
+const { saveBuffer } = require('../utils/localStorage');
 const { connectMongoDB } = require('../config/mongodb');
 const { authMiddleware } = require('../middleware/auth');
 const StudentVerification = require('../models/StudentVerification');
@@ -14,17 +14,10 @@ function toId(id) {
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
-// Vercel Blob — same private-storage + backend-proxy pattern as
-// upload.js's /blob-doc route, avoiding Cloudinary's delivery-restriction
-// failures seen on the doc-stream proxy (401/404 across all fallback attempts).
-function uploadToBlob(buffer, originalname, mimetype) {
-  const safeName = originalname.replace(/[^a-zA-Z0-9._-]/g, '_');
-  const blobPath = `verification/${Date.now()}-${safeName}`;
-  return put(blobPath, buffer, {
-    access: 'private',
-    contentType: mimetype,
-    addRandomSuffix: false,
-  });
+// Documents go to local disk (served by nginx at /uploads/), not Vercel Blob.
+// Returns { url, name, path } — url is the public https link stored in the DB.
+function uploadToBlob(buffer, originalname, _mimetype) {
+  return saveBuffer(buffer, originalname, 'verification');
 }
 
 // ── STUDENT: Upload verification documents ──────────────────────────────────
