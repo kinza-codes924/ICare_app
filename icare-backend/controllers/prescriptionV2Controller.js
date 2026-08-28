@@ -468,17 +468,23 @@ exports.getPatientPrescriptions = async (req, res) => {
     }
 
     const prescriptions = await EnhancedPrescription.find(query)
-      .populate('doctorId', 'name specialization')
+      .populate('doctorId', 'name specialization pmdcLicense')
       .sort({ prescribedAt: -1 })
       .limit(parseInt(limit))
       .skip(parseInt(skip));
 
     const total = await EnhancedPrescription.countDocuments(query);
 
+    // Merge each doctor's DoctorProfile degrees/specialty onto the populated
+    // doctor so the patient's prescription PDF reads like a letterhead — the
+    // list endpoint previously returned only the name, so the PDF showed
+    // "Dr. <name>" with no qualifications.
+    const enriched = await Promise.all(prescriptions.map(p => enrichDoctor(p)));
+
     res.json({
       success: true,
-      prescriptions,
-      count: prescriptions.length,
+      prescriptions: enriched,
+      count: enriched.length,
       total
     });
   } catch (error) {
