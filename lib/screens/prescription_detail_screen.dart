@@ -947,7 +947,7 @@ class PrescriptionDetailScreen extends StatelessWidget {
               const SizedBox(width: 8),
               const Expanded(
                 child: Text(
-                  'This prescription has been electronically generated and authenticated via iCare — RM Health Solutions (Private) Limited. Valid only for the stated patient and date.',
+                  'This is electronically generated prescription, does not require any signature and is intended to be used in Pakistan only.',
                   style: TextStyle(fontSize: 10, color: Color(0xFF64748B), height: 1.4),
                 ),
               ),
@@ -1178,7 +1178,7 @@ class PrescriptionDetailScreen extends StatelessWidget {
               padding: const pw.EdgeInsets.all(8),
               decoration: pw.BoxDecoration(color: PdfColors.grey100, borderRadius: pw.BorderRadius.circular(4)),
               child: pw.Text(
-                'This prescription has been electronically generated and authenticated via iCare — RM Health Solutions (Private) Limited. Valid only for the stated patient and date.',
+                'This is electronically generated prescription, does not require any signature and is intended to be used in Pakistan only.',
                 style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey700),
               ),
             ),

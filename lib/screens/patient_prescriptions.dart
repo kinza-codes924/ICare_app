@@ -1192,7 +1192,7 @@ class _PrescriptionPage extends StatelessWidget {
                 child: const Row(children: [
                   Icon(Icons.verified_rounded, size: 12, color: Color(0xFF0EA5E9)),
                   SizedBox(width: 6),
-                  Expanded(child: Text('Electronically generated & authenticated via iCare — RM Health Solutions (Private) Limited.', style: TextStyle(fontSize: 10, color: Color(0xFF64748B), height: 1.4))),
+                  Expanded(child: Text('This is electronically generated prescription, does not require any signature and is intended to be used in Pakistan only.', style: TextStyle(fontSize: 10, color: Color(0xFF64748B), height: 1.4))),
                 ]),
               ),
             ]),
@@ -1404,7 +1404,7 @@ class _PrescriptionPage extends StatelessWidget {
           pw.Container(
             padding: const pw.EdgeInsets.all(8),
             decoration: pw.BoxDecoration(color: PdfColors.grey100, borderRadius: pw.BorderRadius.circular(4)),
-            child: pw.Text('Electronically generated & authenticated via iCare — RM Health Solutions (Private) Limited.',
+            child: pw.Text('This is electronically generated prescription, does not require any signature and is intended to be used in Pakistan only.',
                 style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey700)),
           ),
         ],

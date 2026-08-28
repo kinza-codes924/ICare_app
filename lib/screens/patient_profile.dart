@@ -135,11 +135,11 @@ class PatientProfile extends ConsumerWidget {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-  _infoChip(Icons.cake_outlined, "Age", user?.age ?? "28 yrs"),
+  _infoChip(Icons.cake_outlined, "Age", (user?.age?.isNotEmpty == true) ? user!.age! : "—"),
   SizedBox(width: ScallingConfig.scale(10)),
-  _infoChip(Icons.height_rounded, "Height", "165 cm"),
+  _infoChip(Icons.height_rounded, "Height", (user?.height?.isNotEmpty == true) ? user!.height! : "—"),
   SizedBox(width: ScallingConfig.scale(10)),
-  _infoChip(Icons.monitor_weight_outlined, "Weight", "58 kg"),
+  _infoChip(Icons.monitor_weight_outlined, "Weight", (user?.weight?.isNotEmpty == true) ? user!.weight! : "—"),
                 ],
               ),
             ),
@@ -167,7 +167,7 @@ class PatientProfile extends ConsumerWidget {
                 children: [
                   SvgWrapper(assetPath: ImagePaths.sms),
                   SizedBox(width: ScallingConfig.scale(10)),
-                  CustomText(text: user?.email ?? "emily@gmail.com"),
+                  CustomText(text: (user?.email.isNotEmpty == true) ? user!.email : "No email"),
                 ],
               ),
             ),
@@ -181,7 +181,7 @@ class PatientProfile extends ConsumerWidget {
                     color: AppColors.primaryColor,
                   ),
                   SizedBox(width: ScallingConfig.scale(10)),
-                  CustomText(text: user?.phoneNumber ?? "+1 234 567 8963"),
+                  CustomText(text: (user?.phoneNumber.isNotEmpty == true) ? user!.phoneNumber : "No phone"),
                 ],
               ),
             ),
@@ -192,175 +192,136 @@ class PatientProfile extends ConsumerWidget {
                 children: [
                   Icon(Icons.badge_outlined, color: AppColors.primaryColor, size: 20),
                   SizedBox(width: ScallingConfig.scale(10)),
-                  CustomText(text: user?.cnic != null && user!.cnic!.isNotEmpty ? "CNIC: ${user.cnic}" : "CNIC: 12345-1234567-1"),
+                  CustomText(text: user?.cnic != null && user!.cnic!.isNotEmpty ? "CNIC: ${user.cnic}" : "CNIC: not set"),
                 ],
               ),
             ),
             SizedBox(height: ScallingConfig.scale(15)),
-            CustomText(
-              text: "Bio:",
-              fontSize: 14,
-              width: Utils.windowWidth(context) * 0.9,
-              isBold: true,
-              fontFamily: "Gilroy-Bold",
-            ),
-            CustomText(
-              fontSize: 12,
-              width: Utils.windowWidth(context) * 0.9,
-              maxLines: 5,
-              text:
-                  "Lorem ipsum dolor sit amet consectetur adipiscing elit suscipit commodo enim tellus et nascetur at leo accumsan, odio habitanLorem ipsum dolor...",
-              fontFamily: "Gilroy-Regular",
-            ),
-            SizedBox(height: ScallingConfig.scale(15)),
-            Container(
-              width: Utils.windowWidth(context) * 0.9,
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: const Color(0xFFFEF2F2),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFFFECACA)),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+            // Bio — real data (health goals / existing conditions), not a
+            // hardcoded Lorem ipsum block.
+            Builder(builder: (context) {
+              final bio = [
+                if (user?.healthGoals?.isNotEmpty == true) user!.healthGoals!,
+                if (user?.existingConditions?.isNotEmpty == true) user!.existingConditions!,
+              ].join('\n');
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  const Row(
-                    children: [
-                      Icon(
-                        Icons.emergency_rounded,
-                        color: Color(0xFFDC2626),
-                        size: 20,
-                      ),
-                      SizedBox(width: 8),
-                      Text(
-                        "Emergency Contact 1",
-                        style: TextStyle(
-                          color: Color(0xFF991B1B),
-                          fontWeight: FontWeight.bold,
-                          fontSize: 14,
-                        ),
-                      ),
-                    ],
+                  CustomText(
+                    text: "Bio:",
+                    fontSize: 14,
+                    width: Utils.windowWidth(context) * 0.9,
+                    isBold: true,
+                    fontFamily: "Gilroy-Bold",
                   ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    "Name: Robert Jordan (Father)",
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: Color(0xFF1E293B),
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const Text(
-                    "Phone: +1 987 654 3210",
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: Color(0xFF1E293B),
-                      fontWeight: FontWeight.w600,
-                    ),
+                  CustomText(
+                    fontSize: 12,
+                    width: Utils.windowWidth(context) * 0.9,
+                    maxLines: 6,
+                    text: bio.isNotEmpty ? bio : "No bio added yet.",
+                    fontFamily: "Gilroy-Regular",
                   ),
                 ],
-              ),
-            ),
-            SizedBox(height: ScallingConfig.scale(10)),
-            Container(
-              width: Utils.windowWidth(context) * 0.9,
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: const Color(0xFFFEF2F2),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFFFECACA)),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Row(
+              );
+            }),
+            SizedBox(height: ScallingConfig.scale(15)),
+            // Emergency contacts — real list from the user, each rendered as a
+            // card. Empty state instead of the old fake Robert/Sarah Jordan.
+            Builder(builder: (context) {
+              final contacts = user?.emergencyContacts ?? [];
+              if (contacts.isEmpty) {
+                return Container(
+                  width: Utils.windowWidth(context) * 0.9,
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                  ),
+                  child: const Row(
                     children: [
-                      Icon(
-                        Icons.emergency_rounded,
-                        color: Color(0xFFDC2626),
-                        size: 20,
-                      ),
+                      Icon(Icons.emergency_rounded, color: Color(0xFF94A3B8), size: 20),
                       SizedBox(width: 8),
-                      Text(
-                        "Emergency Contact 2",
-                        style: TextStyle(
-                          color: Color(0xFF991B1B),
-                          fontWeight: FontWeight.bold,
-                          fontSize: 14,
-                        ),
-                      ),
+                      Expanded(child: Text("No emergency contacts added yet.",
+                          style: TextStyle(fontSize: 13, color: Color(0xFF64748B)))),
                     ],
                   ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    "Name: Sarah Jordan (Mother)",
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: Color(0xFF1E293B),
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const Text(
-                    "Phone: +1 987 654 3211",
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: Color(0xFF1E293B),
-                      fontWeight: FontWeight.w600,
+                );
+              }
+              return Column(
+                children: [
+                  for (int i = 0; i < contacts.length; i++) ...[
+                    _emergencyCard(context, i + 1, contacts[i]),
+                    if (i != contacts.length - 1) SizedBox(height: ScallingConfig.scale(10)),
+                  ],
+                ],
+              );
+            }),
+            SizedBox(height: ScallingConfig.scale(20)),
+            // Medical documents & scans are managed on the Medical Records
+            // screen, not stored on the user object — so link there instead of
+            // showing the same placeholder image four times.
+            SizedBox(
+              width: Utils.windowWidth(context) * 0.9,
+              child: Row(
+                children: [
+                  Icon(Icons.folder_shared_outlined, color: AppColors.primaryColor, size: 20),
+                  SizedBox(width: ScallingConfig.scale(10)),
+                  Expanded(
+                    child: CustomText(
+                      text: "Medical history, documents and scans are in Medical Records.",
+                      fontSize: 12,
+                      maxLines: 3,
                     ),
                   ),
                 ],
               ),
             ),
             SizedBox(height: ScallingConfig.scale(20)),
-            CustomText(
-              width: Utils.windowWidth(context) * 0.9,
-              text: "Medical History & Medical Documents:",
-              fontFamily: "Gilroy-Bold",
-              fontSize: 16,
-            ),
-            Padding(
-              padding: EdgeInsets.symmetric(
-                horizontal: ScallingConfig.scale(10),
-              ),
-              child: Row(
-                children: [
-                  SizedBox(
-                    width: Utils.windowWidth(context) * 0.3,
-                    child: Image.asset('assets/images/medical-doc-1.png'),
-                  ),
-                  SizedBox(
-                    width: Utils.windowWidth(context) * 0.3,
-                    child: Image.asset('assets/images/medical-doc-1.png'),
-                  ),
-                  SizedBox(
-                    width: Utils.windowWidth(context) * 0.3,
-                    child: Image.asset('assets/images/medical-doc-1.png'),
-                  ),
-                ],
-              ),
-            ),
-            SizedBox(height: ScallingConfig.scale(10)),
-            CustomText(
-              width: Utils.windowWidth(context) * 0.9,
-              text: "Recent Scans:",
-              fontFamily: "Gilroy-Bold",
-              fontSize: 16,
-            ),
-            Padding(
-              padding: EdgeInsets.symmetric(
-                horizontal: ScallingConfig.scale(10),
-              ),
-              child: Align(
-                alignment: AlignmentGeometry.topLeft,
-                child: SizedBox(
-                  width: Utils.windowWidth(context) * 0.3,
-                  child: Image.asset('assets/images/medical-doc-1.png'),
-                ),
-              ),
-            ),
           ],
         ),
+      ),
+    );
+  }
+
+  // One emergency-contact card, built from the user's real contact map
+  // ({name, relationship, phone}).
+  Widget _emergencyCard(BuildContext context, int index, Map<String, String> c) {
+    final name = c['name'] ?? '';
+    final relation = c['relationship'] ?? c['relation'] ?? '';
+    final phone = c['phone'] ?? '';
+    return Container(
+      width: Utils.windowWidth(context) * 0.9,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFEF2F2),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFFECACA)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.emergency_rounded, color: Color(0xFFDC2626), size: 20),
+              const SizedBox(width: 8),
+              Text(
+                "Emergency Contact $index",
+                style: const TextStyle(color: Color(0xFF991B1B), fontWeight: FontWeight.bold, fontSize: 14),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            relation.isNotEmpty ? "Name: $name ($relation)" : "Name: $name",
+            style: const TextStyle(fontSize: 13, color: Color(0xFF1E293B), fontWeight: FontWeight.w600),
+          ),
+          if (phone.isNotEmpty)
+            Text(
+              "Phone: $phone",
+              style: const TextStyle(fontSize: 13, color: Color(0xFF1E293B), fontWeight: FontWeight.w600),
+            ),
+        ],
       ),
     );
   }
