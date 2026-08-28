@@ -788,18 +788,11 @@ class _BookAppointmentScreenState extends ConsumerState<BookAppointmentScreen> {
             children: [
               Text('Consultation Fee'.tr(), style: const TextStyle(fontSize: 13, color: Color(0xFF64748B))),
               if (fee > 0)
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text(
-                      'PKR ${(fee * 0.95).round()}',
-                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
-                    ),
-                    Text(
-                      '5% Instant Discount on Online Payment'.tr(),
-                      style: const TextStyle(fontSize: 10, color: Color(0xFF10B981), fontWeight: FontWeight.w600),
-                    ),
-                  ],
+                // Full consultation fee — the 5% online-payment discount was
+                // removed per client request.
+                Text(
+                  'PKR $fee',
+                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
                 )
               else
                 Text(

@@ -265,9 +265,9 @@ async function calculateAmount({ type, refId, voucherCode, userId, installmentIn
     if (appt.paymentStatus === 'paid') throw new Error('This appointment is already paid');
     const profile = await DoctorProfile.findOne({ user_id: appt.doctor_id }).lean();
     const fee = Number(profile?.consultation_fee) || 0;
-    // 5% online-payment discount — cash-at-clinic payers pay full price,
-    // Pay Now (safepay) gets the discount as an incentive to pay upfront.
-    const amount = method === 'safepay' ? Math.round(fee * 0.95 * 100) / 100 : fee;
+    // Online-payment discount removed per client request — full consultation
+    // fee whether paying now (safepay) or in cash.
+    const amount = fee;
     return {
       amount, originalAmount: fee,
       payeeId: appt.doctor_id || null,

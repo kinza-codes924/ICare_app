@@ -91,11 +91,12 @@ class _SelectPaymentMethodState extends State<SelectPaymentMethod> {
   bool get _cashAvailable =>
       widget.labBookingId != null || (widget.appointmentId != null && !widget.isInstant);
 
-  // 5% online-payment incentive — appointments only, matches the backend's
-  // calculateAmount() discount for method:'safepay' on type:'appointment'.
-  bool get _onlineDiscountApplies => widget.appointmentId != null;
-  double get _onlineDiscountedAmount =>
-      _onlineDiscountApplies ? (widget.amount ?? 0) * 0.95 : (widget.amount ?? 0);
+  // Online-payment discount removed per client request — patients pay the
+  // full consultation fee whether they pay now or (for clinics/lab) in cash.
+  // Kept as a getter returning false so the discount UI/amounts below simply
+  // never trigger, and the backend's calculateAmount() charges full price too.
+  bool get _onlineDiscountApplies => false;
+  double get _onlineDiscountedAmount => (widget.amount ?? 0);
 
   Future<void> _applyVoucher() async {
     final code = _voucherController.text.trim();
