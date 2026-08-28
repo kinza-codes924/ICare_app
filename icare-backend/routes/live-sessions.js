@@ -225,23 +225,35 @@ router.get('/course/:courseId/active', authMiddleware, async (req, res) => {
     console.log(`[LIVE-SESSIONS] Found session: ${session ? session._id : 'none'}`);
 
     if (session) {
-      // Auto-expire: no instructor heartbeat for 90s means instructor left without ending
-      const ninetySecsAgo = new Date(Date.now() - 90 * 1000);
+      // Auto-expire only a session the instructor GENUINELY abandoned. The
+      // client-side rule is now "a student leaves only on status:'ended'",
+      // and 'ended' is set by the instructor's explicit End-for-All or by this
+      // check — so this window is the sole remaining way a class could end on
+      // its own. It was 90s, then 5min; both were short enough that a
+      // backgrounded/locked instructor tab (whose heartbeat the browser
+      // throttles) tripped it and kicked the whole class mid-session. It is
+      // now 12h: a real class never approaches it, while a session someone
+      // walked away from for good still gets cleaned up eventually rather than
+      // showing 'live' forever and blocking a fresh go-live.
+      const staleCutoff = new Date(Date.now() - 12 * 60 * 60 * 1000);
       const heartbeat = session.instructorHeartbeat;
       const sessionAge = Date.now() - new Date(session.createdAt).getTime();
       // Grace period: first 60s after creation, heartbeat may not have arrived yet
       const pastGracePeriod = sessionAge > 60 * 1000;
-      if (pastGracePeriod && heartbeat && new Date(heartbeat) < ninetySecsAgo) {
+      if (pastGracePeriod && heartbeat && new Date(heartbeat) < staleCutoff) {
         await LiveSession.findByIdAndUpdate(session._id, { status: 'ended' });
         console.log(`[LIVE-SESSIONS] Auto-expired stale session ${session._id} (last heartbeat: ${heartbeat})`);
         console.log(`[LIVE-SESSIONS] Returning: isLive=false (auto-expired)`);
         return res.json({ success: true, isLive: false, session: null });
       }
 
-      // Hard cap: use heartbeat if available, else createdAt — prevents old reactivated sessions from expiring
-      const threeHoursAgo = new Date(Date.now() - 3 * 60 * 60 * 1000);
+      // Hard cap: use heartbeat if available, else createdAt — prevents old
+      // reactivated sessions from lingering. Raised from 3h to 12h to match
+      // the stale-heartbeat window above, so a long but legitimate class is
+      // never cut off while a genuinely dead one still clears.
+      const twelveHoursAgo = new Date(Date.now() - 12 * 60 * 60 * 1000);
       const lastActivity = heartbeat ? new Date(heartbeat) : new Date(session.createdAt);
-      if (lastActivity < threeHoursAgo) {
+      if (lastActivity < twelveHoursAgo) {
         await LiveSession.findByIdAndUpdate(session._id, { status: 'ended' });
         console.log(`[LIVE-SESSIONS] Hard-cap expired session ${session._id} (lastActivity: ${lastActivity})`);
         console.log(`[LIVE-SESSIONS] Returning: isLive=false (hard-cap)`);
@@ -389,11 +401,12 @@ router.post('/:id/join', authMiddleware, async (req, res) => {
         } catch (_) {}
         return res.json({ success: true, status: 'waiting', message: 'You are in the waiting room. Please wait for the instructor to admit you.' });
       } else {
-        // No waiting room — join directly
-        if (session.attendees.length < session.maxParticipants) {
-          session.attendees.push(studentId);
-          await session.save();
-        }
+        // No waiting room — join directly. No participant cap: any number of
+        // students may join. (Older sessions saved maxParticipants:100, so we
+        // deliberately do NOT gate on it here — that limit used to silently
+        // drop the 101st joiner.)
+        session.attendees.push(studentId);
+        await session.save();
       }
     }
 

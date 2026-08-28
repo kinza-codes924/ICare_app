@@ -20,7 +20,8 @@ const liveSessionSchema = new mongoose.Schema({
     default: 'scheduled'
   },
   attendees: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
-  maxParticipants: { type: Number, default: 100 },
+  // Effectively unlimited — any number of students may join a session.
+  maxParticipants: { type: Number, default: 1000000 },
   isRecorded: { type: Boolean, default: true },
   recordingStartedAt: Date,
   recordingEndedAt: Date,

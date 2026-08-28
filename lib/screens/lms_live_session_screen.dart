@@ -183,16 +183,18 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
       final session = data['session'];
       if (session == null || !mounted) return;
 
-      // Student: if the instructor ended the session, leave automatically.
-      // The 15s guard avoids kicking a student who joined a moment before
-      // the instructor's isLive flag propagated.
-      if (!widget.isInstructor) {
-        final ended = session['status'] == 'ended' ||
-            (session['isLive'] == false && _sessionSeconds > 15);
-        if (ended) {
-          _finishSession();
-          return;
-        }
+      // Student: leave automatically ONLY when the instructor explicitly ended
+      // the session for everyone — status becomes 'ended' only from the
+      // instructor's "End Session for All" (end-and-save) or an explicit
+      // set-live(false). We deliberately do NOT leave on isLive==false: that
+      // flag flips on transient backend conditions (a throttled heartbeat, a
+      // stale-session check racing a new joiner) and was kicking every student
+      // to their dashboard mid-class while the instructor was still teaching.
+      // A student now only exits when they leave themselves or the instructor
+      // truly ends the class.
+      if (!widget.isInstructor && session['status'] == 'ended') {
+        _finishSession();
+        return;
       }
 
       // Update participants from attendees
@@ -452,13 +454,14 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
       if (mounted && !(kIsWeb && _cameraViewName != null)) setState(() {});
     });
     // Instructor heartbeat — tells backend the session is still active.
-    // 15s (not 30s) gives more margin against browser tab-throttling of
-    // Timer.periodic when the instructor's tab is backgrounded — a slow
-    // heartbeat previously caused the backend to mark live sessions 'ended'
-    // while the instructor was still connected.
+    // 10s gives more margin against browser tab-throttling of Timer.periodic
+    // when the instructor's tab is backgrounded. Even heavily throttled to
+    // ~once a minute, that stays well inside the backend's 5-min stale window,
+    // so students are no longer kicked to their dashboard mid-class while the
+    // instructor is still connected.
     if (widget.isInstructor && _sessionDocId.isNotEmpty) {
       _lms.sendHeartbeat(_sessionDocId); // send immediately
-      _heartbeatTimer = Timer.periodic(const Duration(seconds: 15), (_) {
+      _heartbeatTimer = Timer.periodic(const Duration(seconds: 10), (_) {
         if (_sessionDocId.isNotEmpty) _lms.sendHeartbeat(_sessionDocId);
       });
     }

@@ -40,7 +40,9 @@ class _InstructorScheduleSessionScreenState extends State<InstructorScheduleSess
   String? _selectedModuleId; // null = not linked to a specific module
   DateTime? _scheduledAt;
   int _duration = 60; // minutes
-  int _maxParticipants = 100;
+  // Effectively unlimited — sessions have no participant cap. The backend
+  // ignores this on join too; kept only so scheduled sessions store a value.
+  int _maxParticipants = 1000000;
   final String _platform = 'zoom'; // zoom, meet, teams, custom
 
   List<Map<String, dynamic>> _courses = [];
@@ -359,7 +361,7 @@ class _InstructorScheduleSessionScreenState extends State<InstructorScheduleSess
                             border: OutlineInputBorder(),
                           ),
                           keyboardType: TextInputType.number,
-                          onChanged: (value) => _maxParticipants = int.tryParse(value) ?? 100,
+                          onChanged: (value) => _maxParticipants = int.tryParse(value) ?? 1000000,
                         ),
                       ),
                     ],
