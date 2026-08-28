@@ -245,11 +245,11 @@ class _BookAppointmentScreenState extends ConsumerState<BookAppointmentScreen> {
             builder: (_) => SelectPaymentMethod(
               appointmentId: appointmentId,
               amount: fee.toDouble(),
-              // Emergency = instant online consultation (no clinic visit), so
-              // "Pay at Clinic" must not be offered — only Pay Now. A regular
-              // scheduled booking is a clinic visit, where cash-at-clinic is
-              // fine. isInstant drives that choice in SelectPaymentMethod.
-              isInstant: _isEmergency,
+              // Booking a doctor from the app is an online consultation — pay
+              // online only, never "Pay at Clinic". Cash-at-clinic stays only
+              // for the iCare Clinics walk-in flow (reception) and lab-test
+              // collection. isInstant:true suppresses the cash option here.
+              isInstant: true,
               onPaymentSuccess: (successContext, {voucherCode}) {
                 Navigator.of(successContext).popUntil((route) => route.isFirst);
               },
