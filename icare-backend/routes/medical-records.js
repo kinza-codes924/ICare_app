@@ -8,7 +8,7 @@ const PharmacyOrder = require('../models/PharmacyOrder');
 const EnhancedPrescription = require('../models/EnhancedPrescription');
 
 // Normalize an EnhancedPrescription into the same shape as MedicalRecord
-function normalizeEnhancedPrescription(ep) {
+function normalizeEnhancedPrescription(ep, profileMap) {
   const diagnosisText = ep.diagnoses && ep.diagnoses.length > 0
     ? ep.diagnoses.map(d => d.diagnosis).join(', ')
     : 'General Consultation';
@@ -27,8 +27,21 @@ function normalizeEnhancedPrescription(ep) {
     notes: t.instructions || '',
   }));
 
+  // profileMap (optional) maps doctor userId -> DoctorProfile so the
+  // prescription PDF can show the doctor's degrees + specialty (letterhead
+  // style). Without it the card/PDF only had the name.
+  const dp = (profileMap && ep.doctorId)
+    ? profileMap[(ep.doctorId._id || ep.doctorId).toString()]
+    : null;
   const doctor = ep.doctorId && typeof ep.doctorId === 'object'
-    ? { _id: ep.doctorId._id?.toString(), name: ep.doctorId.name, email: ep.doctorId.email }
+    ? {
+        _id: ep.doctorId._id?.toString(),
+        name: ep.doctorId.name,
+        email: ep.doctorId.email,
+        specialization: dp?.specialization || null,
+        qualifications: Array.isArray(dp?.degrees) && dp.degrees.length ? dp.degrees.join(', ') : null,
+        pmdcLicense: dp?.pmdcLicense || null,
+      }
     : null;
 
   const patient = ep.patientId && typeof ep.patientId === 'object'
@@ -244,7 +257,20 @@ router.get('/my-records', authMiddleware, async (req, res) => {
         .sort({ createdAt: -1 })
         .lean();
 
-      normalizedEnhanced = enhancedPrescriptions.map(ep => normalizeEnhancedPrescription(ep));
+      // Batch-load the doctors' DoctorProfiles so each prescription's PDF can
+      // show degrees + specialty, not just the name.
+      const DoctorProfile = require('../models/DoctorProfile');
+      const docIds = [...new Set(enhancedPrescriptions
+        .map(ep => (ep.doctorId?._id || ep.doctorId)?.toString())
+        .filter(Boolean))];
+      const profiles = docIds.length
+        ? await DoctorProfile.find({ user_id: { $in: docIds } })
+            .select('user_id specialization degrees pmdcLicense').lean()
+        : [];
+      const profileMap = {};
+      profiles.forEach(p => { profileMap[p.user_id.toString()] = p; });
+
+      normalizedEnhanced = enhancedPrescriptions.map(ep => normalizeEnhancedPrescription(ep, profileMap));
     } catch (epErr) {
       console.error('Warning: failed to load enhanced prescriptions:', epErr.message);
     }
