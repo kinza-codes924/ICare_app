@@ -140,6 +140,11 @@ const register = async (req, res) => {
     await connectMongoDB();
     const { username: usernameField, name, email, phone, password, role: roleRaw, recaptchaToken } = req.body;
     const username = usernameField || name;
+    // Display name is the real name the form sent (e.g. "Rabia Sufi"), NOT the
+    // username — which for work-with-us signups is the email prefix
+    // ("rabiajalalani"). Using `username` as the display name is what made
+    // approved doctors show up under their email handle instead of their name.
+    const displayName = (name && name.trim()) ? name.trim() : username;
     const role = roleRaw?.toLowerCase();
 
     if (!username || !email || !password || !role) {
@@ -245,7 +250,7 @@ const register = async (req, res) => {
 
     const user = await User.create({
       username,
-      name: username,
+      name: displayName,
       email: email.toLowerCase(),
       phone,
       password: hashedPassword,
@@ -264,7 +269,7 @@ const register = async (req, res) => {
 
     // Fire-and-forget: a slow mail server shouldn't hold up the signup
     // response. If it fails the user can hit /auth/resend-email-otp.
-    sendOtpEmail({ to: user.email, name: username, otp })
+    sendOtpEmail({ to: user.email, name: displayName, otp })
       .catch(e => console.error('[signup] OTP email failed:', e.message));
 
     // Save verificationDetails to user document, namespaced by role so a

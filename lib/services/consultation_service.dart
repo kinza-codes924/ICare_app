@@ -12,6 +12,13 @@ class ConsultationService {
     receiveTimeout: const Duration(seconds: 30),
     // plain text prevents Dio transformer from calling jsonDecode on HTML error pages
     responseType: ResponseType.plain,
+    // Don't let Dio throw on 4xx. 402 (PAYMENT_REQUIRED) is an expected
+    // business response — "patient hasn't paid yet" — not a crash. Without
+    // this, any consultation call that didn't wrap 402 in its own try/catch
+    // surfaced Dio's raw "validateStatus was configured to throw" red screen
+    // on the Consultation Details page. Callers already branch on
+    // success/code, so returning the response is safe everywhere.
+    validateStatus: (s) => s != null && s < 600,
   ));
   final SharedPref _sharedPref = SharedPref();
 
