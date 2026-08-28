@@ -141,12 +141,18 @@ class _ConnectNowWaitingScreenState extends State<ConnectNowWaitingScreen>
     // an explicit context because by the time payment succeeds, THIS screen
     // has already been replaced by SelectPaymentMethod (pushReplacement
     // below) — using the outer `context` here would be a defunct context.
-    Future<void> openChat(BuildContext ctx) async {
-      showDialog(
-        context: ctx,
-        barrierDismissible: false,
-        builder: (_) => const Center(child: CircularProgressIndicator()),
-      );
+    // Keep a single loading dialog up across payment-confirmation retries so
+    // the patient never gets stuck on the waiting screen with no feedback.
+    bool loaderShown = false;
+    Future<void> openChat(BuildContext ctx, {int attempt = 0}) async {
+      if (!loaderShown) {
+        loaderShown = true;
+        showDialog(
+          context: ctx,
+          barrierDismissible: false,
+          builder: (_) => const Center(child: CircularProgressIndicator()),
+        );
+      }
       try {
         final result = await ConsultationService().startConsultationV2(
           appointmentId: appointmentId.isNotEmpty ? appointmentId : '',
@@ -155,9 +161,9 @@ class _ConnectNowWaitingScreenState extends State<ConnectNowWaitingScreen>
           channelName: channelName,
         );
         if (!ctx.mounted) return;
-        Navigator.of(ctx).pop(); // close loading
 
         if (result['success'] == true) {
+          if (loaderShown) { Navigator.of(ctx).pop(); loaderShown = false; }
           final consultationId = result['consultationId']?.toString() ?? appointmentId;
           ctx.go(
             '/consultation/$consultationId',
@@ -170,12 +176,24 @@ class _ConnectNowWaitingScreenState extends State<ConnectNowWaitingScreen>
           );
         } else if (result['code']?.toString() == 'PAYMENT_REQUIRED') {
           // Safepay confirmed on the client but the backend hasn't marked the
-          // appointment paid yet (webhook/verify still in flight). Retry for a
-          // few seconds instead of dead-ending the patient on a red error.
+          // appointment paid yet (webhook/verify still in flight). Poll every
+          // 2s for up to ~40s instead of dead-ending — this is exactly the
+          // gap that left patients stuck loading forever after paying.
+          if (attempt < 20) {
+            await Future.delayed(const Duration(seconds: 2));
+            if (!ctx.mounted) return;
+            return openChat(ctx, attempt: attempt + 1);
+          }
+          if (loaderShown) { Navigator.of(ctx).pop(); loaderShown = false; }
           ScaffoldMessenger.of(ctx).showSnackBar(
-            const SnackBar(content: Text('Confirming your payment…')),
+            const SnackBar(
+              content: Text('Payment is taking longer than expected to confirm. Please check My Appointments in a moment.'),
+              backgroundColor: Colors.orange,
+              duration: Duration(seconds: 5),
+            ),
           );
         } else {
+          if (loaderShown) { Navigator.of(ctx).pop(); loaderShown = false; }
           ScaffoldMessenger.of(ctx).showSnackBar(
             SnackBar(
               content: Text(result['message']?.toString() ?? 'Failed to start consultation'),
@@ -185,7 +203,7 @@ class _ConnectNowWaitingScreenState extends State<ConnectNowWaitingScreen>
         }
       } catch (e) {
         if (!ctx.mounted) return;
-        Navigator.of(ctx).pop(); // close loading
+        if (loaderShown) { Navigator.of(ctx).pop(); loaderShown = false; }
         ScaffoldMessenger.of(ctx).showSnackBar(
           SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
         );
