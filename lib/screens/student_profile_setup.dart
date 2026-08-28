@@ -244,11 +244,34 @@ class _StudentProfileSetupState extends ConsumerState<StudentProfileSetup>
                                   const SizedBox(width: 16),
                                   Expanded(
                                     flex: 3,
-                                    child: _buildTextField(
-                                      controller: _genderController,
-                                      label: 'Gender',
-                                      icon: Icons.people_outline_rounded,
-                                      hint: 'Male/Female',
+                                    child: DropdownButtonFormField<String>(
+                                      initialValue: const ['Male', 'Female', 'Other'].contains(_genderController.text)
+                                          ? _genderController.text
+                                          : null,
+                                      isExpanded: true,
+                                      items: ['Male', 'Female', 'Other']
+                                          .map((g) => DropdownMenuItem(value: g, child: Text(g)))
+                                          .toList(),
+                                      onChanged: (val) => setState(() => _genderController.text = val ?? ''),
+                                      decoration: InputDecoration(
+                                        labelText: 'Gender',
+                                        prefixIcon: const Icon(Icons.people_outline_rounded, color: accentColor),
+                                        border: OutlineInputBorder(
+                                          borderRadius: BorderRadius.circular(12),
+                                          borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                                        ),
+                                        enabledBorder: OutlineInputBorder(
+                                          borderRadius: BorderRadius.circular(12),
+                                          borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                                        ),
+                                        focusedBorder: OutlineInputBorder(
+                                          borderRadius: BorderRadius.circular(12),
+                                          borderSide: const BorderSide(color: accentColor, width: 2),
+                                        ),
+                                        filled: true,
+                                        fillColor: const Color(0xFFF8FAFC),
+                                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                                      ),
                                     ),
                                   ),
                                 ],

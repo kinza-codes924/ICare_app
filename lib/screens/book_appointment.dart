@@ -915,12 +915,22 @@ class _BookAppointmentScreenState extends ConsumerState<BookAppointmentScreen> {
                         Text('Gender'.tr(),
                             style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF64748B))),
                         const SizedBox(height: 8),
-                        TextField(
-                          controller: _genderController,
-                          readOnly: _appointmentForMyself,
+                        // Dropdown (Male / Female / Other) instead of free text —
+                        // still writes into _genderController so all the existing
+                        // submit/prefill logic keeps working unchanged.
+                        DropdownButtonFormField<String>(
+                          initialValue: const ['Male', 'Female', 'Other'].contains(_genderController.text)
+                              ? _genderController.text
+                              : null,
+                          isExpanded: true,
+                          hint: Text('Select'.tr(), style: const TextStyle(color: Color(0xFF94A3B8))),
+                          items: ['Male', 'Female', 'Other']
+                              .map((g) => DropdownMenuItem(value: g, child: Text(g.tr())))
+                              .toList(),
+                          onChanged: _appointmentForMyself
+                              ? null
+                              : (val) => setState(() => _genderController.text = val ?? ''),
                           decoration: InputDecoration(
-                            hintText: 'Male / Female'.tr(),
-                            hintStyle: const TextStyle(color: Color(0xFF94A3B8)),
                             border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
                             enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
                             focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: AppColors.primaryColor)),
