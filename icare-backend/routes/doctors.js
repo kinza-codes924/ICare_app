@@ -188,9 +188,13 @@ router.get('/get_all_doctors', async (req, res) => {
     // a real photo, so it silently dropped every doctor's actual picture on
     // this page and the "Consult Available Doctors" home list rendered the
     // generic person icon for everyone with a real, working profile photo.
-    // 200KB comfortably covers a normally-sized upload while still catching
-    // the pathological case (an uncompressed multi-MB camera photo).
-    const MAX_INLINE_PICTURE = 200 * 1024;
+    // Only inline SMALL avatars in this list. Real uploads are 40-210KB of
+    // base64, and this route is re-fetched every 30s by the home page — a few
+    // such avatars made the doctor list crawl and even time the client out.
+    // The list card shows an initial/placeholder for missing photos anyway;
+    // the full photo loads on the doctor's own profile screen. 12KB keeps tiny
+    // icons inline while dropping the heavy ones from this list payload.
+    const MAX_INLINE_PICTURE = 12 * 1024;
     doctors.forEach(d => {
       if (typeof d.profilePicture === 'string'
         && d.profilePicture.startsWith('data:')

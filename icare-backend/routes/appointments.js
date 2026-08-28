@@ -11,6 +11,14 @@ function toId(id) {
   try { return new mongoose.Types.ObjectId(id); } catch { return null; }
 }
 
+// Profile pictures are stored as base64 data URIs that run 40-210KB each.
+// Inlining them in a LIST (appointments re-fetched constantly) bloats the
+// payload and times the client out. Drop anything over 12KB from lists; the
+// full photo still loads on the profile screen.
+function slimPic(pic) {
+  return (typeof pic === 'string' && pic.startsWith('data:') && pic.length > 12 * 1024) ? null : (pic || null);
+}
+
 async function getAppointments(userId, userRole) {
   await connectMongoDB();
   const uid = toId(userId);
@@ -41,7 +49,7 @@ async function getAppointments(userId, userRole) {
         patient_name: p?.name || p?.username,
         patient_age: p?.age?.toString() ?? null,
         patient_gender: p?.gender ?? null,
-        patient_profilePicture: p?.profilePicture || null,
+        patient_profilePicture: slimPic(p?.profilePicture),
         // contact details intentionally excluded from doctor view
       };
     });
@@ -62,7 +70,7 @@ async function getAppointments(userId, userRole) {
       doctor_name: dMap[a.doctor_id.toString()]?.name || dMap[a.doctor_id.toString()]?.username,
       doctor_email: dMap[a.doctor_id.toString()]?.email,
       doctor_phone: dMap[a.doctor_id.toString()]?.phone,
-      doctor_profilePicture: dMap[a.doctor_id.toString()]?.profilePicture || null,
+      doctor_profilePicture: slimPic(dMap[a.doctor_id.toString()]?.profilePicture),
       specialization: pMap[a.doctor_id.toString()]?.specialization,
       consultation_fee: pMap[a.doctor_id.toString()]?.consultation_fee,
       channel_name: a.channel_name || '',
