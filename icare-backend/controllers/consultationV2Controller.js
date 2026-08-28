@@ -43,6 +43,35 @@ exports.startConsultation = async (req, res) => {
     // enforced here (not just in the client) so a race between the doctor's
     // accept flow and the patient's payment flow can never slip through.
     // Regular scheduled appointments (no connect_now_ channel) are unaffected.
+    // Resume-before-gate: if a consultation for this appointment already
+    // exists (pending/active), it was legitimately started once — so let the
+    // doctor/patient rejoin it, WITHOUT re-checking payment. The payment gate
+    // below only guards STARTING a fresh consultation. Checking payment first
+    // was the bug: a rejoin after both sides bounced to the dashboard hit the
+    // 402 gate (paymentStatus can lag/reset) and showed "This booking was
+    // never paid for" even though the consultation was already running.
+    if (validAppointmentId) {
+      const existingConsultation = await Consultation.findOne({
+        appointmentId: validAppointmentId,
+        status: { $in: ['pending', 'active'] }
+      });
+
+      if (existingConsultation) {
+        console.log('✅ Found existing consultation (resume):', existingConsultation._id);
+        return res.json({
+          success: true,
+          consultationId: existingConsultation._id,
+          consultation: existingConsultation,
+          message: 'Consultation already started'
+        });
+      }
+    }
+
+    // Instant "Connect Now" consultations must not START (for either the
+    // doctor or the patient) until the patient's payment is confirmed —
+    // enforced here (not just in the client) so a race between the doctor's
+    // accept flow and the patient's payment flow can never slip through.
+    // Regular scheduled appointments (no connect_now_ channel) are unaffected.
     let appt = null;
     if (validAppointmentId) {
       appt = await Appointment.findById(validAppointmentId).select('channel_name paymentStatus').lean();
@@ -51,24 +80,6 @@ exports.startConsultation = async (req, res) => {
           success: false,
           code: 'PAYMENT_REQUIRED',
           message: 'Waiting for patient to complete payment before the consultation can start',
-        });
-      }
-    }
-
-    // Check if consultation already exists for this appointment
-    if (validAppointmentId) {
-      const existingConsultation = await Consultation.findOne({
-        appointmentId: validAppointmentId,
-        status: { $in: ['pending', 'active'] }
-      });
-
-      if (existingConsultation) {
-        console.log('✅ Found existing consultation:', existingConsultation._id);
-        return res.json({
-          success: true,
-          consultationId: existingConsultation._id,
-          consultation: existingConsultation,
-          message: 'Consultation already started'
         });
       }
     }
