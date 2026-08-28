@@ -994,6 +994,17 @@ class _PrescriptionPage extends StatelessWidget {
     if (d is Map) return d['phone']?.toString() ?? d['phoneNumber']?.toString() ?? '';
     return '';
   }
+  // Letterhead-style header: qualifications + specialty under the doctor name.
+  String get _doctorQualifications {
+    final d = record['doctor'] ?? record['doctorId'] ?? {};
+    if (d is Map) return d['qualifications']?.toString() ?? d['qualification']?.toString() ?? d['degrees']?.toString() ?? d['education']?.toString() ?? '';
+    return '';
+  }
+  String get _doctorSpecialty {
+    final d = record['doctor'] ?? record['doctorId'] ?? {};
+    if (d is Map) return d['specialization']?.toString() ?? d['specialty']?.toString() ?? d['speciality']?.toString() ?? '';
+    return '';
+  }
   String get _diagnosis => record['diagnosis']?.toString() ?? 'General Prescription';
   List<dynamic> get _diagnoses => (record['diagnoses'] as List?) ?? (record['diagnosis'] is List ? record['diagnosis'] as List : []);
   String get _doctorNotes => record['doctorNotes']?.toString() ?? record['notes']?.toString() ?? '';
@@ -1076,6 +1087,8 @@ class _PrescriptionPage extends StatelessWidget {
                 ])),
                 Container(width: 1, height: 55, color: Colors.white.withValues(alpha: 0.25), margin: const EdgeInsets.symmetric(horizontal: 12)),
                 Expanded(child: _hdrInfo('DOCTOR', 'Dr. $_doctorName', [
+                  if (_doctorQualifications.isNotEmpty) _doctorQualifications,
+                  if (_doctorSpecialty.isNotEmpty) _doctorSpecialty,
                   if (_doctorPmdc.isNotEmpty) 'PMDC: $_doctorPmdc',
                   if (_doctorPhone.isNotEmpty) _doctorPhone,
                 ])),
@@ -1336,6 +1349,8 @@ class _PrescriptionPage extends StatelessWidget {
             pw.Expanded(child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
               pw.Text('DOCTOR', style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold, color: PdfColors.grey)),
               pw.Text('Dr. $_doctorName', style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
+              if (_doctorQualifications.isNotEmpty) pw.Text(_doctorQualifications, style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey800)),
+              if (_doctorSpecialty.isNotEmpty) pw.Text(_doctorSpecialty, style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold, color: PdfColors.blue800)),
               if (_doctorPmdc.isNotEmpty) pw.Text('PMDC: $_doctorPmdc', style: const pw.TextStyle(fontSize: 10)),
               if (_doctorPhone.isNotEmpty) pw.Text(_doctorPhone, style: const pw.TextStyle(fontSize: 10)),
             ])),

@@ -245,6 +245,11 @@ class _BookAppointmentScreenState extends ConsumerState<BookAppointmentScreen> {
             builder: (_) => SelectPaymentMethod(
               appointmentId: appointmentId,
               amount: fee.toDouble(),
+              // Emergency = instant online consultation (no clinic visit), so
+              // "Pay at Clinic" must not be offered — only Pay Now. A regular
+              // scheduled booking is a clinic visit, where cash-at-clinic is
+              // fine. isInstant drives that choice in SelectPaymentMethod.
+              isInstant: _isEmergency,
               onPaymentSuccess: (successContext, {voucherCode}) {
                 Navigator.of(successContext).popUntil((route) => route.isFirst);
               },

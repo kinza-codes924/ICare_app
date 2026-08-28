@@ -5,8 +5,36 @@ const { connectMongoDB } = require('../config/mongodb');
 const LifestyleAdvice = require('../models/LifestyleAdvice');
 const Consultation = require('../models/Consultation');
 const User = require('../models/User');
+const DoctorProfile = require('../models/DoctorProfile');
 const { sendEmail } = require('../utils/email');
 const { PUBLIC_BASE_URL } = require('../utils/publicUrl');
+
+// The prescription's doctorId is a User, which carries no qualifications or
+// specialty — those live on DoctorProfile. The client wants the prescription
+// PDF to read like a letterhead (name + degrees + specialty), so merge the
+// DoctorProfile fields onto the populated doctor object before responding.
+async function enrichDoctor(prescription) {
+  try {
+    if (!prescription) return prescription;
+    const p = prescription.toObject ? prescription.toObject() : prescription;
+    const doc = p.doctorId;
+    const doctorUserId = doc && (doc._id || doc);
+    if (!doctorUserId) return p;
+    const profile = await DoctorProfile.findOne({ user_id: doctorUserId })
+      .select('specialization degrees pmdcLicense')
+      .lean();
+    if (profile && p.doctorId && typeof p.doctorId === 'object') {
+      if (profile.specialization && !p.doctorId.specialization) p.doctorId.specialization = profile.specialization;
+      if (Array.isArray(profile.degrees) && profile.degrees.length) {
+        p.doctorId.qualifications = profile.degrees.join(', ');
+      }
+      if (profile.pmdcLicense && !p.doctorId.pmdcLicense) p.doctorId.pmdcLicense = profile.pmdcLicense;
+    }
+    return p;
+  } catch (_) {
+    return prescription;
+  }
+}
 
 let _logoB64 = '';
 try { _logoB64 = fs.readFileSync(path.join(__dirname, '..', 'logo_b64.txt'), 'utf8').trim(); } catch (_) {}
@@ -383,10 +411,10 @@ exports.getCompletedPrescriptionByConsultation = async (req, res) => {
       if (!anyPrescription) {
         return res.status(404).json({ success: false, message: 'No prescription found for this consultation' });
       }
-      return res.json({ success: true, prescription: anyPrescription });
+      return res.json({ success: true, prescription: await enrichDoctor(anyPrescription) });
     }
 
-    res.json({ success: true, prescription });
+    res.json({ success: true, prescription: await enrichDoctor(prescription) });
   } catch (error) {
     console.error('Error getting prescription by consultation:', error);
     res.status(500).json({ success: false, message: 'Failed to get prescription', error: error.message });
@@ -415,7 +443,7 @@ exports.getPrescription = async (req, res) => {
 
     res.json({
       success: true,
-      prescription
+      prescription: await enrichDoctor(prescription)
     });
   } catch (error) {
     console.error('Error getting prescription:', error);

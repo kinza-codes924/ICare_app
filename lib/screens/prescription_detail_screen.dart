@@ -76,6 +76,25 @@ class PrescriptionDetailScreen extends StatelessWidget {
       prescription['doctorPhone']?.toString() ??
       '';
 
+  // Client asked the prescription to read like a letterhead — the doctor's
+  // qualifications (e.g. "MBBS, MCPS") and specialty (e.g. "Dermatologist")
+  // under the name, not just "Dr. <name>". Pull from whichever field the
+  // profile/prescription happens to carry them in.
+  String get _doctorQualifications =>
+      _doctor['qualifications']?.toString() ??
+      _doctor['qualification']?.toString() ??
+      _doctor['degrees']?.toString() ??
+      _doctor['education']?.toString() ??
+      prescription['doctorQualifications']?.toString() ??
+      '';
+
+  String get _doctorSpecialty =>
+      _doctor['specialization']?.toString() ??
+      _doctor['specialty']?.toString() ??
+      _doctor['speciality']?.toString() ??
+      prescription['doctorSpecialization']?.toString() ??
+      '';
+
   String get _chiefComplaints =>
       prescription['chiefComplaints']?.toString() ??
       prescription['complaints']?.toString() ??
@@ -444,6 +463,16 @@ class PrescriptionDetailScreen extends StatelessWidget {
         Text('Dr. $_doctorName',
             style: const TextStyle(
                 color: Colors.white, fontSize: 15, fontWeight: FontWeight.w900)),
+        if (_doctorQualifications.isNotEmpty) ...[
+          const SizedBox(height: 3),
+          Text(_doctorQualifications,
+              style: const TextStyle(color: Colors.white70, fontSize: 12)),
+        ],
+        if (_doctorSpecialty.isNotEmpty) ...[
+          const SizedBox(height: 2),
+          Text(_doctorSpecialty,
+              style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700)),
+        ],
         if (_doctorPmdc.isNotEmpty) ...[
           const SizedBox(height: 4),
           Row(
@@ -1081,6 +1110,8 @@ class PrescriptionDetailScreen extends StatelessWidget {
                   children: [
                     pw.Text('DOCTOR', style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold, color: PdfColors.grey)),
                     pw.Text('Dr. $_doctorName', style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
+                    if (_doctorQualifications.isNotEmpty) pw.Text(_doctorQualifications, style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey800)),
+                    if (_doctorSpecialty.isNotEmpty) pw.Text(_doctorSpecialty, style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold, color: PdfColors.blue800)),
                     if (_doctorPmdc.isNotEmpty) pw.Text('PMDC: $_doctorPmdc', style: const pw.TextStyle(fontSize: 10)),
                     if (_doctorPhone.isNotEmpty) pw.Text('Phone: $_doctorPhone', style: const pw.TextStyle(fontSize: 10)),
                   ],
