@@ -127,7 +127,7 @@ router.get('/my-profile', authMiddleware, async (req, res) => {
       doctor: {
         id: user._id.toString(),
         _id: user._id.toString(),
-        name: user.username || user.name,
+        name: user.name || user.username,
         email: user.email,
         phoneNumber: user.phone,
         role: user.role,
@@ -209,7 +209,7 @@ router.get('/get_all_doctors', async (req, res) => {
       return {
         id: d._id.toString(),
         _id: d._id.toString(),
-        name: d.username || d.name,
+        name: d.name || d.username,
         email: d.email,
         phoneNumber: d.phone,
         role: d.role,
@@ -322,7 +322,7 @@ router.get('/me/patient-reviews', authMiddleware, async (req, res) => {
     const reviews = rows.map((a) => {
       const p = a.patient_id;
       const patientName = (p && typeof p === 'object')
-        ? (p.username || p.name || 'Patient')
+        ? (p.name || p.username || 'Patient')
         : 'Patient';
       return {
         appointmentId: a._id.toString(),
@@ -409,7 +409,7 @@ router.get('/clinical-rejection-flags', authMiddleware, async (req, res) => {
       if (isNoReferrer(reason)) continue;
       const ptId = o.patient_id?.toString() || '';
       const pt = pMap[ptId];
-      const patientName = pt?.username || pt?.name || 'Patient';
+      const patientName = pt?.name || pt?.username || 'Patient';
       flags.push({ orderId: o._id.toString(), orderNumber: o.order_number || `#${o._id.toString().slice(-8).toUpperCase()}`, prescriptionId: pid, prescriptionSource: mrIdSet.has(pid) ? 'medical_record' : 'enhanced_prescription', patientId: ptId, patientName, rejectionReason: reason || 'Rejected by pharmacy', rejectedAt: o.updatedAt || o.createdAt });
     }
     res.json({ success: true, flags, totalRejections: flags.length });
@@ -491,7 +491,7 @@ router.get('/:id', async (req, res) => {
       doctor: {
         id: user._id.toString(),
         _id: user._id.toString(),
-        name: user.username || user.name,
+        name: user.name || user.username,
         email: user.email,
         phoneNumber: user.phone,
         role: user.role,
@@ -611,7 +611,7 @@ router.get('/clinical-rejection-flags', authMiddleware, async (req, res) => {
 
       const ptId = o.patient_id?.toString() || '';
       const pt = pMap[ptId];
-      const patientName = pt?.username || pt?.name || 'Patient';
+      const patientName = pt?.name || pt?.username || 'Patient';
 
       const prescriptionSource = mrIdSet.has(pid) ? 'medical_record' : 'enhanced_prescription';
 

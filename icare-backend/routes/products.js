@@ -36,7 +36,7 @@ router.get('/', async (req, res) => {
     const result = products.map(p => ({
       ...p,
       _id: p._id.toString(),
-      pharmacy_name: pMap[p.pharmacy_id.toString()]?.username || pMap[p.pharmacy_id.toString()]?.name,
+      pharmacy_name: pMap[p.pharmacy_id.toString()]?.name || pMap[p.pharmacy_id.toString()]?.username,
     }));
 
     res.status(200).json({ success: true, products: result, count: result.length });
@@ -65,7 +65,7 @@ router.get('/:id', async (req, res) => {
       product: {
         ...product,
         _id: product._id.toString(),
-        pharmacy_name: pharmacyUser?.username || pharmacyUser?.name,
+        pharmacy_name: pharmacyUser?.name || pharmacyUser?.username,
         pharmacy_full_name: pharmacyProfile?.pharmacy_name,
         delivery_available: pharmacyProfile?.delivery_available,
       },

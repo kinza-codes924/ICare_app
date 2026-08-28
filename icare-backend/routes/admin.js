@@ -658,7 +658,7 @@ router.get('/leave-requests', authMiddleware, adminOnly, async (req, res) => {
 
     const all = [];
     for (const p of profiles) {
-      const doctorName = p.user_id?.username || p.user_id?.name || 'Doctor';
+      const doctorName = p.user_id?.name || p.user_id?.username || 'Doctor';
       const doctorEmail = p.user_id?.email || '';
       const doctorId = p.user_id?._id;
       for (const r of p.leaveRequests || []) {
@@ -745,7 +745,7 @@ router.get('/credentials', authMiddleware, adminOnly, async (req, res) => {
 
     const all = [];
     for (const p of profiles) {
-      const doctorName = p.user_id?.username || p.user_id?.name || 'Doctor';
+      const doctorName = p.user_id?.name || p.user_id?.username || 'Doctor';
       for (const c of p.credentials || []) {
         const credId = c._id?.toString();
         if (!credId) continue; // skip legacy entries without _id

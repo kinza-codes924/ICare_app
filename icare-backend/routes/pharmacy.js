@@ -124,7 +124,7 @@ router.get('/', async (req, res) => {
       const p = pMap[u._id.toString()] || {};
       return {
         id: u._id.toString(), _id: u._id.toString(),
-        name: u.username || u.name, email: u.email, phone: u.phone,
+        name: u.name || u.username, email: u.email, phone: u.phone,
         pharmacy_name: p.pharmacy_name, license_number: p.license_number,
         operating_hours: p.operating_hours, delivery_available: p.delivery_available,
         delivery_fee: p.delivery_fee, address: p.address, city: p.city,
@@ -153,7 +153,7 @@ router.get('/get_all_pharmacy', async (req, res) => {
       const p = pMap[u._id.toString()] || {};
       return {
         id: u._id.toString(), _id: u._id.toString(),
-        name: u.username || u.name, email: u.email, phone: u.phone,
+        name: u.name || u.username, email: u.email, phone: u.phone,
         pharmacy_name: p.pharmacy_name, license_number: p.license_number,
         operating_hours: p.operating_hours, delivery_available: p.delivery_available,
         delivery_fee: p.delivery_fee, address: p.address, city: p.city,
@@ -198,7 +198,7 @@ router.get('/nearby', async (req, res) => {
           : null;
         return {
           id: u._id.toString(), _id: u._id.toString(),
-          name: u.username || u.name, email: u.email, phone: u.phone,
+          name: u.name || u.username, email: u.email, phone: u.phone,
           pharmacy_name: p.pharmacy_name, license_number: p.license_number,
           operating_hours: p.operating_hours, delivery_available: p.delivery_available,
           delivery_fee: p.delivery_fee, address: p.address, city: p.city,
@@ -231,7 +231,7 @@ router.get('/profile/:userId', authMiddleware, async (req, res) => {
       success: true,
       pharmacy: {
         id: user._id.toString(), _id: user._id.toString(), userId: user._id.toString(),
-        username: user.username || user.name, email: user.email, phone: user.phone,
+        username: user.name || user.username, email: user.email, phone: user.phone,
         profilePicture: user.profilePicture || null,
         ...profile,
         pharmacyName: profile?.pharmacy_name || user.name || user.username || '',
@@ -260,7 +260,7 @@ router.get('/profile', authMiddleware, async (req, res) => {
         id: user._id.toString(),
         _id: user._id.toString(),
         userId: user._id.toString(),
-        username: user.username || user.name, email: user.email, phone: user.phone,
+        username: user.name || user.username, email: user.email, phone: user.phone,
         profilePicture: user.profilePicture || null,
         ...profile,
         // Explicit camelCase fields Flutter reads — must come AFTER spread so they win
@@ -552,7 +552,7 @@ router.get('/orders/pharmacy/list', authMiddleware, async (req, res) => {
           _id: pt?._id?.toString() || '',
           name: o.orderType === 'walk-in'
             ? (o.patientName || 'Walk-in Patient')
-            : (pt?.username || pt?.name || 'Patient'),
+            : (pt?.name || pt?.username || 'Patient'),
           email: pt?.email || '',
           phoneNumber: o.orderType === 'walk-in' ? (o.contact || '') : (pt?.phone || pt?.phoneNumber || ''),
           address: pt?.address || '',
@@ -585,7 +585,7 @@ router.get('/orders', authMiddleware, async (req, res) => {
     const pharmacyProfiles = await PharmacyProfile.find({ user_id: { $in: pharmacyIds.map(id => toId(id)) } }).lean();
     const pharmacyUsers = await User.find({ _id: { $in: pharmacyIds.map(id => toId(id)) } }).lean();
     const pharmNameMap = {};
-    pharmacyUsers.forEach(u => { pharmNameMap[u._id.toString()] = u.username || u.name || 'Pharmacy'; });
+    pharmacyUsers.forEach(u => { pharmNameMap[u._id.toString()] = u.name || u.username || 'Pharmacy'; });
     pharmacyProfiles.forEach(p => {
       if (p.pharmacy_name) pharmNameMap[p.user_id.toString()] = p.pharmacy_name;
     });
@@ -1085,7 +1085,7 @@ router.get('/receipt/:orderId', async (req, res) => {
     const patient = await User.findById(order.patient_id).select('name username email').lean().catch(() => null);
     const pharmProfile = await PharmacyProfile.findOne({ user_id: order.pharmacy_id }).lean().catch(() => null);
     const pharmUser = await User.findById(order.pharmacy_id).select('username name').lean().catch(() => null);
-    const pharmName = pharmProfile?.pharmacy_name || pharmUser?.username || pharmUser?.name || 'iCare Pharmacy';
+    const pharmName = pharmProfile?.pharmacy_name || pharmUser?.name || pharmUser?.username || 'iCare Pharmacy';
     const patientName = patient?.name || patient?.username || 'Patient';
     const orderNum = order.order_number || `#${order._id.toString().slice(-6).toUpperCase()}`;
     const dateStr = new Date(order.createdAt || Date.now()).toLocaleDateString('en-PK', { day: 'numeric', month: 'long', year: 'numeric' });

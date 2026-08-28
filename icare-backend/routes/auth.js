@@ -63,7 +63,7 @@ router.post('/switch-role', authMiddleware, async (req, res) => {
         token,
         user: {
           id: user._id.toString(),
-          username: user.username || user.name,
+          username: user.name || user.username,
           email: user.email,
           phone: user.phone,
           role: user.role,

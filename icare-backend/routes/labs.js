@@ -111,7 +111,7 @@ async function getAllLabs() {
     const p = pMap[u._id.toString()] || {};
     return {
       id: u._id.toString(), _id: u._id.toString(),
-      name: u.username || u.name, email: u.email, phone: u.phone,
+      name: u.name || u.username, email: u.email, phone: u.phone,
       lab_name: p.lab_name, license_number: p.license_number,
       accreditation: p.accreditation, services: p.services,
       operating_hours: p.operating_hours, address: p.address, city: p.city,
@@ -193,14 +193,14 @@ router.get('/profile', authMiddleware, async (req, res) => {
     
     const user = await User.findById(userId).lean();
     if (!user) return res.status(404).json({ success: false, message: 'User not found' });
-    console.log('🔍 LAB PROFILE - User found:', user?.username || user?.name);
+    console.log('🔍 LAB PROFILE - User found:', user?.name || user?.username);
 
     const profile = await LabProfile.findOne({ user_id: userId }).lean() || {};
     console.log('🔍 LAB PROFILE - Profile found:', profile.lab_name);
 
     const lab = {
       id: user._id.toString(), _id: user._id.toString(),
-      username: user.username || user.name, email: user.email, phone: user.phone,
+      username: user.name || user.username, email: user.email, phone: user.phone,
       profilePicture: user.profilePicture || null,
       ...profile,
       // Re-assert user._id AFTER spread so profile._id never overrides it
@@ -379,7 +379,7 @@ router.get('/bookings/my', authMiddleware, async (req, res) => {
         criticalAlert: b.critical_alert || false,
         laboratory: {
           _id: lMap[b.lab_id?.toString()]?._id?.toString(),
-          labName: lpMap[b.lab_id?.toString()]?.lab_name || lMap[b.lab_id?.toString()]?.username || lMap[b.lab_id?.toString()]?.name || 'Laboratory',
+          labName: lpMap[b.lab_id?.toString()]?.lab_name || lMap[b.lab_id?.toString()]?.name || lMap[b.lab_id?.toString()]?.username || 'Laboratory',
           city: lpMap[b.lab_id?.toString()]?.city || '',
         },
       };
@@ -413,9 +413,9 @@ router.get('/bookings/:bookingId', authMiddleware, async (req, res) => {
       booking: {
         ...booking,
         _id: booking._id.toString(),
-        patient_name: patient?.username || patient?.name,
+        patient_name: patient?.name || patient?.username,
         patient_email: patient?.email,
-        lab_username: lab?.username || lab?.name,
+        lab_username: lab?.name || lab?.username,
         lab_name: labProfile?.lab_name,
       },
     });
@@ -689,7 +689,7 @@ router.post('/:labId/bookings', authMiddleware, async (req, res) => {
 
     // Fetch patient info to include in response
     const patient = await User.findById(patientId).lean();
-    const patientNameFromDB = patient?.username || patient?.name || 'Unknown';
+    const patientNameFromDB = patient?.name || patient?.username || 'Unknown';
 
     res.status(201).json({
       success: true,
@@ -889,7 +889,7 @@ router.get('/report/:bookingId', async (req, res) => {
 
     const patientName = booking.patient_name_override || patientUser?.name || patientUser?.username || 'Patient';
     const patientPhone = booking.patient_phone || patientUser?.phone || '—';
-    const labName = labProfile?.lab_name || labUser?.username || labUser?.name || 'iCare Laboratory';
+    const labName = labProfile?.lab_name || labUser?.name || labUser?.username || 'iCare Laboratory';
     const bookingNum = booking._id.toString().slice(-6).toUpperCase();
     const dateObj = booking.test_date ? new Date(booking.test_date) : new Date(booking.createdAt);
     const dateStr = dateObj.toLocaleDateString('en-PK', { day: 'numeric', month: 'long', year: 'numeric' });
@@ -1093,8 +1093,8 @@ router.get('/:labId', async (req, res) => {
     const laboratory = {
       _id: user._id.toString(),
       id: user._id.toString(),
-      name: profile.lab_name || user.username || user.name || 'Laboratory',
-      labName: profile.lab_name || user.username || user.name || 'Laboratory',
+      name: profile.lab_name || user.name || user.username || 'Laboratory',
+      labName: profile.lab_name || user.name || user.username || 'Laboratory',
       email: user.email,
       phone: user.phone,
       address: profile.address || 'Address not available',

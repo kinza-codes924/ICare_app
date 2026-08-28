@@ -98,7 +98,7 @@ router.get('/target/:targetId', async (req, res) => {
     const result = ratings.map(r => ({
       ...r,
       _id: r._id.toString(),
-      reviewer_name: rMap[r.reviewer_id.toString()]?.username || rMap[r.reviewer_id.toString()]?.name,
+      reviewer_name: rMap[r.reviewer_id.toString()]?.name || rMap[r.reviewer_id.toString()]?.username,
     }));
 
     res.json({ success: true, ratings: result, total });
@@ -160,7 +160,7 @@ router.get('/my-ratings', authMiddleware, async (req, res) => {
     const result = ratings.map(r => ({
       ...r,
       _id: r._id.toString(),
-      target_name: tMap[r.target_id.toString()]?.username || tMap[r.target_id.toString()]?.name,
+      target_name: tMap[r.target_id.toString()]?.name || tMap[r.target_id.toString()]?.username,
     }));
 
     res.json({ success: true, ratings: result });

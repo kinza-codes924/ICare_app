@@ -47,7 +47,7 @@ router.get('/me', authMiddleware, async (req, res) => {
       instructor: {
         _id: profile._id.toString(),
         user_id: userId.toString(),
-        name: user?.username || user?.name || '',
+        name: user?.name || user?.username || '',
         email: user?.email || '',
         profilePicture: user?.profilePicture || null,
         ...profile,
@@ -87,7 +87,7 @@ router.get('/get_all_instructors', authMiddleware, async (req, res) => {
     users.forEach(u => { userMap[u._id.toString()] = u; });
     const result = instructors.map(p => {
       const u = userMap[p.user_id.toString()] || {};
-      return { _id: p._id.toString(), user_id: p.user_id.toString(), name: u.username || u.name || '', email: u.email || '', ...p };
+      return { _id: p._id.toString(), user_id: p.user_id.toString(), name: u.name || u.username || '', email: u.email || '', ...p };
     });
     res.json({ success: true, instructors: result });
   } catch (e) {
@@ -338,7 +338,7 @@ router.get('/assigned-learners', authMiddleware, async (req, res) => {
     const users = await User.find({ _id: { $in: allUserIds.map(toId) } }).select('username name email role').lean();
     const learners = users.map(u => ({
       _id: u._id.toString(),
-      name: u.username || u.name,
+      name: u.name || u.username,
       email: u.email,
       role: u.role,
       enrolledCourses: courses.filter(c => c.assigned_to.map(String).includes(u._id.toString())).map(c => ({ _id: c._id.toString(), title: c.title })),
@@ -358,7 +358,7 @@ router.get('/:id', authMiddleware, async (req, res) => {
     const profile = await InstructorProfile.findById(id).lean();
     if (!profile) return res.status(404).json({ success: false, message: 'Not found' });
     const user = await User.findById(profile.user_id).lean() || {};
-    res.json({ success: true, instructor: { _id: profile._id.toString(), name: user.username || user.name || '', email: user.email || '', ...profile } });
+    res.json({ success: true, instructor: { _id: profile._id.toString(), name: user.name || user.username || '', email: user.email || '', ...profile } });
   } catch (e) {
     res.status(500).json({ success: false, message: e.message });
   }

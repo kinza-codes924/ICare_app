@@ -105,7 +105,7 @@ router.get('/doctor/:doctorId', async (req, res) => {
       const p = pMap[a.patient_id?.toString()] || {};
       return {
         appointmentId: a._id.toString(),
-        patientName: p.username || p.name || 'Patient',
+        patientName: p.name || p.username || 'Patient',
         rating: a.rating,
         comment: a.ratingComment || '',
         ratedAt: a.ratedAt || a.updatedAt || a.createdAt,

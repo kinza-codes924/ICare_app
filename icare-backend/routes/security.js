@@ -148,7 +148,7 @@ router.post('/2fa/verify', async (req, res) => {
         token: fullToken,
         user: {
           id: user._id.toString(),
-          username: user.username || user.name,
+          username: user.name || user.username,
           email: user.email,
           phone: user.phone,
           role: user.role,

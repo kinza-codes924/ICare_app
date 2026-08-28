@@ -43,7 +43,7 @@ router.get('/', async (req, res) => {
 
       if (profile?.latitude != null && profile?.longitude != null) {
         results.pharmacies.push({
-          name: user.username || user.name,
+          name: user.name || user.username,
           status: 'skipped — already has coordinates',
           lat: profile.latitude,
           lng: profile.longitude,
@@ -63,7 +63,7 @@ router.get('/', async (req, res) => {
       );
 
       results.pharmacies.push({
-        name: user.username || user.name,
+        name: user.name || user.username,
         status: `seeded — ${area.area}`,
         lat,
         lng,
@@ -82,7 +82,7 @@ router.get('/', async (req, res) => {
 
       if (profile?.latitude != null && profile?.longitude != null) {
         results.labs.push({
-          name: user.username || user.name,
+          name: user.name || user.username,
           status: 'skipped — already has coordinates',
           lat: profile.latitude,
           lng: profile.longitude,
@@ -101,7 +101,7 @@ router.get('/', async (req, res) => {
       );
 
       results.labs.push({
-        name: user.username || user.name,
+        name: user.name || user.username,
         status: `seeded — ${area.area}`,
         lat,
         lng,

@@ -49,7 +49,7 @@ router.get('/', authMiddleware, async (req, res) => {
         requires_prescription: p.requires_prescription,
         medicine_category: p.medicine_category,
         generic_name: p.generic_name,
-        pharmacy_name: phMap[p.pharmacy_id.toString()]?.username || phMap[p.pharmacy_id.toString()]?.name,
+        pharmacy_name: phMap[p.pharmacy_id.toString()]?.name || phMap[p.pharmacy_id.toString()]?.username,
         pharmacy_id: p.pharmacy_id.toString(),
       };
     }).filter(Boolean);

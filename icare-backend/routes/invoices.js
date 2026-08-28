@@ -81,7 +81,7 @@ router.get('/:orderId/pdf', authMiddleware, async (req, res) => {
 
     doc.fontSize(11).fillColor('#0036BC').text('PATIENT INFORMATION', 50, yPos);
     yPos += 20;
-    doc.fontSize(10).fillColor('#333333').text(`Name: ${patient?.username || patient?.name || 'N/A'}`, 50, yPos);
+    doc.fontSize(10).fillColor('#333333').text(`Name: ${patient?.name || patient?.username || 'N/A'}`, 50, yPos);
     yPos += 15;
     doc.text(`Email: ${patient?.email || 'N/A'}`, 50, yPos);
     yPos += 15;
@@ -94,7 +94,7 @@ router.get('/:orderId/pdf', authMiddleware, async (req, res) => {
     yPos = 140;
     doc.fontSize(10).fillColor('#666666').text('Pharmacy:', 350, yPos);
     yPos += 15;
-    doc.fontSize(9).fillColor('#333333').text(pharmacyProfile?.pharmacy_name || pharmacyUser?.username || pharmacyUser?.name || 'N/A', 350, yPos);
+    doc.fontSize(9).fillColor('#333333').text(pharmacyProfile?.pharmacy_name || pharmacyUser?.name || pharmacyUser?.username || 'N/A', 350, yPos);
     if (pharmacyProfile?.address) { yPos += 12; doc.text(pharmacyProfile.address, 350, yPos); }
     if (pharmacyProfile?.city) { yPos += 12; doc.text(pharmacyProfile.city, 350, yPos); }
 
