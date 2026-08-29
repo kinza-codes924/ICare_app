@@ -23,6 +23,11 @@ const doctorProfileSchema = new mongoose.Schema({
   // part of a standalone clinic (independent telehealth doctors) leave
   // this unset.
   clinicId: String,
+  // Whether the doctor sees the Walk-In Patients card on their dashboard.
+  // Front-desk walk-ins only make sense for doctors who physically sit at a
+  // clinic, so this is admin-granted per doctor rather than on for everyone.
+  // Unset is treated as false — see routes/doctors.js walkinEnabled.
+  walkinEnabled: { type: Boolean, default: false },
 }, { timestamps: true, strict: false });
 
 module.exports = mongoose.models.DoctorProfile || mongoose.model('DoctorProfile', doctorProfileSchema);

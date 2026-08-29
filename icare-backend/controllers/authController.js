@@ -272,6 +272,27 @@ const register = async (req, res) => {
     sendOtpEmail({ to: user.email, name: displayName, otp })
       .catch(e => console.error('[signup] OTP email failed:', e.message));
 
+    // A Work-With-Us applicant (doctor/lab/pharmacy/instructor) lands in
+    // manual review and only ever saw "Verification in Progress" in the app —
+    // nothing reached their inbox, so an applicant who closed the tab had no
+    // record they'd applied at all. Same fire-and-forget treatment as the OTP.
+    if (!isApproved) {
+      const roleLabel = { doctor: 'Doctor', lab: 'Laboratory', pharmacy: 'Pharmacy', instructor: 'Instructor', student: 'Student' }[role] || role;
+      sendEmail({
+        to: user.email,
+        subject: 'Your iCare application has been received',
+        html: `
+          <div style="font-family:Arial,Helvetica,sans-serif;max-width:560px;margin:0 auto;color:#0F172A">
+            <h2 style="color:#0036BC;margin-bottom:4px">Application Received</h2>
+            <p>Dear ${displayName},</p>
+            <p>Thank you for applying to join iCare as a <strong>${roleLabel}</strong>. We have received your application and supporting documents.</p>
+            <p>Our team is now reviewing your submission. Verification usually takes <strong>24–48 hours</strong>, and you will be updated by email in due course of time once a decision has been made.</p>
+            <p>You do not need to take any further action for now.</p>
+            <p style="margin-top:24px">Regards,<br/>iCare Team</p>
+          </div>`,
+      }).catch(e => console.error('[signup] application email failed:', e.message));
+    }
+
     // Save verificationDetails to user document, namespaced by role so a
     // later role-request on the same account (via /users/profile) can't
     // silently overwrite this role's saved details — every Work-With-Us

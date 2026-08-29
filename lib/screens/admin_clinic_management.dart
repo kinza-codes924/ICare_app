@@ -318,6 +318,26 @@ class _AdminClinicManagementState extends State<AdminClinicManagement> with Sing
     }
   }
 
+  Future<void> _toggleWalkin(Map doctor, bool enabled) async {
+    final id = doctor['_id']?.toString() ?? '';
+    if (id.isEmpty) return;
+    // Optimistic flip so the switch responds immediately; rolled back below
+    // if the server rejects it.
+    setState(() => doctor['walkinEnabled'] = enabled);
+    try {
+      final response = await _api.put('/admin/doctors/$id/walkin', {'walkinEnabled': enabled});
+      final data = response.data;
+      if (!(data is Map && data['success'] == true)) throw Exception('failed');
+    } catch (_) {
+      if (mounted) {
+        setState(() => doctor['walkinEnabled'] = !enabled);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to update walk-in access')),
+        );
+      }
+    }
+  }
+
   Future<void> _assignDoctorClinic(Map doctor) async {
     String? selectedClinicId = doctor['clinicId']?.toString();
     if (selectedClinicId != null && selectedClinicId.isEmpty) selectedClinicId = null;
@@ -579,12 +599,31 @@ class _AdminClinicManagementState extends State<AdminClinicManagement> with Sing
                                   ),
                                   title: Text(d['name']?.toString() ?? '', style: const TextStyle(fontWeight: FontWeight.w600)),
                                   subtitle: Text(clinicName, style: const TextStyle(fontSize: 13)),
-                                  trailing: OutlinedButton(
-                                    onPressed: () => _assignDoctorClinic(d),
-                                    style: OutlinedButton.styleFrom(
-                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                                    ),
-                                    child: const Text('Assign'),
+                                  trailing: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      // Walk-ins are a front-desk feature, so
+                                      // the admin picks which doctors get the
+                                      // card rather than every doctor seeing it.
+                                      Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          const Text('Walk-in', style: TextStyle(fontSize: 10, color: Color(0xFF64748B))),
+                                          Switch(
+                                            value: d['walkinEnabled'] == true,
+                                            onChanged: (v) => _toggleWalkin(d, v),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(width: 4),
+                                      OutlinedButton(
+                                        onPressed: () => _assignDoctorClinic(d),
+                                        style: OutlinedButton.styleFrom(
+                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                        ),
+                                        child: const Text('Assign'),
+                                      ),
+                                    ],
                                   ),
                                 ),
                               ),

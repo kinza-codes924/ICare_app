@@ -458,8 +458,17 @@ router.get('/walkins', authMiddleware, async (req, res) => {
       .sort({ createdAt: -1 })
       .limit(50)
       .lean();
+    // Walk-ins are a front-desk feature, so the dashboard card is only shown
+    // to doctors an admin has granted it to. Returned here rather than from a
+    // separate endpoint since the dashboard already awaits this call.
+    const walkinProfile = await DoctorProfile.findOne({ user_id: doctorId })
+      .select('walkinEnabled clinicId clinic_name')
+      .lean();
     res.json({
       success: true,
+      walkinEnabled: walkinProfile?.walkinEnabled === true,
+      clinicId: walkinProfile?.clinicId || '',
+      clinicName: walkinProfile?.clinic_name || '',
       walkins: walkins.map(w => ({
         _id: w._id.toString(),
         patientName: w.patientName || '',

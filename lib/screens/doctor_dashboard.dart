@@ -41,6 +41,11 @@ class _DoctorDashboardState extends ConsumerState<DoctorDashboard> {
   Map<String, dynamic> _stats = {};
   List<Map<String, dynamic>> _clinicalRejectionFlags = [];
   int _walkinCount = 0;
+  // Admin-granted per doctor (DoctorProfile.walkinEnabled) — walk-ins only
+  // apply to doctors who physically sit at a clinic, so the card stays hidden
+  // until an admin turns it on.
+  bool _walkinEnabled = false;
+  String _walkinClinicName = '';
   bool _isLoading = true;
   bool _availableForInstantConsultation = true;
   final bool _isInConsultation = false;
@@ -113,6 +118,8 @@ class _DoctorDashboardState extends ConsumerState<DoctorDashboard> {
           }
           if (walkinResult['success'] == true) {
             _walkinCount = List.from(walkinResult['walkins'] ?? []).length;
+            _walkinEnabled = walkinResult['walkinEnabled'] == true;
+            _walkinClinicName = walkinResult['clinicName']?.toString() ?? '';
           }
           _isLoading = false;
         });
@@ -197,9 +204,13 @@ class _DoctorDashboardState extends ConsumerState<DoctorDashboard> {
                         _buildInstantConsultToggle(),
                         const SizedBox(height: 24),
 
-                        // 1c. Walk-In Patients (front-desk visits, no video appointment)
-                        _buildWalkinPatientsCard(),
-                        const SizedBox(height: 24),
+                        // 1c. Walk-In Patients (front-desk visits, no video
+                        // appointment) — only for doctors an admin has granted
+                        // walk-in access to.
+                        if (_walkinEnabled) ...[
+                          _buildWalkinPatientsCard(),
+                          const SizedBox(height: 24),
+                        ],
 
                         // 2. Appointment Requests (pending — Accept/Decline)
                         _buildAppointmentRequests(),
@@ -649,12 +660,19 @@ class _DoctorDashboardState extends ConsumerState<DoctorDashboard> {
               child: Icon(Icons.storefront_outlined, color: AppColors.primaryColor, size: 22),
             ),
             const SizedBox(width: 14),
-            const Expanded(
+            Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Walk-In Patients', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: Color(0xFF0F172A))),
-                  Text('Front-desk patients referred to you', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                  const Text('Walk-In Patients', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: Color(0xFF0F172A))),
+                  Text(
+                    // Show which clinic these walk-ins come from — a doctor
+                    // covering more than one location can't tell otherwise.
+                    _walkinClinicName.isEmpty
+                        ? 'Front-desk patients referred to you'
+                        : 'Front-desk patients · $_walkinClinicName',
+                    style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                  ),
                 ],
               ),
             ),

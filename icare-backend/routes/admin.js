@@ -510,13 +510,15 @@ router.get('/doctors-with-clinic', authMiddleware, adminOnly, async (req, res) =
     const users = await User.find({ role: 'doctor' }).select('name username email is_approved is_active').lean();
     const approved = users.filter(u => u.is_approved !== false && u.is_active !== false);
     const profiles = await DoctorProfile.find({ user_id: { $in: approved.map(u => u._id) } })
-      .select('user_id clinicId').lean();
+      .select('user_id clinicId walkinEnabled').lean();
     const clinicByUser = new Map(profiles.map(p => [p.user_id.toString(), p.clinicId || null]));
+    const walkinByUser = new Map(profiles.map(p => [p.user_id.toString(), p.walkinEnabled === true]));
     const result = approved.map(u => ({
       _id: u._id.toString(),
       name: u.name || u.username || '',
       email: u.email || '',
       clinicId: clinicByUser.get(u._id.toString()) || null,
+      walkinEnabled: walkinByUser.get(u._id.toString()) === true,
     }));
     res.json({ success: true, doctors: result });
   } catch (err) {
@@ -541,6 +543,26 @@ router.put('/doctors/:userId/clinic', authMiddleware, adminOnly, async (req, res
   } catch (err) {
     console.error('update doctor clinic error:', err);
     res.status(500).json({ success: false, message: 'Failed to update doctor clinic' });
+  }
+});
+
+// Grants/revokes the Walk-In Patients card on a doctor's dashboard. Walk-ins
+// are a front-desk feature, so only doctors who actually sit at a clinic get
+// it — which of them do is the admin's call, not a property of the account.
+router.put('/doctors/:userId/walkin', authMiddleware, adminOnly, async (req, res) => {
+  try {
+    await connectMongoDB();
+    const DoctorProfile = require('../models/DoctorProfile');
+    const walkinEnabled = req.body.walkinEnabled === true || req.body.walkinEnabled === 'true';
+    const profile = await DoctorProfile.findOneAndUpdate(
+      { user_id: toId(req.params.userId) },
+      { $set: { walkinEnabled } },
+      { new: true, upsert: true }
+    );
+    res.json({ success: true, walkinEnabled: profile.walkinEnabled === true });
+  } catch (err) {
+    console.error('update doctor walkin error:', err);
+    res.status(500).json({ success: false, message: 'Failed to update walk-in access' });
   }
 });
 
