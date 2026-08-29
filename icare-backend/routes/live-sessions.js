@@ -29,7 +29,11 @@ async function backupSessionRecordingToDrive(session, { fileBuffer, sourceUrl } 
     }
 
     // e.g. "abc course - Fundamentals lesson-1 - 16 Jul 2026, 10-13 PM.mp4"
-    const dt = new Date();
+    // Name it after when the session actually ran, not when the backup
+    // happened — a recording uploaded late (or re-backed-up by hand) was
+    // getting the current time in its filename, so a morning class showed up
+    // in Drive stamped with the evening hour it was recovered at.
+    const dt = new Date(session.startedAt || session.createdAt || Date.now());
     const dateStr = dt.toLocaleString('en-US', {
       timeZone: 'Asia/Karachi',
       day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true,
