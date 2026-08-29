@@ -201,22 +201,27 @@ class _PatientHomeDashboardState extends ConsumerState<PatientHomeDashboard> {
 
   Widget _quickActions(bool isDesktop, bool isTablet) {
     final actions = <_QuickAction>[
-      _QuickAction('Connect to a\nDoctor Now', Icons.videocam_rounded,
+      // Labels used to have a hardcoded \n forcing a line break at a fixed
+      // point — on the narrow 2-column mobile grid, Flutter then had to wrap
+      // AGAIN to fit, splitting a word mid-way ("Book Appoint" / "ment") and
+      // leaving ragged, uneven-height tiles. Letting Flutter wrap naturally
+      // (no \n) always breaks on a whole word instead.
+      _QuickAction('Connect to a Doctor Now', Icons.videocam_rounded,
           const Color(0xFF0036BC), highlighted: true,
           onTap: () => _push(const ConsultationDetailsScreen())),
-      _QuickAction('Book\nAppointment', Icons.calendar_month_rounded, const Color(0xFF2563EB),
+      _QuickAction('Book Appointment', Icons.calendar_month_rounded, const Color(0xFF2563EB),
           onTap: () => _push(const DoctorsList())),
-      _QuickAction('View\nPrescriptions', Icons.description_rounded, const Color(0xFF7C3AED),
+      _QuickAction('View Prescriptions', Icons.description_rounded, const Color(0xFF7C3AED),
           onTap: () => context.push('/patient/prescriptions')),
-      _QuickAction('Order\nMedicines', Icons.local_pharmacy_rounded, const Color(0xFF059669),
+      _QuickAction('Order Medicines', Icons.local_pharmacy_rounded, const Color(0xFF059669),
           onTap: () => context.push('/patient/pharmacies')),
-      _QuickAction('Book\nLab Test', Icons.science_rounded, const Color(0xFF9333EA),
+      _QuickAction('Book Lab Test', Icons.science_rounded, const Color(0xFF9333EA),
           onTap: () => context.push('/patient/book-lab')),
-      _QuickAction('Health\nTracker', Icons.monitor_heart_rounded, const Color(0xFFDB2777),
+      _QuickAction('Health Tracker', Icons.monitor_heart_rounded, const Color(0xFFDB2777),
           onTap: () => context.push('/patient/health-tracker')),
-      _QuickAction('Health\nCommunity', Icons.groups_rounded, const Color(0xFF0D9488),
+      _QuickAction('Health Community', Icons.groups_rounded, const Color(0xFF0D9488),
           onTap: () => context.push('/community')),
-      _QuickAction('Medicine\nReminders', Icons.alarm_rounded, const Color(0xFFDC2626),
+      _QuickAction('Medicine Reminders', Icons.alarm_rounded, const Color(0xFFDC2626),
           onTap: () => context.push('/reminders')),
     ];
 
