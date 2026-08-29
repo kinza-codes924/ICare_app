@@ -805,6 +805,19 @@ router.post('/webhook', async (req, res) => {
         payment.safepayResponse = body?.data || null;
         await payment.save();
         await plog({ paymentId: payment._id, tracker, userId: payment.userId, step: 'STATUS_CHANGED', level: 'WARN', message: '-> failed (webhook)' });
+
+        // An appointment row is created up-front (before payment) so the slot
+        // can be held — but if payment then fails/gets cancelled, that pending
+        // row was never cleaned up, so it kept showing as "booked" in My
+        // Appointments even though the patient never actually paid. Cancel it
+        // here, but only if it's still genuinely unpaid — never touch one a
+        // separate successful payment (e.g. a retry) already marked paid.
+        if (payment.type === 'appointment' && payment.refId) {
+          await Appointment.findOneAndUpdate(
+            { _id: payment.refId, paymentStatus: { $ne: 'paid' } },
+            { $set: { status: 'cancelled' } }
+          ).catch(() => {});
+        }
       }
     } else {
       await plog({ paymentId: payment._id, tracker, step: 'WEBHOOK_RECEIVED', level: 'INFO', message: `Unhandled event type: ${eventType}` });

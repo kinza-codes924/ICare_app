@@ -5,6 +5,7 @@ const { connectMongoDB } = require('../config/mongodb');
 const User = require('../models/User');
 const Appointment = require('../models/Appointment');
 const DoctorProfile = require('../models/DoctorProfile');
+const Payment = require('../models/Payment');
 const { authMiddleware } = require('../middleware/auth');
 
 function toId(id) {
@@ -29,6 +30,37 @@ async function getAppointments(userId, userRole) {
     { status: 'in_progress', updatedAt: { $lt: twoHoursAgo } },
     { $set: { status: 'confirmed' } }
   ).catch(() => {});
+
+  // The appointment row is created up-front (before Pay Now), to hold the
+  // slot while the patient is on the payment screen. If they cancel/close
+  // that screen instead of paying, no webhook ever fires — the row was
+  // silently left pending+unpaid forever and still showed as "booked" in My
+  // Appointments. Expire ones abandoned mid-payment for 30+ min.
+  //
+  // Cash-at-clinic bookings are ALSO pending+unpaid by design (paid on
+  // arrival), so we can't tell the two apart from the Appointment row alone —
+  // must check whether a 'safepay' Payment was ever opened for it. Only THAT
+  // subset is a genuine abandoned-checkout; cash ones are left completely
+  // alone.
+  const thirtyMinAgo = new Date(Date.now() - 30 * 60 * 1000);
+  const stalePending = await Appointment.find(
+    { status: 'pending', paymentStatus: 'unpaid', createdAt: { $lt: thirtyMinAgo } },
+    { _id: 1 }
+  ).lean().catch(() => []);
+  if (stalePending.length) {
+    const stalePaymentIds = await Payment.find({
+      type: 'appointment',
+      method: 'safepay',
+      refId: { $in: stalePending.map(a => a._id) },
+    }, { refId: 1 }).lean().catch(() => []);
+    const idsWithAbandonedCheckout = stalePaymentIds.map(p => p.refId);
+    if (idsWithAbandonedCheckout.length) {
+      await Appointment.updateMany(
+        { _id: { $in: idsWithAbandonedCheckout }, paymentStatus: { $ne: 'paid' } },
+        { $set: { status: 'cancelled' } }
+      ).catch(() => {});
+    }
+  }
 
   let appointments;
 
