@@ -1477,11 +1477,29 @@ router.post('/jibri-recording-complete', jibriUpload.single('file'), async (req,
     // and finalize.sh already has no time pressure (--max-time 600 on its
     // Blob upload proves that).
 
-    // Recordings are archived to Google Drive (via finalize.sh's follow-up
-    // call to jibri-drive-backup) and remain playable
-    // from the Live Sessions list via recordingUrl — per the client's
-    // request, they're intentionally no longer auto-attached as a Course
-    // Content lesson's video.
+    // Attach the finished recording to its Course Content lesson. /end-session
+    // already does this (see the setFields block there), but only for a
+    // recording that exists by the time the session ends — Jibri finalizes and
+    // uploads *after* that, so on a real class the lesson tile kept showing
+    // "Start" with no recording even though the video had saved fine
+    // (confirmed live: the 29-Aug Python workshop). Same fields /end-session
+    // writes, so the tile reads identically either way.
+    if (session.linkedLessonId && session.courseId) {
+      try {
+        const Course = require('../models/Course');
+        await Course.updateOne(
+          { _id: session.courseId?._id || session.courseId },
+          {
+            $set: {
+              'modules.$[].lessons.$[lesson].videoUrl': finalUrl,
+              'modules.$[].lessons.$[lesson].recordingUrl': finalUrl,
+              'modules.$[].lessons.$[lesson].recordingAvailable': true,
+            },
+          },
+          { arrayFilters: [{ 'lesson._id': toId(session.linkedLessonId) }] }
+        );
+      } catch (_) {}
+    }
 
     console.log(`Jibri recording saved for session ${sessionId}: ${finalUrl}`);
     res.json({ success: true, url: finalUrl });
