@@ -8,6 +8,7 @@ const LiveSession = require('../models/LiveSession');
 const Enrollment = require('../models/Enrollment');
 const cloudinary = require('../config/cloudinary');
 const { uploadRecordingToDrive, backupUrlToDrive, getOrCreateCourseFolder, isConfigured: driveConfigured } = require('../utils/googleDrive');
+const { saveBuffer } = require('../utils/localStorage');
 
 const jibriUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 2 * 1024 * 1024 * 1024 } });
 
@@ -1436,14 +1437,25 @@ router.post('/jibri-recording-complete', jibriUpload.single('file'), async (req,
     if (req.body.url) {
       finalUrl = (req.body.url + '').trim();
     } else {
-      const uploadResult = await new Promise((resolve, reject) => {
-        const stream = cloudinary.uploader.upload_stream(
-          { resource_type: 'video', folder: 'icare/lms-recordings' },
-          (err, result) => (err ? reject(err) : resolve(result))
-        );
-        stream.end(req.file.buffer);
-      });
-      finalUrl = uploadResult.secure_url;
+      // Cloudinary's plan caps a single upload around 100MB — a real
+      // class-length recording routinely exceeds that (confirmed live: a
+      // 211MB/45min session got a 413 back from Cloudinary's own API).
+      // Anything over that threshold skips Cloudinary and lands on local
+      // disk instead, same as the doc-upload fallback in routes/upload.js.
+      const CLOUDINARY_SIZE_LIMIT = 95 * 1024 * 1024;
+      if (req.file.buffer.length > CLOUDINARY_SIZE_LIMIT) {
+        const saved = saveBuffer(req.file.buffer, req.file.originalname || `${sessionId}.mp4`, 'lms-recordings');
+        finalUrl = saved.url;
+      } else {
+        const uploadResult = await new Promise((resolve, reject) => {
+          const stream = cloudinary.uploader.upload_stream(
+            { resource_type: 'video', folder: 'icare/lms-recordings' },
+            (err, result) => (err ? reject(err) : resolve(result))
+          );
+          stream.end(req.file.buffer);
+        });
+        finalUrl = uploadResult.secure_url;
+      }
     }
 
     if (!session.recordings) session.recordings = [];
