@@ -646,8 +646,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     ));
   }
 
+  // Deleting is permanent, so it takes a code emailed to the account's own
+  // address — typing DELETE alone was the only guard, which anyone holding an
+  // unlocked phone could pass.
   void _showDeleteAccountDialog(BuildContext ctx) {
     final confirmController = TextEditingController();
+    final otpController = TextEditingController();
+    bool codeSent = false;
+    bool busy = false;
+    String? error;
+
     showDialog(
       context: ctx,
       builder: (dc) => StatefulBuilder(
@@ -656,7 +664,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           title: const Row(children: [
             Icon(Icons.warning_rounded, color: Color(0xFFEF4444), size: 24),
             SizedBox(width: 10),
-            Text('Delete Account', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16, color: Color(0xFFEF4444))),
+            Expanded(child: Text('Delete Account', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16, color: Color(0xFFEF4444)))),
           ]),
           content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
             const Text('This action is permanent and cannot be undone. All your data will be deleted.', style: TextStyle(fontSize: 14, color: Color(0xFF475569), height: 1.5)),
@@ -665,6 +673,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             const SizedBox(height: 8),
             TextField(
               controller: confirmController,
+              enabled: !codeSent,
               onChanged: (_) => setS(() {}),
               decoration: InputDecoration(
                 hintText: 'DELETE',
@@ -672,45 +681,126 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
               ),
             ),
+            if (codeSent) ...[
+              const SizedBox(height: 16),
+              const Text('Enter the code sent to your email:', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF0F172A))),
+              const SizedBox(height: 8),
+              TextField(
+                controller: otpController,
+                keyboardType: TextInputType.number,
+                onChanged: (_) => setS(() {}),
+                decoration: InputDecoration(
+                  hintText: '6-digit code',
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                ),
+              ),
+            ],
+            if (error != null) ...[
+              const SizedBox(height: 10),
+              Text(error!, style: const TextStyle(fontSize: 12, color: Color(0xFFEF4444), fontWeight: FontWeight.w600)),
+            ],
           ]),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(dc), child: const Text('Cancel', style: TextStyle(color: Color(0xFF64748B)))),
-            ElevatedButton.icon(
-              onPressed: confirmController.text.trim() == 'DELETE' ? () async {
-                Navigator.pop(dc);
-                await _doDeleteAccount(ctx);
-              } : null,
-              icon: const Icon(Icons.delete_forever_rounded, size: 16),
-              label: const Text('Delete My Account'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFEF4444),
-                foregroundColor: Colors.white,
-                disabledBackgroundColor: const Color(0xFFFCA5A5),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            TextButton(onPressed: busy ? null : () => Navigator.pop(dc), child: const Text('Cancel', style: TextStyle(color: Color(0xFF64748B)))),
+            if (!codeSent)
+              ElevatedButton.icon(
+                onPressed: (confirmController.text.trim() == 'DELETE' && !busy)
+                    ? () async {
+                        setS(() { busy = true; error = null; });
+                        final res = await _sendDeleteOtp();
+                        setS(() {
+                          busy = false;
+                          if (res == null) {
+                            codeSent = true;
+                          } else {
+                            error = res;
+                          }
+                        });
+                      }
+                    : null,
+                icon: busy
+                    ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                    : const Icon(Icons.mail_outline_rounded, size: 16),
+                label: const Text('Send Confirmation Code'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFEF4444),
+                  foregroundColor: Colors.white,
+                  disabledBackgroundColor: const Color(0xFFFCA5A5),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+              )
+            else
+              ElevatedButton.icon(
+                onPressed: (otpController.text.trim().length >= 4 && !busy)
+                    ? () async {
+                        setS(() { busy = true; error = null; });
+                        final err = await _doDeleteAccount(ctx, otpController.text.trim());
+                        if (err != null) {
+                          setS(() { busy = false; error = err; });
+                        } else if (dc.mounted) {
+                          Navigator.pop(dc);
+                        }
+                      }
+                    : null,
+                icon: busy
+                    ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                    : const Icon(Icons.delete_forever_rounded, size: 16),
+                label: const Text('Delete My Account'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFEF4444),
+                  foregroundColor: Colors.white,
+                  disabledBackgroundColor: const Color(0xFFFCA5A5),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
               ),
-            ),
           ],
         ),
       ),
     );
   }
 
-  Future<void> _doDeleteAccount(BuildContext ctx) async {
+  // Returns null on success, or a message to show in the dialog.
+  Future<String?> _sendDeleteOtp() async {
     try {
       final token = await SharedPref().getToken();
-      final dio = Dio(BaseOptions(baseUrl: 'https://icare.com.co/api'));
-      final resp = await dio.delete(
-        '/users/me',
+      final dio = Dio(BaseOptions(
+        baseUrl: 'https://icare.com.co/api',
+        validateStatus: (s) => s != null && s < 600,
+      ));
+      final resp = await dio.post(
+        '/users/me/delete-otp',
         options: Options(headers: {'Authorization': 'Bearer $token'}),
       );
-      if (resp.data['success'] == true) {
+      if (resp.statusCode == 200 && resp.data?['success'] == true) return null;
+      return resp.data?['message']?.toString() ?? 'Could not send the code. Please try again.';
+    } catch (_) {
+      return 'Could not send the code. Please check your connection.';
+    }
+  }
+
+  // Returns null on success, or a message for the dialog to show — a wrong or
+  // expired code has to keep the dialog open so the user can correct it.
+  Future<String?> _doDeleteAccount(BuildContext ctx, String otp) async {
+    try {
+      final token = await SharedPref().getToken();
+      final dio = Dio(BaseOptions(
+        baseUrl: 'https://icare.com.co/api',
+        validateStatus: (s) => s != null && s < 600,
+      ));
+      final resp = await dio.delete(
+        '/users/me',
+        data: {'otp': otp},
+        options: Options(headers: {'Authorization': 'Bearer $token'}),
+      );
+      if (resp.data?['success'] == true) {
         ref.read(authProvider.notifier).setUserLogout();
         if (mounted) context.go('/login');
-      } else {
-        if (ctx.mounted) ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text(resp.data['message'] ?? 'Failed to delete account'), backgroundColor: Colors.red));
+        return null;
       }
+      return resp.data?['message']?.toString() ?? 'Failed to delete account';
     } catch (e) {
-      if (ctx.mounted) ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(content: Text('Failed to delete account. Please try again.'), backgroundColor: Colors.red));
+      return 'Failed to delete account. Please try again.';
     }
   }
 

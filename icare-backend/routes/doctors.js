@@ -229,6 +229,8 @@ router.get('/get_all_doctors', async (req, res) => {
         conditionsTreated: p.conditions_treated || [],
         availableDays: p.available_days?.length ? p.available_days : ['Monday','Tuesday','Wednesday','Thursday','Friday'],
         availableTime: p.available_hours,
+        weeklySlots: p.weeklySlots || {},
+        slotDuration: p.slotDuration || 15,
         degrees: p.degrees || [],
         languages: p.languages || [],
         specialties: p.specialties || [],
@@ -267,13 +269,17 @@ router.post('/add_doctor_details', authMiddleware, async (req, res) => {
       consultationFee, availableDays, availableTime,
       degrees, clinicName, clinicAddress, consultationType, languages,
       profilePicture, conditionsTreated, specialties, spokenLanguages,
-      licenseValidTill,
+      licenseValidTill, weeklySlots, slotDuration,
     } = req.body;
 
     const update = {};
     if (specialization !== undefined) update.specialization = specialization;
     if (experience !== undefined) update.experience_years = parseInt(experience) || 0;
     if (licenseNumber !== undefined) update.license_number = licenseNumber;
+    // The doctor's actual working blocks per day, and how long one appointment
+    // runs — the booking screen builds its slots from these.
+    if (weeklySlots !== undefined) update.weeklySlots = weeklySlots;
+    if (slotDuration !== undefined) update.slotDuration = parseInt(slotDuration) || 15;
     if (consultationFee !== undefined) update.consultation_fee = parseFloat(consultationFee) || 0;
     if (availableDays !== undefined) update.available_days = availableDays;
     if (availableTime !== undefined) {
@@ -376,6 +382,8 @@ router.get('/availability/me', authMiddleware, async (req, res) => {
       availableTime: { start: timeStart, end: timeEnd },
       unavailableDates: profile?.unavailableDates || [],
       bufferTime: profile?.bufferTime || 15,
+      weeklySlots: profile?.weeklySlots || {},
+      slotDuration: profile?.slotDuration || 15,
       leaveRequests: (profile?.leaveRequests || []).filter(r => r.status === 'approved'),
     };
     res.json({ success: true, availability });
@@ -553,6 +561,8 @@ router.get('/:id', async (req, res) => {
         consultationFee: profile.consultation_fee,
         availableDays: profile.available_days?.length ? profile.available_days : ['Monday','Tuesday','Wednesday','Thursday','Friday'],
         availableTime: profile.available_hours,
+        weeklySlots: profile.weeklySlots || {},
+        slotDuration: profile.slotDuration || 15,
         rating: profile.rating || 0,
         totalReviews: profile.total_reviews || 0,
         clinicName: profile.clinic_name || null,

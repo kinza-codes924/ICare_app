@@ -29,6 +29,7 @@ class _DoctorAvailabilityState extends State<DoctorAvailability> {
   bool _isLoading = true;
   bool _isSaving = false;
   int _bufferTime = 15;
+  int _slotDuration = 15;
 
   bool _is24x7 = false;
   bool _emergencySlots = false;
@@ -181,6 +182,26 @@ class _DoctorAvailabilityState extends State<DoctorAvailability> {
           }
 
           _bufferTime = availability['bufferTime'] ?? 15;
+          _slotDuration = availability['slotDuration'] ?? 15;
+          // Restore the saved per-day slots, or the day keeps the blank
+          // default and a save would wipe what the doctor had set.
+          final savedSlots = availability['weeklySlots'];
+          if (savedSlots is Map) {
+            savedSlots.forEach((day, list) {
+              if (list is! List) return;
+              final key = day.toString();
+              if (!_weeklySlots.containsKey(key)) return;
+              _weeklySlots[key] = [
+                for (var i = 0; i < list.length; i++)
+                  if (list[i] is Map)
+                    {
+                      'name': 'Slot ${i + 1}',
+                      'start': (list[i]['start'] ?? '09:00').toString(),
+                      'end': (list[i]['end'] ?? '10:00').toString(),
+                    },
+              ];
+            });
+          }
           _emergencySlots = availability['emergencySlots'] == true;
           _isLoading = false;
         });
@@ -313,12 +334,30 @@ class _DoctorAvailabilityState extends State<DoctorAvailability> {
     final startStr = '${_startTime.hour.toString().padLeft(2, '0')}:${_startTime.minute.toString().padLeft(2, '0')}';
     final endStr = '${_endTime.hour.toString().padLeft(2, '0')}:${_endTime.minute.toString().padLeft(2, '0')}';
 
+    // The per-day slots were previously only ever held in this screen's state —
+    // saving sent just the outer start/end, so the patient's booking screen
+    // offered every 15 minutes between them and ignored the doctor's actual
+    // working blocks. Send them (and the chosen appointment length) too.
+    final slotsPayload = <String, List<Map<String, String>>>{};
+    _weeklySlots.forEach((day, slots) {
+      if (slots.isEmpty) return;
+      slotsPayload[day] = slots
+          .map((s) => {
+                'start': (s['start'] ?? '').toString(),
+                'end': (s['end'] ?? '').toString(),
+              })
+          .where((s) => s['start']!.isNotEmpty && s['end']!.isNotEmpty)
+          .toList();
+    });
+
     // Primary save: write to doctor profile endpoint (works). The /update_availability
     // endpoint 404s on this backend, so we skip it entirely.
     final result = await _doctorService.patchAvailabilityOnProfile(
       availableDays: _availableDays,
       startTime: startStr,
       endTime: endStr,
+      weeklySlots: slotsPayload,
+      slotDuration: _slotDuration,
     );
 
     setState(() => _isSaving = false);
@@ -968,6 +1007,35 @@ class _DoctorAvailabilityState extends State<DoctorAvailability> {
                         DropdownMenuItem(value: m, child: Text('$m mins')))
                     .toList(),
                 onChanged: (val) => setState(() => _bufferTime = val ?? 15),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          // How long one appointment runs — the patient's booking screen used
+          // to assume 15 minutes for everyone.
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Appointment Duration',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  Text(
+                    'Length of each consultation',
+                    style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                  ),
+                ],
+              ),
+              DropdownButton<int>(
+                value: _slotDuration,
+                items: [10, 15, 20, 30, 45, 60]
+                    .map((m) =>
+                        DropdownMenuItem(value: m, child: Text('$m mins')))
+                    .toList(),
+                onChanged: (val) => setState(() => _slotDuration = val ?? 15),
               ),
             ],
           ),

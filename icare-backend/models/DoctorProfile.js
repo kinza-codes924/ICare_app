@@ -9,6 +9,13 @@ const doctorProfileSchema = new mongoose.Schema({
   consultation_fee: { type: Number, default: 0 },
   available_days: [String],
   available_hours: { type: mongoose.Schema.Types.Mixed },
+  // Per-day working slots, e.g. { Monday: [{ start: '09:00', end: '14:30' }] }.
+  // The booking screen builds its time slots from these, so a doctor working
+  // mornings and evenings doesn't get offered right through the middle of the
+  // day. available_hours stays as the outer envelope / fallback.
+  weeklySlots: { type: mongoose.Schema.Types.Mixed },
+  // Minutes per appointment. Distinct from bufferTime (the gap between them).
+  slotDuration: { type: Number, default: 15 },
   rating: { type: Number, default: 0 },
   total_reviews: { type: Number, default: 0 },
   degrees: [String],

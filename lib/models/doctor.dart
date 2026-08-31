@@ -17,6 +17,11 @@ class Doctor {
   final String? clinicId;
   final List<String> availableDays;
   final AvailableTime? availableTime;
+  // Per-day working blocks, e.g. {'Monday': [{'start':'09:00','end':'14:30'}]}.
+  // Empty means the doctor never set any — fall back to availableTime.
+  final Map<String, List<Map<String, String>>> weeklySlots;
+  // Minutes per appointment, as chosen by the doctor.
+  final int slotDuration;
   final bool isApproved;
   final bool isOnline;
   final List<double> ratings;
@@ -40,6 +45,8 @@ class Doctor {
     this.clinicId,
     this.availableDays = const [],
     this.availableTime,
+    this.weeklySlots = const {},
+    this.slotDuration = 15,
     this.isApproved = false,
     this.isOnline = false,
     this.ratings = const [],
@@ -135,6 +142,23 @@ class Doctor {
       clinicAddress: json['clinicAddress']?.toString(),
       availableDays: parseStringList(json['availableDays']),
       availableTime: parseAvailableTime(json['availableTime']),
+      weeklySlots: () {
+        final raw = json['weeklySlots'];
+        if (raw is! Map) return const <String, List<Map<String, String>>>{};
+        final out = <String, List<Map<String, String>>>{};
+        raw.forEach((day, list) {
+          if (list is! List) return;
+          final blocks = <Map<String, String>>[];
+          for (final b in list) {
+            if (b is Map && b['start'] != null && b['end'] != null) {
+              blocks.add({'start': b['start'].toString(), 'end': b['end'].toString()});
+            }
+          }
+          if (blocks.isNotEmpty) out[day.toString()] = blocks;
+        });
+        return out;
+      }(),
+      slotDuration: int.tryParse((json['slotDuration'] ?? 15).toString()) ?? 15,
       isApproved: json['isApproved'] == true,
       isOnline: json['isOnline'] == true,
       ratings: parseRatings(json['ratings']),

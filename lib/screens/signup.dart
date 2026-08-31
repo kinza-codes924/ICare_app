@@ -798,28 +798,33 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
   // "or" divider + Google button. Only for Patient signup — the professional
   // roles carry licence/credential fields that a Google account can't supply,
   // and they go through admin approval anyway.
-  Widget _googleSignUpBlock() {
+  // [topPlacement] puts the button above the form (mobile) rather than below
+  // it, so the "or" divider has to sit after the button instead of before it.
+  Widget _googleSignUpBlock({bool topPlacement = false}) {
     if (widget.role.toLowerCase() != 'patient') return const SizedBox.shrink();
+    final divider = Row(
+      children: [
+        Expanded(child: Divider(color: Colors.grey[300], thickness: 1)),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          child: Text(
+            'or'.tr(),
+            style: const TextStyle(
+              color: Color(0xFF94A3B8),
+              fontSize: 13,
+              fontFamily: 'Gilroy-Medium',
+            ),
+          ),
+        ),
+        Expanded(child: Divider(color: Colors.grey[300], thickness: 1)),
+      ],
+    );
     return Column(
       children: [
-        const SizedBox(height: 18),
-        Row(
-          children: [
-            Expanded(child: Divider(color: Colors.grey[300], thickness: 1)),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              child: Text(
-                'or'.tr(),
-                style: const TextStyle(
-                  color: Color(0xFF94A3B8),
-                  fontSize: 13,
-                  fontFamily: 'Gilroy-Medium',
-                ),
-              ),
-            ),
-            Expanded(child: Divider(color: Colors.grey[300], thickness: 1)),
-          ],
-        ),
+        if (!topPlacement) ...[
+          const SizedBox(height: 18),
+          divider,
+        ],
         const SizedBox(height: 18),
         GestureDetector(
           onTap: _googleLoading ? null : _handleGoogleSignUp,
@@ -853,6 +858,11 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
             ),
           ),
         ),
+        if (topPlacement) ...[
+          const SizedBox(height: 18),
+          divider,
+          const SizedBox(height: 10),
+        ],
       ],
     );
   }
@@ -1016,12 +1026,16 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                       style: TextStyle(fontSize: 14, color: Colors.grey[500], fontFamily: 'Gilroy-Medium'),
                     ),
                     const SizedBox(height: 28),
+                    // Google goes above the form on mobile: below the long
+                    // field list it sat off-screen and patients reported not
+                    // being able to find it at all. (Desktop keeps it after
+                    // the form — everything fits without scrolling there.)
+                    _googleSignUpBlock(topPlacement: true),
                     ..._buildFields(),
                     const SizedBox(height: 8),
                     const Center(child: RecaptchaCheckbox()),
                     const SizedBox(height: 16),
                     _submitBtn(),
-                    _googleSignUpBlock(),
                     const SizedBox(height: 20),
                     _signInLink(),
                   ],

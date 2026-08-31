@@ -254,11 +254,19 @@ class DoctorService {
     required List<String> availableDays,
     required String startTime,
     required String endTime,
+    // Per-day slots the doctor actually set ("Add Slot" on the availability
+    // screen). Without these only the outer start/end was saved, so a doctor
+    // working 09:00-14:30 and 18:00-22:00 had patients offered every slot
+    // straight through the afternoon gap as well.
+    Map<String, List<Map<String, String>>>? weeklySlots,
+    int? slotDuration,
   }) async {
     try {
       final response = await _apiService.post('/doctors/add_doctor_details', {
         'availableDays': availableDays,
         'availableTime': {'start': startTime, 'end': endTime},
+        if (weeklySlots != null) 'weeklySlots': weeklySlots,
+        if (slotDuration != null) 'slotDuration': slotDuration,
       });
       if (response.statusCode == 200 || response.statusCode == 201) {
         return {'success': true};

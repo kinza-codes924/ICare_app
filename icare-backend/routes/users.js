@@ -8,6 +8,15 @@ const InstructorProfile = require('../models/InstructorProfile');
 const LabProfile = require('../models/LabProfile');
 const PharmacyProfile = require('../models/PharmacyProfile');
 const { authMiddleware } = require('../middleware/auth');
+const { sendEmail } = require('../utils/email');
+const {
+  OTP_TTL_MINUTES,
+  RESEND_COOLDOWN_SECONDS,
+  MAX_ATTEMPTS,
+  generateOtp,
+  hashOtp,
+  otpMatches,
+} = require('../utils/emailOtp');
 
 function toId(id) {
   try { return new mongoose.Types.ObjectId(id); } catch { return null; }
@@ -312,6 +321,59 @@ router.post('/set-role', async (req, res) => {
 });
 
 // ─── DELETE ACCOUNT ───────────────────────────────────────────────────────────
+// Deletion is permanent, so it takes a code emailed to the account's own
+// address — typing "DELETE" alone was the only guard, which anyone holding an
+// unlocked phone could pass.
+// POST /api/users/me/delete-otp — send the confirmation code
+router.post('/me/delete-otp', authMiddleware, async (req, res) => {
+  try {
+    await connectMongoDB();
+    const userId = toId(req.user.id);
+    if (!userId) return res.status(400).json({ success: false, message: 'Invalid user ID' });
+
+    const user = await User.findById(userId).select('email name username deleteOtpLastSentAt').lean();
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+    if (!user.email) return res.status(400).json({ success: false, message: 'This account has no email address' });
+
+    const lastSent = user.deleteOtpLastSentAt ? new Date(user.deleteOtpLastSentAt) : null;
+    if (lastSent && (Date.now() - lastSent.getTime()) < RESEND_COOLDOWN_SECONDS * 1000) {
+      const wait = Math.ceil((RESEND_COOLDOWN_SECONDS * 1000 - (Date.now() - lastSent.getTime())) / 1000);
+      return res.status(429).json({ success: false, message: `Please wait ${wait}s before requesting another code` });
+    }
+
+    const otp = generateOtp();
+    await User.findByIdAndUpdate(userId, {
+      $set: {
+        deleteOtpHash: hashOtp(otp),
+        deleteOtpExpiresAt: new Date(Date.now() + OTP_TTL_MINUTES * 60 * 1000),
+        deleteOtpAttempts: 0,
+        deleteOtpLastSentAt: new Date(),
+      },
+    }, { strict: false });
+
+    const name = user.name || user.username || 'there';
+    await sendEmail({
+      to: user.email,
+      subject: 'Confirm your iCare account deletion',
+      html: `
+        <div style="font-family:Arial,Helvetica,sans-serif;max-width:560px;margin:0 auto;color:#0F172A">
+          <h2 style="color:#EF4444;margin-bottom:4px">Confirm Account Deletion</h2>
+          <p>Dear ${name},</p>
+          <p>We received a request to permanently delete your iCare account. Enter this code in the app to confirm:</p>
+          <p style="font-size:28px;font-weight:800;letter-spacing:6px;color:#0F172A;margin:20px 0">${otp}</p>
+          <p>The code expires in ${OTP_TTL_MINUTES} minutes.</p>
+          <p><strong>If you did not request this, ignore this email</strong> — your account stays exactly as it is, and we'd suggest changing your password.</p>
+          <p style="margin-top:24px">Regards,<br/>iCare Team</p>
+        </div>`,
+    });
+
+    res.json({ success: true, message: 'Confirmation code sent to your email' });
+  } catch (err) {
+    console.error('POST /users/me/delete-otp error:', err);
+    res.status(500).json({ success: false, message: 'Failed to send confirmation code' });
+  }
+});
+
 // DELETE /api/users/me — permanently delete the authenticated user's account
 router.delete('/me', authMiddleware, async (req, res) => {
   try {
@@ -321,6 +383,25 @@ router.delete('/me', authMiddleware, async (req, res) => {
 
     const user = await User.findById(userId).lean();
     if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+
+    // Verify the emailed code before touching anything.
+    const submitted = (req.body?.otp || '').toString().trim();
+    if (!submitted) {
+      return res.status(400).json({ success: false, code: 'OTP_REQUIRED', message: 'Confirmation code is required' });
+    }
+    if (!user.deleteOtpHash || !user.deleteOtpExpiresAt) {
+      return res.status(400).json({ success: false, code: 'OTP_REQUIRED', message: 'Request a confirmation code first' });
+    }
+    if (new Date(user.deleteOtpExpiresAt).getTime() < Date.now()) {
+      return res.status(400).json({ success: false, code: 'OTP_EXPIRED', message: 'That code has expired — request a new one' });
+    }
+    if ((user.deleteOtpAttempts || 0) >= MAX_ATTEMPTS) {
+      return res.status(429).json({ success: false, code: 'OTP_LOCKED', message: 'Too many incorrect codes — request a new one' });
+    }
+    if (!otpMatches(submitted, user.deleteOtpHash)) {
+      await User.findByIdAndUpdate(userId, { $inc: { deleteOtpAttempts: 1 } }, { strict: false });
+      return res.status(400).json({ success: false, code: 'OTP_INVALID', message: 'Incorrect code' });
+    }
 
     const role = (user.role || '').toLowerCase();
 

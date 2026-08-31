@@ -141,21 +141,60 @@ class _BookAppointmentScreenState extends ConsumerState<BookAppointmentScreen> {
     return null;
   }
 
+  // Slots differ per weekday now that the doctor's own blocks drive them, so
+  // regenerate whenever the date changes rather than only once on load.
+  void _selectDate(int index) {
+    setState(() {
+      _selectedDateIndex = index;
+      _selectedSlot = null;
+      _generateSlotsFromDoctorHours();
+    });
+  }
+
   void _generateSlotsFromDoctorHours() {
-    final avail = widget.doctor.availableTime;
-    final startTime = _parseTime(avail?.start) ?? const TimeOfDay(hour: 9, minute: 0);
-    final endTime = _parseTime(avail?.end) ?? const TimeOfDay(hour: 22, minute: 0);
+    // Build from the doctor's own working blocks for the selected weekday when
+    // they've set any. Previously only the outer start/end was used, so a
+    // doctor working 09:00-14:30 and 18:00-22:00 had patients offered every
+    // slot straight through the afternoon they don't work.
+    const weekdayNames = [
+      'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'
+    ];
+    final dayName = weekdayNames[_selectedDate.weekday - 1];
+    final dayBlocks = widget.doctor.weeklySlots[dayName];
+
+    final ranges = <List<TimeOfDay>>[];
+    if (dayBlocks != null && dayBlocks.isNotEmpty) {
+      for (final b in dayBlocks) {
+        final s = _parseTime(b['start']);
+        final e = _parseTime(b['end']);
+        if (s != null && e != null) ranges.add([s, e]);
+      }
+    }
+    if (ranges.isEmpty) {
+      final avail = widget.doctor.availableTime;
+      ranges.add([
+        _parseTime(avail?.start) ?? const TimeOfDay(hour: 9, minute: 0),
+        _parseTime(avail?.end) ?? const TimeOfDay(hour: 22, minute: 0),
+      ]);
+    }
+
+    // Step by the doctor's appointment length rather than a fixed 15 minutes.
+    final step = widget.doctor.slotDuration > 0 ? widget.doctor.slotDuration : 15;
 
     final allSlots = <String>[];
-    int h = startTime.hour;
-    int m = startTime.minute;
+    for (final range in ranges) {
+      final startTime = range[0];
+      final endTime = range[1];
+      int h = startTime.hour;
+      int m = startTime.minute;
 
-    while (h < endTime.hour || (h == endTime.hour && m < endTime.minute)) {
-      final period = h < 12 ? 'AM' : 'PM';
-      final displayH = h == 0 ? 12 : (h > 12 ? h - 12 : h);
-      allSlots.add('${displayH.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')} $period');
-      m += 15;
-      if (m >= 60) { m -= 60; h++; }
+      while (h < endTime.hour || (h == endTime.hour && m < endTime.minute)) {
+        final period = h < 12 ? 'AM' : 'PM';
+        final displayH = h == 0 ? 12 : (h > 12 ? h - 12 : h);
+        allSlots.add('${displayH.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')} $period');
+        m += step;
+        while (m >= 60) { m -= 60; h++; }
+      }
     }
 
     // Split into morning (before 12), afternoon (12-17), evening (17+)
@@ -380,7 +419,7 @@ class _BookAppointmentScreenState extends ConsumerState<BookAppointmentScreen> {
                 IconButton(
                   icon: const Icon(Icons.chevron_left_rounded),
                   onPressed: _selectedDateIndex > 0
-                      ? () => setState(() => _selectedDateIndex--)
+                      ? () => _selectDate(_selectedDateIndex - 1)
                       : null,
                 ),
                 Expanded(
@@ -391,10 +430,7 @@ class _BookAppointmentScreenState extends ConsumerState<BookAppointmentScreen> {
                         final d = _dateRange[i];
                         final isSelected = i == _selectedDateIndex;
                         return GestureDetector(
-                          onTap: () => setState(() {
-                            _selectedDateIndex = i;
-                            _selectedSlot = null;
-                          }),
+                          onTap: () => _selectDate(i),
                           child: Container(
                             margin: const EdgeInsets.symmetric(horizontal: 4),
                             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
@@ -440,7 +476,7 @@ class _BookAppointmentScreenState extends ConsumerState<BookAppointmentScreen> {
                 IconButton(
                   icon: const Icon(Icons.chevron_right_rounded),
                   onPressed: _selectedDateIndex < _dateRange.length - 1
-                      ? () => setState(() => _selectedDateIndex++)
+                      ? () => _selectDate(_selectedDateIndex + 1)
                       : null,
                 ),
               ],
