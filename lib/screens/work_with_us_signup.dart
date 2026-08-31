@@ -664,14 +664,22 @@ class _WorkWithUsSignupState extends State<WorkWithUsSignup> {
           // For doctors, also hit the doctor-specific details endpoint
           if (backendRole == 'doctor') {
             try {
+              // Field names must match what the endpoint actually reads —
+              // 'qualification'/'pmdcNumber'/'workplace'/'availableTimings'
+              // were being ignored, so the doctor landed on "Complete Your
+              // Professional Profile" and had to re-enter what they had just
+              // filled in on this form.
               await api.post('/doctors/add_doctor_details', {
                 'specialization': vd['specialization'] ?? '',
-                'qualification': vd['qualification'] ?? '',
                 'experience': vd['experience'] ?? '',
-                'pmdcNumber': vd['pmdcNumber'] ?? '',
-                'workplace': vd['organizationName'] ?? '',
+                'licenseNumber': vd['licenseNumber'] ?? vd['pmdcNumber'] ?? '',
+                'degrees': (vd['qualification']?.toString().isNotEmpty ?? false)
+                    ? vd['qualification'].toString().split(',').map((d) => d.trim()).toList()
+                    : <String>[],
+                'clinicName': vd['organizationName'] ?? '',
+                'clinicAddress': vd['location'] ?? '',
                 'availableDays': vd['availableDays'] ?? [],
-                'availableTimings': vd['availableTimings'] ?? '',
+                'availableTime': vd['availableTimings'] ?? '',
               }, token: regToken);
             } catch (_) {}
           }

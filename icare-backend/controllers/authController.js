@@ -219,6 +219,40 @@ const register = async (req, res) => {
         // verificationDetails, and land on the same verification-status
         // screen — instead of dead-ending with only a "request sent" toast
         // and no way to attach documents to the pending role request.
+        // Seed this role's details from the application, exactly as a
+        // brand-new signup does further down. Without it the Work-With-Us form
+        // was collected and then thrown away for role requests — the doctor
+        // landed on "Complete Your Professional Profile" and had to re-enter
+        // specialization, experience, licence and the rest by hand.
+        const roleVd = req.body.verificationDetails || {};
+        if (Object.keys(roleVd).length > 0) {
+          await User.findByIdAndUpdate(
+            existing._id,
+            { $set: { [`verificationDetails.byRole.${role}`]: roleVd } },
+            { strict: false }
+          ).catch(() => {});
+        }
+        if (role === 'doctor') {
+          const seed = { user_id: existing._id };
+          if (roleVd.specialization) seed.specialization = roleVd.specialization;
+          if (roleVd.pmdcNumber) seed.pmdcNumber = roleVd.pmdcNumber;
+          if (roleVd.licenseNumber) seed.license_number = roleVd.licenseNumber;
+          if (roleVd.experience) seed.experience_years = roleVd.experience;
+          if (roleVd.availableDays?.length) seed.available_days = roleVd.availableDays;
+          if (roleVd.availableTimings) seed.available_hours = roleVd.availableTimings;
+          await DoctorProfile.findOneAndUpdate(
+            { user_id: existing._id }, { $set: seed }, { upsert: true }
+          ).catch(() => {});
+        } else if (role === 'lab') {
+          await LabProfile.findOneAndUpdate(
+            { user_id: existing._id }, { $set: { user_id: existing._id } }, { upsert: true }
+          ).catch(() => {});
+        } else if (role === 'pharmacy') {
+          await PharmacyProfile.findOneAndUpdate(
+            { user_id: existing._id }, { $set: { user_id: existing._id } }, { upsert: true }
+          ).catch(() => {});
+        }
+
         const roleRequestToken = jwt.sign(
           { id: existing._id.toString(), email: existing.email, role: existing.role },
           process.env.JWT_SECRET,
