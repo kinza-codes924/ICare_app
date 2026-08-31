@@ -530,9 +530,20 @@ class _ConsultationChatScreenV2State extends State<ConsultationChatScreenV2> {
     if (!skipPrescriptionCheck && widget.isDoctor && _consultationId != null && _consultationId!.isNotEmpty) {
       bool complete = false;
       try {
-        final draft = await _consultationService.getPrescriptionDraft(_consultationId!);
-        complete = draft != null && (draft['isComplete'] == true || draft['status'] == 'active');
+        // Check the issued prescription first. Once the doctor completes one it
+        // leaves the draft collection, so looking only at the draft reported
+        // "incomplete" for a consultation that already had a finished
+        // prescription emailed to the patient — the doctor was then forced
+        // through an "End Without Rx" dialog for a prescription they'd written.
+        final issued = await _consultationService.getPrescriptionByConsultation(_consultationId!);
+        complete = issued != null && issued.isNotEmpty;
       } catch (_) {}
+      if (!complete) {
+        try {
+          final draft = await _consultationService.getPrescriptionDraft(_consultationId!);
+          complete = draft != null && (draft['isComplete'] == true || draft['status'] == 'active');
+        } catch (_) {}
+      }
       if (!complete) {
         _showPrescriptionIncompleteDialog();
         return;
@@ -578,21 +589,43 @@ class _ConsultationChatScreenV2State extends State<ConsultationChatScreenV2> {
           
           // Show rating dialog to patient immediately after consultation ends
           if (mounted && !widget.isDoctor) {
-            final apptId = widget.appointment?.id ?? '';
-            final doctorId = widget.appointment?.doctor?.id ?? '';
-            if (apptId.isNotEmpty && mounted) {
+            var apptId = widget.appointment?.id ?? '';
+            var doctorId = widget.appointment?.doctor?.id ?? '';
+            // An instant "Connect Now" consultation is opened without an
+            // appointment object, so both ids were blank and the patient was
+            // sent to the dashboard without ever being asked to rate. Fall
+            // back to the consultation record, which always has them.
+            if ((apptId.isEmpty || doctorId.isEmpty) && _consultationId != null) {
+              try {
+                final res = await _consultationService.getConsultationV2(_consultationId!);
+                final c = (res['consultation'] ?? res) as Map<String, dynamic>?;
+                if (c != null) {
+                  if (apptId.isEmpty) apptId = c['appointmentId']?.toString() ?? '';
+                  if (doctorId.isEmpty) {
+                    final d = c['doctorId'];
+                    doctorId = (d is Map ? d['_id'] : d)?.toString() ?? '';
+                  }
+                }
+              } catch (_) {}
+            }
+            if (doctorId.isNotEmpty && mounted) {
               await showRatingDialog(
                 context: context,
                 title: 'Rate Your Doctor',
                 subtitle: 'How was your consultation experience?',
                 onSubmit: (rating, satisfied, comment) async {
-                  await ReviewService().submitReview(
-                    appointmentId: apptId,
-                    doctorId: doctorId,
-                    starRating: rating,
-                    satisfied: satisfied,
-                    reviewText: comment.isNotEmpty ? comment : null,
-                  );
+                  // Never let a failed review keep the patient on this screen —
+                  // the consultation has already ended by this point.
+                  if (apptId.isEmpty) return;
+                  try {
+                    await ReviewService().submitReview(
+                      appointmentId: apptId,
+                      doctorId: doctorId,
+                      starRating: rating,
+                      satisfied: satisfied,
+                      reviewText: comment.isNotEmpty ? comment : null,
+                    );
+                  } catch (_) {}
                 },
               );
             }

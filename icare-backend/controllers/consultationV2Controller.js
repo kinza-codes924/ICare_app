@@ -298,13 +298,20 @@ exports.endConsultation = async (req, res) => {
 
     await consultation.save();
 
-    // Send system message
+    // Send system message. Name who ended it — the other side just saw a bare
+    // "Consultation has ended." and couldn't tell whether the person had left
+    // or something had gone wrong.
+    const endedByPatient = req.user?.id
+      && consultation.patientId?.toString() === req.user.id.toString();
+    const endedMessage = endedByPatient
+      ? 'The patient ended the consultation and has left.'
+      : 'The doctor ended the consultation.';
     const systemMessage = new ConsultationMessage({
       consultationId,
       senderId: consultation.doctorId,
       senderName: 'System',
       senderRole: 'doctor',
-      message: 'Consultation has ended.',
+      message: endedMessage,
       isSystemMessage: true,
       timestamp: new Date()
     });

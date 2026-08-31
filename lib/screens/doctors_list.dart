@@ -2,6 +2,7 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:icare/models/doctor.dart';
 import 'package:icare/models/user.dart';
+import 'package:icare/screens/consultation_details_screen.dart';
 import 'package:icare/screens/doctor_detail.dart';
 import 'package:icare/services/doctor_service.dart';
 import 'package:icare/utils/theme.dart';
@@ -255,34 +256,74 @@ class _DoctorsListState extends State<DoctorsList> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Online doctors count
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF10B981).withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Container(
-                              width: 8,
-                              height: 8,
-                              decoration: const BoxDecoration(
-                                color: Color(0xFF10B981),
-                                shape: BoxShape.circle,
-                              ),
+                      // Online doctors count — tapping it filters the list down
+                      // to whoever is online right now. Most patients never
+                      // touch the dropdowns, so the one filter they actually
+                      // want is reachable in a single tap.
+                      InkWell(
+                        onTap: () => setState(() {
+                          final showingOnline = _availabilityFilter == 'online';
+                          _availabilityFilter = showingOnline ? null : 'online';
+                          _filterDoctors();
+                        }),
+                        borderRadius: BorderRadius.circular(8),
+                        child: Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF10B981).withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: const Color(0xFF10B981)
+                                  .withValues(alpha: _availabilityFilter == 'online' ? 0.6 : 0.2),
                             ),
-                            const SizedBox(width: 8),
-                            Text(
-                              '$_onlineDoctorsCount ${'doctors online right now'.tr()}',
-                              style: const TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                                color: Color(0xFF10B981),
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 8,
+                                height: 8,
+                                decoration: const BoxDecoration(
+                                  color: Color(0xFF10B981),
+                                  shape: BoxShape.circle,
+                                ),
                               ),
-                            ),
-                          ],
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      '$_onlineDoctorsCount ${'doctors online right now'.tr()}',
+                                      style: const TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w700,
+                                        color: Color(0xFF10B981),
+                                      ),
+                                    ),
+                                    Text(
+                                      _availabilityFilter == 'online'
+                                          ? 'Showing online doctors — tap to show all'
+                                          : 'Tap here to explore and connect',
+                                      style: const TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w600,
+                                        color: Color(0xFF059669),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Icon(
+                                _availabilityFilter == 'online'
+                                    ? Icons.close_rounded
+                                    : Icons.arrow_forward_ios_rounded,
+                                size: 14,
+                                color: const Color(0xFF10B981),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                       const SizedBox(height: 16),
@@ -1107,6 +1148,33 @@ class DoctorProfileCard extends StatelessWidget {
                   child: const Text('Book Appointment'),
                 ),
               ),
+              // A doctor who is online can be reached right now, so offer that
+              // directly instead of making the patient go back out to the
+              // separate instant-consultation entry point.
+              if (displayDoctor.isOnline) ...[
+                const SizedBox(height: 8),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => ConsultationDetailsScreen(
+                          targetDoctorId: displayDoctor.user.id,
+                        ),
+                      ),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFF10B981),
+                      side: const BorderSide(color: Color(0xFF10B981), width: 1.5),
+                      padding: const EdgeInsets.symmetric(vertical: 11),
+                      textStyle: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    icon: const Icon(Icons.videocam_rounded, size: 18),
+                    label: const Text('Connect for instant consultation'),
+                  ),
+                ),
+              ],
             ],
           ),
         ),

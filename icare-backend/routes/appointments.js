@@ -12,6 +12,53 @@ function toId(id) {
   try { return new mongoose.Types.ObjectId(id); } catch { return null; }
 }
 
+// A booking row exists before the patient pays, and the slot isn't held until
+// they do — so tell them straight away that it isn't confirmed yet. Without
+// this a patient who dropped out at checkout heard nothing at all and assumed
+// the appointment was booked. Fire-and-forget: never block the booking response.
+async function notifyBookingAwaitingPayment(appt) {
+  if (!appt?.patient_id) return;
+  try {
+    const Notification = require('../models/Notification');
+    const { sendEmail } = require('../utils/email');
+    const [patient, doctor] = await Promise.all([
+      User.findById(appt.patient_id).select('email name username').lean(),
+      User.findById(appt.doctor_id).select('name username').lean(),
+    ]);
+    const doctorName = doctor?.name || doctor?.username || 'your doctor';
+    const patientName = patient?.name || patient?.username || '';
+    const whenStr = appt.appointment_date
+      ? ` on ${appt.appointment_date}${appt.appointment_time ? ` at ${appt.appointment_time}` : ''}`
+      : '';
+
+    await Notification.create({
+      userId: appt.patient_id,
+      type: 'appointment',
+      title: 'Booking not confirmed — payment pending',
+      message: `Your appointment with Dr. ${doctorName}${whenStr} is not confirmed yet. Please complete the payment to confirm it.`,
+      data: { appointmentId: appt._id.toString(), awaitingPayment: true },
+      read: false,
+    }).catch(() => {});
+
+    if (patient?.email) {
+      await sendEmail({
+        to: patient.email,
+        subject: 'Your iCare booking is not confirmed yet',
+        html: `
+          <div style="font-family:Arial,Helvetica,sans-serif;max-width:560px;margin:0 auto;color:#0F172A">
+            <h2 style="color:#EF4444;margin-bottom:4px">Booking Not Confirmed</h2>
+            <p>Dear ${patientName},</p>
+            <p>Your appointment with <strong>Dr. ${doctorName}</strong>${whenStr} has <strong>not been confirmed</strong> because the payment has not been completed.</p>
+            <p>The time slot is not reserved until payment is received. Please open the iCare app, go to your appointments and tap <strong>“Proceed to payment to confirm your booking”</strong> to complete it.</p>
+            <p style="margin-top:24px">Regards,<br/>iCare Team</p>
+          </div>`,
+      }).catch(() => {});
+    }
+  } catch (e) {
+    console.error('notifyBookingAwaitingPayment error:', e.message);
+  }
+}
+
 // Profile pictures are stored as base64 data URIs that run 40-210KB each.
 // Inlining them in a LIST (appointments re-fetched constantly) bloats the
 // payload and times the client out. Drop anything over 12KB from lists; the
@@ -171,6 +218,8 @@ router.post('/', authMiddleware, async (req, res) => {
       status: 'pending',
     });
 
+    notifyBookingAwaitingPayment(appt).catch(() => {});
+
     res.status(201).json({ success: true, message: 'Appointment booked successfully', appointment: { ...appt.toObject(), id: appt._id.toString() } });
   } catch (error) {
     console.error('Create appointment error:', error);
@@ -248,6 +297,8 @@ router.post('/book_appointment', authMiddleware, async (req, res) => {
       notes: reason || '',
       status: 'pending',
     });
+
+    notifyBookingAwaitingPayment(appt).catch(() => {});
 
     res.status(201).json({ success: true, message: 'Appointment booked successfully', appointment: { ...appt.toObject(), id: appt._id.toString() } });
   } catch (error) {

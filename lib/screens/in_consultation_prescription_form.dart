@@ -1036,10 +1036,9 @@ class _InConsultationPrescriptionFormState
               color: const Color(0xFFF0FDF4),
               borderRadius: BorderRadius.circular(8),
             ),
+            // Matches the two-line row layout below: the name sits on its own
+            // line, so only the input columns are labelled here.
             child: Row(children: [
-              const SizedBox(width: 28),
-              const Expanded(flex: 3, child: Text('Medicine', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Color(0xFF065F46)))),
-              const SizedBox(width: 4),
               const Expanded(flex: 2, child: Text('Dose', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Color(0xFF065F46)))),
               const SizedBox(width: 4),
               const Expanded(flex: 2, child: Text('Form', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Color(0xFF065F46)))),
@@ -1049,7 +1048,6 @@ class _InConsultationPrescriptionFormState
               const Expanded(flex: 2, child: Text('Duration', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Color(0xFF065F46)))),
               const SizedBox(width: 4),
               const Expanded(flex: 2, child: Text('Note', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Color(0xFF065F46)))),
-              const SizedBox(width: 32),
             ]),
           ),
           const SizedBox(height: 4),
@@ -1073,28 +1071,49 @@ class _InConsultationPrescriptionFormState
                 borderRadius: BorderRadius.circular(10),
                 border: Border.all(color: const Color(0xFFD1FAE5), width: 1.5),
               ),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
+              // Two rows rather than one. Six columns sharing a narrow
+              // in-call panel left every field ~40px wide — "500mg" rendered as
+              // "50…" and the dropdowns showed nothing at all. The name gets
+              // its own line; the inputs get the full width below it.
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Index badge
-                  Container(
-                    width: 22, height: 22,
-                    decoration: BoxDecoration(color: const Color(0xFF10B981), borderRadius: BorderRadius.circular(5)),
-                    child: Center(child: Text('${index + 1}', style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w900))),
+                  Row(
+                    children: [
+                      // Index badge
+                      Container(
+                        width: 22, height: 22,
+                        decoration: BoxDecoration(color: const Color(0xFF10B981), borderRadius: BorderRadius.circular(5)),
+                        child: Center(child: Text('${index + 1}', style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w900))),
+                      ),
+                      const SizedBox(width: 6),
+                      // Medicine name (fixed, not editable — already selected)
+                      Expanded(
+                        child: Text(
+                          m.medicineName,
+                          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12.5, color: Color(0xFF0F172A)),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      // Delete
+                      GestureDetector(
+                        onTap: () => setState(() {
+                          _medicines.removeAt(index);
+                          _medDoseControllers.remove(index);
+                          _medNotesControllers.remove(index);
+                          _medDurationControllers.remove(index);
+                        }),
+                        child: const Padding(
+                          padding: EdgeInsets.all(4),
+                          child: Icon(Icons.close_rounded, size: 16, color: Colors.red),
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 6),
-
-                  // Medicine name (fixed, not editable — already selected)
-                  Expanded(
-                    flex: 3,
-                    child: Text(
-                      m.medicineName,
-                      style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12, color: Color(0xFF0F172A)),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  const SizedBox(width: 4),
-
+                  const SizedBox(height: 6),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
                   // Dose
                   Expanded(
                     flex: 2,
@@ -1177,20 +1196,7 @@ class _InConsultationPrescriptionFormState
                       )),
                     ),
                   ),
-                  const SizedBox(width: 2),
-
-                  // Delete
-                  GestureDetector(
-                    onTap: () => setState(() {
-                      _medicines.removeAt(index);
-                      _medDoseControllers.remove(index);
-                      _medNotesControllers.remove(index);
-                      _medDurationControllers.remove(index);
-                    }),
-                    child: const Padding(
-                      padding: EdgeInsets.all(4),
-                      child: Icon(Icons.close_rounded, size: 16, color: Colors.red),
-                    ),
+                    ],
                   ),
                 ],
               ),
@@ -1282,16 +1288,22 @@ class _InConsultationPrescriptionFormState
       backgroundColor: Colors.transparent,
       builder: (ctx) => _PharmaPickerSheet(
         formula: formula,
-        onAdd: (medicineName) {
+        onAdd: (medicineName, strength, form) {
           final idx = _medicines.length;
+          // Carry the strength/form the doctor just picked into the row rather
+          // than leaving those fields blank for them to type again.
+          final formType = form == null || form.isEmpty
+              ? MedicineFormType.tablet
+              : MedicineFormTypeExtension.fromString(form.toLowerCase());
           setState(() {
             _medicines.add(PrescriptionMedicine(
               medicineName: medicineName,
-              dose: '',
+              dose: strength ?? '',
+              formType: formType,
               frequency: MedicationFrequency.bd,
               duration: '',
             ));
-            _medDoseControllers[idx] = TextEditingController();
+            _medDoseControllers[idx] = TextEditingController(text: strength ?? '');
             _medNotesControllers[idx] = TextEditingController();
             _medDurationControllers[idx] = TextEditingController();
           });
@@ -2004,7 +2016,10 @@ class _InConsultationPrescriptionFormState
 // ── Pakistani Pharma Brand Picker ─────────────────────────────────────────────
 class _PharmaPickerSheet extends StatefulWidget {
   final DrugFormula formula;
-  final void Function(String medicineName) onAdd;
+  // Strength and form are chosen right here in the sheet, so hand them back
+  // too — the row's Dose/Form fields used to be left blank for the doctor to
+  // re-type what they had just picked.
+  final void Function(String medicineName, String? strength, String? form) onAdd;
 
   const _PharmaPickerSheet({required this.formula, required this.onAdd});
 
@@ -2213,7 +2228,7 @@ class _PharmaPickerSheetState extends State<_PharmaPickerSheet> {
               Row(
                 children: [
                   ElevatedButton.icon(
-                    onPressed: () => widget.onAdd(_buildMedicineName()),
+                    onPressed: () => widget.onAdd(_buildMedicineName(), _strength, _form),
                     icon: const Icon(Icons.add_circle_outline_rounded, size: 18),
                     label: const Text('Add to Prescription'),
                     style: ElevatedButton.styleFrom(
