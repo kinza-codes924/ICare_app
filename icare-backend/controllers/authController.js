@@ -202,7 +202,17 @@ const register = async (req, res) => {
           });
         }
 
-        await User.findByIdAndUpdate(existing._id, { $addToSet: { pendingRoles: role } });
+        // Keep the name this application was filled out under, per role. The
+        // account row already carries whatever name the FIRST role signed up
+        // with, so a doctor application submitted as "Hashim Khan" on an email
+        // whose patient account says "Shafay Hashmi" was showing the patient's
+        // name on the doctor dashboard. Same for the avatar — the roles share
+        // one login but are separate identities.
+        const roleName = (name && name.trim()) ? name.trim() : null;
+        await User.findByIdAndUpdate(existing._id, {
+          $addToSet: { pendingRoles: role },
+          ...(roleName ? { $set: { [`roleProfiles.${role}.name`]: roleName } } : {}),
+        }, { strict: false });
         // Issue a token for the EXISTING account (same as login would) so
         // the frontend can carry on exactly like a fresh registration —
         // upload the role's supporting documents, hit /users/profile with

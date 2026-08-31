@@ -24,18 +24,27 @@ router.get('/profile', authMiddleware, async (req, res) => {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
 
+    // One login can hold several roles (a patient who later applies as a
+    // doctor). Those are separate identities, but the account row only stores
+    // the name/photo of whichever role registered first — so a doctor
+    // application filled in as "Hashim Khan" showed the patient's "Shafay
+    // Hashmi" and the patient's avatar. Prefer this role's own details.
+    const roleProfile = (user.roleProfiles || {})[(user.role || '').toLowerCase()]
+      || (user.roleProfiles || {})[user.role] || {};
+    const displayName = roleProfile.name || user.name || user.username || '';
+
     // Base user response
     const response = {
       _id: user._id.toString(),
-      name: user.name || user.username || '',
+      name: displayName,
       email: user.email || '',
       role: user.role || '',
       phoneNumber: user.phone || '',
       phone: user.phone || '',
-      username: user.name || user.username || '',
+      username: displayName,
       isApproved: user.is_approved !== false && user.isApproved !== false,
       createdAt: user.createdAt,
-      profilePicture: user.profilePicture || null,
+      profilePicture: roleProfile.profilePicture || user.profilePicture || null,
       gender: user.gender || null,
       age: user.age != null ? user.age.toString() : null,
       cnic: user.cnic || null,
@@ -106,10 +115,23 @@ router.put('/profile', authMiddleware, async (req, res) => {
     const finalBloodGroup = bloodGroup || blood_group;
     
     const update = {};
-    if (name) { update.name = name; update.username = name; }
+    // Name and photo are per-role: an account holding both a patient and a
+    // doctor role is two identities sharing one login, so editing one must not
+    // rename or re-picture the other. Written to both places — the role-scoped
+    // copy the profile route now prefers, and the top-level field everything
+    // else (and any account with a single role) still reads.
+    const roleKey = (req.user?.role || '').toLowerCase();
+    if (name) {
+      update.name = name;
+      update.username = name;
+      if (roleKey) update[`roleProfiles.${roleKey}.name`] = name;
+    }
     const finalPhone = phoneNumber || phone;
     if (finalPhone) update.phone = finalPhone;
-    if (profilePicture !== undefined) update.profilePicture = profilePicture;
+    if (profilePicture !== undefined) {
+      update.profilePicture = profilePicture;
+      if (roleKey) update[`roleProfiles.${roleKey}.profilePicture`] = profilePicture;
+    }
     if (cnic !== undefined) update.cnic = cnic;
     if (age !== undefined) update.age = age;
     if (gender !== undefined) update.gender = gender;
@@ -185,18 +207,21 @@ router.put('/profile', authMiddleware, async (req, res) => {
       );
     }
 
-    // Build response
+    // Build response — same role-scoped preference as GET /profile.
+    const savedRoleProfile = (user.roleProfiles || {})[role] || {};
+    const savedName = savedRoleProfile.name || user.name || user.username || '';
+
     const response = {
       _id: user._id.toString(),
-      name: user.name || user.username || '',
+      name: savedName,
       email: user.email || '',
       role: user.role || '',
       phoneNumber: user.phone || '',
       phone: user.phone || '',
-      username: user.name || user.username || '',
+      username: savedName,
       isApproved: user.is_approved !== false,
       createdAt: user.createdAt,
-      profilePicture: user.profilePicture || null,
+      profilePicture: savedRoleProfile.profilePicture || user.profilePicture || null,
       gender: user.gender || null,
       age: user.age != null ? user.age.toString() : null,
       cnic: user.cnic || null,

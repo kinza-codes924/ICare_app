@@ -257,7 +257,7 @@ router.put('/approve/:userId', authMiddleware, adminOnly, async (req, res) => {
 router.post('/approve-user/:userId', authMiddleware, adminOnly, async (req, res) => {
   try {
     await connectMongoDB();
-    const existing = await User.findById(toId(req.params.userId)).select('pendingRoles roles is_approved').lean();
+    const existing = await User.findById(toId(req.params.userId)).select('pendingRoles roles is_approved roleProfiles').lean();
     if (!existing) return res.status(404).json({ success: false, message: 'User not found' });
 
     // Existing approved account requesting an additional role — promote
@@ -267,13 +267,19 @@ router.post('/approve-user/:userId', authMiddleware, adminOnly, async (req, res)
       if (!existing.pendingRoles.includes(roleToApprove)) {
         return res.status(400).json({ success: false, message: 'That role is not pending for this account' });
       }
+      // Promote the name this role applied under to the account's own name.
+      // Doctor/lab/pharmacy listings all read User.name directly, so without
+      // this an approved doctor kept showing whatever name the account's first
+      // role (e.g. its patient signup) had used.
+      const approvedRoleName = (existing.roleProfiles || {})[roleToApprove]?.name;
       const user = await User.findByIdAndUpdate(
         toId(req.params.userId),
         {
           $addToSet: { roles: roleToApprove },
           $pull: { pendingRoles: roleToApprove },
+          ...(approvedRoleName ? { $set: { name: approvedRoleName, username: approvedRoleName } } : {}),
         },
-        { new: true }
+        { new: true, strict: false }
       ).select('-password').lean();
       try {
         const Notification = require('../models/Notification');
