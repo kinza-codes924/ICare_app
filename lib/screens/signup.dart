@@ -800,6 +800,35 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
   // and they go through admin approval anyway.
   // [topPlacement] puts the button above the form (mobile) rather than below
   // it, so the "or" divider has to sit after the button instead of before it.
+  // Shared by both layouts so they can't drift apart.
+  Widget _backButton() {
+    return GestureDetector(
+      onTap: () {
+        if (context.canPop()) {
+          context.pop();
+        } else {
+          context.go('/login');
+        }
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.92),
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 6)],
+        ),
+        child: const Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.arrow_back_rounded, color: Color(0xFF0036BC), size: 15),
+            SizedBox(width: 5),
+            Text('Back', style: TextStyle(color: Color(0xFF0036BC), fontSize: 12, fontWeight: FontWeight.w700)),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _googleSignUpBlock({bool topPlacement = false}) {
     if (widget.role.toLowerCase() != 'patient') return const SizedBox.shrink();
     final divider = Row(
@@ -1049,10 +1078,17 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
 
     if (isDesktop) {
       return Scaffold(
-        body: Row(
+        body: Stack(
           children: [
-            const Expanded(flex: 5, child: AuthLeftPanel()),
-            Expanded(flex: 5, child: _buildRightPanel()),
+            Row(
+              children: [
+                const Expanded(flex: 5, child: AuthLeftPanel()),
+                Expanded(flex: 5, child: _buildRightPanel()),
+              ],
+            ),
+            // Mobile already had this; on desktop there was no way back to
+            // login short of the browser's own button.
+            Positioned(top: 20, left: 20, child: _backButton()),
           ],
         ),
       );
@@ -1165,31 +1201,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
             Positioned(
               top: MediaQuery.of(context).padding.top + 12,
               left: 16,
-              child: GestureDetector(
-                onTap: () {
-                  if (context.canPop()) {
-                    context.pop();
-                  } else {
-                    context.go('/login');
-                  }
-                },
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.92),
-                    borderRadius: BorderRadius.circular(20),
-                    boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 6)],
-                  ),
-                  child: const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.arrow_back_rounded, color: Color(0xFF0036BC), size: 15),
-                      SizedBox(width: 5),
-                      Text('Back', style: TextStyle(color: Color(0xFF0036BC), fontSize: 12, fontWeight: FontWeight.w700)),
-                    ],
-                  ),
-                ),
-              ),
+              child: _backButton(),
             ),
           ],
         ),
