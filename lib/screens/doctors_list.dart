@@ -35,6 +35,19 @@ class _DoctorsListState extends State<DoctorsList> {
   double? _minRating;
   String? _genderFilter; // male, female, all
   String? _languageFilter;
+  // Mobile only — the dropdowns start collapsed so the results list gets the
+  // viewport. See the Filters Row comment in build().
+  bool _filtersExpanded = false;
+
+  // Shown on the collapsed Filters button so a filter that's still applied
+  // isn't invisible once the panel is closed.
+  int get _activeFilterCount => [
+        _selectedSpecialization,
+        (_availabilityFilter == null || _availabilityFilter == 'all') ? null : _availabilityFilter,
+        _minRating,
+        _genderFilter,
+        _languageFilter,
+      ].where((f) => f != null).length;
   Set<String> _languages = {};
   // Static Pakistani languages shown as fallback when API returns none
   static const _defaultLanguages = ['Urdu', 'Punjabi', 'Pashto', 'Sindhi', 'Balochi', 'English'];
@@ -319,8 +332,49 @@ class _DoctorsListState extends State<DoctorsList> {
                         ),
                       ),
                       const SizedBox(height: 16),
-                      
-                      // Filters Row
+
+                      // Filters Row.
+                      // On mobile every dropdown is full-width, so the five of
+                      // them stack into ~400px of fixed header above the
+                      // Expanded list — leaving the results almost no viewport
+                      // to scroll in. Collapse them behind a toggle on small
+                      // screens (desktop keeps the inline Wrap it always had).
+                      if (!isDesktop) ...[
+                        InkWell(
+                          onTap: () => setState(() => _filtersExpanded = !_filtersExpanded),
+                          borderRadius: BorderRadius.circular(10),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF8FAFC),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: const Color(0xFFE2E8F0)),
+                            ),
+                            child: Row(children: [
+                              const Icon(Icons.tune_rounded, size: 18, color: Color(0xFF0036BC)),
+                              const SizedBox(width: 8),
+                              Text(
+                                'Filters'.tr(),
+                                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
+                              ),
+                              if (_activeFilterCount > 0) ...[
+                                const SizedBox(width: 6),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                                  decoration: BoxDecoration(color: const Color(0xFF0036BC), borderRadius: BorderRadius.circular(10)),
+                                  child: Text('$_activeFilterCount',
+                                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white)),
+                                ),
+                              ],
+                              const Spacer(),
+                              Icon(_filtersExpanded ? Icons.expand_less_rounded : Icons.expand_more_rounded,
+                                  size: 20, color: const Color(0xFF64748B)),
+                            ]),
+                          ),
+                        ),
+                        if (_filtersExpanded) const SizedBox(height: 12),
+                      ],
+                      if (isDesktop || _filtersExpanded)
                       Wrap(
                         spacing: 8,
                         runSpacing: 8,

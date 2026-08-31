@@ -334,7 +334,14 @@ class _MyAppointmentsListScreenState extends State<MyAppointmentsListScreen> {
                 itemBuilder: (context, index) {
                   final appointment = _appointments[index];
                   final effectiveStatus = _effectiveStatus(appointment);
-                  final statusColor = _getStatusColor(effectiveStatus);
+                  // An unpaid booking is still status:'pending', which read as
+                  // an ordinary confirmed-and-waiting appointment — patients
+                  // thought a failed payment had still booked them a slot.
+                  final awaitingPayment = effectiveStatus == 'pending' &&
+                      appointment.paymentStatus.toLowerCase() != 'paid';
+                  final statusColor = awaitingPayment
+                      ? const Color(0xFFEF4444)
+                      : _getStatusColor(effectiveStatus);
                   final isPast = appointment.date.isBefore(DateTime.now());
 
                   return GestureDetector(
@@ -386,7 +393,9 @@ class _MyAppointmentsListScreenState extends State<MyAppointmentsListScreen> {
                                     borderRadius: BorderRadius.circular(12),
                                   ),
                                   child: Icon(
-                                    _getStatusIcon(effectiveStatus),
+                                    awaitingPayment
+                                        ? Icons.error_outline_rounded
+                                        : _getStatusIcon(effectiveStatus),
                                     color: statusColor,
                                     size: 24,
                                   ),
@@ -398,7 +407,9 @@ class _MyAppointmentsListScreenState extends State<MyAppointmentsListScreen> {
                                         CrossAxisAlignment.start,
                                     children: [
                                       Text(
-                                        effectiveStatus.toUpperCase(),
+                                        awaitingPayment
+                                            ? 'PAYMENT PENDING'
+                                            : effectiveStatus.toUpperCase(),
                                         style: TextStyle(
                                           fontSize: 12,
                                           fontWeight: FontWeight.w700,
@@ -406,6 +417,17 @@ class _MyAppointmentsListScreenState extends State<MyAppointmentsListScreen> {
                                           letterSpacing: 0.5,
                                         ),
                                       ),
+                                      if (awaitingPayment) ...[
+                                        const SizedBox(height: 2),
+                                        const Text(
+                                          'Not booked yet — please complete payment',
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w600,
+                                            color: Color(0xFFEF4444),
+                                          ),
+                                        ),
+                                      ],
                                       const SizedBox(height: 4),
                                       Text(
                                         DateFormat(

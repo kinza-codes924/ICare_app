@@ -8,6 +8,10 @@ class AppointmentDetail {
   final String timeSlot;
   final String? reason;
   final String status;
+  // 'paid' / 'unpaid' — a booking whose payment never completed is still
+  // status:'pending', so without this the list showed it as an ordinary
+  // pending appointment and the patient thought it was booked.
+  final String paymentStatus;
   final String? channelName;
   final String? consultationType;
   final int? durationMinutes;
@@ -22,6 +26,7 @@ class AppointmentDetail {
     required this.timeSlot,
     this.reason,
     required this.status,
+    this.paymentStatus = 'unpaid',
     this.channelName,
     this.consultationType,
     this.durationMinutes,
@@ -94,6 +99,7 @@ class AppointmentDetail {
       timeSlot: json['timeSlot']?.toString() ?? json['appointment_time']?.toString() ?? '',
       reason: json['reason']?.toString() ?? json['notes']?.toString(),
       status: json['status']?.toString() ?? 'pending',
+      paymentStatus: json['paymentStatus']?.toString() ?? json['payment_status']?.toString() ?? 'unpaid',
       channelName: json['channel_name']?.toString(),
       consultationType: json['consultation_type']?.toString(),
       durationMinutes: json['durationMinutes'] is num
