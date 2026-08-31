@@ -9,7 +9,7 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black">
   <meta name="apple-mobile-web-app-title" content="iCare">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval' https: http: data: blob:; img-src 'self' data: https: http: blob:; frame-src 'self' https://vh.itserver.biz https://icare-backend-inky.vercel.app https://docs.google.com https://www.youtube.com https://youtube.com https://player.vimeo.com https://www.google.com https://recaptcha.net; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://vh.itserver.biz https://cdn.jsdelivr.net https://www.gstatic.com https://accounts.google.com https://www.google.com https://www.recaptcha.net; connect-src 'self' https: http: wss: data: blob:; worker-src 'self' blob: https://www.gstatic.com;">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval' https: http: data: blob:; img-src 'self' data: https: http: blob:; frame-src 'self' https://vh.itserver.biz https://icare.com.co https://icare-backend-inky.vercel.app https://docs.google.com https://www.youtube.com https://youtube.com https://player.vimeo.com https://www.google.com https://recaptcha.net; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://vh.itserver.biz https://cdn.jsdelivr.net https://www.gstatic.com https://accounts.google.com https://www.google.com https://www.recaptcha.net; connect-src 'self' https: http: wss: data: blob:; worker-src 'self' blob: https://www.gstatic.com;">
   <link rel="apple-touch-icon" href="icons/Icon-192.png">
   <link rel="icon" type="image/png" href="favicon.png"/>
   <title>iCare</title>
@@ -186,7 +186,7 @@
         _postToJitsi({ type: 'icare-context', mode: 'consultation' });
         var token = _consultAuthToken || _lsToken();
         if (!token || !_consultChatChannel) return;
-        fetch('https://icare-backend-inky.vercel.app/api/call-chat/messages/'
+        fetch('https://icare.com.co/api/call-chat/messages/'
               + encodeURIComponent(_consultChatChannel) + '?since=' + _consultFileCursor, {
           headers: { 'Authorization': 'Bearer ' + token },
         }).then(function(r) { return r.json(); })
@@ -236,7 +236,7 @@
         _postToJitsiLms({ type: 'icare-context', mode: 'lms', isInstructor: _lmsIsInstructor });
         var token = _lmsAuthToken || _lsToken();
         if (!token || !_lmsChatChannel) return;
-        fetch('https://icare-backend-inky.vercel.app/api/call-chat/messages/'
+        fetch('https://icare.com.co/api/call-chat/messages/'
               + encodeURIComponent(_lmsChatChannel) + '?since=' + _lmsFileCursor, {
           headers: { 'Authorization': 'Bearer ' + token },
         }).then(function(r) { return r.json(); })
@@ -316,49 +316,182 @@
     // calls) and the two-button "Prescription"/"Patient History" stack
     // (normal consultations).
     var _callTabBtns = [];
+    var _callTabContainer = null;
     window.showCallTabButtons = function(buttons) {
       try {
         _removeCallTabButtons();
+        // Single container sitting just above the Jitsi toolbar, centered
+        var container = document.createElement('div');
+        container.id = 'icare-calltab-bar';
+        var isMobile = window.innerWidth < 768;
+        container.style.cssText = isMobile
+          ? 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);' +
+            'z-index:2147483000;pointer-events:auto;' +
+            'display:flex;flex-direction:row;gap:8px;align-items:center;'
+          : 'position:fixed;bottom:16px;left:calc(50% + 260px);' +
+            'z-index:2147483000;pointer-events:auto;' +
+            'display:flex;flex-direction:row;gap:8px;align-items:center;';
         (buttons || []).forEach(function(b) {
           var btn = document.createElement('button');
           btn.id = 'icare-calltab-' + b.id;
           btn.type = 'button';
           btn.textContent = b.label || b.id;
-          var sidePos = b.side === 'right' ? 'right:16px;' : 'left:16px;';
-          var topPos = 'top:' + (b.top != null ? b.top : 16) + 'px;';
           btn.style.cssText =
-            'position:fixed;' + topPos + sidePos +
-            'z-index:2147483000;pointer-events:auto;' +
-            'background:#0036BC;color:#fff;border:none;border-radius:24px;' +
-            'padding:12px 20px;font-size:14px;font-weight:700;font-family:system-ui,sans-serif;' +
-            'box-shadow:0 4px 14px rgba(0,0,0,.35);cursor:pointer;';
+            'background:rgba(30,30,30,0.75);color:#fff;' +
+            'border:1px solid rgba(255,255,255,0.2);border-radius:20px;' +
+            'padding:9px 18px;font-size:13px;font-weight:600;' +
+            'font-family:system-ui,sans-serif;cursor:pointer;' +
+            'backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);' +
+            'box-shadow:0 2px 8px rgba(0,0,0,0.4);white-space:nowrap;';
+          btn.onmouseover = function() { this.style.background='rgba(60,60,60,0.85)'; };
+          btn.onmouseout  = function() { this.style.background='rgba(30,30,30,0.75)'; };
           (function(id) {
             btn.addEventListener('click', function() {
-              // detail is a JSON STRING, not a raw object — dart:html's
-              // CustomEvent.detail interop for plain JS objects is
-              // unreliable across dart2js/dartdevc; a string payload
-              // decoded with dart:convert is the same proven pattern
-              // already used for icare-recaptcha-result etc.
               try { window.dispatchEvent(new CustomEvent('icareCallTabToggle', { detail: JSON.stringify({ id: id }) })); } catch(_) {}
             });
           })(b.id);
-          document.body.appendChild(btn);
+          container.appendChild(btn);
           _callTabBtns.push(btn);
         });
+        document.body.appendChild(container);
+        _callTabContainer = container;
       } catch(_) {}
     };
     window.hideCallTabButtons = function() { _removeCallTabButtons(); };
     function _removeCallTabButtons() {
-      try { _callTabBtns.forEach(function(b) { b.remove(); }); } catch(_) {}
+      try { if (_callTabContainer) { _callTabContainer.remove(); _callTabContainer = null; } } catch(_) {}
       _callTabBtns = [];
     }
+    // Re-attach container to whichever element is fullscreen so buttons stay
+    // visible when Jitsi's "View full screen" button is pressed.
+    function _reattachCallTabBtns() {
+      if (!_callTabContainer) return;
+      var fsEl = document.fullscreenElement || document.webkitFullscreenElement;
+      var target = fsEl || document.body;
+      try { target.appendChild(_callTabContainer); } catch(_) {}
+    }
+    document.addEventListener('fullscreenchange', _reattachCallTabBtns);
+    document.addEventListener('webkitfullscreenchange', _reattachCallTabBtns);
     // Back-compat single-button aliases — still used by the walk-in call
     // screens (reception_prescription_screen.dart, doctor_call_with_
     // prescription_screen.dart).
     window.showPrescriptionToggle = function(side) {
-      window.showCallTabButtons([{ id: 'prescription', label: '📄  Prescription', side: side }]);
+      window.showCallTabButtons([{ id: 'prescription', label: 'Prescription', side: side }]);
     };
     window.hidePrescriptionToggle = function() { _removeCallTabButtons(); };
+
+    // Panel open/close — disables Jitsi iframe pointer-events so Flutter
+    // widgets inside the left panel (TextFields, ListView, accordion tiles)
+    // receive clicks/scroll correctly. Without this the iframe's transparent
+    // glass pane absorbs all events even though it's visually behind the panel.
+    function _setJitsiPointerEvents(enabled) {
+      try {
+        var ifr = _jitsiApi ? _jitsiApi.getIFrame() : null;
+        if (!ifr) {
+          // Fallback: target any iframe on the page (Jitsi renders one)
+          ifr = document.querySelector('iframe');
+        }
+        if (ifr) ifr.style.pointerEvents = enabled ? 'auto' : 'none';
+      } catch(_) {}
+    }
+    window.addEventListener('icare-panel-open',  function() { _setJitsiPointerEvents(false); });
+    window.addEventListener('icare-panel-close', function() { _setJitsiPointerEvents(true);  });
+
+    // DOM-based prescription preview dialog — renders above Jitsi iframe,
+    // Flutter dialogs can't receive clicks when an HtmlElementView is live.
+    window.showRxPreviewDialog = function(data) {
+      var existing = document.getElementById('icare-rx-dialog');
+      if (existing) existing.remove();
+
+      var overlay = document.createElement('div');
+      overlay.id = 'icare-rx-dialog';
+      overlay.style.cssText =
+        'position:fixed;inset:0;z-index:2147483647;display:flex;align-items:center;' +
+        'justify-content:center;background:rgba(0,0,0,0.45);pointer-events:auto;';
+
+      var card = document.createElement('div');
+      card.style.cssText =
+        'background:#fff;border-radius:12px;width:420px;max-width:92vw;max-height:80vh;' +
+        'display:flex;flex-direction:column;box-shadow:0 8px 32px rgba(0,0,0,0.28);' +
+        'font-family:system-ui,sans-serif;overflow:hidden;pointer-events:auto;';
+
+      // Header
+      var header = document.createElement('div');
+      header.style.cssText =
+        'display:flex;align-items:center;padding:14px 16px;' +
+        'border-bottom:1px solid #E2E8F0;flex-shrink:0;';
+      header.innerHTML =
+        '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" style="margin-right:8px;flex-shrink:0;">' +
+        '<path d="M19 3H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2V5a2 2 0 00-2-2z" stroke="#0036BC" stroke-width="2"/>' +
+        '<path d="M9 12h6M9 8h6M9 16h4" stroke="#0036BC" stroke-width="2" stroke-linecap="round"/></svg>' +
+        '<span style="font-weight:700;font-size:15px;flex:1;">Prescription (Live)</span>';
+      var closeBtn = document.createElement('button');
+      closeBtn.type = 'button';
+      closeBtn.style.cssText =
+        'width:28px;height:28px;border-radius:50%;border:none;background:#F1F5F9;' +
+        'cursor:pointer;display:flex;align-items:center;justify-content:center;' +
+        'font-size:16px;color:#475569;line-height:1;padding:0;';
+      closeBtn.textContent = '×';
+      closeBtn.onclick = function() { overlay.remove(); };
+      header.appendChild(closeBtn);
+      card.appendChild(header);
+
+      // Body
+      var body = document.createElement('div');
+      body.style.cssText = 'padding:16px;overflow-y:auto;flex:1;';
+
+      if (!data || (!data.diagnoses && !data.medicines && !data.labTests && !data.notes)) {
+        body.innerHTML = '<p style="color:#64748B;font-size:13px;">Doctor has not yet written a prescription.<br>Check back once the doctor starts filling the form.</p>';
+      } else {
+        var html = '';
+        if (data.diagnoses && data.diagnoses.length) {
+          html += '<div style="margin-bottom:12px;">';
+          html += '<div style="font-weight:700;font-size:12px;color:#0036BC;margin-bottom:6px;">DIAGNOSIS</div>';
+          data.diagnoses.forEach(function(d) {
+            html += '<div style="font-size:13px;margin-bottom:4px;">&#8226; ' + (d.name || d) + '</div>';
+          });
+          html += '</div>';
+        }
+        if (data.medicines && data.medicines.length) {
+          html += '<div style="margin-bottom:12px;">';
+          html += '<div style="font-weight:700;font-size:12px;color:#0036BC;margin-bottom:6px;">MEDICINES</div>';
+          data.medicines.forEach(function(m) {
+            var name = m.medicineName || m.name || '';
+            var dose = m.dosage || m.dose || '';
+            var freq = m.frequency || '';
+            var dur = m.duration || '';
+            var detail = [dose, freq, dur].filter(Boolean).join(', ');
+            html += '<div style="font-size:13px;margin-bottom:4px;">&#8226; ' + name + (detail ? ' — ' + detail : '') + '</div>';
+          });
+          html += '</div>';
+        }
+        if (data.labTests && data.labTests.length) {
+          html += '<div style="margin-bottom:12px;">';
+          html += '<div style="font-weight:700;font-size:12px;color:#0036BC;margin-bottom:6px;">LAB TESTS</div>';
+          data.labTests.forEach(function(t) {
+            html += '<div style="font-size:13px;margin-bottom:4px;">&#8226; ' + (t.testName || t.name || t) + '</div>';
+          });
+          html += '</div>';
+        }
+        if (data.notes) {
+          html += '<div style="margin-bottom:12px;">';
+          html += '<div style="font-weight:700;font-size:12px;color:#0036BC;margin-bottom:6px;">NOTES</div>';
+          html += '<div style="font-size:13px;">' + data.notes + '</div>';
+          html += '</div>';
+        }
+        body.innerHTML = html;
+      }
+      card.appendChild(body);
+
+      // Close on overlay click (outside card)
+      overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.remove(); });
+      overlay.appendChild(card);
+      document.body.appendChild(overlay);
+    };
+    window.hideRxPreviewDialog = function() {
+      var el = document.getElementById('icare-rx-dialog');
+      if (el) el.remove();
+    };
 
     window.jitsiJoin = function(roomName, displayName, audioOnly, jwt, subject, authToken, chatChannelName) {
       // Store for consultation file upload
@@ -471,7 +604,7 @@
         console.warn('[iCare file-upload] DROPPED — missing auth/channel. consultChannel=', _consultChatChannel, 'lmsChannel=', _lmsChatChannel);
         return;
       }
-      fetch('https://icare-backend-inky.vercel.app/api/call-chat/send', {
+      fetch('https://icare.com.co/api/call-chat/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
         body: JSON.stringify({ channelName: channel, sender: sender, text: msg.data }),
@@ -730,6 +863,60 @@
       } catch (err) {}
     });
   </script>
+  <!-- Mobile browsers reclaim a background tab's GPU memory, which kills the
+       WebGL context CanvasKit renders through. On returning to the tab Flutter
+       keeps painting into a dead context, so the page comes back solid black
+       and only a manual refresh fixes it — reported on Android Chrome after
+       switching to WhatsApp and back.
+
+       Two parts: ask the canvas to restore itself when the context is lost
+       (preventDefault is what makes 'webglcontextrestored' fire at all), and
+       if it hasn't come back shortly after the tab is visible again, reload —
+       a reload is what the user was doing by hand anyway. -->
+  <script>
+    (function () {
+      var contextLost = false;
+
+      function watchCanvas(canvas) {
+        if (!canvas || canvas._icareGlWatched) return;
+        canvas._icareGlWatched = true;
+        canvas.addEventListener('webglcontextlost', function (e) {
+          // Without this the browser will not attempt a restore at all.
+          e.preventDefault();
+          contextLost = true;
+        }, false);
+        canvas.addEventListener('webglcontextrestored', function () {
+          contextLost = false;
+        }, false);
+      }
+
+      function watchAll() {
+        var list = document.querySelectorAll('canvas');
+        for (var i = 0; i < list.length; i++) watchCanvas(list[i]);
+      }
+
+      // Flutter creates (and recreates) its canvases after boot, so keep an eye
+      // on the tree rather than binding once.
+      if (window.MutationObserver) {
+        new MutationObserver(watchAll).observe(document.documentElement, {
+          childList: true, subtree: true,
+        });
+      }
+      document.addEventListener('DOMContentLoaded', watchAll);
+      window.addEventListener('load', watchAll);
+
+      document.addEventListener('visibilitychange', function () {
+        if (document.visibilityState !== 'visible') return;
+        watchAll();
+        // Give the browser a moment to restore the context on its own; reload
+        // only if it genuinely did not come back.
+        setTimeout(function () {
+          if (contextLost) window.location.reload();
+        }, 600);
+      });
+    })();
+  </script>
+
   <!-- SystemSound.play() (Flutter's built-in alert-sound API) is a no-op on
        web — there's no OS alert sound to hook into, so notification banners
        played silently despite the Dart code "calling" it. A short beep
