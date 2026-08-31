@@ -2167,10 +2167,68 @@ class _WebSettingsLayout extends StatelessWidget {
   }
 
   // â”€â”€ CONTACT â”€â”€
+  // Shares the Play Store listing. Uses Clipboard + a WhatsApp deep link
+  // rather than a native share sheet — share_plus isn't a dependency here, and
+  // these two cover how the link actually gets passed around in practice.
+  void _showInviteFriendsDialog(BuildContext context) {
+    const playStoreUrl = 'https://play.google.com/store/apps/details?id=com.cartzlinkv2.icare';
+    const message = 'I\'m using iCare for online doctor consultations, lab tests and medicines. Download it here: $playStoreUrl';
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Row(children: [
+          Icon(Icons.person_add_alt_1_rounded, color: Color(0xFF10B981), size: 22),
+          SizedBox(width: 10),
+          Text('Invite Friends', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
+        ]),
+        content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const Text('Share iCare with friends and family so they can book doctors, lab tests and medicines from their phone.',
+              style: TextStyle(fontSize: 13, color: Color(0xFF475569), height: 1.5)),
+          const SizedBox(height: 16),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+            decoration: BoxDecoration(color: const Color(0xFFF8FAFC), borderRadius: BorderRadius.circular(10), border: Border.all(color: const Color(0xFFE2E8F0))),
+            child: const Text(playStoreUrl, style: TextStyle(fontSize: 11, color: Color(0xFF334155))),
+          ),
+        ]),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Close')),
+          TextButton.icon(
+            onPressed: () {
+              Clipboard.setData(const ClipboardData(text: message));
+              Navigator.pop(ctx);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Invite link copied')),
+              );
+            },
+            icon: const Icon(Icons.copy_rounded, size: 16),
+            label: const Text('Copy Link'),
+          ),
+          ElevatedButton.icon(
+            onPressed: () async {
+              final uri = Uri.parse('https://wa.me/?text=${Uri.encodeComponent(message)}');
+              Navigator.pop(ctx);
+              if (await canLaunchUrl(uri)) {
+                await launchUrl(uri, mode: LaunchMode.externalApplication, webOnlyWindowName: '_blank');
+              }
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF10B981), foregroundColor: Colors.white),
+            icon: const Icon(Icons.share_rounded, size: 16),
+            label: const Text('Share'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _contactCard(BuildContext context) {
     return Card(elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Padding(padding: const EdgeInsets.all(20), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         _sectionLabel('Contact & Legal'), const SizedBox(height: 16),
+        _settingsTile(icon: Icons.person_add_alt_1_outlined, iconColor: const Color(0xFF10B981), title: 'Invite Friends', subtitle: 'Share the iCare app', onTap: () => _showInviteFriendsDialog(context)),
+        const Divider(height: 1),
         _settingsTile(icon: Icons.headset_mic_outlined, iconColor: const Color(0xFF6366F1), title: 'Contact Support', subtitle: 'Get help from our team', onTap: () => context.push('/help')),
         const Divider(height: 1),
         _settingsTile(icon: Icons.help_outline, iconColor: const Color(0xFF6366F1), title: 'FAQ', subtitle: 'Frequently asked questions', onTap: () => context.push('/help')),

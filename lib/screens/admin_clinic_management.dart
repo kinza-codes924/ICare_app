@@ -587,44 +587,51 @@ class _AdminClinicManagementState extends State<AdminClinicManagement> with Sing
                                   borderRadius: BorderRadius.circular(14),
                                   border: Border.all(color: const Color(0xFFE2E8F0)),
                                 ),
-                                child: ListTile(
-                                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-                                  leading: Container(
-                                    padding: const EdgeInsets.all(10),
-                                    decoration: BoxDecoration(
-                                      color: (isIndependent ? const Color(0xFF64748B) : AppColors.primaryColor).withValues(alpha: 0.08),
-                                      borderRadius: BorderRadius.circular(10),
+                                // Plain Row rather than a ListTile — the
+                                // walk-in switch plus the Assign button
+                                // together overflow ListTile.trailing's width
+                                // cap, which silently clips them out of view.
+                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                                child: Row(
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.all(10),
+                                      decoration: BoxDecoration(
+                                        color: (isIndependent ? const Color(0xFF64748B) : AppColors.primaryColor).withValues(alpha: 0.08),
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                      child: Icon(icon, color: isIndependent ? const Color(0xFF64748B) : AppColors.primaryColor, size: 20),
                                     ),
-                                    child: Icon(icon, color: isIndependent ? const Color(0xFF64748B) : AppColors.primaryColor, size: 20),
-                                  ),
-                                  title: Text(d['name']?.toString() ?? '', style: const TextStyle(fontWeight: FontWeight.w600)),
-                                  subtitle: Text(clinicName, style: const TextStyle(fontSize: 13)),
-                                  trailing: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      // Walk-ins are a front-desk feature, so
-                                      // the admin picks which doctors get the
-                                      // card rather than every doctor seeing it.
-                                      Column(
+                                    const SizedBox(width: 14),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
                                         mainAxisSize: MainAxisSize.min,
                                         children: [
-                                          const Text('Walk-in', style: TextStyle(fontSize: 10, color: Color(0xFF64748B))),
-                                          Switch(
-                                            value: d['walkinEnabled'] == true,
-                                            onChanged: (v) => _toggleWalkin(d, v),
-                                          ),
+                                          Text(d['name']?.toString() ?? '', style: const TextStyle(fontWeight: FontWeight.w600)),
+                                          const SizedBox(height: 2),
+                                          Text(clinicName, style: const TextStyle(fontSize: 13, color: Color(0xFF64748B))),
                                         ],
                                       ),
-                                      const SizedBox(width: 4),
-                                      OutlinedButton(
-                                        onPressed: () => _assignDoctorClinic(d),
-                                        style: OutlinedButton.styleFrom(
-                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                                        ),
-                                        child: const Text('Assign'),
+                                    ),
+                                    // Walk-ins are a front-desk feature, so the
+                                    // admin picks which doctors get the card
+                                    // rather than every doctor seeing it.
+                                    const Text('Walk-in', style: TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+                                    Switch(
+                                      value: d['walkinEnabled'] == true,
+                                      onChanged: (v) => _toggleWalkin(d, v),
+                                    ),
+                                    const SizedBox(width: 6),
+                                    OutlinedButton(
+                                      onPressed: () => _assignDoctorClinic(d),
+                                      style: OutlinedButton.styleFrom(
+                                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                                       ),
-                                    ],
-                                  ),
+                                      child: const Text('Assign'),
+                                    ),
+                                  ],
                                 ),
                               ),
                             );

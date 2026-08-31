@@ -3,11 +3,27 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:icare/models/doctor.dart';
 import 'package:icare/providers/auth_provider.dart';
+import 'package:icare/services/doctor_service.dart';
 import 'package:icare/screens/book_appointment.dart';
 import 'package:icare/utils/theme.dart';
 import 'package:icare/utils/utils.dart';
 import 'package:icare/widgets/back_button.dart';
 import 'package:icare/widgets/custom_text.dart';
+
+// The doctor list strips large base64 avatars from its payload to keep that
+// (30s-polled) list fast, so the object handed to this screen often has no
+// photo even when the doctor has one. Fetch the full record by id for the
+// avatar — this screen loads once, so the weight is fine here.
+final _doctorPhotoProvider = FutureProvider.family<String?, String>((ref, doctorId) async {
+  try {
+    final result = await DoctorService().getDoctorById(doctorId);
+    if (result['success'] == true) {
+      final pic = result['doctor']?['profilePicture']?.toString();
+      if (pic != null && pic.isNotEmpty) return pic;
+    }
+  } catch (_) {}
+  return null;
+});
 
 class DoctorDetailScreen extends ConsumerWidget {
   const DoctorDetailScreen({super.key, required this.doctor});
@@ -19,6 +35,11 @@ class DoctorDetailScreen extends ConsumerWidget {
     final bool isDesktop = Utils.windowWidth(context) > 600;
     final averageRating = doctor.averageRating;
     final selectedRole = ref.watch(authProvider).userRole;
+    // Prefer whatever the list already gave us; fall back to the fetched one.
+    final listPhoto = doctor.user.profilePicture;
+    final photo = (listPhoto != null && listPhoto.isNotEmpty)
+        ? listPhoto
+        : ref.watch(_doctorPhotoProvider(doctor.user.id)).value;
 
     // Mobile view with standard AppBar
     if (!isDesktop) {
@@ -71,8 +92,8 @@ class DoctorDetailScreen extends ConsumerWidget {
                   CircleAvatar(
                     radius: 50,
                     backgroundColor: AppColors.primaryColor.withValues(alpha: 0.1),
-                    backgroundImage: buildProfileImageProvider(doctor.user.profilePicture),
-                    child: buildProfileImageProvider(doctor.user.profilePicture) == null
+                    backgroundImage: buildProfileImageProvider(photo),
+                    child: buildProfileImageProvider(photo) == null
                         ? Text(
                             doctor.user.name.isNotEmpty ? doctor.user.name.substring(0, 1).toUpperCase() : 'D',
                             style: TextStyle(fontSize: 40, fontWeight: FontWeight.bold, color: AppColors.primaryColor),
@@ -538,8 +559,8 @@ class DoctorDetailScreen extends ConsumerWidget {
                               child: CircleAvatar(
                                 radius: isDesktop ? 65 : 55,
                                 backgroundColor: const Color(0xFFF0F9FF),
-                                backgroundImage: buildProfileImageProvider(doctor.user.profilePicture),
-                                child: buildProfileImageProvider(doctor.user.profilePicture) == null
+                                backgroundImage: buildProfileImageProvider(photo),
+                                child: buildProfileImageProvider(photo) == null
                                     ? Text(
                                         doctor.user.name.isNotEmpty ? doctor.user.name.substring(0, 1).toUpperCase() : 'D',
                                         style: TextStyle(fontSize: isDesktop ? 56 : 48, fontWeight: FontWeight.w900, color: AppColors.primaryColor),
