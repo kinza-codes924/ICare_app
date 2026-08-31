@@ -194,12 +194,16 @@ router.get('/get_all_doctors', async (req, res) => {
     // The list card shows an initial/placeholder for missing photos anyway;
     // the full photo loads on the doctor's own profile screen. 12KB keeps tiny
     // icons inline while dropping the heavy ones from this list payload.
+    // …so a heavy avatar is swapped for a URL to the cacheable /avatar route
+    // below instead of being dropped. The browser fetches each one once and
+    // caches it, so the 30s poll no longer re-downloads any of them — the list
+    // stays fast AND doctors actually show their photo.
     const MAX_INLINE_PICTURE = 12 * 1024;
     doctors.forEach(d => {
       if (typeof d.profilePicture === 'string'
         && d.profilePicture.startsWith('data:')
         && d.profilePicture.length > MAX_INLINE_PICTURE) {
-        d.profilePicture = null;
+        d.profilePicture = `/api/doctors/${d._id.toString()}/avatar`;
       }
     });
 
@@ -444,6 +448,36 @@ router.post('/leave-requests', authMiddleware, async (req, res) => {
     await DoctorProfile.findOneAndUpdate({ user_id: doctorId }, { $push: { leaveRequests: { _id: new mongoose.Types.ObjectId(), fromDate: from, toDate: to, reason: reason||'', status:'pending', conflictingAppointments: conflicting, createdAt: new Date() } } }, { upsert: true });
     res.json({ success: true, message: 'Leave request submitted. Pending admin approval.', conflictingAppointments: conflicting });
   } catch (e) { console.error('leave-requests POST error:', e); res.status(500).json({ success: false, message: e.message }); }
+});
+
+// ─── DOCTOR AVATAR ────────────────────────────────────────────────────────────
+// Serves a doctor's profile photo as a real cacheable image rather than inline
+// base64 in the doctor list. The list route re-runs every 30s, so inlining a
+// 40-210KB avatar per doctor made it crawl; sent as a URL, each photo is
+// fetched once and then served from browser cache. Public: a doctor's photo is
+// already shown to anyone browsing the doctor list.
+router.get('/:id/avatar', async (req, res) => {
+  try {
+    await connectMongoDB();
+    const id = toId(req.params.id);
+    if (!id) return res.status(400).end();
+    const user = await User.findById(id).select('profilePicture').lean();
+    const pic = user?.profilePicture;
+    if (typeof pic !== 'string' || !pic.startsWith('data:')) return res.status(404).end();
+
+    const match = /^data:([^;]+);base64,(.*)$/s.exec(pic);
+    if (!match) return res.status(404).end();
+    const buf = Buffer.from(match[2], 'base64');
+
+    res.set('Content-Type', match[1]);
+    // Photos change rarely; ETag lets an unchanged one come back as a 304.
+    res.set('Cache-Control', 'public, max-age=86400');
+    res.set('ETag', `"${id.toString()}-${buf.length}"`);
+    return res.send(buf);
+  } catch (e) {
+    console.error('doctor avatar error:', e.message);
+    return res.status(500).end();
+  }
 });
 
 // ─── WALK-IN PATIENTS (front-desk visits under this doctor) ───────────────────

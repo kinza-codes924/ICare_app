@@ -225,9 +225,17 @@ class _DoctorsListState extends State<DoctorsList> {
           color: const Color(0xFF0F172A),
         ),
       ),
+      // One scroll view for the whole page. The filter block used to sit as a
+      // fixed child above an Expanded list, so it never moved while scrolling
+      // and the results were confined to whatever height was left over. As
+      // slivers, the filters scroll away and the list owns the full viewport —
+      // and there is still only one vertical scrollable, so nothing competes.
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : Column(
+          : CustomScrollView(
+              slivers: [
+                SliverToBoxAdapter(
+                  child: Column(
               children: [
                 // Active filter banner
                 if (_searchQuery.isNotEmpty && (_searchMode == 'condition' || _searchMode == 'specialty'))
@@ -584,29 +592,34 @@ class _DoctorsListState extends State<DoctorsList> {
                     ],
                   ),
                 ),
-                // Doctors Grid
-                Expanded(
-                  child: _filteredDoctors.isEmpty
-                      ? Center(
-                          child: CustomText(
-                            text: 'No doctors found'.tr(),
-                            fontSize: 16,
-                            color: Colors.grey,
-                          ),
-                        )
-                      : ListView.builder(
-                          itemCount: _filteredDoctors.length,
-                          padding: EdgeInsets.symmetric(
-                            horizontal: isDesktop ? 40 : 16,
-                            vertical: 16,
-                          ),
-                          itemBuilder: (ctx, i) {
-                            return DoctorProfileCard(
-                              doctor: _filteredDoctors[i],
-                            );
-                          },
-                        ),
+              ],
+                  ),
                 ),
+                // Doctors list
+                if (_filteredDoctors.isEmpty)
+                  SliverFillRemaining(
+                    hasScrollBody: false,
+                    child: Center(
+                      child: CustomText(
+                        text: 'No doctors found'.tr(),
+                        fontSize: 16,
+                        color: Colors.grey,
+                      ),
+                    ),
+                  )
+                else
+                  SliverPadding(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: isDesktop ? 40 : 16,
+                      vertical: 16,
+                    ),
+                    sliver: SliverList(
+                      delegate: SliverChildBuilderDelegate(
+                        (ctx, i) => DoctorProfileCard(doctor: _filteredDoctors[i]),
+                        childCount: _filteredDoctors.length,
+                      ),
+                    ),
+                  ),
               ],
             ),
     );

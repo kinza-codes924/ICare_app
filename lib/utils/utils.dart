@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:icare/services/api_config.dart';
 import 'package:responsive_framework/responsive_framework.dart';
 
 class Utils {
@@ -75,6 +76,13 @@ ImageProvider? buildProfileImageProvider(String? url) {
     } catch (_) {
       return null;
     }
+  }
+  // Large avatars come back from list endpoints as a server-relative path
+  // (e.g. /api/doctors/<id>/avatar) so the browser can cache them instead of
+  // re-downloading base64 on every poll. NetworkImage needs an absolute URL.
+  if (url.startsWith('/')) {
+    final origin = ApiConfig.baseUrl.replaceFirst(RegExp(r'/api/?$'), '');
+    return NetworkImage('$origin$url');
   }
   return NetworkImage(url);
 }
