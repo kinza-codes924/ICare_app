@@ -234,6 +234,10 @@ router.get('/get_all_doctors', async (req, res) => {
         specialties: p.specialties || [],
         clinicName: p.clinic_name || null,
         clinicAddress: p.clinic_address || null,
+        // Which standalone iCare Clinic this doctor belongs to, if any. Unset
+        // means an independent telehealth doctor — the booking screen uses it
+        // to decide whether cash-at-clinic is an option.
+        clinicId: p.clinicId || null,
         consultationType: p.consultation_type || [],
         rating: p.rating || 0,
         totalReviews: p.total_reviews || 0,
@@ -551,6 +555,10 @@ router.get('/:id', async (req, res) => {
         availableTime: profile.available_hours,
         rating: profile.rating || 0,
         totalReviews: profile.total_reviews || 0,
+        clinicName: profile.clinic_name || null,
+        clinicAddress: profile.clinic_address || null,
+        clinicId: profile.clinicId || null,
+        degrees: profile.degrees || [],
       },
     });
   } catch (error) {

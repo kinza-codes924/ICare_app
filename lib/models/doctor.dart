@@ -12,6 +12,9 @@ class Doctor {
   final String? licenseNumber;
   final String? clinicName;
   final String? clinicAddress;
+  // Set when the doctor belongs to a standalone iCare Clinic; unset means an
+  // independent telehealth doctor. Cash-at-clinic only applies to the former.
+  final String? clinicId;
   final List<String> availableDays;
   final AvailableTime? availableTime;
   final bool isApproved;
@@ -34,6 +37,7 @@ class Doctor {
     this.licenseNumber,
     this.clinicName,
     this.clinicAddress,
+    this.clinicId,
     this.availableDays = const [],
     this.availableTime,
     this.isApproved = false,
@@ -127,6 +131,7 @@ class Doctor {
       experience: json['experience']?.toString(),
       licenseNumber: json['licenseNumber']?.toString(),
       clinicName: json['clinicName']?.toString(),
+      clinicId: json['clinicId']?.toString(),
       clinicAddress: json['clinicAddress']?.toString(),
       availableDays: parseStringList(json['availableDays']),
       availableTime: parseAvailableTime(json['availableTime']),

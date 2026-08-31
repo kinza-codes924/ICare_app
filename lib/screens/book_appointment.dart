@@ -245,11 +245,12 @@ class _BookAppointmentScreenState extends ConsumerState<BookAppointmentScreen> {
             builder: (_) => SelectPaymentMethod(
               appointmentId: appointmentId,
               amount: fee.toDouble(),
-              // Booking a doctor from the app is an online consultation — pay
-              // online only, never "Pay at Clinic". Cash-at-clinic stays only
-              // for the iCare Clinics walk-in flow (reception) and lab-test
-              // collection. isInstant:true suppresses the cash option here.
-              isInstant: true,
+              // A doctor attached to a standalone iCare Clinic is seen in
+              // person, so cash-at-clinic (and the online-payment discount
+              // that goes with it) applies. An independent telehealth doctor
+              // has no clinic to pay at — isInstant:true hides the cash option
+              // for them.
+              isInstant: (widget.doctor.clinicId ?? '').isEmpty,
               onPaymentSuccess: (successContext, {voucherCode}) {
                 Navigator.of(successContext).popUntil((route) => route.isFirst);
               },
@@ -778,22 +779,35 @@ class _BookAppointmentScreenState extends ConsumerState<BookAppointmentScreen> {
           ),
           const SizedBox(height: 8),
 
-          // Consultation type + fee — shows the 5% online-payment
-          // discounted price (the default path on SelectPaymentMethod,
-          // which _confirmBooking pushes next); "Pay at the Clinic" there
-          // charges the full fee instead.
+          // Consultation type + fee. For an iCare Clinic doctor the next
+          // screen offers cash-at-clinic alongside a 5% online-payment
+          // discount, so show that discounted price here; a telehealth doctor
+          // has neither and pays the full fee.
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text('Consultation Fee'.tr(), style: const TextStyle(fontSize: 13, color: Color(0xFF64748B))),
               if (fee > 0)
-                // Full consultation fee — the 5% online-payment discount was
-                // removed per client request.
-                Text(
-                  'PKR $fee',
-                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
-                )
+                if ((widget.doctor.clinicId ?? '').isNotEmpty)
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        'PKR ${(fee * 0.95).round()}',
+                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
+                      ),
+                      Text(
+                        '5% off on online payment',
+                        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF10B981)),
+                      ),
+                    ],
+                  )
+                else
+                  Text(
+                    'PKR $fee',
+                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
+                  )
               else
                 Text(
                   'Free / As per clinic'.tr(),

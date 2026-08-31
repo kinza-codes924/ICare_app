@@ -12,6 +12,26 @@ function toId(id) {
   try { return new mongoose.Types.ObjectId(id); } catch { return null; }
 }
 
+// Resolves a doctor the patient is allowed to book. The doctor LIST is built
+// from whoever has a DoctorProfile (see routes/doctors.js) and never looks at
+// User.role, but booking used to require role === 'doctor' exactly — so an
+// account whose primary role is something else (a patient who was later
+// approved as a doctor, where the new role lands in `roles` rather than
+// replacing `role`) appeared in the list and then failed with "Doctor not
+// found" at checkout. Accept the same set the list does.
+async function findBookableDoctor(doctorId) {
+  const id = toId(doctorId);
+  if (!id) return null;
+  const user = await User.findOne({ _id: id, is_active: { $ne: false } });
+  if (!user) return null;
+  const isDoctorRole = /^doctor$/i.test(user.role || '')
+    || (user.roles || []).some(r => /^doctor$/i.test(r));
+  if (isDoctorRole) return user;
+  // Falls back to the profile so the list and booking can never disagree.
+  const profile = await DoctorProfile.findOne({ user_id: id }).select('_id').lean();
+  return profile ? user : null;
+}
+
 // A booking row exists before the patient pays, and the slot isn't held until
 // they do — so tell them straight away that it isn't confirmed yet. Without
 // this a patient who dropped out at checkout heard nothing at all and assumed
@@ -203,7 +223,7 @@ router.post('/', authMiddleware, async (req, res) => {
       return res.status(400).json({ success: false, message: 'Doctor, date, and time are required' });
     }
 
-    const doctor = await User.findOne({ _id: toId(doctorId), role: /^doctor$/i });
+    const doctor = await findBookableDoctor(doctorId);
     if (!doctor) {
       return res.status(404).json({ success: false, message: 'Doctor not found' });
     }
@@ -238,7 +258,7 @@ router.post('/book_appointment', authMiddleware, async (req, res) => {
       return res.status(400).json({ success: false, message: 'Doctor, date, and time are required' });
     }
 
-    const doctor = await User.findOne({ _id: toId(doctorId), role: /^doctor$/i });
+    const doctor = await findBookableDoctor(doctorId);
     if (!doctor) {
       return res.status(404).json({ success: false, message: 'Doctor not found' });
     }

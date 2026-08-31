@@ -265,9 +265,14 @@ async function calculateAmount({ type, refId, voucherCode, userId, installmentIn
     if (appt.paymentStatus === 'paid') throw new Error('This appointment is already paid');
     const profile = await DoctorProfile.findOne({ user_id: appt.doctor_id }).lean();
     const fee = Number(profile?.consultation_fee) || 0;
-    // Online-payment discount removed per client request — full consultation
-    // fee whether paying now (safepay) or in cash.
-    const amount = fee;
+    // 5% off for paying online, but only for an iCare Clinic appointment —
+    // that is the one where cash-at-clinic is the alternative the discount is
+    // meant to steer away from. A telehealth consultation has no cash option
+    // and is charged in full. Must mirror _onlineDiscountApplies in
+    // select_payment_method.dart, or the patient sees one price and is
+    // charged another.
+    const isClinicAppointment = !!(profile?.clinicId && String(profile.clinicId).trim());
+    const amount = isClinicAppointment ? Math.round(fee * 0.95) : fee;
     return {
       amount, originalAmount: fee,
       payeeId: appt.doctor_id || null,
