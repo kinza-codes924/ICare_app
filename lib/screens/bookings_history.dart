@@ -759,7 +759,10 @@ class _ApptCardState extends State<_ApptCard> {
   Future<void> _cancelAppointment() async {
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (_) => AlertDialog(
+      // Pop with the DIALOG's context, not the card's. Using the outer context
+      // popped the wrong navigator, so the dialog stayed on screen and the
+      // pending await then blew up with a null-check error.
+      builder: (dialogCtx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Text('Cancel Appointment'.tr(),
             style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
@@ -767,11 +770,11 @@ class _ApptCardState extends State<_ApptCard> {
             'Are you sure you want to cancel this appointment? This cannot be undone.'.tr()),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context, false),
+            onPressed: () => Navigator.pop(dialogCtx, false),
             child: Text('No'.tr(), style: const TextStyle(color: Color(0xFF64748B))),
           ),
           ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
+            onPressed: () => Navigator.pop(dialogCtx, true),
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFFEF4444),
               foregroundColor: Colors.white,
