@@ -42,9 +42,11 @@ class ClinicDetailScreen extends ConsumerWidget {
             ElevatedButton(
               onPressed: () {
                 Navigator.pop(ctx);
+                // Carry the clinic through the login round-trip too, or the
+                // booking comes back priced as plain telehealth.
                 context.go(
                   clinic.doctorId != null
-                      ? '/login?redirectDoctorId=${clinic.doctorId}'
+                      ? '/login?redirectDoctorId=${clinic.doctorId}&redirectClinicId=${clinic.id}'
                       : '/login',
                 );
               },

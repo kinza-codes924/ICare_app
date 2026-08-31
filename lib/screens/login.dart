@@ -33,7 +33,10 @@ class LoginScreen extends ConsumerStatefulWidget {
   // slot picker after login instead of dropping them on the generic
   // dashboard, where the clinic they came from is lost.
   final String? redirectDoctorId;
-  const LoginScreen({super.key, this.redirectDoctorId});
+  // The clinic that sign-in was prompted from, carried through so the booking
+  // is still recognised as a clinic visit (cash + online-payment discount).
+  final String? redirectClinicId;
+  const LoginScreen({super.key, this.redirectDoctorId, this.redirectClinicId});
   @override
   ConsumerState<LoginScreen> createState() => _LoginScreenState();
 }
@@ -130,7 +133,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     if (!mounted) return;
     final doctorId = widget.redirectDoctorId;
     if (doctorId != null && doctorId.isNotEmpty) {
-      context.go('/book-appointment?doctorId=$doctorId');
+      final clinicId = widget.redirectClinicId;
+      // Without the clinic the booking is priced as plain telehealth, losing
+      // cash-at-clinic and the online-payment discount.
+      final clinicPart = (clinicId != null && clinicId.isNotEmpty)
+          ? '&clinicId=$clinicId'
+          : '';
+      context.go('/book-appointment?doctorId=$doctorId$clinicPart');
       return;
     }
     context.go('/dashboard');
@@ -142,7 +151,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
   String get _signupRoute {
     final doctorId = widget.redirectDoctorId;
     if (doctorId != null && doctorId.isNotEmpty) {
-      return '/signup?redirectDoctorId=$doctorId';
+      final clinicId = widget.redirectClinicId;
+      final clinicPart = (clinicId != null && clinicId.isNotEmpty)
+          ? '&redirectClinicId=$clinicId'
+          : '';
+      return '/signup?redirectDoctorId=$doctorId$clinicPart';
     }
     return '/signup';
   }

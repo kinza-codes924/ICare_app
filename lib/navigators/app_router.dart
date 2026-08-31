@@ -313,7 +313,13 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/login',
         builder: (_, state) {
           final redirectDoctorId = state.uri.queryParameters['redirectDoctorId'];
-          return LoginScreen(redirectDoctorId: redirectDoctorId);
+          // Set when the sign-in was prompted from a clinic page, so the
+          // booking it returns to is still priced as a clinic visit.
+          final redirectClinicId = state.uri.queryParameters['redirectClinicId'];
+          return LoginScreen(
+            redirectDoctorId: redirectDoctorId,
+            redirectClinicId: redirectClinicId,
+          );
         },
       ),
       GoRoute(
@@ -321,7 +327,12 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (_, state) {
           final role = state.uri.queryParameters['role'] ?? 'Patient';
           final redirectDoctorId = state.uri.queryParameters['redirectDoctorId'];
-          return SignupScreen(role: role, redirectDoctorId: redirectDoctorId);
+          final redirectClinicId = state.uri.queryParameters['redirectClinicId'];
+          return SignupScreen(
+            role: role,
+            redirectDoctorId: redirectDoctorId,
+            redirectClinicId: redirectClinicId,
+          );
         },
       ),
       GoRoute(

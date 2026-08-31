@@ -25,7 +25,15 @@ class SignupScreen extends ConsumerStatefulWidget {
   // instead of dropping them on the generic dashboard, same as
   // LoginScreen.redirectDoctorId.
   final String? redirectDoctorId;
-  const SignupScreen({super.key, this.role = 'Patient', this.redirectDoctorId});
+  // The clinic the sign-up was prompted from, so the booking it returns to is
+  // still priced as a clinic visit.
+  final String? redirectClinicId;
+  const SignupScreen({
+    super.key,
+    this.role = 'Patient',
+    this.redirectDoctorId,
+    this.redirectClinicId,
+  });
 
   @override
   ConsumerState<SignupScreen> createState() => _SignupScreenState();
@@ -294,7 +302,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
   void _goAfterSignup() {
     final doctorId = widget.redirectDoctorId;
     if (doctorId != null && doctorId.isNotEmpty) {
-      context.go('/book-appointment?doctorId=$doctorId');
+      context.go('/book-appointment?doctorId=$doctorId${_clinicQuery()}');
     } else {
       context.go('/dashboard');
     }
@@ -328,7 +336,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
           if (!mounted) return;
           final doctorId = widget.redirectDoctorId;
           if (doctorId != null && doctorId.isNotEmpty) {
-            context.go('/book-appointment?doctorId=$doctorId');
+            context.go('/book-appointment?doctorId=$doctorId${_clinicQuery()}');
           } else {
             context.go('/dashboard');
           }
@@ -800,6 +808,13 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
   // and they go through admin approval anyway.
   // [topPlacement] puts the button above the form (mobile) rather than below
   // it, so the "or" divider has to sit after the button instead of before it.
+  // Appended to the post-signup booking URL so a clinic booking stays a clinic
+  // booking through the sign-up round-trip.
+  String _clinicQuery() {
+    final clinicId = widget.redirectClinicId;
+    return (clinicId != null && clinicId.isNotEmpty) ? '&clinicId=$clinicId' : '';
+  }
+
   // Shared by both layouts so they can't drift apart.
   Widget _backButton() {
     return GestureDetector(
