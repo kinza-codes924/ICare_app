@@ -66,7 +66,20 @@ async function getAppointments(userId, userRole) {
 
   // Case-insensitive role check — some accounts have 'Doctor', some have 'doctor'
   if (userRole?.toLowerCase() === 'doctor') {
-    appointments = await Appointment.find({ doctor_id: uid }).sort({ createdAt: -1 }).lean();
+    // An appointment row is created before the patient pays, so a patient who
+    // cancelled at the payment step still left a 'pending' row behind — and it
+    // showed up here as a real request the doctor could Accept, blocking the
+    // slot for a booking nobody paid for. A booking only reaches the doctor
+    // once it is paid; cash-at-clinic bookings are marked paid by reception,
+    // and anything already accepted/finished stays visible regardless.
+    appointments = await Appointment.find({
+      doctor_id: uid,
+      $or: [
+        { paymentStatus: 'paid' },
+        { paymentMethod: 'cash' },
+        { status: { $nin: ['pending', 'cancelled'] } },
+      ],
+    }).sort({ createdAt: -1 }).lean();
     const patientIds = [...new Set(appointments.map(a => a.patient_id.toString()))];
     const patients = await User.find({ _id: { $in: patientIds.map(id => toId(id)) } }).lean();
     const pMap = {};

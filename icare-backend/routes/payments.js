@@ -632,6 +632,11 @@ router.post('/create', authMiddleware, async (req, res) => {
         // so they can expect the patient and confirm cash on arrival —
         // payment confirmation (fulfillPayment) won't fire until then, so
         // notify here at booking time instead.
+        // Mark it as a deliberate cash booking. The doctor's appointment list
+        // hides unpaid 'pending' rows (a patient who bailed at the payment step
+        // used to leave one behind that looked like a real request) — this flag
+        // is what separates "chose to pay at the clinic" from "never paid".
+        await Appointment.findByIdAndUpdate(rId, { $set: { paymentMethod: 'cash' } });
         const appt = await Appointment.findById(rId).lean();
         await notifyAppointmentBooked(appt, { cashPending: true });
       } else {

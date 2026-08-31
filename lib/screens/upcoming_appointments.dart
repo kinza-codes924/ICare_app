@@ -114,7 +114,11 @@ class _UpcomingAppointmentsState extends ConsumerState<UpcomingAppointments> {
   }
 
   void _showAppointmentDetails(AppointmentDetail appt) {
-    final statusLabel = appt.status == 'confirmed' ? 'Confirmed' : 'Pending';
+    final statusLabel = appt.status == 'confirmed'
+        ? 'Confirmed'
+        : (appt.paymentStatus.toLowerCase() != 'paid'
+            ? 'Payment pending — not booked yet'
+            : 'Pending');
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
@@ -413,7 +417,13 @@ class _UpcomingAppointmentsState extends ConsumerState<UpcomingAppointments> {
 
   Widget _appointmentTile(AppointmentDetail appt) {
     final confirmed = appt.status == 'confirmed' || appt.status == 'in_progress';
-    final statusColor = confirmed ? const Color(0xFF10B981) : const Color(0xFFF59E0B);
+    // An unpaid booking is still 'pending', so it showed the same amber
+    // "Pending" chip as a paid booking awaiting the doctor — the patient had no
+    // way to tell that a cancelled payment hadn't actually booked them a slot.
+    final unpaid = !confirmed && appt.paymentStatus.toLowerCase() != 'paid';
+    final statusColor = confirmed
+        ? const Color(0xFF10B981)
+        : (unpaid ? const Color(0xFFEF4444) : const Color(0xFFF59E0B));
     final photo = appt.doctor?.profilePicture;
 
     return Container(
@@ -462,7 +472,7 @@ class _UpcomingAppointmentsState extends ConsumerState<UpcomingAppointments> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                   decoration: BoxDecoration(color: statusColor.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(20)),
-                  child: Text(confirmed ? 'Confirmed' : 'Pending',
+                  child: Text(confirmed ? 'Confirmed' : (unpaid ? 'Payment Pending' : 'Pending'),
                       style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: statusColor)),
                 ),
               ],

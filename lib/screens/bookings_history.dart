@@ -312,7 +312,7 @@ class _BookingsHistoryScreenState extends State<BookingsHistoryScreen> {
       ],
 
       // Categories: Pending → Upcoming → Completed → Cancelled
-      _categoryTile('Pending'.tr(), 'Awaiting confirmation'.tr(),
+      _categoryTile('Pending'.tr(), 'Awaiting payment or confirmation'.tr(),
           _count('pending'), const Color(0xFFF59E0B),
           Icons.hourglass_empty_rounded, _byStatus('pending')),
       const SizedBox(height: 10),
@@ -918,6 +918,31 @@ class _ApptCardState extends State<_ApptCard> {
                               style: TextStyle(fontSize: 11, color: color, fontWeight: FontWeight.w600)),
                         ],
                       ),
+                      // A booking whose payment never completed is still
+                      // status:'pending', so it read as a normal confirmed
+                      // slot — patients thought a cancelled payment had still
+                      // booked them in. Say so plainly instead.
+                      if (appt.status.toLowerCase() == 'pending' &&
+                          appt.paymentStatus.toLowerCase() != 'paid') ...[
+                        const SizedBox(height: 5),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFEF4444).withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: const Row(mainAxisSize: MainAxisSize.min, children: [
+                            Icon(Icons.error_outline_rounded, size: 11, color: Color(0xFFEF4444)),
+                            SizedBox(width: 4),
+                            Flexible(
+                              child: Text(
+                                'Not booked — payment pending',
+                                style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Color(0xFFEF4444)),
+                              ),
+                            ),
+                          ]),
+                        ),
+                      ],
                     ],
                   ),
                 ),
