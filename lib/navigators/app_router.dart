@@ -328,7 +328,10 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/book-appointment',
         builder: (_, state) {
           final doctorId = state.uri.queryParameters['doctorId'] ?? '';
-          return BookAppointmentRouteLoader(doctorId: doctorId);
+          // Present when the booking was opened from a clinic page — that is
+          // what makes it a clinic visit for pricing.
+          final clinicId = state.uri.queryParameters['clinicId'];
+          return BookAppointmentRouteLoader(doctorId: doctorId, clinicId: clinicId);
         },
       ),
       GoRoute(path: '/work-with-us', builder: (_, _) => const WorkWithUsSignup()),

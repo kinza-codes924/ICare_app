@@ -1178,7 +1178,10 @@ class _BookAppointmentScreenState extends ConsumerState<BookAppointmentScreen> {
 // end up, so the redirect has nothing to fight.
 class BookAppointmentRouteLoader extends StatefulWidget {
   final String doctorId;
-  const BookAppointmentRouteLoader({super.key, required this.doctorId});
+  // Carried through from a clinic page (?clinicId=...) so a booking opened by
+  // URL is still recognised as a clinic visit.
+  final String? clinicId;
+  const BookAppointmentRouteLoader({super.key, required this.doctorId, this.clinicId});
 
   @override
   State<BookAppointmentRouteLoader> createState() => _BookAppointmentRouteLoaderState();
@@ -1215,6 +1218,6 @@ class _BookAppointmentRouteLoaderState extends State<BookAppointmentRouteLoader>
     if (_doctor == null) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
-    return BookAppointmentScreen(doctor: _doctor!);
+    return BookAppointmentScreen(doctor: _doctor!, clinicId: widget.clinicId);
   }
 }
