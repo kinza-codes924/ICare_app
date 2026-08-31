@@ -6,6 +6,11 @@ const appointmentSchema = new mongoose.Schema({
   appointment_date: { type: String },
   appointment_time: { type: String },
   consultation_type: { type: String, default: 'in-person' },
+  // Which iCare Clinic the patient booked through, if any. Unset means a
+  // direct/telehealth booking. Pricing reads this to decide whether the
+  // online-payment discount applies — the clinic department accounts don't
+  // all carry a clinicId of their own, so the booking route is the signal.
+  clinicId: String,
   notes: { type: String, default: '' },
   channel_name: { type: String }, // for video consultations
   status: {

@@ -11,8 +11,12 @@ import 'package:icare/utils/utils.dart';
 import 'package:icare/widgets/back_button.dart';
 
 class BookAppointmentScreen extends ConsumerStatefulWidget {
-  const BookAppointmentScreen({super.key, required this.doctor});
+  const BookAppointmentScreen({super.key, required this.doctor, this.clinicId});
   final Doctor doctor;
+  // Set when the patient reached this screen through an iCare Clinic, which
+  // is what makes the visit a clinic visit — cash-at-clinic and the
+  // online-payment discount follow from that, not from the doctor record.
+  final String? clinicId;
 
   @override
   ConsumerState<BookAppointmentScreen> createState() => _BookAppointmentScreenState();
@@ -140,6 +144,13 @@ class _BookAppointmentScreenState extends ConsumerState<BookAppointmentScreen> {
     } catch (_) {}
     return null;
   }
+
+  // True when this is a visit to an iCare Clinic: either the patient came in
+  // through a clinic's page, or the doctor is attached to one. The route
+  // matters because the clinic department accounts don't all carry a clinicId
+  // of their own.
+  bool get _isClinicVisit =>
+      (widget.clinicId ?? '').isNotEmpty || (widget.doctor.clinicId ?? '').isNotEmpty;
 
   // Slots differ per weekday now that the doctor's own blocks drive them, so
   // regenerate whenever the date changes rather than only once on load.
@@ -269,6 +280,9 @@ class _BookAppointmentScreenState extends ConsumerState<BookAppointmentScreen> {
       timeSlot: _isEmergency ? 'Emergency' : _selectedSlot!,
       reason: _reasonController.text.trim(),
       isEmergency: _isEmergency,
+      clinicId: _isClinicVisit
+          ? ((widget.clinicId ?? '').isNotEmpty ? widget.clinicId : widget.doctor.clinicId)
+          : null,
     );
 
     setState(() => _isBooking = false);
@@ -284,12 +298,11 @@ class _BookAppointmentScreenState extends ConsumerState<BookAppointmentScreen> {
             builder: (_) => SelectPaymentMethod(
               appointmentId: appointmentId,
               amount: fee.toDouble(),
-              // A doctor attached to a standalone iCare Clinic is seen in
-              // person, so cash-at-clinic (and the online-payment discount
-              // that goes with it) applies. An independent telehealth doctor
-              // has no clinic to pay at — isInstant:true hides the cash option
-              // for them.
-              isInstant: (widget.doctor.clinicId ?? '').isEmpty,
+              // A clinic visit is seen in person, so cash-at-clinic (and the
+              // online-payment discount that goes with it) applies. An
+              // independent telehealth consultation has no clinic to pay at —
+              // isInstant:true hides the cash option for those.
+              isInstant: !_isClinicVisit,
               onPaymentSuccess: (successContext, {voucherCode}) {
                 Navigator.of(successContext).popUntil((route) => route.isFirst);
               },
@@ -825,7 +838,7 @@ class _BookAppointmentScreenState extends ConsumerState<BookAppointmentScreen> {
             children: [
               Text('Consultation Fee'.tr(), style: const TextStyle(fontSize: 13, color: Color(0xFF64748B))),
               if (fee > 0)
-                if ((widget.doctor.clinicId ?? '').isNotEmpty)
+                if (_isClinicVisit)
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [

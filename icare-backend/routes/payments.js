@@ -271,7 +271,13 @@ async function calculateAmount({ type, refId, voucherCode, userId, installmentIn
     // and is charged in full. Must mirror _onlineDiscountApplies in
     // select_payment_method.dart, or the patient sees one price and is
     // charged another.
-    const isClinicAppointment = !!(profile?.clinicId && String(profile.clinicId).trim());
+    // The booking records the clinic it was made through; fall back to the
+    // doctor's own clinic. The clinic department accounts don't all carry a
+    // clinicId, so the booking route is the reliable signal.
+    const isClinicAppointment = !!(
+      (appt.clinicId && String(appt.clinicId).trim()) ||
+      (profile?.clinicId && String(profile.clinicId).trim())
+    );
     const amount = isClinicAppointment ? Math.round(fee * 0.95) : fee;
     return {
       amount, originalAmount: fee,

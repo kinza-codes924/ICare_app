@@ -74,7 +74,14 @@ class ClinicDetailScreen extends ConsumerWidget {
         final doctor = Doctor.fromJson(result['doctor']);
         if (context.mounted) {
           Navigator.of(context).push(
-            MaterialPageRoute(builder: (_) => BookAppointmentScreen(doctor: doctor)),
+            MaterialPageRoute(
+              // This booking IS at this clinic, whatever the doctor record
+              // happens to say — that's what makes cash-at-clinic and the
+              // online-payment discount apply. Relying on the doctor's own
+              // clinicId missed it, since the clinic department accounts
+              // don't all have one set.
+              builder: (_) => BookAppointmentScreen(doctor: doctor, clinicId: clinic.id),
+            ),
           );
         }
         return;

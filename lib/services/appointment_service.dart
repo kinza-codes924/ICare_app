@@ -13,6 +13,10 @@ class AppointmentService {
     required String timeSlot,
     String? reason,
     bool isEmergency = false,
+    // Set when the booking came through an iCare Clinic — the backend prices
+    // the appointment from this, so it has to be recorded on the booking
+    // rather than re-derived from the doctor later.
+    String? clinicId,
   }) async {
     try {
       debugPrint('📅 Booking appointment...');
@@ -30,6 +34,7 @@ class AppointmentService {
             'reason': reason,
             if (isEmergency) 'isEmergency': true,
             if (isEmergency) 'type': 'emergency',
+            if (clinicId != null && clinicId.isNotEmpty) 'clinicId': clinicId,
           });
 
       debugPrint('✅ Appointment booked successfully');

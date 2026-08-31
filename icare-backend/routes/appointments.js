@@ -252,7 +252,7 @@ router.post('/book_appointment', authMiddleware, async (req, res) => {
   try {
     await connectMongoDB();
     const patientId = toId(req.user.id);
-    const { doctorId, date, timeSlot, reason } = req.body;
+    const { doctorId, date, timeSlot, reason, clinicId } = req.body;
 
     if (!doctorId || !date || !timeSlot) {
       return res.status(400).json({ success: false, message: 'Doctor, date, and time are required' });
@@ -316,6 +316,10 @@ router.post('/book_appointment', authMiddleware, async (req, res) => {
       consultation_type: 'in-person',
       notes: reason || '',
       status: 'pending',
+      // Which iCare Clinic this visit is at, when the patient booked through
+      // one. Pricing reads this — a clinic visit gets the online-payment
+      // discount, a telehealth consultation does not.
+      ...(clinicId ? { clinicId: String(clinicId) } : {}),
     });
 
     notifyBookingAwaitingPayment(appt).catch(() => {});
