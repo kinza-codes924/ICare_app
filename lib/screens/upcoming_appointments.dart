@@ -72,6 +72,83 @@ class _UpcomingAppointmentsState extends ConsumerState<UpcomingAppointments> {
     return _appointments.where((a) => _isSameDay(a.date, day)).toList();
   }
 
+  // What's coming up on any LATER date, so an empty day can point the patient
+  // at where their appointments actually are. Capped — this is a hint, not a
+  // second full list.
+  List<AppointmentDetail> get _upcomingAfterSelected {
+    final day = _selectedDate ?? DateTime.now();
+    final cutoff = DateTime(day.year, day.month, day.day);
+    final later = _appointments
+        .where((a) => DateTime(a.date.year, a.date.month, a.date.day).isAfter(cutoff))
+        .toList()
+      ..sort((a, b) => a.date.compareTo(b.date));
+    return later.take(5).toList();
+  }
+
+  Widget _upcomingJumpTile(AppointmentDetail appt) {
+    final unpaid = appt.status.toLowerCase() == 'pending' &&
+        appt.paymentStatus.toLowerCase() != 'paid';
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        // Jump the picker to that date so the full card is one tap away.
+        onTap: () => setState(() => _selectedDate = appt.date),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: const Color(0xFFE2E8F0)),
+          ),
+          child: Row(children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: (unpaid ? const Color(0xFFEF4444) : _navy).withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(Icons.event_rounded,
+                  size: 16, color: unpaid ? const Color(0xFFEF4444) : _navy),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    appt.doctor?.name != null ? 'Dr. ${appt.doctor!.name}' : 'Doctor',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w800, color: _navy),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    '${DateFormat('EEE, d MMM').format(appt.date)}  ·  ${appt.timeSlot}',
+                    style: const TextStyle(fontSize: 12, color: _slate, fontWeight: FontWeight.w600),
+                  ),
+                ],
+              ),
+            ),
+            if (unpaid)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEF4444).withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: const Text('Payment Pending',
+                    style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: Color(0xFFEF4444))),
+              )
+            else
+              const Icon(Icons.chevron_right_rounded, size: 18, color: _slate),
+          ]),
+        ),
+      ),
+    );
+  }
+
   void _openConsultation(AppointmentDetail appt) {
     final user = ref.read(authProvider).user;
     Navigator.of(context).push(
@@ -387,16 +464,20 @@ class _UpcomingAppointmentsState extends ConsumerState<UpcomingAppointments> {
       );
     }
     if (list.isEmpty) {
+      // Picking an empty date used to be a dead end — the patient had to hunt
+      // day by day to find where their next appointment actually was. Show
+      // what's coming up instead, each row jumping to its own date.
+      final upcoming = _upcomingAfterSelected;
       return ListView(
         padding: padding,
         physics: const AlwaysScrollableScrollPhysics(),
         children: [
-          const SizedBox(height: 60),
+          const SizedBox(height: 28),
           Center(
             child: Column(
               children: [
-                const Icon(Icons.event_busy_rounded, size: 48, color: Color(0xFFCBD5E1)),
-                const SizedBox(height: 14),
+                const Icon(Icons.event_busy_rounded, size: 40, color: Color(0xFFCBD5E1)),
+                const SizedBox(height: 12),
                 Text(
                   'No appointments on ${DateFormat('d MMMM yyyy').format(_selectedDate ?? DateTime.now())}',
                   textAlign: TextAlign.center,
@@ -405,6 +486,13 @@ class _UpcomingAppointmentsState extends ConsumerState<UpcomingAppointments> {
               ],
             ),
           ),
+          if (upcoming.isNotEmpty) ...[
+            const SizedBox(height: 28),
+            const Text('Your next appointments',
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: _navy)),
+            const SizedBox(height: 10),
+            ...upcoming.map(_upcomingJumpTile),
+          ],
         ],
       );
     }
