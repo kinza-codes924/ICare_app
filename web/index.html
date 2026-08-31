@@ -869,10 +869,11 @@
        and only a manual refresh fixes it — reported on Android Chrome after
        switching to WhatsApp and back.
 
-       Two parts: ask the canvas to restore itself when the context is lost
-       (preventDefault is what makes 'webglcontextrestored' fire at all), and
-       if it hasn't come back shortly after the tab is visible again, reload —
-       a reload is what the user was doing by hand anyway. -->
+       Listening for 'webglcontextlost' alone was not enough: the context dies
+       while the tab is backgrounded, so the event fires with the page frozen
+       (or never reaches us at all) and the flag stays false. So on return we
+       ask the canvas directly whether its context is gone, rather than
+       trusting that we saw the event. -->
   <script>
     (function () {
       var contextLost = false;
@@ -895,6 +896,24 @@
         for (var i = 0; i < list.length; i++) watchCanvas(list[i]);
       }
 
+      // Ask the live canvases whether their context is actually dead. Reading
+      // the existing context is non-destructive — getContext returns the one
+      // already created rather than making a new one.
+      function anyContextDead() {
+        var list = document.querySelectorAll('canvas');
+        for (var i = 0; i < list.length; i++) {
+          var c = list[i];
+          // Skip canvases too small to be the renderer (Flutter keeps a few
+          // tiny measurement ones around).
+          if (c.width < 2 || c.height < 2) continue;
+          try {
+            var gl = c.getContext('webgl2') || c.getContext('webgl');
+            if (gl && gl.isContextLost()) return true;
+          } catch (e) { /* not a WebGL canvas — ignore */ }
+        }
+        return false;
+      }
+
       // Flutter creates (and recreates) its canvases after boot, so keep an eye
       // on the tree rather than binding once.
       if (window.MutationObserver) {
@@ -905,15 +924,34 @@
       document.addEventListener('DOMContentLoaded', watchAll);
       window.addEventListener('load', watchAll);
 
-      document.addEventListener('visibilitychange', function () {
-        if (document.visibilityState !== 'visible') return;
+      var checking = false;
+      function checkAfterResume() {
+        if (checking) return;
+        checking = true;
         watchAll();
-        // Give the browser a moment to restore the context on its own; reload
-        // only if it genuinely did not come back.
+        // Two passes: the browser is given a moment to restore the context on
+        // its own, then a second look in case restoration was slower.
         setTimeout(function () {
-          if (contextLost) window.location.reload();
-        }, 600);
+          if (contextLost || anyContextDead()) {
+            window.location.reload();
+            return;
+          }
+          setTimeout(function () {
+            checking = false;
+            if (contextLost || anyContextDead()) window.location.reload();
+          }, 1200);
+        }, 500);
+      }
+
+      document.addEventListener('visibilitychange', function () {
+        if (document.visibilityState === 'visible') checkAfterResume();
       });
+      // Fires when the page is restored from the back/forward cache, which a
+      // backgrounded mobile tab often comes back through.
+      window.addEventListener('pageshow', function (e) {
+        if (e.persisted) checkAfterResume();
+      });
+      window.addEventListener('focus', checkAfterResume);
     })();
   </script>
 

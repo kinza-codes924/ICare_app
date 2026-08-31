@@ -1026,16 +1026,12 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                       style: TextStyle(fontSize: 14, color: Colors.grey[500], fontFamily: 'Gilroy-Medium'),
                     ),
                     const SizedBox(height: 28),
-                    // Google goes above the form on mobile: below the long
-                    // field list it sat off-screen and patients reported not
-                    // being able to find it at all. (Desktop keeps it after
-                    // the form — everything fits without scrolling there.)
-                    _googleSignUpBlock(topPlacement: true),
                     ..._buildFields(),
                     const SizedBox(height: 8),
                     const Center(child: RecaptchaCheckbox()),
                     const SizedBox(height: 16),
                     _submitBtn(),
+                    _googleSignUpBlock(),
                     const SizedBox(height: 20),
                     _signInLink(),
                   ],
@@ -1146,12 +1142,16 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        // Google goes above the form on mobile: below the long
+                        // field list it sat off-screen and patients reported
+                        // not finding it at all. Desktop keeps it after the
+                        // form, where everything fits without scrolling.
+                        _googleSignUpBlock(topPlacement: true),
                         ..._buildFields(),
                         const SizedBox(height: 8),
                         const Center(child: RecaptchaCheckbox()),
                         const SizedBox(height: 16),
                         _submitBtn(height: 50),
-                        _googleSignUpBlock(),
                         const SizedBox(height: 20),
                         _signInLink(),
                         const SizedBox(height: 20),
