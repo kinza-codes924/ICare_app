@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'api_service.dart';
 import '../utils/shared_pref.dart';
@@ -54,9 +55,19 @@ class ConnectNowService {
         'requestId': requestId,
         'doctorName': userData?.name ?? 'Doctor',
       });
+      // A 409 means the patient cancelled or the request timed out before the
+      // doctor tapped Accept — an ordinary race, not a crash. Return it as a
+      // normal failed result so the caller can show a plain message instead of
+      // letting Dio's raw exception reach the screen.
+      if (response.statusCode == 409) {
+        return {'success': false, 'expired': true, 'message': 'This request is no longer available'};
+      }
       return response.data;
     } catch (e) {
       debugPrint('Accept request error: $e');
+      if (e is DioException && e.response?.statusCode == 409) {
+        return {'success': false, 'expired': true, 'message': 'This request is no longer available'};
+      }
       rethrow;
     }
   }

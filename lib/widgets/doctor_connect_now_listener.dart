@@ -383,6 +383,23 @@ class _DoctorConnectNowListenerState extends State<DoctorConnectNowListener> {
             } catch (_) {}
             try {
               final result = await _service.acceptRequest(requestId);
+              // The patient can cancel (or the request can time out) between the
+              // ring and the tap — clear the busy flag set just above, or the
+              // doctor stays marked in-consultation for a call that never began.
+              if (result['success'] == false) {
+                try {
+                  final prefs = await SharedPreferences.getInstance();
+                  await prefs.setBool('doctor_in_consultation', false);
+                } catch (_) {}
+                if (nav.canPop()) nav.pop();
+                ScaffoldMessenger.of(nav.context).showSnackBar(
+                  SnackBar(
+                    content: Text(result['message']?.toString() ?? 'This request is no longer available'),
+                    backgroundColor: const Color(0xFFF59E0B),
+                  ),
+                );
+                return;
+              }
               final callChannel = result['channelName']?.toString() ?? channelName;
               final callPatient = result['patientName']?.toString() ?? patientName;
               final appointmentId = result['appointmentId']?.toString() ?? '';
@@ -436,10 +453,15 @@ class _DoctorConnectNowListenerState extends State<DoctorConnectNowListener> {
               );
             } catch (e) {
               debugPrint('❌ Accept failed: $e');
+              try {
+                final prefs = await SharedPreferences.getInstance();
+                await prefs.setBool('doctor_in_consultation', false);
+              } catch (_) {}
               if (nav.canPop()) nav.pop();
               ScaffoldMessenger.of(nav.context).showSnackBar(
-                SnackBar(
-                  content: Text('Failed to accept: $e'),
+                const SnackBar(
+                  // Raw exception text used to be dumped on screen here.
+                  content: Text('Could not accept the request. Please try again.'),
                   backgroundColor: Colors.red,
                 ),
               );
