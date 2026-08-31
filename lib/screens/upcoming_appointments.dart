@@ -6,6 +6,7 @@ import 'package:flutter_size_matters/flutter_size_matters.dart';
 import 'package:icare/models/appointment_detail.dart';
 import 'package:icare/providers/auth_provider.dart';
 import 'package:icare/screens/consultation_chat_screen_v2.dart';
+import 'package:icare/screens/select_payment_method.dart';
 import 'package:icare/services/api_config.dart';
 import 'package:icare/services/appointment_service.dart';
 import 'package:icare/utils/theme.dart';
@@ -489,7 +490,47 @@ class _UpcomingAppointmentsState extends ConsumerState<UpcomingAppointments> {
                 Text(appt.timeSlot, style: const TextStyle(fontSize: 12.5, color: _navy, fontWeight: FontWeight.w600)),
               ],
             ),
+            // The slot isn't held until it's paid for, so give the patient the
+            // way to finish rather than only telling them it's outstanding.
+            if (unpaid) ...[
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: () => _proceedToPayment(appt),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFEF4444),
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  icon: const Icon(Icons.payment_rounded, size: 18),
+                  label: const Text('Proceed to Payment',
+                      style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w800)),
+                ),
+              ),
+            ],
           ],
+        ),
+      ),
+    );
+  }
+
+  void _proceedToPayment(AppointmentDetail appt) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => SelectPaymentMethod(
+          appointmentId: appt.id,
+          amount: appt.consultationFee,
+          // Same as the booking flow: an app booking is paid online, never
+          // "Pay at Clinic".
+          isInstant: true,
+          onPaymentSuccess: (successContext, {voucherCode}) {
+            Navigator.of(successContext).pop();
+            _load();
+          },
         ),
       ),
     );

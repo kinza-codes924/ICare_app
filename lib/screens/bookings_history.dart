@@ -5,6 +5,7 @@ import 'package:icare/widgets/date_filter_bar.dart';
 import 'package:icare/screens/doctors_list.dart';
 import 'package:icare/screens/prescription_detail_screen.dart';
 import 'package:icare/screens/profile_or_appointement_view.dart';
+import 'package:icare/screens/select_payment_method.dart';
 import 'package:go_router/go_router.dart';
 import 'package:icare/services/appointment_service.dart';
 import 'package:icare/services/consultation_service.dart';
@@ -735,6 +736,26 @@ class _ApptCard extends StatefulWidget {
 class _ApptCardState extends State<_ApptCard> {
   bool _cancelling = false;
 
+  // Sends the patient to checkout for a booking whose payment never completed.
+  // Reuses onCancelled to refresh the list — it just means "this row changed".
+  void _proceedToPayment() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => SelectPaymentMethod(
+          appointmentId: widget.appt.id,
+          amount: widget.appt.consultationFee,
+          // Same as the booking flow: an app booking is paid online.
+          isInstant: true,
+          onPaymentSuccess: (successContext, {voucherCode}) {
+            Navigator.of(successContext).pop();
+            widget.onCancelled?.call();
+          },
+        ),
+      ),
+    );
+  }
+
   Future<void> _cancelAppointment() async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -957,6 +978,31 @@ class _ApptCardState extends State<_ApptCard> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
+                // The slot isn't held until it's paid for, so offer the way to
+                // finish rather than only flagging that it's outstanding.
+                if (appt.status.toLowerCase() == 'pending' &&
+                    appt.paymentStatus.toLowerCase() != 'paid') ...[
+                  GestureDetector(
+                    onTap: _proceedToPayment,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEF4444),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.payment_rounded, size: 12, color: Colors.white),
+                          SizedBox(width: 4),
+                          Text('Proceed to Payment',
+                              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white)),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                ],
                 // View Prescription (only for completed)
                 if (isCompleted) ...[
                   GestureDetector(

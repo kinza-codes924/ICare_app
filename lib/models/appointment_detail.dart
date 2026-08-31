@@ -12,6 +12,8 @@ class AppointmentDetail {
   // status:'pending', so without this the list showed it as an ordinary
   // pending appointment and the patient thought it was booked.
   final String paymentStatus;
+  // Needed to send the patient straight to checkout for an unpaid booking.
+  final double consultationFee;
   final String? channelName;
   final String? consultationType;
   final int? durationMinutes;
@@ -27,6 +29,7 @@ class AppointmentDetail {
     this.reason,
     required this.status,
     this.paymentStatus = 'unpaid',
+    this.consultationFee = 0,
     this.channelName,
     this.consultationType,
     this.durationMinutes,
@@ -100,6 +103,9 @@ class AppointmentDetail {
       reason: json['reason']?.toString() ?? json['notes']?.toString(),
       status: json['status']?.toString() ?? 'pending',
       paymentStatus: json['paymentStatus']?.toString() ?? json['payment_status']?.toString() ?? 'unpaid',
+      consultationFee: double.tryParse(
+              (json['consultation_fee'] ?? json['consultationFee'] ?? 0).toString()) ??
+          0,
       channelName: json['channel_name']?.toString(),
       consultationType: json['consultation_type']?.toString(),
       durationMinutes: json['durationMinutes'] is num
