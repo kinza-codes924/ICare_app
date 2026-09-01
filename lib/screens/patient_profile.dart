@@ -7,10 +7,25 @@ import 'package:icare/screens/patient_addresses_screen.dart';
 import 'package:icare/screens/profile_edit.dart';
 import 'package:icare/utils/imagePaths.dart';
 import 'package:icare/utils/theme.dart';
+import 'package:icare/services/user_service.dart';
 import 'package:icare/utils/utils.dart';
 import 'package:icare/widgets/back_button.dart';
 import 'package:icare/widgets/custom_text.dart';
 import 'package:icare/widgets/svg_wrapper.dart';
+
+// The auth provider's user is whatever login returned, so a photo added (or
+// changed) since then never showed here — the screen rendered the initial
+// placeholder even though the account had a picture. Read it fresh instead.
+final _patientProfilePictureProvider = FutureProvider<String?>((ref) async {
+  try {
+    final result = await UserService().getUserProfile();
+    if (result['success'] == true) {
+      final pic = result['user']?['profilePicture']?.toString();
+      if (pic != null && pic.isNotEmpty) return pic;
+    }
+  } catch (_) {}
+  return null;
+});
 
 class PatientProfile extends ConsumerWidget {
   const PatientProfile({super.key});
@@ -18,6 +33,11 @@ class PatientProfile extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(authProvider).user;
+    // Prefer whatever the session already has; fall back to the fetched one.
+    final sessionPic = user?.profilePicture;
+    final profilePic = (sessionPic != null && sessionPic.isNotEmpty)
+        ? sessionPic
+        : ref.watch(_patientProfilePictureProvider).value;
 
     return Scaffold(
       appBar: AppBar(
@@ -101,7 +121,7 @@ class PatientProfile extends ConsumerWidget {
                 backgroundColor: AppColors.primaryColor.withValues(alpha: 0.1),
                 child: ClipOval(
                   child: () {
-                    final imgProvider = buildProfileImageProvider(user?.profilePicture);
+                    final imgProvider = buildProfileImageProvider(profilePic);
                     if (imgProvider != null) {
                       final r = Utils.windowWidth(context) * 0.34;
                       return Image(
