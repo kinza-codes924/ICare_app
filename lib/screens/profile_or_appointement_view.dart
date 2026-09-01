@@ -24,10 +24,33 @@ import 'package:icare/widgets/custom_text.dart';
 import 'package:icare/widgets/svg_wrapper.dart';
 import 'package:intl/intl.dart';
 
+// The doctor's photo and credentials come from the profile endpoint, not the
+// appointment. The desktop view already fetched them; mobile showed only a
+// name, so the same appointment looked half-empty on a phone.
+final _apptDoctorProfileProvider =
+    FutureProvider.family<Map<String, dynamic>?, String>((ref, doctorId) async {
+  if (doctorId.isEmpty) return null;
+  try {
+    return await AppointmentService().getDoctorProfile(doctorId);
+  } catch (_) {
+    return null;
+  }
+});
+
 class ProfileOrAppointmentViewScreen extends ConsumerWidget {
   final AppointmentDetail appointment;
 
   const ProfileOrAppointmentViewScreen({super.key, required this.appointment});
+
+  // 'in-person' → 'In-Person', matching how the desktop view reads.
+  static String _prettyType(String? raw) {
+    final t = (raw ?? 'in-person').trim();
+    if (t.isEmpty) return 'In-Person';
+    return t
+        .split('-')
+        .map((w) => w.isEmpty ? w : '${w[0].toUpperCase()}${w.substring(1)}')
+        .join('-');
+  }
 
   static bool _isAppointmentPast(AppointmentDetail appt) {
     try {
@@ -287,6 +310,11 @@ class ProfileOrAppointmentViewScreen extends ConsumerWidget {
                   const SizedBox(height: 8),
                   _detailRow('Time', appointment.timeSlot),
                   const SizedBox(height: 8),
+                  // Shown on desktop but missing here.
+                  _detailRow('Status', appointment.status.toUpperCase()),
+                  const SizedBox(height: 8),
+                  _detailRow('Type', _prettyType(appointment.consultationType)),
+                  const SizedBox(height: 8),
                   _detailRow('Booking for', 'Self'),
                 ],
               ),
@@ -337,6 +365,31 @@ class ProfileOrAppointmentViewScreen extends ConsumerWidget {
                   ),
                   const SizedBox(height: 12),
                   _detailRow('Name', otherPerson?.name ?? 'N/A'),
+                  // Same credentials the desktop view shows — a phone was
+                  // getting the name and nothing else.
+                  if (selectedRole != 'Doctor') ...[
+                    ...(() {
+                      final p = ref
+                          .watch(_apptDoctorProfileProvider(appointment.doctor?.id ?? ''))
+                          .value;
+                      if (p == null) return <Widget>[];
+                      final rows = <Widget>[];
+                      void add(String label, String? value) {
+                        if (value == null || value.isEmpty || value == 'null') return;
+                        rows.add(const SizedBox(height: 8));
+                        rows.add(_detailRow(label, value));
+                      }
+                      add('Specialization', p['specialization']?.toString());
+                      add('PMDC No.', p['licenseNumber']?.toString());
+                      final exp = p['experience'];
+                      if (exp != null && exp.toString().isNotEmpty) add('Experience', '$exp yrs');
+                      final rating = p['rating'];
+                      if (rating != null) {
+                        add('Rating', '$rating ★ (${p['totalReviews'] ?? 0} reviews)');
+                      }
+                      return rows;
+                    })(),
+                  ],
                   if (appointment.reason != null &&
                       appointment.reason!.isNotEmpty &&
                       !appointment.reason!.contains('Channel:')) ...[
