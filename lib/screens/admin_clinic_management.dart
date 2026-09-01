@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:icare/services/api_service.dart';
 import 'package:icare/utils/theme.dart';
+import 'package:icare/widgets/back_button.dart';
 
 // Standalone iCare Clinics — same static ids as lib/data/icare_clinics_data.dart.
 const Map<String, String> kIcareClinics = {
@@ -434,10 +435,11 @@ class _AdminClinicManagementState extends State<AdminClinicManagement> with Sing
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_rounded),
-          onPressed: () => Navigator.of(context).maybePop(),
-        ),
+        // maybePop() is a no-op when this route is the only one on the stack —
+        // which is exactly the case when the admin opens /admin/clinics by URL,
+        // so the arrow did nothing. CustomBackButton falls back to the
+        // dashboard in that case.
+        leading: const CustomBackButton(color: Colors.white),
         title: const Text('iCare Clinics'),
         backgroundColor: AppColors.primaryColor,
         foregroundColor: Colors.white,

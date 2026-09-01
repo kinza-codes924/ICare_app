@@ -5,6 +5,7 @@ import 'package:icare/providers/auth_provider.dart';
 import 'package:icare/screens/clinic_admin_staff_tab.dart';
 import 'package:icare/services/api_service.dart';
 import 'package:icare/utils/theme.dart';
+import 'package:icare/widgets/back_button.dart';
 
 // Dashboard for a clinic-scoped admin account. Tab 1 is the original
 // booking-visibility view (every telehealth appointment, in-person
@@ -58,10 +59,9 @@ class _ClinicAdminDashboardState extends ConsumerState<ClinicAdminDashboard> wit
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_rounded),
-          onPressed: () => Navigator.of(context).maybePop(),
-        ),
+        // Same as admin_clinic_management: maybePop() does nothing when this
+        // route is the only one on the stack (opened by URL).
+        leading: const CustomBackButton(color: Colors.white),
         title: const Text('Clinic Dashboard'),
         backgroundColor: AppColors.primaryColor,
         foregroundColor: Colors.white,
