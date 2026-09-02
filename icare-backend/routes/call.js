@@ -19,23 +19,19 @@ router.post('/initiate', authMiddleware, async (req, res) => {
       ],
     };
 
-    // If a call between these two is already CONNECTED, don't start a second
-    // one. Both sides sitting in the chat would often ring each other at the
-    // same moment; whoever joined first was then re-prompted by the other's
-    // signal, over and over. Hand back the live call instead of creating a
-    // rival to it.
-    // Same 30-minute window as /incoming — a stale 'accepted' row must not
-    // permanently hand back a dead call instead of starting a fresh one.
-    // 'accepted' means the other side answered; a still-'pending' signal that
-    // THIS user placed is equally a call in flight — the caller's own row never
-    // changes status, so treating only 'accepted' as live let each side create
-    // its own parallel call.
+    // If a call between these two is already ANSWERED, don't start a second
+    // one — both sides sitting in the chat would often ring each other at the
+    // same moment, and whoever joined first then got re-prompted by the
+    // other's signal. Hand back the live call instead of creating a rival.
+    //
+    // Only 'accepted' counts here. A 'pending' row is a ring nobody picked up:
+    // treating those as live meant one unanswered call left the caller unable
+    // to ever ring again — the next attempt silently returned the dead signal
+    // and the other side was never notified at all.
     const active = await CallSignal.findOne({
+      ...pairFilter,
+      status: 'accepted',
       createdAt: { $gte: new Date(Date.now() - 30 * 60 * 1000) },
-      $or: [
-        { ...pairFilter, status: 'accepted' },
-        { callerId: req.user.id, receiverId, status: 'pending' },
-      ],
     }).sort({ createdAt: -1 });
     if (active) {
       return res.json({
@@ -46,7 +42,7 @@ router.post('/initiate', authMiddleware, async (req, res) => {
       });
     }
 
-    // Cancel any existing pending signal between these two users
+    // Clear out any unanswered ring between these two before placing a new one.
     await CallSignal.deleteMany({ ...pairFilter, status: 'pending' });
     const signal = await CallSignal.create({
       channelName,
@@ -96,18 +92,20 @@ router.get('/incoming', authMiddleware, async (req, res) => {
     // that crashed mid-call would otherwise leave an 'accepted' row behind and
     // silently block every future call for that user.
     const liveCutoff = new Date(Date.now() - 30 * 60 * 1000);
+    // A ring only lasts about a minute; past that an unanswered 'pending' row
+    // is just litter and must not keep marking its caller as busy.
+    const ringingCutoff = new Date(Date.now() - 90 * 1000);
     const inCall = await CallSignal.findOne({
-      createdAt: { $gte: liveCutoff },
       $or: [
         // The other side answered a call this user placed.
-        { status: 'accepted', callerId: req.user.id },
-        { status: 'accepted', receiverId: req.user.id },
-        // …or this user is the one who placed a call that's still ringing.
+        { status: 'accepted', callerId: req.user.id, createdAt: { $gte: liveCutoff } },
+        { status: 'accepted', receiverId: req.user.id, createdAt: { $gte: liveCutoff } },
+        // …or this user placed a call that is still actually ringing.
         // Only the RECEIVER's signal ever turns 'accepted' — the caller's stays
         // 'pending' for its whole life. Checking 'accepted' alone therefore
         // never recognised the caller as busy, so the moment the other side
         // rang back they got a dialog on top of the call they had just started.
-        { status: 'pending', callerId: req.user.id },
+        { status: 'pending', callerId: req.user.id, createdAt: { $gte: ringingCutoff } },
       ],
     }).sort({ createdAt: -1 }).maxTimeMS(2000);
 
