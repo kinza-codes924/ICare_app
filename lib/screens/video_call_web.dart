@@ -1,4 +1,5 @@
 // Web video call — Jitsi Meet External API via dart:js_interop
+import 'package:go_router/go_router.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:js_interop';
@@ -168,6 +169,25 @@ class _VideoCallWebState extends State<VideoCall> {
     _startClosedPoller();
   }
 
+  /// Leaves the call screen. Navigator.pop alone does nothing when this route
+  /// is the only one on the stack — the case when the consultation was opened
+  /// by URL, which is how it usually happens on a phone. Ending the call then
+  /// left the user staring at a dead dark screen. Fall back to the
+  /// consultation (or the dashboard) by location instead.
+  void _exitCallScreen() {
+    if (!mounted) return;
+    if (Navigator.of(context).canPop()) {
+      Navigator.pop(context);
+      return;
+    }
+    final consultationId = widget.consultationId;
+    if (consultationId != null && consultationId.isNotEmpty) {
+      context.go('/consultation/$consultationId');
+    } else {
+      context.go(_isDoctor ? '/doctor/dashboard' : '/patient/home');
+    }
+  }
+
   /// Poll the JS flag set when the user presses Jitsi's own hangup button.
   /// Jitsi's UI is the only call UI now, so this is how the screen closes.
   void _startClosedPoller() {
@@ -178,18 +198,20 @@ class _VideoCallWebState extends State<VideoCall> {
       if (!closed) return;
       _closedPoller?.cancel();
 
-      // Keep consultation rejoinable from the chat screen
-      if (widget.appointmentId != null && widget.appointmentId!.isNotEmpty) {
-        try {
-          await AppointmentService().updateAppointmentStatus(
-            appointmentId: widget.appointmentId!,
-            status: 'in_progress',
-          );
-        } catch (_) {}
-      }
+      // Leave the screen first. Awaiting the status update before popping meant
+      // a slow request held the user on a dead call screen; the update only
+      // keeps the consultation rejoinable, so it can finish on its own.
       if (mounted) {
         widget.onCallEnded?.call();
-        if (widget.popOnCallEnded) Navigator.pop(context);
+        if (widget.popOnCallEnded) _exitCallScreen();
+      }
+
+      // Keep consultation rejoinable from the chat screen
+      if (widget.appointmentId != null && widget.appointmentId!.isNotEmpty) {
+        AppointmentService().updateAppointmentStatus(
+          appointmentId: widget.appointmentId!,
+          status: 'in_progress',
+        ).catchError((_) => <String, dynamic>{});
       }
     });
   }
@@ -361,7 +383,7 @@ class _VideoCallWebState extends State<VideoCall> {
           await Future.delayed(const Duration(seconds: 2));
           if (mounted) {
             widget.onCallEnded?.call();
-            if (widget.popOnCallEnded) Navigator.pop(context);
+            if (widget.popOnCallEnded) _exitCallScreen();
           }
         }
       } catch (_) {}
@@ -1010,7 +1032,7 @@ class _VideoCallWebState extends State<VideoCall> {
       debugPrint('⚠️ appointmentId is null — cannot mark in_progress. channelName: ${widget.channelName}');
     }
 
-    if (mounted) Navigator.pop(context);
+    if (mounted) _exitCallScreen();
   }
   /// End Consultation button — opens workflow screen for doctor to complete documentation
   Future<void> _endConsultation() async {
@@ -1019,7 +1041,7 @@ class _VideoCallWebState extends State<VideoCall> {
       // No appointment ID - just leave the call (for quick calls)
       try { await CallService().endCall(widget.channelName); } catch (_) {}
       try { await _jitsiLeave().toDart; } catch (_) {}
-      if (mounted) Navigator.pop(context);
+      if (mounted) _exitCallScreen();
       return;
     }
 
@@ -1077,7 +1099,7 @@ class _VideoCallWebState extends State<VideoCall> {
 
       // Navigate back — the chat screen is already in the stack
       // Just pop back to ConsultationChatScreenV2
-      Navigator.pop(context);
+      _exitCallScreen();
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
