@@ -234,20 +234,47 @@ class _PatientHomeDashboardState extends ConsumerState<PatientHomeDashboard> {
       child: LayoutBuilder(builder: (context, constraints) {
         const gap = 12.0;
         final w = (constraints.maxWidth - gap * (columns - 1)) / columns;
+        // On a phone two columns leave a tile ~168px wide, and the icon plus
+        // padding eats ~94px of that — so a word like "Appointment" couldn't
+        // fit on the remaining ~74px and got broken mid-word ("Book App /
+        // ointment"). Stacking the icon above the label there gives the text
+        // the tile's full width.
+        final stacked = columns == 2;
         return Wrap(
           spacing: gap,
           runSpacing: gap,
-          children: actions.map((a) => SizedBox(width: w, child: _actionTile(a))).toList(),
+          children: actions
+              .map((a) => SizedBox(width: w, child: _actionTile(a, stacked: stacked)))
+              .toList(),
         );
       }),
     );
   }
 
-  Widget _actionTile(_QuickAction a) {
+  Widget _actionTile(_QuickAction a, {bool stacked = false}) {
     final bg = a.highlighted ? _blue : a.color.withValues(alpha: 0.07);
     final fg = a.highlighted ? Colors.white : _navy;
     final iconBg = a.highlighted ? Colors.white.withValues(alpha: 0.18) : a.color.withValues(alpha: 0.14);
     final iconFg = a.highlighted ? Colors.white : a.color;
+
+    final icon = Container(
+      width: 40,
+      height: 40,
+      decoration: BoxDecoration(color: iconBg, borderRadius: BorderRadius.circular(12)),
+      child: Icon(a.icon, color: iconFg, size: 21),
+    );
+    final label = Text(
+      a.label,
+      // Never split a word across lines — that's what produced "Book App /
+      // ointment". Wrapping between words is fine.
+      softWrap: true,
+      style: TextStyle(
+        fontSize: 12.5,
+        height: 1.25,
+        fontWeight: FontWeight.w800,
+        color: fg,
+      ),
+    );
 
     return Material(
       color: bg,
@@ -257,28 +284,23 @@ class _PatientHomeDashboardState extends ConsumerState<PatientHomeDashboard> {
         borderRadius: BorderRadius.circular(16),
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
-          child: Row(
-            children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(color: iconBg, borderRadius: BorderRadius.circular(12)),
-                child: Icon(a.icon, color: iconFg, size: 21),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  a.label,
-                  style: TextStyle(
-                    fontSize: 12.5,
-                    height: 1.25,
-                    fontWeight: FontWeight.w800,
-                    color: fg,
-                  ),
+          child: stacked
+              ? Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    icon,
+                    const SizedBox(height: 10),
+                    label,
+                  ],
+                )
+              : Row(
+                  children: [
+                    icon,
+                    const SizedBox(width: 12),
+                    Expanded(child: label),
+                  ],
                 ),
-              ),
-            ],
-          ),
         ),
       ),
     );
