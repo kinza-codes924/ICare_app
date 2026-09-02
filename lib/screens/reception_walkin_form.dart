@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:icare/screens/reception_prescription_screen.dart';
 import 'package:icare/services/reception_service.dart';
 import 'package:icare/utils/theme.dart';
+import 'package:icare/widgets/back_button.dart';
 
 class ReceptionWalkinForm extends StatefulWidget {
   const ReceptionWalkinForm({super.key});
@@ -94,7 +95,7 @@ class _ReceptionWalkinFormState extends State<ReceptionWalkinForm> {
           IconButton(
             icon: const Icon(Icons.home_outlined),
             tooltip: 'Back to Front Desk',
-            onPressed: () => Navigator.of(context).popUntil((route) => route.isFirst),
+            onPressed: () => goBackOrHome(context),
           ),
         ],
       ),

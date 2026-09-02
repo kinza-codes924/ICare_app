@@ -2482,7 +2482,7 @@ class _MarkAttendanceScreenState extends State<_MarkAttendanceScreen> {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Color(0xFF0F172A)),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () => goBackOrHome(context),
         ),
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:icare/utils/imagePaths.dart';
 import 'package:icare/utils/theme.dart';
+import 'package:icare/widgets/back_button.dart';
 
 class ProfessionalSignup extends StatefulWidget {
   final String role;
@@ -148,7 +149,7 @@ class _ProfessionalSignupState extends State<ProfessionalSignup> {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_rounded, color: Color(0xFF0036BC)),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () => goBackOrHome(context),
         ),
         title: Row(
           children: [

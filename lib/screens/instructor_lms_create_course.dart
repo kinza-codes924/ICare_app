@@ -5,6 +5,7 @@ import 'package:dio/dio.dart';
 import 'package:icare/services/lms_service.dart';
 import 'package:icare/services/api_service.dart';
 import 'package:icare/utils/theme.dart';
+import 'package:icare/widgets/back_button.dart';
 
 // Helper: get signed Cloudinary upload params from backend then upload directly
 Future<String?> _signedCloudinaryUpload({
@@ -524,7 +525,7 @@ class _InstructorLmsCreateCourseScreenState
                       Icons.arrow_back_rounded,
                       color: Color(0xFF0F172A),
                     ),
-                    onPressed: () => Navigator.pop(context),
+                    onPressed: () => goBackOrHome(context),
                   ),
                   const SizedBox(width: 4),
                   Column(
@@ -2336,7 +2337,7 @@ class _ModuleEditorPageState extends State<_ModuleEditorPage> {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () => goBackOrHome(context),
         ),
         title: Text(
           widget.existingModule == null ? 'Add Module' : 'Edit Module',

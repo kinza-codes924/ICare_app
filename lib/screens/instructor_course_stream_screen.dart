@@ -2,6 +2,7 @@
 import 'package:icare/services/lms_service.dart';
 import 'package:icare/utils/theme.dart';
 import 'package:intl/intl.dart';
+import 'package:icare/widgets/back_button.dart';
 
 /// Course Stream/Announcements - Google Classroom style
 class InstructorCourseStreamScreen extends StatefulWidget {
@@ -139,7 +140,7 @@ class _InstructorCourseStreamScreenState extends State<InstructorCourseStreamScr
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Color(0xFF0F172A)),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () => goBackOrHome(context),
         ),
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,

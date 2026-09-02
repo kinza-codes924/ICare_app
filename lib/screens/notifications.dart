@@ -319,7 +319,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
                 child: Row(
                   children: [
                     GestureDetector(
-                      onTap: () => Navigator.of(context).pop(),
+                      onTap: () => goBackOrHome(context),
                       child: Container(
                         padding: const EdgeInsets.all(10),
                         decoration: BoxDecoration(

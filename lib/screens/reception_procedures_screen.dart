@@ -3,6 +3,7 @@ import 'package:icare/data/procedures_data.dart';
 import 'package:icare/screens/reception_payment_screen.dart';
 import 'package:icare/services/reception_service.dart';
 import 'package:icare/utils/theme.dart';
+import 'package:icare/widgets/back_button.dart';
 
 class ReceptionProceduresScreen extends StatefulWidget {
   final String consultationId;
@@ -240,7 +241,7 @@ class _ReceptionProceduresScreenState extends State<ReceptionProceduresScreen> {
           IconButton(
             icon: const Icon(Icons.home_outlined),
             tooltip: 'Back to Front Desk',
-            onPressed: () => Navigator.of(context).popUntil((route) => route.isFirst),
+            onPressed: () => goBackOrHome(context),
           ),
         ],
       ),

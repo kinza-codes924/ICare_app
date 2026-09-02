@@ -18,6 +18,7 @@ import 'package:icare/screens/instructor_voucher_screen.dart';
 import 'package:icare/widgets/video_player_widget.dart';
 import 'package:icare/widgets/attachment_viewer.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:icare/widgets/back_button.dart';
 
 /// Course Content Management - Moodle/Udemy style
 class InstructorCourseContentScreen extends StatefulWidget {
@@ -541,7 +542,7 @@ class InstructorCourseContentScreenState extends State<InstructorCourseContentSc
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Color(0xFF0F172A)),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () => goBackOrHome(context),
         ),
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,

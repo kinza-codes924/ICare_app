@@ -10,6 +10,7 @@ import 'package:icare/utils/theme.dart';
 import 'package:icare/utils/utils.dart' show buildProfileImageProvider;
 import 'package:icare/widgets/custom_text_input.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:icare/widgets/back_button.dart';
 
 class ProfileEditScreen extends ConsumerStatefulWidget {
   const ProfileEditScreen({super.key});
@@ -508,7 +509,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new, color: Color(0xFF0F172A)),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () => goBackOrHome(context),
         ),
         title: Text(
           'Edit Profile'.tr(),

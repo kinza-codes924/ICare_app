@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../data/lab_tests_data.dart';
 import '../utils/theme.dart';
+import 'package:icare/widgets/back_button.dart';
 
 class LabTestsDirectoryScreen extends StatefulWidget {
   const LabTestsDirectoryScreen({super.key});
@@ -72,7 +73,7 @@ class _LabTestsDirectoryScreenState extends State<LabTestsDirectoryScreen> {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18, color: Color(0xFF0F172A)),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () => goBackOrHome(context),
         ),
         title: const Text(
           'Lab Test Directory',

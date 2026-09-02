@@ -6,6 +6,7 @@ import 'package:printing/printing.dart';
 import 'package:intl/intl.dart';
 import 'package:icare/services/api_service.dart';
 import 'package:icare/utils/theme.dart';
+import 'package:icare/widgets/back_button.dart';
 
 /// 4 Pre-designed certificate templates
 /// Used by instructors to assign template to a course
@@ -136,7 +137,7 @@ class _CertificateTemplateSelectorScreenState extends State<CertificateTemplateS
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Color(0xFF0F172A)),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () => goBackOrHome(context),
         ),
         title: const Text('Certificate Templates', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18, color: Color(0xFF0F172A))),
         actions: [
@@ -305,7 +306,7 @@ class LmsCertificateScreen extends StatelessWidget {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () => goBackOrHome(context),
         ),
         title: const Text('Your Certificate', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
         actions: [

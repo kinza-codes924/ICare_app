@@ -462,7 +462,7 @@ class _FillLabFormState extends ConsumerState<FillLabForm> {
             child: Row(
               children: [
                 IconButton(
-                  onPressed: () => Navigator.pop(context),
+                  onPressed: () => goBackOrHome(context),
                   icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
                 ),
                 const SizedBox(width: 10),

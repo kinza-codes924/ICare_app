@@ -374,7 +374,7 @@ class _DeclineAppointmentScreenState extends State<DeclineAppointmentScreen> {
                     children: [
                       Expanded(
                         child: OutlinedButton.icon(
-                          onPressed: () => Navigator.pop(context),
+                          onPressed: () => goBackOrHome(context),
                           icon: const Icon(Icons.arrow_back_rounded),
                           label: const Text('Go Back'),
                           style: OutlinedButton.styleFrom(

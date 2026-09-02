@@ -4,6 +4,7 @@ import 'package:icare/screens/reception_dashboard.dart';
 import 'package:icare/services/reception_service.dart';
 import 'package:icare/services/api_config.dart';
 import 'package:icare/utils/theme.dart';
+import 'package:icare/widgets/back_button.dart';
 
 // Standalone invoice creation — no walk-in patient, no consultation, no
 // doctor. Just a client name, freeform line items, and an SRB tax rate,
@@ -176,7 +177,7 @@ class _ReceptionCreateInvoiceScreenState extends State<ReceptionCreateInvoiceScr
           IconButton(
             icon: const Icon(Icons.home_outlined),
             tooltip: 'Back to Front Desk',
-            onPressed: () => Navigator.of(context).popUntil((route) => route.isFirst),
+            onPressed: () => goBackOrHome(context),
           ),
         ],
       ),

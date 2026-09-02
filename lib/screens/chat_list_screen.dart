@@ -5,6 +5,7 @@ import 'dart:async';
 import '../services/chat_service.dart';
 import '../utils/theme.dart';
 import 'chat_screen.dart';
+import 'package:icare/widgets/back_button.dart';
 
 class ChatListScreen extends StatefulWidget {
   const ChatListScreen({super.key});
@@ -82,7 +83,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
         elevation: 0.5,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.black),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () => goBackOrHome(context),
         ),
         title: Text(
           'Messages'.tr(),

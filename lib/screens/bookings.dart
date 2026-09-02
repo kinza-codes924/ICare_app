@@ -459,7 +459,7 @@ class _BookingsScreenState extends ConsumerState<BookingsScreen> {
                           child: Padding(
                             padding: const EdgeInsets.only(bottom: 16),
                             child: GestureDetector(
-                              onTap: () => Navigator.of(context).pop(),
+                              onTap: () => goBackOrHome(context),
                               child: Container(
                                 padding: const EdgeInsets.all(10),
                                 decoration: BoxDecoration(

@@ -165,7 +165,7 @@ class REceiptScreen extends StatelessWidget {
               const SizedBox(height: 20),
               TextButton(
                 onPressed: () =>
-                    Navigator.of(context).popUntil((route) => route.isFirst),
+                    goBackOrHome(context),
                 child: const CustomText(
                   text: "Back to Home",
                   color: AppColors.grayColor,

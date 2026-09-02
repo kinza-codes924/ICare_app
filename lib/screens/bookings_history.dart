@@ -12,6 +12,7 @@ import 'package:icare/services/consultation_service.dart';
 import 'package:icare/utils/shared_pref.dart';
 import 'package:icare/utils/theme.dart';
 import 'package:icare/utils/utils.dart';
+import 'package:icare/widgets/back_button.dart';
 
 class BookingsHistoryScreen extends StatefulWidget {
   const BookingsHistoryScreen({super.key});
@@ -154,7 +155,7 @@ class _BookingsHistoryScreenState extends State<BookingsHistoryScreen> {
                 // Back
                 GestureDetector(
                   onTap: () =>
-                      Navigator.of(context).popUntil((r) => r.isFirst),
+                      goBackOrHome(context),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [

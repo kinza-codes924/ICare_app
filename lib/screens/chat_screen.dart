@@ -11,6 +11,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'dart:io';
+import 'package:icare/widgets/back_button.dart';
 
 class ChatScreen extends StatefulWidget {
   final String userId;
@@ -413,7 +414,7 @@ class _ChatScreenState extends State<ChatScreen> {
         elevation: 0.5,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.black),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () => goBackOrHome(context),
         ),
         title: Row(
           children: [

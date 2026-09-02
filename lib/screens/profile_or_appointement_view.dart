@@ -97,7 +97,7 @@ class ProfileOrAppointmentViewScreen extends ConsumerWidget {
         automaticallyImplyLeading: false,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
-          onPressed: () => Navigator.of(context).pop(),
+          onPressed: () => goBackOrHome(context),
         ),
         title: CustomText(
           text: "Appointment Details",

@@ -11,6 +11,7 @@ import 'package:icare/screens/clinic_detail_sections.dart';
 import 'package:icare/services/doctor_service.dart';
 import 'package:icare/widgets/whatsapp_button.dart';
 import 'package:icare/widgets/clinic_image.dart';
+import 'package:icare/widgets/back_button.dart';
 
 /// Generic detail page for one iCare specialty clinic. One screen for all
 /// clinics (data-driven from Clinic) rather than 6 hardcoded files, so a
@@ -317,7 +318,7 @@ class _Header extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               IconButton(
-                onPressed: () => Navigator.of(context).pop(),
+                onPressed: () => goBackOrHome(context),
                 icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
               ),
               const SizedBox(height: 8),

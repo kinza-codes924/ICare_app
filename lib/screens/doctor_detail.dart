@@ -457,7 +457,7 @@ class DoctorDetailScreen extends ConsumerWidget {
                 child: Center(
                   child: IconButton(
                     icon: const Icon(Icons.arrow_back_ios_new, size: 20, color: AppColors.primaryColor),
-                    onPressed: () => Navigator.of(context).pop(),
+                    onPressed: () => goBackOrHome(context),
                     padding: EdgeInsets.zero,
                   ),
                 ),

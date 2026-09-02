@@ -5,6 +5,7 @@ import 'package:icare/services/live_session_controller.dart';
 import 'package:icare/services/lms_service.dart';
 import 'package:icare/utils/shared_pref.dart';
 import 'package:icare/utils/theme.dart';
+import 'package:icare/widgets/back_button.dart';
 import '../utils/lms_agora_stub.dart'
     if (dart.library.js_interop) '../utils/lms_agora_web.dart';
 
@@ -466,7 +467,7 @@ class _LiveStreamViewState extends State<LiveStreamView> with SingleTickerProvid
                 ),
                 const SizedBox(height: 24),
                 ElevatedButton.icon(
-                  onPressed: () => Navigator.pop(context),
+                  onPressed: () => goBackOrHome(context),
                   icon: const Icon(Icons.arrow_back_rounded),
                   label: const Text('Go Back'),
                   style: ElevatedButton.styleFrom(

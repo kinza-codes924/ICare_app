@@ -1134,7 +1134,7 @@ class _QuizTakeScreenState extends State<QuizTakeScreen> {
                     children: [
                       Expanded(
                         child: OutlinedButton.icon(
-                          onPressed: () => Navigator.pop(context),
+                          onPressed: () => goBackOrHome(context),
                           icon: const Icon(Icons.arrow_back_rounded, size: 18),
                           label: const Text('Go Back', style: TextStyle(fontWeight: FontWeight.w700)),
                           style: OutlinedButton.styleFrom(

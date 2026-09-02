@@ -20,6 +20,7 @@ import 'package:icare/screens/installment_schedule_screen.dart';
 import 'package:icare/widgets/video_player_widget.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:icare/widgets/back_button.dart';
 
 // ─────────────────────────────────────────────────────────────
 // Google Classroom-style inside-course view
@@ -467,7 +468,7 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
       shadowColor: Colors.grey.shade200,
       leading: IconButton(
         icon: const Icon(Icons.arrow_back_rounded, color: Color(0xFF444746)),
-        onPressed: () => Navigator.pop(context),
+        onPressed: () => goBackOrHome(context),
       ),
       title: Row(
         children: [

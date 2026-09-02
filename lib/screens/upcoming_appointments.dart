@@ -330,7 +330,7 @@ class _UpcomingAppointmentsState extends ConsumerState<UpcomingAppointments> {
                     Row(
                       children: [
                         GestureDetector(
-                          onTap: () => Navigator.of(context).pop(),
+                          onTap: () => goBackOrHome(context),
                           child: Container(
                             padding: const EdgeInsets.all(10),
                             decoration: BoxDecoration(color: const Color(0xFFF1F5F9), borderRadius: BorderRadius.circular(14)),

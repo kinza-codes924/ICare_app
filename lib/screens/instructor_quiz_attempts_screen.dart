@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:icare/services/lms_service.dart';
 import 'package:icare/utils/theme.dart';
 import 'package:intl/intl.dart';
+import 'package:icare/widgets/back_button.dart';
 
 /// Instructor view of all student attempts for a quiz — lets the instructor
 /// add a rubric level, star rating, and written feedback per attempt
@@ -61,7 +62,7 @@ class _InstructorQuizAttemptsScreenState extends State<InstructorQuizAttemptsScr
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Color(0xFF0F172A)),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () => goBackOrHome(context),
         ),
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,

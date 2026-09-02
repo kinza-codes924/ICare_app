@@ -27,7 +27,7 @@ class MyAppointment extends StatelessWidget {
                 children: [
                   // Back button
                   GestureDetector(
-                    onTap: () => Navigator.pop(context),
+                    onTap: () => goBackOrHome(context),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [

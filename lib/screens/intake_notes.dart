@@ -10,6 +10,7 @@ import 'package:icare/widgets/custom_button.dart';
 import 'package:icare/widgets/custom_text.dart';
 import 'package:icare/widgets/custom_text_input.dart';
 import 'package:icare/widgets/svg_wrapper.dart';
+import 'package:icare/widgets/back_button.dart';
 
 class IntakeNotes extends StatefulWidget {
   const IntakeNotes({super.key});
@@ -28,7 +29,7 @@ class _IntakeNotesState extends State<IntakeNotes> {
       appBar: AppBar(
         leading: IconButton(
           onPressed: () {
-            Navigator.of(context).pop();
+            goBackOrHome(context);
           },
           icon: Icon(Icons.arrow_back_ios_new, color: AppColors.primaryColor),
         ),

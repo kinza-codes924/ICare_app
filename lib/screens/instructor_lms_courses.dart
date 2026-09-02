@@ -8,6 +8,7 @@ import 'package:icare/screens/instructor_course_analytics_screen.dart';
 import 'package:icare/services/api_service.dart';
 import 'package:icare/services/lms_service.dart';
 import 'package:icare/utils/theme.dart';
+import 'package:icare/widgets/back_button.dart';
 
 /// Instructor Courses Management - Moodle style course list
 class InstructorLmsCoursesScreen extends StatefulWidget {
@@ -309,7 +310,7 @@ class _InstructorLmsCoursesScreenState extends State<InstructorLmsCoursesScreen>
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_rounded, color: Color(0xFF0F172A)),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () => goBackOrHome(context),
         ),
         backgroundColor: Colors.white,
         elevation: 0,

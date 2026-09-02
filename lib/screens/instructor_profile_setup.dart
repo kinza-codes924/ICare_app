@@ -7,6 +7,7 @@ import 'package:icare/services/instructor_service.dart';
 import 'package:icare/services/api_service.dart';
 import 'package:icare/models/user.dart';
 import 'package:icare/providers/auth_provider.dart';
+import 'package:icare/widgets/back_button.dart';
 
 class InstructorProfileSetupScreen extends ConsumerStatefulWidget {
   const InstructorProfileSetupScreen({super.key});
@@ -247,7 +248,7 @@ class _InstructorProfileSetupScreenState
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new_rounded, color: _primaryDark),
-          onPressed: () => Navigator.of(context).pop(),
+          onPressed: () => goBackOrHome(context),
         ),
         title: const Text(
           'Instructor Profile',
