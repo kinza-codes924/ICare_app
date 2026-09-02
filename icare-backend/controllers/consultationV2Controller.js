@@ -103,6 +103,17 @@ exports.startConsultation = async (req, res) => {
     await consultation.save();
     console.log('✅ Consultation created:', consultation._id);
 
+    // Mark the appointment as running. Nothing here ever set this, so the
+    // doctor's "In Progress" tab stayed empty all the way through a live
+    // consultation, and the patient's rejoin card keyed off whatever stale
+    // in_progress row happened to be left over from before.
+    if (validAppointmentId) {
+      await Appointment.findByIdAndUpdate(
+        validAppointmentId,
+        { $set: { status: 'in_progress' } }
+      ).catch(() => {});
+    }
+
     // Get doctor details for consent message
     const doctor = await User.findById(doctorId);
     const doctorName = doctor ? doctor.name : 'Doctor';
@@ -297,6 +308,16 @@ exports.endConsultation = async (req, res) => {
     }
 
     await consultation.save();
+
+    // Close the appointment out with it. Without this a finished consultation
+    // left its appointment sitting at in_progress, so it kept showing a
+    // "Rejoin" card for a call that was already over.
+    if (consultation.appointmentId) {
+      await Appointment.findByIdAndUpdate(
+        consultation.appointmentId,
+        { $set: { status: 'completed' } }
+      ).catch(() => {});
+    }
 
     // Send system message. Name who ended it — the other side just saw a bare
     // "Consultation has ended." and couldn't tell whether the person had left
