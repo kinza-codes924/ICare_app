@@ -62,6 +62,10 @@ class _ConsultationChatScreenV2State extends State<ConsultationChatScreenV2> {
   bool _showPrescriptionPanel = false;
   Map<String, dynamic>? _prescriptionDraft;
   bool _prescriptionLoading = false;
+  // Read off the consultation record when the screen is opened by URL and has
+  // neither an appointment nor a remoteUserName to name the other party with.
+  String? _fetchedDoctorName;
+  String? _fetchedPatientName;
 
   @override
   void initState() {
@@ -109,12 +113,55 @@ class _ConsultationChatScreenV2State extends State<ConsultationChatScreenV2> {
     });
   }
 
+  // The other party's user id, read off the consultation record.
+  Future<String> _fetchCounterpartId() async {
+    try {
+      final res = await _consultationService.getConsultationV2(_consultationId!);
+      final c = (res['consultation'] ?? res) as Map<String, dynamic>?;
+      if (c == null) return '';
+      final raw = widget.isDoctor ? c['patientId'] : c['doctorId'];
+      if (raw is Map) return raw['_id']?.toString() ?? '';
+      return raw?.toString() ?? '';
+    } catch (_) {
+      return '';
+    }
+  }
+
+  // Fire-and-forget: the header shows whatever it has until these arrive.
+  Future<void> _loadParticipantNames(String consultationId) async {
+    try {
+      final res = await _consultationService.getConsultationV2(consultationId);
+      final c = (res['consultation'] ?? res) as Map<String, dynamic>?;
+      if (c == null || !mounted) return;
+      String? nameOf(dynamic v) {
+        if (v is Map) {
+          final n = v['name']?.toString();
+          return (n != null && n.isNotEmpty) ? n : null;
+        }
+        return null;
+      }
+      final doc = nameOf(c['doctorId']);
+      final pat = nameOf(c['patientId']);
+      if (doc == null && pat == null) return;
+      setState(() {
+        _fetchedDoctorName = doc;
+        _fetchedPatientName = pat;
+      });
+    } catch (_) {}
+  }
+
   Future<void> _initializeConsultation() async {
     try {
       // consultationId already provided (started from booking card)
       // Backend already created the session and sent consent messages — just load
       if (widget.consultationId != null && widget.consultationId!.isNotEmpty) {
         _consultationId = widget.consultationId;
+        // Names for the header — needed when this screen was opened straight
+        // from /consultation/<id> (a page reload), where there's no appointment
+        // object and no remoteUserName to fall back on.
+        if (widget.appointment == null) {
+          _loadParticipantNames(widget.consultationId!);
+        }
         // Load messages with a timeout — don't block UI if backend is slow
         await _loadMessages().timeout(
           const Duration(seconds: 10),
@@ -399,10 +446,17 @@ class _ConsultationChatScreenV2State extends State<ConsultationChatScreenV2> {
   }
 
   Future<void> _initiateCall({required bool audioOnly}) async {
-    // Determine the other party's ID to send them a ring signal
-    final receiverId = widget.isDoctor
+    // Determine the other party's ID to send them a ring signal. After a page
+    // reload there's no appointment object, so fall back to the ids on the
+    // consultation record — otherwise calling was simply impossible from a
+    // reloaded consultation.
+    var receiverId = widget.isDoctor
         ? widget.appointment?.patient?.id ?? ''
         : widget.appointment?.doctor?.id ?? '';
+
+    if (receiverId.isEmpty && _consultationId != null) {
+      receiverId = await _fetchCounterpartId();
+    }
 
     if (receiverId.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -416,10 +470,12 @@ class _ConsultationChatScreenV2State extends State<ConsultationChatScreenV2> {
     // fall back to the remoteUserName passed into this screen (the caller's name).
     final appointmentDoctorName = widget.appointment?.doctor?.name;
     final remoteUserName = widget.isDoctor
-        ? (widget.appointment?.patient?.name ?? widget.remoteUserName ?? 'Patient')
+        ? (widget.appointment?.patient?.name ?? _fetchedPatientName ?? widget.remoteUserName ?? 'Patient')
         : (appointmentDoctorName != null && appointmentDoctorName.isNotEmpty
             ? withDoctorTitle(appointmentDoctorName)
-            : (widget.remoteUserName ?? 'Dr. Doctor'));
+            : (_fetchedDoctorName != null
+                ? withDoctorTitle(_fetchedDoctorName)
+                : (widget.remoteUserName ?? 'Dr. Doctor')));
 
     // Send ring signal to the other party via call signaling backend
     final callService = CallService();
@@ -1001,11 +1057,18 @@ class _ConsultationChatScreenV2State extends State<ConsultationChatScreenV2> {
     final apptPatientName = widget.appointment?.patient?.name;
     final patientName = (apptPatientName != null && apptPatientName != 'Patient' && apptPatientName.isNotEmpty)
         ? apptPatientName
-        : (!widget.isDoctor ? widget.currentUserName : (widget.remoteUserName ?? 'Patient'));
+        // _fetchedPatientName covers the reload case: opening
+        // /consultation/<id> by URL has no appointment and no remoteUserName,
+        // so the header used to fall back to the literal "Patient"/"Doctor".
+        : (!widget.isDoctor
+            ? widget.currentUserName
+            : (_fetchedPatientName ?? widget.remoteUserName ?? 'Patient'));
     final apptDoctorName = widget.appointment?.doctor?.name;
     final doctorName = (apptDoctorName != null && apptDoctorName != 'Doctor' && apptDoctorName.isNotEmpty)
         ? apptDoctorName
-        : (widget.isDoctor ? widget.currentUserName : (widget.remoteUserName?.replaceFirst('Dr. ', '') ?? 'Doctor'));
+        : (widget.isDoctor
+            ? widget.currentUserName
+            : (_fetchedDoctorName ?? widget.remoteUserName?.replaceFirst('Dr. ', '') ?? 'Doctor'));
     final mins = (_timer.elapsed.inSeconds ~/ 60).toString().padLeft(2, '0');
     final secs = (_timer.elapsed.inSeconds % 60).toString().padLeft(2, '0');
 
