@@ -7,6 +7,7 @@ import 'package:icare/models/consultation_message.dart';
 import 'package:icare/screens/video_call.dart';
 import 'package:intl/intl.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:icare/utils/utils.dart';
 
 class ConsultationChatScreen extends StatefulWidget {
   final String consultationId;
@@ -251,7 +252,7 @@ class _ConsultationChatScreenState extends State<ConsultationChatScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              widget.isDoctor ? widget.patientName : 'Dr. ${widget.doctorName}',
+              widget.isDoctor ? widget.patientName : withDoctorTitle(widget.doctorName),
               style: const TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w900,

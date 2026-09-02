@@ -74,8 +74,24 @@ exports.startConsultation = async (req, res) => {
     // Regular scheduled appointments (no connect_now_ channel) are unaffected.
     let appt = null;
     if (validAppointmentId) {
-      appt = await Appointment.findById(validAppointmentId).select('channel_name paymentStatus').lean();
-      if (appt?.channel_name?.startsWith('connect_now_') && appt.paymentStatus !== 'paid') {
+      appt = await Appointment.findById(validAppointmentId)
+        .select('channel_name paymentStatus paymentMethod status').lean();
+
+      // A cancelled booking has nothing left to open.
+      if (appt && appt.status === 'cancelled') {
+        return res.status(409).json({
+          success: false,
+          code: 'APPOINTMENT_CANCELLED',
+          message: 'This appointment was cancelled',
+        });
+      }
+
+      // The gate used to cover only connect_now_ channels, so a SCHEDULED
+      // appointment whose payment never completed could still open a session.
+      // Cash-at-clinic is the one legitimate unpaid case — reception collects
+      // on arrival — so it stays allowed.
+      const isCash = appt?.paymentMethod === 'cash';
+      if (appt && appt.paymentStatus !== 'paid' && !isCash) {
         return res.status(402).json({
           success: false,
           code: 'PAYMENT_REQUIRED',

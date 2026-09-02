@@ -12,6 +12,10 @@ class AppointmentDetail {
   // status:'pending', so without this the list showed it as an ordinary
   // pending appointment and the patient thought it was booked.
   final String paymentStatus;
+  // 'cash' when the patient chose to pay at the clinic. Such a booking is
+  // legitimately unpaid until reception collects, so it must not be treated
+  // the same as one whose online payment never went through.
+  final String paymentMethod;
   // Needed to send the patient straight to checkout for an unpaid booking.
   final double consultationFee;
   final String? channelName;
@@ -29,6 +33,7 @@ class AppointmentDetail {
     this.reason,
     required this.status,
     this.paymentStatus = 'unpaid',
+    this.paymentMethod = '',
     this.consultationFee = 0,
     this.channelName,
     this.consultationType,
@@ -103,6 +108,7 @@ class AppointmentDetail {
       reason: json['reason']?.toString() ?? json['notes']?.toString(),
       status: json['status']?.toString() ?? 'pending',
       paymentStatus: json['paymentStatus']?.toString() ?? json['payment_status']?.toString() ?? 'unpaid',
+      paymentMethod: json['paymentMethod']?.toString() ?? json['payment_method']?.toString() ?? '',
       consultationFee: double.tryParse(
               (json['consultation_fee'] ?? json['consultationFee'] ?? 0).toString()) ??
           0,

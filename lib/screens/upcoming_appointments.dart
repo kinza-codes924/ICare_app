@@ -118,7 +118,7 @@ class _UpcomingAppointmentsState extends ConsumerState<UpcomingAppointments> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    appt.doctor?.name != null ? 'Dr. ${appt.doctor!.name}' : 'Doctor',
+                    appt.doctor?.name != null ? withDoctorTitle(appt.doctor!.name) : 'Doctor',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w800, color: _navy),
@@ -216,7 +216,7 @@ class _UpcomingAppointmentsState extends ConsumerState<UpcomingAppointments> {
               ),
             ),
             const SizedBox(height: 20),
-            Text(appt.doctor?.name != null ? 'Dr. ${appt.doctor!.name}' : 'Doctor',
+            Text(appt.doctor?.name != null ? withDoctorTitle(appt.doctor!.name) : 'Doctor',
                 style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: _navy)),
             const SizedBox(height: 4),
             Text((appt.consultationType ?? 'Consultation').toUpperCase(),
@@ -548,7 +548,7 @@ class _UpcomingAppointmentsState extends ConsumerState<UpcomingAppointments> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(appt.doctor?.name != null ? 'Dr. ${appt.doctor!.name}' : 'Doctor',
+                      Text(appt.doctor?.name != null ? withDoctorTitle(appt.doctor!.name) : 'Doctor',
                           maxLines: 1, overflow: TextOverflow.ellipsis,
                           style: const TextStyle(fontSize: 15.5, fontWeight: FontWeight.w900, color: _navy)),
                       const SizedBox(height: 3),

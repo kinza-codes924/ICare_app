@@ -23,6 +23,7 @@ import '../services/consultation_service.dart';
 import '../utils/shared_pref.dart';
 import '../utils/prescription_toggle_bridge.dart';
 import '../widgets/rating_dialog.dart';
+import 'package:icare/utils/utils.dart';
 
 // JS interop — Jitsi Meet External API
 // jitsiJoin and jitsiLeave now return Promises (handled via JSPromise)
@@ -570,6 +571,10 @@ class _VideoCallWebState extends State<VideoCall> {
   void _startSessionTimer() {
     _sessionTimer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (!mounted) return;
+      // Only count time the two sides are actually together. This used to tick
+      // from the moment the screen opened, so a call the other person never
+      // joined still showed a running duration — a ghost call.
+      if (!_remoteJoined) return;
       _sessionSeconds++;
     });
   }
@@ -842,6 +847,10 @@ class _VideoCallWebState extends State<VideoCall> {
   }
 
   String get _sessionTimeStr {
+    // Say so plainly rather than showing 00:00 ticking against nobody.
+    if (!_remoteJoined && _sessionSeconds == 0) {
+      return _isDoctor ? 'Waiting for patient…' : 'Waiting for doctor…';
+    }
     final m = _sessionSeconds ~/ 60;
     final s = _sessionSeconds % 60;
     return '${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
@@ -1928,7 +1937,7 @@ class _VideoCallWebState extends State<VideoCall> {
                                       _pastConsultDetailRow(
                                         Icons.person_rounded,
                                         widget.patientId != null ? 'Patient' : 'Doctor',
-                                        widget.patientId != null ? patient : 'Dr. $doctor',
+                                        widget.patientId != null ? patient : withDoctorTitle(doctor),
                                       ),
                                       if (widget.patientId == null)
                                         _pastConsultDetailRow(Icons.medical_services_rounded, 'Specialization', specialization),
@@ -2088,7 +2097,7 @@ class _VideoCallWebState extends State<VideoCall> {
                                     const SizedBox(width: 4),
                                     Expanded(
                                       child: Text(
-                                        widget.patientId != null ? patient : 'Dr. $doctor',
+                                        widget.patientId != null ? patient : withDoctorTitle(doctor),
                                         style: const TextStyle(color: Colors.white60, fontSize: 12),
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
@@ -2335,7 +2344,7 @@ class _VideoCallWebState extends State<VideoCall> {
             ),
             const SizedBox(height: 6),
             // Doctor
-            Text('Dr. $doctorName',
+            Text(withDoctorTitle(doctorName),
                 style: const TextStyle(
                     color: Colors.white70, fontSize: 12)),
             // Diagnosis
@@ -2416,7 +2425,7 @@ class _VideoCallWebState extends State<VideoCall> {
             ],
           ),
           const SizedBox(height: 4),
-          Text('Dr. $doctorName',
+          Text(withDoctorTitle(doctorName),
               style: const TextStyle(color: Colors.white60, fontSize: 12)),
           if (complaint.isNotEmpty) ...[
             const SizedBox(height: 2),
@@ -2499,7 +2508,7 @@ class _VideoCallWebState extends State<VideoCall> {
                     children: [
                       // Doctor
                       _detailRow(Icons.person_rounded,
-                          const Color(0xFF3B82F6), 'Doctor', 'Dr. $doctorName'),
+                          const Color(0xFF3B82F6), 'Doctor', withDoctorTitle(doctorName)),
                       const SizedBox(height: 12),
 
                       // Diagnosis

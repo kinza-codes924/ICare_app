@@ -80,11 +80,18 @@ class _BookingsHistoryScreenState extends State<BookingsHistoryScreen> {
     return match?.group(1);
   }
 
-  /// Show all in_progress appointments — patient can always rejoin via consultationId lookup.
+  /// In-progress appointments the patient can actually rejoin.
+  ///
+  /// Status alone isn't enough: an unpaid or cancelled booking has no session
+  /// to return to, so offering "Rejoin" for one just dead-ends. Cash-at-clinic
+  /// bookings stay eligible — they're settled at reception, not online.
   List<AppointmentDetail> get _inProgress {
-    return _displayAppointments
-        .where((a) => a.status.toLowerCase() == 'in_progress')
-        .toList();
+    return _displayAppointments.where((a) {
+      if (a.status.toLowerCase() != 'in_progress') return false;
+      final paid = a.paymentStatus.toLowerCase() == 'paid';
+      final cash = a.paymentMethod.toLowerCase() == 'cash';
+      return paid || cash;
+    }).toList();
   }
 
   List<AppointmentDetail> get _upcoming => _displayAppointments
@@ -809,16 +816,33 @@ class _ApptCardState extends State<_ApptCard> {
   }
 
   Future<void> _viewPrescription() async {
+    // Hold the loader's OWN context and close it in a finally. Previously an
+    // early `if (!mounted) return` sat before the pop, so any path that bailed
+    // out left the spinner covering the screen — the "frozen" card the client
+    // reported. The catch also popped whatever route happened to be on top,
+    // which could close the screen itself rather than the dialog.
+    BuildContext? loaderCtx;
+    bool loaderClosed = false;
+    void closeLoader() {
+      if (loaderClosed) return;
+      loaderClosed = true;
+      final ctx = loaderCtx;
+      if (ctx != null && ctx.mounted) Navigator.of(ctx).pop();
+    }
+
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (_) => const Center(child: CircularProgressIndicator()),
+      builder: (dialogCtx) {
+        loaderCtx = dialogCtx;
+        return const Center(child: CircularProgressIndicator());
+      },
     );
     try {
       final svc = ConsultationService();
       final res = await svc.getConsultationByAppointmentId(widget.appt.id);
+      closeLoader();
       if (!mounted) return;
-      Navigator.pop(context);
 
       if (res['success'] == true && res['consultation'] != null) {
         final consultation = res['consultation'] as Map;
@@ -871,10 +895,11 @@ class _ApptCardState extends State<_ApptCard> {
       );
     } catch (e) {
       if (!mounted) return;
-      if (Navigator.canPop(context)) Navigator.pop(context);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
       );
+    } finally {
+      closeLoader();
     }
   }
 

@@ -6,6 +6,7 @@ import 'package:icare/services/medical_record_service.dart';
 import 'package:icare/screens/medical_record_detail.dart';
 import 'package:icare/utils/theme.dart';
 import 'package:icare/widgets/back_button.dart';
+import 'package:icare/utils/utils.dart';
 
 class PatientMedicalRecords extends ConsumerStatefulWidget {
   const PatientMedicalRecords({super.key});
@@ -266,7 +267,7 @@ class _PatientMedicalRecordsState extends ConsumerState<PatientMedicalRecords> {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              'Dr. $doctorName',
+                              withDoctorTitle(doctorName),
                               style: const TextStyle(
                                 fontSize: 13,
                                 color: Color(0xFF64748B),

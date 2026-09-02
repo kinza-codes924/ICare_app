@@ -29,7 +29,7 @@ import 'package:icare/screens/prescriptions.dart' show PrescriptionsScreen;
 import 'package:icare/services/health_settings_service.dart';
 import 'package:icare/services/api_service.dart';
 import 'package:icare/utils/shared_pref.dart';
-import 'package:icare/utils/utils.dart' show buildProfileImageProvider;
+import 'package:icare/utils/utils.dart' show buildProfileImageProvider, withDoctorTitle;
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
@@ -1320,7 +1320,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 decoration: pw.BoxDecoration(border: pw.Border.all(color: PdfColors.grey300), borderRadius: pw.BorderRadius.circular(4)),
                 child: pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
                   pw.Expanded(child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
-                    pw.Text('Dr. $doctor', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 11)),
+                    pw.Text(withDoctorTitle(doctor), style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 11)),
                     pw.Text('Date: ${fmt(a['date'] ?? a['createdAt'])}  |  Status: ${a['status'] ?? ''}', style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey)),
                   ])),
                   pw.Text(feeStr, style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold, color: PdfColors.blue800)),

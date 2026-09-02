@@ -411,7 +411,7 @@ class _DoctorDashboardState extends ConsumerState<DoctorDashboard> {
                   ),
                 ),
                 Text(
-                  'Dr. $userName',
+                  withDoctorTitle(userName),
                   style: const TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.w900,

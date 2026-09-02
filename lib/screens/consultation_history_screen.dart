@@ -5,6 +5,7 @@ import 'package:icare/services/medical_record_service.dart';
 import 'package:icare/screens/medical_record_detail.dart';
 import 'package:icare/utils/theme.dart';
 import 'package:icare/widgets/back_button.dart';
+import 'package:icare/utils/utils.dart';
 
 class ConsultationHistoryScreen extends StatefulWidget {
   const ConsultationHistoryScreen({super.key});
@@ -476,7 +477,7 @@ class _ConsultationHistoryScreenState extends State<ConsultationHistoryScreen> {
                         const SizedBox(height: 4),
                       ],
                       Text(
-                        'Dr. ${record.doctor.name}',
+                        withDoctorTitle(record.doctor.name),
                         style: const TextStyle(
                           fontSize: 13,
                           color: Color(0xFF64748B),

@@ -12,6 +12,7 @@ import 'package:icare/services/gamification_service.dart';
 import 'package:icare/services/health_tracker_service.dart';
 import 'package:icare/services/medical_record_service.dart';
 import 'package:intl/intl.dart';
+import 'package:icare/utils/utils.dart';
 
 /// Logged-in patient dashboard — replaces the public-home mirror with a real
 /// action center. Every tile/card navigates to an existing, working screen;
@@ -312,7 +313,7 @@ class _PatientHomeDashboardState extends ConsumerState<PatientHomeDashboard> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                appt.doctor?.name != null ? 'Dr. ${appt.doctor!.name}' : 'Doctor',
+                                appt.doctor?.name != null ? withDoctorTitle(appt.doctor!.name) : 'Doctor',
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: const TextStyle(

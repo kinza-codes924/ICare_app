@@ -7,6 +7,7 @@ import '../providers/auth_provider.dart';
 import '../services/laboratory_service.dart';
 import 'lab_result_entry_screen.dart';
 import '../widgets/rating_dialog.dart';
+import 'package:icare/utils/utils.dart';
 
 class LabBookingDetails extends ConsumerWidget {
   final Map<String, dynamic> booking;
@@ -293,7 +294,7 @@ class LabBookingDetails extends ConsumerWidget {
             _buildInfoRow(
               Icons.medical_services_rounded,
               'Ordered By',
-              'Dr. ${booking['doctor']?['name'] ?? booking['orderedBy'] ?? 'N/A'}',
+              withDoctorTitle(booking['doctor']?['name'] ?? booking['orderedBy'] ?? 'N/A'),
             ),
           _buildInfoRow(
             Icons.person_rounded,
@@ -309,7 +310,7 @@ class LabBookingDetails extends ConsumerWidget {
             _buildInfoRow(
               Icons.medical_services_rounded,
               'Referred By',
-              'Dr. ${booking['referredBy'] ?? booking['referred_by'] ?? 'N/A'}',
+              withDoctorTitle(booking['referredBy'] ?? booking['referred_by'] ?? 'N/A'),
             ),
           _buildInfoRow(
             Icons.location_on_rounded,

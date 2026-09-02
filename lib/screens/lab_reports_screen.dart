@@ -7,6 +7,7 @@ import 'package:icare/utils/shared_pref.dart';
 import 'package:icare/utils/pdf_invoice_generator.dart';
 import 'package:icare/widgets/back_button.dart';
 import 'package:intl/intl.dart';
+import 'package:icare/utils/utils.dart';
 
 const Color primaryColor = Color(0xFF0B2D6E);
 const Color secondaryColor = Color(0xFF1565C0);
@@ -996,7 +997,7 @@ class _RecordCardState extends State<_RecordCard>
                                 const Icon(Icons.medical_services_outlined,
                                     size: 13, color: Color(0xFF94A3B8)),
                                 const SizedBox(width: 4),
-                                Text('Dr. $referredBy',
+                                Text(withDoctorTitle(referredBy),
                                     style: const TextStyle(
                                         fontSize: 12, color: Color(0xFF64748B))),
                               ]),

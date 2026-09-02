@@ -65,6 +65,23 @@ class Utils {
   }
 }
 
+/// Prefixes a doctor's name with "Dr." unless it already carries one.
+///
+/// Call sites used to interpolate the prefix directly, which read as
+/// "Dr. Dr Ahmed Bux Buriro" for every doctor whose stored name already
+/// begins with a title. Handles "Dr", "Dr.", "Doctor" and "Prof"/"Prof.",
+/// in any casing.
+String withDoctorTitle(String? name) {
+  final trimmed = (name ?? '').trim();
+  if (trimmed.isEmpty) return 'Doctor';
+  final lower = trimmed.toLowerCase();
+  const titles = ['dr.', 'dr ', 'doctor ', 'prof.', 'prof '];
+  for (final t in titles) {
+    if (lower.startsWith(t)) return trimmed;
+  }
+  return 'Dr. $trimmed';
+}
+
 /// Returns an ImageProvider that handles both HTTP URLs and base64 data URIs.
 /// Returns null if the url is empty or null.
 ImageProvider? buildProfileImageProvider(String? url) {

@@ -4,6 +4,7 @@ import 'package:icare/utils/theme.dart';
 import 'package:icare/widgets/back_button.dart';
 import 'package:intl/intl.dart';
 import 'package:go_router/go_router.dart';
+import 'package:icare/utils/utils.dart';
 
 /// Prescription PDF-Style View Screen
 /// Displays prescription in a single-page PDF-like format
@@ -288,7 +289,7 @@ class PrescriptionPdfViewScreen extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 8),
-                    _buildInfoRow('Name', 'Dr. ${doctorData?['name'] ?? 'N/A'}'),
+                    _buildInfoRow('Name', withDoctorTitle(doctorData?['name'] ?? 'N/A')),
                     _buildInfoRow('PMDC License', doctorData?['pmdcLicense'] ?? doctorData?['licenseNumber'] ?? 'N/A'),
                     _buildInfoRow('Specialization', doctorData?['specialization'] ?? 'General Practitioner'),
                     _buildInfoRow('Phone', doctorData?['phone'] ?? 'N/A'),

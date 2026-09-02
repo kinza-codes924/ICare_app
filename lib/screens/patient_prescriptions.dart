@@ -22,6 +22,7 @@ import 'dart:math' as math;
 // ignore: avoid_web_libraries_in_flutter
 import '../utils/js_stub.dart'
     if (dart.library.html) 'dart:js' as js;
+import 'package:icare/utils/utils.dart';
 
 class PatientPrescriptions extends ConsumerStatefulWidget {
   const PatientPrescriptions({super.key});
@@ -1086,7 +1087,7 @@ class _PrescriptionPage extends StatelessWidget {
                   _mrNumber,
                 ])),
                 Container(width: 1, height: 55, color: Colors.white.withValues(alpha: 0.25), margin: const EdgeInsets.symmetric(horizontal: 12)),
-                Expanded(child: _hdrInfo('DOCTOR', 'Dr. $_doctorName', [
+                Expanded(child: _hdrInfo('DOCTOR', withDoctorTitle(_doctorName), [
                   if (_doctorQualifications.isNotEmpty) _doctorQualifications,
                   if (_doctorSpecialty.isNotEmpty) _doctorSpecialty,
                   if (_doctorPmdc.isNotEmpty) 'PMDC: $_doctorPmdc',
@@ -1190,10 +1191,10 @@ class _PrescriptionPage extends StatelessWidget {
                 ),
                 const Spacer(),
                 Column(crossAxisAlignment: CrossAxisAlignment.center, children: [
-                  Text('Dr. $_doctorName', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: Color(0xFF0036BC), fontStyle: FontStyle.italic)),
+                  Text(withDoctorTitle(_doctorName), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: Color(0xFF0036BC), fontStyle: FontStyle.italic)),
                   Container(width: 150, height: 1, color: const Color(0xFF374151)),
                   const SizedBox(height: 4),
-                  Text('Dr. $_doctorName', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF0F172A))),
+                  Text(withDoctorTitle(_doctorName), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF0F172A))),
                   if (_doctorPmdc.isNotEmpty) Text('PMDC: $_doctorPmdc', style: const TextStyle(fontSize: 10, color: Color(0xFF64748B))),
                   const Text('Authorized Signature', style: TextStyle(fontSize: 9, color: Color(0xFF94A3B8))),
                 ]),
@@ -1348,7 +1349,7 @@ class _PrescriptionPage extends StatelessWidget {
             pw.SizedBox(width: 20),
             pw.Expanded(child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
               pw.Text('DOCTOR', style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold, color: PdfColors.grey)),
-              pw.Text('Dr. $_doctorName', style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
+              pw.Text(withDoctorTitle(_doctorName), style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
               if (_doctorQualifications.isNotEmpty) pw.Text(_doctorQualifications, style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey800)),
               if (_doctorSpecialty.isNotEmpty) pw.Text(_doctorSpecialty, style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold, color: PdfColors.blue800)),
               if (_doctorPmdc.isNotEmpty) pw.Text('PMDC: $_doctorPmdc', style: const pw.TextStyle(fontSize: 10)),
@@ -1410,7 +1411,7 @@ class _PrescriptionPage extends StatelessWidget {
             pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.center, children: [
               pw.Container(width: 150, height: 1, color: PdfColors.black),
               pw.SizedBox(height: 4),
-              pw.Text('Dr. $_doctorName', style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold)),
+              pw.Text(withDoctorTitle(_doctorName), style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold)),
               if (_doctorPmdc.isNotEmpty) pw.Text('PMDC: $_doctorPmdc', style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey)),
               pw.Text('Authorized Signature', style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey)),
             ]),

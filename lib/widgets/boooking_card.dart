@@ -137,7 +137,7 @@ class BookingCard extends ConsumerWidget {
                             await CallService().initiateCall(
                               receiverId: patientId,
                               channelName: consultationId,
-                              callerName: 'Dr. $currentUserName',
+                              callerName: withDoctorTitle(currentUserName),
                               callType: 'consultation',
                             );
                           } catch (_) {}
@@ -963,7 +963,7 @@ class _WebBookingCardState extends State<_WebBookingCard> {
                                     callService.initiateCall(
                                       receiverId: patientId,
                                       channelName: consultationId,
-                                      callerName: 'Dr. $currentUserName',
+                                      callerName: withDoctorTitle(currentUserName),
                                       callType: 'consultation',
                                     ).catchError((_) {});
                                   }

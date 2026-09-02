@@ -23,6 +23,7 @@ import 'package:icare/widgets/back_button.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:icare/utils/utils.dart';
 
 class ConsultationChatScreenV2 extends StatefulWidget {
   final AppointmentDetail? appointment; // nullable — may be null for patient accepting call
@@ -128,11 +129,38 @@ class _ConsultationChatScreenV2State extends State<ConsultationChatScreenV2> {
         return;
       }
 
-      // No consultationId provided — create new consultation (Connect Now flow)
+      // No consultationId provided — create new consultation (Connect Now flow).
+      // The appointment object is optional here (a patient who joined from a
+      // call notification has none), so reading the ids only off it sent empty
+      // strings and the backend answered "Valid Doctor ID is required". The
+      // logged-in user is always one side of the consultation — use that for
+      // whichever id the appointment can't supply.
+      final apptDoctorId = widget.appointment?.doctor?.id ?? '';
+      final apptPatientId = widget.appointment?.patient?.id ?? '';
+      final doctorId = apptDoctorId.isNotEmpty
+          ? apptDoctorId
+          : (widget.isDoctor ? widget.currentUserId : '');
+      final patientId = apptPatientId.isNotEmpty
+          ? apptPatientId
+          : (widget.isDoctor ? '' : widget.currentUserId);
+
+      if (doctorId.isEmpty || patientId.isEmpty) {
+        if (mounted) {
+          setState(() => _isLoading = false);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Could not start the consultation — missing session details.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return;
+      }
+
       final result = await _consultationService.startConsultationV2(
         appointmentId: widget.appointment?.id ?? '',
-        patientId: widget.appointment?.patient?.id ?? '',
-        doctorId: widget.appointment?.doctor?.id ?? '',
+        patientId: patientId,
+        doctorId: doctorId,
       );
 
       if (result['success'] == true) {
@@ -211,7 +239,7 @@ class _ConsultationChatScreenV2State extends State<ConsultationChatScreenV2> {
     await _consultationService.sendMessageV2(
       consultationId: _consultationId!,
       senderId: widget.currentUserId,
-      senderName: 'Dr. ${widget.currentUserName}',
+      senderName: withDoctorTitle(widget.currentUserName),
       senderRole: 'doctor',
       message: consentMessage,
       isSystemMessage: true,
@@ -390,14 +418,14 @@ class _ConsultationChatScreenV2State extends State<ConsultationChatScreenV2> {
     final remoteUserName = widget.isDoctor
         ? (widget.appointment?.patient?.name ?? widget.remoteUserName ?? 'Patient')
         : (appointmentDoctorName != null && appointmentDoctorName.isNotEmpty
-            ? 'Dr. $appointmentDoctorName'
+            ? withDoctorTitle(appointmentDoctorName)
             : (widget.remoteUserName ?? 'Dr. Doctor'));
 
     // Send ring signal to the other party via call signaling backend
     final callService = CallService();
     // Doctor calls with "Dr. [name]" so patient sees proper title
     final callerDisplayName = widget.isDoctor
-        ? (widget.currentUserName.startsWith('Dr.') ? widget.currentUserName : 'Dr. ${widget.currentUserName}')
+        ? (widget.currentUserName.startsWith('Dr.') ? widget.currentUserName : withDoctorTitle(widget.currentUserName))
         : widget.currentUserName;
     final callResult = await callService.initiateCall(
       receiverId: receiverId,
@@ -1005,7 +1033,7 @@ class _ConsultationChatScreenV2State extends State<ConsultationChatScreenV2> {
                       children: [
                         _participantRow(Icons.person_outline, patientName),
                         const SizedBox(height: 4),
-                        _participantRow(Icons.medical_services_outlined, 'Dr. $doctorName'),
+                        _participantRow(Icons.medical_services_outlined, withDoctorTitle(doctorName)),
                       ],
                     ),
                   ),

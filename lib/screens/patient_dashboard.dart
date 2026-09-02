@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:icare/screens/patient_home_dashboard.dart';
+import 'package:icare/utils/utils.dart';
 
 /// Patient Dashboard — real logged-in dashboard (quick actions, upcoming
 /// appointment, health tracker, records, rewards). The public marketing
@@ -609,7 +610,7 @@ class _PatientDashboardState_OLD extends State<PatientDashboard> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Dr. ${appointment.doctor?.name ?? 'Doctor'}',
+                  withDoctorTitle(appointment.doctor?.name ?? 'Doctor'),
                   style: const TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w900,

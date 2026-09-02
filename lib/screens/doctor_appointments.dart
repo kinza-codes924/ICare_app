@@ -729,7 +729,7 @@ class _DoctorAppointmentsScreenState extends State<DoctorAppointmentsScreen> {
                                       await CallService().initiateCall(
                                         receiverId: patientId,
                                         channelName: consultationId,
-                                        callerName: 'Dr. $currentUserName',
+                                        callerName: withDoctorTitle(currentUserName),
                                         callType: 'consultation',
                                       );
                                     } catch (_) {}

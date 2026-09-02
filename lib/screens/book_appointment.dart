@@ -409,7 +409,7 @@ class _BookAppointmentScreenState extends ConsumerState<BookAppointmentScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Dr. ${widget.doctor.user.name}',
+                      Text(withDoctorTitle(widget.doctor.user.name),
                           style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Color(0xFF0F172A))),
                       Text(widget.doctor.specialization ?? 'General Practitioner',
                           style: const TextStyle(fontSize: 13, color: Color(0xFF64748B))),
@@ -804,7 +804,7 @@ class _BookAppointmentScreenState extends ConsumerState<BookAppointmentScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Dr. ${widget.doctor.user.name}',
+                    Text(withDoctorTitle(widget.doctor.user.name),
                         style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: Color(0xFF0F172A))),
                     Text(widget.doctor.specialization ?? 'General Practitioner',
                         style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),

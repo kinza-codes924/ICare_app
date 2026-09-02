@@ -8,6 +8,7 @@ import '../models/appointment.dart';
 import '../models/appointment_detail.dart';
 import '../utils/role_ui.dart';
 import '../utils/shared_pref.dart';
+import 'package:icare/utils/utils.dart';
 
 class StandaloneCareHubService {
   StandaloneCareHubService._internal();
@@ -1438,7 +1439,7 @@ class StandaloneCareHubService {
     for (var i = 0; i < 10; i++) {
       final doctorUser = {
         '_id': 'doctor-${i + 1}',
-        'name': 'Dr. ${['Ahsan', 'Fatima', 'Ali', 'Mariam', 'Hamza', 'Ayesha', 'Usman', 'Zara', 'Bilal', 'Noor'][i]}',
+        'name': withDoctorTitle(['Ahsan', 'Fatima', 'Ali', 'Mariam', 'Hamza', 'Ayesha', 'Usman', 'Zara', 'Bilal', 'Noor'][i]),
         'email': 'doctor${i + 1}@icare.demo',
         'phoneNumber': '0311${(1111111 + i).toString()}',
         'role': 'Doctor',

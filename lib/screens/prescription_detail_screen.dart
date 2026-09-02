@@ -8,6 +8,7 @@ import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
+import 'package:icare/utils/utils.dart';
 
 /// Full PDF-style prescription display screen.
 ///
@@ -460,7 +461,7 @@ class PrescriptionDetailScreen extends StatelessWidget {
                 fontWeight: FontWeight.w800,
                 letterSpacing: 1.5)),
         const SizedBox(height: 6),
-        Text('Dr. $_doctorName',
+        Text(withDoctorTitle(_doctorName),
             style: const TextStyle(
                 color: Colors.white, fontSize: 15, fontWeight: FontWeight.w900)),
         if (_doctorQualifications.isNotEmpty) ...[
@@ -936,7 +937,7 @@ class PrescriptionDetailScreen extends StatelessWidget {
                     children: [
                       // Stylized signature text
                       Text(
-                        'Dr. $_doctorName',
+                        withDoctorTitle(_doctorName),
                         style: TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w900,
@@ -949,7 +950,7 @@ class PrescriptionDetailScreen extends StatelessWidget {
                 ),
                 Container(width: 180, height: 1, color: const Color(0xFF374151)),
                 const SizedBox(height: 6),
-                Text('Dr. $_doctorName',
+                Text(withDoctorTitle(_doctorName),
                     style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF0F172A))),
                 if (_doctorPmdc.isNotEmpty)
                   Text('PMDC Reg. No. $_doctorPmdc',
@@ -1109,7 +1110,7 @@ class PrescriptionDetailScreen extends StatelessWidget {
                   crossAxisAlignment: pw.CrossAxisAlignment.start,
                   children: [
                     pw.Text('DOCTOR', style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold, color: PdfColors.grey)),
-                    pw.Text('Dr. $_doctorName', style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
+                    pw.Text(withDoctorTitle(_doctorName), style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
                     if (_doctorQualifications.isNotEmpty) pw.Text(_doctorQualifications, style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey800)),
                     if (_doctorSpecialty.isNotEmpty) pw.Text(_doctorSpecialty, style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold, color: PdfColors.blue800)),
                     if (_doctorPmdc.isNotEmpty) pw.Text('PMDC: $_doctorPmdc', style: const pw.TextStyle(fontSize: 10)),
@@ -1197,7 +1198,7 @@ class PrescriptionDetailScreen extends StatelessWidget {
                   children: [
                     pw.Container(width: 160, height: 1, color: PdfColors.black),
                     pw.SizedBox(height: 4),
-                    pw.Text('Dr. $_doctorName', style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold)),
+                    pw.Text(withDoctorTitle(_doctorName), style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold)),
                     if (_doctorPmdc.isNotEmpty) pw.Text('PMDC Reg. No. $_doctorPmdc', style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey)),
                     pw.Text('Authorized Signature', style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey)),
                   ],

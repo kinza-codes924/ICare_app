@@ -10,6 +10,7 @@ import 'package:icare/utils/theme.dart';
 import 'package:icare/widgets/doc_preview_widget.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:icare/utils/utils.dart';
 
 class AdminDashboard extends ConsumerStatefulWidget {
   final String initialTab;
@@ -1068,7 +1069,7 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
                 ),
                 items: [
                   const DropdownMenuItem(value: null, child: Text('All Doctors')),
-                  ..._doctorNames.map((name) => DropdownMenuItem(value: name, child: Text('Dr. $name'))),
+                  ..._doctorNames.map((name) => DropdownMenuItem(value: name, child: Text(withDoctorTitle(name)))),
                 ],
                 onChanged: (val) {
                   _selectedDoctorFilter = val;
@@ -1154,7 +1155,7 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
                                   children: [
                                     const Icon(Icons.person_rounded, size: 12, color: Color(0xFF94A3B8)),
                                     const SizedBox(width: 4),
-                                    Text('Dr. $doctorName', style: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8), fontWeight: FontWeight.w600)),
+                                    Text(withDoctorTitle(doctorName), style: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8), fontWeight: FontWeight.w600)),
                                     const SizedBox(width: 12),
                                     const Icon(Icons.calendar_today_rounded, size: 12, color: Color(0xFF94A3B8)),
                                     const SizedBox(width: 4),
