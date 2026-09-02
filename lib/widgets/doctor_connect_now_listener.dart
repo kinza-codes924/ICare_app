@@ -315,9 +315,17 @@ class _DoctorConnectNowListenerState extends State<DoctorConnectNowListener> {
   Future<void> _doCheckPending() async {
     if (!mounted) return;
 
-    // Use cached role/token to avoid SharedPreferences round-trip every tick
-    _cachedRole ??= await _sharedPref.getUserRole();
-    if (_cachedRole == null || _cachedRole!.toLowerCase() != 'doctor') return;
+    // Read the role fresh. It used to be cached with ??= and never refreshed,
+    // so after switching accounts the listener kept the previous session's
+    // role — a patient who had earlier been signed in as a doctor was shown
+    // the doctor's "Instant Consultation Request" dialog for their own
+    // request. Same for the token, which would otherwise stay the old user's.
+    final role = await _sharedPref.getUserRole();
+    if (role != _cachedRole) {
+      _cachedRole = role;
+      _cachedToken = null; // account changed — the old token is not ours
+    }
+    if (role == null || role.toLowerCase() != 'doctor') return;
 
     _cachedToken ??= await _sharedPref.getToken();
     if (_cachedToken == null || _cachedToken!.isEmpty) return;
