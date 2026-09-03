@@ -19,27 +19,20 @@ router.post('/initiate', authMiddleware, async (req, res) => {
       ],
     };
 
-    // If a call between these two is already ANSWERED, don't start a second
-    // one — both sides sitting in the chat would often ring each other at the
-    // same moment, and whoever joined first then got re-prompted by the
-    // other's signal. Hand back the live call instead of creating a rival.
-    //
-    // Only 'accepted' counts here. A 'pending' row is a ring nobody picked up:
-    // treating those as live meant one unanswered call left the caller unable
-    // to ever ring again — the next attempt silently returned the dead signal
-    // and the other side was never notified at all.
-    const active = await CallSignal.findOne({
+    // If a stale 'accepted' signal exists between these two, end it before
+    // placing a new ring. Returning alreadyActive caused the intermittent
+    // call failure: calls that ended without a proper /end cleanup left an
+    // 'accepted' row that suppressed the next ring for up to 30 minutes —
+    // the caller joined a dead Jitsi channel while the patient saw nothing.
+    // Ending it here and falling through always creates a fresh pending signal
+    // the patient's poller will see.
+    const stale = await CallSignal.findOne({
       ...pairFilter,
       status: 'accepted',
       createdAt: { $gte: new Date(Date.now() - 30 * 60 * 1000) },
     }).sort({ createdAt: -1 });
-    if (active) {
-      return res.json({
-        success: true,
-        signalId: active._id,
-        channelName: active.channelName,
-        alreadyActive: true,
-      });
+    if (stale) {
+      await CallSignal.findByIdAndUpdate(stale._id, { status: 'ended' }).catch(() => {});
     }
 
     // Clear out any unanswered ring between these two before placing a new one.

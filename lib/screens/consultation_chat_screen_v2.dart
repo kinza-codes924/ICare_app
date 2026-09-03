@@ -9,11 +9,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:icare/models/consultation_timer.dart';
 import 'package:icare/models/consultation_message.dart';
 import 'package:icare/models/appointment_detail.dart';
-import 'package:icare/models/enhanced_prescription.dart';
 import 'package:icare/screens/video_call.dart';
 import 'package:icare/screens/doctor_consultation_call_screen.dart';
 import 'package:icare/screens/patient_history_view.dart';
-import 'package:icare/screens/prescription_pdf_view_screen.dart';
 import 'package:icare/services/consultation_service.dart';
 import 'package:icare/services/call_service.dart';
 import 'package:icare/services/review_service.dart';
@@ -630,7 +628,9 @@ class _ConsultationChatScreenV2State extends State<ConsultationChatScreenV2> {
       if (!complete) {
         try {
           final draft = await _consultationService.getPrescriptionDraft(_consultationId!);
-          complete = draft != null && (draft['isComplete'] == true || draft['status'] == 'active');
+          // Any prescription record means the doctor wrote one — show dialog only
+          // when there is literally nothing saved at all.
+          complete = draft != null;
         } catch (_) {}
       }
       if (!complete) {
@@ -719,60 +719,12 @@ class _ConsultationChatScreenV2State extends State<ConsultationChatScreenV2> {
               );
             }
             if (!mounted) return;
-            // Then show prescription if available
-            final prescriptionId = result['prescriptionId']?.toString();
-            if (prescriptionId != null && prescriptionId.isNotEmpty) {
-              // Navigate to prescription view
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => FutureBuilder(
-                    future: _consultationService.getPrescription(prescriptionId),
-                    builder: (context, snapshot) {
-                      if (snapshot.connectionState == ConnectionState.waiting) {
-                        return const Scaffold(
-                          body: Center(child: CircularProgressIndicator()),
-                        );
-                      }
-                      if (snapshot.hasError || !snapshot.hasData) {
-                        return Scaffold(
-                          appBar: AppBar(title: const Text('Consultation Ended')),
-                          body: Center(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                const Icon(Icons.check_circle, color: Colors.green, size: 64),
-                                const SizedBox(height: 16),
-                                const Text('Consultation completed successfully'),
-                                const SizedBox(height: 24),
-                                ElevatedButton(
-                                  // popUntil((route) => route.isFirst) is a
-                                  // no-op when THIS route already is first —
-                                  // the case after a refresh — leaving the
-                                  // user stuck here. Go by location instead.
-                                  onPressed: _exitToDashboard,
-                                  child: const Text('Go to Dashboard'),
-                                ),
-                              ],
-                            ),
-                          ),
-                        );
-                      }
-                      // Show prescription
-                      final prescriptionData = snapshot.data as Map<String, dynamic>;
-                      return PrescriptionPdfViewScreen(
-                        prescription: EnhancedPrescription.fromJson(prescriptionData['prescription']),
-                        patientData: prescriptionData['patient'],
-                        doctorData: prescriptionData['doctor'],
-                      );
-                    },
-                  ),
-                ),
-              );
-            } else {
-              // No prescription - just show success and go back
-              _exitToDashboard();
-            }
+            // Go straight to the patient's dashboard. The prescription (if
+            // any) is available from their Prescriptions page — stopping here
+            // to show a FutureBuilder screen left the patient stranded because
+            // the screen required a manual "Go to Dashboard" tap rather than
+            // redirecting automatically.
+            _exitToDashboard();
           } else {
             // Doctor side - just go back
             _exitToDashboard();

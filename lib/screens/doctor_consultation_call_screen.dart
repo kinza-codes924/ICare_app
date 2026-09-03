@@ -5,8 +5,9 @@ import 'package:icare/screens/in_consultation_prescription_form.dart';
 import 'package:icare/screens/patient_history_form_screen.dart';
 import 'package:icare/screens/video_call.dart';
 import 'package:icare/utils/prescription_toggle_bridge.dart';
-// ignore: avoid_web_libraries_in_flutter
-import 'dart:html' as html show window, CustomEvent;
+import 'package:icare/utils/html_stub.dart'
+    // ignore: uri_does_not_exist
+    if (dart.library.html) 'dart:html' as html;
 
 
 // Doctor's call screen for a NORMAL (appointment-based) consultation — full-
