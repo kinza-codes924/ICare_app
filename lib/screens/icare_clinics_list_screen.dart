@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:icare/data/icare_clinics_data.dart';
 import 'package:icare/models/clinic.dart';
 import 'package:icare/screens/clinic_detail_screen.dart';
+import 'package:icare/widgets/back_button.dart';
 import 'package:icare/widgets/clinic_card_thumbnail.dart';
 
 /// Landing screen shown after tapping into the "iCare Clinics" home-page
@@ -18,6 +19,8 @@ class ICareClinicsListScreen extends StatelessWidget {
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
+        leading: const CustomBackButton(),
+        automaticallyImplyLeading: false,
         iconTheme: const IconThemeData(color: Color(0xFF0F172A)),
         title: const Text(
           'iCare Clinics',

@@ -10,6 +10,7 @@ import 'package:icare/services/call_service.dart';
 import 'package:icare/utils/shared_pref.dart';
 import 'package:icare/utils/theme.dart';
 import 'package:icare/utils/utils.dart';
+import 'package:icare/widgets/back_button.dart';
 import 'package:icare/widgets/custom_text.dart';
 
 class DoctorAppointmentsScreen extends StatefulWidget {
@@ -156,6 +157,7 @@ class _DoctorAppointmentsScreenState extends State<DoctorAppointmentsScreen> {
       backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
         automaticallyImplyLeading: false,
+        leading: const CustomBackButton(),
         backgroundColor: Colors.white,
         elevation: 0,
         centerTitle: true,

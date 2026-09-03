@@ -264,7 +264,7 @@ class _CustomDrawerState extends ConsumerState<CustomDrawer> {
           context.go('/patient/health-tracker');
         }),
         _drawerItem('Lab Results/Reports', Icons.biotech_outlined, () {
-          context.go('/lab/reports');
+          context.go('/patient/lab-orders');
         }),
         _drawerItem('Reminders', Icons.alarm_outlined, () {
           context.go('/reminders');
