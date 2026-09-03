@@ -84,32 +84,33 @@ router.get('/incoming', authMiddleware, async (req, res) => {
       return res.json({ success: true, hasIncomingCall: false });
     }
 
-    // Someone already in a live call must not be rung again. Both sides
-    // calling each other at once left the one who answered first being
-    // re-prompted by the other's signal — the repeating dialog. Retire the
-    // redundant signal rather than surfacing it.
-    // Only signals from the last 30 minutes count as "in a call" — a browser
-    // that crashed mid-call would otherwise leave an 'accepted' row behind and
-    // silently block every future call for that user.
-    const liveCutoff = new Date(Date.now() - 30 * 60 * 1000);
-    // A ring only lasts about a minute; past that an unanswered 'pending' row
-    // is just litter and must not keep marking its caller as busy.
-    const ringingCutoff = new Date(Date.now() - 90 * 1000);
-    const inCall = await CallSignal.findOne({
-      $or: [
-        // The other side answered a call this user placed.
-        { status: 'accepted', callerId: req.user.id, createdAt: { $gte: liveCutoff } },
-        { status: 'accepted', receiverId: req.user.id, createdAt: { $gte: liveCutoff } },
-        // …or this user placed a call that is still actually ringing.
-        // Only the RECEIVER's signal ever turns 'accepted' — the caller's stays
-        // 'pending' for its whole life. Checking 'accepted' alone therefore
-        // never recognised the caller as busy, so the moment the other side
-        // rang back they got a dialog on top of the call they had just started.
-        { status: 'pending', callerId: req.user.id, createdAt: { $gte: ringingCutoff } },
-      ],
+    // Suppress a ring ONLY while this user's own outgoing call is still
+    // ringing — that is the genuine simultaneous-dial case, where both sides
+    // press call within a second of each other and the one who connects first
+    // would otherwise get a dialog on top of the call they just started.
+    //
+    // Deliberately NOT checked here: whether an 'accepted' signal exists for
+    // this user. That check used to be in this list and is what broke calling
+    // outright — one completed call left an 'accepted' row that marked the
+    // user busy for a full 30 minutes, so no further call could ring either
+    // side for the rest of the consultation. A finished call must never block
+    // the next one, and /initiate already hands back a genuinely live call
+    // instead of creating a rival, which is the case that check was aiming at.
+    //
+    // The window is short on purpose: a ring lasts about a minute, so anything
+    // older is an abandoned row, not a call in progress.
+    const ringingCutoff = new Date(Date.now() - 45 * 1000);
+    const ringingOut = await CallSignal.findOne({
+      status: 'pending',
+      callerId: req.user.id,
+      createdAt: { $gte: ringingCutoff },
     }).sort({ createdAt: -1 }).maxTimeMS(2000);
 
-    if (inCall) {
+    // Only stand down for a call placed BEFORE the one now arriving. If our
+    // own ring is the newer of the two we are the later dialler, so we take
+    // theirs and let our stale one go — otherwise both sides suppress each
+    // other and neither phone ever rings.
+    if (ringingOut && ringingOut.createdAt <= signal.createdAt) {
       await CallSignal.findByIdAndUpdate(signal._id, { status: 'ended' }).catch(() => {});
       return res.json({ success: true, hasIncomingCall: false });
     }

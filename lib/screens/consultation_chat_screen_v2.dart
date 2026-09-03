@@ -143,9 +143,14 @@ class _ConsultationChatScreenV2State extends State<ConsultationChatScreenV2> {
       final doc = nameOf(c['doctorId']);
       final pat = nameOf(c['patientId']);
       if (doc == null && pat == null) return;
+      // Assign only what actually resolved. Writing both unconditionally meant
+      // that when one side came back populated and the other didn't, the
+      // missing one was overwritten with null — which is why the patient's
+      // name disappeared from the header on a page reload while the doctor's
+      // stayed.
       setState(() {
-        _fetchedDoctorName = doc;
-        _fetchedPatientName = pat;
+        if (doc != null) _fetchedDoctorName = doc;
+        if (pat != null) _fetchedPatientName = pat;
       });
     } catch (_) {}
   }
