@@ -30,4 +30,13 @@ const appointmentSchema = new mongoose.Schema({
   reminderSent10min: { type: Boolean, default: false },
 }, { timestamps: true });
 
+// This collection carried no index but _id, so every appointments listing was
+// a full collection scan followed by an in-memory sort — 1.5s on its own, on a
+// route both dashboards call at load. These cover the two listings and the two
+// maintenance sweeps in routes/appointments.js.
+appointmentSchema.index({ doctor_id: 1, createdAt: -1 });
+appointmentSchema.index({ patient_id: 1, createdAt: -1 });
+appointmentSchema.index({ status: 1, updatedAt: 1 });
+appointmentSchema.index({ status: 1, paymentStatus: 1, createdAt: 1 });
+
 module.exports = mongoose.models.Appointment || mongoose.model('Appointment', appointmentSchema);

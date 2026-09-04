@@ -109,4 +109,11 @@ consultationSchema.pre('save', async function() {
   }
 });
 
+// Also had nothing but _id. The appointments route looks consultations up by
+// appointmentId and by participant on every maintenance sweep.
+consultationSchema.index({ appointmentId: 1 });
+consultationSchema.index({ status: 1 });
+consultationSchema.index({ patientId: 1, createdAt: -1 });
+consultationSchema.index({ doctorId: 1, createdAt: -1 });
+
 module.exports = mongoose.model('Consultation', consultationSchema);
