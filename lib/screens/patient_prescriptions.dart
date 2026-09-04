@@ -1501,10 +1501,28 @@ class _PrescriptionPage extends StatelessWidget {
               children: labTests
                   .map((t) => pw.Container(
                         width: 250,
-                        padding: const pw.EdgeInsets.only(bottom: 2),
-                        child: pw.Text(
-                            '•  ${(t is Map ? (t['name'] ?? t['testName'] ?? 'Test') : t)}',
-                            style: const pw.TextStyle(fontSize: 9)),
+                        padding: const pw.EdgeInsets.only(bottom: 3),
+                        // A drawn dot rather than a bullet character — the PDF
+                        // font has no glyph for one and printed a tofu box.
+                        child: pw.Row(
+                          crossAxisAlignment: pw.CrossAxisAlignment.start,
+                          children: [
+                            pw.Container(
+                              width: 3,
+                              height: 3,
+                              margin: const pw.EdgeInsets.only(top: 3.5, right: 6, left: 2),
+                              decoration: const pw.BoxDecoration(
+                                color: PdfColors.blue800,
+                                shape: pw.BoxShape.circle,
+                              ),
+                            ),
+                            pw.Expanded(
+                              child: pw.Text(
+                                  '${(t is Map ? (t['name'] ?? t['testName'] ?? 'Test') : t)}',
+                                  style: const pw.TextStyle(fontSize: 9)),
+                            ),
+                          ],
+                        ),
                       ))
                   .toList(),
             ),
