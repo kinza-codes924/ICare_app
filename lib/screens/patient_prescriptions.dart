@@ -147,11 +147,26 @@ class _PatientPrescriptionsState extends ConsumerState<PatientPrescriptions> {
           final rxMap = Map<String, dynamic>.from(rx as Map);
           rxMap['_source'] = 'enhanced';
           final rxId = rxMap['_id']?.toString() ?? '';
-          final alreadyExists = allPrescriptions.any((r) {
+          // The same prescription arrives from two places: the medical-record
+          // feed and the prescriptions API. The record version was winning and
+          // the API one discarded — but only the API version carries the
+          // populated lifestyle advice and the doctor's PMDC/speciality, which
+          // is why those never appeared here while the emailed and printed
+          // copies had them. Merge the richer fields in rather than skipping.
+          final existingIndex = allPrescriptions.indexWhere((r) {
             final eid = (r is Map ? (r['_id'] ?? r['prescription']?['_id'] ?? '') : '').toString();
             return eid == rxId && rxId.isNotEmpty;
           });
-          if (!alreadyExists) allPrescriptions.add(rxMap);
+          if (existingIndex == -1) {
+            allPrescriptions.add(rxMap);
+          } else {
+            final existing = allPrescriptions[existingIndex];
+            if (existing is Map) {
+              for (final key in const ['lifestyleAdviceId', 'lifestyleAdvice', 'doctorId', 'patientId', 'referralFollowUp']) {
+                if (rxMap[key] != null) existing[key] = rxMap[key];
+              }
+            }
+          }
         }
       }
 
