@@ -20,15 +20,19 @@ async function enrichDoctor(prescription) {
     const doc = p.doctorId;
     const doctorUserId = doc && (doc._id || doc);
     if (!doctorUserId) return p;
+    // The registration number is stored as license_number; selecting
+    // pmdcLicense (the name the app reads it by) always came back undefined,
+    // so the PMDC line was blank on every in-app prescription.
     const profile = await DoctorProfile.findOne({ user_id: doctorUserId })
-      .select('specialization degrees pmdcLicense')
+      .select('specialization degrees license_number pmdcLicense')
       .lean();
     if (profile && p.doctorId && typeof p.doctorId === 'object') {
       if (profile.specialization && !p.doctorId.specialization) p.doctorId.specialization = profile.specialization;
       if (Array.isArray(profile.degrees) && profile.degrees.length) {
         p.doctorId.qualifications = profile.degrees.join(', ');
       }
-      if (profile.pmdcLicense && !p.doctorId.pmdcLicense) p.doctorId.pmdcLicense = profile.pmdcLicense;
+      const pmdc = profile.pmdcLicense || profile.license_number;
+      if (pmdc && !p.doctorId.pmdcLicense) p.doctorId.pmdcLicense = pmdc;
     }
     return p;
   } catch (_) {
@@ -319,6 +323,63 @@ exports.completePrescription = async (req, res) => {
           const referralHtml = buildReferralFollowUpHtml(prescription.referralFollowUp);
           const pdfUrl = `${PUBLIC_BASE_URL}/api/prescriptions-v2/prescriptions/${prescription._id}/pdf`;
 
+          // The email carried no patient or doctor block at all, so it did not
+          // match the copy saved in the patient's account. Same sources as the
+          // printed prescription: MR number is on the User, age/gender on the
+          // Consultation, PMDC and speciality on the DoctorProfile — none of
+          // them live on the prescription document itself.
+          const DoctorProfile = require('../models/DoctorProfile');
+          const Consultation = require('../models/Consultation');
+          const [doctorUser, docProfile, consultationDoc] = await Promise.all([
+            User.findById(prescription.doctorId).select('name username').lean().catch(() => null),
+            DoctorProfile.findOne({ user_id: prescription.doctorId })
+              .select('license_number specialization').lean().catch(() => null),
+            prescription.consultationId
+              ? Consultation.findById(prescription.consultationId)
+                  .select('patientAge patientGender').lean().catch(() => null)
+              : null,
+          ]);
+          // Age and gender are on the User; the MR number is not stored at all
+          // — the app derives it from the patient id, so match that exactly or
+          // the emailed copy disagrees with the one in the patient's account.
+          const mrFromId = (id) => {
+            const s = id ? id.toString() : '';
+            return s.length >= 6 ? `MR-${s.slice(-6).toUpperCase()}` : '';
+          };
+          const ptName = patient.name || patient.username || 'Patient';
+          const ptAge = prescription.patientAge || consultationDoc?.patientAge || (patient.age ? `${patient.age} yrs` : '');
+          const ptGender = prescription.patientGender || consultationDoc?.patientGender || patient.gender || '';
+          const ptMr = prescription.mrNumber || patient.mrNumber || mrFromId(prescription.patientId);
+          const drName = doctorUser?.name || doctorUser?.username || 'Doctor';
+          const drSpec = docProfile?.specialization || '';
+          const drPmdc = prescription.doctorPmdc || docProfile?.license_number || '';
+
+          const cell = (label, lines) =>
+            `<td style="vertical-align:top;width:50%;padding:0 8px;">
+               <div style="font-size:10px;letter-spacing:.5px;color:#94A3B8;font-weight:700;">${label}</div>
+               ${lines.filter(Boolean).join('')}
+             </td>`;
+          const strong = (t) => `<div style="font-size:15px;font-weight:800;color:#0F172A;margin-top:2px;">${t}</div>`;
+          const sub = (t) => `<div style="font-size:12px;color:#64748B;">${t}</div>`;
+
+          const partiesHtml = `
+            <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width:100%;margin:4px 0 18px;">
+              <tr>
+                ${cell('PATIENT', [
+                  strong(ptName),
+                  ptAge || ptGender
+                    ? sub(`${ptAge ? 'Age: ' + ptAge : ''}${ptAge && ptGender ? ' &nbsp;|&nbsp; ' : ''}${ptGender || ''}`)
+                    : '',
+                  ptMr ? `<div style="font-size:12px;font-weight:700;color:#0F172A;">MR# ${ptMr}</div>` : '',
+                ])}
+                ${cell('DOCTOR', [
+                  strong(`Dr. ${drName}`),
+                  drSpec ? sub(drSpec) : '',
+                  drPmdc ? sub(`PMDC: ${drPmdc}`) : '',
+                ])}
+              </tr>
+            </table>`;
+
           console.log('[Prescription] Sending email to:', patient.email);
           await sendEmail({
             to: patient.email,
@@ -331,8 +392,9 @@ exports.completePrescription = async (req, res) => {
                   <p style="color:rgba(255,255,255,0.8);margin:4px 0 0;font-size:14px;">Your doctor has completed your prescription</p>
                 </div>
                 <div style="background:#fff;padding:32px;border-radius:0 0 12px 12px;box-shadow:0 4px 20px rgba(0,0,0,0.06);">
-                  <p style="color:#374151;font-size:15px;">Dear <strong>${patient.name || patient.username || 'Patient'}</strong>,</p>
+                  <p style="color:#374151;font-size:15px;">Dear <strong>${ptName}</strong>,</p>
                   <p style="color:#374151;font-size:14px;">Your doctor has issued a prescription for you. Please find the details below.</p>
+                  ${partiesHtml}
                   ${diagnosesHtml ? `<div style="margin:16px 0;"><strong style="color:#0F172A;font-size:14px;">Diagnosis:</strong><br/><div style="margin-top:8px;">${diagnosesHtml}</div></div>` : ''}
                   ${medsHtml ? `
                   <div style="margin:20px 0;">
@@ -370,6 +432,10 @@ exports.completePrescription = async (req, res) => {
                     </tr>
                   </table>
                   <p style="color:#64748b;font-size:12px;text-align:center;margin:0 0 20px;">If the button does not appear, use this link:<br/><a href="${pdfUrl}" style="color:#0036BC;word-break:break-all;">${pdfUrl}</a></p>
+                  <div style="text-align:right;margin:24px 0 0;padding-top:12px;border-top:1px solid #e2e8f0;">
+                    <div style="font-size:13px;font-weight:700;color:#0F172A;">${drPmdc ? `PMDC Reg. No. ${drPmdc}` : `Dr. ${drName}`}</div>
+                    <div style="font-size:11px;color:#94A3B8;">Electronically Generated</div>
+                  </div>
                   <hr style="border:none;border-top:1px solid #e2e8f0;margin:20px 0;">
                   <p style="color:#94A3B8;font-size:12px;text-align:center;margin:0;">iCare Healthcare Platform &nbsp;|&nbsp; <a href="https://www.icare.com.co" style="color:#0036BC;text-decoration:none;">www.icare.com.co</a></p>
                 </div>

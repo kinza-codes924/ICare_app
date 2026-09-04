@@ -157,7 +157,15 @@ function pktTime(d) {
 // Flatten whichever of its category sub-documents the doctor actually filled
 // in into one readable block; returns '' when there is nothing to show, so
 // the caller can omit the whole section.
-const { buildLifestyleHtml } = require('../utils/lifestyleSummary');
+const { buildLifestyleHtml, buildLifestyleText } = require('../utils/lifestyleSummary');
+
+// The MR number is never stored — the app shows the last six characters of the
+// patient id, so the printed and emailed copies derive it the same way rather
+// than leaving the row blank.
+function mrFromId(patientId) {
+  const id = patientId ? patientId.toString() : '';
+  return id.length >= 6 ? `MR-${id.slice(-6).toUpperCase()}` : '';
+}
 
 // ─── PRINTABLE PRESCRIPTION PAGE — kept for direct browser access ─────────────
 router.get('/prescriptions/:prescriptionId/view', async (req, res) => {
@@ -172,7 +180,7 @@ router.get('/prescriptions/:prescriptionId/view', async (req, res) => {
     const Consultation = require('../models/Consultation');
     const DoctorProfileModel = require('../models/DoctorProfile');
     const [patient, doctor, consultation, docProfile] = await Promise.all([
-      rx.patientId ? User.findById(rx.patientId).select('name username mrNumber').lean().catch(() => null) : null,
+      rx.patientId ? User.findById(rx.patientId).select('name username mrNumber age gender').lean().catch(() => null) : null,
       User.findById(rx.doctorId).select('name username').lean().catch(() => null),
       rx.consultationId ? Consultation.findById(rx.consultationId).select('patientAge patientGender').lean().catch(() => null) : null,
       DoctorProfileModel.findOne({ user_id: rx.doctorId }).select('license_number specialization').lean().catch(() => null),
@@ -183,9 +191,12 @@ router.get('/prescriptions/:prescriptionId/view', async (req, res) => {
     // Age/gender live on the Consultation and the MR number on the User —
     // EnhancedPrescription carries neither, so reading only rx.* left these
     // rows blank on every printed prescription.
-    const ptAge = rx.patientAge || consultation?.patientAge || '';
-    const ptGender = rx.patientGender || consultation?.patientGender || '';
-    const ptMr = rx.mrNumber || rx.patientMrNumber || patient?.mrNumber || '';
+    // Age and gender live on the User; the MR number is not stored anywhere —
+    // it is derived from the patient id, exactly as the in-app prescription
+    // does it, so both copies show the same MR#.
+    const ptAge = rx.patientAge || consultation?.patientAge || (patient?.age ? `${patient.age} yrs` : '');
+    const ptGender = rx.patientGender || consultation?.patientGender || patient?.gender || '';
+    const ptMr = rx.mrNumber || rx.patientMrNumber || patient?.mrNumber || mrFromId(rx.patientId);
     const drPmdc = rx.doctorPmdc || docProfile?.license_number || '';
     const drSpec = docProfile?.specialization || '';
     const dateObj = new Date(rx.prescribedAt || rx.createdAt || Date.now());
@@ -365,7 +376,7 @@ router.get('/prescriptions/:prescriptionId/pdf', async (req, res) => {
     const { resolveClinicAddress } = require('../utils/clinicAddresses');
     const ConsultationModel = require('../models/Consultation');
     const [patient, doctor, doctorProfile, consultation] = await Promise.all([
-      rx.patientId ? User.findById(rx.patientId).select('name username mrNumber').lean().catch(() => null) : null,
+      rx.patientId ? User.findById(rx.patientId).select('name username mrNumber age gender').lean().catch(() => null) : null,
       User.findById(rx.doctorId).select('name username').lean().catch(() => null),
       DoctorProfile.findOne({ user_id: rx.doctorId }).lean().catch(() => null),
       rx.consultationId ? ConsultationModel.findById(rx.consultationId).select('patientAge patientGender').lean().catch(() => null) : null,
@@ -376,9 +387,12 @@ router.get('/prescriptions/:prescriptionId/pdf', async (req, res) => {
     const doctorName = doctor?.name || doctor?.username || 'Doctor';
     // Same resolution as the HTML view — these fields do not live on the
     // prescription document itself.
-    const ptAge = rx.patientAge || consultation?.patientAge || '';
-    const ptGender = rx.patientGender || consultation?.patientGender || '';
-    const ptMr = rx.mrNumber || rx.patientMrNumber || patient?.mrNumber || '';
+    // Age and gender live on the User; the MR number is not stored anywhere —
+    // it is derived from the patient id, exactly as the in-app prescription
+    // does it, so both copies show the same MR#.
+    const ptAge = rx.patientAge || consultation?.patientAge || (patient?.age ? `${patient.age} yrs` : '');
+    const ptGender = rx.patientGender || consultation?.patientGender || patient?.gender || '';
+    const ptMr = rx.mrNumber || rx.patientMrNumber || patient?.mrNumber || mrFromId(rx.patientId);
     const drPmdc = rx.doctorPmdc || doctorProfile?.license_number || '';
     const drSpec = doctorProfile?.specialization || '';
     const dateObj = new Date(rx.prescribedAt || rx.createdAt || Date.now());
@@ -553,7 +567,9 @@ router.get('/prescriptions/:prescriptionId/pdf', async (req, res) => {
     const stripTags = (s) => s.replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]+>/g, '');
     const rfPdf = rx.referralFollowUp || {};
 
-    pdfSection('LIFESTYLE ADVICE', stripTags(await buildLifestyleHtml(rx.lifestyleAdviceId)));
+    // Plain-text build, not the HTML one stripped — stripping glued each
+    // heading onto its body ("DietFollow DASH diet…", "occursSleep7-9 hours").
+    pdfSection('LIFESTYLE ADVICE', await buildLifestyleText(rx.lifestyleAdviceId));
 
     if (rfPdf.referralType && rfPdf.referralType !== 'none') {
       pdfSection('REFERRAL', [
