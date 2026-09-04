@@ -10,6 +10,13 @@ import 'package:icare/utils/utils.dart';
 import 'package:icare/widgets/back_button.dart';
 import 'package:icare/widgets/custom_text.dart';
 
+/// "5" on its own read as a bare number under the Experience label, so the
+/// unit goes on the value — the stat card has no room for a second line.
+String _experienceLabel(String? years) {
+  if (years == null || years.isEmpty || years == '0') return 'Not set';
+  return years == '1' ? '1 year' : '$years years';
+}
+
 // The doctor list strips large base64 avatars from its payload to keep that
 // (30s-polled) list fast, so the object handed to this screen often has no
 // photo even when the doctor has one. Fetch the full record by id for the
@@ -144,9 +151,7 @@ class DoctorDetailScreen extends ConsumerWidget {
                   child: _buildStatCard(
                     icon: Icons.work_history_rounded,
                     label: 'Experience',
-                    value: (doctor.experience != null && doctor.experience!.isNotEmpty && doctor.experience != '0')
-                        ? doctor.experience!
-                        : 'Not set',
+                    value: _experienceLabel(doctor.experience),
                     color: const Color(0xFF3B82F6),
                   ),
                 ),
@@ -634,9 +639,7 @@ class DoctorDetailScreen extends ConsumerWidget {
                           child: _buildGlassStatCard(
                             icon: Icons.work_history_rounded,
                             label: 'Experience',
-                            value: (doctor.experience != null && doctor.experience!.isNotEmpty && doctor.experience != '0')
-                                ? doctor.experience!
-                                : 'Not set',
+                            value: _experienceLabel(doctor.experience),
                             color: const Color(0xFF3B82F6),
                           ),
                         ),

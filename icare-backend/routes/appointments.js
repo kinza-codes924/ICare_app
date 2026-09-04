@@ -54,8 +54,8 @@ async function notifyBookingAwaitingPayment(appt) {
     await Notification.create({
       userId: appt.patient_id,
       type: 'appointment',
-      title: 'Booking not confirmed — payment pending',
-      message: `Your appointment with Dr. ${doctorName}${whenStr} is not confirmed yet. Please complete the payment to confirm it.`,
+      title: 'Booking cancelled — payment not completed',
+      message: `Your appointment with Dr. ${doctorName}${whenStr} was cancelled because the payment was not completed. You can book the slot again any time.`,
       data: { appointmentId: appt._id.toString(), awaitingPayment: true },
       read: false,
     }).catch(() => {});
@@ -63,13 +63,13 @@ async function notifyBookingAwaitingPayment(appt) {
     if (patient?.email) {
       await sendEmail({
         to: patient.email,
-        subject: 'Your iCare booking is not confirmed yet',
+        subject: 'Your iCare booking was cancelled — payment not completed',
         html: `
           <div style="font-family:Arial,Helvetica,sans-serif;max-width:560px;margin:0 auto;color:#0F172A">
-            <h2 style="color:#EF4444;margin-bottom:4px">Booking Not Confirmed</h2>
+            <h2 style="color:#EF4444;margin-bottom:4px">Booking Cancelled</h2>
             <p>Dear ${patientName},</p>
-            <p>Your appointment with <strong>Dr. ${doctorName}</strong>${whenStr} has <strong>not been confirmed</strong> because the payment has not been completed.</p>
-            <p>The time slot is not reserved until payment is received. Please open the iCare app, go to your appointments and tap <strong>“Proceed to payment to confirm your booking”</strong> to complete it.</p>
+            <p>Your appointment with <strong>Dr. ${doctorName}</strong>${whenStr} was <strong>cancelled</strong> because the payment was not completed.</p>
+            <p>You have not been charged. The slot is free again — you can book it, or any other time, from the iCare app whenever you are ready.</p>
             <p style="margin-top:24px">Regards,<br/>iCare Team</p>
           </div>`,
       }).catch(() => {});
@@ -174,7 +174,7 @@ async function getAppointments(userId, userRole) {
   const thirtyMinAgo = new Date(Date.now() - 30 * 60 * 1000);
   const stalePending = await Appointment.find(
     { status: 'pending', paymentStatus: 'unpaid', createdAt: { $lt: thirtyMinAgo } },
-    { _id: 1 }
+    { _id: 1, patient_id: 1, doctor_id: 1, appointment_date: 1, appointment_time: 1 }
   ).lean().catch(() => []);
   if (stalePending.length) {
     const stalePaymentIds = await Payment.find({
@@ -184,10 +184,19 @@ async function getAppointments(userId, userRole) {
     }, { refId: 1 }).lean().catch(() => []);
     const idsWithAbandonedCheckout = stalePaymentIds.map(p => p.refId);
     if (idsWithAbandonedCheckout.length) {
+      const cancelledIds = idsWithAbandonedCheckout.map(String);
       await Appointment.updateMany(
         { _id: { $in: idsWithAbandonedCheckout }, paymentStatus: { $ne: 'paid' } },
         { $set: { status: 'cancelled' } }
       ).catch(() => {});
+      // Tell the patient here, not at booking time. This used to fire the
+      // moment the row was created — which is before the patient has even
+      // reached the payment page — so they were told the booking had failed
+      // while they were still standing at checkout, and got an email to match.
+      // By this point the checkout really was abandoned for 30+ minutes.
+      stalePending
+        .filter(a => cancelledIds.includes(String(a._id)))
+        .forEach(a => { notifyBookingAwaitingPayment(a).catch(() => {}); });
     }
   }
 
@@ -300,8 +309,6 @@ router.post('/', authMiddleware, async (req, res) => {
       status: 'pending',
     });
 
-    notifyBookingAwaitingPayment(appt).catch(() => {});
-
     res.status(201).json({ success: true, message: 'Appointment booked successfully', appointment: { ...appt.toObject(), id: appt._id.toString() } });
   } catch (error) {
     console.error('Create appointment error:', error);
@@ -383,8 +390,6 @@ router.post('/book_appointment', authMiddleware, async (req, res) => {
       // discount, a telehealth consultation does not.
       ...(clinicId ? { clinicId: String(clinicId) } : {}),
     });
-
-    notifyBookingAwaitingPayment(appt).catch(() => {});
 
     res.status(201).json({ success: true, message: 'Appointment booked successfully', appointment: { ...appt.toObject(), id: appt._id.toString() } });
   } catch (error) {
