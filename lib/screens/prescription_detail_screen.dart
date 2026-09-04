@@ -1197,7 +1197,7 @@ class PrescriptionDetailScreen extends StatelessWidget {
                   crossAxisAlignment: pw.CrossAxisAlignment.center,
                   children: [
                     pw.Text(
-                      _doctorPmdc.isNotEmpty ? 'PMDC Reg. No. $_doctorPmdc' : withDoctorTitle(_doctorName),
+                      _doctorPmdc.isNotEmpty ? 'PMDC Reg. No. $_doctorPmdc' : 'iCare Telemedicine Platform',
                       style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold),
                     ),
                     pw.SizedBox(height: 2),

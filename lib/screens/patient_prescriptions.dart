@@ -1004,14 +1004,17 @@ class _PrescriptionPage extends StatelessWidget {
   /// and emailed copies. It is stored in its own collection and comes back
   /// populated under lifestyleAdviceId; this screen simply never rendered it,
   /// which is why the section was missing here while the email had it.
-  List<MapEntry<String, String>> get _lifestyleSections {
+  /// Each section's parts are kept as separate lines rather than joined with a
+  /// separator — a bullet character rendered as a tofu box in the PDF font,
+  /// and one long run-on line was hard to read anyway.
+  List<MapEntry<String, List<String>>> get _lifestyleSections {
     final la = record['lifestyleAdvice'] ?? record['lifestyleAdviceId'];
     if (la is! Map) return [];
     String list(dynamic v) =>
         v is List ? v.where((e) => e != null && '$e'.isNotEmpty).join(', ') : '';
-    final out = <MapEntry<String, String>>[];
+    final out = <MapEntry<String, List<String>>>[];
     void add(String label, List<String?> parts) {
-      final body = parts.where((p) => p != null && p.isNotEmpty).join(' • ');
+      final body = parts.where((p) => p != null && p.isNotEmpty).cast<String>().toList();
       if (body.isNotEmpty) out.add(MapEntry(label, body));
     }
 
@@ -1233,14 +1236,23 @@ class _PrescriptionPage extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(s.key, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: Color(0xFF0F172A))),
-                          const SizedBox(height: 2),
+                          const SizedBox(height: 3),
                           Container(
                             width: double.infinity,
                             padding: const EdgeInsets.only(left: 10),
                             decoration: const BoxDecoration(
                               border: Border(left: BorderSide(color: Color(0xFFE2E8F0), width: 2)),
                             ),
-                            child: Text(s.value, style: const TextStyle(fontSize: 12.5, color: Color(0xFF374151), height: 1.5)),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: s.value
+                                  .map((line) => Padding(
+                                        padding: const EdgeInsets.only(bottom: 2),
+                                        child: Text(line,
+                                            style: const TextStyle(fontSize: 12.5, color: Color(0xFF374151), height: 1.45)),
+                                      ))
+                                  .toList(),
+                            ),
                           ),
                         ],
                       ),
@@ -1281,7 +1293,7 @@ class _PrescriptionPage extends StatelessWidget {
                 // registration number instead.
                 Column(crossAxisAlignment: CrossAxisAlignment.center, children: [
                   Text(
-                    _doctorPmdc.isNotEmpty ? 'PMDC Reg. No. $_doctorPmdc' : withDoctorTitle(_doctorName),
+                    _doctorPmdc.isNotEmpty ? 'PMDC Reg. No. $_doctorPmdc' : 'iCare Telemedicine Platform',
                     style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
                   ),
                   const SizedBox(height: 2),
@@ -1498,12 +1510,25 @@ class _PrescriptionPage extends StatelessWidget {
             pw.Text('LIFESTYLE ADVICE', style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold, color: PdfColors.blue800)),
             pw.SizedBox(height: 4),
             ..._lifestyleSections.map((s) => pw.Padding(
-                  padding: const pw.EdgeInsets.only(bottom: 4),
-                  child: pw.RichText(
-                    text: pw.TextSpan(children: [
-                      pw.TextSpan(text: '${s.key}: ', style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold)),
-                      pw.TextSpan(text: s.value, style: const pw.TextStyle(fontSize: 11)),
-                    ]),
+                  padding: const pw.EdgeInsets.only(bottom: 6),
+                  child: pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.start,
+                    children: [
+                      pw.Text(s.key, style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold)),
+                      pw.SizedBox(height: 2),
+                      pw.Padding(
+                        padding: const pw.EdgeInsets.only(left: 12),
+                        child: pw.Column(
+                          crossAxisAlignment: pw.CrossAxisAlignment.start,
+                          children: s.value
+                              .map((line) => pw.Padding(
+                                    padding: const pw.EdgeInsets.only(bottom: 1),
+                                    child: pw.Text(line, style: const pw.TextStyle(fontSize: 10.5)),
+                                  ))
+                              .toList(),
+                        ),
+                      ),
+                    ],
                   ),
                 )),
             pw.SizedBox(height: 8),
@@ -1513,7 +1538,7 @@ class _PrescriptionPage extends StatelessWidget {
           pw.Row(mainAxisAlignment: pw.MainAxisAlignment.end, children: [
             pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.center, children: [
               pw.Text(
-                _doctorPmdc.isNotEmpty ? 'PMDC Reg. No. $_doctorPmdc' : withDoctorTitle(_doctorName),
+                _doctorPmdc.isNotEmpty ? 'PMDC Reg. No. $_doctorPmdc' : 'iCare Telemedicine Platform',
                 style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold),
               ),
               pw.SizedBox(height: 2),

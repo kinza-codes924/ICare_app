@@ -17,9 +17,11 @@ async function lifestyleSections(lifestyleAdviceId) {
 
     const list = (v) => (Array.isArray(v) ? v.filter(Boolean).join(', ') : '');
     const out = [];
+    // Parts stay separate so each renderer can lay them out on their own line.
+    // Joining them with a bullet produced a tofu box in the PDF font.
     const push = (label, ...parts) => {
-      const body = parts.filter(Boolean).join(' • ');
-      if (body) out.push({ label, body });
+      const lines = parts.filter(Boolean);
+      if (lines.length) out.push({ label, lines });
     };
 
     // Schema (and the Flutter model) use the short keys; the longer
@@ -45,44 +47,49 @@ async function lifestyleSections(lifestyleAdviceId) {
   }
 }
 
-const htmlBlock = (label, body) =>
+const htmlBlock = (label, lines) =>
   `<div style="margin:0 0 10px 0;">` +
   `<div style="font-weight:700;color:#0F172A;margin-bottom:2px;">${label}</div>` +
-  `<div style="color:#374151;padding-left:12px;border-left:2px solid #E2E8F0;">${body}</div>` +
-  `</div>`;
+  `<div style="color:#374151;padding-left:12px;border-left:2px solid #E2E8F0;">` +
+  lines.map((l) => `<div>${l}</div>`).join('') +
+  `</div></div>`;
 
 async function buildLifestyleHtml(lifestyleAdviceId) {
   const sections = await lifestyleSections(lifestyleAdviceId);
-  return sections.map((s) => htmlBlock(s.label, s.body)).join('');
+  return sections.map((s) => htmlBlock(s.label, s.lines)).join('');
 }
 
-/// Plain text for the PDF — one section per line, heading kept separate.
+/// Plain text for the PDF — heading on its own line, each part indented below.
 async function buildLifestyleText(lifestyleAdviceId) {
   const sections = await lifestyleSections(lifestyleAdviceId);
-  return sections.map((s) => `${s.label}: ${s.body}`).join('\n');
+  return sections
+    .map((s) => `${s.label}\n${s.lines.map((l) => `   ${l}`).join('\n')}`)
+    .join('\n');
 }
 
 function referralFollowUpSections(rf) {
   if (!rf) return [];
   const out = [];
-  const referral = [rf.referralType, rf.referralSpecialty, rf.referralNotes].filter(Boolean).join(' • ');
-  if (referral) out.push({ label: 'Referral', body: referral });
+  const referral = [rf.referralType, rf.referralSpecialty, rf.referralNotes].filter(Boolean);
+  if (referral.length) out.push({ label: 'Referral', lines: referral });
 
   const followDate = rf.followUpDate
     ? new Date(rf.followUpDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
     : '';
-  const follow = [rf.followUpDuration, followDate, rf.followUpNotes].filter(Boolean).join(' • ');
-  if (follow) out.push({ label: 'Follow-Up', body: follow });
+  const follow = [rf.followUpDuration, followDate, rf.followUpNotes].filter(Boolean);
+  if (follow.length) out.push({ label: 'Follow-Up', lines: follow });
 
   return out;
 }
 
 function buildReferralFollowUpHtml(rf) {
-  return referralFollowUpSections(rf).map((s) => htmlBlock(s.label, s.body)).join('');
+  return referralFollowUpSections(rf).map((s) => htmlBlock(s.label, s.lines)).join('');
 }
 
 function buildReferralFollowUpText(rf) {
-  return referralFollowUpSections(rf).map((s) => `${s.label}: ${s.body}`).join('\n');
+  return referralFollowUpSections(rf)
+    .map((s) => `${s.label}\n${s.lines.map((l) => `   ${l}`).join('\n')}`)
+    .join('\n');
 }
 
 module.exports = {
