@@ -167,17 +167,41 @@ router.get('/get_all_doctors', async (req, res) => {
   try {
     await connectMongoDB();
     // Query DoctorProfile first (small collection) then join by _id (indexed).
-    const profiles = await DoctorProfile.find({}).lean();
+    // Only the fields this listing actually renders. Pulling whole profiles
+    // took ~26s for 42 documents, which is what pushed the request past the
+    // socket timeout in the first place.
+    const profiles = await DoctorProfile.find({}, {
+      user_id: 1, specialization: 1, experience_years: 1, license_number: 1,
+      consultation_fee: 1, conditions_treated: 1, available_days: 1,
+      available_hours: 1, weeklySlots: 1, slotDuration: 1, degrees: 1,
+      languages: 1, specialties: 1, clinic_name: 1, clinic_address: 1,
+      clinicId: 1, consultation_type: 1, rating: 1, total_reviews: 1,
+      is_online: 1, last_seen: 1,
+    }).lean();
     const profileMap = {};
     const profileUserIds = [];
     profiles.forEach(p => {
       const uid = p.user_id?.toString();
       if (uid) { profileMap[uid] = p; profileUserIds.push(p.user_id); }
     });
-    const doctors = await User.find({
-      _id: { $in: profileUserIds },
-      is_active: { $ne: false },
-    }).select('_id username name email phone profilePicture role is_active').lean();
+    // profilePicture holds a base64 data URI — a real upload is 40-210KB, so
+    // selecting it here dragged several MB across the wire for a list that
+    // then throws the big ones away anyway. With this many doctors it blew
+    // past socketTimeoutMS (8s) and the route started failing outright with
+    // MongoNetworkTimeoutError. Ask Mongo whether a picture exists rather than
+    // shipping its bytes; /api/doctors/:id/avatar serves the image itself and
+    // is cacheable.
+    const doctors = await User.aggregate([
+      { $match: { _id: { $in: profileUserIds }, is_active: { $ne: false } } },
+      {
+        $project: {
+          username: 1, name: 1, email: 1, phone: 1, role: 1, is_active: 1,
+          hasPicture: {
+            $cond: [{ $ifNull: ['$profilePicture', false] }, true, false],
+          },
+        },
+      },
+    ]);
 
     // Profile pictures are stored as base64 data URIs on the User document.
     // Inlining a large one in a LIST response is wasteful — none of it is
@@ -198,13 +222,11 @@ router.get('/get_all_doctors', async (req, res) => {
     // below instead of being dropped. The browser fetches each one once and
     // caches it, so the 30s poll no longer re-downloads any of them — the list
     // stays fast AND doctors actually show their photo.
-    const MAX_INLINE_PICTURE = 12 * 1024;
     doctors.forEach(d => {
-      if (typeof d.profilePicture === 'string'
-        && d.profilePicture.startsWith('data:')
-        && d.profilePicture.length > MAX_INLINE_PICTURE) {
-        d.profilePicture = `/api/doctors/${d._id.toString()}/avatar`;
-      }
+      d.profilePicture = d.hasPicture
+        ? `/api/doctors/${d._id.toString()}/avatar`
+        : null;
+      delete d.hasPicture;
     });
 
     const result = doctors.map(d => {

@@ -20,15 +20,17 @@ const connectMongoDB = async () => {
 
   _connectionPromise = mongoose
     .connect(uri, {
-      // vercel.json uses the legacy builds/routes format, which cannot set a
-      // per-function maxDuration — Vercel's default (10s on Hobby) applies.
-      // Keep all timeouts well under that so Express always gets to send a
-      // JSON error before Vercel kills the lambda and returns HTML instead.
-      serverSelectionTimeoutMS: 6000,
-      connectTimeoutMS: 6000,
-      socketTimeoutMS: 8000,
-      maxPoolSize: 5,
-      minPoolSize: 0,
+      // These were sized for Vercel's 10s Hobby lambda cap, so every timeout
+      // sat below it. The app now runs as a long-lived PM2 process on its own
+      // server, where no such cap exists — and the old 8s socket timeout was
+      // cutting off real queries mid-flight, surfacing as
+      // MongoNetworkTimeoutError and blanket 500s on /get_all_doctors and
+      // /getAppointments. Sized for a persistent server instead.
+      serverSelectionTimeoutMS: 15000,
+      connectTimeoutMS: 15000,
+      socketTimeoutMS: 45000,
+      maxPoolSize: 10,
+      minPoolSize: 1,
       maxIdleTimeMS: 60000, // keep warm for 60s between requests
       retryWrites: true,
       retryReads: true,
