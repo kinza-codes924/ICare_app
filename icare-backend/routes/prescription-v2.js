@@ -488,18 +488,35 @@ router.get('/prescriptions/:prescriptionId/pdf', async (req, res) => {
 
     // thin divider after patient/doctor block
     let curY = Math.max(ptY, drY) + 24;
+
+    // This page is laid out by absolute Y with no page-break handling at all.
+    // Once the content outgrew one page — which a full lab-test list plus
+    // lifestyle advice does easily — curY simply kept counting past the bottom
+    // margin, and every later draw call landed off-page, so pdfkit scattered
+    // the rest across blank pages. One prescription was coming out as four.
+    // Start a fresh page deliberately when the next block will not fit.
+    const PAGE_TOP = 50;
+    const pageBottom = () => doc.page.height - 60;
+    const ensureSpace = (needed) => {
+      if (curY + needed > pageBottom()) {
+        doc.addPage();
+        curY = PAGE_TOP;
+      }
+    };
     doc.rect(50, curY, pageWidth, 0.5).fill('#e2e8f0');
     curY += 12;
 
     // ── Diagnosis ──────────────────────────────────────────────────────────────
     const diagnoses = rx.diagnoses || [];
     if (diagnoses.length > 0) {
+      ensureSpace(40);
       doc.fontSize(8).fillColor(BLUE).font('Helvetica-Bold').text('DIAGNOSIS', 50, curY);
       curY += 14;
       diagnoses.forEach((d) => {
         const text = d.description || d.desc || d.diagnosis || d.name || (typeof d === 'string' ? d : '');
         if (!text) return;
         const tw = doc.widthOfString(text, { fontSize: 10 }) + 16;
+        ensureSpace(28);
         doc.rect(50, curY - 3, tw, 18).fill('#FEF2F2').stroke('#FECACA');
         doc.fontSize(10).fillColor(RED).font('Helvetica').text(text, 58, curY + 1);
         curY += 24;
@@ -510,6 +527,7 @@ router.get('/prescriptions/:prescriptionId/pdf', async (req, res) => {
     // ── Medications ────────────────────────────────────────────────────────────
     const medicines = rx.medicines || [];
     if (medicines.length > 0) {
+      ensureSpace(40);
       doc.fontSize(8).fillColor(BLUE).font('Helvetica-Bold').text('Rx   MEDICATIONS', 50, curY);
       curY += 14;
       medicines.forEach((m, i) => {
@@ -520,6 +538,7 @@ router.get('/prescriptions/:prescriptionId/pdf', async (req, res) => {
         const details = [dose && `Dose: ${dose}`, freq && `Frequency: ${freq}`, dur && `Duration: ${dur}`].filter(Boolean).join('   ');
 
         // card background
+        ensureSpace(details ? 50 : 36);
         doc.rect(50, curY - 4, pageWidth, details ? 34 : 22).fill('#EFF6FF').stroke('#BFDBFE');
         doc.fontSize(11).fillColor(DARK).font('Helvetica-Bold').text(`${i + 1}. ${name}`, 62, curY);
         if (details) {
@@ -533,10 +552,12 @@ router.get('/prescriptions/:prescriptionId/pdf', async (req, res) => {
     // ── Lab Tests ──────────────────────────────────────────────────────────────
     const labTests = rx.labTests || [];
     if (labTests.length > 0) {
+      ensureSpace(40);
       doc.fontSize(8).fillColor(BLUE).font('Helvetica-Bold').text('LAB TESTS', 50, curY);
       curY += 14;
       labTests.forEach((t) => {
         const name = typeof t === 'string' ? t : (t.testName || t.name || 'Lab Test');
+        ensureSpace(20);
         doc.fontSize(10).fillColor(DARK).font('Helvetica').text(`•  ${name}`, 60, curY);
         curY += 16;
       });
@@ -545,6 +566,7 @@ router.get('/prescriptions/:prescriptionId/pdf', async (req, res) => {
 
     // ── Doctor Notes ───────────────────────────────────────────────────────────
     if (rx.doctorNotes) {
+      ensureSpace(40);
       doc.fontSize(8).fillColor(BLUE).font('Helvetica-Bold').text('DOCTOR NOTES', 50, curY);
       curY += 12;
       doc.fontSize(10).fillColor(DARK).font('Helvetica').text(rx.doctorNotes, 50, curY, { width: pageWidth });
@@ -556,12 +578,17 @@ router.get('/prescriptions/:prescriptionId/pdf', async (req, res) => {
     // output at all here, and follow-up read a top-level rx.followUpDate the
     // schema does not have (it lives under referralFollowUp), so it never
     // printed even when the doctor set one.
+    // Advance by pdfkit's own cursor rather than by a measured height. When a
+    // block is long enough to flow onto a new page, pdfkit starts that page
+    // itself and doc.y follows it — while a hand-computed curY kept counting
+    // down the old page, pushing everything after it past the bottom and
+    // spawning blank pages. Lifestyle advice became long enough to trigger it,
+    // which is how one prescription turned into four pages.
     const pdfSection = (title, body) => {
       if (!body) return;
       doc.fontSize(8).fillColor(BLUE).font('Helvetica-Bold').text(title, 50, curY);
-      curY += 12;
-      doc.fontSize(10).fillColor(DARK).font('Helvetica').text(body, 50, curY, { width: pageWidth });
-      curY += doc.heightOfString(body, { width: pageWidth }) + 10;
+      doc.fontSize(10).fillColor(DARK).font('Helvetica').text(body, 50, doc.y + 2, { width: pageWidth });
+      curY = doc.y + 10;
     };
 
     const stripTags = (s) => s.replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]+>/g, '');
