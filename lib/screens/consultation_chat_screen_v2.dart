@@ -12,6 +12,7 @@ import 'package:icare/models/appointment_detail.dart';
 import 'package:icare/screens/video_call.dart';
 import 'package:icare/screens/doctor_consultation_call_screen.dart';
 import 'package:icare/screens/patient_history_view.dart';
+import 'package:icare/services/appointment_service.dart';
 import 'package:icare/services/consultation_service.dart';
 import 'package:icare/services/call_service.dart';
 import 'package:icare/services/review_service.dart';
@@ -65,6 +66,20 @@ class _ConsultationChatScreenV2State extends State<ConsultationChatScreenV2> {
   String? _fetchedDoctorName;
   String? _fetchedPatientName;
 
+  // go_router's `extra` does not survive a page load, so opening
+  // /consultation/:id directly — which is how the doctor reaches it on mobile,
+  // and what any refresh produces — hands this screen isDoctor:false and
+  // appointment:null regardless of who is actually looking at it. That
+  // mislabels the doctor as the patient throughout, and the in-call
+  // Prescription / Patient History panels are gated on exactly those two
+  // values, so they never appeared on that side. Re-derive both from the
+  // consultation record instead of trusting what was passed in.
+  bool _roleIsDoctor = false;
+  AppointmentDetail? _fetchedAppointment;
+
+  bool get _isDoctor => widget.isDoctor || _roleIsDoctor;
+  AppointmentDetail? get _appointment => widget.appointment ?? _fetchedAppointment;
+
   @override
   void initState() {
     super.initState();
@@ -117,7 +132,7 @@ class _ConsultationChatScreenV2State extends State<ConsultationChatScreenV2> {
       final res = await _consultationService.getConsultationV2(_consultationId!);
       final c = (res['consultation'] ?? res) as Map<String, dynamic>?;
       if (c == null) return '';
-      final raw = widget.isDoctor ? c['patientId'] : c['doctorId'];
+      final raw = _isDoctor ? c['patientId'] : c['doctorId'];
       if (raw is Map) return raw['_id']?.toString() ?? '';
       return raw?.toString() ?? '';
     } catch (_) {
@@ -138,9 +153,34 @@ class _ConsultationChatScreenV2State extends State<ConsultationChatScreenV2> {
         }
         return null;
       }
+      // Who is looking at this screen, decided by the consultation itself
+      // rather than by whatever `extra` did or didn't carry.
+      String? idOf(dynamic v) {
+        if (v is Map) return (v['_id'] ?? v['id'])?.toString();
+        return v?.toString();
+      }
+      final docId = idOf(c['doctorId']);
+      final viewerIsDoctor =
+          docId != null && docId.isNotEmpty && docId == widget.currentUserId;
+
+      // The in-call panels need a real AppointmentDetail.
+      AppointmentDetail? appt;
+      if (viewerIsDoctor && widget.appointment == null) {
+        final apptId = idOf(c['appointmentId']);
+        if (apptId != null && apptId.isNotEmpty) {
+          try {
+            final aRes = await AppointmentService().getAppointmentById(apptId);
+            if (aRes != null) appt = AppointmentDetail.fromJson(aRes);
+          } catch (e) {
+            debugPrint('Could not resolve appointment for consultation: $e');
+          }
+        }
+      }
+      if (!mounted) return;
+
       final doc = nameOf(c['doctorId']);
       final pat = nameOf(c['patientId']);
-      if (doc == null && pat == null) return;
+      if (doc == null && pat == null && !viewerIsDoctor && appt == null) return;
       // Assign only what actually resolved. Writing both unconditionally meant
       // that when one side came back populated and the other didn't, the
       // missing one was overwritten with null — which is why the patient's
@@ -149,6 +189,8 @@ class _ConsultationChatScreenV2State extends State<ConsultationChatScreenV2> {
       setState(() {
         if (doc != null) _fetchedDoctorName = doc;
         if (pat != null) _fetchedPatientName = pat;
+        if (viewerIsDoctor) _roleIsDoctor = true;
+        if (appt != null) _fetchedAppointment = appt;
       });
     } catch (_) {}
   }
@@ -162,7 +204,7 @@ class _ConsultationChatScreenV2State extends State<ConsultationChatScreenV2> {
         // Names for the header — needed when this screen was opened straight
         // from /consultation/<id> (a page reload), where there's no appointment
         // object and no remoteUserName to fall back on.
-        if (widget.appointment == null) {
+        if (_appointment == null) {
           _loadParticipantNames(widget.consultationId!);
         }
         // Load messages with a timeout — don't block UI if backend is slow
@@ -185,14 +227,14 @@ class _ConsultationChatScreenV2State extends State<ConsultationChatScreenV2> {
       // strings and the backend answered "Valid Doctor ID is required". The
       // logged-in user is always one side of the consultation — use that for
       // whichever id the appointment can't supply.
-      final apptDoctorId = widget.appointment?.doctor?.id ?? '';
-      final apptPatientId = widget.appointment?.patient?.id ?? '';
+      final apptDoctorId = _appointment?.doctor?.id ?? '';
+      final apptPatientId = _appointment?.patient?.id ?? '';
       final doctorId = apptDoctorId.isNotEmpty
           ? apptDoctorId
-          : (widget.isDoctor ? widget.currentUserId : '');
+          : (_isDoctor ? widget.currentUserId : '');
       final patientId = apptPatientId.isNotEmpty
           ? apptPatientId
-          : (widget.isDoctor ? '' : widget.currentUserId);
+          : (_isDoctor ? '' : widget.currentUserId);
 
       if (doctorId.isEmpty || patientId.isEmpty) {
         if (mounted) {
@@ -208,7 +250,7 @@ class _ConsultationChatScreenV2State extends State<ConsultationChatScreenV2> {
       }
 
       final result = await _consultationService.startConsultationV2(
-        appointmentId: widget.appointment?.id ?? '',
+        appointmentId: _appointment?.id ?? '',
         patientId: patientId,
         doctorId: doctorId,
       );
@@ -228,7 +270,7 @@ class _ConsultationChatScreenV2State extends State<ConsultationChatScreenV2> {
         }
 
         // Doctor sends consent message automatically at consultation start
-        if (widget.isDoctor) {
+        if (_isDoctor) {
           await _sendConsentMessage().catchError((_) {});
         }
 
@@ -371,7 +413,7 @@ class _ConsultationChatScreenV2State extends State<ConsultationChatScreenV2> {
         consultationId: _consultationId!,
         senderId: widget.currentUserId,
         senderName: widget.currentUserName,
-        senderRole: widget.isDoctor ? 'doctor' : 'patient',
+        senderRole: _isDoctor ? 'doctor' : 'patient',
         message: message,
       );
       await _loadMessages();
@@ -445,7 +487,7 @@ class _ConsultationChatScreenV2State extends State<ConsultationChatScreenV2> {
           consultationId: _consultationId!,
           senderId: widget.currentUserId,
           senderName: widget.currentUserName,
-          senderRole: widget.isDoctor ? 'doctor' : 'patient',
+          senderRole: _isDoctor ? 'doctor' : 'patient',
           message: attachmentLabel,
           attachmentUrl: url,
         );
@@ -469,9 +511,9 @@ class _ConsultationChatScreenV2State extends State<ConsultationChatScreenV2> {
     // reload there's no appointment object, so fall back to the ids on the
     // consultation record — otherwise calling was simply impossible from a
     // reloaded consultation.
-    var receiverId = widget.isDoctor
-        ? widget.appointment?.patient?.id ?? ''
-        : widget.appointment?.doctor?.id ?? '';
+    var receiverId = _isDoctor
+        ? _appointment?.patient?.id ?? ''
+        : _appointment?.doctor?.id ?? '';
 
     if (receiverId.isEmpty && _consultationId != null) {
       receiverId = await _fetchCounterpartId();
@@ -484,12 +526,12 @@ class _ConsultationChatScreenV2State extends State<ConsultationChatScreenV2> {
       return;
     }
 
-    final channelName = _consultationId ?? widget.appointment?.id ?? 'consultation';
+    final channelName = _consultationId ?? _appointment?.id ?? 'consultation';
     // For patients who joined via call notification, appointment may be null —
     // fall back to the remoteUserName passed into this screen (the caller's name).
-    final appointmentDoctorName = widget.appointment?.doctor?.name;
-    final remoteUserName = widget.isDoctor
-        ? (widget.appointment?.patient?.name ?? _fetchedPatientName ?? widget.remoteUserName ?? 'Patient')
+    final appointmentDoctorName = _appointment?.doctor?.name;
+    final remoteUserName = _isDoctor
+        ? (_appointment?.patient?.name ?? _fetchedPatientName ?? widget.remoteUserName ?? 'Patient')
         : (appointmentDoctorName != null && appointmentDoctorName.isNotEmpty
             ? withDoctorTitle(appointmentDoctorName)
             : (_fetchedDoctorName != null
@@ -499,7 +541,7 @@ class _ConsultationChatScreenV2State extends State<ConsultationChatScreenV2> {
     // Send ring signal to the other party via call signaling backend
     final callService = CallService();
     // Doctor calls with "Dr. [name]" so patient sees proper title
-    final callerDisplayName = widget.isDoctor
+    final callerDisplayName = _isDoctor
         ? (widget.currentUserName.startsWith('Dr.') ? widget.currentUserName : withDoctorTitle(widget.currentUserName))
         : widget.currentUserName;
     final callResult = await callService.initiateCall(
@@ -534,14 +576,14 @@ class _ConsultationChatScreenV2State extends State<ConsultationChatScreenV2> {
     // consultationId to embed PatientHistoryFormScreen (which requires a
     // non-null AppointmentDetail); the patient side never had those panels
     // and keeps the plain call screen.
-    debugPrint('🩺 _initiateCall panel-gate check: isDoctor=${widget.isDoctor} '
-        'appointment=${widget.appointment != null} consultationId=$_consultationId');
-    if (widget.isDoctor && widget.appointment != null && _consultationId != null && _consultationId!.isNotEmpty) {
+    debugPrint('🩺 _initiateCall panel-gate check: isDoctor=${_isDoctor} '
+        'appointment=${_appointment != null} consultationId=$_consultationId');
+    if (_isDoctor && _appointment != null && _consultationId != null && _consultationId!.isNotEmpty) {
       Navigator.push(
         context,
         MaterialPageRoute(
           builder: (ctx) => DoctorConsultationCallScreen(
-            appointment: widget.appointment!,
+            appointment: _appointment!,
             consultationId: _consultationId!,
             remoteUserName: remoteUserName,
             isAudioOnly: audioOnly,
@@ -563,9 +605,9 @@ class _ConsultationChatScreenV2State extends State<ConsultationChatScreenV2> {
           channelName: channelName,
           remoteUserName: remoteUserName,
           isAudioOnly: audioOnly,
-          appointmentId: widget.appointment?.id,
+          appointmentId: _appointment?.id,
           consultationId: _consultationId,
-          patientId: widget.appointment?.patient?.id,
+          patientId: _appointment?.patient?.id,
           currentUserName: widget.currentUserName,
           currentUserId: widget.currentUserId,
           consultationElapsedSeconds: _timer.elapsed.inSeconds,
@@ -579,8 +621,8 @@ class _ConsultationChatScreenV2State extends State<ConsultationChatScreenV2> {
   void _startVoiceCall() => _initiateCall(audioOnly: true);
 
   void _openPastConsultations() {
-    if (!widget.isDoctor) return;
-    final patient = widget.appointment?.patient;
+    if (!_isDoctor) return;
+    final patient = _appointment?.patient;
     if (patient == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Patient info not available')),
@@ -605,7 +647,7 @@ class _ConsultationChatScreenV2State extends State<ConsultationChatScreenV2> {
   // of what (if anything) is under this route on the stack.
   void _exitToDashboard() {
     if (!mounted) return;
-    context.go(widget.isDoctor ? '/doctor/dashboard' : '/patient/home');
+    context.go(_isDoctor ? '/doctor/dashboard' : '/patient/home');
   }
 
   Future<void> _endConsultation({bool skipPrescriptionCheck = false}) async {
@@ -630,7 +672,7 @@ class _ConsultationChatScreenV2State extends State<ConsultationChatScreenV2> {
     // Without Rx" on the incomplete-prescription dialog below — without it,
     // re-checking here would find the backend still says incomplete and
     // loop straight back into the same dialog.
-    if (!skipPrescriptionCheck && widget.isDoctor && _consultationId != null && _consultationId!.isNotEmpty) {
+    if (!skipPrescriptionCheck && _isDoctor && _consultationId != null && _consultationId!.isNotEmpty) {
       bool complete = false;
       try {
         // Check the issued prescription first. Once the doctor completes one it
@@ -693,9 +735,9 @@ class _ConsultationChatScreenV2State extends State<ConsultationChatScreenV2> {
           await _clearConsultationState();
           
           // Show rating dialog to patient immediately after consultation ends
-          if (mounted && !widget.isDoctor) {
-            var apptId = widget.appointment?.id ?? '';
-            var doctorId = widget.appointment?.doctor?.id ?? '';
+          if (mounted && !_isDoctor) {
+            var apptId = _appointment?.id ?? '';
+            var doctorId = _appointment?.doctor?.id ?? '';
             // An instant "Connect Now" consultation is opened without an
             // appointment object, so both ids were blank and the patient was
             // sent to the dashboard without ever being asked to rate. Fall
@@ -792,7 +834,7 @@ class _ConsultationChatScreenV2State extends State<ConsultationChatScreenV2> {
   }
 
   Future<void> _fetchAndTogglePrescription() async {
-    if (widget.isDoctor) return;
+    if (_isDoctor) return;
     if (_showPrescriptionPanel) {
       setState(() => _showPrescriptionPanel = false);
       return;
@@ -941,7 +983,7 @@ class _ConsultationChatScreenV2State extends State<ConsultationChatScreenV2> {
           : Column(
               children: [
                 _buildConsultationHeader(),
-                if (!widget.isDoctor && _showPrescriptionPanel)
+                if (!_isDoctor && _showPrescriptionPanel)
                   _buildPatientPrescriptionPanel(),
                 Expanded(
                   child: ListView.builder(
@@ -1073,19 +1115,19 @@ class _ConsultationChatScreenV2State extends State<ConsultationChatScreenV2> {
     // When appointment is available use its names;
     // when null (patient joined via call notification) use current/remote names.
     // Treat placeholder names ('Doctor', 'Patient') as missing — fall back to real names
-    final apptPatientName = widget.appointment?.patient?.name;
+    final apptPatientName = _appointment?.patient?.name;
     final patientName = (apptPatientName != null && apptPatientName != 'Patient' && apptPatientName.isNotEmpty)
         ? apptPatientName
         // _fetchedPatientName covers the reload case: opening
         // /consultation/<id> by URL has no appointment and no remoteUserName,
         // so the header used to fall back to the literal "Patient"/"Doctor".
-        : (!widget.isDoctor
+        : (!_isDoctor
             ? widget.currentUserName
             : (_fetchedPatientName ?? widget.remoteUserName ?? 'Patient'));
-    final apptDoctorName = widget.appointment?.doctor?.name;
+    final apptDoctorName = _appointment?.doctor?.name;
     final doctorName = (apptDoctorName != null && apptDoctorName != 'Doctor' && apptDoctorName.isNotEmpty)
         ? apptDoctorName
-        : (widget.isDoctor
+        : (_isDoctor
             ? widget.currentUserName
             : (_fetchedDoctorName ?? widget.remoteUserName?.replaceFirst('Dr. ', '') ?? 'Doctor'));
     final mins = (_timer.elapsed.inSeconds ~/ 60).toString().padLeft(2, '0');
@@ -1123,7 +1165,7 @@ class _ConsultationChatScreenV2State extends State<ConsultationChatScreenV2> {
                   // panel (DoctorConsultationCallScreen) — only accessible
                   // during the live call now, per client's explicit
                   // instruction. Past Consultations stays here.
-                  if (widget.isDoctor) ...[
+                  if (_isDoctor) ...[
                     IconButton(
                       icon: const Icon(Icons.history_rounded, size: 22),
                       color: AppColors.primaryColor,
@@ -1131,7 +1173,7 @@ class _ConsultationChatScreenV2State extends State<ConsultationChatScreenV2> {
                       tooltip: 'Past Consultations',
                     ),
                   ],
-                  if (!widget.isDoctor) ...[
+                  if (!_isDoctor) ...[
                     IconButton(
                       icon: Icon(
                         _showPrescriptionPanel
@@ -1567,7 +1609,7 @@ class _ConsultationChatScreenV2State extends State<ConsultationChatScreenV2> {
     _scrollController.dispose();
     
     // Clear doctor_in_consultation flag when leaving consultation
-    if (widget.isDoctor) {
+    if (_isDoctor) {
       SharedPreferences.getInstance().then((prefs) {
         prefs.setBool('doctor_in_consultation', false);
         debugPrint('✅ Cleared doctor_in_consultation flag on dispose');
