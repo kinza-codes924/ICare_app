@@ -87,9 +87,40 @@ function slimPic(pic) {
   return (typeof pic === 'string' && pic.startsWith('data:') && pic.length > 12 * 1024) ? null : (pic || null);
 }
 
+// slimPic throws away any avatar over 12KB — but a plain find() has already
+// dragged the whole base64 string (40-210KB each) out of Mongo by then, which
+// is most of why this route took seconds. Do the same test inside the query so
+// the big ones never cross the wire, and select only the fields used below.
+const PIC_LIMIT = 12 * 1024;
+function usersWithSlimPics(ids, extraFields) {
+  const project = { _id: 1, name: 1, username: 1 };
+  extraFields.forEach(f => { project[f] = 1; });
+  project.profilePicture = {
+    $cond: [
+      { $lte: [{ $strLenCP: { $ifNull: ['$profilePicture', ''] } }, PIC_LIMIT] },
+      '$profilePicture',
+      null,
+    ],
+  };
+  return User.aggregate([{ $match: { _id: { $in: ids } } }, { $project: project }]);
+}
+
+// The housekeeping below (stale sessions, orphaned consultations, abandoned
+// checkouts) used to run on every single call to this route. It is a dozen
+// finds and updateManys, and it was costing ~6s per request — the doctor
+// dashboard calls this on load, which is what made it sit on a spinner. None
+// of it is time-critical: the thresholds it enforces are 2 hours and 30
+// minutes, so sweeping every couple of minutes is more than often enough.
+let _lastSweepAt = 0;
+const SWEEP_INTERVAL_MS = 2 * 60 * 1000;
+
 async function getAppointments(userId, userRole) {
   await connectMongoDB();
   const uid = toId(userId);
+
+  const shouldSweep = Date.now() - _lastSweepAt > SWEEP_INTERVAL_MS;
+  if (shouldSweep) {
+  _lastSweepAt = Date.now();
 
   // Auto-fix stale in_progress sessions older than 2 hours → revert to confirmed
   const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000);
@@ -199,6 +230,7 @@ async function getAppointments(userId, userRole) {
         .forEach(a => { notifyBookingAwaitingPayment(a).catch(() => {}); });
     }
   }
+  } // end maintenance sweep
 
   let appointments;
 
@@ -219,7 +251,7 @@ async function getAppointments(userId, userRole) {
       ],
     }).sort({ createdAt: -1 }).lean();
     const patientIds = [...new Set(appointments.map(a => a.patient_id.toString()))];
-    const patients = await User.find({ _id: { $in: patientIds.map(id => toId(id)) } }).lean();
+    const patients = await usersWithSlimPics(patientIds.map(id => toId(id)), ['age', 'gender']);
     const pMap = {};
     patients.forEach(p => { pMap[p._id.toString()] = p; });
     return appointments.map(a => {
@@ -239,8 +271,11 @@ async function getAppointments(userId, userRole) {
   } else {
     appointments = await Appointment.find({ patient_id: uid }).sort({ createdAt: -1 }).lean();
     const doctorIds = [...new Set(appointments.map(a => a.doctor_id.toString()))];
-    const doctors = await User.find({ _id: { $in: doctorIds.map(id => toId(id)) } }).lean();
-    const profiles = await DoctorProfile.find({ user_id: { $in: doctorIds.map(id => toId(id)) } }).lean();
+    const doctors = await usersWithSlimPics(doctorIds.map(id => toId(id)), ['email', 'phone']);
+    const profiles = await DoctorProfile.find(
+      { user_id: { $in: doctorIds.map(id => toId(id)) } },
+      { user_id: 1, specialization: 1, consultation_fee: 1 }
+    ).lean();
     const dMap = {};
     doctors.forEach(d => { dMap[d._id.toString()] = d; });
     const pMap = {};
