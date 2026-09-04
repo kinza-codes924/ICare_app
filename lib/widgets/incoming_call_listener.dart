@@ -7,6 +7,10 @@ import '../utils/app_keys.dart';
 import '../screens/video_call.dart';
 import '../screens/consultation_chat_screen_v2.dart';
 import '../screens/doctor_call_with_prescription_screen.dart';
+import '../screens/doctor_consultation_call_screen.dart';
+import '../models/appointment_detail.dart';
+import '../services/consultation_service.dart';
+import '../services/appointment_service.dart';
 
 // Conditional import for web-only dart:js_interop
 import '../utils/js_interop_stub.dart'
@@ -110,20 +114,61 @@ class _IncomingCallListenerState extends State<IncomingCallListener> {
             nav.pop();
 
             if (callType == 'consultation') {
-              // Appointment-based consultation: enter chat screen (chat-first)
-              // channelName holds the consultationId; callerName is "Dr. [Name]"
-              nav.push(
-                MaterialPageRoute(
-                  builder: (_) => ConsultationChatScreenV2(
-                    appointment: null,
-                    isDoctor: false,
-                    currentUserId: userData?.id ?? '',
-                    currentUserName: userData?.name ?? 'User',
-                    consultationId: channelName,
-                    remoteUserName: callerName, // e.g. "Dr. Ahmed"
+              // Whoever answers, not always the patient. isDoctor was
+              // hard-coded false here, so a doctor answering a patient's call
+              // was treated as the patient — which is why the Prescription and
+              // Patient History panels never appeared on that side, while the
+              // doctor-initiated path (ConsultationChatScreenV2._initiateCall)
+              // showed them fine. Give the doctor the same call screen.
+              final isDoctorUser =
+                  (userData?.role ?? '').toLowerCase() == 'doctor';
+              AppointmentDetail? appointment;
+              if (isDoctorUser) {
+                // Those panels need a real AppointmentDetail — the signal
+                // only carries the consultation id, so resolve it.
+                try {
+                  final cRes = await ConsultationService()
+                      .getConsultationV2(channelName);
+                  final apptId = cRes['consultation']?['appointmentId'];
+                  if (apptId != null && apptId.toString().isNotEmpty) {
+                    final aRes = await AppointmentService()
+                        .getAppointmentById(apptId.toString());
+                    if (aRes != null) {
+                      appointment = AppointmentDetail.fromJson(aRes);
+                    }
+                  }
+                } catch (e) {
+                  debugPrint('Could not resolve appointment for call: $e');
+                }
+              }
+
+              if (isDoctorUser && appointment != null) {
+                nav.push(
+                  MaterialPageRoute(
+                    builder: (_) => DoctorConsultationCallScreen(
+                      appointment: appointment!,
+                      consultationId: channelName,
+                      remoteUserName: callerName,
+                      isAudioOnly: isAudioOnly,
+                      currentUserId: userData?.id ?? '',
+                      currentUserName: userData?.name ?? 'User',
+                    ),
                   ),
-                ),
-              );
+                );
+              } else {
+                nav.push(
+                  MaterialPageRoute(
+                    builder: (_) => ConsultationChatScreenV2(
+                      appointment: appointment,
+                      isDoctor: isDoctorUser,
+                      currentUserId: userData?.id ?? '',
+                      currentUserName: userData?.name ?? 'User',
+                      consultationId: channelName,
+                      remoteUserName: callerName, // e.g. "Dr. Ahmed"
+                    ),
+                  ),
+                );
+              }
             } else if (callType == 'reception') {
               // Walk-in front-desk call — channelName is the walk-in
               // Consultation id. Doctor sees the same prescription form

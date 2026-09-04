@@ -13,9 +13,18 @@ async function buildLifestyleHtml(lifestyleAdviceId) {
 
     const list = (v) => (Array.isArray(v) ? v.filter(Boolean).join(', ') : '');
     const lines = [];
+    // Each heading on its own line with the body indented under it. Joined as
+    // one run-on paragraph these sections were unreadable in the email.
     const push = (label, ...parts) => {
-      const body = parts.filter(Boolean).join(' — ');
-      if (body) lines.push(`<strong>${label}:</strong> ${body}`);
+      const body = parts.filter(Boolean).join(' • ');
+      if (body) {
+        lines.push(
+          `<div style="margin:0 0 10px 0;">` +
+          `<div style="font-weight:700;color:#0F172A;margin-bottom:2px;">${label}</div>` +
+          `<div style="color:#374151;padding-left:12px;border-left:2px solid #E2E8F0;">${body}</div>` +
+          `</div>`
+        );
+      }
     };
 
     if (la.diet) push('Diet', la.diet.recommendations, list(la.diet.foodsToInclude) && `Include: ${list(la.diet.foodsToInclude)}`, list(la.diet.foodsToAvoid) && `Avoid: ${list(la.diet.foodsToAvoid)}`, la.diet.mealTiming, la.diet.hydration);
@@ -35,7 +44,7 @@ async function buildLifestyleHtml(lifestyleAdviceId) {
     if (weight) push('Weight', weight.targetWeight && `Target: ${weight.targetWeight}`, weight.plan, weight.timeline);
     if (Array.isArray(la.otherAdvice) && la.otherAdvice.filter(Boolean).length) push('Other', list(la.otherAdvice));
 
-    return lines.join('<br/>');
+    return lines.join('');
   } catch (_) {
     return '';
   }
@@ -44,15 +53,21 @@ async function buildLifestyleHtml(lifestyleAdviceId) {
 // Referral + follow-up, flattened the same way.
 function buildReferralFollowUpHtml(rf) {
   if (!rf) return '';
+  const block = (label, body) =>
+    `<div style="margin:0 0 10px 0;">` +
+    `<div style="font-weight:700;color:#0F172A;margin-bottom:2px;">${label}</div>` +
+    `<div style="color:#374151;padding-left:12px;border-left:2px solid #E2E8F0;">${body}</div>` +
+    `</div>`;
+
   const lines = [];
-  const referral = [rf.referralType, rf.referralSpecialty, rf.referralNotes].filter(Boolean).join(' — ');
-  if (referral) lines.push(`<strong>Referral:</strong> ${referral}`);
+  const referral = [rf.referralType, rf.referralSpecialty, rf.referralNotes].filter(Boolean).join(' • ');
+  if (referral) lines.push(block('Referral', referral));
 
   const followDate = rf.followUpDate ? new Date(rf.followUpDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '';
-  const follow = [rf.followUpDuration, followDate, rf.followUpNotes].filter(Boolean).join(' — ');
-  if (follow) lines.push(`<strong>Follow-Up:</strong> ${follow}`);
+  const follow = [rf.followUpDuration, followDate, rf.followUpNotes].filter(Boolean).join(' • ');
+  if (follow) lines.push(block('Follow-Up', follow));
 
-  return lines.join('<br/>');
+  return lines.join('');
 }
 
 module.exports = { buildLifestyleHtml, buildReferralFollowUpHtml };

@@ -1196,11 +1196,12 @@ class PrescriptionDetailScreen extends StatelessWidget {
                 pw.Column(
                   crossAxisAlignment: pw.CrossAxisAlignment.center,
                   children: [
-                    pw.Container(width: 160, height: 1, color: PdfColors.black),
-                    pw.SizedBox(height: 4),
-                    pw.Text(withDoctorTitle(_doctorName), style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold)),
-                    if (_doctorPmdc.isNotEmpty) pw.Text('PMDC Reg. No. $_doctorPmdc', style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey)),
-                    pw.Text('Authorized Signature', style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey)),
+                    pw.Text(
+                      _doctorPmdc.isNotEmpty ? 'PMDC Reg. No. $_doctorPmdc' : withDoctorTitle(_doctorName),
+                      style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold),
+                    ),
+                    pw.SizedBox(height: 2),
+                    pw.Text('Electronically Generated', style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey)),
                   ],
                 ),
               ],

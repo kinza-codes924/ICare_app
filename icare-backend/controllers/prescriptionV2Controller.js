@@ -353,8 +353,8 @@ exports.completePrescription = async (req, res) => {
                     <ul style="margin-top:8px;padding-left:20px;">${labsHtml}</ul>
                   </div>` : ''}
                   ${prescription.doctorNotes ? `<div style="background:#f8fafc;border-left:3px solid #0036BC;padding:12px 16px;margin:20px 0;border-radius:4px;"><strong style="color:#0F172A;font-size:13px;">Doctor's Notes:</strong><p style="color:#374151;font-size:13px;margin:4px 0 0;">${prescription.doctorNotes}</p></div>` : ''}
-                  ${lifestyleHtml ? `<div style="margin:20px 0;"><strong style="color:#0F172A;font-size:14px;">Lifestyle Advice:</strong><p style="color:#374151;font-size:13px;margin:8px 0 0;line-height:1.6;">${lifestyleHtml}</p></div>` : ''}
-                  ${referralHtml ? `<div style="margin:20px 0;"><strong style="color:#0F172A;font-size:14px;">Referral &amp; Follow-Up:</strong><p style="color:#374151;font-size:13px;margin:8px 0 0;line-height:1.6;">${referralHtml}</p></div>` : ''}
+                  ${lifestyleHtml ? `<div style="margin:20px 0;"><strong style="color:#0F172A;font-size:14px;">Lifestyle Advice:</strong><div style="font-size:13px;line-height:1.6;margin-top:10px;">${lifestyleHtml}</div></div>` : ''}
+                  ${referralHtml ? `<div style="margin:20px 0;"><strong style="color:#0F172A;font-size:14px;">Referral &amp; Follow-Up:</strong><div style="font-size:13px;line-height:1.6;margin-top:10px;">${referralHtml}</div></div>` : ''}
                   <div style="background:#FEF3C7;border-radius:8px;padding:12px 16px;margin:20px 0;">
                     <p style="color:#92400E;font-size:13px;margin:0;">This prescription is valid for <strong>30 days</strong>. Open the iCare app to order medicines or book lab tests.</p>
                   </div>

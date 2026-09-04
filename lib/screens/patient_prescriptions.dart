@@ -1190,13 +1190,16 @@ class _PrescriptionPage extends StatelessWidget {
                   ]),
                 ),
                 const Spacer(),
+                // Matches the server-rendered prescription: no signature line
+                // and no scripted name — the doctor is identified by PMDC
+                // registration number instead.
                 Column(crossAxisAlignment: CrossAxisAlignment.center, children: [
-                  Text(withDoctorTitle(_doctorName), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: Color(0xFF0036BC), fontStyle: FontStyle.italic)),
-                  Container(width: 150, height: 1, color: const Color(0xFF374151)),
-                  const SizedBox(height: 4),
-                  Text(withDoctorTitle(_doctorName), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF0F172A))),
-                  if (_doctorPmdc.isNotEmpty) Text('PMDC: $_doctorPmdc', style: const TextStyle(fontSize: 10, color: Color(0xFF64748B))),
-                  const Text('Authorized Signature', style: TextStyle(fontSize: 9, color: Color(0xFF94A3B8))),
+                  Text(
+                    _doctorPmdc.isNotEmpty ? 'PMDC Reg. No. $_doctorPmdc' : withDoctorTitle(_doctorName),
+                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
+                  ),
+                  const SizedBox(height: 2),
+                  const Text('Electronically Generated', style: TextStyle(fontSize: 9, color: Color(0xFF94A3B8))),
                 ]),
               ]),
               const SizedBox(height: 12),
@@ -1409,11 +1412,12 @@ class _PrescriptionPage extends StatelessWidget {
           pw.SizedBox(height: 8),
           pw.Row(mainAxisAlignment: pw.MainAxisAlignment.end, children: [
             pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.center, children: [
-              pw.Container(width: 150, height: 1, color: PdfColors.black),
-              pw.SizedBox(height: 4),
-              pw.Text(withDoctorTitle(_doctorName), style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold)),
-              if (_doctorPmdc.isNotEmpty) pw.Text('PMDC: $_doctorPmdc', style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey)),
-              pw.Text('Authorized Signature', style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey)),
+              pw.Text(
+                _doctorPmdc.isNotEmpty ? 'PMDC Reg. No. $_doctorPmdc' : withDoctorTitle(_doctorName),
+                style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold),
+              ),
+              pw.SizedBox(height: 2),
+              pw.Text('Electronically Generated', style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey)),
             ]),
           ]),
           pw.SizedBox(height: 10),
