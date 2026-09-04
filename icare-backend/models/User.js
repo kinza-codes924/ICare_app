@@ -8,7 +8,19 @@ const userSchema = new mongoose.Schema({
   password: { type: String, required: true },
   role: {
     type: String,
-    enum: ['patient', 'doctor', 'lab', 'pharmacy', 'admin', 'instructor', 'student', 'receptionist'],
+    // Both cases are genuinely in the data — a `distinct('role')` returns
+    // 'Patient' alongside 'patient', and 'Laboratory' alongside 'lab'. The app
+    // compares against the capitalised forms in most places and lowercases at
+    // the comparison site elsewhere. With only the lowercase values listed
+    // here, ANY save() on one of those accounts failed validation, which is
+    // what silently swallowed review gamification awards
+    // ("role: `Patient` is not a valid enum value"). Listing what exists is
+    // the non-destructive fix; normalising the column would break every
+    // === 'Patient' check in the codebase.
+    enum: [
+      'patient', 'doctor', 'lab', 'pharmacy', 'admin', 'instructor', 'student', 'receptionist',
+      'Patient', 'Doctor', 'Laboratory', 'Pharmacy', 'Admin', 'Instructor', 'Student',
+    ],
     default: 'patient',
   },
   // Multi-role support: all roles this account is approved for.
