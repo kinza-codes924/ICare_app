@@ -185,18 +185,61 @@ class _IncomingCallListenerState extends State<IncomingCallListener> {
                 ),
               );
             } else {
-              // Direct video/audio call
-              nav.push(
-                MaterialPageRoute(
-                  builder: (_) => VideoCall(
-                    channelName: channelName,
-                    remoteUserName: callerName,
-                    isAudioOnly: isAudioOnly,
-                    currentUserId: userData?.id ?? '',
-                    currentUserName: userData?.name ?? 'User',
+              // A patient calling from inside a consultation sends callType
+              // 'audio'/'video', never 'consultation' — so this branch, not
+              // the one above, is what the doctor lands on. It opened a bare
+              // VideoCall, which is why the Prescription and Patient History
+              // panels were there when the doctor placed the call and missing
+              // when the doctor answered one. channelName is the consultation
+              // id in that case, so the same screen can be used.
+              final isDoctorUser =
+                  (userData?.role ?? '').toLowerCase() == 'doctor';
+              AppointmentDetail? appointment;
+              if (isDoctorUser && channelName.isNotEmpty) {
+                try {
+                  final cRes = await ConsultationService()
+                      .getConsultationV2(channelName);
+                  final c = (cRes['consultation'] ?? cRes) as Map<String, dynamic>?;
+                  final rawAppt = c?['appointmentId'];
+                  final apptId = (rawAppt is Map ? rawAppt['_id'] : rawAppt)?.toString();
+                  if (apptId != null && apptId.isNotEmpty) {
+                    final aRes =
+                        await AppointmentService().getAppointmentById(apptId);
+                    if (aRes != null) {
+                      appointment = AppointmentDetail.fromJson(aRes);
+                    }
+                  }
+                } catch (e) {
+                  debugPrint('Could not resolve appointment for call: $e');
+                }
+              }
+
+              if (isDoctorUser && appointment != null) {
+                nav.push(
+                  MaterialPageRoute(
+                    builder: (_) => DoctorConsultationCallScreen(
+                      appointment: appointment!,
+                      consultationId: channelName,
+                      remoteUserName: callerName,
+                      isAudioOnly: isAudioOnly,
+                      currentUserId: userData?.id ?? '',
+                      currentUserName: userData?.name ?? 'User',
+                    ),
                   ),
-                ),
-              );
+                );
+              } else {
+                nav.push(
+                  MaterialPageRoute(
+                    builder: (_) => VideoCall(
+                      channelName: channelName,
+                      remoteUserName: callerName,
+                      isAudioOnly: isAudioOnly,
+                      currentUserId: userData?.id ?? '',
+                      currentUserName: userData?.name ?? 'User',
+                    ),
+                  ),
+                );
+              }
             }
           },
           onDecline: () {
