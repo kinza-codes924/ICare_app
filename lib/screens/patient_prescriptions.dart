@@ -985,6 +985,53 @@ class _PrescriptionPage extends StatelessWidget {
     if (d is Map) return d['name']?.toString() ?? d['username']?.toString() ?? 'Doctor';
     return 'Doctor';
   }
+  /// Lifestyle advice, flattened the same way the server does for the printed
+  /// and emailed copies. It is stored in its own collection and comes back
+  /// populated under lifestyleAdviceId; this screen simply never rendered it,
+  /// which is why the section was missing here while the email had it.
+  List<MapEntry<String, String>> get _lifestyleSections {
+    final la = record['lifestyleAdvice'] ?? record['lifestyleAdviceId'];
+    if (la is! Map) return [];
+    String list(dynamic v) =>
+        v is List ? v.where((e) => e != null && '$e'.isNotEmpty).join(', ') : '';
+    final out = <MapEntry<String, String>>[];
+    void add(String label, List<String?> parts) {
+      final body = parts.where((p) => p != null && p.isNotEmpty).join(' • ');
+      if (body.isNotEmpty) out.add(MapEntry(label, body));
+    }
+
+    String? s(dynamic v) => v == null || '$v'.isEmpty ? null : '$v';
+    final diet = la['diet'], ex = la['exercise'], sl = la['sleep'];
+    final st = la['stress'] ?? la['stressManagement'];
+    final sm = la['smoking'] ?? la['smokingCessation'];
+    final al = la['alcohol'] ?? la['alcoholModeration'];
+    final wt = la['weight'] ?? la['weightManagement'];
+
+    if (diet is Map) {
+      add('Diet', [
+        s(diet['recommendations']),
+        list(diet['foodsToInclude']).isEmpty ? null : 'Include: ${list(diet['foodsToInclude'])}',
+        list(diet['foodsToAvoid']).isEmpty ? null : 'Avoid: ${list(diet['foodsToAvoid'])}',
+        s(diet['mealTiming']), s(diet['hydration']),
+      ]);
+    }
+    if (ex is Map) {
+      add('Exercise', [s(ex['type']), s(ex['frequency']), s(ex['duration']), s(ex['intensity']), s(list(ex['precautions']))]);
+    }
+    if (sl is Map) {
+      add('Sleep', [s(sl['recommendedHours']), s(sl['sleepSchedule']), s(list(sl['sleepHygieneTips']))]);
+    }
+    if (st is Map) add('Stress', [s(list(st['techniques'])), s(st['recommendations'])]);
+    if (sm is Map) add('Smoking', [s(sm['plan']), s(sm['timeline']), s(list(sm['resources']))]);
+    if (al is Map) add('Alcohol', [s(al['recommendations']), s(al['limits'])]);
+    if (wt is Map) {
+      add('Weight', [wt['targetWeight'] == null ? null : 'Target: ${wt['targetWeight']}', s(wt['plan']), s(wt['timeline'])]);
+    }
+    final other = list(la['otherAdvice']);
+    if (other.isNotEmpty) add('Other', [other]);
+    return out;
+  }
+
   String get _doctorPmdc {
     final d = record['doctor'] ?? record['doctorId'] ?? {};
     if (d is Map) return d['pmdcLicense']?.toString() ?? d['pmdc']?.toString() ?? '';
@@ -1159,6 +1206,30 @@ class _PrescriptionPage extends StatelessWidget {
                   decoration: BoxDecoration(color: const Color(0xFFF0FDF4), borderRadius: BorderRadius.circular(8), border: Border.all(color: const Color(0xFFA7F3D0))),
                   child: Text(_doctorNotes, style: const TextStyle(fontSize: 13, color: Color(0xFF374151), height: 1.5)),
                 ),
+              ],
+
+              if (_lifestyleSections.isNotEmpty) ...[
+                const SizedBox(height: 16), _div(), const SizedBox(height: 14),
+                _sec('LIFESTYLE ADVICE', Icons.favorite_rounded, const Color(0xFF0EA5E9)),
+                const SizedBox(height: 8),
+                ..._lifestyleSections.map((s) => Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(s.key, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: Color(0xFF0F172A))),
+                          const SizedBox(height: 2),
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.only(left: 10),
+                            decoration: const BoxDecoration(
+                              border: Border(left: BorderSide(color: Color(0xFFE2E8F0), width: 2)),
+                            ),
+                            child: Text(s.value, style: const TextStyle(fontSize: 12.5, color: Color(0xFF374151), height: 1.5)),
+                          ),
+                        ],
+                      ),
+                    )),
               ],
 
               if (followUp.isNotEmpty) ...[
@@ -1406,6 +1477,20 @@ class _PrescriptionPage extends StatelessWidget {
             pw.Text("DOCTOR'S NOTES", style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold, color: PdfColors.blue800)),
             pw.SizedBox(height: 4),
             pw.Text(_doctorNotes, style: const pw.TextStyle(fontSize: 11)),
+            pw.SizedBox(height: 8),
+          ],
+          if (_lifestyleSections.isNotEmpty) ...[
+            pw.Text('LIFESTYLE ADVICE', style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold, color: PdfColors.blue800)),
+            pw.SizedBox(height: 4),
+            ..._lifestyleSections.map((s) => pw.Padding(
+                  padding: const pw.EdgeInsets.only(bottom: 4),
+                  child: pw.RichText(
+                    text: pw.TextSpan(children: [
+                      pw.TextSpan(text: '${s.key}: ', style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold)),
+                      pw.TextSpan(text: s.value, style: const pw.TextStyle(fontSize: 11)),
+                    ]),
+                  ),
+                )),
             pw.SizedBox(height: 8),
           ],
           pw.Divider(),

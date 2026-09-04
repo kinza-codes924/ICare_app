@@ -576,6 +576,11 @@ exports.getPatientPrescriptions = async (req, res) => {
 
     const prescriptions = await EnhancedPrescription.find(query)
       .populate('doctorId', 'name specialization pmdcLicense')
+      // Without this the lifestyle advice never reached the app's own
+      // prescription view, so that section was blank there while the emailed
+      // and printed copies showed it.
+      .populate('lifestyleAdviceId')
+      .populate('patientId', 'name username age gender mrNumber')
       .sort({ prescribedAt: -1 })
       .limit(parseInt(limit))
       .skip(parseInt(skip));
