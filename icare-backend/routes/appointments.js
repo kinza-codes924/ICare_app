@@ -98,6 +98,68 @@ async function getAppointments(userId, userRole) {
     { $set: { status: 'confirmed' } }
   ).catch(() => {});
 
+  // The 2-hour rule above only catches old rows, so a session abandoned
+  // minutes ago (both sides navigated away without ending it) still showed a
+  // "Rejoin" card — several at once, for calls nobody was in. The appointment
+  // status alone can't be trusted for that: settle it against the actual
+  // Consultation, which is the thing rejoin needs to exist. Anything marked
+  // in_progress with no pending/active consultation behind it is over.
+  try {
+    const Consultation = require('../models/Consultation');
+    const inProgress = await Appointment.find(
+      { status: 'in_progress', $or: [{ patient_id: uid }, { doctor_id: uid }] },
+      { _id: 1 }
+    ).lean();
+    if (inProgress.length) {
+      const ids = inProgress.map(a => a._id);
+      const liveIds = (await Consultation.find(
+        { appointmentId: { $in: ids }, status: { $in: ['pending', 'active'] } },
+        { appointmentId: 1 }
+      ).lean()).map(c => String(c.appointmentId));
+      const deadIds = ids.filter(id => !liveIds.includes(String(id)));
+      if (deadIds.length) {
+        await Appointment.updateMany(
+          { _id: { $in: deadIds } },
+          { $set: { status: 'completed' } }
+        );
+      }
+    }
+  } catch (_) { /* cleanup is best-effort — never block the listing */ }
+
+  // Mirror of the block above, the other way round. A Consultation left
+  // 'active' after its appointment already finished keeps the call alive as
+  // far as every "is anyone waiting?" poll is concerned — that is what leaves
+  // Doctor Connect stuck on "Waiting" and inflates the Live count. Four such
+  // rows were sitting in production 23-45 hours old, all against completed
+  // appointments. Close them out.
+  try {
+    const Consultation = require('../models/Consultation');
+    const stale = await Consultation.find(
+      { status: { $in: ['pending', 'active'] }, $or: [{ patientId: uid }, { doctorId: uid }] },
+      { _id: 1, appointmentId: 1, createdAt: 1 }
+    ).lean();
+    if (stale.length) {
+      const apptIds = stale.map(c => c.appointmentId).filter(Boolean);
+      const finished = new Set(
+        (await Appointment.find(
+          { _id: { $in: apptIds }, status: { $in: ['completed', 'cancelled', 'missed'] } },
+          { _id: 1 }
+        ).lean()).map(a => String(a._id))
+      );
+      const deadIds = stale
+        .filter(c =>
+          (c.appointmentId && finished.has(String(c.appointmentId))) ||
+          (c.createdAt && new Date(c.createdAt) < twoHoursAgo))
+        .map(c => c._id);
+      if (deadIds.length) {
+        await Consultation.updateMany(
+          { _id: { $in: deadIds } },
+          { $set: { status: 'completed', endTime: new Date() } }
+        );
+      }
+    }
+  } catch (_) { /* best-effort */ }
+
   // The appointment row is created up-front (before Pay Now), to hold the
   // slot while the patient is on the payment screen. If they cancel/close
   // that screen instead of paying, no webhook ever fires — the row was

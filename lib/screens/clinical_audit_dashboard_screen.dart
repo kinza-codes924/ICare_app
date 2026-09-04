@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:icare/services/clinical_audit_service.dart';
 import 'package:icare/utils/theme.dart';
+import 'package:icare/widgets/back_button.dart';
 
 /// Clinical Audit & QA Dashboard
 ///
@@ -54,6 +55,7 @@ class _ClinicalAuditDashboardScreenState extends ConsumerState<ClinicalAuditDash
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
+        leading: const CustomBackButton(),
         backgroundColor: Colors.white,
         elevation: 0,
         title: Column(

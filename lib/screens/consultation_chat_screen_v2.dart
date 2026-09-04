@@ -256,12 +256,24 @@ class _ConsultationChatScreenV2State extends State<ConsultationChatScreenV2> {
         // Show a clear message instead of the raw backend text (which reads
         // like a crash: "Waiting for patient to complete payment...").
         final code = result['code']?.toString();
-        final message = code == 'PAYMENT_REQUIRED'
-            ? 'This booking was never paid for, so it can\'t be resumed. Please start a new consultation.'
-            : (result['message']?.toString() ?? 'Failed to start consultation');
+        final message = switch (code) {
+          // The session was abandoned rather than ended cleanly; the backend
+          // has just settled the stale appointment row, so the rejoin card
+          // this came from is gone on the next load.
+          'SESSION_ENDED' =>
+            'That consultation has already ended. Please start a new one.',
+          'PAYMENT_REQUIRED' =>
+            'This booking was never paid for, so it can\'t be resumed. Please start a new consultation.',
+          _ => (result['message']?.toString() ?? 'Failed to start consultation'),
+        };
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(message)),
         );
+        // Nothing to show behind the message — this screen opened only to
+        // resume a session that no longer exists.
+        if (code == 'SESSION_ENDED' || code == 'PAYMENT_REQUIRED') {
+          _exitToDashboard();
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -390,13 +402,17 @@ class _ConsultationChatScreenV2State extends State<ConsultationChatScreenV2> {
       final file = result.files.single;
       final fileName = file.name;
 
-      // Guard: max 4MB (Vercel 4.5MB limit with headroom)
+      // Match the backend's own multer cap (consultationRoutes.js: 10 MB).
+      // This was pinned at 4 MB for Vercel's 4.5 MB request limit, which no
+      // longer applies now that the API runs on our own server — files
+      // between 4 and 10 MB were being rejected client-side even though the
+      // upload would have succeeded.
       final fileSize = file.bytes?.length ?? file.size;
-      if (fileSize > 4 * 1024 * 1024) {
+      if (fileSize > 10 * 1024 * 1024) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('File too large. Maximum size is 4 MB. Please compress the image and try again.'),
+              content: Text('File too large. Maximum size is 10 MB. Please compress the file and try again.'),
               backgroundColor: Colors.orange,
               duration: Duration(seconds: 4),
             ),
@@ -871,9 +887,54 @@ class _ConsultationChatScreenV2State extends State<ConsultationChatScreenV2> {
     );
   }
 
+  /// Back out of a live consultation.
+  ///
+  /// Leaving used to just drop the screen: the consultation stayed `active`
+  /// on the backend and its appointment stayed `in_progress`, so the patient
+  /// was left with a "Rejoin" card for a session nobody was in — and enough
+  /// of those piled up to show several "Consultation in Progress" rows at
+  /// once. Make the choice explicit instead of guessing for the user.
+  Future<bool> _confirmLeave() async {
+    final choice = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Leave consultation?'),
+        content: const Text(
+          'You can step away and come back to this session, or end it now for good.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, 'stay'),
+            child: const Text('Stay'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, 'leave'),
+            child: const Text('Leave (keep session)'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, 'end'),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('End consultation'),
+          ),
+        ],
+      ),
+    );
+    if (choice == 'end') {
+      await _endConsultation();
+      return false; // _endConsultation navigates on its own
+    }
+    return choice == 'leave';
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) async {
+        if (didPop) return;
+        if (await _confirmLeave() && mounted) _exitToDashboard();
+      },
+      child: Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -893,6 +954,7 @@ class _ConsultationChatScreenV2State extends State<ConsultationChatScreenV2> {
                 _buildMessageInput(),
               ],
             ),
+      ),
     );
   }
 

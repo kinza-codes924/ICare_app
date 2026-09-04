@@ -250,11 +250,13 @@ final routerProvider = Provider<GoRouter>((ref) {
         }
         for (final entry in rolePrefixes.entries) {
           if (path.startsWith(entry.value) && role != entry.key) {
+            debugPrint('🚦 ROUTER BLOCK: path=$path role=$role needs=${entry.key} → /dashboard');
             return '/dashboard';
           }
         }
       }
 
+      debugPrint('🚦 ROUTER ALLOW: path=$path role=${auth.userRole}');
       return null;
     },
     routes: [

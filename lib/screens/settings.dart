@@ -43,6 +43,7 @@ import '../utils/water_notif_stub.dart'
 import '../utils/daily_reminder_stub.dart'
     if (dart.library.html) '../utils/daily_reminder_web.dart';
 import 'package:icare/services/reminder_service.dart';
+import 'package:icare/widgets/back_button.dart';
 
 // 1 reward point = 0.01 PKR (100 pts = 1 PKR). Configurable from backend.
 const double _kPointToPkr = 0.01;
@@ -1919,7 +1920,7 @@ class _WebSettingsLayout extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('settings_title'.tr(), style: const TextStyle(color: AppColors.primaryColor, fontWeight: FontWeight.w700)), centerTitle: true, backgroundColor: Colors.white, foregroundColor: AppColors.primaryColor, elevation: 0, surfaceTintColor: Colors.white),
+      appBar: AppBar(leading: const CustomBackButton(), title: Text('settings_title'.tr(), style: const TextStyle(color: AppColors.primaryColor, fontWeight: FontWeight.w700)), centerTitle: true, backgroundColor: Colors.white, foregroundColor: AppColors.primaryColor, elevation: 0, surfaceTintColor: Colors.white),
       body: SingleChildScrollView(padding: const EdgeInsets.all(24), child: Center(child: Container(constraints: const BoxConstraints(maxWidth: 800), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         // Remove any blue background header - using clean white layout
         _ProfileEditCard(p: p), const SizedBox(height: 24),
@@ -2592,7 +2593,7 @@ class _MobileSettingsLayout extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('settings_title'.tr(), style: const TextStyle(color: AppColors.primaryColor, fontWeight: FontWeight.w700)), centerTitle: true, backgroundColor: Colors.white, foregroundColor: AppColors.primaryColor, elevation: 0, surfaceTintColor: Colors.white),
+      appBar: AppBar(leading: const CustomBackButton(), title: Text('settings_title'.tr(), style: const TextStyle(color: AppColors.primaryColor, fontWeight: FontWeight.w700)), centerTitle: true, backgroundColor: Colors.white, foregroundColor: AppColors.primaryColor, elevation: 0, surfaceTintColor: Colors.white),
       body: SingleChildScrollView(padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         _ProfileEditCard(p: p), const SizedBox(height: 16),
         if (p.isDoctor) ...[_doctorProfessionalCard(context), const SizedBox(height: 16)],

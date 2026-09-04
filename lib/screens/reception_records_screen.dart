@@ -3,6 +3,7 @@ import 'package:icare/screens/reception_visit_summary.dart';
 import 'package:icare/screens/reception_create_invoice_screen.dart';
 import 'package:icare/services/reception_service.dart';
 import 'package:icare/utils/theme.dart';
+import 'package:icare/widgets/back_button.dart';
 
 // Confirmed/paid walk-in visits and standalone invoices, merged into one
 // chronological list — lets the receptionist look back at completed work.
@@ -61,6 +62,7 @@ class _ReceptionRecordsScreenState extends State<ReceptionRecordsScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
+        leading: const CustomBackButton(),
         title: const Text('Records'),
         backgroundColor: AppColors.primaryColor,
         foregroundColor: Colors.white,

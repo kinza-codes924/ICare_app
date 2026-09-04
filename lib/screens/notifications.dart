@@ -15,6 +15,7 @@ import 'package:icare/utils/theme.dart';
 import 'package:icare/utils/utils.dart';
 import 'package:icare/widgets/back_button.dart';
 import 'package:icare/widgets/custom_text.dart';
+import 'package:icare/widgets/tap_area.dart';
 
 class NotificationScreen extends StatefulWidget {
   const NotificationScreen({super.key});
@@ -318,7 +319,8 @@ class _NotificationScreenState extends State<NotificationScreen> {
                 constraints: const BoxConstraints(maxWidth: 800),
                 child: Row(
                   children: [
-                    GestureDetector(
+                    TapArea(
+        behavior: HitTestBehavior.opaque,
                       onTap: () => goBackOrHome(context),
                       child: Container(
                         padding: const EdgeInsets.all(10),

@@ -16,6 +16,7 @@ import 'package:icare/utils/utils.dart';
 import 'package:icare/utils/recaptcha.dart';
 import 'package:icare/widgets/auth_left_panel.dart';
 import 'package:icare/widgets/recaptcha_checkbox.dart';
+import 'package:icare/widgets/tap_area.dart';
 
 class SignupScreen extends ConsumerStatefulWidget {
   final String role;
@@ -817,7 +818,8 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
 
   // Shared by both layouts so they can't drift apart.
   Widget _backButton() {
-    return GestureDetector(
+    return TapArea(
+        behavior: HitTestBehavior.opaque,
       onTap: () {
         if (context.canPop()) {
           context.pop();

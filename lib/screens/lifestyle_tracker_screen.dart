@@ -9,6 +9,7 @@ import 'package:icare/services/gamification_service.dart';
 import 'package:icare/services/consultation_service.dart';
 import 'package:intl/intl.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:icare/widgets/tap_area.dart';
 
 class LifestyleTrackerScreen extends StatefulWidget {
   const LifestyleTrackerScreen({super.key});
@@ -1210,7 +1211,8 @@ class _LifestyleTrackerScreenState extends State<LifestyleTrackerScreen>
         content: Wrap(
           spacing: 16,
           children: moods
-              .map((m) => GestureDetector(
+              .map((m) => TapArea(
+        behavior: HitTestBehavior.opaque,
                     onTap: () {
                       setState(() {
                         _selectedMood = m;

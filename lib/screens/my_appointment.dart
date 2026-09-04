@@ -6,6 +6,7 @@ import 'package:icare/utils/utils.dart';
 import 'package:icare/widgets/back_button.dart';
 import 'package:icare/widgets/custom_text.dart';
 import 'package:icare/widgets/svg_wrapper.dart';
+import 'package:icare/widgets/tap_area.dart';
 
 class MyAppointment extends StatelessWidget {
   const MyAppointment({super.key});
@@ -26,7 +27,8 @@ class MyAppointment extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // Back button
-                  GestureDetector(
+                  TapArea(
+        behavior: HitTestBehavior.opaque,
                     onTap: () => goBackOrHome(context),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,

@@ -2,6 +2,7 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:icare/models/appointment_detail.dart';
 import 'package:icare/widgets/date_filter_bar.dart';
+import 'package:icare/screens/consultation_details_screen.dart';
 import 'package:icare/screens/doctors_list.dart';
 import 'package:icare/screens/prescription_detail_screen.dart';
 import 'package:icare/screens/profile_or_appointement_view.dart';
@@ -107,25 +108,68 @@ class _BookingsHistoryScreenState extends State<BookingsHistoryScreen> {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF1F5F9),
-      body: RefreshIndicator(
-        onRefresh: _loadAppointments,
-        child: CustomScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          slivers: [
-            _buildHeader(pad),
-            if (_isLoading)
-              const SliverFillRemaining(
-                child: Center(child: CircularProgressIndicator()),
-              )
-            else
-              SliverPadding(
-                padding: EdgeInsets.fromLTRB(pad, 24, pad, 40),
-                sliver: SliverList(
-                  delegate: SliverChildListDelegate(_buildBody()),
+      body: Stack(
+        children: [
+          RefreshIndicator(
+            onRefresh: _loadAppointments,
+            child: CustomScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              slivers: [
+                _buildHeader(pad),
+                if (_isLoading)
+                  const SliverFillRemaining(
+                    child: Center(child: CircularProgressIndicator()),
+                  )
+                else
+                  SliverPadding(
+                    padding: EdgeInsets.fromLTRB(pad, 24, pad, 40),
+                    sliver: SliverList(
+                      delegate: SliverChildListDelegate(_buildBody()),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          // Back control sits in the Scaffold body's Stack, not in an AppBar
+          // and not inside the scroll view. Both of those were tried and the
+          // tap never reached onTap (a debugPrint in the handler never fired,
+          // verified against a byte-matched live build). This is the exact
+          // Material+InkWell placement that _categoryTile uses on this same
+          // screen, which is confirmed working.
+          Positioned(
+            top: 12,
+            left: 12,
+            child: Material(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(24),
+              elevation: 3,
+              child: InkWell(
+                onTap: () {
+                  debugPrint('⬅️ PILL BACK TAP fired');
+                  goBackOrHome(context);
+                },
+                borderRadius: BorderRadius.circular(24),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 16, vertical: 10),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.arrow_back_rounded,
+                          size: 20, color: Color(0xFF0F2744)),
+                      const SizedBox(width: 8),
+                      Text('Back'.tr(),
+                          style: const TextStyle(
+                              color: Color(0xFF0F2744),
+                              fontWeight: FontWeight.w700,
+                              fontSize: 14)),
+                    ],
+                  ),
                 ),
               ),
-          ],
-        ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -148,36 +192,12 @@ class _BookingsHistoryScreenState extends State<BookingsHistoryScreen> {
         child: SafeArea(
           bottom: false,
           child: Padding(
-            padding: EdgeInsets.fromLTRB(pad, 16, pad, 28),
+            padding: EdgeInsets.fromLTRB(pad, 64, pad, 28),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Back
-                GestureDetector(
-                  onTap: () =>
-                      goBackOrHome(context),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: const Icon(Icons.arrow_back_ios_new_rounded,
-                            color: Colors.white, size: 16),
-                      ),
-                      const SizedBox(width: 10),
-                      Text('Home'.tr(),
-                          style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w600,
-                              fontSize: 14)),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 24),
+                // Back button now lives in the real AppBar above (see build())
+                // — this header keeps only the decorative title block.
 
                 // Icon + title — centered
                 Center(
@@ -523,15 +543,62 @@ class _BookingsHistoryScreenState extends State<BookingsHistoryScreen> {
     } catch (_) {}
 
     if (!mounted) return;
-    final pathId = (consultationId != null && consultationId.isNotEmpty)
-        ? consultationId
-        : 'new';
-    context.go('/consultation/$pathId', extra: {
+
+    // No live consultation behind this card means the doctor has left. Opening
+    // a brand-new session here (the old 'new' fallback) silently dropped the
+    // patient into an empty call with nobody in it. Say so, and offer the only
+    // thing that actually helps — a different doctor. "Rejoin" stays the label
+    // on the card itself, because when the session IS live it does exactly
+    // that: returns to the same doctor.
+    if (consultationId == null || consultationId.isEmpty) {
+      await showDialog<void>(
+        context: context,
+        builder: (dCtx) => AlertDialog(
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Text('Session Ended'.tr(),
+              style: const TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xFF0F172A))),
+          content: Text(
+            'The doctor is no longer in this session. You can connect with another available doctor.'
+                .tr(),
+            style: const TextStyle(fontSize: 14, color: Color(0xFF475569)),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dCtx).pop(),
+              child: Text('Close'.tr(),
+                  style: const TextStyle(color: Color(0xFF64748B))),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.of(dCtx).pop();
+                Navigator.of(context).push(MaterialPageRoute(
+                    builder: (_) => const ConsultationDetailsScreen()));
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF0036BC),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10)),
+              ),
+              child: Text('Connect to Another Doctor'.tr(),
+                  style: const TextStyle(fontWeight: FontWeight.w700)),
+            ),
+          ],
+        ),
+      );
+      if (mounted) _loadAppointments();
+      return;
+    }
+
+    context.go('/consultation/$consultationId', extra: {
       'appointment': appt,
       'isDoctor': false,
       'currentUserId': _currentUserId,
       'currentUserName': _currentUserName,
-      if (pathId == 'new') 'consultationId': null,
     });
   }
 
@@ -549,7 +616,10 @@ class _BookingsHistoryScreenState extends State<BookingsHistoryScreen> {
       borderRadius: BorderRadius.circular(18),
       child: InkWell(
         onTap: count > 0
-            ? () => _showSheet(title, list, color)
+            ? () {
+                debugPrint('📂 CATEGORY TAP: $title count=$count');
+                _showSheet(title, list, color);
+              }
             : null,
         borderRadius: BorderRadius.circular(18),
         child: Container(
@@ -687,8 +757,9 @@ class _BookingsHistoryScreenState extends State<BookingsHistoryScreen> {
                             ],
                           ),
                         ),
-                        // Global Close (X) button — dismisses the entire list view
+                        // Global Close (X) button — dismisses just this bottom sheet
                         GestureDetector(
+                          behavior: HitTestBehavior.opaque,
                           onTap: () => Navigator.of(context).pop(),
                           child: Container(
                             padding: const EdgeInsets.all(8),

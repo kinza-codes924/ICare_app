@@ -19,6 +19,7 @@ import 'package:icare/widgets/video_player_widget.dart';
 import 'package:icare/widgets/attachment_viewer.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:icare/widgets/back_button.dart';
+import 'package:icare/widgets/tap_area.dart';
 
 /// Course Content Management - Moodle/Udemy style
 class InstructorCourseContentScreen extends StatefulWidget {
@@ -376,7 +377,8 @@ class InstructorCourseContentScreenState extends State<InstructorCourseContentSc
 
   Widget _courseTypeOption(BuildContext ctx, String type, IconData icon, Color color, String label, String desc) {
     final selected = _courseType == type;
-    return GestureDetector(
+    return TapArea(
+        behavior: HitTestBehavior.opaque,
       onTap: () { Navigator.pop(ctx); _updateCourseType(type); },
       child: Container(
         padding: const EdgeInsets.all(14),
@@ -983,6 +985,7 @@ class InstructorCourseContentScreenState extends State<InstructorCourseContentSc
         ),
         const SizedBox(width: 8),
         GestureDetector(
+        behavior: HitTestBehavior.opaque,
           onTap: () async {
             final confirm = await showDialog<bool>(context: context, builder: (ctx) => AlertDialog(
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -1054,6 +1057,7 @@ class InstructorCourseContentScreenState extends State<InstructorCourseContentSc
             style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: isPublished ? const Color(0xFF10B981) : Colors.grey)),
         ),
         GestureDetector(
+        behavior: HitTestBehavior.opaque,
           onTap: () async {
             final confirm = await showDialog<bool>(context: context, builder: (ctx) => AlertDialog(
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -1136,6 +1140,7 @@ class InstructorCourseContentScreenState extends State<InstructorCourseContentSc
             },
           ),
         GestureDetector(
+        behavior: HitTestBehavior.opaque,
           onTap: () async {
             final confirm = await showDialog<bool>(context: context, builder: (ctx) => AlertDialog(
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),

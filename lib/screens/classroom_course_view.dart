@@ -21,6 +21,7 @@ import 'package:icare/widgets/video_player_widget.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:icare/widgets/back_button.dart';
+import 'package:icare/widgets/tap_area.dart';
 
 // ─────────────────────────────────────────────────────────────
 // Google Classroom-style inside-course view
@@ -472,7 +473,8 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
       ),
       title: Row(
         children: [
-          GestureDetector(
+          TapArea(
+        behavior: HitTestBehavior.opaque,
             onTap: () => Navigator.pop(context),
             child: const Text(
               'Classroom',

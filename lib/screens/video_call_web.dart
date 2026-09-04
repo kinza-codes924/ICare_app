@@ -25,6 +25,7 @@ import '../utils/shared_pref.dart';
 import '../utils/prescription_toggle_bridge.dart';
 import '../widgets/rating_dialog.dart';
 import 'package:icare/utils/utils.dart';
+import 'package:icare/widgets/tap_area.dart';
 
 // JS interop — Jitsi Meet External API
 // jitsiJoin and jitsiLeave now return Promises (handled via JSPromise)
@@ -1471,7 +1472,8 @@ class _VideoCallWebState extends State<VideoCall> {
             Positioned(
               top: 0,
               right: 0,
-              child: GestureDetector(
+              child: TapArea(
+        behavior: HitTestBehavior.opaque,
                 onTap: () => Navigator.pop(ctx),
                 child: Container(
                   padding: const EdgeInsets.all(8),
@@ -1489,6 +1491,7 @@ class _VideoCallWebState extends State<VideoCall> {
               bottom: 0,
               right: 0,
               child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
                 onTap: () {
                   Navigator.pop(ctx);
                   _downloadImageFromDataUrl(dataUrl);

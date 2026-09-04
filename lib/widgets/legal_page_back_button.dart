@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:icare/widgets/tap_area.dart';
 
 /// Back button for screens that can be reached via a direct URL (e.g.
 /// /privacypolicy, /terms, /refund-policy). Unlike [CustomBackButton], it
@@ -13,7 +14,8 @@ class LegalPageBackButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
+    return TapArea(
+        behavior: HitTestBehavior.opaque,
       onTap: () {
         if (context.canPop()) {
           context.pop();

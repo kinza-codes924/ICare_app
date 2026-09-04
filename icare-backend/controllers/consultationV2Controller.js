@@ -86,6 +86,26 @@ exports.startConsultation = async (req, res) => {
         });
       }
 
+      // Reaching here means no pending/active consultation exists for this
+      // appointment, yet its status still says in_progress — the session was
+      // abandoned (both sides navigated away) rather than ended cleanly, so
+      // the end-of-call handler that normally closes it never ran. Left as
+      // is, the patient keeps seeing a "Rejoin" card for a dead session; the
+      // rejoin then falls through to the payment gate below and reports
+      // "never paid for" on a booking that was in fact paid. Settle the row
+      // here so the stale card disappears on the next load.
+      if (appt && appt.status === 'in_progress') {
+        await Appointment.findByIdAndUpdate(
+          validAppointmentId,
+          { $set: { status: 'completed' } }
+        ).catch(() => {});
+        return res.status(409).json({
+          success: false,
+          code: 'SESSION_ENDED',
+          message: 'That consultation has already ended. Please start a new one.',
+        });
+      }
+
       // The gate used to cover only connect_now_ channels, so a SCHEDULED
       // appointment whose payment never completed could still open a session.
       // Cash-at-clinic is the one legitimate unpaid case — reception collects

@@ -153,6 +153,12 @@ function pktTime(d) {
   return pkt.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', timeZone: 'UTC' });
 }
 
+// Lifestyle advice lives in its own collection, linked by lifestyleAdviceId.
+// Flatten whichever of its category sub-documents the doctor actually filled
+// in into one readable block; returns '' when there is nothing to show, so
+// the caller can omit the whole section.
+const { buildLifestyleHtml } = require('../utils/lifestyleSummary');
+
 // ─── PRINTABLE PRESCRIPTION PAGE — kept for direct browser access ─────────────
 router.get('/prescriptions/:prescriptionId/view', async (req, res) => {
   try {
@@ -163,13 +169,25 @@ router.get('/prescriptions/:prescriptionId/view', async (req, res) => {
     const rx = await EnhancedPrescription.findById(new mongoose.Types.ObjectId(req.params.prescriptionId)).lean();
     if (!rx) return res.status(404).send('<h2>Prescription not found</h2>');
 
-    const [patient, doctor] = await Promise.all([
-      rx.patientId ? User.findById(rx.patientId).select('name username').lean().catch(() => null) : null,
+    const Consultation = require('../models/Consultation');
+    const DoctorProfileModel = require('../models/DoctorProfile');
+    const [patient, doctor, consultation, docProfile] = await Promise.all([
+      rx.patientId ? User.findById(rx.patientId).select('name username mrNumber').lean().catch(() => null) : null,
       User.findById(rx.doctorId).select('name username').lean().catch(() => null),
+      rx.consultationId ? Consultation.findById(rx.consultationId).select('patientAge patientGender').lean().catch(() => null) : null,
+      DoctorProfileModel.findOne({ user_id: rx.doctorId }).select('license_number specialization').lean().catch(() => null),
     ]);
 
     const patientName = patient?.name || patient?.username || rx.patientName || 'Patient';
     const doctorName = doctor?.name || doctor?.username || 'Doctor';
+    // Age/gender live on the Consultation and the MR number on the User —
+    // EnhancedPrescription carries neither, so reading only rx.* left these
+    // rows blank on every printed prescription.
+    const ptAge = rx.patientAge || consultation?.patientAge || '';
+    const ptGender = rx.patientGender || consultation?.patientGender || '';
+    const ptMr = rx.mrNumber || rx.patientMrNumber || patient?.mrNumber || '';
+    const drPmdc = rx.doctorPmdc || docProfile?.license_number || '';
+    const drSpec = docProfile?.specialization || '';
     const dateObj = new Date(rx.prescribedAt || rx.createdAt || Date.now());
     const dateStr = pktDate(dateObj);
     const timeStr = pktTime(dateObj);
@@ -196,6 +214,27 @@ router.get('/prescriptions/:prescriptionId/view', async (req, res) => {
       const name = (typeof t === 'string') ? t : (t.testName || t.name || 'Lab Test');
       return `<li style="margin-bottom:6px;font-size:13px;color:#374151;">${name}</li>`;
     }).join('');
+
+    // Referral / follow-up / lifestyle advice. These are all filled in on the
+    // prescription form but none of them used to reach the printed page:
+    // referral and lifestyle had no markup at all, and follow-up read a
+    // top-level rx.followUpDate that the schema does not have (it lives under
+    // referralFollowUp), so that block never rendered either.
+    const rf = rx.referralFollowUp || {};
+    const referralHtml = (rf.referralType && rf.referralType !== 'none')
+      ? [
+          `Referred to: ${rf.referralType}${rf.referralSpecialty ? ` — ${rf.referralSpecialty}` : ''}`,
+          rf.referralNotes,
+        ].filter(Boolean).join('<br/>')
+      : '';
+    const followUpHtml = (rf.followUpDate || (rf.followUpDuration && rf.followUpDuration !== 'none'))
+      ? [
+          rf.followUpDate ? `Next visit: ${pktDate(new Date(rf.followUpDate))}` : `Follow up in: ${rf.followUpDuration}`,
+          rf.followUpNotes,
+        ].filter(Boolean).join('<br/>')
+      : '';
+
+    const lifestyleHtml = await buildLifestyleHtml(rx.lifestyleAdviceId);
 
     const html = `<!DOCTYPE html>
 <html lang="en">
@@ -256,13 +295,14 @@ router.get('/prescriptions/:prescriptionId/view', async (req, res) => {
         <div class="pt-col">
           <div class="col-label">Patient</div>
           <div class="col-name">${patientName}</div>
-          ${rx.patientAge ? `<div class="col-sub">Age: ${rx.patientAge}${rx.patientGender ? '  |  Gender: ' + rx.patientGender : ''}</div>` : ''}
-          ${rx.mrNumber || rx.patientMrNumber ? `<div class="col-sub" style="font-weight:700;">MR#: ${rx.mrNumber || rx.patientMrNumber}</div>` : ''}
+          ${ptAge ? `<div class="col-sub">Age: ${ptAge}${ptGender ? '  |  Gender: ' + ptGender : ''}</div>` : ''}
+          ${ptMr ? `<div class="col-sub" style="font-weight:700;">MR#: ${ptMr}</div>` : ''}
         </div>
         <div class="dr-col">
           <div class="col-label">Doctor</div>
           <div class="col-name">Dr. ${doctorName}</div>
-          ${rx.doctorPmdc ? `<div class="col-sub">PMDC: ${rx.doctorPmdc}</div>` : ''}
+          ${drSpec ? `<div class="col-sub">${drSpec}</div>` : ''}
+          ${drPmdc ? `<div class="col-sub">PMDC: ${drPmdc}</div>` : ''}
           ${rx.doctorPhone ? `<div class="col-sub">Phone: ${rx.doctorPhone}</div>` : ''}
         </div>
       </div>
@@ -275,16 +315,20 @@ router.get('/prescriptions/:prescriptionId/view', async (req, res) => {
 
       ${rx.doctorNotes ? `<div class="sec"><div class="sec-title">Doctor Notes</div><p style="font-size:12px;color:#374151;line-height:1.6;margin:0;">${rx.doctorNotes}</p></div>` : ''}
 
-      ${rx.followUpDate ? `<div class="sec"><div class="sec-title">Follow-Up</div><p style="font-size:13px;color:#374151;margin:0;">Next visit: ${rx.followUpDate}</p></div>` : ''}
+      ${lifestyleHtml ? `<div class="sec"><div class="sec-title">Lifestyle Advice</div><p style="font-size:12px;color:#374151;line-height:1.6;margin:0;">${lifestyleHtml}</p></div>` : ''}
+
+      ${referralHtml ? `<div class="sec"><div class="sec-title">Referral</div><p style="font-size:12px;color:#374151;line-height:1.6;margin:0;">${referralHtml}</p></div>` : ''}
+
+      ${followUpHtml ? `<div class="sec"><div class="sec-title">Follow-Up</div><p style="font-size:13px;color:#374151;margin:0;">${followUpHtml}</p></div>` : ''}
 
       <div class="validity-box">⚠️ This prescription is valid for <strong>30 days</strong> from the date of issue.</div>
 
+      <!-- No signature line: these are issued electronically, so the doctor
+           is identified by PMDC registration number rather than a signature. -->
       <div class="sig-row">
         <div class="sig-right">
-          <div><span class="sig-line-elem"></span></div>
-          <div class="sig-name">Dr. ${doctorName}</div>
-          ${rx.doctorPmdc ? `<div class="sig-sub">PMDC Reg. No. ${rx.doctorPmdc}</div>` : ''}
-          <div class="sig-sub">Authorized Signature</div>
+          <div class="sig-name">${drPmdc ? `PMDC Reg. No. ${drPmdc}` : `Dr. ${doctorName}`}</div>
+          <div class="sig-sub">Electronically Generated</div>
         </div>
       </div>
 
@@ -319,15 +363,24 @@ router.get('/prescriptions/:prescriptionId/pdf', async (req, res) => {
 
     const DoctorProfile = require('../models/DoctorProfile');
     const { resolveClinicAddress } = require('../utils/clinicAddresses');
-    const [patient, doctor, doctorProfile] = await Promise.all([
-      rx.patientId ? User.findById(rx.patientId).select('name username').lean().catch(() => null) : null,
+    const ConsultationModel = require('../models/Consultation');
+    const [patient, doctor, doctorProfile, consultation] = await Promise.all([
+      rx.patientId ? User.findById(rx.patientId).select('name username mrNumber').lean().catch(() => null) : null,
       User.findById(rx.doctorId).select('name username').lean().catch(() => null),
       DoctorProfile.findOne({ user_id: rx.doctorId }).lean().catch(() => null),
+      rx.consultationId ? ConsultationModel.findById(rx.consultationId).select('patientAge patientGender').lean().catch(() => null) : null,
     ]);
     const clinicAddress = resolveClinicAddress(doctorProfile);
 
     const patientName = patient?.name || patient?.username || rx.patientName || 'Patient';
     const doctorName = doctor?.name || doctor?.username || 'Doctor';
+    // Same resolution as the HTML view — these fields do not live on the
+    // prescription document itself.
+    const ptAge = rx.patientAge || consultation?.patientAge || '';
+    const ptGender = rx.patientGender || consultation?.patientGender || '';
+    const ptMr = rx.mrNumber || rx.patientMrNumber || patient?.mrNumber || '';
+    const drPmdc = rx.doctorPmdc || doctorProfile?.license_number || '';
+    const drSpec = doctorProfile?.specialization || '';
     const dateObj = new Date(rx.prescribedAt || rx.createdAt || Date.now());
     const dateStr = pktDate(dateObj);
     const timeStr = pktTime(dateObj);
@@ -387,13 +440,13 @@ router.get('/prescriptions/:prescriptionId/pdf', async (req, res) => {
     doc.fontSize(7).fillColor(GREY).font('Helvetica-Bold').text('PATIENT', 50, colY);
     doc.fontSize(13).fillColor(DARK).font('Helvetica-Bold').text(patientName, 50, colY + 12);
     let ptY = colY + 28;
-    if (rx.patientAge) {
-      const ageGender = `Age: ${rx.patientAge}${rx.patientGender ? '  |  Gender: ' + rx.patientGender : ''}`;
+    if (ptAge) {
+      const ageGender = `Age: ${ptAge}${ptGender ? '  |  Gender: ' + ptGender : ''}`;
       doc.fontSize(9).fillColor(GREY).font('Helvetica').text(ageGender, 50, ptY);
       ptY += 13;
     }
-    if (rx.mrNumber || rx.patientMrNumber) {
-      doc.fontSize(9).fillColor(DARK).font('Helvetica-Bold').text(`MR# ${rx.mrNumber || rx.patientMrNumber}`, 50, ptY);
+    if (ptMr) {
+      doc.fontSize(9).fillColor(DARK).font('Helvetica-Bold').text(`MR# ${ptMr}`, 50, ptY);
     }
 
     // Doctor column
@@ -401,8 +454,12 @@ router.get('/prescriptions/:prescriptionId/pdf', async (req, res) => {
     doc.fontSize(7).fillColor(GREY).font('Helvetica-Bold').text('DOCTOR', drX, colY);
     doc.fontSize(13).fillColor(DARK).font('Helvetica-Bold').text(`Dr. ${doctorName}`, drX, colY + 12);
     let drY = colY + 28;
-    if (rx.doctorPmdc) {
-      doc.fontSize(9).fillColor(GREY).font('Helvetica').text(`PMDC: ${rx.doctorPmdc}`, drX, drY);
+    if (drSpec) {
+      doc.fontSize(9).fillColor(GREY).font('Helvetica').text(drSpec, drX, drY);
+      drY += 13;
+    }
+    if (drPmdc) {
+      doc.fontSize(9).fillColor(GREY).font('Helvetica').text(`PMDC: ${drPmdc}`, drX, drY);
       drY += 13;
     }
     if (rx.doctorPhone) {
@@ -480,29 +537,49 @@ router.get('/prescriptions/:prescriptionId/pdf', async (req, res) => {
       curY += doc.heightOfString(rx.doctorNotes, { width: pageWidth }) + 10;
     }
 
-    // ── Follow-up ──────────────────────────────────────────────────────────────
-    if (rx.followUpDate) {
-      doc.fontSize(8).fillColor(BLUE).font('Helvetica-Bold').text('FOLLOW-UP', 50, curY);
+    // ── Lifestyle Advice / Referral / Follow-up ────────────────────────────────
+    // Same three sections the HTML view gained: referral and lifestyle had no
+    // output at all here, and follow-up read a top-level rx.followUpDate the
+    // schema does not have (it lives under referralFollowUp), so it never
+    // printed even when the doctor set one.
+    const pdfSection = (title, body) => {
+      if (!body) return;
+      doc.fontSize(8).fillColor(BLUE).font('Helvetica-Bold').text(title, 50, curY);
       curY += 12;
-      doc.fontSize(10).fillColor(DARK).font('Helvetica').text(`Next visit: ${rx.followUpDate}`, 50, curY);
-      curY += 20;
+      doc.fontSize(10).fillColor(DARK).font('Helvetica').text(body, 50, curY, { width: pageWidth });
+      curY += doc.heightOfString(body, { width: pageWidth }) + 10;
+    };
+
+    const stripTags = (s) => s.replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]+>/g, '');
+    const rfPdf = rx.referralFollowUp || {};
+
+    pdfSection('LIFESTYLE ADVICE', stripTags(await buildLifestyleHtml(rx.lifestyleAdviceId)));
+
+    if (rfPdf.referralType && rfPdf.referralType !== 'none') {
+      pdfSection('REFERRAL', [
+        `Referred to: ${rfPdf.referralType}${rfPdf.referralSpecialty ? ` — ${rfPdf.referralSpecialty}` : ''}`,
+        rfPdf.referralNotes,
+      ].filter(Boolean).join('\n'));
     }
 
-    // ── Signature block (bottom, right-aligned) ────────────────────────────────
+    if (rfPdf.followUpDate || (rfPdf.followUpDuration && rfPdf.followUpDuration !== 'none')) {
+      pdfSection('FOLLOW-UP', [
+        rfPdf.followUpDate ? `Next visit: ${pktDate(new Date(rfPdf.followUpDate))}` : `Follow up in: ${rfPdf.followUpDuration}`,
+        rfPdf.followUpNotes,
+      ].filter(Boolean).join('\n'));
+    }
+
+    // ── Attribution block (bottom, right-aligned) ─────────────────────────────
+    // No signature line — these are issued electronically, so the doctor is
+    // identified by PMDC registration number rather than a signature.
     curY += 20;
     doc.rect(50, curY, pageWidth, 0.5).fill('#e2e8f0');
     curY += 16;
     const sigLineX = doc.page.width - 50 - 180;
-    doc.rect(sigLineX, curY, 180, 1).fill(DARK);
-    curY += 6;
-    const sigNameText = `Dr. ${doctorName}`;
-    doc.fontSize(11).fillColor(DARK).font('Helvetica-Bold').text(sigNameText, sigLineX, curY, { width: 180, align: 'center' });
-    curY += doc.heightOfString(sigNameText, { width: 180 }) + 3;
-    if (rx.doctorPmdc) {
-      doc.fontSize(9).fillColor(GREY).font('Helvetica').text(`PMDC Reg. No. ${rx.doctorPmdc}`, sigLineX, curY, { width: 180, align: 'center' });
-      curY += 12;
-    }
-    doc.fontSize(9).fillColor(GREY).font('Helvetica').text('Authorized Signature', sigLineX, curY, { width: 180, align: 'center' });
+    const attribText = drPmdc ? `PMDC Reg. No. ${drPmdc}` : `Dr. ${doctorName}`;
+    doc.fontSize(11).fillColor(DARK).font('Helvetica-Bold').text(attribText, sigLineX, curY, { width: 180, align: 'center' });
+    curY += doc.heightOfString(attribText, { width: 180 }) + 3;
+    doc.fontSize(9).fillColor(GREY).font('Helvetica').text('Electronically Generated', sigLineX, curY, { width: 180, align: 'center' });
 
     // ── Footer disclaimer ──────────────────────────────────────────────────────
     const footerY = doc.page.height - 80;

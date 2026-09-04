@@ -5,6 +5,7 @@ import 'package:icare/services/api_service.dart';
 import 'package:icare/utils/theme.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:icare/widgets/back_button.dart';
 
 /// Admin Panel
 ///
@@ -102,6 +103,7 @@ class _AdminPanelScreenState extends ConsumerState<AdminPanelScreen>
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
+        leading: const CustomBackButton(),
         backgroundColor: Colors.white,
         elevation: 0,
         title: Column(

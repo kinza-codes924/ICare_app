@@ -26,6 +26,7 @@ import 'package:icare/utils/theme.dart';
 import 'package:icare/utils/utils.dart';
 import 'package:icare/widgets/custom_text.dart';
 import 'package:icare/widgets/custom_text_input.dart';
+import 'package:icare/widgets/tap_area.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   // Set when the user was bounced here from "Book Appointment" on a clinic/
@@ -693,7 +694,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                   // Back to Home button
                   Positioned(
                     top: 24, left: 24,
-                    child: GestureDetector(
+                    child: TapArea(
                       onTap: () => context.go('/home'),
                       child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
@@ -1816,7 +1817,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
           Positioned(
             top: MediaQuery.of(context).padding.top + 12,
             left: 16,
-            child: GestureDetector(
+            child: TapArea(
               onTap: () => context.go('/home'),
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),

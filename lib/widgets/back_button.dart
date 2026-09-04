@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:icare/widgets/tap_area.dart';
 
 /// Goes back one screen, or to the dashboard when there is nothing to go back
 /// to.
@@ -9,8 +10,13 @@ import 'package:go_router/go_router.dart';
 /// any screen can be opened straight from its URL. Back buttons written with
 /// those alone were simply dead there. Call this instead.
 void goBackOrHome(BuildContext context) {
-  if (Navigator.of(context).canPop()) {
-    Navigator.of(context).pop();
+  // Use GoRouter's canPop/pop — Navigator.of(context).canPop() is unreliable
+  // inside a ShellRoute where the inner Navigator may report canPop=true even
+  // when there is only one logical route on the stack.
+  final canPop = context.canPop();
+  debugPrint('⬅️ BACK TAP fired: canPop=$canPop');
+  if (canPop) {
+    context.pop();
   } else {
     context.go('/dashboard');
   }
@@ -23,7 +29,8 @@ class CustomBackButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
+    return TapArea(
+        behavior: HitTestBehavior.opaque,
       onTap: () => goBackOrHome(context),
       child: Container(
         margin: margin ?? EdgeInsets.only(left: 21),

@@ -2,6 +2,7 @@
 import 'package:icare/services/lms_service.dart';
 import 'package:icare/utils/theme.dart';
 import 'package:intl/intl.dart';
+import 'package:icare/widgets/back_button.dart';
 
 /// Live Session Scheduling Screen - Zoom/Google Meet style
 class InstructorScheduleSessionScreen extends StatefulWidget {
@@ -215,7 +216,7 @@ class _InstructorScheduleSessionScreenState extends State<InstructorScheduleSess
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.close, color: Color(0xFF0F172A)),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () => goBackOrHome(context),
         ),
         backgroundColor: Colors.white,
         elevation: 0,

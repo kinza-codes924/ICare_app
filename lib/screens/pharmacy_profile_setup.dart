@@ -14,6 +14,7 @@ import '../services/api_service.dart';
 import '../models/user.dart';
 import '../providers/auth_provider.dart';
 import 'tabs.dart';
+import 'package:icare/widgets/back_button.dart';
 
 class PharmacyProfileSetup extends ConsumerStatefulWidget {
   const PharmacyProfileSetup({super.key});
@@ -385,6 +386,7 @@ class _PharmacyProfileSetupState extends ConsumerState<PharmacyProfileSetup> {
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7FA),
       appBar: AppBar(
+        leading: const CustomBackButton(),
         title: const Text('Pharmacy Profile Setup'),
         backgroundColor: const Color(0xFF00897B),
         foregroundColor: Colors.white,

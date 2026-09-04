@@ -9,6 +9,7 @@ import 'package:icare/utils/utils.dart';
 import 'package:icare/widgets/auth_left_panel.dart';
 import 'package:icare/widgets/custom_text.dart';
 import 'package:icare/widgets/custom_text_input.dart';
+import 'package:icare/widgets/back_button.dart';
 
 class ResetPassword extends StatefulWidget {
   final String email;
@@ -128,7 +129,7 @@ class _ResetPasswordState extends State<ResetPassword> {
                         Align(
                           alignment: Alignment.topLeft,
                           child: InkWell(
-                            onTap: () => Navigator.pop(context),
+                            onTap: () => goBackOrHome(context),
                             borderRadius: BorderRadius.circular(12),
                             child: Container(
                               padding: const EdgeInsets.all(10),

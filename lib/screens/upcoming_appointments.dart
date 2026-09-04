@@ -14,6 +14,7 @@ import 'package:icare/utils/utils.dart';
 import 'package:icare/widgets/back_button.dart';
 import 'package:icare/widgets/custom_text.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:icare/widgets/tap_area.dart';
 
 /// Real upcoming-appointments list — pick a date on the calendar strip to
 /// see that day's appointments (confirmed/pending only). Previously this
@@ -329,7 +330,8 @@ class _UpcomingAppointmentsState extends ConsumerState<UpcomingAppointments> {
                   children: [
                     Row(
                       children: [
-                        GestureDetector(
+                        TapArea(
+        behavior: HitTestBehavior.opaque,
                           onTap: () => goBackOrHome(context),
                           child: Container(
                             padding: const EdgeInsets.all(10),

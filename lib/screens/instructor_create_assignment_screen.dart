@@ -7,6 +7,7 @@ import 'package:icare/utils/api_constants.dart';
 import 'package:icare/utils/shared_pref.dart';
 import 'package:icare/utils/theme.dart';
 import 'package:intl/intl.dart';
+import 'package:icare/widgets/back_button.dart';
 
 /// Assignment Creation Screen - Google Classroom style
 class InstructorCreateAssignmentScreen extends StatefulWidget {
@@ -239,7 +240,7 @@ class _InstructorCreateAssignmentScreenState extends State<InstructorCreateAssig
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.close, color: Color(0xFF0F172A)),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () => goBackOrHome(context),
         ),
         backgroundColor: Colors.white,
         elevation: 0,

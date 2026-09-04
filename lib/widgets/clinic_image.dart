@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:icare/widgets/tap_area.dart';
 
 /// Opens a full-screen, swipeable preview of one or more clinic images,
 /// starting at [initialIndex]. Tap the backdrop or the close button to
@@ -42,7 +43,8 @@ class _ImagePreviewScreenState extends State<_ImagePreviewScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.transparent,
-      body: GestureDetector(
+      body: TapArea(
+        behavior: HitTestBehavior.opaque,
         onTap: () => Navigator.of(context).pop(),
         child: Stack(
           children: [

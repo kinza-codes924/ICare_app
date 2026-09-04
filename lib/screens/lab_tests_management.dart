@@ -2,6 +2,7 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import '../services/laboratory_service.dart';
 import '../widgets/back_button.dart';
+import 'package:icare/widgets/tap_area.dart';
 
 class LabTestsManagement extends StatefulWidget {
   const LabTestsManagement({super.key});
@@ -415,7 +416,8 @@ class _LabTestsManagementState extends State<LabTestsManagement>
                           ],
                         ),
                       ),
-                      GestureDetector(
+                      TapArea(
+        behavior: HitTestBehavior.opaque,
                         onTap: () => Navigator.pop(ctx),
                         child: Container(
                           padding: const EdgeInsets.all(8),

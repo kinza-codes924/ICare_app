@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:icare/models/auth_security.dart';
 import 'package:icare/utils/theme.dart';
 import 'package:intl/intl.dart';
+import 'package:icare/widgets/back_button.dart';
 
 /// Security Settings Screen
 ///
@@ -63,6 +64,7 @@ class _SecuritySettingsScreenState extends ConsumerState<SecuritySettingsScreen>
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
+        leading: const CustomBackButton(),
         backgroundColor: Colors.white,
         elevation: 0,
         title: const Column(

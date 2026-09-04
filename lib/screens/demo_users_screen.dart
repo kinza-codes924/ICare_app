@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:icare/utils/demo_users.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
+import 'package:icare/widgets/back_button.dart';
 
 /// Demo Users Information Screen
 ///
@@ -47,6 +48,7 @@ class _DemoUsersScreenState extends State<DemoUsersScreen>
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
+        leading: const CustomBackButton(),
         backgroundColor: Colors.white,
         elevation: 0,
         title: const Text(

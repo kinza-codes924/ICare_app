@@ -229,6 +229,31 @@ exports.completePrescription = async (req, res) => {
     // Ensure doctorNotes
     if (!prescription.doctorNotes) prescription.doctorNotes = '';
 
+    // The form posts lifestyle advice as a nested object under
+    // `lifestyleAdvice`, but the schema only has `lifestyleAdviceId` pointing
+    // at its own collection — so Mongoose's strict mode dropped the whole
+    // thing on every save and the section printed blank no matter what the
+    // doctor typed. Persist it properly and link it.
+    if (prescriptionData.lifestyleAdvice && typeof prescriptionData.lifestyleAdvice === 'object') {
+      try {
+        if (!prescription._id) await prescription.save();
+        const la = await LifestyleAdvice.findOneAndUpdate(
+          { prescriptionId: prescription._id },
+          {
+            $set: {
+              ...prescriptionData.lifestyleAdvice,
+              consultationId,
+              prescriptionId: prescription._id,
+            },
+          },
+          { upsert: true, new: true, setDefaultsOnInsert: true }
+        );
+        if (la) prescription.lifestyleAdviceId = la._id;
+      } catch (laErr) {
+        console.error('[Prescription] Lifestyle advice save failed:', laErr.message);
+      }
+    }
+
     // Validate — require at least one clinical item
     const hasMeds = prescription.medicines && prescription.medicines.length > 0;
     const hasDiagnoses = prescription.diagnoses && prescription.diagnoses.length > 0;
@@ -287,6 +312,12 @@ exports.completePrescription = async (req, res) => {
           const diagnosesHtml = (prescription.diagnoses || []).map(d =>
             `<span style="display:inline-block;background:#EFF6FF;color:#1D4ED8;padding:3px 10px;border-radius:20px;font-size:13px;margin:2px;">${d.diagnosis || d.name || d}</span>`
           ).join('');
+          // Lifestyle advice, referral and follow-up were missing from this
+          // email even though the printed prescription carries them.
+          const { buildLifestyleHtml, buildReferralFollowUpHtml } = require('../utils/lifestyleSummary');
+          const lifestyleHtml = await buildLifestyleHtml(prescription.lifestyleAdviceId);
+          const referralHtml = buildReferralFollowUpHtml(prescription.referralFollowUp);
+          const pdfUrl = `${PUBLIC_BASE_URL}/api/prescriptions-v2/prescriptions/${prescription._id}/pdf`;
 
           console.log('[Prescription] Sending email to:', patient.email);
           await sendEmail({
@@ -322,13 +353,23 @@ exports.completePrescription = async (req, res) => {
                     <ul style="margin-top:8px;padding-left:20px;">${labsHtml}</ul>
                   </div>` : ''}
                   ${prescription.doctorNotes ? `<div style="background:#f8fafc;border-left:3px solid #0036BC;padding:12px 16px;margin:20px 0;border-radius:4px;"><strong style="color:#0F172A;font-size:13px;">Doctor's Notes:</strong><p style="color:#374151;font-size:13px;margin:4px 0 0;">${prescription.doctorNotes}</p></div>` : ''}
+                  ${lifestyleHtml ? `<div style="margin:20px 0;"><strong style="color:#0F172A;font-size:14px;">Lifestyle Advice:</strong><p style="color:#374151;font-size:13px;margin:8px 0 0;line-height:1.6;">${lifestyleHtml}</p></div>` : ''}
+                  ${referralHtml ? `<div style="margin:20px 0;"><strong style="color:#0F172A;font-size:14px;">Referral &amp; Follow-Up:</strong><p style="color:#374151;font-size:13px;margin:8px 0 0;line-height:1.6;">${referralHtml}</p></div>` : ''}
                   <div style="background:#FEF3C7;border-radius:8px;padding:12px 16px;margin:20px 0;">
                     <p style="color:#92400E;font-size:13px;margin:0;">This prescription is valid for <strong>30 days</strong>. Open the iCare app to order medicines or book lab tests.</p>
                   </div>
-                  <div style="text-align:center;margin:24px 0 8px;">
-                    <a href="${PUBLIC_BASE_URL}/api/prescriptions-v2/prescriptions/${prescription._id}/pdf" style="background:#0036BC;color:#fff;padding:13px 32px;border-radius:8px;text-decoration:none;font-weight:700;font-size:15px;display:inline-block;">📥 Download Prescription PDF</a>
-                  </div>
-                  <p style="color:#94a3b8;font-size:12px;text-align:center;margin:0 0 20px;">Click above to download your prescription as a PDF file.</p>
+                  <!-- Table + bgcolor, not a CSS-only button: Gmail (iOS and
+                       dark mode especially) strips background-color from <a>,
+                       which made this button render invisible. The border and
+                       the plain-text link below are the fallbacks. -->
+                  <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="margin:24px auto 8px;">
+                    <tr>
+                      <td align="center" bgcolor="#0036BC" style="border-radius:8px;border:2px solid #0036BC;">
+                        <a href="${pdfUrl}" style="display:inline-block;padding:14px 34px;color:#ffffff;text-decoration:none;font-weight:700;font-size:15px;font-family:Arial,sans-serif;">Download / View Prescription (PDF)</a>
+                      </td>
+                    </tr>
+                  </table>
+                  <p style="color:#64748b;font-size:12px;text-align:center;margin:0 0 20px;">If the button does not appear, use this link:<br/><a href="${pdfUrl}" style="color:#0036BC;word-break:break-all;">${pdfUrl}</a></p>
                   <hr style="border:none;border-top:1px solid #e2e8f0;margin:20px 0;">
                   <p style="color:#94A3B8;font-size:12px;text-align:center;margin:0;">iCare Healthcare Platform &nbsp;|&nbsp; <a href="https://www.icare.com.co" style="color:#0036BC;text-decoration:none;">www.icare.com.co</a></p>
                 </div>

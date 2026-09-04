@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/lab_supply_service.dart';
+import 'package:icare/widgets/back_button.dart';
 
 class LabSuppliesManagement extends StatefulWidget {
   const LabSuppliesManagement({super.key});
@@ -254,6 +255,7 @@ class _LabSuppliesManagementState extends State<LabSuppliesManagement> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        leading: const CustomBackButton(),
         title: const Text('Lab Supplies Management'),
         actions: [
           IconButton(icon: const Icon(Icons.refresh), onPressed: loadSupplies),

@@ -8,6 +8,7 @@ import 'package:icare/utils/pdf_invoice_generator.dart';
 import 'package:icare/widgets/back_button.dart';
 import 'package:intl/intl.dart';
 import 'package:icare/utils/utils.dart';
+import 'package:icare/widgets/tap_area.dart';
 
 const Color primaryColor = Color(0xFF0B2D6E);
 const Color secondaryColor = Color(0xFF1565C0);
@@ -322,6 +323,7 @@ class _LabReportsScreenState extends State<LabReportsScreen>
                   color: Colors.white,
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
                   child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       const Text('Period:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF64748B))),
                       const SizedBox(width: 10),
@@ -527,7 +529,8 @@ class _LabReportsScreenState extends State<LabReportsScreen>
                     ],
                   ),
                 ),
-                GestureDetector(
+                TapArea(
+        behavior: HitTestBehavior.opaque,
                   onTap: () => Navigator.pop(ctx),
                   child: const Icon(Icons.close_rounded, color: Color(0xFF94A3B8)),
                 ),

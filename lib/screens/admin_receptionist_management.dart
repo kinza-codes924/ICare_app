@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:icare/services/api_service.dart';
 import 'package:icare/utils/theme.dart';
+import 'package:icare/widgets/back_button.dart';
 
 class AdminReceptionistManagement extends StatefulWidget {
   const AdminReceptionistManagement({super.key});
@@ -222,6 +223,7 @@ class _AdminReceptionistManagementState extends State<AdminReceptionistManagemen
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
+        leading: const CustomBackButton(),
         title: const Text('Receptionists'),
         backgroundColor: AppColors.primaryColor,
         foregroundColor: Colors.white,

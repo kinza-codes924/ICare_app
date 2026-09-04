@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:icare/services/api_service.dart';
 import 'package:icare/services/lms_service.dart';
 import 'package:icare/utils/theme.dart';
+import 'package:icare/widgets/back_button.dart';
 
 class InstructorVoucherScreen extends StatefulWidget {
   const InstructorVoucherScreen({super.key});
@@ -266,6 +267,7 @@ class _InstructorVoucherScreenState extends State<InstructorVoucherScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
+        leading: const CustomBackButton(),
         title: const Text('Discount Vouchers', style: TextStyle(fontWeight: FontWeight.w800)),
         backgroundColor: Colors.white,
         foregroundColor: const Color(0xFF0F172A),

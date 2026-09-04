@@ -14,6 +14,7 @@ import 'package:icare/utils/utils.dart';
 import 'package:icare/utils/shared_pref.dart';
 import 'package:icare/widgets/back_button.dart';
 import 'package:icare/widgets/custom_text.dart';
+import 'package:icare/widgets/tap_area.dart';
 
 class BookingsScreen extends ConsumerStatefulWidget {
   const BookingsScreen({super.key, this.tabs = false});
@@ -458,7 +459,8 @@ class _BookingsScreenState extends ConsumerState<BookingsScreen> {
                           alignment: Alignment.centerLeft,
                           child: Padding(
                             padding: const EdgeInsets.only(bottom: 16),
-                            child: GestureDetector(
+                            child: TapArea(
+        behavior: HitTestBehavior.opaque,
                               onTap: () => goBackOrHome(context),
                               child: Container(
                                 padding: const EdgeInsets.all(10),

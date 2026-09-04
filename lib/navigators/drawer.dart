@@ -264,7 +264,7 @@ class _CustomDrawerState extends ConsumerState<CustomDrawer> {
           context.go('/patient/health-tracker');
         }),
         _drawerItem('Lab Results/Reports', Icons.biotech_outlined, () {
-          context.go('/patient/lab-orders');
+          context.go('/patient/lab-reports');
         }),
         _drawerItem('Reminders', Icons.alarm_outlined, () {
           context.go('/reminders');
@@ -463,14 +463,14 @@ class _CustomDrawerState extends ConsumerState<CustomDrawer> {
                           'Book Appointment',
                           const Color(0xFF6366F1),
                           Icons.calendar_month_outlined,
-                          () {},
+                          () => context.go('/patient/bookings-history'),
                         ),
                         _drawerActionItem(
                           context,
                           'View Lab Reports',
                           const Color(0xFF0EA5E9),
                           Icons.science_outlined,
-                          () {},
+                          () => context.go('/patient/lab-reports'),
                         ),
                       ] else if (selectedRole == 'Laboratory') ...[
                         _drawerActionItem(

@@ -259,7 +259,27 @@ class _SelectPaymentMethodState extends State<SelectPaymentMethod> {
     }
 
     // Open Safepay hosted checkout (new tab on web, browser on mobile).
-    await launchUrl(Uri.parse(checkoutUrl), mode: LaunchMode.externalApplication);
+    // launchUrl returns false (never throws) when the tab/window never
+    // opened — typically a mobile browser's popup blocker, since this runs
+    // after an awaited network call and no longer counts as a user gesture.
+    // Falling through silently here used to start pollUntilPaid anyway: it
+    // would poll a checkout that was never actually opened, eventually time
+    // out, and show "Payment was not completed" — indistinguishable from a
+    // real cancel even though no gateway page was ever shown.
+    final opened = await launchUrl(Uri.parse(checkoutUrl), mode: LaunchMode.externalApplication);
+    if (!opened) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Couldn't open the payment page — your browser may have blocked the popup. Please allow popups for this site and try again."),
+            backgroundColor: Colors.red,
+            duration: Duration(seconds: 6),
+          ),
+        );
+      }
+      return;
+    }
 
     if (!mounted) return;
     setState(() {

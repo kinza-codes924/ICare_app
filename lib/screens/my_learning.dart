@@ -7,6 +7,7 @@ import 'package:icare/services/payment_service.dart';
 import 'package:icare/providers/auth_provider.dart';
 import 'package:icare/utils/theme.dart';
 import 'package:icare/widgets/certificates_list.dart';
+import 'package:icare/widgets/back_button.dart';
 
 class MyLearningScreen extends ConsumerStatefulWidget {
   const MyLearningScreen({super.key});
@@ -73,6 +74,7 @@ class _MyLearningScreenState extends ConsumerState<MyLearningScreen>
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFD),
       appBar: AppBar(
+        leading: const CustomBackButton(),
         backgroundColor: Colors.white,
         elevation: 0,
         title: Text(

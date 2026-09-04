@@ -5,6 +5,7 @@ import 'package:dio/dio.dart';
 import 'package:icare/services/lms_service.dart';
 import 'package:icare/services/api_service.dart';
 import 'package:icare/utils/theme.dart';
+import 'package:icare/widgets/back_button.dart';
 
 /// Quiz Creation Screen - Google Classroom style
 class InstructorCreateQuizScreen extends StatefulWidget {
@@ -209,7 +210,7 @@ class _InstructorCreateQuizScreenState extends State<InstructorCreateQuizScreen>
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.close, color: Color(0xFF0F172A)),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () => goBackOrHome(context),
         ),
         backgroundColor: Colors.white,
         elevation: 0,
