@@ -512,16 +512,20 @@ router.get('/prescriptions/:prescriptionId/pdf', async (req, res) => {
       ensureSpace(40);
       doc.fontSize(8).fillColor(BLUE).font('Helvetica-Bold').text('DIAGNOSIS', 50, curY);
       curY += 14;
+      // Chips flow across the line and wrap, instead of one per row — four
+      // diagnoses used a quarter of the page on their own.
+      let chipX = 50;
       diagnoses.forEach((d) => {
         const text = d.description || d.desc || d.diagnosis || d.name || (typeof d === 'string' ? d : '');
         if (!text) return;
-        const tw = doc.widthOfString(text, { fontSize: 10 }) + 16;
-        ensureSpace(28);
-        doc.rect(50, curY - 3, tw, 18).fill('#FEF2F2').stroke('#FECACA');
-        doc.fontSize(10).fillColor(RED).font('Helvetica').text(text, 58, curY + 1);
-        curY += 24;
+        doc.fontSize(9);
+        const tw = doc.widthOfString(text) + 14;
+        if (chipX + tw > 50 + pageWidth) { chipX = 50; curY += 19; ensureSpace(24); }
+        doc.rect(chipX, curY - 3, tw, 16).fill('#FEF2F2').stroke('#FECACA');
+        doc.fontSize(9).fillColor(RED).font('Helvetica').text(text, chipX + 7, curY);
+        chipX += tw + 6;
       });
-      curY += 4;
+      curY += 22;
     }
 
     // ── Medications ────────────────────────────────────────────────────────────
@@ -538,13 +542,13 @@ router.get('/prescriptions/:prescriptionId/pdf', async (req, res) => {
         const details = [dose && `Dose: ${dose}`, freq && `Frequency: ${freq}`, dur && `Duration: ${dur}`].filter(Boolean).join('   ');
 
         // card background
-        ensureSpace(details ? 50 : 36);
-        doc.rect(50, curY - 4, pageWidth, details ? 34 : 22).fill('#EFF6FF').stroke('#BFDBFE');
-        doc.fontSize(11).fillColor(DARK).font('Helvetica-Bold').text(`${i + 1}. ${name}`, 62, curY);
+        ensureSpace(details ? 42 : 30);
+        doc.rect(50, curY - 4, pageWidth, details ? 30 : 19).fill('#EFF6FF').stroke('#BFDBFE');
+        doc.fontSize(10).fillColor(DARK).font('Helvetica-Bold').text(`${i + 1}. ${name}`, 62, curY);
         if (details) {
-          doc.fontSize(9).fillColor(GREY).font('Helvetica').text(details, 62, curY + 14);
+          doc.fontSize(8.5).fillColor(GREY).font('Helvetica').text(details, 62, curY + 13);
         }
-        curY += details ? 44 : 30;
+        curY += details ? 38 : 26;
       });
       curY += 4;
     }
@@ -555,12 +559,18 @@ router.get('/prescriptions/:prescriptionId/pdf', async (req, res) => {
       ensureSpace(40);
       doc.fontSize(8).fillColor(BLUE).font('Helvetica-Bold').text('LAB TESTS', 50, curY);
       curY += 14;
-      labTests.forEach((t) => {
+      // Two columns — a ten-test list down a single column was the largest
+      // block on the page by itself.
+      const colW = pageWidth / 2;
+      labTests.forEach((t, i) => {
         const name = typeof t === 'string' ? t : (t.testName || t.name || 'Lab Test');
-        ensureSpace(20);
-        doc.fontSize(10).fillColor(DARK).font('Helvetica').text(`•  ${name}`, 60, curY);
-        curY += 16;
+        const left = i % 2 === 0;
+        if (left) ensureSpace(16);
+        doc.fontSize(9).fillColor(DARK).font('Helvetica')
+          .text(`•  ${name}`, left ? 58 : 58 + colW, curY, { width: colW - 12, lineBreak: false });
+        if (!left) curY += 13;
       });
+      if (labTests.length % 2 === 1) curY += 13;
       curY += 4;
     }
 
@@ -587,8 +597,8 @@ router.get('/prescriptions/:prescriptionId/pdf', async (req, res) => {
     const pdfSection = (title, body) => {
       if (!body) return;
       doc.fontSize(8).fillColor(BLUE).font('Helvetica-Bold').text(title, 50, curY);
-      doc.fontSize(10).fillColor(DARK).font('Helvetica').text(body, 50, doc.y + 2, { width: pageWidth });
-      curY = doc.y + 10;
+      doc.fontSize(9).fillColor(DARK).font('Helvetica').text(body, 50, doc.y + 2, { width: pageWidth, lineGap: -0.5 });
+      curY = doc.y + 8;
     };
 
     const stripTags = (s) => s.replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]+>/g, '');

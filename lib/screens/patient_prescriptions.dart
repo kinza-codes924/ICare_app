@@ -1477,15 +1477,15 @@ class _PrescriptionPage extends StatelessWidget {
               final freq = m is Map ? (m['frequency']?.toString() ?? '') : '';
               final dur = m is Map ? (m['duration']?.toString() ?? '') : '';
               return pw.Padding(
-                padding: const pw.EdgeInsets.only(bottom: 6),
+                padding: const pw.EdgeInsets.only(bottom: 4),
                 child: pw.Container(
-                  padding: const pw.EdgeInsets.all(8),
+                  padding: const pw.EdgeInsets.all(6),
                   decoration: pw.BoxDecoration(color: PdfColors.blue50, borderRadius: pw.BorderRadius.circular(4)),
                   child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
-                    pw.Text('${e.key + 1}. $name', style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold)),
+                    pw.Text('${e.key + 1}. $name', style: pw.TextStyle(fontSize: 10.5, fontWeight: pw.FontWeight.bold)),
                     if (dose.isNotEmpty || freq.isNotEmpty || dur.isNotEmpty)
                       pw.Text('${dose.isNotEmpty ? "Dose: $dose  " : ""}${freq.isNotEmpty ? "Freq: $freq  " : ""}${dur.isNotEmpty ? "Duration: $dur" : ""}',
-                          style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey700)),
+                          style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey700)),
                   ]),
                 ),
               );
@@ -1495,9 +1495,19 @@ class _PrescriptionPage extends StatelessWidget {
           if (labTests.isNotEmpty) ...[
             pw.Text('LAB TESTS', style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold, color: PdfColors.blue800)),
             pw.SizedBox(height: 4),
-            ...labTests.map((t) => pw.Bullet(
-                text: (t is Map ? (t['name'] ?? t['testName'] ?? 'Test') : t).toString(),
-                style: const pw.TextStyle(fontSize: 11))),
+            // Two columns — a ten-test list down one column was the single
+            // biggest block on the page.
+            pw.Wrap(
+              children: labTests
+                  .map((t) => pw.Container(
+                        width: 250,
+                        padding: const pw.EdgeInsets.only(bottom: 2),
+                        child: pw.Text(
+                            '•  ${(t is Map ? (t['name'] ?? t['testName'] ?? 'Test') : t)}',
+                            style: const pw.TextStyle(fontSize: 9)),
+                      ))
+                  .toList(),
+            ),
             pw.SizedBox(height: 8),
           ],
           if (_doctorNotes.isNotEmpty) ...[
@@ -1514,7 +1524,7 @@ class _PrescriptionPage extends StatelessWidget {
                   child: pw.Column(
                     crossAxisAlignment: pw.CrossAxisAlignment.start,
                     children: [
-                      pw.Text(s.key, style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold)),
+                      pw.Text(s.key, style: pw.TextStyle(fontSize: 9.5, fontWeight: pw.FontWeight.bold)),
                       pw.SizedBox(height: 2),
                       pw.Padding(
                         padding: const pw.EdgeInsets.only(left: 12),
@@ -1523,7 +1533,7 @@ class _PrescriptionPage extends StatelessWidget {
                           children: s.value
                               .map((line) => pw.Padding(
                                     padding: const pw.EdgeInsets.only(bottom: 1),
-                                    child: pw.Text(line, style: const pw.TextStyle(fontSize: 10.5)),
+                                    child: pw.Text(line, style: const pw.TextStyle(fontSize: 9)),
                                   ))
                               .toList(),
                         ),
