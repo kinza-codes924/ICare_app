@@ -116,10 +116,33 @@ router.get('/me/clinical-audit', authMiddleware, async (req, res) => {
     const pct = (n, d) => (d > 0 ? Math.round((n / d) * 100) : null);
 
     // ── Documentation completeness ──────────────────────────────────────────
-    // Share of completed consultations carrying doctor's notes. A consultation
-    // closed with an empty note is the thing this is meant to catch.
-    const documented = completed.filter(
-      (c) => (c.doctorNotes || '').trim().length > 0
+    // A consultation counts as documented if it carries written findings --
+    // either free-text doctorNotes, or the SOAP notes on its prescription.
+    //
+    // Measuring doctorNotes alone reported 1% against 214 consultations, which
+    // was wrong rather than damning: that field is only written by a separate
+    // optional "Save Notes" action, while the clinical record doctors actually
+    // fill in lives in the prescription's SOAP section. The same doctor had 81
+    // prescriptions, so the work was being done and simply not counted.
+    const scriptIds = completed
+      .filter((c) => c.prescriptionId)
+      .map((c) => c.prescriptionId);
+    const documentedScripts = new Set();
+    if (scriptIds.length) {
+      const withNotes = await EnhancedPrescription.find(
+        { _id: { $in: scriptIds } },
+        'soapNotes',
+      ).lean();
+      for (const p of withNotes) {
+        const n = p.soapNotes || {};
+        const any = ['subjective', 'objective', 'assessment', 'plan']
+          .some((k) => (n[k] || '').trim().length > 0);
+        if (any) documentedScripts.add(p._id.toString());
+      }
+    }
+    const documented = completed.filter((c) =>
+      (c.doctorNotes || '').trim().length > 0 ||
+      (c.prescriptionId && documentedScripts.has(c.prescriptionId.toString()))
     ).length;
 
     // ── Prescription completeness ───────────────────────────────────────────
@@ -199,7 +222,7 @@ router.get('/me/clinical-audit', authMiddleware, async (req, res) => {
           key: 'documentation',
           label: 'Documentation Completeness',
           value: documentation,
-          detail: `${documented} of ${total} completed consultations have notes`,
+          detail: `${documented} of ${total} completed consultations have written findings`,
         },
         {
           key: 'prescriptions',
