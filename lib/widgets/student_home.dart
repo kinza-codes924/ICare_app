@@ -251,6 +251,7 @@ class _StudentHomeState extends ConsumerState<StudentHome> {
                                   ),
                                 ),
                                 GestureDetector(
+                                  behavior: HitTestBehavior.opaque, // taps on the transparent padding were being dropped
                                   onTap: () => Navigator.of(context).push(
                                     MaterialPageRoute(
                                       builder: (ctx) =>

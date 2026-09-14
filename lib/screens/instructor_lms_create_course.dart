@@ -1134,6 +1134,7 @@ class _InstructorLmsCreateCourseScreenState
             const SizedBox(height: 20),
             // Course Start Date
             GestureDetector(
+              behavior: HitTestBehavior.opaque, // taps on the transparent padding were being dropped
               onTap: () async {
                 final picked = await showDatePicker(
                   context: context,

@@ -139,6 +139,7 @@ class _StudentDashboardState extends ConsumerState<StudentDashboard> {
                                 ),
                                 const SizedBox(height: 16),
                                 GestureDetector(
+                                  behavior: HitTestBehavior.opaque, // taps on the transparent padding were being dropped
                                   onTap: () => Navigator.of(context).push(
                                     MaterialPageRoute(
                                       builder: (ctx) => const StudentLmsDashboard(),

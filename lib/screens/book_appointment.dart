@@ -85,10 +85,11 @@ class _BookAppointmentScreenState extends ConsumerState<BookAppointmentScreen> {
     final today = DateTime.now();
     final allDays = List.generate(45, (i) => today.add(Duration(days: i)));
     _dateRange = allDays.where(_isDayAvailable).take(30).toList();
-    if (_dateRange.isEmpty) {
-      // Fallback: show all days if none matched (safety net)
-      _dateRange = List.generate(8, (i) => today.add(Duration(days: i)));
-    }
+    // No fallback to "show every day". It used to offer the next eight days
+    // whenever the doctor's availability matched nothing, which let a patient
+    // pick a day the server then refused with "Doctor is not available on
+    // <day>" -- the screen and the server disagreeing about the same doctor.
+    // An empty list is the honest answer, and the UI says so below.
     // Generate slots from doctor's working hours
     _generateSlotsFromDoctorHours();
     // Auto-fill user details for "Myself"
@@ -428,7 +429,26 @@ class _BookAppointmentScreenState extends ConsumerState<BookAppointmentScreen> {
             color: Colors.white,
             padding: const EdgeInsets.symmetric(vertical: 12),
             child: Row(
-              children: [
+              children: _dateRange.isEmpty
+              // Say plainly that there is nothing to pick, rather than
+              // rendering an empty strip of dates with no explanation.
+              ? [
+                  const Expanded(
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(vertical: 14),
+                      child: Text(
+                        'This doctor has no available days set up yet. '
+                        'Please try another doctor or check back later.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Color(0xFF64748B),
+                        ),
+                      ),
+                    ),
+                  ),
+                ]
+              : [
                 IconButton(
                   icon: const Icon(Icons.chevron_left_rounded),
                   onPressed: _selectedDateIndex > 0

@@ -414,11 +414,24 @@ const verifyEmailOtp = async (req, res) => {
     const email = (req.body.email || '').toString().trim().toLowerCase();
     const otp = (req.body.otp || req.body.code || '').toString().trim();
 
-    if (!email || !otp) {
-      return res.status(400).json({ success: false, message: 'Email and code are required' });
+    if (!otp) {
+      return res.status(400).json({ success: false, message: 'Verification code is required' });
     }
 
-    const user = await User.findOne({ email });
+    // Two screens reach this endpoint and they send different payloads: the
+    // signup flow posts {email, otp}, while the in-app verification screen is
+    // already authenticated and posts {otp} alone. Requiring an email rejected
+    // the second one every time with "Email and code are required" -- which is
+    // why that screen sat there accepting codes and never moving on. Identify
+    // the user by whichever the caller supplied.
+    let user = null;
+    if (email) {
+      user = await User.findOne({ email });
+    } else if (req.user?.id) {
+      user = await User.findById(req.user.id);
+    } else {
+      return res.status(400).json({ success: false, message: 'Email is required' });
+    }
     // Same message whether the account is missing or the code is wrong —
     // otherwise this endpoint doubles as a way to enumerate registered emails.
     const generic = { success: false, message: 'Invalid or expired code' };

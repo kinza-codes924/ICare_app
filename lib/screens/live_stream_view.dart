@@ -1103,6 +1103,7 @@ class _LiveStreamViewState extends State<LiveStreamView> with SingleTickerProvid
                 children: [
                   if (!widget.isInstructor && !hasVoted)
                     GestureDetector(
+                      behavior: HitTestBehavior.opaque, // taps on the transparent padding were being dropped
                       onTap: () async {
                         if (pollId.isNotEmpty) {
                           setState(() => _votedPolls[pollId] = optIndex);
@@ -1477,6 +1478,7 @@ class _LiveStreamViewState extends State<LiveStreamView> with SingleTickerProvid
     String? badge,
   }) {
     return GestureDetector(
+      behavior: HitTestBehavior.opaque, // taps on the transparent padding were being dropped
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),

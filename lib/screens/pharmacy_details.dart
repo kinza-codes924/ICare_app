@@ -512,6 +512,7 @@ class _PharmacyDetailsScreenState extends State<PharmacyDetailsScreen> {
               children: [
                 // View Cart — on top
                 GestureDetector(
+                  behavior: HitTestBehavior.opaque, // taps on the transparent padding were being dropped
                   onTap: () => Navigator.of(context).push(
                     MaterialPageRoute(builder: (_) => MyCartScreen(
                       deliveryFee: (widget.pharmacy['delivery_fee'] as num?)?.toDouble() ?? 0.0,

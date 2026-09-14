@@ -175,7 +175,12 @@ class _AccountActivatedScreenState extends State<AccountActivatedScreen>
                         ),
                         const SizedBox(height: 12),
                         TextButton(
-                          onPressed: () => context.go('/home'),
+                          // Was context.go('/home'). /home is a public route, and the
+                          // router sends a logged-in user from any public route to
+                          // /dashboard -- so the tap did navigate, landed somewhere
+                          // else, and read as a button that does nothing. Go where it
+                          // was always going to end up.
+                          onPressed: () => context.go('/dashboard'),
                           child: const Text(
                             'I\'ll set up my profile later',
                             style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),

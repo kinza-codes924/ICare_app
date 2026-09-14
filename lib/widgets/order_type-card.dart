@@ -28,6 +28,7 @@ class OrderTypecard extends StatelessWidget {
         : ImagePaths.transit_orders;
 
     return GestureDetector(
+      behavior: HitTestBehavior.opaque, // taps on the transparent padding were being dropped
       onTap: onTap,
       child: Container(
         width: double.infinity,

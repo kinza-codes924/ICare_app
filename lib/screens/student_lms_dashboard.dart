@@ -489,6 +489,7 @@ class _StudentLmsDashboardState extends State<StudentLmsDashboard>
         : courseId;
 
     return GestureDetector(
+      behavior: HitTestBehavior.opaque, // taps on the transparent padding were being dropped
       onTap: () {
         if (validSessionId.isEmpty) return;
         Navigator.push(

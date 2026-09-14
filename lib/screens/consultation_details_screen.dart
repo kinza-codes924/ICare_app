@@ -311,6 +311,7 @@ class _ConsultationDetailsScreenState
                                     final isSelected =
                                         _genderController.text == g;
                                     return GestureDetector(
+                                      behavior: HitTestBehavior.opaque, // taps on the transparent padding were being dropped
                                       onTap: () => setState(
                                         () => _genderController.text = g,
                                       ),

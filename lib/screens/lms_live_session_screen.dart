@@ -1358,6 +1358,7 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
                 // Student can tap to vote if not voted yet; instructor always sees results
                 if (!widget.isInstructor && !hasVoted)
                   GestureDetector(
+                    behavior: HitTestBehavior.opaque, // taps on the transparent padding were being dropped
                     onTap: () async {
                       if (pollId.isNotEmpty) {
                         setState(() => _votedPolls[pollId] = optIndex);

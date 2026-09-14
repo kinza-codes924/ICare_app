@@ -337,6 +337,7 @@ class AppointmentCard extends StatelessWidget {
                     ),
                     const SizedBox(width: 10),
                     GestureDetector(
+                      behavior: HitTestBehavior.opaque, // taps on the transparent padding were being dropped
                       onTap: () {
                         Navigator.of(context).push(
                           MaterialPageRoute(

@@ -1394,6 +1394,7 @@ class InstructorCourseContentScreenState
           ),
           if (isEnded)
             GestureDetector(
+              behavior: HitTestBehavior.opaque, // taps on the transparent padding were being dropped
               onTap: driveUrl.isEmpty
                   ? null
                   : () async {
@@ -2428,6 +2429,7 @@ class InstructorCourseContentScreenState
                   else if (isLockedByTime)
                     // Scheduled for the future — can't start early
                     GestureDetector(
+                      behavior: HitTestBehavior.opaque, // taps on the transparent padding were being dropped
                       onTap: () {
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(

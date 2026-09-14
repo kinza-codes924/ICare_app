@@ -572,6 +572,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           ),
                           const SizedBox(height: 4),
                           GestureDetector(
+                            behavior: HitTestBehavior.opaque, // taps on the transparent padding were being dropped
                             onTap: () => Clipboard.setData(
                               ClipboardData(text: manualKey),
                             ),
@@ -1117,7 +1118,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               ),
             ],
           ),
-          content: Column(
+          // Scrollable, and capped to the space the keyboard leaves behind.
+          // The body was a bare Column, so on a phone the on-screen keyboard
+          // pushed the code field past the bottom -- "BOTTOM OVERFLOWED BY 27
+          // PIXELS" -- and there was no way to scroll to it.
+          content: SizedBox(
+            width: double.maxFinite,
+            child: SingleChildScrollView(
+              child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -1131,7 +1139,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               ),
               const SizedBox(height: 16),
               const Text(
-                'Type DELETE to confirm:',
+                'Type DELETE to confirm',
                 style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
@@ -1142,6 +1150,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               TextField(
                 controller: confirmController,
                 enabled: !codeSent,
+                // iOS auto-capitalises the first letter and then leaves the
+                // rest lower-case, so someone typing the word as instructed got
+                // "Delete" and a button that stayed grey with nothing to
+                // explain why. Force upper-case as they type, and compare
+                // case-insensitively below.
+                textCapitalization: TextCapitalization.characters,
+                autocorrect: false,
+                enableSuggestions: false,
                 onChanged: (_) => setS(() {}),
                 decoration: InputDecoration(
                   hintText: 'DELETE',
@@ -1193,6 +1209,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 ),
               ],
             ],
+              ),
+            ),
           ),
           actions: [
             TextButton(
@@ -1204,7 +1222,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ),
             if (!codeSent)
               ElevatedButton.icon(
-                onPressed: (confirmController.text.trim() == 'DELETE' && !busy)
+                onPressed: (confirmController.text.trim().toUpperCase() == 'DELETE' && !busy)
                     ? () async {
                         setS(() {
                           busy = true;

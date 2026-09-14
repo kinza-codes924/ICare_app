@@ -30,6 +30,7 @@ class UserTypeCard extends StatelessWidget {
     final is4KScreen = ResponsiveHelper.is4KScreen(context);
 
     return GestureDetector(
+      behavior: HitTestBehavior.opaque, // taps on the transparent padding were being dropped
       onTap: onPressed,
       child: Container(
         // height: (isDesktop || isTablet || is4KScreen ) ? ScallingConfig.scale(80): null ,

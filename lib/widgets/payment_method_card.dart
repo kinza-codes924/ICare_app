@@ -25,6 +25,7 @@ class PaymentMethodCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
+      behavior: HitTestBehavior.opaque, // taps on the transparent padding were being dropped
       onTap: onTap ?? () {},
       child: Container(
         width: Utils.windowWidth(context) * 0.8,

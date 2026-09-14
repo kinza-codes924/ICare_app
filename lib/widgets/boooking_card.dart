@@ -308,6 +308,7 @@ class BookingCard extends ConsumerWidget {
             currentUserId: currentUser?.id ?? '',
           )
         : GestureDetector(
+            behavior: HitTestBehavior.opaque, // taps on the transparent padding were being dropped
             onTap: onTap ?? () {},
             child: Container(
               width: Utils.windowWidth(context) * 0.75,

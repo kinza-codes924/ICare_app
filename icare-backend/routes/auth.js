@@ -1,13 +1,32 @@
 const express = require('express');
 const router = express.Router();
 const { register, login, getUserProfile, forgotPassword, verifyOTP, resetPassword, changePassword, googleLogin, appleLogin, checkEmail, checkEmailAvailable, verifyEmailOtp, resendEmailOtp } = require('../controllers/authController');
+const jwt = require('jsonwebtoken');
 const { authMiddleware } = require('../middleware/auth');
 
 // Public routes
 router.get('/check-email', checkEmail);
 router.get('/email-available', checkEmailAvailable);
-// Email ownership verification at signup
-router.post('/verify-email-otp', verifyEmailOtp);
+// Email ownership verification at signup.
+//
+// Deliberately public -- at signup the account exists but nobody is logged in
+// yet, so the caller identifies itself with {email, otp}. The in-app
+// verification screen is logged in and sends {otp} alone, so the token is read
+// here when one happens to be present and the controller falls back to it. A
+// missing or invalid token simply means "no user", never an error, which keeps
+// the signup path working exactly as before.
+router.post('/verify-email-otp', (req, res, next) => {
+  // Decoded here rather than via authMiddleware, which answers 401 itself on a
+  // bad token instead of passing the error on -- that would have turned a stale
+  // token in storage into a blocked signup.
+  try {
+    const token = req.headers.authorization?.split(' ')[1];
+    if (token) req.user = jwt.verify(token, process.env.JWT_SECRET);
+  } catch (_) {
+    req.user = undefined;
+  }
+  next();
+}, verifyEmailOtp);
 router.post('/resend-email-otp', resendEmailOtp);
 router.post('/register', register);
 router.post('/login', login);
@@ -201,49 +220,16 @@ router.post('/send-email-otp', authMiddleware, async (req, res) => {
   }
 });
 
-// POST /api/auth/verify-email-otp  — compare OTP, clear it, set isEmailVerified true
-router.post('/verify-email-otp', authMiddleware, async (req, res) => {
-  try {
-    const { connectMongoDB } = require('../config/mongodb');
-    await connectMongoDB();
-    const User = require('../models/User');
-
-    const { otp } = req.body;
-    if (!otp || otp.toString().trim().length !== 6) {
-      return res.status(400).json({ success: false, message: 'A 6-digit verification code is required' });
-    }
-
-    const user = await User.findById(req.user.id).lean();
-    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
-    if (user.isEmailVerified) {
-      return res.json({ success: true, alreadyVerified: true, message: 'Email already verified' });
-    }
-
-    if (!user.emailOtp) {
-      return res.status(400).json({ success: false, message: 'No verification code found. Please request a new one.' });
-    }
-    if (user.emailOtp !== otp.toString().trim()) {
-      return res.status(400).json({ success: false, message: 'Incorrect verification code' });
-    }
-    if (user.emailOtpExpiry && new Date() > new Date(user.emailOtpExpiry)) {
-      return res.status(400).json({ success: false, message: 'Verification code has expired. Please request a new one.' });
-    }
-
-    await User.findByIdAndUpdate(
-      req.user.id,
-      {
-        $set: { isEmailVerified: true },
-        $unset: { emailOtp: '', emailOtpExpiry: '' },
-      },
-      { strict: false }
-    );
-
-    res.json({ success: true, message: 'Email verified successfully' });
-  } catch (e) {
-    console.error('verify-email-otp error:', e.message);
-    res.status(500).json({ success: false, message: e.message });
-  }
-});
+// NOTE: /verify-email-otp is registered at the top of this file, bound to
+// authController.verifyEmailOtp. A second definition used to sit here.
+//
+// Express serves the first matching route, so this one never ran -- but it was
+// a materially weaker check that would have become live the moment the order
+// changed: it compared a plaintext `emailOtp` field (the controller stores only
+// a SHA-256 hash), read `isEmailVerified` where the controller writes
+// `emailVerified`, and had no cap on wrong attempts. Two handlers for one path,
+// disagreeing about both the field names and the rules, is how a verified-email
+// flag ends up meaning nothing. Removed rather than repaired.
 
 // POST /api/auth/send-phone-otp  — generate 6-digit OTP, store+expiry, send via Brevo SMS
 router.post('/send-phone-otp', authMiddleware, async (req, res) => {

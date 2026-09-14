@@ -2037,6 +2037,7 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
                     ? DateFormat('d MMM').format(due)
                     : '';
                 return GestureDetector(
+                  behavior: HitTestBehavior.opaque, // taps on the transparent padding were being dropped
                   onTap: () => Navigator.push(
                     context,
                     MaterialPageRoute(
@@ -2534,6 +2535,7 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
                 ),
                 if (isEnded)
                   GestureDetector(
+                    behavior: HitTestBehavior.opaque, // taps on the transparent padding were being dropped
                     onTap: driveUrl.isEmpty
                         ? null
                         : () async {
@@ -3064,6 +3066,7 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
               if (hasMeetLink && isScheduled && !isTimeLocked) ...[
                 const SizedBox(height: 8),
                 GestureDetector(
+                  behavior: HitTestBehavior.opaque, // taps on the transparent padding were being dropped
                   onTap: () async {
                     final uri = Uri.tryParse(meetingLink);
                     if (uri != null)
