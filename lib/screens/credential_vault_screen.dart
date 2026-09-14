@@ -632,10 +632,11 @@ class _CredentialVaultScreenState extends State<CredentialVaultScreen> {
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator())
                 : ListView(
-                    // The bottom padding clears the "Add Document" button. With
-                    // none, the last card sat underneath it and the page looked
-                    // like it would not scroll -- there was simply nothing more
-                    // to reveal.
+                    // Bottom padding clears the floating WhatsApp bubble, so
+                    // the last card is never hidden behind it. Before, the list
+                    // had no bottom padding at all and the final card sat under
+                    // the "Add Document" button -- which is why the page looked
+                    // like it would not scroll: there was nothing left to reveal.
                     padding: const EdgeInsets.fromLTRB(20, 0, 20, 96),
                     children: [
                       Padding(

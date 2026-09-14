@@ -27,18 +27,9 @@ class WhatsAppFloatingButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Bottom LEFT, not right.
-    //
-    // It used to float bottom-right, which is where Material puts a screen's
-    // FloatingActionButton -- so on every screen with one, the two sat on top
-    // of each other and the FAB became unreachable. tabs.dart carried a list of
-    // routes to lift the bubble above, but that only worked for screens reached
-    // by URL; most of these are pushed with Navigator.push and never change the
-    // route, so the lift never applied. Seven screens were affected. Moving to
-    // the opposite corner fixes all of them at once, and any FAB added later.
     return Positioned(
       bottom: bottomOffset,
-      left: 20,
+      right: 20,
       child: Tooltip(
         message: 'Chat on WhatsApp',
         child: GestureDetector(

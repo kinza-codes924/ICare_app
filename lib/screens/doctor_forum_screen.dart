@@ -288,11 +288,18 @@ class _DoctorForumScreenState extends State<DoctorForumScreen> {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _showCreatePostDialog,
-        label: const Text('Start Discussion'),
-        icon: const Icon(Icons.add_comment_rounded),
-        backgroundColor: AppColors.primaryColor,
+      // Lifted clear of the WhatsApp bubble, which floats in this same corner.
+      // The offset table in tabs.dart cannot help here: this screen is opened
+      // with Navigator.push from the dashboard, so the URL stays
+      // /doctor/dashboard and a route-keyed lookup never matches it.
+      floatingActionButton: Padding(
+        padding: const EdgeInsets.only(bottom: 72),
+        child: FloatingActionButton.extended(
+          onPressed: _showCreatePostDialog,
+          label: const Text('Start Discussion'),
+          icon: const Icon(Icons.add_comment_rounded),
+          backgroundColor: AppColors.primaryColor,
+        ),
       ),
     );
   }
