@@ -161,8 +161,12 @@ class DoctorDetailScreen extends ConsumerWidget {
               const SizedBox(height: 16),
 
               // Stats Row
+              // No crossAxisAlignment.stretch here: inside a scrolling Column
+              // it makes the Row claim unbounded height and swallow everything
+              // below it -- the qualifications, about and reviews sections all
+              // disappeared. The cards match height because their contents are
+              // fixed-height, which is enough.
               Row(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Expanded(
                     child: _buildStatCard(
