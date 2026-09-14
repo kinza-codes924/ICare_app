@@ -115,6 +115,14 @@ router.get('/posts', async (req, res) => {
       viewerId = null;
     }
 
+    // One grouped query rather than a lookup per post.
+    const reshareRows = await CommunityPost.aggregate([
+      { $match: { resharedFrom: { $in: posts.map(p => p._id) } } },
+      { $group: { _id: '$resharedFrom', n: { $sum: 1 } } },
+    ]);
+    const reshareCounts = {};
+    for (const r of reshareRows) reshareCounts[r._id.toString()] = r.n;
+
     const formatted = posts.map(p => {
       const uid = p.userId?.toString();
       const u = userMap[uid] || {};
@@ -135,6 +143,10 @@ router.get('/posts', async (req, res) => {
         isLiked: !!viewerId &&
           Array.isArray(p.likes) &&
           p.likes.some(l => l && l.toString() === viewerId),
+        // How many times this post has been reshared. Never sent before, so the
+        // client's reshare counter was pinned at 0 no matter how many reshares
+        // existed -- resharedFrom on the copies is the only record of them.
+        reshareCount: reshareCounts[p._id.toString()] || 0,
       };
     });
 

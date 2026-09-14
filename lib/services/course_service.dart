@@ -347,9 +347,18 @@ class CourseService {
     }
   }
 
-  Future<void> reshareForumPost(String postId) async {
+  /// Reshare a post, returning the newly created one.
+  ///
+  /// The route replies with the whole new post; this discarded it and returned
+  /// void, so the caller had no way to show it without refetching the feed.
+  Future<Map<String, dynamic>?> reshareForumPost(String postId) async {
     try {
-      await _apiService.post('/community/posts/$postId/reshare', {});
+      final res = await _apiService.post('/community/posts/$postId/reshare', {});
+      final data = res.data;
+      if (data is Map && data['post'] is Map) {
+        return Map<String, dynamic>.from(data['post'] as Map);
+      }
+      return null;
     } catch (e) {
       debugPrint('Error resharing forum post: $e');
       rethrow;
@@ -357,11 +366,23 @@ class CourseService {
   }
 
   // Comment on forum post
-  Future<void> addForumComment(String postId, String comment) async {
+  /// Add a comment, returning it along with the post's new comment count.
+  ///
+  /// The route replies with both; this threw them away and returned void, which
+  /// forced the caller to reload the entire feed just to show one new comment.
+  Future<Map<String, dynamic>?> addForumComment(String postId, String comment) async {
     try {
-      await _apiService.post('/community/posts/$postId/comment', {
+      final res = await _apiService.post('/community/posts/$postId/comment', {
         'content': comment,
       });
+      final data = res.data;
+      if (data is Map && data['success'] == true) {
+        return {
+          'comment': data['comment'],
+          'commentCount': (data['commentCount'] as num?)?.toInt() ?? 0,
+        };
+      }
+      return null;
     } catch (e) {
       debugPrint('Error adding forum comment: $e');
       rethrow;

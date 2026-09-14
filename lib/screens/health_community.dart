@@ -629,10 +629,36 @@ class _HealthCommunityScreenState extends ConsumerState<HealthCommunityScreen> {
                     if (text.isEmpty) return;
                     controller.clear();
                     try {
-                      await _courseService.addForumComment(postId, text);
-                      // Ensure this post stays expanded after the reload
-                      _expandedPostIds.add(postId);
-                      await _loadPosts();
+                      // Append the returned comment to this post rather than
+                      // reloading the feed. The reload was the spinner -- the
+                      // same one the like button used to show -- and it also
+                      // collapsed the thread, which is why the post had to be
+                      // re-expanded afterwards.
+                      final result =
+                          await _courseService.addForumComment(postId, text);
+                      if (result != null && mounted) {
+                        // This builder is handed only the id, so find the post
+                        // it belongs to rather than capturing it -- the entry in
+                        // _posts is the one the list actually renders.
+                        final target = _posts.firstWhere(
+                          (p) =>
+                              (p['_id']?.toString() ?? p['id']?.toString()) ==
+                              postId,
+                          orElse: () => null,
+                        );
+                        setState(() {
+                          if (target != null) {
+                            final list = target['comments'];
+                            if (list is List) {
+                              list.add(result['comment']);
+                            } else {
+                              target['comments'] = [result['comment']];
+                            }
+                            target['commentCount'] = result['commentCount'];
+                          }
+                          _expandedPostIds.add(postId);
+                        });
+                      }
                     } catch (e) {
                       if (mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
@@ -781,12 +807,19 @@ class _HealthCommunityScreenState extends ConsumerState<HealthCommunityScreen> {
     if (confirm != true || !mounted) return;
 
     try {
-      await _courseService.reshareForumPost(postId);
+      // The new post comes back from the server, so it goes straight to the top
+      // of the feed. Reloading everything just to show it was the spinner.
+      final created = await _courseService.reshareForumPost(postId);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Post reshared successfully!'), backgroundColor: Colors.green, duration: Duration(seconds: 2)),
         );
-        _loadPosts();
+        setState(() {
+          if (created != null) _posts.insert(0, created);
+          // The original's reshare count went up by one.
+          final n = post['reshareCount'];
+          post['reshareCount'] = (n is num ? n.toInt() : 0) + 1;
+        });
       }
     } catch (e) {
       if (mounted) {
