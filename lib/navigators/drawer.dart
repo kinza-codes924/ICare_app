@@ -303,9 +303,9 @@ class _CustomDrawerState extends ConsumerState<CustomDrawer> {
         _drawerItem('My Appointments', Icons.calendar_month_outlined, () {
           context.go('/doctor/appointments');
         }),
-        _drawerItem('Patient Records', Icons.folder_shared_outlined, () {
-          context.go('/patient/records');
-        }),
+        // Patient Records removed from the doctor's sidebar at the client's
+        // request. The route and the screen are untouched -- patients still
+        // reach their own records from their dashboard.
         _drawerItem('My Schedule', Icons.schedule_outlined, () {
           context.go('/doctor/schedule');
         }),

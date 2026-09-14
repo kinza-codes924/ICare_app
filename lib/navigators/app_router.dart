@@ -157,6 +157,7 @@ import 'package:icare/screens/doctor_revenue_analytics_screen.dart'
     deferred as d_doctor_revenue_analytics_screen;
 import 'package:icare/screens/patient_profile.dart'
     deferred as d_patient_profile;
+import 'package:icare/screens/profile_edit.dart' deferred as d_profile_edit;
 import 'package:icare/screens/patient_home_dashboard.dart'
     deferred as d_patient_home_dashboard;
 import 'package:icare/screens/patient_medical_records.dart'
@@ -1071,7 +1072,20 @@ final routerProvider = Provider<GoRouter>((ref) {
             ),
           ),
           GoRoute(
+            // The Profile tab opens the editable profile directly. It used to
+            // land on a read-only view where editing was tucked behind a menu
+            // in the top-right corner -- a tap on "Profile" that showed the
+            // details but gave no obvious way to change them. The edit screen
+            // carries every field the read-only one displayed.
             path: '/patient/profile',
+            builder: (_, _) => DeferredScreen(
+              loader: d_profile_edit.loadLibrary,
+              builder: () => d_profile_edit.ProfileEditScreen(),
+            ),
+          ),
+          GoRoute(
+            // The read-only view is still reachable for anyone who wants it.
+            path: '/patient/profile/view',
             builder: (_, _) => DeferredScreen(
               loader: d_patient_profile.loadLibrary,
               builder: () => d_patient_profile.PatientProfile(),

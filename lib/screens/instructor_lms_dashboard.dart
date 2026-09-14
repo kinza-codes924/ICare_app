@@ -1,4 +1,5 @@
 import 'package:easy_localization/easy_localization.dart';
+import 'package:icare/utils/app_time.dart';
 import 'package:icare/widgets/drag_scroll.dart';
 import 'package:icare/screens/lms_public_catalog.dart';
 import 'package:icare/utils/utils.dart';
@@ -1092,7 +1093,7 @@ class _CalendarPageState extends State<_CalendarPage> {
           final dueStr = a['dueDate']?.toString() ?? '';
           if (dueStr.isEmpty) continue;
           try {
-            final dt = DateTime.parse(dueStr);
+            final dt = parseServerTimeOr(dueStr, DateTime.now());
             final key = DateFormat('yyyy-MM-dd').format(dt);
             events.putIfAbsent(key, () => []).add({
               'title': a['title'] ?? 'Assignment',
@@ -1110,7 +1111,7 @@ class _CalendarPageState extends State<_CalendarPage> {
           final dateStr = s['scheduledAt']?.toString() ?? s['date']?.toString() ?? '';
           if (dateStr.isEmpty) continue;
           try {
-            final dt = DateTime.parse(dateStr);
+            final dt = parseServerTimeOr(dateStr, DateTime.now());
             final key = DateFormat('yyyy-MM-dd').format(dt);
             events.putIfAbsent(key, () => []).add({
               'title': s['title'] ?? 'Live Session',
@@ -1330,7 +1331,7 @@ class _TodoPageState extends State<_TodoPage> with SingleTickerProviderStateMixi
           final dueStr = a['dueDate']?.toString() ?? '';
           if (dueStr.isNotEmpty) {
             try {
-              final dt = DateTime.parse(dueStr);
+              final dt = parseServerTimeOr(dueStr, DateTime.now());
               if (dt.isAfter(now)) {
                 upcoming.add({...Map<String, dynamic>.from(a), '_courseName': name});
               }
@@ -1350,7 +1351,7 @@ class _TodoPageState extends State<_TodoPage> with SingleTickerProviderStateMixi
     if (mounted) setState(() { _toReview = toReview; _upcoming = upcoming; _loading = false; });
   }
 
-  DateTime? _d(String s) { try { return DateTime.parse(s); } catch (_) { return null; } }
+  DateTime? _d(String s) { try { return parseServerTimeOr(s, DateTime.now()); } catch (_) { return null; } }
 
   @override
   Widget build(BuildContext context) {
@@ -1847,7 +1848,7 @@ class _VoucherManagerState extends State<VoucherManagerWidget> {
           final code = v['code']?.toString() ?? '';
           final discount = v['discount'] ?? 0;
           final createdAt = v['createdAt'] != null
-              ? DateFormat('MMM d, yyyy').format(DateTime.tryParse(v['createdAt'].toString()) ?? DateTime.now())
+              ? DateFormat('MMM d, yyyy').format(parseServerTime(v['createdAt'].toString()) ?? DateTime.now())
               : '';
           return Container(
             margin: const EdgeInsets.only(bottom: 8),

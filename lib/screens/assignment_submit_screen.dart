@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:icare/utils/app_time.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -340,7 +341,7 @@ class _AssignmentSubmitScreenState extends State<AssignmentSubmitScreen> {
     final dueDateStr = widget.assignment['dueDate']?.toString() ?? '';
     if (dueDateStr.isEmpty) return '';
     try {
-      final due = DateTime.parse(dueDateStr);
+      final due = parseServerTimeOr(dueDateStr, DateTime.now());
       return DateFormat('MMMM dd, yyyy • hh:mm a').format(due);
     } catch (_) {
       return dueDateStr;
@@ -351,7 +352,7 @@ class _AssignmentSubmitScreenState extends State<AssignmentSubmitScreen> {
     final dueDateStr = widget.assignment['dueDate']?.toString() ?? '';
     if (dueDateStr.isEmpty) return false;
     try {
-      final due = DateTime.parse(dueDateStr);
+      final due = parseServerTimeOr(dueDateStr, DateTime.now());
       return DateTime.now().isAfter(due);
     } catch (_) {
       return false;
@@ -915,7 +916,7 @@ class _AssignmentSubmitScreenState extends State<AssignmentSubmitScreen> {
 
   String _formatDate(String dateStr) {
     try {
-      final date = DateTime.parse(dateStr);
+      final date = parseServerTimeOr(dateStr, DateTime.now());
       return DateFormat('MMM dd, yyyy').format(date);
     } catch (_) {
       return dateStr;

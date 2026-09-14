@@ -1,4 +1,5 @@
 import 'package:easy_localization/easy_localization.dart';
+import 'package:icare/utils/app_time.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'dart:async';
@@ -59,7 +60,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
   }
 
   String _formatTime(String timestamp) {
-    final date = DateTime.parse(timestamp);
+    final date = parseServerTimeOr(timestamp, DateTime.now());
     final now = DateTime.now();
     final difference = now.difference(date);
 

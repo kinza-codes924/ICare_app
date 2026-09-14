@@ -162,6 +162,7 @@ class DoctorDetailScreen extends ConsumerWidget {
 
               // Stats Row
               Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Expanded(
                     child: _buildStatCard(
@@ -1182,21 +1183,39 @@ class DoctorDetailScreen extends ConsumerWidget {
           ),
         ],
       ),
+      // The four cards sit in a Row of Expanded children, so they share the
+      // width equally -- but each sized itself to its own content height. On a
+      // phone "5 years" wrapped onto a second line, making that card taller
+      // than the other three and knocking the row out of alignment.
+      //
+      // FittedBox scales the value down to fit one line instead of wrapping,
+      // and the icon/label above and below stay put, so all four cards end up
+      // the same height whatever they contain.
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
           Icon(icon, color: color, size: 24),
           const SizedBox(height: 8),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w900,
-              color: color,
+          SizedBox(
+            height: 24,
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                value,
+                maxLines: 1,
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w900,
+                  color: color,
+                ),
+              ),
             ),
           ),
           const SizedBox(height: 4),
           Text(
             label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
             style: const TextStyle(
               fontSize: 11,
               fontWeight: FontWeight.w600,

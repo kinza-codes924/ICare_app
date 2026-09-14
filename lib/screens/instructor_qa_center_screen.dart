@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:icare/utils/app_time.dart';
 import 'package:icare/services/instructor_service.dart';
 import 'package:icare/utils/theme.dart';
 import 'package:icare/widgets/back_button.dart';
@@ -103,9 +104,9 @@ class _InstructorQACenterScreenState extends State<InstructorQACenterScreen> {
               const Spacer(),
               Text(
                 DateFormat('MMM dd, hh:mm a').format(
-                  DateTime.parse(
+                  parseServerTimeOr(
                     q['createdAt'] ?? DateTime.now().toIso8601String(),
-                  ),
+                  DateTime.now()),
                 ),
                 style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
               ),

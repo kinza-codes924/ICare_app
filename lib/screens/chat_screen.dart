@@ -1,4 +1,5 @@
 import 'package:easy_localization/easy_localization.dart';
+import 'package:icare/utils/app_time.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'dart:async';
@@ -525,12 +526,12 @@ class _ChatScreenState extends State<ChatScreen> {
                           showDateSeparator = true;
                         } else {
                           final prevMessage = _messages[index - 1];
-                          final prevDate = DateTime.parse(
+                          final prevDate = parseServerTimeOr(
                             prevMessage['createdAt'],
-                          );
-                          final currentDate = DateTime.parse(
+                          DateTime.now());
+                          final currentDate = parseServerTimeOr(
                             message['createdAt'],
-                          );
+                          DateTime.now());
                           showDateSeparator = !_isSameDay(
                             prevDate,
                             currentDate,
@@ -541,7 +542,7 @@ class _ChatScreenState extends State<ChatScreen> {
                           children: [
                             if (showDateSeparator)
                               _buildDateSeparator(
-                                DateTime.parse(message['createdAt']),
+                                parseServerTimeOr(message['createdAt'], DateTime.now()),
                               ),
                             _buildMessageBubble(message, isMe),
                           ],
@@ -597,7 +598,7 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Widget _buildMessageBubble(Map<String, dynamic> message, bool isMe) {
-    final timestamp = DateTime.parse(message['createdAt']);
+    final timestamp = parseServerTimeOr(message['createdAt'], DateTime.now());
     final timeStr = DateFormat('HH:mm').format(timestamp);
     final isRead = message['read'] ?? false;
 

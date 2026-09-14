@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:icare/utils/app_time.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:icare/providers/auth_provider.dart';
 import 'package:icare/utils/theme.dart';
@@ -85,7 +86,7 @@ class _PharmacyOrdersState extends ConsumerState<PharmacyOrders>
             'total': _calcOrderTotal(o),
             'status': normalizedStatus,
             'date': o['createdAt'] != null
-                ? DateTime.parse(o['createdAt'])
+                ? parseServerTimeOr(o['createdAt'], DateTime.now())
                 : DateTime.now(),
             'orderType': o['orderType'] ?? 'cart',
             'deliveryAddress': (() {
@@ -1619,7 +1620,7 @@ class _PharmacyOrdersState extends ConsumerState<PharmacyOrders>
       if (rawDate is DateTime) {
         orderDate = rawDate;
       } else if (rawDate != null) {
-        orderDate = DateTime.tryParse(rawDate.toString()) ?? DateTime.now();
+        orderDate = parseServerTime(rawDate.toString()) ?? DateTime.now();
       } else {
         orderDate = DateTime.now();
       }

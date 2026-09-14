@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:icare/utils/app_time.dart';
 import 'package:icare/services/security_service.dart';
 import 'package:icare/widgets/back_button.dart';
 import 'package:intl/intl.dart';
@@ -72,9 +73,9 @@ class _SecurityAuditLogScreenState extends State<SecurityAuditLogScreen> {
       separatorBuilder: (_, _) => const SizedBox(height: 12),
       itemBuilder: (context, index) {
         final log = _logs[index];
-        final timestamp = DateTime.parse(
+        final timestamp = parseServerTimeOr(
           log['timestamp'] ?? DateTime.now().toIso8601String(),
-        );
+        DateTime.now());
 
         return Container(
           padding: const EdgeInsets.all(16),

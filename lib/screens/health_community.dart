@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:icare/utils/api_constants.dart';
 import 'package:icare/utils/shared_pref.dart';
+import 'package:icare/utils/app_time.dart';
 import 'package:icare/utils/theme.dart';
 import 'package:icare/widgets/back_button.dart';
 import 'package:icare/services/course_service.dart';
@@ -393,9 +394,7 @@ class _HealthCommunityScreenState extends ConsumerState<HealthCommunityScreen> {
     final role = post['authorRole'] ?? post['author']?['role'] ?? 'Patient';
     final authorAvatar = post['authorAvatar']?.toString();
     final timeRaw = post['createdAt'] ?? post['updatedAt'];
-    final time = timeRaw != null
-        ? DateTime.parse(timeRaw.toString())
-        : DateTime.now();
+    final time = parseServerTimeOr(timeRaw, DateTime.now());
     final String postId = post['_id'] ?? post['id'] ?? "";
 
     return Container(
@@ -697,7 +696,9 @@ class _HealthCommunityScreenState extends ConsumerState<HealthCommunityScreen> {
             final author = comment['authorName'] ?? comment['userName'] ?? 'User';
             final content = comment['content'] ?? '';
             final timeRaw = comment['createdAt'];
-            final time = timeRaw != null ? DateTime.parse(timeRaw) : DateTime.now();
+            // Server timestamps are UTC; without converting, a comment posted
+            // at 10:40 PM local rendered as 5:40 PM.
+            final time = parseServerTimeOr(timeRaw, DateTime.now());
             final isMyComment = comment['userId']?.toString() == _currentUserId;
 
             return Padding(
