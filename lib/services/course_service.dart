@@ -324,11 +324,26 @@ class CourseService {
   }
 
   // Like forum post
-  Future<void> likeForumPost(String postId) async {
+  /// Toggle a like, returning the server's new state for that post.
+  ///
+  /// The route already replies with `liked` and `likeCount`; this used to
+  /// discard both and return void, which left the caller with no way to update
+  /// a single post and forced a full list reload after every tap.
+  /// Returns null when the request fails, so the caller can roll back.
+  Future<Map<String, dynamic>?> likeForumPost(String postId) async {
     try {
-      await _apiService.post('/community/posts/$postId/like', {});
+      final res = await _apiService.post('/community/posts/$postId/like', {});
+      final data = res.data;
+      if (data is Map && data['success'] == true) {
+        return {
+          'liked': data['liked'] == true,
+          'likeCount': (data['likeCount'] as num?)?.toInt() ?? 0,
+        };
+      }
+      return null;
     } catch (e) {
       debugPrint('Error liking forum post: $e');
+      return null;
     }
   }
 

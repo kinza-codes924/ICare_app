@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:icare/widgets/success_dialog.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:icare/providers/auth_provider.dart';
@@ -240,26 +241,6 @@ class _DoctorProfileSetupState extends ConsumerState<DoctorProfileSetup> {
     _ageController.dispose();
     _addressController.dispose();
     super.dispose();
-  }
-
-  Future<void> _selectTime(TextEditingController controller) async {
-    // Parse existing HH:mm text as initial time, fallback to now
-    TimeOfDay initial = TimeOfDay.now();
-    final parts = controller.text.split(':');
-    if (parts.length == 2) {
-      final h = int.tryParse(parts[0]);
-      final m = int.tryParse(parts[1]);
-      if (h != null && m != null) initial = TimeOfDay(hour: h, minute: m);
-    }
-    final TimeOfDay? picked = await showTimePicker(
-      context: context,
-      initialTime: initial,
-    );
-    if (picked != null) {
-      setState(() {
-        controller.text = '${picked.hour.toString().padLeft(2, '0')}:${picked.minute.toString().padLeft(2, '0')}';
-      });
-    }
   }
 
   /// Opens a date picker for license expiry and schedules a 30-day admin reminder.
@@ -638,25 +619,7 @@ class _DoctorProfileSetupState extends ConsumerState<DoctorProfileSetup> {
                 const SizedBox(height: 16),
                 _buildDaysSelector(),
                 const SizedBox(height: 16),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _buildTimeField(
-                        controller: startTimeController,
-                        label: "Start Time",
-                        hint: "09:00 AM",
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: _buildTimeField(
-                        controller: endTimeController,
-                        label: "End Time",
-                        hint: "05:00 PM",
-                      ),
-                    ),
-                  ],
-                ),
+                _buildAvailabilityLink(),
                 const SizedBox(height: 40),
                 SizedBox(
                   width: double.infinity,
@@ -684,6 +647,59 @@ class _DoctorProfileSetupState extends ConsumerState<DoctorProfileSetup> {
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+
+  /// Availability lives on one screen only.
+  ///
+  /// This form used to carry a single Start Time / End Time pair applied to
+  /// every selected day, so a doctor working 9-10 on Monday and 11-12 on
+  /// Wednesday could not describe that here, and a break in the middle of a day
+  /// was impossible to express. Manage Availability already models hours
+  /// properly -- per day, with up to three slots each -- so this sends the
+  /// doctor there instead of offering a second, weaker way to set the same
+  /// thing and letting the two disagree.
+  Widget _buildAvailabilityLink() {
+    return InkWell(
+      onTap: () => context.push('/doctor/availability'),
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: AppColors.primaryColor.withValues(alpha: 0.05),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: AppColors.primaryColor.withValues(alpha: 0.25),
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.schedule_rounded,
+                color: AppColors.primaryColor, size: 22),
+            const SizedBox(width: 14),
+            const Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Set your working hours',
+                    style: TextStyle(
+                        fontSize: 14, fontWeight: FontWeight.w700),
+                  ),
+                  SizedBox(height: 3),
+                  Text(
+                    'Different times on different days, and more than one slot '
+                    'per day — set them all in Manage Availability.',
+                    style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                  ),
+                ],
+              ),
+            ),
+            Icon(Icons.chevron_right_rounded,
+                color: AppColors.primaryColor, size: 22),
+          ],
         ),
       ),
     );
@@ -984,25 +1000,7 @@ class _DoctorProfileSetupState extends ConsumerState<DoctorProfileSetup> {
                         const SizedBox(height: 24),
                         _buildDaysSelector(),
                         const SizedBox(height: 24),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: _buildTimeField(
-                                controller: startTimeController,
-                                label: "Start Time",
-                                hint: "09:00 AM",
-                              ),
-                            ),
-                            const SizedBox(width: 24),
-                            Expanded(
-                              child: _buildTimeField(
-                                controller: endTimeController,
-                                label: "End Time",
-                                hint: "05:00 PM",
-                              ),
-                            ),
-                          ],
-                        ),
+                        _buildAvailabilityLink(),
                         const SizedBox(height: 60),
                         SizedBox(
                           width: double.infinity,
@@ -1395,68 +1393,6 @@ class _DoctorProfileSetupState extends ConsumerState<DoctorProfileSetup> {
             errorBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: const BorderSide(color: Colors.red),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildTimeField({
-    required TextEditingController controller,
-    required String label,
-    required String hint,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-            color: Color(0xFF64748B),
-          ),
-        ),
-        const SizedBox(height: 8),
-        TextFormField(
-          controller: controller,
-          readOnly: true,
-          onTap: () => _selectTime(controller),
-          validator: (value) {
-            if (value == null || value.isEmpty) {
-              return 'Required';
-            }
-            return null;
-          },
-          decoration: InputDecoration(
-            hintText: hint,
-            hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 14),
-            prefixIcon: const Icon(
-              Icons.access_time,
-              color: AppColors.primaryColor,
-              size: 20,
-            ),
-            filled: true,
-            fillColor: Colors.white,
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 20,
-              vertical: 18,
-            ),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(
-                color: AppColors.primaryColor,
-                width: 2,
-              ),
             ),
           ),
         ),

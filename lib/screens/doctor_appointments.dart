@@ -29,6 +29,8 @@ class _DoctorAppointmentsScreenState extends State<DoctorAppointmentsScreen> {
   late String _selectedFilter;
   String _dateFilter = 'all';
   DateTime? _customDate;
+  DateTime? _rangeStart;
+  DateTime? _rangeEnd;
   String? _startingConsultationId; // tracks which appointment has a pending start
   String? _joiningConsultationId;  // tracks which appointment is being rejoined
 
@@ -92,7 +94,14 @@ class _DoctorAppointmentsScreenState extends State<DoctorAppointmentsScreen> {
           .where((a) => a.status.toLowerCase() == _selectedFilter)
           .toList();
     }
-    return applyDateFilter<AppointmentDetail>(byStatus, (a) => a.date, _dateFilter, _customDate);
+    return applyDateFilter<AppointmentDetail>(
+      byStatus,
+      (a) => a.date,
+      _dateFilter,
+      _customDate,
+      rangeStart: _rangeStart,
+      rangeEnd: _rangeEnd,
+    );
   }
 
   Color _getStatusColor(String status) {
@@ -243,9 +252,16 @@ class _DoctorAppointmentsScreenState extends State<DoctorAppointmentsScreen> {
           DateFilterBar(
             selected: _dateFilter,
             customDate: _customDate,
+            rangeStart: _rangeStart,
+            rangeEnd: _rangeEnd,
             onChanged: (filter, date) => setState(() {
               _dateFilter = filter;
               if (date != null) _customDate = date;
+            }),
+            onRangeChanged: (start, end) => setState(() {
+              _dateFilter = 'range';
+              _rangeStart = start;
+              _rangeEnd = end;
             }),
           ),
 

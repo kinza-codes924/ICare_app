@@ -632,26 +632,29 @@ class _CredentialVaultScreenState extends State<CredentialVaultScreen> {
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator())
                 : ListView(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    // The bottom padding clears the "Add Document" button. With
+                    // none, the last card sat underneath it and the page looked
+                    // like it would not scroll -- there was simply nothing more
+                    // to reveal.
+                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 96),
                     children: [
                       // Verification documents uploaded during Work With Us signup
                       if (_verificationDocs.isNotEmpty) ...[
-                        const Padding(
-                          padding: EdgeInsets.only(top: 20, bottom: 10),
-                          child: Text(
-                            'Verification Documents',
-                            style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
-                          ),
+                        _buildSectionHeading(
+                          'Medical Licenses',
+                          'Uploaded for verification by iCare',
                         ),
                         ..._verificationDocs.map((doc) => _buildVerificationDocCard(doc)),
-                        const Padding(
-                          padding: EdgeInsets.only(top: 20, bottom: 10),
-                          child: Text(
-                            'LMS Certificates',
-                            style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
-                          ),
-                        ),
                       ],
+                      // The heading used to be printed only when verification
+                      // documents existed, so a doctor with course certificates
+                      // and nothing else saw an unlabelled list and no way to
+                      // tell the two kinds apart.
+                      if (_credentials.isNotEmpty)
+                        _buildSectionHeading(
+                          'Course Certificates',
+                          'Earned by completing iCare Academy courses',
+                        ),
                       if (_credentials.isEmpty && _verificationDocs.isEmpty)
                         _buildEmptyState()
                       else
@@ -669,6 +672,31 @@ class _CredentialVaultScreenState extends State<CredentialVaultScreen> {
         ),
         icon: const Icon(Icons.add_rounded),
         backgroundColor: AppColors.primaryColor,
+      ),
+    );
+  }
+
+  /// A labelled divider between the two kinds of document a doctor holds.
+  Widget _buildSectionHeading(String title, String subtitle) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 24, bottom: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: const TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w800,
+              color: Color(0xFF0F172A),
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            subtitle,
+            style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+          ),
+        ],
       ),
     );
   }

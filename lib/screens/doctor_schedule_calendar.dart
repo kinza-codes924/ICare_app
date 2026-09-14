@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:icare/models/appointment_detail.dart';
 import 'package:icare/services/appointment_service.dart';
 import 'package:icare/services/doctor_service.dart';
+import 'package:icare/services/lms_service.dart';
 import 'package:icare/utils/theme.dart';
 import 'package:icare/widgets/back_button.dart';
 import 'package:intl/intl.dart';
@@ -36,9 +37,48 @@ class _DoctorScheduleCalendarState
 
   Future<void> _loadData() async {
     setState(() => _isLoading = true);
-    await Future.wait([_loadAppointments(), _loadLeaveRanges()]);
+    await Future.wait([
+      _loadAppointments(),
+      _loadLeaveRanges(),
+      _loadCourseClasses(),
+    ]);
     if (mounted) setState(() => _isLoading = false);
   }
+
+  /// Classes from courses this doctor is enrolled on.
+  ///
+  /// The calendar read appointments only, so a doctor studying a course saw
+  /// nothing of their own classes here and had to keep a second calendar in
+  /// their head. These sit alongside appointments, marked as classes.
+  Future<void> _loadCourseClasses() async {
+    try {
+      final sessions = await LmsService().getMyEnrolledSessions();
+      if (!mounted) return;
+      final parsed = <Map<String, dynamic>>[];
+      for (final raw in sessions) {
+        if (raw is! Map) continue;
+        final when = DateTime.tryParse(raw['scheduledAt']?.toString() ?? '');
+        if (when == null) continue;
+        final course = raw['courseId'];
+        parsed.add({
+          'date': when.toLocal(),
+          'title': raw['title']?.toString() ?? 'Class',
+          'course': (course is Map ? course['title']?.toString() : null) ?? '',
+        });
+      }
+      setState(() => _courseClasses = parsed);
+    } catch (_) {}
+  }
+
+  List<Map<String, dynamic>> _getClassesForDate(DateTime date) {
+    return _courseClasses.where((c) {
+      final d = c['date'] as DateTime;
+      return d.year == date.year && d.month == date.month && d.day == date.day;
+    }).toList();
+  }
+
+  /// Enrolled-course classes, each {date, title, course}.
+  List<Map<String, dynamic>> _courseClasses = [];
 
   Future<void> _loadAppointments() async {
     try {
@@ -89,7 +129,10 @@ class _DoctorScheduleCalendarState
   }
 
   int _getAppointmentCountForDate(DateTime date) {
-    return _getAppointmentsForDate(date).length;
+    // Classes count towards the day's badge too -- the number is what tells the
+    // doctor the day is busy, and a class occupies them just as an appointment
+    // does.
+    return _getAppointmentsForDate(date).length + _getClassesForDate(date).length;
   }
 
   @override
@@ -363,6 +406,7 @@ class _DoctorScheduleCalendarState
 
   Widget _buildSelectedDateAppointments() {
     final appointments = _getAppointmentsForDate(_selectedDate);
+    final classes = _getClassesForDate(_selectedDate);
 
     return Container(
       padding: const EdgeInsets.all(24),
@@ -381,7 +425,9 @@ class _DoctorScheduleCalendarState
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Appointments on ${DateFormat('MMMM dd, yyyy').format(_selectedDate)}',
+            // The day can now hold classes as well, so the heading no longer
+            // promises only appointments.
+            DateFormat('MMMM dd, yyyy').format(_selectedDate),
             style: const TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.w900,
@@ -389,7 +435,10 @@ class _DoctorScheduleCalendarState
             ),
           ),
           const SizedBox(height: 16),
-          if (appointments.isEmpty)
+          ...classes.map(_buildClassCard),
+          if (classes.isNotEmpty && appointments.isNotEmpty)
+            const SizedBox(height: 4),
+          if (appointments.isEmpty && classes.isEmpty)
             Center(
               child: Padding(
                 padding: const EdgeInsets.all(32),
@@ -402,7 +451,7 @@ class _DoctorScheduleCalendarState
                     ),
                     const SizedBox(height: 12),
                     const Text(
-                      'No appointments scheduled',
+                      'Nothing scheduled',
                       style: TextStyle(fontSize: 15, color: Color(0xFF64748B)),
                     ),
                   ],
@@ -413,6 +462,75 @@ class _DoctorScheduleCalendarState
             ...appointments.map(
               (appointment) => _buildAppointmentCard(appointment),
             ),
+        ],
+      ),
+    );
+  }
+
+  /// A class from a course the doctor is enrolled on.
+  ///
+  /// Deliberately a different colour from an appointment card: one is a patient
+  /// waiting for them, the other is them sitting in a lecture, and confusing
+  /// the two on a calendar would be worse than not showing classes at all.
+  Widget _buildClassCard(Map<String, dynamic> item) {
+    final when = item['date'] as DateTime;
+    final course = (item['course'] as String?) ?? '';
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF7C3AED).withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFF7C3AED).withValues(alpha: 0.25)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(9),
+            decoration: BoxDecoration(
+              color: const Color(0xFF7C3AED).withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Icon(Icons.school_rounded,
+                color: Color(0xFF7C3AED), size: 18),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  item['title']?.toString() ?? 'Class',
+                  style: const TextStyle(
+                      fontSize: 14, fontWeight: FontWeight.w800),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  course.isEmpty
+                      ? DateFormat('h:mm a').format(when)
+                      : '$course  ·  ${DateFormat('h:mm a').format(when)}',
+                  style: const TextStyle(
+                      fontSize: 12, color: Color(0xFF64748B)),
+                ),
+              ],
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+            decoration: BoxDecoration(
+              color: const Color(0xFF7C3AED),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: const Text(
+              'CLASS',
+              style: TextStyle(
+                fontSize: 9,
+                fontWeight: FontWeight.w900,
+                color: Colors.white,
+                letterSpacing: 0.5,
+              ),
+            ),
+          ),
         ],
       ),
     );

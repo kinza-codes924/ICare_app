@@ -48,6 +48,26 @@ class LmsService {
     } catch (_) { return []; }
   }
 
+  /// Live sessions for courses the signed-in user is enrolled on.
+  ///
+  /// getUpcomingSessions() hits /upcoming, which returns everyone's sessions
+  /// capped at ten -- useful for a promo strip, wrong for a personal calendar.
+  /// Pass [from]/[to] to fetch just the window being displayed.
+  Future<List<dynamic>> getMyEnrolledSessions({DateTime? from, DateTime? to}) async {
+    try {
+      final q = <String, dynamic>{};
+      if (from != null) q['from'] = from.toIso8601String();
+      if (to != null) q['to'] = to.toIso8601String();
+      final response = await _api.get(
+        '/live-sessions/my-enrolled',
+        queryParameters: q.isEmpty ? null : q,
+      );
+      return response.data['sessions'] ?? [];
+    } catch (_) {
+      return [];
+    }
+  }
+
   Future<Map<String, dynamic>> joinSession(String sessionId) async {
     try {
       final response = await _api.post('/live-sessions/$sessionId/join', {});

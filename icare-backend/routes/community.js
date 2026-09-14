@@ -1,4 +1,5 @@
 const express = require('express');
+const jwt = require('jsonwebtoken');
 const router = express.Router();
 const mongoose = require('mongoose');
 const { connectMongoDB } = require('../config/mongodb');
@@ -98,6 +99,21 @@ router.get('/posts', async (req, res) => {
     const userMap = {};
     users.forEach(u => { userMap[u._id.toString()] = u; });
 
+    // This route is deliberately public -- the feed is readable logged out --
+    // so authMiddleware cannot be added without breaking that. Read the token
+    // if one happens to be present, purely to work out isLiked below. A missing
+    // or bad token just means no viewer, never an error.
+    let viewerId = null;
+    try {
+      const token = req.headers.authorization?.split(' ')[1];
+      if (token) {
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        viewerId = decoded?.id ? decoded.id.toString() : null;
+      }
+    } catch (_) {
+      viewerId = null;
+    }
+
     const formatted = posts.map(p => {
       const uid = p.userId?.toString();
       const u = userMap[uid] || {};
@@ -107,8 +123,17 @@ router.get('/posts', async (req, res) => {
         authorName: u.name || u.username || p.userName || 'User',
         authorRole: u.role || p.userRole || 'Patient',
         authorAvatar: u.profilePicture || null,
-        likeCount: (p.likes || []).length,
-        commentCount: (p.comments || []).length,
+        // likes is an array on current posts, but older documents stored a
+        // plain number. .length on a number is undefined, which passed silently;
+        // .some() on one throws, so both are guarded here rather than assuming.
+        likeCount: Array.isArray(p.likes) ? p.likes.length : (Number(p.likes) || 0),
+        commentCount: Array.isArray(p.comments) ? p.comments.length : (Number(p.comments) || 0),
+        // Whether the caller has liked this post. Without it the client could
+        // only colour the heart by whether the count was zero, so a post
+        // somebody else had liked looked liked to everyone.
+        isLiked: !!viewerId &&
+          Array.isArray(p.likes) &&
+          p.likes.some(l => l && l.toString() === viewerId),
       };
     });
 

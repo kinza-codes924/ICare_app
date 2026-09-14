@@ -289,6 +289,43 @@ router.get('/upcoming', authMiddleware, async (req, res) => {
   }
 });
 
+// GET /live-sessions/my-enrolled — sessions for courses THIS user is enrolled on
+//
+// /upcoming returns every scheduled session on the platform, capped at 10, with
+// no regard for who is asking. That is fine for a promo strip but wrong for a
+// personal calendar: a doctor studying one course would see other people's
+// classes and miss their own past the tenth. This is scoped to the caller's own
+// enrollments and takes a date window, so a calendar can ask for the month it
+// is showing.
+router.get('/my-enrolled', authMiddleware, async (req, res) => {
+  try {
+    await connectMongoDB();
+    const Enrollment = require('../models/Enrollment');
+
+    const enrollments = await Enrollment.find({ userId: req.user.id }, 'courseId').lean();
+    const courseIds = enrollments.map(e => e.courseId).filter(Boolean);
+    if (!courseIds.length) return res.json({ success: true, sessions: [] });
+
+    const q = { courseId: { $in: courseIds } };
+    const from = req.query.from ? new Date(req.query.from) : null;
+    const to = req.query.to ? new Date(req.query.to) : null;
+    if (from && !isNaN(from.getTime()) && to && !isNaN(to.getTime())) {
+      q.scheduledAt = { $gte: from, $lte: to };
+    }
+
+    const sessions = await LiveSession.find(q)
+      .populate('courseId', 'title')
+      .populate('instructorId', 'name username')
+      .sort({ scheduledAt: 1 })
+      .lean();
+
+    res.json({ success: true, sessions });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+
 // ── STUDENT: Join session ───────────────────────────────────────────────────
 // ── IMPORTANT: /course/:courseId/active and /course/:courseId/set-live must be
 // ── defined BEFORE /:id to prevent Express treating 'course' as an :id param.

@@ -69,6 +69,54 @@ class _HealthCommunityScreenState extends ConsumerState<HealthCommunityScreen> {
     }
   }
 
+  /// Like or unlike a post without reloading the list.
+  ///
+  /// This used to call the API and then _loadPosts(), so every tap threw away
+  /// the whole feed and fetched it again -- that round trip was the spinner the
+  /// client saw before the like registered. The count moves immediately now and
+  /// the request goes out behind it; if the server disagrees or the call fails,
+  /// the post is put back the way it was.
+  Future<void> _toggleLike(dynamic post, String postId) async {
+    int currentCount() {
+      final c = post['likeCount'];
+      if (c is num) return c.toInt();
+      final l = post['likes'];
+      if (l is List) return l.length;
+      if (l is num) return l.toInt();
+      return 0;
+    }
+
+    final wasLiked = post['isLiked'] == true;
+    final before = currentCount();
+
+    setState(() {
+      post['isLiked'] = !wasLiked;
+      post['likeCount'] = wasLiked
+          ? (before > 0 ? before - 1 : 0)
+          : before + 1;
+    });
+
+    final result = await _courseService.likeForumPost(postId);
+    if (!mounted) return;
+
+    setState(() {
+      if (result == null) {
+        post['isLiked'] = wasLiked;
+        post['likeCount'] = before;
+      } else {
+        // Trust the server over the guess -- it is the authority on both.
+        post['isLiked'] = result['liked'];
+        post['likeCount'] = result['likeCount'];
+      }
+    });
+
+    if (result == null && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not update the like')),
+      );
+    }
+  }
+
   Future<void> _deletePost(String postId) async {
     final ok = await showDialog<bool>(
       context: context,
@@ -494,10 +542,8 @@ class _HealthCommunityScreenState extends ConsumerState<HealthCommunityScreen> {
                   // Backend returns 'likeCount', also fallback to array length or 'likes'
                   ((post['likeCount'] ?? (post['likes'] is List ? (post['likes'] as List).length : post['likes'])) ?? 0).toString(),
                   const Color(0xFFEF4444),
-                  () async {
-                    await _courseService.likeForumPost(postId);
-                    _loadPosts(); // Refresh for accurate counts
-                  },
+                  () => _toggleLike(post, postId),
+                  isActive: post['isLiked'] == true,
                 ),
                 const SizedBox(width: 24),
                 _buildInteractionButton(
@@ -811,15 +857,21 @@ class _HealthCommunityScreenState extends ConsumerState<HealthCommunityScreen> {
     IconData icon,
     String count,
     Color color,
-    VoidCallback onTap,
-  ) {
+    VoidCallback onTap, {
+    // Whether *this* user has acted on the post. Colour keyed off the count
+    // alone, which meant a post someone else had liked looked liked to you too.
+    // Null keeps the old count-based shading for the buttons that have no
+    // per-user state (comments, reshares).
+    bool? isActive,
+  }) {
+    final active = isActive ?? (count != '0');
     return InkWell(
       onTap: onTap,
       child: Row(
         children: [
           Icon(
             icon,
-            color: count == '0' ? const Color(0xFFCBD5E1) : color,
+            color: active ? color : const Color(0xFFCBD5E1),
             size: 20,
           ),
           const SizedBox(width: 8),

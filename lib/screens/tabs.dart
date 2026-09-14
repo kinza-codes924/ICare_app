@@ -153,6 +153,10 @@ class _TabsScreenState extends ConsumerState<TabsScreen> {
     '/instructor/manage-courses',
     '/instructor/precautions',
     '/lab/tests',
+    // The credential vault carries an extended "Add Document" FAB. Without it
+    // listed here the WhatsApp bubble sat on top of that button and the doctor
+    // could not reach it.
+    '/credential-vault',
   };
 
   /// How far up from the bottom the WhatsApp button should float for the
@@ -1398,12 +1402,8 @@ class _WebSidebarState extends ConsumerState<_WebSidebar> {
                       'Availability',
                       () => context.go('/doctor/availability'),
                     ),
-                    _buildExtraNavItem(
-                      context,
-                      Icons.notifications_outlined,
-                      'Notifications',
-                      () => context.go('/doctor/notifications'),
-                    ),
+                    // Notifications is deliberately absent here too -- the
+                    // bell above opens the same screen.
                     _buildExtraNavItem(
                       context,
                       Icons.help_outline_rounded,

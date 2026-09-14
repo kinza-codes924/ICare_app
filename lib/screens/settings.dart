@@ -6227,10 +6227,13 @@ class _WebSettingsLayout extends StatelessWidget {
               iconColor: const Color(0xFF0EA5E9),
               title: 'Medical License',
               subtitle: 'View & update license details',
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const DoctorProfileSetup()),
-              ),
+              // Opened DoctorProfileSetup, which is the whole "Complete Your
+              // Professional Profile" form -- the client's point was that
+              // tapping Medical License should show the licence, not send the
+              // doctor back through profile setup. The credential vault already
+              // holds the uploaded PMDC certificate and every other document,
+              // with its verification status.
+              onTap: () => context.push('/credential-vault'),
             ),
           ],
         ),
@@ -7874,10 +7877,13 @@ class _MobileSettingsLayout extends StatelessWidget {
               iconColor: const Color(0xFF0EA5E9),
               title: 'Medical License',
               subtitle: 'View & update license details',
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const DoctorProfileSetup()),
-              ),
+              // Opened DoctorProfileSetup, which is the whole "Complete Your
+              // Professional Profile" form -- the client's point was that
+              // tapping Medical License should show the licence, not send the
+              // doctor back through profile setup. The credential vault already
+              // holds the uploaded PMDC certificate and every other document,
+              // with its verification status.
+              onTap: () => context.push('/credential-vault'),
             ),
           ],
         ),

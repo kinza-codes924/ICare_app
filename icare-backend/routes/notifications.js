@@ -190,7 +190,7 @@ router.post('/promotions', authMiddleware, async (req, res) => {
   try {
     await connectMongoDB();
     const sender = await User.findById(req.user.id).lean();
-    if (!sender || sender.role !== 'admin') {
+    if (!sender || String(sender.role).toLowerCase() !== 'admin') {
       return res.status(403).json({ success: false, message: 'Admins only' });
     }
 
@@ -199,12 +199,50 @@ router.post('/promotions', authMiddleware, async (req, res) => {
       return res.status(400).json({ success: false, message: 'title and message are required' });
     }
 
-    const filter = { 'notificationPrefs.promotions': true };
-    if (Array.isArray(roles) && roles.length) filter.role = { $in: roles };
+    // The field is notification_preferences (snake_case) -- that is what the
+    // User model declares and what PUT /notifications/preferences writes. This
+    // filter used to read notificationPrefs, a field no document has, so every
+    // promotion reached exactly nobody however many people had opted in.
+    const basePrefFilter = { 'notification_preferences.promotions': true };
+    const filter = { ...basePrefFilter };
+    if (Array.isArray(roles) && roles.length) {
+      // `role` is stored in both cases in this collection ('student' and
+      // 'Student' both exist -- see the enum comment on the User model), and
+      // laboratories are stored as either 'lab' or 'Laboratory'. Matching the
+      // one spelling the client sends found nobody, so a promotion aimed at a
+      // role silently reached zero people. Expand each requested role into
+      // every spelling that is actually in the data.
+      const VARIANTS = {
+        student: ['student', 'Student'],
+        patient: ['patient', 'Patient'],
+        doctor: ['doctor', 'Doctor'],
+        instructor: ['instructor', 'Instructor'],
+        pharmacy: ['pharmacy', 'Pharmacy'],
+        laboratory: ['lab', 'Laboratory'],
+        lab: ['lab', 'Laboratory'],
+        receptionist: ['receptionist'],
+        admin: ['admin', 'Admin'],
+      };
+      const wanted = [];
+      for (const r of roles) {
+        const key = String(r).toLowerCase();
+        wanted.push(...(VARIANTS[key] || [r]));
+      }
+      filter.role = { $in: [...new Set(wanted)] };
+    }
 
     const recipients = await User.find(filter, '_id').lean();
     if (!recipients.length) {
-      return res.json({ success: true, sent: 0, message: 'No users have promotions enabled' });
+      // Say which of the two reasons it was: nobody has promotions switched on
+      // at all, or nobody in the roles that were picked.
+      const anyOptedIn = await User.countDocuments(basePrefFilter);
+      return res.json({
+        success: true,
+        sent: 0,
+        message: anyOptedIn === 0
+          ? 'Nobody has Promotions & Offers switched on yet'
+          : `No one in the selected role(s) has Promotions & Offers switched on (${anyOptedIn} user(s) have it on overall)`,
+      });
     }
 
     await Notification.insertMany(recipients.map(u => ({

@@ -318,9 +318,9 @@ class _CustomDrawerState extends ConsumerState<CustomDrawer> {
         _drawerItem('Availability', Icons.event_available_outlined, () {
           context.go('/doctor/availability');
         }),
-        _drawerItem('Notifications', Icons.notifications_outlined, () {
-          context.go('/doctor/notifications');
-        }),
+        // Notifications is deliberately absent: the bell in the top bar opens
+        // this same screen, and carrying it in both places was the client's
+        // point -- one entry, one place.
         _drawerItem('Help & Support', Icons.help_outline_rounded, () {
           context.go('/help');
         }),

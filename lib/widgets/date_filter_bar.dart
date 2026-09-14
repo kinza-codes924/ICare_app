@@ -3,15 +3,31 @@ import 'package:icare/utils/theme.dart';
 import 'package:intl/intl.dart';
 
 class DateFilterBar extends StatelessWidget {
-  final String selected; // 'all' | 'today' | '7days' | '30days' | 'custom'
+  final String selected; // 'all' | 'today' | '7days' | '30days' | 'custom' | 'range'
   final DateTime? customDate;
+
+  /// Start and end of a 'range' selection, inclusive.
+  ///
+  /// The bar only offered a single day under Calendar, so asking for "the first
+  /// two weeks of last month" was not expressible -- the client asked for a
+  /// range, and a whole month is just one.
+  final DateTime? rangeStart;
+  final DateTime? rangeEnd;
+
   final void Function(String filter, DateTime? date) onChanged;
+
+  /// Called when a range is chosen. Screens that do not pass this keep showing
+  /// only the single-date Calendar chip, so existing callers are unaffected.
+  final void Function(DateTime start, DateTime end)? onRangeChanged;
 
   const DateFilterBar({
     super.key,
     required this.selected,
     required this.onChanged,
     this.customDate,
+    this.rangeStart,
+    this.rangeEnd,
+    this.onRangeChanged,
   });
 
   Future<void> _pickDate(BuildContext context) async {
@@ -30,6 +46,46 @@ class DateFilterBar extends StatelessWidget {
     if (picked != null) {
       onChanged('custom', picked);
     }
+  }
+
+  Future<void> _pickRange(BuildContext context) async {
+    final picked = await showDateRangePicker(
+      context: context,
+      firstDate: DateTime(2023),
+      lastDate: DateTime.now().add(const Duration(days: 365)),
+      initialDateRange: (rangeStart != null && rangeEnd != null)
+          ? DateTimeRange(start: rangeStart!, end: rangeEnd!)
+          : null,
+      builder: (context, child) => Theme(
+        data: Theme.of(context).copyWith(
+          colorScheme: ColorScheme.light(primary: AppColors.primaryColor),
+        ),
+        child: child!,
+      ),
+    );
+    if (picked != null) onRangeChanged?.call(picked.start, picked.end);
+  }
+
+  Widget _chip({
+    required bool isSelected,
+    required VoidCallback onTap,
+    required Widget child,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: GestureDetector(
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+          decoration: BoxDecoration(
+            color: isSelected ? AppColors.primaryColor : const Color(0xFFF1F5F9),
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: child,
+        ),
+      ),
+    );
   }
 
   @override
@@ -73,35 +129,51 @@ class DateFilterBar extends StatelessWidget {
                 ),
               );
             }),
-            GestureDetector(
+            _chip(
+              isSelected: selected == 'custom',
               onTap: () => _pickDate(context),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 150),
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-                decoration: BoxDecoration(
-                  color: selected == 'custom' ? AppColors.primaryColor : const Color(0xFFF1F5F9),
-                  borderRadius: BorderRadius.circular(20),
-                ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.calendar_month_rounded, size: 13,
+                      color: selected == 'custom' ? Colors.white : const Color(0xFF64748B)),
+                  const SizedBox(width: 5),
+                  Text(
+                    selected == 'custom' && customDate != null
+                        ? DateFormat('d MMM').format(customDate!)
+                        : 'Calendar',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: selected == 'custom' ? Colors.white : const Color(0xFF64748B),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (onRangeChanged != null)
+              _chip(
+                isSelected: selected == 'range',
+                onTap: () => _pickRange(context),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.calendar_month_rounded, size: 13,
-                        color: selected == 'custom' ? Colors.white : const Color(0xFF64748B)),
+                    Icon(Icons.date_range_rounded, size: 13,
+                        color: selected == 'range' ? Colors.white : const Color(0xFF64748B)),
                     const SizedBox(width: 5),
                     Text(
-                      selected == 'custom' && customDate != null
-                          ? DateFormat('d MMM').format(customDate!)
-                          : 'Calendar',
+                      (selected == 'range' && rangeStart != null && rangeEnd != null)
+                          ? '${DateFormat('d MMM').format(rangeStart!)} - ${DateFormat('d MMM').format(rangeEnd!)}'
+                          : 'Date Range',
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
-                        color: selected == 'custom' ? Colors.white : const Color(0xFF64748B),
+                        color: selected == 'range' ? Colors.white : const Color(0xFF64748B),
                       ),
                     ),
                   ],
                 ),
               ),
-            ),
           ],
         ),
       ),
@@ -111,7 +183,14 @@ class DateFilterBar extends StatelessWidget {
 
 /// Helper: filter a list of items by date.
 /// [getDate] extracts the DateTime from each item.
-List<T> applyDateFilter<T>(List<T> items, DateTime Function(T) getDate, String filter, DateTime? customDate) {
+List<T> applyDateFilter<T>(
+  List<T> items,
+  DateTime Function(T) getDate,
+  String filter,
+  DateTime? customDate, {
+  DateTime? rangeStart,
+  DateTime? rangeEnd,
+}) {
   final now = DateTime.now();
   final today = DateTime(now.year, now.month, now.day);
 
@@ -132,6 +211,16 @@ List<T> applyDateFilter<T>(List<T> items, DateTime Function(T) getDate, String f
       return items.where((item) {
         final d = getDate(item);
         return !DateTime(d.year, d.month, d.day).isBefore(cutoff);
+      }).toList();
+    case 'range':
+      if (rangeStart == null || rangeEnd == null) return items;
+      final from = DateTime(rangeStart.year, rangeStart.month, rangeStart.day);
+      final to = DateTime(rangeEnd.year, rangeEnd.month, rangeEnd.day);
+      return items.where((item) {
+        final d = getDate(item);
+        final day = DateTime(d.year, d.month, d.day);
+        // Both ends inclusive -- picking 1-14 should include the 14th.
+        return !day.isBefore(from) && !day.isAfter(to);
       }).toList();
     case 'custom':
       if (customDate == null) return items;
