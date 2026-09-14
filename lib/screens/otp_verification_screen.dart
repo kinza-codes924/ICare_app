@@ -172,6 +172,16 @@ class _OtpVerificationScreenState
 
   // ── Build ──────────────────────────────────────────────────────────────────
 
+  /// Sign out and return to login.
+  ///
+  /// Clearing the auth state is what actually releases the screen: the router's
+  /// redirect keys off the signed-in user, so without this it would send them
+  /// straight back here.
+  Future<void> _signOut() async {
+    await ref.read(authProvider.notifier).setUserLogout();
+    if (mounted) context.go('/login');
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -221,6 +231,24 @@ class _OtpVerificationScreenState
                     const SizedBox(height: 16),
                     _Banner(message: _infoMsg, isError: false),
                   ],
+                  // A way out. The router sends an unverified user straight
+                  // back to this screen from anywhere, and it carried no back
+                  // control and no sign-out -- so a wrong number or an email
+                  // that never arrives left the account with nowhere to go.
+                  // Verification still cannot be skipped; this signs out so a
+                  // different account can be used.
+                  const SizedBox(height: 20),
+                  TextButton(
+                    onPressed: _signOut,
+                    child: const Text(
+                      'Sign out and use a different account',
+                      style: TextStyle(
+                        color: Color(0xFF64748B),
+                        fontSize: 13,
+                        decoration: TextDecoration.underline,
+                      ),
+                    ),
+                  ),
                 ],
               ),
             ),

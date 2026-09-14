@@ -3,6 +3,9 @@ import 'dart:async';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import 'package:icare/providers/auth_provider.dart';
 import 'package:icare/services/auth_service.dart';
 import 'package:icare/utils/theme.dart';
 
@@ -11,7 +14,7 @@ import 'package:icare/utils/theme.dart';
 ///
 /// Not to be confused with the older `email_verification_screen.dart`, which
 /// takes a click-through *token* and has no route pointing at it.
-class EmailOtpScreen extends StatefulWidget {
+class EmailOtpScreen extends ConsumerStatefulWidget {
   final String email;
 
   /// Runs once the code is accepted, with the fresh token the backend issues.
@@ -24,10 +27,10 @@ class EmailOtpScreen extends StatefulWidget {
   });
 
   @override
-  State<EmailOtpScreen> createState() => _EmailOtpScreenState();
+  ConsumerState<EmailOtpScreen> createState() => _EmailOtpScreenState();
 }
 
-class _EmailOtpScreenState extends State<EmailOtpScreen> {
+class _EmailOtpScreenState extends ConsumerState<EmailOtpScreen> {
   final _code = TextEditingController();
   final _authService = AuthService();
 
@@ -117,6 +120,16 @@ class _EmailOtpScreenState extends State<EmailOtpScreen> {
     } finally {
       if (mounted) setState(() => _resending = false);
     }
+  }
+
+  /// Sign out and return to login.
+  ///
+  /// Clearing the auth state is what actually releases the screen: the
+  /// router's redirect keys off the signed-in user, so without this it would
+  /// send them straight back here.
+  Future<void> _signOut() async {
+    await ref.read(authProvider.notifier).setUserLogout();
+    if (mounted) context.go('/login');
   }
 
   @override
@@ -341,6 +354,29 @@ class _EmailOtpScreenState extends State<EmailOtpScreen> {
                           color: Color(0xFF94A3B8),
                           fontSize: 12,
                           fontFamily: 'Gilroy-Medium',
+                        ),
+                      ),
+                    ),
+                    // A way out.
+                    //
+                    // The router sends an unverified user straight back here
+                    // from anywhere, and the screen carried no back control, no
+                    // sign-out and no app bar -- so a mistyped address, or a
+                    // code that never arrives, left the account with nowhere to
+                    // go but uninstalling. Verification still cannot be skipped;
+                    // this signs out so a different address can be used.
+                    const SizedBox(height: 20),
+                    Center(
+                      child: TextButton(
+                        onPressed: _signOut,
+                        child: const Text(
+                          'Use a different email',
+                          style: TextStyle(
+                            color: Color(0xFF64748B),
+                            fontSize: 13,
+                            fontFamily: 'Gilroy-Medium',
+                            decoration: TextDecoration.underline,
+                          ),
                         ),
                       ),
                     ),
