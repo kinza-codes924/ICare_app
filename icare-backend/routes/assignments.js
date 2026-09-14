@@ -2,8 +2,7 @@ const express = require('express');
 const router  = express.Router();
 const mongoose = require('mongoose');
 const multer   = require('multer');
-// cloudinary (~110ms) is required lazily inside uploadBuffer(): it is only
-// needed when a file is actually uploaded, not on every cold start.
+const { saveBuffer } = require('../utils/localStorage');
 const { connectMongoDB }  = require('../config/mongodb');
 const { authMiddleware }  = require('../middleware/auth');
 const Assignment           = require('../models/Assignment');
@@ -17,15 +16,14 @@ function toId(id) {
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });
 
-function uploadBuffer(buffer, folder) {
-  const { v2: cloudinary } = require('cloudinary');
-  return new Promise((resolve, reject) => {
-    const stream = cloudinary.uploader.upload_stream(
-      { folder, resource_type: 'auto' },
-      (err, result) => err ? reject(err) : resolve(result)
-    );
-    stream.end(buffer);
-  });
+// Writes to our own disk (nginx serves it at /uploads/) rather than Cloudinary.
+// The returned shape is kept -- callers read `secure_url` -- so nothing
+// downstream changed. Assignment submissions are usually PDFs, which Cloudinary
+// refuses to deliver by default.
+function uploadBuffer(buffer, folder, originalname = 'file') {
+  const sub = String(folder || 'assignments').split('/').pop();
+  const saved = saveBuffer(buffer, originalname, sub);
+  return Promise.resolve({ secure_url: saved.url, public_id: saved.name });
 }
 
 // ── INSTRUCTOR: create assignment ────────────────────────────────────────────
@@ -170,7 +168,7 @@ router.post('/:assignmentId/submit', authMiddleware, upload.single('file'), asyn
     let fileUrl = null, fileName = null, files = [];
     if (req.file) {
       // Multipart upload directly to this endpoint
-      const result = await uploadBuffer(req.file.buffer, 'icare/lms/submissions');
+      const result = await uploadBuffer(req.file.buffer, 'icare/lms/submissions', req.file.originalname);
       fileUrl  = result.secure_url;
       fileName = req.file.originalname;
       files = [{ url: fileUrl, name: fileName }];

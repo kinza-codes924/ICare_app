@@ -1,4 +1,5 @@
 const Consultation = require('../models/Consultation');
+const { saveBuffer } = require('../utils/localStorage');
 const ConsultationMessage = require('../models/ConsultationMessage');
 const User = require('../models/User');
 
@@ -253,15 +254,15 @@ exports.uploadAttachment = async (req, res) => {
     if (!req.file) {
       return res.status(400).json({ success: false, message: 'No file uploaded' });
     }
-    const cloudinary = require('../config/cloudinary');
-    const result = await new Promise((resolve, reject) => {
-      const stream = cloudinary.uploader.upload_stream(
-        { folder: 'icare/consultation-attachments', resource_type: 'auto' },
-        (err, result) => (err ? reject(err) : resolve(result))
-      );
-      stream.end(req.file.buffer);
-    });
-    res.json({ success: true, url: result.secure_url });
+    // Our own disk rather than Cloudinary: a consultation attachment is as
+    // often a PDF as an image, and Cloudinary blocks PDF delivery by default,
+    // which answered 401 from the CDN however the file had been stored.
+    const saved = saveBuffer(
+      req.file.buffer,
+      req.file.originalname,
+      'consultation-attachments',
+    );
+    res.json({ success: true, url: saved.url, name: req.file.originalname });
   } catch (error) {
     console.error('Upload attachment error:', error);
     res.status(500).json({ success: false, message: error.message });

@@ -48,18 +48,23 @@ router.post('/', protect, upload.single('file'), async (req, res) => {
     if (!req.file) {
       return res.status(400).json({ success: false, message: 'No file provided' });
     }
+    // Everything new goes to our own disk, served by nginx at /uploads/.
+    // Documents already did; images followed Cloudinary, which meant the same
+    // conversation's files lived in two places and depended on an outside
+    // account staying within its free tier. A stored URL is now a plain public
+    // link on our own domain, and nothing breaks if that account lapses.
     const mt = req.file.mimetype || '';
-    if (mt.startsWith('image/')) {
-      // Images: Cloudinary (it delivers/transforms images fine).
-      const folder = req.body.folder || 'icare/consultation-attachments';
-      const result = await uploadToCloudinary(req.file.buffer, folder, 'image');
-      return res.json({ success: true, url: result.secure_url, publicId: result.public_id, resourceType: 'image' });
-    }
-    // PDFs and other documents: server disk (nginx /uploads/). Cloudinary's
-    // free tier blocks raw-file delivery, which was 500'ing every PDF sent in
-    // consultation chat. Local disk serves them as a plain public link.
-    const saved = saveBuffer(req.file.buffer, req.file.originalname, 'chat-docs');
-    res.json({ success: true, url: saved.url, name: req.file.originalname, resourceType: 'raw' });
+    const saved = saveBuffer(
+      req.file.buffer,
+      req.file.originalname,
+      mt.startsWith('image/') ? 'chat-images' : 'chat-docs',
+    );
+    res.json({
+      success: true,
+      url: saved.url,
+      name: req.file.originalname,
+      resourceType: mt.startsWith('image/') ? 'image' : 'raw',
+    });
   } catch (err) {
     console.error('Upload error:', err);
     res.status(500).json({ success: false, message: err.message });
@@ -72,9 +77,11 @@ router.post('/image', protect, upload.single('file'), async (req, res) => {
     if (!req.file) {
       return res.status(400).json({ success: false, message: 'No file provided' });
     }
-    const folder = req.body.folder || 'icare/general';
-    const result = await uploadToCloudinary(req.file.buffer, folder);
-    res.json({ success: true, url: result.secure_url, publicId: result.public_id });
+    // The caller may pass a Cloudinary-style folder path ("icare/products");
+    // saveBuffer takes a single safe segment, so only the last part is used.
+    const folder = String(req.body.folder || 'general').split('/').pop();
+    const saved = saveBuffer(req.file.buffer, req.file.originalname, folder);
+    res.json({ success: true, url: saved.url, name: req.file.originalname });
   } catch (err) {
     console.error('Upload error:', err);
     res.status(500).json({ success: false, message: err.message });
@@ -87,12 +94,18 @@ router.post('/prescription', protect, upload.single('file'), async (req, res) =>
     if (!req.file) {
       return res.status(400).json({ success: false, message: 'No file provided' });
     }
-    // PDFs must use resource_type:'raw' so Cloudinary stores them as documents,
-    // not images. Images use the default 'image' resource type.
+    // Prescriptions are the reason this mattered: Cloudinary blocks PDF
+    // delivery by default, so an uploaded prescription answered 401 from the
+    // CDN however it had been stored ("deny or ACL failure"). On our own disk
+    // it is an ordinary file behind an ordinary link.
     const isPdf = req.file.mimetype === 'application/pdf';
-    const resourceType = isPdf ? 'auto' : 'image';
-    const result = await uploadToCloudinary(req.file.buffer, 'icare/prescriptions', resourceType);
-    res.json({ success: true, url: result.secure_url, publicId: result.public_id, resourceType });
+    const saved = saveBuffer(req.file.buffer, req.file.originalname, 'prescriptions');
+    res.json({
+      success: true,
+      url: saved.url,
+      name: req.file.originalname,
+      resourceType: isPdf ? 'raw' : 'image',
+    });
   } catch (err) {
     console.error('Prescription upload error:', err);
     res.status(500).json({ success: false, message: err.message });
@@ -105,8 +118,8 @@ router.post('/product', protect, upload.single('file'), async (req, res) => {
     if (!req.file) {
       return res.status(400).json({ success: false, message: 'No file provided' });
     }
-    const result = await uploadToCloudinary(req.file.buffer, 'icare/products');
-    res.json({ success: true, url: result.secure_url, publicId: result.public_id });
+    const saved = saveBuffer(req.file.buffer, req.file.originalname, 'products');
+    res.json({ success: true, url: saved.url, name: req.file.originalname });
   } catch (err) {
     console.error('Product upload error:', err);
     res.status(500).json({ success: false, message: err.message });

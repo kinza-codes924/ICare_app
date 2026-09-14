@@ -1,6 +1,7 @@
 const express = require('express');
 const jwt = require('jsonwebtoken');
 const router = express.Router();
+const { saveBuffer } = require('../utils/localStorage');
 const mongoose = require('mongoose');
 const { connectMongoDB } = require('../config/mongodb');
 const CommunityPost = require('../models/CommunityPost');
@@ -158,14 +159,19 @@ router.post('/posts', authMiddleware, async (req, res) => {
 
     if (image && image.startsWith('data:')) {
       try {
-        const uploadResult = await cloudinary.uploader.upload(image, {
-          folder: 'community_posts',
-          resource_type: 'image',
-          transformation: [{ width: 1200, height: 1200, crop: 'limit', quality: 'auto' }],
-        });
-        finalImageUrl = uploadResult.secure_url;
+        // Stored on our own disk now rather than Cloudinary. The client sends a
+        // base64 data URL, so the payload is decoded back to bytes here.
+        // Cloudinary was also resizing to 1200px; that is lost, so the original
+        // is kept as uploaded -- the client already compresses before sending.
+        const comma = image.indexOf(',');
+        const meta = image.slice(5, comma);           // e.g. "image/jpeg;base64"
+        const mime = meta.split(';')[0] || 'image/jpeg';
+        const ext = (mime.split('/')[1] || 'jpg').replace(/[^a-z0-9]/gi, '');
+        const buffer = Buffer.from(image.slice(comma + 1), 'base64');
+        const saved = saveBuffer(buffer, `post.${ext}`, 'community-posts');
+        finalImageUrl = saved.url;
       } catch (uploadErr) {
-        console.error('Cloudinary upload error:', uploadErr);
+        console.error('Post image upload error:', uploadErr);
       }
     }
 

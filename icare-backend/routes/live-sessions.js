@@ -1646,20 +1646,16 @@ router.post('/jibri-recording-complete', jibriUpload.single('file'), async (req,
       // 211MB/45min session got a 413 back from Cloudinary's own API).
       // Anything over that threshold skips Cloudinary and lands on local
       // disk instead, same as the doc-upload fallback in routes/upload.js.
-      const CLOUDINARY_SIZE_LIMIT = 95 * 1024 * 1024;
-      if (req.file.buffer.length > CLOUDINARY_SIZE_LIMIT) {
-        const saved = saveBuffer(req.file.buffer, req.file.originalname || `${sessionId}.mp4`, 'lms-recordings');
-        finalUrl = saved.url;
-      } else {
-        const uploadResult = await new Promise((resolve, reject) => {
-          const stream = cloudinary.uploader.upload_stream(
-            { resource_type: 'video', folder: 'icare/lms-recordings' },
-            (err, result) => (err ? reject(err) : resolve(result))
-          );
-          stream.end(req.file.buffer);
-        });
-        finalUrl = uploadResult.secure_url;
-      }
+      // Every recording lands on our own disk now. The size test above used to
+      // send anything under 95MB to Cloudinary and only the big ones here,
+      // which split one kind of file across two places for no benefit -- and a
+      // 45-minute class routinely crossed the line anyway.
+      const saved = saveBuffer(
+        req.file.buffer,
+        req.file.originalname || `${sessionId}.mp4`,
+        'lms-recordings',
+      );
+      finalUrl = saved.url;
     }
 
     if (!session.recordings) session.recordings = [];

@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const { saveBuffer } = require('../utils/localStorage');
 const mongoose = require('mongoose');
 const multer = require('multer');
 const cloudinary = require('../config/cloudinary');
@@ -815,12 +816,13 @@ router.post('/bookings/:bookingId/upload-report', authMiddleware, _reportUpload.
     let reportUrl = (req.body && req.body.reportUrl) || null;
     const reportNotes = (req.body && req.body.reportNotes) || '';
 
-    // If a file was uploaded, push it to Cloudinary and get a persistent URL
+    // Lab reports are usually PDFs, and Cloudinary blocks PDF delivery by
+    // default -- an uploaded report answered 401 from the CDN however it was
+    // stored. On our own disk, served by nginx at /uploads/, it is an ordinary
+    // file behind an ordinary link.
     if (req.file) {
-      const isPdf = req.file.mimetype === 'application/pdf';
-      const resourceType = isPdf ? 'raw' : 'image';
-      const result = await _uploadToCloudinary(req.file.buffer, 'icare/lab-reports', resourceType);
-      reportUrl = result.secure_url;
+      const saved = saveBuffer(req.file.buffer, req.file.originalname, 'lab-reports');
+      reportUrl = saved.url;
     }
 
     const booking = await LabTestRequest.findByIdAndUpdate(

@@ -159,8 +159,12 @@ class _TabsScreenState extends ConsumerState<TabsScreen> {
     '/credential-vault',
   };
 
-  /// How far up from the bottom the WhatsApp button should float for the
-  /// given location — lifted above the screen's own FAB where one exists.
+  /// How far up from the bottom the WhatsApp button should float.
+  ///
+  /// The lifts below date from when the bubble sat bottom-right, on top of each
+  /// screen's own FAB. It lives bottom-left now, so nothing it could collide
+  /// with is there any more — but a couple of screens put their own content in
+  /// that corner, so the offsets are kept rather than guessed away.
   double _whatsappOffset(String location, String role) {
     // Community has an extended "New Post" FAB (plus an extra "Add Topic" FAB
     // for admins), so it needs the most clearance.
