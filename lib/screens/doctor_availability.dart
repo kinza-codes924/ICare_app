@@ -250,22 +250,6 @@ class _DoctorAvailabilityState extends State<DoctorAvailability> {
     setState(() => _unavailableDates.remove(date));
   }
 
-  Future<void> _selectTime(bool isStart) async {
-    final time = await showTimePicker(
-      context: context,
-      initialTime: isStart ? _startTime : _endTime,
-    );
-    if (time != null) {
-      setState(() {
-        if (isStart) {
-          _startTime = time;
-        } else {
-          _endTime = time;
-        }
-      });
-    }
-  }
-
   Future<void> _pickSlotTime(String day, int slotIndex, bool isStart) async {
     final slot = _weeklySlots[day]![slotIndex];
     final parts = (isStart ? slot['start'] : slot['end'])!.split(':');
@@ -331,8 +315,43 @@ class _DoctorAvailabilityState extends State<DoctorAvailability> {
   void _saveAvailability() async {
     setState(() => _isSaving = true);
 
-    final startStr = '${_startTime.hour.toString().padLeft(2, '0')}:${_startTime.minute.toString().padLeft(2, '0')}';
-    final endStr = '${_endTime.hour.toString().padLeft(2, '0')}:${_endTime.minute.toString().padLeft(2, '0')}';
+    // The backend still stores an outer start/end alongside the slots, and the
+    // patient-facing screens read it, so it cannot simply be dropped. With the
+    // Working Hours card gone it is computed instead: the earliest slot start
+    // and the latest slot end across the week. That way the envelope can never
+    // contradict the slots it is supposed to contain -- which is exactly what
+    // could happen while a doctor could set both by hand.
+    int toMinutes(String hhmm) {
+      final parts = hhmm.split(':');
+      if (parts.length < 2) return -1;
+      final h = int.tryParse(parts[0].trim());
+      final m = int.tryParse(parts[1].trim());
+      if (h == null || m == null) return -1;
+      return h * 60 + m;
+    }
+
+    int? earliest;
+    int? latest;
+    _weeklySlots.forEach((_, slots) {
+      for (final slot in slots) {
+        final st = toMinutes((slot['start'] ?? '').toString());
+        final en = toMinutes((slot['end'] ?? '').toString());
+        if (st >= 0 && (earliest == null || st < earliest!)) earliest = st;
+        if (en >= 0 && (latest == null || en > latest!)) latest = en;
+      }
+    });
+
+    String fmt(int mins) =>
+        '${(mins ~/ 60).toString().padLeft(2, '0')}:${(mins % 60).toString().padLeft(2, '0')}';
+
+    // No slots anywhere: fall back to whatever was loaded, so saving an
+    // otherwise-empty schedule does not wipe the stored hours.
+    final startStr = earliest != null
+        ? fmt(earliest!)
+        : '${_startTime.hour.toString().padLeft(2, '0')}:${_startTime.minute.toString().padLeft(2, '0')}';
+    final endStr = latest != null
+        ? fmt(latest!)
+        : '${_endTime.hour.toString().padLeft(2, '0')}:${_endTime.minute.toString().padLeft(2, '0')}';
 
     // The per-day slots were previously only ever held in this screen's state —
     // saving sent just the outer start/end, so the patient's booking screen
@@ -410,7 +429,11 @@ class _DoctorAvailabilityState extends State<DoctorAvailability> {
                     children: [
                       _build24x7Toggle(),
                       const SizedBox(height: 24),
-                      _buildWorkingHours(),
+                      // Working Hours (one outer start/end) is gone: the
+                      // client's point was that Weekly Schedule already
+                      // says when the doctor works, per day and per slot,
+                      // so a second set of hours could only disagree with
+                      // it. The envelope is derived from the slots below.
                       const SizedBox(height: 24),
                       _buildWeeklySchedule(),
                       const SizedBox(height: 24),
@@ -524,129 +547,6 @@ class _DoctorAvailabilityState extends State<DoctorAvailability> {
             activeTrackColor: Colors.white.withValues(alpha: 0.3),
             inactiveThumbColor: const Color(0xFF0036BC),
             inactiveTrackColor: const Color(0xFF0036BC).withValues(alpha: 0.15),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildWorkingHours() {
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 20,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF3B82F6).withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: const Icon(
-                  Icons.access_time_rounded,
-                  color: Color(0xFF3B82F6),
-                  size: 24,
-                ),
-              ),
-              const SizedBox(width: 12),
-              const Text(
-                'Working Hours',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w900,
-                  color: Color(0xFF0F172A),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
-          Row(
-            children: [
-              Expanded(
-                child: InkWell(
-                  onTap: () => _selectTime(true),
-                  child: Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF8FAFC),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: const Color(0xFFE2E8F0)),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Start Time',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Color(0xFF64748B),
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          _startTime.format(context),
-                          style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w900,
-                            color: Color(0xFF0F172A),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: InkWell(
-                  onTap: () => _selectTime(false),
-                  child: Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF8FAFC),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: const Color(0xFFE2E8F0)),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'End Time',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Color(0xFF64748B),
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          _endTime.format(context),
-                          style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w900,
-                            color: Color(0xFF0F172A),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ],
           ),
         ],
       ),

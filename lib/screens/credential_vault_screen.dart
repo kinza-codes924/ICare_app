@@ -638,6 +638,29 @@ class _CredentialVaultScreenState extends State<CredentialVaultScreen> {
                     // to reveal.
                     padding: const EdgeInsets.fromLTRB(20, 0, 20, 96),
                     children: [
+                      Padding(
+                        padding: const EdgeInsets.only(top: 20),
+                        child: SizedBox(
+                          width: double.infinity,
+                          height: 48,
+                          child: ElevatedButton.icon(
+                            onPressed: _showUploadDialog,
+                            icon: const Icon(Icons.add_rounded, size: 20),
+                            label: const Text(
+                              'Add Document',
+                              style: TextStyle(fontWeight: FontWeight.bold),
+                            ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.primaryColor,
+                              foregroundColor: Colors.white,
+                              elevation: 0,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
                       // Verification documents uploaded during Work With Us signup
                       if (_verificationDocs.isNotEmpty) ...[
                         _buildSectionHeading(
@@ -664,15 +687,11 @@ class _CredentialVaultScreenState extends State<CredentialVaultScreen> {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _showUploadDialog,
-        label: const Text(
-          'Add Document',
-          style: TextStyle(fontWeight: FontWeight.bold),
-        ),
-        icon: const Icon(Icons.add_rounded),
-        backgroundColor: AppColors.primaryColor,
-      ),
+      // "Add Document" was a FloatingActionButton, which put it in the bottom
+      // right -- exactly where the app's WhatsApp bubble floats. The two
+      // overlapped and the doctor could not reach the button. It sits in the
+      // page now, above the list, where nothing can cover it.
+      
     );
   }
 

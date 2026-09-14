@@ -1,8 +1,20 @@
 import 'package:flutter/material.dart';
-import 'package:icare/widgets/drag_scroll.dart';
-import 'package:icare/utils/theme.dart';
+import 'package:icare/services/api_service.dart';
 import 'package:icare/widgets/back_button.dart';
+import 'package:icare/widgets/drag_scroll.dart';
 
+/// Clinical Audit & QA — the doctor's own quality figures.
+///
+/// Every number on this screen used to be written into the file: a 94% quality
+/// score, 98% documentation, 100% prescription accuracy, 85% follow-up, and a
+/// "Record #21 approved by Senior Medical Officer" that pointed at no record.
+/// Nothing was fetched and nothing ever moved, so a doctor reading it was being
+/// shown an invented judgement of their own work. It reads
+/// GET /doctors/me/clinical-audit now, which derives each figure from that
+/// doctor's completed consultations.
+///
+/// A metric with nothing behind it yet shows "Not enough data" rather than a
+/// flattering default — an empty record must never read as 100%.
 class ClinicalAuditScreen extends StatefulWidget {
   const ClinicalAuditScreen({super.key});
 
@@ -11,37 +23,57 @@ class ClinicalAuditScreen extends StatefulWidget {
 }
 
 class _ClinicalAuditScreenState extends State<ClinicalAuditScreen> {
-  bool _isLoading = false;
-  final List<Map<String, dynamic>> _auditLogs = [
-    {
-      'message': 'Record #21 approved by Senior Medical Officer',
-      'status': 'Verified',
-      'color': Colors.green,
-    },
-  ];
+  final _api = ApiService();
 
-  void _runQAScan() async {
-    setState(() => _isLoading = true);
-    // Requirement 15.8: QA Automation logic
-    await Future.delayed(const Duration(seconds: 2));
+  bool _isLoading = true;
+  String? _error;
+  int? _qualityScore;
+  int _totalConsultations = 0;
+  List<Map<String, dynamic>> _metrics = [];
 
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
     setState(() {
-      _auditLogs.insert(0, {
-        'message': 'System: No critical clinical flags found.',
-        'status': 'Clear',
-        'color': Colors.green,
-      });
-      _isLoading = false;
+      _isLoading = true;
+      _error = null;
     });
-
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('QA Scan Complete: No critical issues found.'),
-          backgroundColor: Colors.green,
-        ),
-      );
+    try {
+      final res = await _api.get('/doctors/me/clinical-audit');
+      final data = res.data;
+      if (data is Map && data['success'] == true) {
+        setState(() {
+          _qualityScore = (data['qualityScore'] as num?)?.toInt();
+          _totalConsultations = (data['totalConsultations'] as num?)?.toInt() ?? 0;
+          _metrics = List<Map<String, dynamic>>.from(
+            (data['metrics'] as List? ?? []).map((m) => Map<String, dynamic>.from(m as Map)),
+          );
+          _isLoading = false;
+        });
+      } else {
+        setState(() {
+          _error = data is Map ? data['message']?.toString() : null;
+          _isLoading = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _error = 'Could not load your audit figures';
+          _isLoading = false;
+        });
+      }
     }
+  }
+
+  Color _colourFor(int value) {
+    if (value >= 85) return const Color(0xFF16A34A);
+    if (value >= 60) return const Color(0xFFF59E0B);
+    return const Color(0xFFDC2626);
   }
 
   @override
@@ -49,80 +81,94 @@ class _ClinicalAuditScreenState extends State<ClinicalAuditScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
-        leading: const CustomBackButton(),
         backgroundColor: Colors.white,
         elevation: 0,
+        leading: CustomBackButton(),
+        centerTitle: true,
         title: const Text(
           'Clinical Audit & QA',
           style: TextStyle(
             color: Color(0xFF0F172A),
-            fontWeight: FontWeight.w900,
+            fontWeight: FontWeight.w800,
+            fontSize: 17,
           ),
         ),
         actions: [
           IconButton(
-            onPressed: _isLoading ? null : _runQAScan,
-            icon: _isLoading
-                ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(
-                    Icons.security_update_good_rounded,
-                    color: AppColors.primaryColor,
-                  ),
-            tooltip: 'Run QA Scan',
+            tooltip: 'Refresh',
+            icon: const Icon(Icons.refresh_rounded, color: Color(0xFF0F172A)),
+            onPressed: _isLoading ? null : _load,
           ),
-          const SizedBox(width: 8),
         ],
       ),
-      body: DragScroll(
-        builder: (context, dragScrollCtrl) => SingleChildScrollView(
-          controller: dragScrollCtrl,
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildQualityScore(),
-              const SizedBox(height: 32),
-              _buildSectionHeader('Performance Metrics'),
-              const SizedBox(height: 16),
-              _buildMetricTile(
-                'Documentation Completeness',
-                '98%',
-                Colors.green,
-              ),
-              _buildMetricTile('Prescription Accuracy', '100%', Colors.green),
-              _buildMetricTile('Patient Follow-up Rate', '85%', Colors.orange),
-              const SizedBox(height: 32),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  _buildSectionHeader('Clinical Flags & QA Reviews'),
-                  TextButton.icon(
-                    onPressed: _runQAScan,
-                    icon: const Icon(Icons.refresh_rounded, size: 16),
-                    label: const Text(
-                      'Refresh Scan',
-                      style: TextStyle(fontSize: 12),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : DragScroll(
+              builder: (context, controller) => SingleChildScrollView(
+                controller: controller,
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (_error != null) ...[
+                      _buildNotice(_error!, isError: true),
+                      const SizedBox(height: 20),
+                    ],
+                    _buildQualityScore(),
+                    const SizedBox(height: 28),
+                    const Text(
+                      'Performance Metrics',
+                      style: TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF0F172A),
+                      ),
                     ),
-                  ),
-                ],
+                    const SizedBox(height: 4),
+                    Text(
+                      'Calculated from your own completed consultations.',
+                      style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                    ),
+                    const SizedBox(height: 16),
+                    ..._metrics.map(_buildMetricTile),
+                    if (_metrics.isEmpty && _error == null)
+                      _buildNotice(
+                        'No completed consultations yet — figures appear here '
+                        'once you have seen patients through the platform.',
+                      ),
+                    const SizedBox(height: 28),
+                  ],
+                ),
               ),
-              const SizedBox(height: 16),
-              ..._auditLogs.map(
-                (log) =>
-                    _buildAuditLog(log['message'], log['status'], log['color']),
-              ),
-            ],
+            ),
+    );
+  }
+
+  Widget _buildNotice(String text, {bool isError = false}) {
+    final colour = isError ? const Color(0xFFDC2626) : const Color(0xFF64748B);
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: colour.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: colour.withValues(alpha: 0.2)),
+      ),
+      child: Row(
+        children: [
+          Icon(isError ? Icons.error_outline_rounded : Icons.info_outline_rounded,
+              size: 18, color: colour),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(text, style: TextStyle(fontSize: 13, color: colour)),
           ),
-        ),
+        ],
       ),
     );
   }
 
   Widget _buildQualityScore() {
+    final score = _qualityScore;
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
@@ -136,19 +182,19 @@ class _ClinicalAuditScreenState extends State<ClinicalAuditScreen> {
           Stack(
             alignment: Alignment.center,
             children: [
-              const SizedBox(
+              SizedBox(
                 width: 80,
                 height: 80,
                 child: CircularProgressIndicator(
-                  value: 0.94,
+                  value: score == null ? 0 : score / 100,
                   strokeWidth: 8,
-                  color: Colors.green,
+                  color: score == null ? Colors.white24 : _colourFor(score),
                   backgroundColor: Colors.white10,
                 ),
               ),
-              const Text(
-                '94%',
-                style: TextStyle(
+              Text(
+                score == null ? '—' : '$score%',
+                style: const TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.bold,
                   fontSize: 18,
@@ -157,11 +203,11 @@ class _ClinicalAuditScreenState extends State<ClinicalAuditScreen> {
             ],
           ),
           const SizedBox(width: 24),
-          const Expanded(
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
+                const Text(
                   'Quality Score',
                   style: TextStyle(
                     color: Colors.white,
@@ -169,10 +215,17 @@ class _ClinicalAuditScreenState extends State<ClinicalAuditScreen> {
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-                SizedBox(height: 4),
+                const SizedBox(height: 4),
                 Text(
-                  'Your clinical documentation is above the hospital average.',
-                  style: TextStyle(color: Colors.white70, fontSize: 12),
+                  score == null
+                      ? 'Not enough data yet.'
+                      // No comparison against a "hospital average" is claimed:
+                      // no such figure is computed anywhere, and the old copy
+                      // asserted one.
+                      : 'The average of your measurable metrics, across '
+                        '$_totalConsultations completed consultation'
+                        '${_totalConsultations == 1 ? '' : 's'}.',
+                  style: const TextStyle(color: Colors.white70, fontSize: 12),
                 ),
               ],
             ),
@@ -182,91 +235,64 @@ class _ClinicalAuditScreenState extends State<ClinicalAuditScreen> {
     );
   }
 
-  Widget _buildSectionHeader(String title) {
-    return Text(
-      title,
-      style: const TextStyle(
-        fontSize: 18,
-        fontWeight: FontWeight.w800,
-        color: Color(0xFF0F172A),
-      ),
-    );
-  }
+  Widget _buildMetricTile(Map<String, dynamic> metric) {
+    final value = (metric['value'] as num?)?.toInt();
+    final label = metric['label']?.toString() ?? '';
+    final detail = metric['detail']?.toString() ?? '';
 
-  Widget _buildMetricTile(String label, String value, Color color) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(color: const Color(0xFFE2E8F0)),
       ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            label,
-            style: const TextStyle(
-              fontWeight: FontWeight.w600,
-              color: Color(0xFF475569),
-            ),
-          ),
-          Text(
-            value,
-            style: TextStyle(
-              fontWeight: FontWeight.w900,
-              color: color,
-              fontSize: 16,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildAuditLog(String message, String status, Color color) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withValues(alpha: 0.2)),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 4,
-            height: 40,
-            decoration: BoxDecoration(
-              color: color,
-              borderRadius: BorderRadius.circular(2),
-            ),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  message,
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  label,
                   style: const TextStyle(
-                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
                     color: Color(0xFF0F172A),
                   ),
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  'Status: $status',
-                  style: TextStyle(
-                    color: color,
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                  ),
+              ),
+              Text(
+                value == null ? 'Not enough data' : '$value%',
+                style: TextStyle(
+                  fontSize: value == null ? 12 : 16,
+                  fontWeight: FontWeight.w900,
+                  color: value == null
+                      ? const Color(0xFF94A3B8)
+                      : _colourFor(value),
                 ),
-              ],
+              ),
+            ],
+          ),
+          if (value != null) ...[
+            const SizedBox(height: 10),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(6),
+              child: LinearProgressIndicator(
+                value: value / 100,
+                minHeight: 6,
+                backgroundColor: const Color(0xFFF1F5F9),
+                color: _colourFor(value),
+              ),
             ),
+          ],
+          const SizedBox(height: 8),
+          // Every figure says what it counted, so the doctor can check it
+          // against their own records rather than take the number on trust.
+          Text(
+            detail,
+            style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
           ),
         ],
       ),

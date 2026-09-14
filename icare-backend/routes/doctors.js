@@ -89,6 +89,142 @@ router.get('/stats', authMiddleware, async (req, res) => {
 });
 
 // ─── SET ONLINE STATUS ────────────────────────────────────────────────────────
+// GET /api/doctors/me/clinical-audit — real quality metrics for the signed-in doctor
+//
+// This screen used to show fixed numbers written into the Flutter file: a 94%
+// quality score, 98% documentation, 100% prescription accuracy, 85% follow-up
+// and a "Record #21 approved by Senior Medical Officer" that referred to no
+// record. Nothing was computed and nothing ever moved. The client asked where
+// the figures came from; the honest answer was nowhere, so they are derived
+// here from the doctor's own completed consultations.
+//
+// Every number is defined below, and every one is a plain ratio over documents
+// this doctor actually owns. Where there is nothing to measure yet the metric
+// comes back null rather than a flattering default -- an empty record should
+// read as "no data", never as 100%.
+router.get('/me/clinical-audit', authMiddleware, async (req, res) => {
+  try {
+    await connectMongoDB();
+
+    const doctorId = toId(req.user.id);
+    const completed = await Consultation.find(
+      { doctorId, status: 'completed' },
+      'doctorNotes hasPrescription prescriptionId createdAt patientId'
+    ).lean();
+
+    const total = completed.length;
+    const pct = (n, d) => (d > 0 ? Math.round((n / d) * 100) : null);
+
+    // ── Documentation completeness ──────────────────────────────────────────
+    // Share of completed consultations carrying doctor's notes. A consultation
+    // closed with an empty note is the thing this is meant to catch.
+    const documented = completed.filter(
+      (c) => (c.doctorNotes || '').trim().length > 0
+    ).length;
+
+    // ── Prescription completeness ───────────────────────────────────────────
+    // Renamed from "accuracy" on purpose: nothing here can judge whether a
+    // prescription was clinically correct, and a number labelled "accuracy"
+    // would claim exactly that. What is measurable is whether the prescriptions
+    // this doctor issued carry the parts that make them safe to dispense -- at
+    // least one medicine, a diagnosis, and a SOAP plan.
+    const prescriptionIds = completed
+      .filter((c) => c.hasPrescription && c.prescriptionId)
+      .map((c) => c.prescriptionId);
+
+    let prescriptionsComplete = null;
+    let prescriptionsTotal = prescriptionIds.length;
+    if (prescriptionsTotal > 0) {
+      const scripts = await EnhancedPrescription.find(
+        { _id: { $in: prescriptionIds } },
+        'medicines diagnoses soapNotes followUpDate'
+      ).lean();
+      prescriptionsTotal = scripts.length;
+      prescriptionsComplete = scripts.filter(
+        (p) =>
+          Array.isArray(p.medicines) && p.medicines.length > 0 &&
+          Array.isArray(p.diagnoses) && p.diagnoses.length > 0 &&
+          (p.soapNotes?.plan || '').trim().length > 0
+      ).length;
+    }
+
+    // ── Follow-up rate ──────────────────────────────────────────────────────
+    // Of the consultations where the doctor asked the patient to return, how
+    // many of those patients were actually seen again afterwards. Measuring it
+    // against every consultation would punish a doctor for the visits that
+    // rightly needed no follow-up.
+    let followUpAsked = 0;
+    let followUpHonoured = 0;
+    if (prescriptionIds.length) {
+      const withFollowUp = await EnhancedPrescription.find(
+        { _id: { $in: prescriptionIds }, followUpDate: { $ne: null } },
+        'followUpDate'
+      ).lean();
+      const byId = new Map(withFollowUp.map((p) => [p._id.toString(), p]));
+      for (const c of completed) {
+        if (!c.prescriptionId) continue;
+        const script = byId.get(c.prescriptionId.toString());
+        if (!script) continue;
+        followUpAsked += 1;
+        const returned = completed.some(
+          (other) =>
+            other.patientId &&
+            c.patientId &&
+            other.patientId.toString() === c.patientId.toString() &&
+            new Date(other.createdAt) > new Date(c.createdAt)
+        );
+        if (returned) followUpHonoured += 1;
+      }
+    }
+
+    const documentation = pct(documented, total);
+    const prescriptions = pct(prescriptionsComplete, prescriptionsTotal);
+    const followUp = pct(followUpHonoured, followUpAsked);
+
+    // The headline is the mean of whichever metrics could be measured, so it
+    // cannot be propped up by ones that have no data behind them.
+    const measured = [documentation, prescriptions, followUp].filter(
+      (v) => v !== null
+    );
+    const qualityScore = measured.length
+      ? Math.round(measured.reduce((a, b) => a + b, 0) / measured.length)
+      : null;
+
+    res.json({
+      success: true,
+      qualityScore,
+      totalConsultations: total,
+      metrics: [
+        {
+          key: 'documentation',
+          label: 'Documentation Completeness',
+          value: documentation,
+          detail: `${documented} of ${total} completed consultations have notes`,
+        },
+        {
+          key: 'prescriptions',
+          label: 'Prescription Completeness',
+          value: prescriptions,
+          detail: prescriptionsTotal > 0
+            ? `${prescriptionsComplete} of ${prescriptionsTotal} prescriptions include medicines, a diagnosis and a plan`
+            : 'No prescriptions issued yet',
+        },
+        {
+          key: 'followUp',
+          label: 'Patient Follow-up Rate',
+          value: followUp,
+          detail: followUpAsked > 0
+            ? `${followUpHonoured} of ${followUpAsked} patients asked to return were seen again`
+            : 'No follow-ups requested yet',
+        },
+      ],
+    });
+  } catch (e) {
+    console.error('[CLINICAL AUDIT ERROR]', e);
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
 router.post('/online-status', authMiddleware, async (req, res) => {
   try {
     await connectMongoDB();

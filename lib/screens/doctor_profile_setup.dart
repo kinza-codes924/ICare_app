@@ -1,6 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
+import 'package:icare/screens/doctor_availability.dart';
 import 'package:icare/widgets/success_dialog.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:icare/providers/auth_provider.dart';
@@ -663,7 +663,14 @@ class _DoctorProfileSetupState extends ConsumerState<DoctorProfileSetup> {
   /// thing and letting the two disagree.
   Widget _buildAvailabilityLink() {
     return InkWell(
-      onTap: () => context.push('/doctor/availability'),
+      // This screen is always opened with Navigator.push (a MaterialPageRoute
+      // from Settings, the drawer and the top bar), so its context sits outside
+      // GoRouter's tree -- context.push threw rather than navigating. Pushing
+      // the widget directly works from wherever this form was opened.
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const DoctorAvailability()),
+      ),
       borderRadius: BorderRadius.circular(12),
       child: Container(
         padding: const EdgeInsets.all(16),
