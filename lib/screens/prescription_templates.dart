@@ -474,6 +474,7 @@ class _AddTemplateDialogState extends State<_AddTemplateDialog> {
             ),
             const SizedBox(height: 20),
             TextField(
+              maxLength: 80,
               controller: _nameController,
               decoration: const InputDecoration(
                 labelText: 'Template Name',
@@ -532,6 +533,7 @@ class _AddTemplateDialogState extends State<_AddTemplateDialog> {
                                 ),
                                 const SizedBox(height: 8),
                                 TextField(
+                                  maxLength: 80,
                                   controller: _medicines[index]['name'],
                                   decoration: const InputDecoration(
                                     labelText: 'Name',
@@ -544,6 +546,7 @@ class _AddTemplateDialogState extends State<_AddTemplateDialog> {
                                   children: [
                                     Expanded(
                                       child: TextField(
+                                        maxLength: 40,
                                         controller: _medicines[index]['dosage'],
                                         decoration: const InputDecoration(
                                           labelText: 'Dosage',
@@ -555,6 +558,7 @@ class _AddTemplateDialogState extends State<_AddTemplateDialog> {
                                     const SizedBox(width: 8),
                                     Expanded(
                                       child: TextField(
+                                        maxLength: 40,
                                         controller:
                                             _medicines[index]['frequency'],
                                         decoration: const InputDecoration(
@@ -568,6 +572,7 @@ class _AddTemplateDialogState extends State<_AddTemplateDialog> {
                                 ),
                                 const SizedBox(height: 8),
                                 TextField(
+                                  maxLength: 20,
                                   controller: _medicines[index]['duration'],
                                   decoration: const InputDecoration(
                                     labelText: 'Duration',

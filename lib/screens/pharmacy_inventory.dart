@@ -554,6 +554,7 @@ class _PharmacyInventoryState extends State<PharmacyInventory> {
             mainAxisSize: MainAxisSize.min,
             children: [
               TextField(
+                maxLength: 6,
                 controller: qtyCtrl,
                 keyboardType: TextInputType.number,
                 decoration: InputDecoration(
@@ -566,6 +567,7 @@ class _PharmacyInventoryState extends State<PharmacyInventory> {
               ),
               const SizedBox(height: 12),
               TextField(
+                maxLength: 9,
                 controller: priceCtrl,
                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
                 decoration: InputDecoration(
@@ -964,13 +966,13 @@ class _AddMedicineModalState extends State<_AddMedicineModal> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      TextFormField(controller: _name, decoration: _dec('Medicine Name *', Icons.medication_rounded),
+                      TextFormField(maxLength: 80, controller: _name, decoration: _dec('Medicine Name *', Icons.medication_rounded),
                           validator: (v) => v!.isEmpty ? 'Required' : null),
                       const SizedBox(height: 12),
                       Row(children: [
-                        Expanded(child: TextFormField(controller: _brand, decoration: _dec('Brand', Icons.business_rounded))),
+                        Expanded(child: TextFormField(maxLength: 150, controller: _brand, decoration: _dec('Brand', Icons.business_rounded))),
                         const SizedBox(width: 12),
-                        Expanded(child: TextFormField(controller: _power, decoration: _dec('Strength (e.g. 500mg)', Icons.science_rounded))),
+                        Expanded(child: TextFormField(maxLength: 40, controller: _power, decoration: _dec('Strength (e.g. 500mg)', Icons.science_rounded))),
                       ]),
                       const SizedBox(height: 12),
                       Row(children: [
@@ -994,20 +996,20 @@ class _AddMedicineModalState extends State<_AddMedicineModal> {
                       ]),
                       const SizedBox(height: 12),
                       Row(children: [
-                        Expanded(child: TextFormField(controller: _price, decoration: _dec('Price (Rs) *', Icons.attach_money_rounded),
+                        Expanded(child: TextFormField(maxLength: 9, controller: _price, decoration: _dec('Price (Rs) *', Icons.attach_money_rounded),
                             keyboardType: TextInputType.number,
                             validator: (v) => v!.isEmpty ? 'Required' : null)),
                         const SizedBox(width: 12),
-                        Expanded(child: TextFormField(controller: _qty, decoration: _dec('Quantity *', Icons.inventory_rounded),
+                        Expanded(child: TextFormField(maxLength: 6, controller: _qty, decoration: _dec('Quantity *', Icons.inventory_rounded),
                             keyboardType: TextInputType.number,
                             validator: (v) => v!.isEmpty ? 'Required' : null)),
                       ]),
                       const SizedBox(height: 12),
-                      TextFormField(controller: _amount, decoration: _dec('Pack Size (e.g. 20 tablets)', Icons.straighten_rounded)),
+                      TextFormField(maxLength: 9, controller: _amount, decoration: _dec('Pack Size (e.g. 20 tablets)', Icons.straighten_rounded)),
                       const SizedBox(height: 12),
-                      TextFormField(controller: _details, decoration: _dec('Description', Icons.description_rounded), maxLines: 2),
+                      TextFormField(maxLength: 500, controller: _details, decoration: _dec('Description', Icons.description_rounded), maxLines: 2),
                       const SizedBox(height: 12),
-                      TextFormField(controller: _precautions, decoration: _dec('Precautions', Icons.warning_amber_rounded), maxLines: 2),
+                      TextFormField(maxLength: 500, controller: _precautions, decoration: _dec('Precautions', Icons.warning_amber_rounded), maxLines: 2),
                       const SizedBox(height: 12),
                       // Medicine Permission
                       const Text('Medicine Permission', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF374151))),

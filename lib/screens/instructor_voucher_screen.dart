@@ -98,6 +98,7 @@ class _InstructorVoucherScreenState extends State<InstructorVoucherScreen> {
                   ),
                   const SizedBox(height: 14),
                   TextField(
+                    maxLength: 150,
                     controller: codeCtrl,
                     textCapitalization: TextCapitalization.characters,
                     decoration: const InputDecoration(
@@ -151,6 +152,7 @@ class _InstructorVoucherScreenState extends State<InstructorVoucherScreen> {
                     ),
                     const SizedBox(height: 14),
                     TextField(
+                      maxLength: 9,
                       controller: discountCtrl,
                       keyboardType: TextInputType.number,
                       inputFormatters: [FilteringTextInputFormatter.digitsOnly],

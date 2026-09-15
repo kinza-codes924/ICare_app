@@ -61,6 +61,7 @@ class _LabSuppliesManagementState extends State<LabSuppliesManagement> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 TextFormField(
+                  maxLength: 80,
                   decoration: const InputDecoration(labelText: 'Item Name'),
                   validator: (v) => v?.isEmpty ?? true ? 'Required' : null,
                   onSaved: (v) => itemName = v!,
@@ -76,6 +77,7 @@ class _LabSuppliesManagementState extends State<LabSuppliesManagement> {
                 ),
                 const SizedBox(height: 12),
                 TextFormField(
+                  maxLength: 6,
                   decoration: const InputDecoration(labelText: 'Current Stock'),
                   keyboardType: TextInputType.number,
                   validator: (v) => v?.isEmpty ?? true ? 'Required' : null,
@@ -83,6 +85,7 @@ class _LabSuppliesManagementState extends State<LabSuppliesManagement> {
                 ),
                 const SizedBox(height: 12),
                 TextFormField(
+                  maxLength: 6,
                   decoration: const InputDecoration(
                     labelText: 'Min Stock Level',
                   ),
@@ -93,12 +96,14 @@ class _LabSuppliesManagementState extends State<LabSuppliesManagement> {
                 ),
                 const SizedBox(height: 12),
                 TextFormField(
+                  maxLength: 150,
                   decoration: const InputDecoration(labelText: 'Unit'),
                   initialValue: 'units',
                   onSaved: (v) => unit = v!,
                 ),
                 const SizedBox(height: 12),
                 TextFormField(
+                  maxLength: 150,
                   decoration: const InputDecoration(
                     labelText: 'Supplier (Optional)',
                   ),
@@ -106,6 +111,7 @@ class _LabSuppliesManagementState extends State<LabSuppliesManagement> {
                 ),
                 const SizedBox(height: 12),
                 TextFormField(
+                  maxLength: 500,
                   decoration: const InputDecoration(
                     labelText: 'Notes (Optional)',
                   ),
@@ -201,6 +207,7 @@ class _LabSuppliesManagementState extends State<LabSuppliesManagement> {
               ),
               const SizedBox(height: 12),
               TextFormField(
+                maxLength: 9,
                 decoration: const InputDecoration(labelText: 'Amount'),
                 keyboardType: TextInputType.number,
                 validator: (v) => v?.isEmpty ?? true ? 'Required' : null,

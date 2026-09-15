@@ -240,6 +240,7 @@ class _IntakeNotesScreenState extends State<IntakeNotesScreen> {
   }) {
     final readOnly = widget.isReadOnly;
     return TextFormField(
+      maxLength: 500,
       controller: controller,
       maxLines: maxLines,
       readOnly: readOnly,

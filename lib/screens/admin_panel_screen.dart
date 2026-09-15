@@ -917,30 +917,35 @@ class _AddLaboratoryDialogState extends State<_AddLaboratoryDialog> {
             mainAxisSize: MainAxisSize.min,
             children: [
               TextFormField(
+                maxLength: 80,
                 controller: _nameController,
                 decoration: const InputDecoration(labelText: 'Laboratory Name *', border: OutlineInputBorder()),
                 validator: (v) => v?.isEmpty ?? true ? 'Required' : null,
               ),
               const SizedBox(height: 12),
               TextFormField(
+                maxLength: 100,
                 controller: _emailController,
                 decoration: const InputDecoration(labelText: 'Email *', border: OutlineInputBorder()),
                 validator: (v) => v?.isEmpty ?? true ? 'Required' : null,
               ),
               const SizedBox(height: 12),
               TextFormField(
+                maxLength: 15,
                 controller: _phoneController,
                 decoration: const InputDecoration(labelText: 'Phone *', border: OutlineInputBorder()),
                 validator: (v) => v?.isEmpty ?? true ? 'Required' : null,
               ),
               const SizedBox(height: 12),
               TextFormField(
+                maxLength: 40,
                 controller: _licenseController,
                 decoration: const InputDecoration(labelText: 'License Number *', border: OutlineInputBorder()),
                 validator: (v) => v?.isEmpty ?? true ? 'Required' : null,
               ),
               const SizedBox(height: 12),
               TextFormField(
+                maxLength: 150,
                 controller: _addressController,
                 decoration: const InputDecoration(labelText: 'Address *', border: OutlineInputBorder()),
                 maxLines: 2,
@@ -948,6 +953,7 @@ class _AddLaboratoryDialogState extends State<_AddLaboratoryDialog> {
               ),
               const SizedBox(height: 12),
               TextFormField(
+                maxLength: 60,
                 controller: _cityController,
                 decoration: const InputDecoration(labelText: 'City *', border: OutlineInputBorder()),
                 validator: (v) => v?.isEmpty ?? true ? 'Required' : null,
@@ -1008,11 +1014,11 @@ class _AddPharmacyDialogState extends State<_AddPharmacyDialog> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            TextFormField(controller: _nameController, decoration: const InputDecoration(labelText: 'Pharmacy Name *'), validator: (v) => v?.isEmpty ?? true ? 'Required' : null),
-            TextFormField(controller: _emailController, decoration: const InputDecoration(labelText: 'Email *'), validator: (v) => v?.isEmpty ?? true ? 'Required' : null),
-            TextFormField(controller: _phoneController, decoration: const InputDecoration(labelText: 'Phone *'), validator: (v) => v?.isEmpty ?? true ? 'Required' : null),
-            TextFormField(controller: _licenseController, decoration: const InputDecoration(labelText: 'License *'), validator: (v) => v?.isEmpty ?? true ? 'Required' : null),
-            TextFormField(controller: _addressController, decoration: const InputDecoration(labelText: 'Address *'), validator: (v) => v?.isEmpty ?? true ? 'Required' : null),
+            TextFormField(maxLength: 80, controller: _nameController, decoration: const InputDecoration(labelText: 'Pharmacy Name *'), validator: (v) => v?.isEmpty ?? true ? 'Required' : null),
+            TextFormField(maxLength: 100, controller: _emailController, decoration: const InputDecoration(labelText: 'Email *'), validator: (v) => v?.isEmpty ?? true ? 'Required' : null),
+            TextFormField(maxLength: 15, controller: _phoneController, decoration: const InputDecoration(labelText: 'Phone *'), validator: (v) => v?.isEmpty ?? true ? 'Required' : null),
+            TextFormField(maxLength: 40, controller: _licenseController, decoration: const InputDecoration(labelText: 'License *'), validator: (v) => v?.isEmpty ?? true ? 'Required' : null),
+            TextFormField(maxLength: 150, controller: _addressController, decoration: const InputDecoration(labelText: 'Address *'), validator: (v) => v?.isEmpty ?? true ? 'Required' : null),
           ],
         ),
       ),
@@ -1054,9 +1060,9 @@ class _AddInstructorDialogState extends State<_AddInstructorDialog> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            TextFormField(controller: _nameController, decoration: const InputDecoration(labelText: 'Name *'), validator: (v) => v?.isEmpty ?? true ? 'Required' : null),
-            TextFormField(controller: _emailController, decoration: const InputDecoration(labelText: 'Email *'), validator: (v) => v?.isEmpty ?? true ? 'Required' : null),
-            TextFormField(controller: _specialtyController, decoration: const InputDecoration(labelText: 'Specialty *'), validator: (v) => v?.isEmpty ?? true ? 'Required' : null),
+            TextFormField(maxLength: 80, controller: _nameController, decoration: const InputDecoration(labelText: 'Name *'), validator: (v) => v?.isEmpty ?? true ? 'Required' : null),
+            TextFormField(maxLength: 100, controller: _emailController, decoration: const InputDecoration(labelText: 'Email *'), validator: (v) => v?.isEmpty ?? true ? 'Required' : null),
+            TextFormField(maxLength: 80, controller: _specialtyController, decoration: const InputDecoration(labelText: 'Specialty *'), validator: (v) => v?.isEmpty ?? true ? 'Required' : null),
           ],
         ),
       ),
@@ -1097,8 +1103,8 @@ class _AddStudentDialogState extends State<_AddStudentDialog> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            TextFormField(controller: _nameController, decoration: const InputDecoration(labelText: 'Name *'), validator: (v) => v?.isEmpty ?? true ? 'Required' : null),
-            TextFormField(controller: _emailController, decoration: const InputDecoration(labelText: 'Email *'), validator: (v) => v?.isEmpty ?? true ? 'Required' : null),
+            TextFormField(maxLength: 80, controller: _nameController, decoration: const InputDecoration(labelText: 'Name *'), validator: (v) => v?.isEmpty ?? true ? 'Required' : null),
+            TextFormField(maxLength: 100, controller: _emailController, decoration: const InputDecoration(labelText: 'Email *'), validator: (v) => v?.isEmpty ?? true ? 'Required' : null),
           ],
         ),
       ),
@@ -1152,9 +1158,9 @@ class _AdminCategoriesPanelState extends State<_AdminCategoriesPanel> {
       builder: (ctx) => AlertDialog(
         title: const Text('Add Course Category'),
         content: Column(mainAxisSize: MainAxisSize.min, children: [
-          TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Category Name *', border: OutlineInputBorder())),
+          TextField(maxLength: 40, controller: nameCtrl, decoration: const InputDecoration(labelText: 'Category Name *', border: OutlineInputBorder())),
           const SizedBox(height: 12),
-          TextField(controller: descCtrl, decoration: const InputDecoration(labelText: 'Description (optional)', border: OutlineInputBorder())),
+          TextField(maxLength: 500, controller: descCtrl, decoration: const InputDecoration(labelText: 'Description (optional)', border: OutlineInputBorder())),
         ]),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),

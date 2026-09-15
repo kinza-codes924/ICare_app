@@ -134,6 +134,7 @@ class _InstructorCreateCourseScreenState
             ),
             const SizedBox(height: 12),
             TextField(
+              maxLength: 200,
               controller: urlController,
               decoration: const InputDecoration(
                 hintText: 'https://i.imgur.com/...',
@@ -500,12 +501,14 @@ class _InstructorCreateCourseScreenState
         ),
         const SizedBox(height: 16),
         CustomInputField(
+          maxLength: 120,
           controller: _titleController,
           hintText: 'Course Title',
           validator: (val) => val?.isEmpty ?? true ? 'Required' : null,
         ),
         const SizedBox(height: 16),
         CustomInputField(
+          maxLength: 500,
           controller: _descriptionController,
           hintText: 'Course Description',
           maxLines: 3,
@@ -521,6 +524,7 @@ class _InstructorCreateCourseScreenState
           children: [
             Expanded(
               child: CustomInputField(
+                maxLength: 20,
                 controller: _durationDaysController,
                 hintText: 'Days',
                 keyboardType: TextInputType.number,
@@ -529,6 +533,7 @@ class _InstructorCreateCourseScreenState
             const SizedBox(width: 10),
             Expanded(
               child: CustomInputField(
+                maxLength: 20,
                 controller: _durationWeeksController,
                 hintText: 'Weeks',
                 keyboardType: TextInputType.number,
@@ -537,6 +542,7 @@ class _InstructorCreateCourseScreenState
             const SizedBox(width: 10),
             Expanded(
               child: CustomInputField(
+                maxLength: 20,
                 controller: _durationMonthsController,
                 hintText: 'Months',
                 keyboardType: TextInputType.number,
@@ -727,6 +733,7 @@ class _InstructorCreateCourseScreenState
           children: [
             Expanded(
               child: TextField(
+                maxLength: 150,
                 controller: conditionController,
                 decoration: const InputDecoration(
                   hintText: 'Enter condition',
@@ -988,12 +995,14 @@ class _ModuleEditorScreenState extends State<ModuleEditorScreen> {
             children: [
               // Module info
               CustomInputField(
+                maxLength: 120,
                 controller: _titleController,
                 hintText: 'Module Title',
                 validator: (val) => val?.isEmpty ?? true ? 'Required' : null,
               ),
               const SizedBox(height: 16),
               CustomInputField(
+                maxLength: 500,
                 controller: _descriptionController,
                 hintText: 'Module Description (optional)',
                 maxLines: 2,
@@ -1158,7 +1167,7 @@ class _InlineLessonFormWidgetState extends State<_InlineLessonFormWidget> {
         content: Column(mainAxisSize: MainAxisSize.min, children: [
           const Text('YouTube, Vimeo, or direct .mp4 link:', style: TextStyle(fontSize: 13, color: Color(0xFF64748B))),
           const SizedBox(height: 12),
-          TextField(controller: c, decoration: const InputDecoration(hintText: 'https://...', border: OutlineInputBorder()), autofocus: true),
+          TextField(maxLength: 150, controller: c, decoration: const InputDecoration(hintText: 'https://...', border: OutlineInputBorder()), autofocus: true),
         ]),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
@@ -1296,6 +1305,7 @@ class _InlineLessonFormWidgetState extends State<_InlineLessonFormWidget> {
               children: [
                 // Title
                 CustomInputField(
+                  maxLength: 120,
                   controller: f.titleController,
                   hintText: 'Lesson Title *',
                   validator: (val) => val?.isEmpty ?? true ? 'Enter lesson title' : null,
@@ -1303,6 +1313,7 @@ class _InlineLessonFormWidgetState extends State<_InlineLessonFormWidget> {
                 const SizedBox(height: 12),
                 // Content / Notes
                 CustomInputField(
+                  maxLength: 500,
                   controller: f.contentController,
                   hintText: 'Lesson notes / description (optional)',
                   maxLines: 3,
@@ -1310,6 +1321,7 @@ class _InlineLessonFormWidgetState extends State<_InlineLessonFormWidget> {
                 const SizedBox(height: 12),
                 // Duration
                 CustomInputField(
+                  maxLength: 20,
                   controller: f.durationController,
                   hintText: 'Duration (minutes)',
                   keyboardType: TextInputType.number,
@@ -1488,6 +1500,7 @@ class _LessonEditorScreenState extends State<LessonEditorScreen> {
             ),
             const SizedBox(height: 12),
             TextField(
+              maxLength: 200,
               controller: urlController,
               decoration: const InputDecoration(
                 hintText: 'https://youtube.com/watch?v=...',
@@ -1723,12 +1736,14 @@ class _LessonEditorScreenState extends State<LessonEditorScreen> {
           child: Column(
             children: [
               CustomInputField(
+                maxLength: 120,
                 controller: _titleController,
                 hintText: 'Lesson Title',
                 validator: (val) => val?.isEmpty ?? true ? 'Required' : null,
               ),
               const SizedBox(height: 16),
               CustomInputField(
+                maxLength: 1000,
                 controller: _contentController,
                 hintText: 'Lesson Content',
                 maxLines: 5,
@@ -1768,6 +1783,7 @@ class _LessonEditorScreenState extends State<LessonEditorScreen> {
                       children: [
                         Expanded(
                           child: CustomInputField(
+                            maxLength: 200,
                             controller: _videoUrlController,
                             hintText: 'https://youtube.com/watch?v=...',
                             onChanged: (val) {
@@ -1849,6 +1865,7 @@ class _LessonEditorScreenState extends State<LessonEditorScreen> {
               ),
               const SizedBox(height: 16),
               CustomInputField(
+                maxLength: 20,
                 controller: _durationController,
                 hintText: 'Duration (minutes)',
                 keyboardType: TextInputType.number,
@@ -2013,6 +2030,7 @@ class _QuizEditorScreenState extends State<QuizEditorScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               CustomInputField(
+                maxLength: 150,
                 controller: _passingScoreController,
                 hintText: 'Passing Score (%)',
                 keyboardType: TextInputType.number,
@@ -2199,6 +2217,7 @@ class _QuestionEditorScreenState extends State<QuestionEditorScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               CustomInputField(
+                maxLength: 500,
                 controller: _questionController,
                 hintText: 'Question',
                 maxLines: 2,
@@ -2226,6 +2245,7 @@ class _QuestionEditorScreenState extends State<QuestionEditorScreen> {
                       ),
                       Expanded(
                         child: CustomInputField(
+                          maxLength: 150,
                           controller: controller,
                           hintText: 'Option ${i + 1}',
                           validator: (val) {
@@ -2242,6 +2262,7 @@ class _QuestionEditorScreenState extends State<QuestionEditorScreen> {
               }),
               const SizedBox(height: 24),
               CustomInputField(
+                maxLength: 500,
                 controller: _explanationController,
                 hintText: 'Explanation (optional)',
                 maxLines: 2,

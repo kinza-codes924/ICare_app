@@ -1024,6 +1024,7 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
     IconData icon,
   ) {
     return TextFormField(
+      maxLength: 150,
       controller: controller,
       decoration: InputDecoration(
         labelText: label,
@@ -1884,6 +1885,7 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
             const Text('Enter the platform commission percentage (0–100)', style: TextStyle(fontSize: 13, color: Color(0xFF64748B))),
             const SizedBox(height: 12),
             TextField(
+              maxLength: 150,
               controller: ctrl,
               keyboardType: TextInputType.number,
               autofocus: true,
@@ -1939,7 +1941,7 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
           const Text('Set the maximum consultation time in minutes (default: 30)',
               style: TextStyle(fontSize: 13, color: Color(0xFF64748B))),
           const SizedBox(height: 12),
-          TextField(controller: ctrl, keyboardType: TextInputType.number, autofocus: true,
+          TextField(maxLength: 4, controller: ctrl, keyboardType: TextInputType.number, autofocus: true,
             decoration: InputDecoration(hintText: 'e.g. 30', suffixText: 'min',
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
               filled: true, fillColor: const Color(0xFFF8FAFC))),
@@ -2248,6 +2250,7 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text('Add Community Topic', style: TextStyle(fontWeight: FontWeight.w800)),
         content: TextField(
+          maxLength: 150,
           controller: ctrl, autofocus: true,
           textCapitalization: TextCapitalization.words,
           decoration: const InputDecoration(hintText: 'e.g. Dental Health', border: OutlineInputBorder()),
@@ -2520,12 +2523,14 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
                 ),
                 const SizedBox(height: 12),
                 TextField(
+                  maxLength: 500,
                   controller: questionCtrl,
                   maxLines: 2,
                   decoration: const InputDecoration(labelText: 'Question *', border: OutlineInputBorder()),
                 ),
                 const SizedBox(height: 12),
                 TextField(
+                  maxLength: 500,
                   controller: answerCtrl,
                   maxLines: 4,
                   decoration: const InputDecoration(labelText: 'Answer *', border: OutlineInputBorder()),
@@ -2721,9 +2726,9 @@ class _CourseCategoriesPanelState extends State<_CourseCategoriesPanel> {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       title: const Text('Add Course Category', style: TextStyle(fontWeight: FontWeight.w800)),
       content: Column(mainAxisSize: MainAxisSize.min, children: [
-        TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Category Name *', border: OutlineInputBorder())),
+        TextField(maxLength: 40, controller: nameCtrl, decoration: const InputDecoration(labelText: 'Category Name *', border: OutlineInputBorder())),
         const SizedBox(height: 12),
-        TextField(controller: descCtrl, decoration: const InputDecoration(labelText: 'Description (optional)', border: OutlineInputBorder()), maxLines: 2),
+        TextField(maxLength: 500, controller: descCtrl, decoration: const InputDecoration(labelText: 'Description (optional)', border: OutlineInputBorder()), maxLines: 2),
       ]),
       actions: [
         TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),

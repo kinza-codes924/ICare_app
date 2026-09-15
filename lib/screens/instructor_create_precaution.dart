@@ -105,12 +105,14 @@ class _InstructorCreatePrecautionScreenState
               ),
               const SizedBox(height: 24),
               CustomInputField(
+                maxLength: 120,
                 controller: _titleController,
                 hintText: 'Title (e.g., Daily Mental Health Practices)',
                 validator: (val) => val?.isEmpty ?? true ? 'Required' : null,
               ),
               const SizedBox(height: 16),
               CustomInputField(
+                maxLength: 500,
                 controller: _bodyController,
                 hintText:
                     'Description\n\nProvide detailed information, tips, and recommendations...',

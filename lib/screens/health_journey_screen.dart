@@ -565,6 +565,7 @@ class _JourneyVitalSheet extends StatelessWidget {
               style: const TextStyle(fontSize: 13, color: Color(0xFF64748B))),
           const SizedBox(height: 20),
           TextField(
+            maxLength: 150,
             controller: controller,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
             inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[\d.]'))],
@@ -693,6 +694,7 @@ class _JourneyBPSheet extends StatelessWidget {
 
   Widget _bpField(TextEditingController ctrl, String label, BuildContext context, {VoidCallback? onDone}) {
     return TextField(
+      maxLength: 150,
       controller: ctrl,
       keyboardType: TextInputType.number,
       inputFormatters: [FilteringTextInputFormatter.digitsOnly],

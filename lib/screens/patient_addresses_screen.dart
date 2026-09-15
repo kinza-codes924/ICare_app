@@ -108,6 +108,7 @@ class _PatientAddressesScreenState extends State<PatientAddressesScreen> {
                 const Text('Label', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF64748B))),
                 const SizedBox(height: 8),
                 TextField(
+                  maxLength: 120,
                   controller: titleController,
                   decoration: InputDecoration(
                     hintText: 'e.g. Home, Office, Parents',
@@ -132,6 +133,7 @@ class _PatientAddressesScreenState extends State<PatientAddressesScreen> {
                 const Text('Full Address', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF64748B))),
                 const SizedBox(height: 8),
                 TextField(
+                  maxLength: 150,
                   controller: addressController,
                   maxLines: 3,
                   decoration: InputDecoration(

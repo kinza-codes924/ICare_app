@@ -197,6 +197,7 @@ class _InstructorQACenterScreenState extends State<InstructorQACenterScreen> {
             ),
             const SizedBox(height: 16),
             TextField(
+              maxLength: 1000,
               controller: replyController,
               maxLines: 5,
               decoration: InputDecoration(

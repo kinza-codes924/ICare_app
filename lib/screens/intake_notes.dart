@@ -52,12 +52,14 @@ class _IntakeNotesState extends State<IntakeNotes> {
               ),
 
               CustomInputField(
+                maxLength: 120,
                 hintText: 'Title',
                 width: Utils.windowWidth(context) * 0.85,
               ),
               SizedBox(height: ScallingConfig.scale(20)),
 
               CustomInputField(
+                maxLength: 150,
                 hintText: 'Therapy',
                 width: Utils.windowWidth(context) * 0.85,
               ),

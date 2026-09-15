@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:web/web.dart' as web;
 import 'package:icare/models/appointment_detail.dart';
 import 'package:icare/screens/lab_test_template_screen.dart';
@@ -641,6 +642,7 @@ class _EndConsultationWorkflowState extends State<EndConsultationWorkflow> {
                   ),
                   const SizedBox(height: 8),
                   TextField(
+                    maxLength: 500,
                     controller: _diagnosisNotesController,
                     maxLines: 3,
                     decoration: InputDecoration(
@@ -929,6 +931,7 @@ class _EndConsultationWorkflowState extends State<EndConsultationWorkflow> {
                             children: [
                               Expanded(
                                 child: _buildDosageField(
+                                  maxLength: 150,
                                   controller: _medDayController,
                                   label: 'Day',
                                   icon: Icons.wb_sunny_rounded,
@@ -938,6 +941,7 @@ class _EndConsultationWorkflowState extends State<EndConsultationWorkflow> {
                               const SizedBox(width: 8),
                               Expanded(
                                 child: _buildDosageField(
+                                  maxLength: 150,
                                   controller: _medNoonController,
                                   label: 'Noon',
                                   icon: Icons.wb_twilight_rounded,
@@ -947,6 +951,7 @@ class _EndConsultationWorkflowState extends State<EndConsultationWorkflow> {
                               const SizedBox(width: 8),
                               Expanded(
                                 child: _buildDosageField(
+                                  maxLength: 150,
                                   controller: _medNightController,
                                   label: 'Night',
                                   icon: Icons.nightlight_round,
@@ -960,6 +965,7 @@ class _EndConsultationWorkflowState extends State<EndConsultationWorkflow> {
                             children: [
                               Expanded(
                                 child: TextField(
+                                  maxLength: 20,
                                   controller: _medDurationController,
                                   decoration: InputDecoration(
                                     labelText: 'Duration',
@@ -984,6 +990,7 @@ class _EndConsultationWorkflowState extends State<EndConsultationWorkflow> {
                               const SizedBox(width: 8),
                               Expanded(
                                 child: TextField(
+                                  maxLength: 500,
                                   controller: _medNotesController,
                                   decoration: InputDecoration(
                                     labelText: 'Notes',
@@ -1373,6 +1380,7 @@ class _EndConsultationWorkflowState extends State<EndConsultationWorkflow> {
                     ),
                     const SizedBox(height: 8),
                     TextField(
+                      maxLength: 500,
                       maxLines: 3,
                       decoration: InputDecoration(
                         hintText:
@@ -1687,8 +1695,15 @@ class _EndConsultationWorkflowState extends State<EndConsultationWorkflow> {
     required String label,
     required IconData icon,
     required Color color,
+    // Capped like every other field in the app: a limit that suits the
+    // field, not an open-ended box. Call sites pass their own where the
+    // content is shorter (a phone, an age) or longer (notes, a bio).
+    int maxLength = 150,
+    List<TextInputFormatter>? inputFormatters,
   }) {
     return TextField(
+      maxLength: maxLength,
+      inputFormatters: inputFormatters,
       controller: controller,
       keyboardType: TextInputType.number,
       textAlign: TextAlign.center,

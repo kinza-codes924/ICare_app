@@ -4,6 +4,7 @@
 import 'dart:async';
 import 'package:icare/widgets/drag_scroll.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:icare/models/appointment_detail.dart';
 import 'package:icare/models/enhanced_prescription.dart';
 import 'package:icare/models/lifestyle_advice.dart';
@@ -950,6 +951,7 @@ class _InConsultationPrescriptionFormState
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _buildTextField(
+          maxLength: 500,
           controller: _subjectiveController,
           label: 'Subjective',
           hint: "Patient's symptoms and complaints...",
@@ -957,6 +959,7 @@ class _InConsultationPrescriptionFormState
         ),
         const SizedBox(height: 12),
         _buildTextField(
+          maxLength: 500,
           controller: _objectiveController,
           label: 'Objective',
           hint: 'Clinical findings and observations...',
@@ -964,6 +967,7 @@ class _InConsultationPrescriptionFormState
         ),
         const SizedBox(height: 12),
         _buildTextField(
+          maxLength: 500,
           controller: _assessmentController,
           label: 'Assessment',
           hint: 'Clinical assessment and diagnosis...',
@@ -971,6 +975,7 @@ class _InConsultationPrescriptionFormState
         ),
         const SizedBox(height: 12),
         _buildTextField(
+          maxLength: 500,
           controller: _planController,
           label: 'Plan',
           hint: 'Treatment plan and recommendations...',
@@ -1697,6 +1702,7 @@ class _InConsultationPrescriptionFormState
     required ValueChanged<String> onChanged,
   }) {
     return TextField(
+      maxLength: 150,
       controller: controller,
       onChanged: onChanged,
       style: const TextStyle(fontSize: 11),
@@ -2287,6 +2293,7 @@ class _InConsultationPrescriptionFormState
     int maxLines = 1,
   }) {
     return TextField(
+      maxLength: 500,
       controller: TextEditingController(text: value),
       maxLines: maxLines,
       onChanged: onChanged,
@@ -2629,6 +2636,7 @@ class _InConsultationPrescriptionFormState
                   ReferralType.none) ...[
                 const SizedBox(height: 12),
                 TextField(
+                  maxLength: 500,
                   controller: TextEditingController(text: ref?.referralNotes),
                   maxLines: 2,
                   decoration: InputDecoration(
@@ -2704,6 +2712,7 @@ class _InConsultationPrescriptionFormState
               ),
               const SizedBox(height: 12),
               TextField(
+                maxLength: 500,
                 controller: TextEditingController(text: ref?.followUpNotes),
                 maxLines: 2,
                 decoration: InputDecoration(
@@ -2827,6 +2836,11 @@ class _InConsultationPrescriptionFormState
     required String label,
     required String hint,
     int maxLines = 1,
+    // Capped like every other field in the app: a limit that suits the
+    // field, not an open-ended box. Call sites pass their own where the
+    // content is shorter (a phone, an age) or longer (notes, a bio).
+    int maxLength = 150,
+    List<TextInputFormatter>? inputFormatters,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -2841,6 +2855,8 @@ class _InConsultationPrescriptionFormState
         ),
         const SizedBox(height: 8),
         TextField(
+          maxLength: maxLength,
+          inputFormatters: inputFormatters,
           controller: controller,
           maxLines: maxLines,
           decoration: InputDecoration(
@@ -2857,6 +2873,7 @@ class _InConsultationPrescriptionFormState
   // ── Section 3: Additional Notes ───────────────────────────────────────────
   Widget _buildDoctorNotesContent() {
     return _buildTextField(
+      maxLength: 500,
       controller: _doctorNotesController,
       label: 'Clinical Notes',
       hint: 'Enter your clinical observations and notes...',

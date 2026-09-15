@@ -555,6 +555,7 @@ class _GradingDialogState extends State<_GradingDialog> {
 
               // Marks input
               TextField(
+                maxLength: 150,
                 controller: _marksController,
                 decoration: const InputDecoration(
                   labelText: 'Marks Obtained *',
@@ -632,6 +633,7 @@ class _GradingDialogState extends State<_GradingDialog> {
 
               // Feedback
               TextField(
+                maxLength: 1000,
                 controller: _feedbackController,
                 decoration: const InputDecoration(
                   labelText: 'Feedback (optional)',

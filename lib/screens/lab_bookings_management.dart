@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../services/laboratory_service.dart';
 import '../widgets/back_button.dart';
 import 'package:intl/intl.dart';
@@ -274,6 +275,7 @@ class _LabBookingsManagementState extends State<LabBookingsManagement>
               ),
               const SizedBox(height: 12),
               TextField(
+                maxLength: 500,
                 controller: reasonCtrl,
                 maxLines: 3,
                 decoration: InputDecoration(
@@ -375,6 +377,7 @@ class _LabBookingsManagementState extends State<LabBookingsManagement>
               ))),
               const SizedBox(height: 16),
               TextField(
+                maxLength: 1000,
                 controller: commentCtrl,
                 maxLines: 2,
                 decoration: InputDecoration(
@@ -549,6 +552,7 @@ class _LabBookingsManagementState extends State<LabBookingsManagement>
                   _buildSectionLabel('Patient Details'),
                   const SizedBox(height: 12),
                   _buildFormField(
+                    maxLength: 80,
                     controller: nameController,
                     label: 'Patient Name',
                     icon: Icons.person_rounded,
@@ -559,6 +563,7 @@ class _LabBookingsManagementState extends State<LabBookingsManagement>
                     children: [
                       Expanded(
                         child: _buildFormField(
+                          maxLength: 3,
                           controller: ageController,
                           label: 'Age',
                           icon: Icons.cake_rounded,
@@ -592,6 +597,7 @@ class _LabBookingsManagementState extends State<LabBookingsManagement>
                   ),
                   const SizedBox(height: 12),
                   _buildFormField(
+                    maxLength: 150,
                     controller: mrNumberController,
                     label: 'MR Number (Medical Record Number)',
                     icon: Icons.badge_rounded,
@@ -599,6 +605,7 @@ class _LabBookingsManagementState extends State<LabBookingsManagement>
                   ),
                   const SizedBox(height: 12),
                   _buildFormField(
+                    maxLength: 15,
                     controller: contactController,
                     label: 'Contact Number',
                     icon: Icons.phone_rounded,
@@ -607,6 +614,7 @@ class _LabBookingsManagementState extends State<LabBookingsManagement>
                   ),
                   const SizedBox(height: 12),
                   _buildFormField(
+                    maxLength: 150,
                     controller: locationController,
                     label: 'Address',
                     icon: Icons.location_on_rounded,
@@ -616,6 +624,7 @@ class _LabBookingsManagementState extends State<LabBookingsManagement>
                   _buildSectionLabel('Referred By'),
                   const SizedBox(height: 12),
                   _buildFormField(
+                    maxLength: 80,
                     controller: referredByController,
                     label: 'Referring Doctor Name',
                     icon: Icons.medical_services_rounded,
@@ -623,6 +632,7 @@ class _LabBookingsManagementState extends State<LabBookingsManagement>
                   ),
                   const SizedBox(height: 12),
                   _buildFormField(
+                    maxLength: 150,
                     controller: prescriptionDateController,
                     label: 'Test Prescription Date',
                     icon: Icons.calendar_today_rounded,
@@ -661,6 +671,7 @@ class _LabBookingsManagementState extends State<LabBookingsManagement>
                     ),
                   ] else ...[
                     _buildFormField(
+                      maxLength: 40,
                       controller: testController,
                       label: 'Test Name(s)',
                       icon: Icons.science_rounded,
@@ -691,6 +702,7 @@ class _LabBookingsManagementState extends State<LabBookingsManagement>
                         children: [
                           Expanded(
                             child: _buildFormField(
+                              maxLength: 150,
                               controller: ctrl,
                               label: 'Specimen ID ${specimenControllers.length > 1 ? '#${i + 1}' : ''}',
                               icon: Icons.qr_code_rounded,
@@ -928,8 +940,15 @@ class _LabBookingsManagementState extends State<LabBookingsManagement>
     int maxLines = 1,
     TextInputType keyboardType = TextInputType.text,
     String? Function(String?)? validator,
+    // Capped like every other field in the app: a limit that suits the
+    // field, not an open-ended box. Call sites pass their own where the
+    // content is shorter (a phone, an age) or longer (notes, a bio).
+    int maxLength = 150,
+    List<TextInputFormatter>? inputFormatters,
   }) {
     return TextFormField(
+      maxLength: maxLength,
+      inputFormatters: inputFormatters,
       controller: controller,
       maxLines: maxLines,
       keyboardType: keyboardType,

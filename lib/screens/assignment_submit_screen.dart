@@ -715,6 +715,7 @@ class _AssignmentSubmitScreenState extends State<AssignmentSubmitScreen> {
                                 fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF374151))),
                         const SizedBox(height: 8),
                         TextField(
+                          maxLength: 1000,
                           controller: _contentController,
                           maxLines: 8,
                           readOnly: !_canEdit,

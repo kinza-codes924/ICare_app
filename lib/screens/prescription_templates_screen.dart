@@ -163,6 +163,7 @@ class _PrescriptionTemplatesScreenState
               mainAxisSize: MainAxisSize.min,
               children: [
                 TextField(
+                  maxLength: 80,
                   controller: nameController,
                   decoration: const InputDecoration(
                     labelText: 'Template Name',
@@ -179,11 +180,13 @@ class _PrescriptionTemplatesScreenState
                 ),
                 const SizedBox(height: 12),
                 TextField(
+                  maxLength: 80,
                   controller: drugNameController,
                   decoration: const InputDecoration(labelText: 'Drug Name'),
                 ),
                 const SizedBox(height: 8),
                 TextField(
+                  maxLength: 40,
                   controller: dosageController,
                   decoration: const InputDecoration(labelText: 'Dosage'),
                 ),

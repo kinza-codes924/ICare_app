@@ -983,6 +983,7 @@ class _BookAppointmentScreenState extends ConsumerState<BookAppointmentScreen> {
                   style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF64748B))),
               const SizedBox(height: 8),
               TextField(
+                maxLength: 80,
                 controller: _nameController,
                 readOnly: _appointmentForMyself,
                 decoration: InputDecoration(
@@ -1042,6 +1043,7 @@ class _BookAppointmentScreenState extends ConsumerState<BookAppointmentScreen> {
                             style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF64748B))),
                         const SizedBox(height: 8),
                         TextField(
+                          maxLength: 150,
                           controller: _ageController,
                           readOnly: _appointmentForMyself,
                           keyboardType: TextInputType.number,
@@ -1080,6 +1082,7 @@ class _BookAppointmentScreenState extends ConsumerState<BookAppointmentScreen> {
               ),
               const SizedBox(height: 8),
               TextField(
+                maxLength: 500,
                 controller: _reasonController,
                 maxLines: 3,
                 decoration: InputDecoration(

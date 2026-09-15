@@ -29,6 +29,10 @@ class CustomInputField extends StatefulWidget {
   final FontWeight titleFontWeight;
   final EdgeInsetsGeometry? margin;
   final int? maxLines;
+  // How much the field accepts. 105 screens share this widget,
+  // so the cap belongs to the caller: a password is not a bio
+  // and a phone number is not an address.
+  final int? maxLength;
   final BoxBorder? borderType;
   final VoidCallback? onEditingComplete;
   const CustomInputField({
@@ -56,6 +60,7 @@ class CustomInputField extends StatefulWidget {
     this.textStyle,
     this.focusNode,
     this.maxLines,
+    this.maxLength,
     this.autoFocus = false,
     this.titleColor,
     this.titleFontSize = 15,
@@ -119,6 +124,7 @@ class _CustomInputFieldState extends State<CustomInputField> {
                 ],
                 Expanded(
                   child: TextFormField(
+                    maxLength: widget.maxLength,
                     maxLines: widget.maxLines ?? 1,
                     controller: widget.controller,
                     obscureText: widget.isPassword ? _obscureText : false,

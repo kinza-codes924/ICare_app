@@ -465,6 +465,7 @@ class _CredentialVaultScreenState extends State<CredentialVaultScreen> {
               ),
               const SizedBox(height: 8),
               TextField(
+                maxLength: 40,
                 controller: titleController,
                 decoration: InputDecoration(
                   hintText: 'e.g. PMC License 2024',

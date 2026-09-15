@@ -254,6 +254,7 @@ class _WhiteboardWidgetState extends State<WhiteboardWidget> {
       builder: (ctx) => AlertDialog(
         title: const Text('Add Text'),
         content: TextField(
+          maxLength: 150,
           controller: ctrl,
           autofocus: true,
           decoration: const InputDecoration(hintText: 'Type something...'),

@@ -796,6 +796,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
                           ),
                           const SizedBox(height: 20),
                           CustomInputField(
+                            maxLength: 80,
                             hintText: 'Full Name'.tr(),
                             leadingIcon: const Icon(
                               Icons.person_outline,
@@ -815,6 +816,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
                           ),
                           const SizedBox(height: 16),
                           CustomInputField(
+                            maxLength: 15,
                             hintText: 'Phone Number'.tr(),
                             leadingIcon: const Icon(
                               Icons.phone_outlined,
@@ -835,6 +837,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
                           const SizedBox(height: 16),
                           // Email (read-only)
                           CustomInputField(
+                            maxLength: 150,
                             hintText: user?.email ?? '',
                             leadingIcon: const Icon(
                               Icons.email_outlined,
@@ -1081,6 +1084,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
                             const SizedBox(height: 16),
                             // Age
                             CustomInputField(
+                              maxLength: 3,
                               hintText: 'Age'.tr(),
                               leadingIcon: const Icon(
                                 Icons.cake_outlined,
@@ -1182,6 +1186,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
                               ),
                             const SizedBox(height: 16),
                             CustomInputField(
+                              maxLength: 150,
                               hintText: 'Address',
                               leadingIcon: const Icon(
                                 Icons.location_on_outlined,
@@ -1337,6 +1342,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
                                       ),
                                       const SizedBox(height: 10),
                                       CustomInputField(
+                                        maxLength: 15,
                                         hintText: 'Contact Name',
                                         leadingIcon: const Icon(
                                           Icons.person_outline,
@@ -1350,6 +1356,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
                                       ),
                                       const SizedBox(height: 10),
                                       CustomInputField(
+                                        maxLength: 15,
                                         hintText:
                                             'Relationship (e.g. Father, Spouse)',
                                         leadingIcon: const Icon(
@@ -1364,6 +1371,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
                                       ),
                                       const SizedBox(height: 10),
                                       CustomInputField(
+                                        maxLength: 15,
                                         hintText: 'Phone Number'.tr(),
                                         leadingIcon: const Icon(
                                           Icons.phone_outlined,

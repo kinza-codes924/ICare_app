@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../services/laboratory_service.dart';
 import '../widgets/back_button.dart';
 
@@ -190,6 +191,7 @@ class _LabSettingsScreenState extends State<LabSettingsScreen> {
                       iconColor: primaryColor,
                       children: [
                         _buildField(
+                          maxLength: 80,
                           controller: _labNameController,
                           label: 'Lab Name',
                           icon: Icons.local_hospital_rounded,
@@ -198,12 +200,14 @@ class _LabSettingsScreenState extends State<LabSettingsScreen> {
                         ),
                         const SizedBox(height: 16),
                         _buildField(
+                          maxLength: 40,
                           controller: _licenseController,
                           label: 'License Number',
                           icon: Icons.verified_rounded,
                         ),
                         const SizedBox(height: 16),
                         _buildField(
+                          maxLength: 15,
                           controller: _phoneController,
                           label: 'Contact Number',
                           icon: Icons.phone_rounded,
@@ -211,6 +215,7 @@ class _LabSettingsScreenState extends State<LabSettingsScreen> {
                         ),
                         const SizedBox(height: 16),
                         _buildField(
+                          maxLength: 150,
                           controller: _emailController,
                           label: 'Email Address',
                           icon: Icons.email_rounded,
@@ -225,6 +230,7 @@ class _LabSettingsScreenState extends State<LabSettingsScreen> {
                       iconColor: const Color(0xFF0EA5E9),
                       children: [
                         _buildField(
+                          maxLength: 500,
                           controller: _addressController,
                           label: 'Street Address',
                           icon: Icons.home_rounded,
@@ -232,6 +238,7 @@ class _LabSettingsScreenState extends State<LabSettingsScreen> {
                         ),
                         const SizedBox(height: 16),
                         _buildField(
+                          maxLength: 60,
                           controller: _cityController,
                           label: 'City',
                           icon: Icons.location_city_rounded,
@@ -256,6 +263,7 @@ class _LabSettingsScreenState extends State<LabSettingsScreen> {
                             children: [
                               Expanded(
                                 child: _buildField(
+                                  maxLength: 150,
                                   controller: _openTimeController,
                                   label: 'Opens At',
                                   icon: Icons.wb_sunny_rounded,
@@ -265,6 +273,7 @@ class _LabSettingsScreenState extends State<LabSettingsScreen> {
                               const SizedBox(width: 16),
                               Expanded(
                                 child: _buildField(
+                                  maxLength: 150,
                                   controller: _closeTimeController,
                                   label: 'Closes At',
                                   icon: Icons.nights_stay_rounded,
@@ -425,8 +434,15 @@ class _LabSettingsScreenState extends State<LabSettingsScreen> {
     int maxLines = 1,
     TextInputType keyboardType = TextInputType.text,
     String? Function(String?)? validator,
+    // Capped like every other field in the app: a limit that suits the
+    // field, not an open-ended box. Call sites pass their own where the
+    // content is shorter (a phone, an age) or longer (notes, a bio).
+    int maxLength = 150,
+    List<TextInputFormatter>? inputFormatters,
   }) {
     return TextFormField(
+      maxLength: maxLength,
+      inputFormatters: inputFormatters,
       controller: controller,
       maxLines: maxLines,
       keyboardType: keyboardType,

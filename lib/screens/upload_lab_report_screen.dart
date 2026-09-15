@@ -130,6 +130,7 @@ class _UploadLabReportScreenState extends State<UploadLabReportScreen> {
               ),
               const SizedBox(height: 12),
               TextField(
+                maxLength: 500,
                 controller: _notesController,
                 maxLines: 4,
                 decoration: InputDecoration(

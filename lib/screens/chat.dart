@@ -651,6 +651,7 @@ class _WebChatScreenState extends State<_WebChatScreen> {
                               ),
                             ),
                             child: TextField(
+                              maxLength: 1000,
                               controller: _messageController,
                               onSubmitted: (_) => _sendMessage(),
                               decoration: const InputDecoration(

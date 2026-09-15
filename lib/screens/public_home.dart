@@ -1078,6 +1078,7 @@ class _MedicineSearchBarState extends State<_MedicineSearchBar> {
                 ),
                 Expanded(
                   child: TextField(
+                    maxLength: 150,
                     controller: _controller,
                     focusNode: _focusNode,
                     decoration: InputDecoration(
@@ -1375,6 +1376,7 @@ class _LabSearchBarState extends State<_LabSearchBar> {
                 ),
                 Expanded(
                   child: TextField(
+                    maxLength: 150,
                     controller: _controller,
                     focusNode: _focusNode,
                     decoration: InputDecoration(

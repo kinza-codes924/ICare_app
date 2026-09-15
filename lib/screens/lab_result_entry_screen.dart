@@ -424,6 +424,7 @@ class _LabResultEntryScreenState extends State<LabResultEntryScreen>
               const Text('Sample Receipt', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: Color(0xFF0F172A))),
               const SizedBox(height: 12),
               TextFormField(
+                maxLength: 150,
                 controller: _specimenIdController,
                 decoration: InputDecoration(
                   labelText: 'Specimen ID / Barcode',
@@ -510,6 +511,7 @@ class _LabResultEntryScreenState extends State<LabResultEntryScreen>
         Container(
           decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xFFE8ECF5))),
           child: TextField(
+            maxLength: 500,
             controller: _notesController,
             maxLines: 3,
             decoration: const InputDecoration(
@@ -670,6 +672,7 @@ class _LabResultEntryScreenState extends State<LabResultEntryScreen>
         Text(label, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF64748B))),
         const SizedBox(height: 4),
         TextField(
+          maxLength: 150,
           controller: controller,
           style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
           decoration: InputDecoration(
@@ -792,6 +795,7 @@ class _LabResultEntryScreenState extends State<LabResultEntryScreen>
               border: Border.all(color: const Color(0xFFE8ECF5)),
             ),
             child: TextField(
+              maxLength: 500,
               controller: _notesController,
               maxLines: 3,
               decoration: const InputDecoration(

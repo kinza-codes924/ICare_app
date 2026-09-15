@@ -512,6 +512,7 @@ class _LabTestsManagementState extends State<LabTestsManagement>
                   const Text('PRICE (PKR)', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Color(0xFF64748B), letterSpacing: 1.0)),
                   const SizedBox(height: 8),
                   TextField(
+                    maxLength: 9,
                     controller: priceController,
                     keyboardType: TextInputType.number,
                     decoration: InputDecoration(

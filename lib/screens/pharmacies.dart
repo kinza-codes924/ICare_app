@@ -317,6 +317,7 @@ class _PharmaciesScreenState extends State<PharmaciesScreen> {
                               ],
                               if (_viewMode == 'search_location')
                                 CustomInputField(
+                                  maxLength: 150,
                                   width: double.infinity,
                                   hintText: "Enter area, city or address...".tr(),
                                   controller: _locationController,

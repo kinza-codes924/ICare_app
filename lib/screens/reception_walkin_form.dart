@@ -157,6 +157,7 @@ class _ReceptionWalkinFormState extends State<ReceptionWalkinForm> {
                     const Text('Patient Name', style: TextStyle(fontWeight: FontWeight.w600)),
                     const SizedBox(height: 6),
                     TextFormField(
+                      maxLength: 80,
                       controller: _nameCtrl,
                       decoration: const InputDecoration(border: OutlineInputBorder()),
                       validator: (v) => (v == null || v.trim().isEmpty) ? 'Patient name is required' : null,
@@ -171,6 +172,7 @@ class _ReceptionWalkinFormState extends State<ReceptionWalkinForm> {
                               const Text('Age', style: TextStyle(fontWeight: FontWeight.w600)),
                               const SizedBox(height: 6),
                               TextFormField(
+                                maxLength: 150,
                                 controller: _ageCtrl,
                                 keyboardType: TextInputType.number,
                                 decoration: const InputDecoration(border: OutlineInputBorder()),
@@ -204,6 +206,7 @@ class _ReceptionWalkinFormState extends State<ReceptionWalkinForm> {
                     const Text('Reason for visit (optional)', style: TextStyle(fontWeight: FontWeight.w600)),
                     const SizedBox(height: 6),
                     TextFormField(
+                      maxLength: 500,
                       controller: _reasonCtrl,
                       maxLines: 2,
                       decoration: const InputDecoration(border: OutlineInputBorder()),

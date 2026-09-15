@@ -94,6 +94,7 @@ class _PatientLabOrdersScreenState extends ConsumerState<PatientLabOrdersScreen>
                 const Text('Subject', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
                 const SizedBox(height: 8),
                 TextField(
+                  maxLength: 500,
                   controller: subjectCtrl,
                   decoration: InputDecoration(
                     hintText: 'Brief subject of complaint',
@@ -105,6 +106,7 @@ class _PatientLabOrdersScreenState extends ConsumerState<PatientLabOrdersScreen>
                 const Text('Details', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
                 const SizedBox(height: 8),
                 TextField(
+                  maxLength: 1000,
                   controller: messageCtrl,
                   maxLines: 3,
                   decoration: InputDecoration(
@@ -194,6 +196,7 @@ ${messageCtrl.text.trim()}
               ))),
               const SizedBox(height: 16),
               TextField(
+                maxLength: 1000,
                 controller: commentCtrl,
                 maxLines: 2,
                 decoration: InputDecoration(

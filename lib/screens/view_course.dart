@@ -504,6 +504,7 @@ class _ViewCourseState extends ConsumerState<ViewCourse> {
             children: [
               Expanded(
                 child: TextField(
+                  maxLength: 150,
                   controller: _questionController,
                   decoration: InputDecoration(
                     hintText: "Ask a question about this program...",

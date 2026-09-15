@@ -80,6 +80,7 @@ class _IntakeNotesRedesignState extends State<IntakeNotesRedesign> {
       builder: (ctx) => AlertDialog(
         title: const Text('Add Signed Addendum'),
         content: TextField(
+          maxLength: 500,
           controller: addendumController,
           maxLines: 4,
           decoration: const InputDecoration(
@@ -234,6 +235,7 @@ class _IntakeNotesRedesignState extends State<IntakeNotesRedesign> {
       alignment: Alignment.topRight,
       children: [
         TextFormField(
+          maxLength: 500,
           controller: controller,
           maxLines: maxLines,
           readOnly: _isFinalized,

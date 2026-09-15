@@ -172,6 +172,7 @@ class _SoapNotesRedesignState extends State<SoapNotesRedesign> {
       builder: (ctx) => AlertDialog(
         title: const Text('Add Signed Addendum'),
         content: TextField(
+          maxLength: 500,
           controller: addendumController,
           maxLines: 4,
           decoration: const InputDecoration(
@@ -572,6 +573,7 @@ class _SoapNotesRedesignState extends State<SoapNotesRedesign> {
       alignment: Alignment.topRight,
       children: [
         TextFormField(
+          maxLength: 500,
           controller: controller,
           maxLines: maxLines,
           readOnly: _isFinalized,

@@ -228,6 +228,7 @@ class _FillLabFormState extends ConsumerState<FillLabForm> {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               CustomInputField(
+                maxLength: 80,
                 controller: _nameController,
                 hintText: "Your Name",
                 borderRadius: 0,
@@ -243,6 +244,7 @@ class _FillLabFormState extends ConsumerState<FillLabForm> {
               ),
               SizedBox(width: ScallingConfig.scale(20)),
               CustomInputField(
+                maxLength: 80,
                 controller: _patientNameController,
                 hintText: "Patient Name",
                 borderRadius: 0,
@@ -263,6 +265,7 @@ class _FillLabFormState extends ConsumerState<FillLabForm> {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               CustomInputField(
+                maxLength: 150,
                 controller: _locationController,
                 hintText: "Address",
                 borderRadius: 0,
@@ -278,6 +281,7 @@ class _FillLabFormState extends ConsumerState<FillLabForm> {
               ),
               SizedBox(width: ScallingConfig.scale(20)),
               CustomInputField(
+                maxLength: 3,
                 controller: _ageController,
                 hintText: "Age",
                 borderRadius: 0,
@@ -299,6 +303,7 @@ class _FillLabFormState extends ConsumerState<FillLabForm> {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               CustomInputField(
+                maxLength: 150,
                 controller: _dateController,
                 hintText: "Date",
                 borderRadius: 0,
@@ -314,6 +319,7 @@ class _FillLabFormState extends ConsumerState<FillLabForm> {
               ),
               SizedBox(width: ScallingConfig.scale(20)),
               CustomInputField(
+                maxLength: 150,
                 controller: _timeController,
                 hintText: "Time",
                 borderRadius: 0,
@@ -331,6 +337,7 @@ class _FillLabFormState extends ConsumerState<FillLabForm> {
           ),
           SizedBox(height: ScallingConfig.scale(15)),
           CustomInputField(
+            maxLength: 15,
             controller: _phoneController,
             hintText: "Phone Number",
             borderRadius: 0,
@@ -759,6 +766,7 @@ class _FillLabFormState extends ConsumerState<FillLabForm> {
             border: Border.all(color: const Color(0xFFE2E8F0)),
           ),
           child: TextField(
+            maxLength: 150,
             controller: controller,
             decoration: InputDecoration(
               icon: Icon(icon, size: 20, color: const Color(0xFF94A3B8)),

@@ -520,6 +520,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
       return Padding(
         padding: EdgeInsets.only(top: isMobile ? 5.0 : 16.0),
         child: CustomInputField(
+          maxLength: 150,
           hintText: hintText,
           leadingIcon: Icon(
             icon,
@@ -994,6 +995,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                             children: [
                               // Username field (always shown)
                               CustomInputField(
+                                maxLength: 80,
                                 hintText: isLogin
                                     ? "Username or Email".tr()
                                     : "Full Name".tr(),
@@ -1017,6 +1019,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                               if (!isLogin) ...[
                                 const SizedBox(height: 16),
                                 CustomInputField(
+                                  maxLength: 150,
                                   hintText: "Email Address".tr(),
                                   leadingIcon: const Icon(
                                     Icons.email_outlined,
@@ -1037,6 +1040,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                                 ),
                                 const SizedBox(height: 16),
                                 CustomInputField(
+                                  maxLength: 15,
                                   hintText: "Phone Number".tr(),
                                   leadingIcon: const Icon(
                                     Icons.phone_outlined,
@@ -1059,6 +1063,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                               const SizedBox(height: 16),
 
                               CustomInputField(
+                                maxLength: 64,
                                 hintText: "Password".tr(),
                                 leadingIcon: const Icon(
                                   Icons.lock_outline_rounded,
@@ -1090,6 +1095,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                               if (!isLogin) ...[
                                 const SizedBox(height: 16),
                                 CustomInputField(
+                                  maxLength: 64,
                                   controller: confirmPasswordController,
                                   hintText: "Confirm Password".tr(),
                                   leadingIcon: const Icon(
@@ -1521,6 +1527,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                         children: [
                           if (!isLogin)
                             CustomInputField(
+                              maxLength: 100,
                               hintText: "Username or Email",
                               leadingIcon: Icon(
                                 Icons.person_outline,
@@ -1541,6 +1548,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                           if (!isLogin) SizedBox(height: 5),
                           if (!isLogin)
                             CustomInputField(
+                              maxLength: 150,
                               hintText: "Email Address".tr(),
                               leadingIcon: Icon(
                                 Icons.email_outlined,
@@ -1561,6 +1569,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                           if (!isLogin) SizedBox(height: 5),
                           if (!isLogin)
                             CustomInputField(
+                              maxLength: 15,
                               hintText: "Phone Number".tr(),
                               leadingIcon: Icon(
                                 Icons.phone_outlined,
@@ -1581,6 +1590,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                           SizedBox(height: 5),
                           if (isLogin)
                             CustomInputField(
+                              maxLength: 100,
                               hintText: "Username or Email",
                               leadingIcon: Icon(
                                 Icons.person_outline,
@@ -1601,6 +1611,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                           SizedBox(height: 5),
 
                           CustomInputField(
+                            maxLength: 64,
                             hintText: "Enter Your Password".tr(),
                             leadingIcon: Icon(
                               Icons.key,
@@ -1631,6 +1642,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                           if (!isLogin) ...[
                             SizedBox(height: 5),
                             CustomInputField(
+                              maxLength: 64,
                               controller: confirmPasswordController,
                               hintText: "Confirm Password".tr(),
                               leadingIcon: Icon(

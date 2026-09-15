@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_switch/flutter_switch.dart';
 import 'package:icare/models/lab_test.dart';
 import 'package:icare/screens/confirm_booking.dart';
@@ -228,6 +229,7 @@ class _BookLabScreenState extends State<BookLabScreen> {
           _buildInputLabel('CITY'),
           const SizedBox(height: 8),
           _buildCustomInputField(
+            maxLength: 60,
             controller: _cityController,
             hint: 'e.g., Karachi',
             icon: Icons.location_city_rounded,
@@ -239,6 +241,7 @@ class _BookLabScreenState extends State<BookLabScreen> {
           _buildInputLabel('COLLECTION ADDRESS'),
           const SizedBox(height: 8),
           _buildCustomInputField(
+            maxLength: 150,
             controller: _addressController,
             hint: 'Street name, Apartment, etc.',
             icon: Icons.location_on_rounded,
@@ -271,6 +274,11 @@ class _BookLabScreenState extends State<BookLabScreen> {
     required TextEditingController controller,
     required String hint,
     required IconData icon,
+    // Capped like every other field in the app: a limit that suits the
+    // field, not an open-ended box. Call sites pass their own where the
+    // content is shorter (a phone, an age) or longer (notes, a bio).
+    int maxLength = 150,
+    List<TextInputFormatter>? inputFormatters,
   }) {
     return Container(
       decoration: BoxDecoration(
@@ -279,6 +287,8 @@ class _BookLabScreenState extends State<BookLabScreen> {
         border: Border.all(color: const Color(0xFFE2E8F0)),
       ),
       child: TextField(
+        maxLength: maxLength,
+        inputFormatters: inputFormatters,
         controller: controller,
         style: const TextStyle(
           fontSize: 14,

@@ -1044,6 +1044,7 @@ class _InquiryFormDialogState extends ConsumerState<_InquiryFormDialog> {
                 _label('Your Name'),
                 const SizedBox(height: 6),
                 TextFormField(
+                  maxLength: 80,
                   controller: _nameCtrl,
                   decoration: _deco(
                     'Enter your full name',
@@ -1056,6 +1057,7 @@ class _InquiryFormDialogState extends ConsumerState<_InquiryFormDialog> {
                 _label('Email Address'),
                 const SizedBox(height: 6),
                 TextFormField(
+                  maxLength: 100,
                   controller: _emailCtrl,
                   keyboardType: TextInputType.emailAddress,
                   decoration: _deco('you@example.com', Icons.email_outlined),
@@ -1082,6 +1084,7 @@ class _InquiryFormDialogState extends ConsumerState<_InquiryFormDialog> {
                 _label('Subject'),
                 const SizedBox(height: 6),
                 TextFormField(
+                  maxLength: 120,
                   controller: _subjectCtrl,
                   decoration: _deco(
                     'Brief summary of your inquiry',
@@ -1095,6 +1098,7 @@ class _InquiryFormDialogState extends ConsumerState<_InquiryFormDialog> {
                 _label('Message'),
                 const SizedBox(height: 6),
                 TextFormField(
+                  maxLength: 1000,
                   controller: _messageCtrl,
                   maxLines: 5,
                   decoration: _deco(

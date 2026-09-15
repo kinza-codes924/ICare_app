@@ -317,6 +317,7 @@ class _EmergencyContactsScreenState
           ),
           const SizedBox(height: 20),
           CustomInputField(
+            maxLength: 80,
             hintText: 'Full Name',
             leadingIcon: const Icon(
               Icons.person_outline,
@@ -335,6 +336,7 @@ class _EmergencyContactsScreenState
           ),
           const SizedBox(height: 12),
           CustomInputField(
+            maxLength: 150,
             hintText: 'Relationship (e.g. Father, Spouse)',
             leadingIcon: const Icon(
               Icons.family_restroom_rounded,
@@ -348,6 +350,7 @@ class _EmergencyContactsScreenState
           ),
           const SizedBox(height: 12),
           CustomInputField(
+            maxLength: 15,
             hintText: 'Phone Number',
             leadingIcon: const Icon(
               Icons.phone_outlined,

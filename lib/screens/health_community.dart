@@ -172,6 +172,7 @@ class _HealthCommunityScreenState extends ConsumerState<HealthCommunityScreen> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text('Add New Topic', style: TextStyle(fontWeight: FontWeight.w800)),
         content: TextField(
+          maxLength: 150,
           controller: ctrl,
           autofocus: true,
           decoration: const InputDecoration(hintText: 'e.g. Dental Health', border: OutlineInputBorder()),
@@ -608,6 +609,7 @@ class _HealthCommunityScreenState extends ConsumerState<HealthCommunityScreen> {
               children: [
                 Expanded(
                   child: TextField(
+                    maxLength: 1000,
                     controller: controller,
                     style: const TextStyle(fontSize: 14),
                     decoration: const InputDecoration(
@@ -1071,6 +1073,7 @@ class _CreatePostSheetState extends State<_CreatePostSheet> {
               ),
               const SizedBox(height: 24),
               TextField(
+                maxLength: 1000,
                 controller: _contentController,
                 maxLines: 4,
                 autofocus: true,

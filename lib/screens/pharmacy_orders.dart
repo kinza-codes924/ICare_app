@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:icare/utils/app_time.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:icare/providers/auth_provider.dart';
@@ -199,6 +200,7 @@ class _PharmacyOrdersState extends ConsumerState<PharmacyOrders>
                 if (category == 'other') ...[
                   const SizedBox(height: 8),
                   TextField(
+                    maxLength: 500,
                     controller: custom,
                     decoration: const InputDecoration(
                       hintText: 'Describe reason',
@@ -448,6 +450,7 @@ class _PharmacyOrdersState extends ConsumerState<PharmacyOrders>
                     },
                     child: AbsorbPointer(
                       child: TextFormField(
+                        maxLength: 150,
                         controller: deliveryController,
                         decoration: InputDecoration(
                           hintText: 'Tap to select time',
@@ -684,10 +687,10 @@ class _PharmacyOrdersState extends ConsumerState<PharmacyOrders>
                       const Expanded(child: Text('Create Walk-in Order', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: Color(0xFF0F172A)))),
                     ]),
                     const SizedBox(height: 24),
-                    _buildWalkInField(controller: nameController, label: 'Patient Name', icon: Icons.person_rounded,
+                    _buildWalkInField(maxLength: 80, controller: nameController, label: 'Patient Name', icon: Icons.person_rounded,
                       validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null),
                     const SizedBox(height: 12),
-                    _buildWalkInField(controller: phoneController, label: 'Contact Number', icon: Icons.phone_rounded,
+                    _buildWalkInField(maxLength: 15, controller: phoneController, label: 'Contact Number', icon: Icons.phone_rounded,
                       keyboardType: TextInputType.phone,
                       validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null),
                     const SizedBox(height: 20),
@@ -828,6 +831,7 @@ class _PharmacyOrdersState extends ConsumerState<PharmacyOrders>
                       ),
                       const SizedBox(height: 10),
                       TextFormField(
+                        maxLength: 150,
                         controller: prescriptionCtrl,
                         decoration: InputDecoration(
                           labelText: 'iCare Prescription ID *',
@@ -868,10 +872,10 @@ class _PharmacyOrdersState extends ConsumerState<PharmacyOrders>
                     ]),
                     if (deliveryOption == 'delivery') ...[
                       const SizedBox(height: 12),
-                      _buildWalkInField(controller: addressController, label: 'Delivery Address', icon: Icons.location_on_rounded),
+                      _buildWalkInField(maxLength: 150, controller: addressController, label: 'Delivery Address', icon: Icons.location_on_rounded),
                     ],
                     const SizedBox(height: 12),
-                    _buildWalkInField(controller: notesController, label: 'Notes (optional)', icon: Icons.notes_rounded, maxLines: 2),
+                    _buildWalkInField(maxLength: 500, controller: notesController, label: 'Notes (optional)', icon: Icons.notes_rounded, maxLines: 2),
                     const SizedBox(height: 24),
                     SizedBox(
                       width: double.infinity,
@@ -948,8 +952,15 @@ class _PharmacyOrdersState extends ConsumerState<PharmacyOrders>
     int maxLines = 1,
     TextInputType keyboardType = TextInputType.text,
     String? Function(String?)? validator,
+    // Capped like every other field in the app: a limit that suits the
+    // field, not an open-ended box. Call sites pass their own where the
+    // content is shorter (a phone, an age) or longer (notes, a bio).
+    int maxLength = 150,
+    List<TextInputFormatter>? inputFormatters,
   }) {
     return TextFormField(
+      maxLength: maxLength,
+      inputFormatters: inputFormatters,
       controller: controller,
       maxLines: maxLines,
       keyboardType: keyboardType,

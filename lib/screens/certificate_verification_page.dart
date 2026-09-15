@@ -171,6 +171,7 @@ class _CertificateVerificationPageState
                     ),
                     const SizedBox(height: 12),
                     TextField(
+                      maxLength: 150,
                       controller: _codeController,
                       decoration: InputDecoration(
                         hintText: 'Enter certificate code',

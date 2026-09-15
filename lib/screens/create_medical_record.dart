@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:icare/models/appointment_detail.dart';
 import 'package:icare/services/efficiency_service.dart';
 import 'package:icare/services/medical_record_service.dart';
@@ -425,6 +426,7 @@ class _CreateMedicalRecordScreenState extends State<CreateMedicalRecordScreen> {
                               nameController.text = fieldController.text;
                             });
                             return TextField(
+                              maxLength: 150,
                               controller: fieldController,
                               focusNode: focusNode,
                               decoration: InputDecoration(
@@ -488,6 +490,7 @@ class _CreateMedicalRecordScreenState extends State<CreateMedicalRecordScreen> {
                           children: [
                             Expanded(
                               child: _buildModalTextField(
+                                maxLength: 40,
                                 controller: dosageController,
                                 label: 'Dosage',
                                 icon: Icons.science_rounded,
@@ -514,6 +517,7 @@ class _CreateMedicalRecordScreenState extends State<CreateMedicalRecordScreen> {
                                       Expanded(
                                         flex: 2,
                                         child: TextField(
+                                          maxLength: 20,
                                           controller: durationNumberController,
                                           keyboardType: TextInputType.number,
                                           decoration: InputDecoration(
@@ -575,6 +579,7 @@ class _CreateMedicalRecordScreenState extends State<CreateMedicalRecordScreen> {
                         ),
                         const SizedBox(height: 16),
                         _buildModalTextField(
+                          maxLength: 40,
                           controller: frequencyController,
                           label: 'Frequency',
                           icon: Icons.schedule_rounded,
@@ -582,6 +587,7 @@ class _CreateMedicalRecordScreenState extends State<CreateMedicalRecordScreen> {
                         ),
                         const SizedBox(height: 16),
                         _buildModalTextField(
+                          maxLength: 500,
                           controller: instructionsController,
                           label: 'Instructions',
                           icon: Icons.note_rounded,
@@ -939,6 +945,7 @@ class _CreateMedicalRecordScreenState extends State<CreateMedicalRecordScreen> {
                             testController.text = fieldController.text;
                           });
                           return TextField(
+                            maxLength: 40,
                             controller: fieldController,
                             focusNode: focusNode,
                             decoration: InputDecoration(
@@ -1079,6 +1086,11 @@ class _CreateMedicalRecordScreenState extends State<CreateMedicalRecordScreen> {
     required IconData icon,
     required String hint,
     int maxLines = 1,
+    // Capped like every other field in the app: a limit that suits the
+    // field, not an open-ended box. Call sites pass their own where the
+    // content is shorter (a phone, an age) or longer (notes, a bio).
+    int maxLength = 150,
+    List<TextInputFormatter>? inputFormatters,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1093,6 +1105,8 @@ class _CreateMedicalRecordScreenState extends State<CreateMedicalRecordScreen> {
         ),
         const SizedBox(height: 8),
         TextField(
+          maxLength: maxLength,
+          inputFormatters: inputFormatters,
           controller: controller,
           maxLines: maxLines,
           decoration: InputDecoration(
@@ -1347,6 +1361,7 @@ class _CreateMedicalRecordScreenState extends State<CreateMedicalRecordScreen> {
                     Icons.sick_rounded,
                     const Color(0xFFF59E0B),
                     child: TextFormField(
+                      maxLength: 500,
                       controller: _symptomsController,
                       decoration: _modernInputDecoration(
                         'e.g., Fever, Headache, Cough (comma separated)',
@@ -1382,6 +1397,7 @@ class _CreateMedicalRecordScreenState extends State<CreateMedicalRecordScreen> {
                           _diagnosisController.text = controller.text;
                         });
                         return TextFormField(
+                          maxLength: 150,
                           controller: controller,
                           focusNode: focusNode,
                           decoration: _modernInputDecoration(
@@ -1568,6 +1584,7 @@ class _CreateMedicalRecordScreenState extends State<CreateMedicalRecordScreen> {
                           children: [
                             Expanded(
                               child: TextFormField(
+                                maxLength: 7,
                                 controller: _bpController,
                                 decoration: _inputDecoration('BP (120/80)'),
                               ),
@@ -1575,6 +1592,7 @@ class _CreateMedicalRecordScreenState extends State<CreateMedicalRecordScreen> {
                             const SizedBox(width: 12),
                             Expanded(
                               child: TextFormField(
+                                maxLength: 5,
                                 controller: _tempController,
                                 decoration: _inputDecoration('Temp (°F)'),
                                 keyboardType: TextInputType.number,
@@ -1587,6 +1605,7 @@ class _CreateMedicalRecordScreenState extends State<CreateMedicalRecordScreen> {
                           children: [
                             Expanded(
                               child: TextFormField(
+                                maxLength: 3,
                                 controller: _heartRateController,
                                 decoration: _inputDecoration('Heart Rate'),
                                 keyboardType: TextInputType.number,
@@ -1595,6 +1614,7 @@ class _CreateMedicalRecordScreenState extends State<CreateMedicalRecordScreen> {
                             const SizedBox(width: 12),
                             Expanded(
                               child: TextFormField(
+                                maxLength: 6,
                                 controller: _weightController,
                                 decoration: _inputDecoration('Weight (kg)'),
                                 keyboardType: TextInputType.number,
@@ -1603,6 +1623,7 @@ class _CreateMedicalRecordScreenState extends State<CreateMedicalRecordScreen> {
                             const SizedBox(width: 12),
                             Expanded(
                               child: TextFormField(
+                                maxLength: 6,
                                 controller: _heightController,
                                 decoration: _inputDecoration('Height (cm)'),
                                 keyboardType: TextInputType.number,
@@ -1619,6 +1640,7 @@ class _CreateMedicalRecordScreenState extends State<CreateMedicalRecordScreen> {
                   // Notes
                   _buildSectionTitle('Additional Notes'),
                   TextFormField(
+                    maxLength: 500,
                     controller: _notesController,
                     decoration: _inputDecoration('Enter any additional notes'),
                     maxLines: 4,
@@ -1701,6 +1723,7 @@ class _CreateMedicalRecordScreenState extends State<CreateMedicalRecordScreen> {
                         ),
                         const SizedBox(height: 12),
                         TextFormField(
+                          maxLength: 500,
                           controller: _referReasonController,
                           maxLines: 3,
                           decoration: _modernInputDecoration(

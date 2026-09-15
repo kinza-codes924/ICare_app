@@ -324,6 +324,7 @@ class _RecordVitalsScreenState extends State<RecordVitalsScreen> {
           ),
           const SizedBox(height: 12),
           TextFormField(
+            maxLength: 150,
             controller: controller,
             keyboardType: TextInputType.number,
             style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900),

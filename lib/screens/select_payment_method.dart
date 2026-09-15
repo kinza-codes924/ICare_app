@@ -801,6 +801,7 @@ class _SelectPaymentMethodState extends State<SelectPaymentMethod> {
             children: [
               Expanded(
                 child: TextField(
+                  maxLength: 150,
                   controller: _voucherController,
                   textCapitalization: TextCapitalization.characters,
                   decoration: InputDecoration(

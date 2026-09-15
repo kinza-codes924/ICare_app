@@ -407,6 +407,7 @@ class _ConsultationChatScreenState extends State<ConsultationChatScreen> {
           ),
           Expanded(
             child: TextField(
+              maxLength: 1000,
               controller: _messageController,
               decoration: InputDecoration(
                 hintText: 'Type a message...',

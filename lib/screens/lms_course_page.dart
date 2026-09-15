@@ -353,6 +353,7 @@ class _LeaveReviewCardState extends State<_LeaveReviewCard> {
             ),
             const SizedBox(height: 12),
             TextField(
+              maxLength: 500,
               controller: _commentCtrl,
               maxLines: 3,
               decoration: const InputDecoration(
@@ -399,6 +400,7 @@ class _PostBox extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
           TextField(
+            maxLength: 1000,
             controller: ctrl,
             maxLines: 3,
             decoration: const InputDecoration(
@@ -468,6 +470,7 @@ class _PostCard extends StatelessWidget {
           const SizedBox(height: 8),
           Row(children: [
             Expanded(child: TextField(
+              maxLength: 1000,
               controller: ctrl,
               decoration: InputDecoration(
                 hintText: 'Add a comment...',
@@ -558,11 +561,11 @@ class _ClassworkTabState extends State<_ClassworkTab> {
       builder: (ctx, setLocal) => AlertDialog(
         title: const Text('Create Assignment'),
         content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
-          TextField(controller: titleCtrl, decoration: const InputDecoration(labelText: 'Title *', border: OutlineInputBorder())),
+          TextField(maxLength: 120, controller: titleCtrl, decoration: const InputDecoration(labelText: 'Title *', border: OutlineInputBorder())),
           const SizedBox(height: 12),
-          TextField(controller: descCtrl, maxLines: 3, decoration: const InputDecoration(labelText: 'Instructions', border: OutlineInputBorder())),
+          TextField(maxLength: 500, controller: descCtrl, maxLines: 3, decoration: const InputDecoration(labelText: 'Instructions', border: OutlineInputBorder())),
           const SizedBox(height: 12),
-          TextField(controller: marksCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Total Marks', border: OutlineInputBorder())),
+          TextField(maxLength: 5, controller: marksCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Total Marks', border: OutlineInputBorder())),
           const SizedBox(height: 12),
           OutlinedButton.icon(
             icon: const Icon(Icons.calendar_today, size: 16),
@@ -1270,6 +1273,7 @@ class _SubmissionsPageState extends State<_SubmissionsPage> {
               children: [
                 // Marks
                 TextField(
+                  maxLength: 150,
                   controller: marksCtrl,
                   keyboardType: TextInputType.number,
                   decoration: InputDecoration(
@@ -1320,6 +1324,7 @@ class _SubmissionsPageState extends State<_SubmissionsPage> {
 
                 // Feedback
                 TextField(
+                  maxLength: 1000,
                   controller: feedbackCtrl,
                   maxLines: 3,
                   decoration: const InputDecoration(
@@ -1333,6 +1338,7 @@ class _SubmissionsPageState extends State<_SubmissionsPage> {
 
                 // Comments
                 TextField(
+                  maxLength: 1000,
                   controller: commentsCtrl,
                   maxLines: 2,
                   decoration: const InputDecoration(
@@ -1444,7 +1450,7 @@ class _GradesTabState extends State<_GradesTab> {
         content: Column(mainAxisSize: MainAxisSize.min, children: [
           Text('${action == 'approve' ? 'Approve' : 'Reject'} certificate for $studentName?'),
           const SizedBox(height: 12),
-          TextField(controller: noteCtrl, decoration: const InputDecoration(labelText: 'Note (optional)', border: OutlineInputBorder()), maxLines: 2),
+          TextField(maxLength: 500, controller: noteCtrl, decoration: const InputDecoration(labelText: 'Note (optional)', border: OutlineInputBorder()), maxLines: 2),
         ]),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
@@ -1771,6 +1777,7 @@ class _PeopleTabState extends State<_PeopleTab> {
         title: const Text('Invite Teacher', style: TextStyle(fontWeight: FontWeight.w800)),
         content: Column(mainAxisSize: MainAxisSize.min, children: [
           TextField(
+            maxLength: 100,
             controller: emailCtrl,
             keyboardType: TextInputType.emailAddress,
             decoration: const InputDecoration(labelText: 'Teacher Email *', border: OutlineInputBorder()),
@@ -2304,11 +2311,13 @@ class _AttendanceTabState extends State<_AttendanceTab> {
           mainAxisSize: MainAxisSize.min,
           children: [
             TextField(
+              maxLength: 120,
               controller: titleController,
               decoration: const InputDecoration(labelText: 'Session Title', hintText: 'e.g., Lecture 1'),
             ),
             const SizedBox(height: 16),
             TextField(
+              maxLength: 150,
               controller: dateController,
               decoration: const InputDecoration(labelText: 'Date (YYYY-MM-DD)'),
             ),

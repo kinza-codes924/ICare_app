@@ -3231,6 +3231,7 @@ class _LogBottomSheet extends StatelessWidget {
                   fontSize: 13, color: Color(0xFF64748B))),
           const SizedBox(height: 20),
           TextField(
+            maxLength: 150,
             controller: controller,
             keyboardType:
                 const TextInputType.numberWithOptions(decimal: true),
@@ -3421,6 +3422,7 @@ class _BPBottomSheet extends StatelessWidget {
   Widget _bpField(TextEditingController ctrl, String label, String unit,
       BuildContext context) {
     return TextField(
+      maxLength: 150,
       controller: ctrl,
       keyboardType: TextInputType.number,
       inputFormatters: [FilteringTextInputFormatter.digitsOnly],

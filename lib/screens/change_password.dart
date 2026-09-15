@@ -133,6 +133,7 @@ class _ChangePasswordState extends State<ChangePassword> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   CustomInputField(
+                    maxLength: 64,
                     controller: _currentController,
                     maxLines: 1,
                     hintText: "Current Password".tr(),
@@ -145,6 +146,7 @@ class _ChangePasswordState extends State<ChangePassword> {
                   ),
                   SizedBox(height: ScallingConfig.scale(10)),
                   CustomInputField(
+                    maxLength: 64,
                     controller: _newController,
                     maxLines: 1,
                     hintText: "New Password".tr(),
@@ -157,6 +159,7 @@ class _ChangePasswordState extends State<ChangePassword> {
                   ),
                   SizedBox(height: ScallingConfig.scale(10)),
                   CustomInputField(
+                    maxLength: 64,
                     controller: _confirmController,
                     maxLines: 1,
                     hintText: "Confirm Password".tr(),
@@ -317,6 +320,7 @@ class _WebChangePassword extends StatelessWidget {
                           ),
                           const SizedBox(height: 8),
                           CustomInputField(
+                            maxLength: 64,
                             controller: currentController,
                             maxLines: 1,
                             hintText: "Enter current password".tr(),
@@ -345,6 +349,7 @@ class _WebChangePassword extends StatelessWidget {
                           ),
                           const SizedBox(height: 8),
                           CustomInputField(
+                            maxLength: 64,
                             controller: newController,
                             maxLines: 1,
                             hintText: "Enter new password".tr(),
@@ -373,6 +378,7 @@ class _WebChangePassword extends StatelessWidget {
                           ),
                           const SizedBox(height: 8),
                           CustomInputField(
+                            maxLength: 64,
                             controller: confirmController,
                             maxLines: 1,
                             hintText: "Confirm your password".tr(),

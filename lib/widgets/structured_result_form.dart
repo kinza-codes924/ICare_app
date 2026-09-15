@@ -224,6 +224,7 @@ class _StructuredResultFormState extends State<StructuredResultForm> {
 
             // Value Input
             TextFormField(
+              maxLength: 150,
               initialValue: result['value'],
               decoration: InputDecoration(
                 labelText: 'Value',

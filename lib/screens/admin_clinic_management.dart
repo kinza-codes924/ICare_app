@@ -110,6 +110,7 @@ class _AdminClinicManagementState extends State<AdminClinicManagement> with Sing
                     ),
                     const SizedBox(height: 22),
                     TextField(
+                      maxLength: 80,
                       controller: nameCtrl,
                       decoration: InputDecoration(
                         labelText: 'Name',
@@ -119,6 +120,7 @@ class _AdminClinicManagementState extends State<AdminClinicManagement> with Sing
                     ),
                     const SizedBox(height: 14),
                     TextField(
+                      maxLength: 100,
                       controller: emailCtrl,
                       decoration: InputDecoration(
                         labelText: 'Email',
@@ -128,6 +130,7 @@ class _AdminClinicManagementState extends State<AdminClinicManagement> with Sing
                     ),
                     const SizedBox(height: 14),
                     TextField(
+                      maxLength: 64,
                       controller: passwordCtrl,
                       obscureText: true,
                       decoration: InputDecoration(

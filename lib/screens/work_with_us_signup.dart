@@ -954,6 +954,7 @@ class _WorkWithUsSignupState extends State<WorkWithUsSignup> {
               validator: (v) => v == null || v.isEmpty ? 'Email is required' : null),
           const SizedBox(height: 14),
           TextFormField(
+            maxLength: 64,
             controller: _passwordCtrl,
             obscureText: _obscurePassword,
             enableInteractiveSelection: true,
@@ -1815,6 +1816,7 @@ class _WorkWithUsSignupState extends State<WorkWithUsSignup> {
 
   Widget _multilineField(TextEditingController ctrl, String hint) {
     return TextFormField(
+      maxLength: 500,
       controller: ctrl,
       maxLines: 4,
       decoration: InputDecoration(
@@ -1845,6 +1847,7 @@ class _WorkWithUsSignupState extends State<WorkWithUsSignup> {
     String? hint,
   }) {
     return TextFormField(
+      maxLength: 150,
       controller: controller,
       keyboardType: keyboardType,
       validator: validator,

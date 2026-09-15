@@ -273,6 +273,7 @@ class _OtpVerificationScreenState
         const SizedBox(height: 24),
 
         TextField(
+          maxLength: 15,
           controller: _phoneController,
           keyboardType: TextInputType.phone,
           enabled: !_otpSent,

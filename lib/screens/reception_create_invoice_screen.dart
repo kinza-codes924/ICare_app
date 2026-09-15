@@ -89,6 +89,7 @@ class _ReceptionCreateInvoiceScreenState
                 ),
                 const SizedBox(height: 20),
                 TextField(
+                  maxLength: 80,
                   controller: nameCtrl,
                   decoration: InputDecoration(
                     labelText: 'Item name',
@@ -100,6 +101,7 @@ class _ReceptionCreateInvoiceScreenState
                 ),
                 const SizedBox(height: 14),
                 TextField(
+                  maxLength: 9,
                   controller: priceCtrl,
                   keyboardType: TextInputType.number,
                   decoration: InputDecoration(
@@ -223,6 +225,7 @@ class _ReceptionCreateInvoiceScreenState
             ),
             const SizedBox(height: 6),
             TextField(
+              maxLength: 80,
               controller: _clientNameCtrl,
               decoration: const InputDecoration(border: OutlineInputBorder()),
             ),
@@ -310,6 +313,7 @@ class _ReceptionCreateInvoiceScreenState
               ),
               const SizedBox(height: 10),
               TextField(
+                maxLength: 150,
                 controller: _taxRateCtrl,
                 keyboardType: TextInputType.number,
                 decoration: const InputDecoration(

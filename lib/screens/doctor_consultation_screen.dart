@@ -310,6 +310,7 @@ class _DoctorConsultationScreenState
         ),
         const SizedBox(height: 8),
         TextField(
+          maxLength: 500,
           controller: _chiefComplaintController,
           decoration: InputDecoration(
             hintText: 'What brings the patient in today?',
@@ -333,6 +334,7 @@ class _DoctorConsultationScreenState
         ),
         const SizedBox(height: 8),
         TextField(
+          maxLength: 500,
           controller: _hpiController,
           decoration: InputDecoration(
             hintText: 'Detailed description of current illness...',
@@ -356,6 +358,7 @@ class _DoctorConsultationScreenState
         ),
         const SizedBox(height: 8),
         TextField(
+          maxLength: 500,
           controller: _pastMedicalHistoryController,
           decoration: InputDecoration(
             hintText: 'Previous conditions, surgeries, hospitalizations...',
@@ -379,6 +382,7 @@ class _DoctorConsultationScreenState
         ),
         const SizedBox(height: 8),
         TextField(
+          maxLength: 500,
           controller: _medicationsController,
           decoration: InputDecoration(
             hintText: 'List current medications...',
@@ -402,6 +406,7 @@ class _DoctorConsultationScreenState
         ),
         const SizedBox(height: 8),
         TextField(
+          maxLength: 500,
           controller: _allergiesController,
           decoration: InputDecoration(
             hintText: 'Drug allergies, food allergies...',
@@ -425,6 +430,7 @@ class _DoctorConsultationScreenState
         ),
         const SizedBox(height: 8),
         TextField(
+          maxLength: 500,
           controller: _familyHistoryController,
           decoration: InputDecoration(
             hintText: 'Relevant family medical history...',
@@ -448,6 +454,7 @@ class _DoctorConsultationScreenState
         ),
         const SizedBox(height: 8),
         TextField(
+          maxLength: 500,
           controller: _socialHistoryController,
           decoration: InputDecoration(
             hintText: 'Smoking, alcohol, occupation, living situation...',
@@ -486,6 +493,7 @@ class _DoctorConsultationScreenState
                   const Text('BP Systolic (mmHg)', style: TextStyle(fontSize: 12)),
                   const SizedBox(height: 4),
                   TextField(
+                    maxLength: 3,
                     controller: _bpSystolicController,
                     keyboardType: TextInputType.number,
                     decoration: InputDecoration(
@@ -506,6 +514,7 @@ class _DoctorConsultationScreenState
                   const Text('BP Diastolic (mmHg)', style: TextStyle(fontSize: 12)),
                   const SizedBox(height: 4),
                   TextField(
+                    maxLength: 3,
                     controller: _bpDiastolicController,
                     keyboardType: TextInputType.number,
                     decoration: InputDecoration(
@@ -530,6 +539,7 @@ class _DoctorConsultationScreenState
                   const Text('Heart Rate (bpm)', style: TextStyle(fontSize: 12)),
                   const SizedBox(height: 4),
                   TextField(
+                    maxLength: 3,
                     controller: _heartRateController,
                     keyboardType: TextInputType.number,
                     decoration: InputDecoration(
@@ -550,6 +560,7 @@ class _DoctorConsultationScreenState
                   const Text('Temperature (°F)', style: TextStyle(fontSize: 12)),
                   const SizedBox(height: 4),
                   TextField(
+                    maxLength: 5,
                     controller: _temperatureController,
                     keyboardType: TextInputType.number,
                     decoration: InputDecoration(
@@ -576,6 +587,7 @@ class _DoctorConsultationScreenState
         ),
         const SizedBox(height: 8),
         TextField(
+          maxLength: 500,
           controller: _generalAppearanceController,
           decoration: InputDecoration(
             hintText: 'Well-appearing, alert and oriented...',
@@ -597,6 +609,7 @@ class _DoctorConsultationScreenState
         ),
         const SizedBox(height: 8),
         TextField(
+          maxLength: 500,
           controller: _examinationNotesController,
           decoration: InputDecoration(
             hintText: 'Systemic examination findings...',
@@ -625,6 +638,7 @@ class _DoctorConsultationScreenState
         ),
         const SizedBox(height: 8),
         TextField(
+          maxLength: 500,
           controller: _primaryDiagnosisController,
           decoration: InputDecoration(
             hintText: 'Main diagnosis...',
@@ -645,6 +659,7 @@ class _DoctorConsultationScreenState
         ),
         const SizedBox(height: 8),
         TextField(
+          maxLength: 150,
           controller: _icdCodeController,
           decoration: InputDecoration(
             hintText: 'ICD-10 code...',
@@ -665,6 +680,7 @@ class _DoctorConsultationScreenState
         ),
         const SizedBox(height: 8),
         TextField(
+          maxLength: 500,
           controller: _differentialDiagnosisController,
           decoration: InputDecoration(
             hintText: 'Alternative diagnoses (comma-separated)...',
@@ -686,6 +702,7 @@ class _DoctorConsultationScreenState
         ),
         const SizedBox(height: 8),
         TextField(
+          maxLength: 500,
           controller: _clinicalNotesController,
           decoration: InputDecoration(
             hintText: 'Additional clinical observations...',
@@ -863,6 +880,7 @@ class _DoctorConsultationScreenState
         ),
         const SizedBox(height: 8),
         TextField(
+          maxLength: 500,
           controller: _instructionsController,
           decoration: InputDecoration(
             hintText: 'General instructions, lifestyle advice, diet, etc.',
@@ -879,6 +897,7 @@ class _DoctorConsultationScreenState
         ),
         const SizedBox(height: 8),
         TextField(
+          maxLength: 500,
           controller: _followUpInstructionsController,
           decoration: InputDecoration(
             hintText: 'When to return, warning signs to watch for...',
@@ -921,6 +940,7 @@ class _DoctorConsultationScreenState
                   Expanded(
                     flex: 2,
                     child: TextField(
+                      maxLength: 20,
                       controller: _followUpDurationController,
                       keyboardType: TextInputType.number,
                       decoration: InputDecoration(
@@ -1131,13 +1151,13 @@ class _DoctorConsultationScreenState
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Medicine Name', hintText: 'e.g. Paracetamol 500mg')),
+            TextField(maxLength: 80, controller: nameCtrl, decoration: const InputDecoration(labelText: 'Medicine Name', hintText: 'e.g. Paracetamol 500mg')),
             const SizedBox(height: 12),
-            TextField(controller: dosageCtrl, decoration: const InputDecoration(labelText: 'Dosage', hintText: 'e.g. 1 tablet')),
+            TextField(maxLength: 40, controller: dosageCtrl, decoration: const InputDecoration(labelText: 'Dosage', hintText: 'e.g. 1 tablet')),
             const SizedBox(height: 12),
-            TextField(controller: freqCtrl, decoration: const InputDecoration(labelText: 'Frequency')),
+            TextField(maxLength: 40, controller: freqCtrl, decoration: const InputDecoration(labelText: 'Frequency')),
             const SizedBox(height: 12),
-            TextField(controller: durationCtrl, decoration: const InputDecoration(labelText: 'Duration')),
+            TextField(maxLength: 20, controller: durationCtrl, decoration: const InputDecoration(labelText: 'Duration')),
           ],
         ),
         actions: [
@@ -1188,7 +1208,7 @@ class _DoctorConsultationScreenState
                 )).toList(),
               ),
               const SizedBox(height: 12),
-              TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Test Name')),
+              TextField(maxLength: 80, controller: nameCtrl, decoration: const InputDecoration(labelText: 'Test Name')),
               const SizedBox(height: 12),
               DropdownButtonFormField<String>(
                 initialValue: urgency,
@@ -1197,7 +1217,7 @@ class _DoctorConsultationScreenState
                 onChanged: (v) => setDlgState(() => urgency = v!),
               ),
               const SizedBox(height: 12),
-              TextField(controller: notesCtrl, decoration: const InputDecoration(labelText: 'Clinical Notes (optional)')),
+              TextField(maxLength: 500, controller: notesCtrl, decoration: const InputDecoration(labelText: 'Clinical Notes (optional)')),
             ],
           ),
           actions: [
@@ -1294,7 +1314,7 @@ class _DoctorConsultationScreenState
                 onChanged: (v) => setDlgState(() => selected = v),
               ),
               const SizedBox(height: 12),
-              TextField(controller: reasonCtrl, decoration: const InputDecoration(labelText: 'Reason for Referral'), maxLines: 2),
+              TextField(maxLength: 500, controller: reasonCtrl, decoration: const InputDecoration(labelText: 'Reason for Referral'), maxLines: 2),
             ],
           ),
           actions: [

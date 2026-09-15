@@ -61,11 +61,12 @@ class _AdminReceptionistManagementState extends State<AdminReceptionistManagemen
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Name')),
+                  TextField(maxLength: 80, controller: nameCtrl, decoration: const InputDecoration(labelText: 'Name')),
                   const SizedBox(height: 10),
-                  TextField(controller: emailCtrl, decoration: const InputDecoration(labelText: 'Email')),
+                  TextField(maxLength: 100, controller: emailCtrl, decoration: const InputDecoration(labelText: 'Email')),
                   const SizedBox(height: 10),
                   TextField(
+                    maxLength: 64,
                     controller: passwordCtrl,
                     obscureText: true,
                     decoration: const InputDecoration(labelText: 'Password'),

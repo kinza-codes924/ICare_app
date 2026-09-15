@@ -570,6 +570,7 @@ class _AddMedicationSheetState extends State<_AddMedicationSheet> {
 
   Widget _field(TextEditingController ctrl, String hint, {int maxLines = 1, TextInputType? inputType}) =>
       TextField(
+        maxLength: 500,
         controller: ctrl,
         maxLines: maxLines,
         keyboardType: inputType,

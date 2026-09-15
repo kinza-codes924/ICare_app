@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:go_router/go_router.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
@@ -278,6 +279,7 @@ class _LabProfileSetupState extends ConsumerState<LabProfileSetup>
                 const SizedBox(height: 16),
               ],
               TextField(
+                maxLength: 12,
                 controller: latCtrl,
                 keyboardType: const TextInputType.numberWithOptions(
                     decimal: true, signed: true),
@@ -295,6 +297,7 @@ class _LabProfileSetupState extends ConsumerState<LabProfileSetup>
               ),
               const SizedBox(height: 12),
               TextField(
+                maxLength: 12,
                 controller: lngCtrl,
                 keyboardType: const TextInputType.numberWithOptions(
                     decimal: true, signed: true),
@@ -504,6 +507,7 @@ class _LabProfileSetupState extends ConsumerState<LabProfileSetup>
                             Icons.business_rounded,
                             [
                               _buildTextField(
+                                maxLength: 80,
                                 controller: _labNameController,
                                 label: 'Laboratory Name',
                                 icon: Icons.business_rounded,
@@ -514,6 +518,7 @@ class _LabProfileSetupState extends ConsumerState<LabProfileSetup>
                               ),
                               const SizedBox(height: 16),
                               _buildTextField(
+                                maxLength: 80,
                                 controller: _ownerNameController,
                                 label: 'Owner Name',
                                 icon: Icons.person_rounded,
@@ -524,6 +529,7 @@ class _LabProfileSetupState extends ConsumerState<LabProfileSetup>
                               ),
                               const SizedBox(height: 16),
                               _buildTextField(
+                                maxLength: 40,
                                 controller: _licenseNumberController,
                                 label: 'License Number',
                                 icon: Icons.badge_rounded,
@@ -531,6 +537,7 @@ class _LabProfileSetupState extends ConsumerState<LabProfileSetup>
                               ),
                               const SizedBox(height: 16),
                               _buildTextField(
+                                maxLength: 40,
                                 controller: _accreditationController,
                                 label: 'Accreditation',
                                 icon: Icons.verified_rounded,
@@ -544,6 +551,7 @@ class _LabProfileSetupState extends ConsumerState<LabProfileSetup>
                             Icons.contact_phone_rounded,
                             [
                               _buildTextField(
+                                maxLength: 100,
                                 controller: _labEmailController,
                                 label: 'Laboratory Email',
                                 icon: Icons.email_rounded,
@@ -552,6 +560,7 @@ class _LabProfileSetupState extends ConsumerState<LabProfileSetup>
                               ),
                               const SizedBox(height: 16),
                               _buildTextField(
+                                maxLength: 15,
                                 controller: _labPhoneController,
                                 label: 'Laboratory Phone',
                                 icon: Icons.phone_rounded,
@@ -566,6 +575,7 @@ class _LabProfileSetupState extends ConsumerState<LabProfileSetup>
                             Icons.location_on_rounded,
                             [
                               _buildTextField(
+                                maxLength: 150,
                                 controller: _addressController,
                                 label: 'Address',
                                 icon: Icons.home_rounded,
@@ -574,6 +584,7 @@ class _LabProfileSetupState extends ConsumerState<LabProfileSetup>
                               ),
                               const SizedBox(height: 16),
                               _buildTextField(
+                                maxLength: 60,
                                 controller: _cityController,
                                 label: 'City',
                                 icon: Icons.location_city_rounded,
@@ -619,6 +630,7 @@ class _LabProfileSetupState extends ConsumerState<LabProfileSetup>
                             Icons.description_rounded,
                             [
                               _buildTextField(
+                                maxLength: 120,
                                 controller: _titleController,
                                 label: 'Title/Tagline',
                                 icon: Icons.title_rounded,
@@ -626,6 +638,7 @@ class _LabProfileSetupState extends ConsumerState<LabProfileSetup>
                               ),
                               const SizedBox(height: 16),
                               _buildTextField(
+                                maxLength: 500,
                                 controller: _descriptionController,
                                 label: 'Description',
                                 icon: Icons.notes_rounded,
@@ -650,6 +663,7 @@ class _LabProfileSetupState extends ConsumerState<LabProfileSetup>
                                 children: [
                                   Expanded(
                                     child: _buildTextField(
+                                      maxLength: 10,
                                       controller: _workingHoursFromController,
                                       label: 'Opening Time',
                                       icon: Icons.wb_sunny_rounded,
@@ -659,6 +673,7 @@ class _LabProfileSetupState extends ConsumerState<LabProfileSetup>
                                   const SizedBox(width: 16),
                                   Expanded(
                                     child: _buildTextField(
+                                      maxLength: 10,
                                       controller: _workingHoursToController,
                                       label: 'Closing Time',
                                       icon: Icons.nightlight_round,
@@ -843,8 +858,15 @@ class _LabProfileSetupState extends ConsumerState<LabProfileSetup>
     String? Function(String?)? validator,
     TextInputType? keyboardType,
     int maxLines = 1,
+    // Capped like every other field in the app: a limit that suits the
+    // field, not an open-ended box. Call sites pass their own where the
+    // content is shorter (a phone, an age) or longer (notes, a bio).
+    int maxLength = 150,
+    List<TextInputFormatter>? inputFormatters,
   }) {
     return TextFormField(
+      maxLength: maxLength,
+      inputFormatters: inputFormatters,
       controller: controller,
       decoration: InputDecoration(
         labelText: label,
@@ -1123,11 +1145,11 @@ class _LabProfileSetupState extends ConsumerState<LabProfileSetup>
                       ],
                     ),
                     const SizedBox(height: 8),
-                    TextField(controller: _doctors[i]['name'], decoration: _inputDec('Full Name', Icons.person_rounded)),
+                    TextField(maxLength: 80, controller: _doctors[i]['name'], decoration: _inputDec('Full Name', Icons.person_rounded)),
                     const SizedBox(height: 8),
-                    TextField(controller: _doctors[i]['education'], decoration: _inputDec('Education (e.g. MBBS, FCPS)', Icons.school_rounded)),
+                    TextField(maxLength: 150, controller: _doctors[i]['education'], decoration: _inputDec('Education (e.g. MBBS, FCPS)', Icons.school_rounded)),
                     const SizedBox(height: 8),
-                    TextField(controller: _doctors[i]['designation'], decoration: _inputDec('Designation (e.g. Associate Professor)', Icons.work_rounded)),
+                    TextField(maxLength: 80, controller: _doctors[i]['designation'], decoration: _inputDec('Designation (e.g. Associate Professor)', Icons.work_rounded)),
                   ],
                 ),
               ),
@@ -1201,9 +1223,9 @@ class _LabProfileSetupState extends ConsumerState<LabProfileSetup>
                       ],
                     ),
                     const SizedBox(height: 8),
-                    TextField(controller: _collectors[i]['name'], decoration: _inputDec('Full Name', Icons.person_rounded)),
+                    TextField(maxLength: 80, controller: _collectors[i]['name'], decoration: _inputDec('Full Name', Icons.person_rounded)),
                     const SizedBox(height: 8),
-                    TextField(controller: _collectors[i]['designation'], decoration: _inputDec('Designation (e.g. Lab Technician)', Icons.work_rounded)),
+                    TextField(maxLength: 80, controller: _collectors[i]['designation'], decoration: _inputDec('Designation (e.g. Lab Technician)', Icons.work_rounded)),
                   ],
                 ),
               ),

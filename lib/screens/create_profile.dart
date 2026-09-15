@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:icare/widgets/success_dialog.dart';
 import 'package:flutter_size_matters/flutter_size_matters.dart';
 import 'package:icare/utils/imagePaths.dart';
@@ -87,6 +88,7 @@ class _CreateProfileState extends State<CreateProfile> {
                   child: Column(
                     children: [
                       CustomInputField(
+                        maxLength: 80,
                         hintText: "Name",
                         leadingIcon: const Icon(
                           Icons.person_outline,
@@ -98,6 +100,7 @@ class _CreateProfileState extends State<CreateProfile> {
                         controller: nameController,
                       ),
                       CustomInputField(
+                        maxLength: 100,
                         hintText: "Email",
                         leadingIcon: const Icon(
                           Icons.email_outlined,
@@ -109,6 +112,7 @@ class _CreateProfileState extends State<CreateProfile> {
                         controller: emailController,
                       ),
                       CustomInputField(
+                        maxLength: 15,
                         hintText: "Phone Number",
                         leadingIcon: const Icon(
                           Icons.phone_outlined,
@@ -120,6 +124,7 @@ class _CreateProfileState extends State<CreateProfile> {
                         controller: phoneController,
                       ),
                       CustomInputField(
+                        maxLength: 600,
                         hintText: "Type your bio here....",
                         leadingIcon: const Icon(
                           Icons.text_snippet_outlined,
@@ -131,6 +136,7 @@ class _CreateProfileState extends State<CreateProfile> {
                         controller: bioController,
                       ),
                       CustomInputField(
+                        maxLength: 80,
                         hintText: "Add Qualification",
                         leadingIcon: const Icon(
                           Icons.school_outlined,
@@ -142,6 +148,7 @@ class _CreateProfileState extends State<CreateProfile> {
                         controller: qualificationController,
                       ),
                       CustomInputField(
+                        maxLength: 3,
                         hintText: "Age",
                         leadingIcon: const Icon(
                           Icons.calendar_today_outlined,
@@ -153,6 +160,7 @@ class _CreateProfileState extends State<CreateProfile> {
                         controller: ageController,
                       ),
                       CustomInputField(
+                        maxLength: 15,
                         hintText: "CNIC Number (e.g. 35201-1234567-1)",
                         leadingIcon: const Icon(
                           Icons.credit_card_outlined,
@@ -164,6 +172,7 @@ class _CreateProfileState extends State<CreateProfile> {
                         controller: cnicController,
                       ),
                       CustomInputField(
+                        maxLength: 6,
                         hintText: "Height (e.g. 5'7\")",
                         leadingIcon: const Icon(
                           Icons.height_rounded,
@@ -175,6 +184,7 @@ class _CreateProfileState extends State<CreateProfile> {
                         controller: heightController,
                       ),
                       CustomInputField(
+                        maxLength: 6,
                         hintText: "Weight (kg)",
                         leadingIcon: const Icon(
                           Icons.monitor_weight_outlined,
@@ -186,6 +196,7 @@ class _CreateProfileState extends State<CreateProfile> {
                         controller: weightController,
                       ),
                       CustomInputField(
+                        maxLength: 150,
                         hintText: "Address",
                         leadingIcon: const Icon(
                           Icons.location_on_outlined,
@@ -385,6 +396,7 @@ class _WebCreateProfile extends StatelessWidget {
                               children: [
                                 Expanded(
                                   child: _buildInput(
+                                    maxLength: 80,
                                     label: "Full Name",
                                     controller: nameController,
                                     icon: Icons.person_outline_rounded,
@@ -394,6 +406,7 @@ class _WebCreateProfile extends StatelessWidget {
                                 const SizedBox(width: 32),
                                 Expanded(
                                   child: _buildInput(
+                                    maxLength: 100,
                                     label: "Official Email",
                                     controller: emailController,
                                     icon: Icons.alternate_email_rounded,
@@ -407,6 +420,7 @@ class _WebCreateProfile extends StatelessWidget {
                               children: [
                                 Expanded(
                                   child: _buildInput(
+                                    maxLength: 15,
                                     label: "Phone Number",
                                     controller: phoneController,
                                     icon: Icons.phone_android_rounded,
@@ -416,6 +430,7 @@ class _WebCreateProfile extends StatelessWidget {
                                 const SizedBox(width: 32),
                                 Expanded(
                                   child: _buildInput(
+                                    maxLength: 150,
                                     label: "Age",
                                     controller: ageController,
                                     icon: Icons.calendar_today_rounded,
@@ -429,6 +444,7 @@ class _WebCreateProfile extends StatelessWidget {
                               children: [
                                 Expanded(
                                   child: _buildInput(
+                                    maxLength: 40,
                                     label: "CNIC Number",
                                     controller: cnicController,
                                     icon: Icons.credit_card_outlined,
@@ -438,6 +454,7 @@ class _WebCreateProfile extends StatelessWidget {
                                 const SizedBox(width: 32),
                                 Expanded(
                                   child: _buildInput(
+                                    maxLength: 150,
                                     label: "Address",
                                     controller: addressController,
                                     icon: Icons.location_on_outlined,
@@ -451,6 +468,7 @@ class _WebCreateProfile extends StatelessWidget {
                               children: [
                                 Expanded(
                                   child: _buildInput(
+                                    maxLength: 6,
                                     label: "Height",
                                     controller: heightController,
                                     icon: Icons.height_rounded,
@@ -460,6 +478,7 @@ class _WebCreateProfile extends StatelessWidget {
                                 const SizedBox(width: 32),
                                 Expanded(
                                   child: _buildInput(
+                                    maxLength: 6,
                                     label: "Weight (kg)",
                                     controller: weightController,
                                     icon: Icons.monitor_weight_outlined,
@@ -470,6 +489,7 @@ class _WebCreateProfile extends StatelessWidget {
                             ),
                             const SizedBox(height: 32),
                             _buildInput(
+                              maxLength: 600,
                               label: "Bio & Description",
                               controller: bioController,
                               icon: Icons.description_outlined,
@@ -478,6 +498,7 @@ class _WebCreateProfile extends StatelessWidget {
                             ),
                             const SizedBox(height: 32),
                             _buildInput(
+                              maxLength: 80,
                               label: "Qualifications",
                               controller: qualificationController,
                               icon: Icons.school_outlined,
@@ -533,6 +554,11 @@ class _WebCreateProfile extends StatelessWidget {
     required IconData icon,
     required String hint,
     int maxLines = 1,
+    // Capped like every other field in the app: a limit that suits the
+    // field, not an open-ended box. Call sites pass their own where the
+    // content is shorter (a phone, an age) or longer (notes, a bio).
+    int maxLength = 150,
+    List<TextInputFormatter>? inputFormatters,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -547,6 +573,8 @@ class _WebCreateProfile extends StatelessWidget {
         ),
         const SizedBox(height: 8),
         TextFormField(
+          maxLength: maxLength,
+          inputFormatters: inputFormatters,
           controller: controller,
           maxLines: maxLines,
           decoration: InputDecoration(

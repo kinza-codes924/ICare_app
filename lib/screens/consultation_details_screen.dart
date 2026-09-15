@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:icare/widgets/drag_scroll.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:icare/providers/auth_provider.dart';
@@ -241,6 +242,7 @@ class _ConsultationDetailsScreenState
                     _label('Patient Name'),
                     const SizedBox(height: 8),
                     _textField(
+                      maxLength: 80,
                       controller: _nameController,
                       hint: 'Enter patient name',
                       icon: Icons.person_outline_rounded,
@@ -358,6 +360,7 @@ class _ConsultationDetailsScreenState
                               _label('Age'),
                               const SizedBox(height: 8),
                               _textField(
+                                maxLength: 150,
                                 controller: _ageController,
                                 hint: _forMyself
                                     ? 'Not set in profile'
@@ -401,6 +404,7 @@ class _ConsultationDetailsScreenState
                     ),
                     const SizedBox(height: 8),
                     TextField(
+                      maxLength: 500,
                       controller: _reasonController,
                       maxLines: 3,
                       decoration: InputDecoration(
@@ -566,8 +570,15 @@ class _ConsultationDetailsScreenState
     IconData? icon,
     bool readOnly = false,
     TextInputType keyboardType = TextInputType.text,
+    // Capped like every other field in the app: a limit that suits the
+    // field, not an open-ended box. Call sites pass their own where the
+    // content is shorter (a phone, an age) or longer (notes, a bio).
+    int maxLength = 150,
+    List<TextInputFormatter>? inputFormatters,
   }) {
     return TextField(
+      maxLength: maxLength,
+      inputFormatters: inputFormatters,
       controller: controller,
       readOnly: readOnly,
       keyboardType: keyboardType,

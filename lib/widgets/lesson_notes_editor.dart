@@ -185,6 +185,7 @@ class _LessonNotesEditorState extends State<LessonNotesEditor> {
             Padding(
               padding: const EdgeInsets.all(16),
               child: TextField(
+                maxLength: 500,
                 controller: _notesController,
                 maxLines: 10,
                 decoration: InputDecoration(

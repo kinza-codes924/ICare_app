@@ -194,6 +194,7 @@ class _InstructorCourseStreamScreenState extends State<InstructorCourseStreamScr
                 ),
                 const SizedBox(height: 12),
                 TextField(
+                  maxLength: 1000,
                   controller: _announcementController,
                   decoration: InputDecoration(
                     hintText: 'Announce something to your class...',
@@ -427,6 +428,7 @@ class _InstructorCourseStreamScreenState extends State<InstructorCourseStreamScr
               children: [
                 Expanded(
                   child: TextField(
+                    maxLength: 1000,
                     decoration: InputDecoration(
                       hintText: 'Add a class comment...',
                       hintStyle: const TextStyle(fontSize: 13),

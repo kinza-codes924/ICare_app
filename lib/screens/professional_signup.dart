@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:icare/utils/imagePaths.dart';
 import 'package:icare/utils/theme.dart';
@@ -85,10 +86,17 @@ class _ProfessionalSignupState extends State<ProfessionalSignup> {
     VoidCallback? onToggleObscure,
     TextInputType keyboardType = TextInputType.text,
     String? Function(String?)? validator,
+    // Capped like every other field in the app: a limit that suits the
+    // field, not an open-ended box. Call sites pass their own where the
+    // content is shorter (a phone, an age) or longer (notes, a bio).
+    int maxLength = 150,
+    List<TextInputFormatter>? inputFormatters,
   }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: TextFormField(
+        maxLength: maxLength,
+        inputFormatters: inputFormatters,
         controller: controller,
         readOnly: readOnly,
         obscureText: obscure,
@@ -236,6 +244,7 @@ class _ProfessionalSignupState extends State<ProfessionalSignup> {
 
                   // Full Name
                   _buildField(
+                    maxLength: 80,
                     controller: _fullName,
                     label: 'Full Name',
                     icon: Icons.person_rounded,
@@ -244,6 +253,7 @@ class _ProfessionalSignupState extends State<ProfessionalSignup> {
 
                   // Role (read-only)
                   _buildField(
+                    maxLength: 150,
                     controller: TextEditingController(text: widget.roleDescription),
                     label: 'Role',
                     icon: _roleIcon,
@@ -253,6 +263,7 @@ class _ProfessionalSignupState extends State<ProfessionalSignup> {
 
                   // Email
                   _buildField(
+                    maxLength: 150,
                     controller: _email,
                     label: 'Email Address',
                     icon: Icons.email_rounded,
@@ -267,6 +278,7 @@ class _ProfessionalSignupState extends State<ProfessionalSignup> {
 
                   // Phone
                   _buildField(
+                    maxLength: 15,
                     controller: _phone,
                     label: 'Phone Number',
                     icon: Icons.phone_rounded,
@@ -277,12 +289,14 @@ class _ProfessionalSignupState extends State<ProfessionalSignup> {
                   // Doctor-specific fields
                   if (_isDoctor) ...[
                     _buildField(
+                      maxLength: 40,
                       controller: _licenseNumber,
                       label: 'Medical License Number',
                       icon: Icons.badge_rounded,
                       hint: 'e.g. PMDC-12345',
                     ),
                     _buildField(
+                      maxLength: 150,
                       controller: _credentials,
                       label: 'Credentials',
                       icon: Icons.school_rounded,
@@ -292,6 +306,7 @@ class _ProfessionalSignupState extends State<ProfessionalSignup> {
 
                   // Password
                   _buildField(
+                    maxLength: 64,
                     controller: _password,
                     label: 'Password',
                     icon: Icons.lock_rounded,
@@ -307,6 +322,7 @@ class _ProfessionalSignupState extends State<ProfessionalSignup> {
 
                   // Confirm Password
                   _buildField(
+                    maxLength: 64,
                     controller: _confirmPassword,
                     label: 'Confirm Password',
                     icon: Icons.lock_outline_rounded,

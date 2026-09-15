@@ -83,6 +83,7 @@ class _DoctorForumScreenState extends State<DoctorForumScreen> {
                 ),
                 const SizedBox(height: 16),
                 TextField(
+                  maxLength: 120,
                   controller: titleController,
                   decoration: const InputDecoration(
                     hintText: 'Post Title',
@@ -104,6 +105,7 @@ class _DoctorForumScreenState extends State<DoctorForumScreen> {
                 ),
                 const SizedBox(height: 12),
                 TextField(
+                  maxLength: 1000,
                   controller: contentController,
                   maxLines: 5,
                   decoration: const InputDecoration(
@@ -711,6 +713,7 @@ class _ForumDetailScreenState extends State<ForumDetailScreen> {
         children: [
           Expanded(
             child: TextField(
+              maxLength: 1000,
               controller: _commentController,
               decoration: InputDecoration(
                 hintText: 'Add a clinical response...',

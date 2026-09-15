@@ -50,6 +50,7 @@ class _ReferralDetailScreenState extends State<ReferralDetailScreen> {
       builder: (ctx) => AlertDialog(
         title: const Text('Decline Referral'),
         content: TextField(
+          maxLength: 500,
           controller: _declineReasonController,
           decoration: const InputDecoration(hintText: 'Reason for declining'),
           maxLines: 3,
@@ -85,6 +86,7 @@ class _ReferralDetailScreenState extends State<ReferralDetailScreen> {
       builder: (ctx) => AlertDialog(
         title: const Text('Complete Referral'),
         content: TextField(
+          maxLength: 500,
           controller: _summaryController,
           decoration: const InputDecoration(hintText: 'Consultation summary'),
           maxLines: 5,

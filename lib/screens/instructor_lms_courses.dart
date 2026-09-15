@@ -262,6 +262,7 @@ class _InstructorLmsCoursesScreenState extends State<InstructorLmsCoursesScreen>
 
                 // Or paste URL
                 TextField(
+                  maxLength: 200,
                   controller: urlController,
                   onChanged: (v) => setModal(() => previewUrl = v.trim()),
                   decoration: InputDecoration(

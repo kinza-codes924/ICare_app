@@ -1898,6 +1898,7 @@ class _VideoCallWebState extends State<VideoCall> {
               ),
               Expanded(
                 child: TextField(
+                  maxLength: 1000,
                   controller: _chatController,
                   style: const TextStyle(color: Colors.white),
                   decoration: InputDecoration(
@@ -1990,6 +1991,7 @@ class _VideoCallWebState extends State<VideoCall> {
                 const SizedBox(height: 8),
                 Expanded(
                   child: TextField(
+                    maxLength: 500,
                     controller: _doctorNotesController,
                     maxLines: null,
                     expands: true,

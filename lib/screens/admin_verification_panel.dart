@@ -102,6 +102,7 @@ class _AdminVerificationPanelState extends State<AdminVerificationPanel>
             const Text('Please provide a reason for rejection:'),
             const SizedBox(height: 16),
             TextField(
+              maxLength: 500,
               controller: reasonController,
               decoration: const InputDecoration(
                 hintText: 'Reason for rejection',

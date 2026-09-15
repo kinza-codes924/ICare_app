@@ -123,11 +123,12 @@ class _ClinicAdminStaffTabState extends State<ClinicAdminStaffTab> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   if (!isEdit) ...[
-                    TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Name')),
+                    TextField(maxLength: 80, controller: nameCtrl, decoration: const InputDecoration(labelText: 'Name')),
                     const SizedBox(height: 10),
-                    TextField(controller: emailCtrl, decoration: const InputDecoration(labelText: 'Email')),
+                    TextField(maxLength: 100, controller: emailCtrl, decoration: const InputDecoration(labelText: 'Email')),
                     const SizedBox(height: 10),
                     TextField(
+                      maxLength: 64,
                       controller: passwordCtrl,
                       obscureText: true,
                       decoration: const InputDecoration(labelText: 'Password'),
@@ -135,7 +136,7 @@ class _ClinicAdminStaffTabState extends State<ClinicAdminStaffTab> {
                     const SizedBox(height: 10),
                   ],
                   for (final f in widget.extraFields) ...[
-                    TextField(controller: extraCtrls[f.key], decoration: InputDecoration(labelText: f.label)),
+                    TextField(maxLength: 150, controller: extraCtrls[f.key], decoration: InputDecoration(labelText: f.label)),
                     const SizedBox(height: 10),
                   ],
                   if (widget.showDoctorAssignment) ...[

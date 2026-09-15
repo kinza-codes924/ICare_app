@@ -286,6 +286,7 @@ class _DoctorReferralScreenState extends State<DoctorReferralScreen> {
                 ),
                 const SizedBox(height: 16),
                 TextField(
+                  maxLength: 500,
                   controller: _reasonController,
                   maxLines: 4,
                   decoration: InputDecoration(

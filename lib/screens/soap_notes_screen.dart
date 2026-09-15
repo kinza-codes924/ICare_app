@@ -334,6 +334,7 @@ class _SoapNotesScreenState extends State<SoapNotesScreen> {
     int maxLines = 1,
   }) {
     return TextFormField(
+      maxLength: 500,
       controller: controller,
       maxLines: maxLines,
       decoration: InputDecoration(

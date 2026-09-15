@@ -810,6 +810,7 @@ Future<void> _showReviewDialog(
                     ),
                     const SizedBox(height: 8),
                     TextField(
+                      maxLength: 500,
                       controller: reviewController,
                       maxLines: 3,
                       decoration: InputDecoration(

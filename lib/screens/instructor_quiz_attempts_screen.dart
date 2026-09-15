@@ -373,6 +373,7 @@ class _QuizGradingDialogState extends State<_QuizGradingDialog> {
 
               // Feedback
               TextField(
+                maxLength: 1000,
                 controller: _feedbackController,
                 decoration: const InputDecoration(
                   labelText: 'Feedback (optional)',

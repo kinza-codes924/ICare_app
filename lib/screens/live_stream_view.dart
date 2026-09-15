@@ -843,6 +843,7 @@ class _LiveStreamViewState extends State<LiveStreamView> with SingleTickerProvid
           child: Row(children: [
             Expanded(
               child: TextField(
+                maxLength: 1000,
                 controller: _chatCtrl,
                 style: const TextStyle(color: Colors.white),
                 decoration: InputDecoration(
@@ -1224,6 +1225,7 @@ class _LiveStreamViewState extends State<LiveStreamView> with SingleTickerProvid
               mainAxisSize: MainAxisSize.min,
               children: [
                 TextField(
+                  maxLength: 150,
                   controller: questionCtrl,
                   style: const TextStyle(color: Colors.white),
                   decoration: const InputDecoration(
@@ -1242,6 +1244,7 @@ class _LiveStreamViewState extends State<LiveStreamView> with SingleTickerProvid
                       (e) => Padding(
                         padding: const EdgeInsets.only(bottom: 8),
                         child: TextField(
+                          maxLength: 150,
                           controller: e.value,
                           style: const TextStyle(color: Colors.white),
                           decoration: InputDecoration(

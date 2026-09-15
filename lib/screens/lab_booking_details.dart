@@ -861,6 +861,7 @@ class LabBookingDetails extends ConsumerWidget {
               ),
               const SizedBox(height: 12),
               TextField(
+                maxLength: 500,
                 controller: reasonController,
                 maxLines: 3,
                 autofocus: true,

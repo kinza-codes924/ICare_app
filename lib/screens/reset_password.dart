@@ -176,6 +176,7 @@ class _ResetPasswordState extends State<ResetPassword> {
                           child: Column(
                             children: [
                               CustomInputField(
+                                maxLength: 64,
                                 hintText: "New Password".tr(),
                                 leadingIcon: const Icon(
                                   Icons.lock_outline_rounded,
@@ -197,6 +198,7 @@ class _ResetPasswordState extends State<ResetPassword> {
                               ),
                               const SizedBox(height: 20),
                               CustomInputField(
+                                maxLength: 64,
                                 hintText: "Confirm Password".tr(),
                                 leadingIcon: const Icon(
                                   Icons.lock_reset_rounded,

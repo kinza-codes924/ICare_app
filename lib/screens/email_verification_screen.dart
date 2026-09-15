@@ -179,6 +179,7 @@ class _EmailVerificationScreenState extends ConsumerState<EmailVerificationScree
 
               // Token input
               TextField(
+                maxLength: 100,
                 controller: _tokenController,
                 decoration: InputDecoration(
                   labelText: 'Verification Token',

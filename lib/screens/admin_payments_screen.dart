@@ -416,6 +416,7 @@ class _AdminPaymentsScreenState extends State<AdminPaymentsScreen> {
 
   Widget _amountField(TextEditingController c, String hint) {
     return TextField(
+      maxLength: 150,
       controller: c,
       keyboardType: TextInputType.number,
       style: const TextStyle(fontSize: 13),

@@ -832,6 +832,7 @@ class _AddVitalDialogState extends State<_AddVitalDialog> {
               ),
               const SizedBox(height: 20),
               TextField(
+                maxLength: 150,
                 controller: _valueController,
                 keyboardType: _isTextInput
                     ? TextInputType.text
@@ -849,6 +850,7 @@ class _AddVitalDialogState extends State<_AddVitalDialog> {
               ),
               const SizedBox(height: 16),
               TextField(
+                maxLength: 500,
                 controller: _notesController,
                 maxLines: 2,
                 decoration: const InputDecoration(

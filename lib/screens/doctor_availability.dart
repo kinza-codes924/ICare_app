@@ -1210,6 +1210,7 @@ class _DoctorAvailabilityState extends State<DoctorAvailability> {
 
           // Reason
           TextField(
+            maxLength: 500,
             controller: _leaveReasonCtrl,
             maxLines: 2,
             decoration: InputDecoration(

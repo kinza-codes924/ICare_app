@@ -363,6 +363,7 @@ class _LabsListScreenState extends State<LabsListScreen> {
                               ],
                               if (_viewMode == 'search_location')
                                 CustomInputField(
+                                  maxLength: 150,
                                   width: double.infinity,
                                   hintText: "Enter area, city or address...",
                                   controller: _locationController,

@@ -198,6 +198,7 @@ class _CreateReminderState extends State<CreateReminder> {
                     _fieldLabel('Label'),
                     const SizedBox(height: 8),
                     TextField(
+                      maxLength: 150,
                       controller: _labelController,
                       decoration: _inputDecoration(
                         'e.g. Take morning medicine',

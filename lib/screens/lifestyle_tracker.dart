@@ -729,6 +729,7 @@ class _LifestyleTrackerScreenState extends State<LifestyleTrackerScreen> {
       ]),
       content: Column(mainAxisSize: MainAxisSize.min, children: [
         TextField(
+          maxLength: 150,
           controller: ctrl, autofocus: true,
           keyboardType: TextInputType.number,
           inputFormatters: [FilteringTextInputFormatter.digitsOnly],
@@ -974,6 +975,7 @@ class _LogEntryDialogState extends State<_LogEntryDialog> {
 
   Widget _field(TextEditingController ctrl, String label, String hint, Color color, {TextInputType? type}) {
     return TextField(
+      maxLength: 150,
       controller: ctrl, autofocus: true, keyboardType: type,
       decoration: InputDecoration(
         labelText: label, hintText: hint,

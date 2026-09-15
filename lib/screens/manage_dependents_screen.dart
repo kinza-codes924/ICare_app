@@ -167,11 +167,13 @@ class _ManageDependentsScreenState extends State<ManageDependentsScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             TextField(
+              maxLength: 80,
               controller: nameController,
               decoration: const InputDecoration(labelText: 'Full Name'),
             ),
             const SizedBox(height: 16),
             TextField(
+              maxLength: 150,
               controller: relationController,
               decoration: const InputDecoration(
                 labelText: 'Relation (e.g. Spouse, Child)',
@@ -179,6 +181,7 @@ class _ManageDependentsScreenState extends State<ManageDependentsScreen> {
             ),
             const SizedBox(height: 16),
             TextField(
+              maxLength: 3,
               controller: ageController,
               decoration: const InputDecoration(labelText: 'Age'),
               keyboardType: TextInputType.number,

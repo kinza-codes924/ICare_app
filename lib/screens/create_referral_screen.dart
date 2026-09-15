@@ -150,6 +150,7 @@ class _CreateReferralScreenState extends State<CreateReferralScreen> {
                     _buildSectionTitle('Reason for Referral'),
                     const SizedBox(height: 12),
                     TextFormField(
+                      maxLength: 500,
                       controller: _reasonController,
                       maxLines: 3,
                       decoration: InputDecoration(
@@ -182,6 +183,7 @@ class _CreateReferralScreenState extends State<CreateReferralScreen> {
                     _buildSectionTitle('Clinical Notes (Optional)'),
                     const SizedBox(height: 12),
                     TextFormField(
+                      maxLength: 500,
                       controller: _clinicalNotesController,
                       maxLines: 5,
                       decoration: InputDecoration(

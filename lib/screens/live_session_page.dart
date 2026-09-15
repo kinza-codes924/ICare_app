@@ -397,6 +397,7 @@ class _LiveSessionPageState extends State<LiveSessionPage> with SingleTickerProv
             children: [
               Expanded(
                 child: TextField(
+                  maxLength: 1000,
                   controller: _chatController,
                   decoration: InputDecoration(
                     hintText: 'Type a message...',

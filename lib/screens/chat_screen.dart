@@ -761,6 +761,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   borderRadius: BorderRadius.circular(24),
                 ),
                 child: TextField(
+                  maxLength: 1000,
                   controller: _messageController,
                   focusNode: _messageFocusNode,
                   decoration: InputDecoration(

@@ -80,6 +80,7 @@ class _CommunityForumScreenState extends State<CommunityForumScreen> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Text('Add New Topic'.tr(), style: const TextStyle(fontWeight: FontWeight.w900)),
         content: TextField(
+          maxLength: 150,
           controller: ctrl,
           autofocus: true,
           decoration: InputDecoration(
@@ -153,6 +154,7 @@ class _CommunityForumScreenState extends State<CommunityForumScreen> {
               ),
               const SizedBox(height: 12),
               TextField(
+                maxLength: 1000,
                 controller: contentCtrl,
                 maxLines: 5,
                 decoration: InputDecoration(
@@ -705,6 +707,7 @@ class _CommunityPostDetailScreenState extends State<_CommunityPostDetailScreen> 
               children: [
                 Expanded(
                   child: TextField(
+                    maxLength: 1000,
                     controller: _commentCtrl,
                     decoration: InputDecoration(
                       hintText: 'Write a comment...',

@@ -123,6 +123,7 @@ class _DeclineAppointmentScreenState extends State<DeclineAppointmentScreen> {
                 ),
                 const SizedBox(height: 12),
                 TextFormField(
+                  maxLength: 500,
                   controller: _reasonController,
                   maxLines: 4,
                   decoration: InputDecoration(
@@ -365,6 +366,7 @@ class _DeclineAppointmentScreenState extends State<DeclineAppointmentScreen> {
                         border: Border.all(color: const Color(0xFFE2E8F0)),
                       ),
                       child: TextFormField(
+                        maxLength: 500,
                         controller: _reasonController,
                         maxLines: 5,
                         decoration: const InputDecoration(

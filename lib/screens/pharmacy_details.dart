@@ -1419,6 +1419,7 @@ class _PharmacyDetailsScreenState extends State<PharmacyDetailsScreen> {
                       child: SizedBox(
                         width: 36,
                         child: TextField(
+                          maxLength: 150,
                           controller: _qtyControllers[id],
                           keyboardType: TextInputType.number,
                           textAlign: TextAlign.center,

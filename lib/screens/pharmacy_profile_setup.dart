@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:go_router/go_router.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
@@ -224,6 +225,7 @@ class _PharmacyProfileSetupState extends ConsumerState<PharmacyProfileSetup> {
                 const SizedBox(height: 16),
               ],
               TextField(
+                maxLength: 12,
                 controller: latCtrl,
                 keyboardType: const TextInputType.numberWithOptions(
                     decimal: true, signed: true),
@@ -241,6 +243,7 @@ class _PharmacyProfileSetupState extends ConsumerState<PharmacyProfileSetup> {
               ),
               const SizedBox(height: 12),
               TextField(
+                maxLength: 12,
                 controller: lngCtrl,
                 keyboardType: const TextInputType.numberWithOptions(
                     decimal: true, signed: true),
@@ -446,6 +449,7 @@ class _PharmacyProfileSetupState extends ConsumerState<PharmacyProfileSetup> {
                     const SizedBox(height: 24),
                     _buildSection('Basic Information', Icons.info_outline, [
                       _buildTextField(
+                        maxLength: 80,
                         controller: _ownerNameController,
                         label: 'Pharmacy Name',
                         icon: Icons.local_pharmacy,
@@ -454,12 +458,14 @@ class _PharmacyProfileSetupState extends ConsumerState<PharmacyProfileSetup> {
                       ),
                       const SizedBox(height: 16),
                       _buildTextField(
+                        maxLength: 40,
                         controller: _cnicController,
                         label: 'CNIC',
                         icon: Icons.badge,
                       ),
                       const SizedBox(height: 16),
                       _buildTextField(
+                        maxLength: 40,
                         controller: _licenseNumberController,
                         label: 'Drug Sale License',
                         icon: Icons.verified_user,
@@ -468,6 +474,7 @@ class _PharmacyProfileSetupState extends ConsumerState<PharmacyProfileSetup> {
                     const SizedBox(height: 24),
                     _buildSection('Location', Icons.location_on, [
                       _buildTextField(
+                        maxLength: 500,
                         controller: _addressController,
                         label: 'Address',
                         icon: Icons.home,
@@ -475,6 +482,7 @@ class _PharmacyProfileSetupState extends ConsumerState<PharmacyProfileSetup> {
                       ),
                       const SizedBox(height: 16),
                       _buildTextField(
+                        maxLength: 60,
                         controller: _cityController,
                         label: 'City',
                         icon: Icons.location_city,
@@ -518,6 +526,7 @@ class _PharmacyProfileSetupState extends ConsumerState<PharmacyProfileSetup> {
                         children: [
                           Expanded(
                             child: _buildTextField(
+                              maxLength: 150,
                               controller: _openHoursFromController,
                               label: 'From (e.g., 09:00 AM)',
                               icon: Icons.schedule,
@@ -526,6 +535,7 @@ class _PharmacyProfileSetupState extends ConsumerState<PharmacyProfileSetup> {
                           const SizedBox(width: 16),
                           Expanded(
                             child: _buildTextField(
+                              maxLength: 150,
                               controller: _openHoursToController,
                               label: 'To (e.g., 09:00 PM)',
                               icon: Icons.schedule,
@@ -548,6 +558,7 @@ class _PharmacyProfileSetupState extends ConsumerState<PharmacyProfileSetup> {
                       if (_deliveryAvailable) ...[
                         const SizedBox(height: 12),
                         _buildTextField(
+                          maxLength: 9,
                           controller: _deliveryFeeController,
                           label: 'Delivery Fee (PKR)',
                           icon: Icons.local_shipping_outlined,
@@ -664,8 +675,15 @@ class _PharmacyProfileSetupState extends ConsumerState<PharmacyProfileSetup> {
     String? Function(String?)? validator,
     TextInputType? keyboardType,
     int maxLines = 1,
+    // Capped like every other field in the app: a limit that suits the
+    // field, not an open-ended box. Call sites pass their own where the
+    // content is shorter (a phone, an age) or longer (notes, a bio).
+    int maxLength = 150,
+    List<TextInputFormatter>? inputFormatters,
   }) {
     return TextFormField(
+      maxLength: maxLength,
+      inputFormatters: inputFormatters,
       controller: controller,
       decoration: InputDecoration(
         labelText: label,

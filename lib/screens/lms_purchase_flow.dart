@@ -432,6 +432,7 @@ class _LmsPurchaseFlowState extends ConsumerState<LmsPurchaseFlow> {
 
             // Name Field
             TextFormField(
+              maxLength: 80,
               controller: _nameController,
               decoration: InputDecoration(
                 labelText: 'Full Name',
@@ -451,6 +452,7 @@ class _LmsPurchaseFlowState extends ConsumerState<LmsPurchaseFlow> {
 
             // Email Field
             TextFormField(
+              maxLength: 150,
               controller: _emailController,
               keyboardType: TextInputType.emailAddress,
               decoration: InputDecoration(
@@ -474,6 +476,7 @@ class _LmsPurchaseFlowState extends ConsumerState<LmsPurchaseFlow> {
 
             // Phone Field
             TextFormField(
+              maxLength: 15,
               controller: _phoneController,
               keyboardType: TextInputType.phone,
               decoration: InputDecoration(
@@ -494,6 +497,7 @@ class _LmsPurchaseFlowState extends ConsumerState<LmsPurchaseFlow> {
 
             // Password Field
             TextFormField(
+              maxLength: 64,
               controller: _passwordController,
               obscureText: _obscurePassword,
               enableInteractiveSelection: true,
@@ -530,6 +534,7 @@ class _LmsPurchaseFlowState extends ConsumerState<LmsPurchaseFlow> {
 
             // Confirm Password Field
             TextFormField(
+              maxLength: 64,
               controller: _confirmPasswordController,
               obscureText: _obscureConfirmPassword,
               enableInteractiveSelection: true,

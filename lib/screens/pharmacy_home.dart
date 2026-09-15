@@ -210,6 +210,7 @@ class _PharmacyHomeState extends State<PharmacyHome> {
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           child: _viewMode == 'search_location'
               ? CustomInputField(
+                maxLength: 150,
                   width: Utils.windowWidth(context) * 0.9,
                   hintText: 'Enter area, city or address...'.tr(),
                   controller: _locationController,

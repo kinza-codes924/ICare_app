@@ -498,6 +498,7 @@ class _MyCartScreenState extends State<MyCartScreen> {
               children: [
                 Expanded(
                   child: TextField(
+                    maxLength: 150,
                     onChanged: (v) => setState(() => _promoCode = v),
                     decoration: InputDecoration(
                       hintText: 'Promo code'.tr(),
@@ -1122,6 +1123,7 @@ class _CheckoutScreenState extends State<_CheckoutScreen> {
         Text('Optional — pre-filled from your saved preferences'.tr(), style: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8))),
         const SizedBox(height: 8),
         TextFormField(
+          maxLength: 500,
           controller: _instructionsCtrl,
           maxLines: 2,
           decoration: InputDecoration(
@@ -1148,6 +1150,7 @@ class _CheckoutScreenState extends State<_CheckoutScreen> {
     String? Function(String?)? validator,
   }) {
     return TextFormField(
+      maxLength: 150,
       controller: ctrl,
       keyboardType: keyboardType,
       validator: validator,

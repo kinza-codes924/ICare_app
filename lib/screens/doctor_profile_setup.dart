@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:icare/screens/doctor_availability.dart';
 import 'package:icare/widgets/success_dialog.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -503,6 +504,7 @@ class _DoctorProfileSetupState extends ConsumerState<DoctorProfileSetup> {
                 _buildSectionTitle("Personal Information"),
                 const SizedBox(height: 16),
                 _buildTextField(
+                  maxLength: 15,
                   controller: _phoneController,
                   label: "Phone Number",
                   icon: Icons.phone_outlined,
@@ -514,6 +516,7 @@ class _DoctorProfileSetupState extends ConsumerState<DoctorProfileSetup> {
                   children: [
                     Expanded(
                       child: _buildTextField(
+                        maxLength: 150,
                         controller: _ageController,
                         label: "Age",
                         icon: Icons.cake_outlined,
@@ -539,6 +542,7 @@ class _DoctorProfileSetupState extends ConsumerState<DoctorProfileSetup> {
                 ),
                 const SizedBox(height: 16),
                 _buildTextField(
+                  maxLength: 150,
                   controller: _addressController,
                   label: "Address",
                   icon: Icons.location_on_outlined,
@@ -548,6 +552,7 @@ class _DoctorProfileSetupState extends ConsumerState<DoctorProfileSetup> {
                 _buildSectionTitle("Professional Details"),
                 const SizedBox(height: 16),
                 _buildTextField(
+                  maxLength: 80,
                   controller: specializationController,
                   label: "Specialization",
                   icon: Icons.medical_services_outlined,
@@ -555,6 +560,7 @@ class _DoctorProfileSetupState extends ConsumerState<DoctorProfileSetup> {
                 ),
                 const SizedBox(height: 16),
                 _buildTextField(
+                  maxLength: 80,
                   controller: degreesController,
                   label: "Degrees (comma separated)",
                   icon: Icons.school_outlined,
@@ -562,6 +568,7 @@ class _DoctorProfileSetupState extends ConsumerState<DoctorProfileSetup> {
                 ),
                 const SizedBox(height: 16),
                 _buildTextField(
+                  maxLength: 20,
                   controller: experienceController,
                   label: "Years of Experience",
                   icon: Icons.work_outline,
@@ -575,6 +582,7 @@ class _DoctorProfileSetupState extends ConsumerState<DoctorProfileSetup> {
                   children: [
                     Expanded(
                       child: _buildTextField(
+                        maxLength: 40,
                         controller: licenseController,
                         label: "License Number",
                         icon: Icons.badge_outlined,
@@ -846,6 +854,7 @@ class _DoctorProfileSetupState extends ConsumerState<DoctorProfileSetup> {
                           children: [
                             Expanded(
                               child: _buildTextField(
+                                maxLength: 15,
                                 controller: _phoneController,
                                 label: "Phone Number",
                                 icon: Icons.phone_outlined,
@@ -855,6 +864,7 @@ class _DoctorProfileSetupState extends ConsumerState<DoctorProfileSetup> {
                             const SizedBox(width: 24),
                             Expanded(
                               child: _buildTextField(
+                                maxLength: 150,
                                 controller: _ageController,
                                 label: "Age",
                                 icon: Icons.cake_outlined,
@@ -883,6 +893,7 @@ class _DoctorProfileSetupState extends ConsumerState<DoctorProfileSetup> {
                             const SizedBox(width: 24),
                             Expanded(
                               child: _buildTextField(
+                                maxLength: 150,
                                 controller: _addressController,
                                 label: "Address",
                                 icon: Icons.location_on_outlined,
@@ -905,6 +916,7 @@ class _DoctorProfileSetupState extends ConsumerState<DoctorProfileSetup> {
                           children: [
                             Expanded(
                               child: _buildTextField(
+                                maxLength: 80,
                                 controller: specializationController,
                                 label: "Specialization",
                                 icon: Icons.medical_services_outlined,
@@ -914,6 +926,7 @@ class _DoctorProfileSetupState extends ConsumerState<DoctorProfileSetup> {
                             const SizedBox(width: 24),
                             Expanded(
                               child: _buildTextField(
+                                maxLength: 20,
                                 controller: experienceController,
                                 label: "Years of Experience",
                                 icon: Icons.work_outline,
@@ -927,6 +940,7 @@ class _DoctorProfileSetupState extends ConsumerState<DoctorProfileSetup> {
                           children: [
                             Expanded(
                               child: _buildTextField(
+                                maxLength: 80,
                                 controller: degreesController,
                                 label: "Degrees (comma separated)",
                                 icon: Icons.school_outlined,
@@ -936,6 +950,7 @@ class _DoctorProfileSetupState extends ConsumerState<DoctorProfileSetup> {
                             const SizedBox(width: 24),
                             Expanded(
                               child: _buildTextField(
+                                maxLength: 40,
                                 controller: licenseController,
                                 label: "License Number",
                                 icon: Icons.badge_outlined,
@@ -1112,6 +1127,7 @@ class _DoctorProfileSetupState extends ConsumerState<DoctorProfileSetup> {
           children: [
             Expanded(
               child: TextField(
+                maxLength: 80,
                 controller: _specialtyCustomCtrl,
                 decoration: InputDecoration(
                   hintText: 'Add custom specialty...',
@@ -1181,6 +1197,7 @@ class _DoctorProfileSetupState extends ConsumerState<DoctorProfileSetup> {
           children: [
             Expanded(
               child: TextField(
+                maxLength: 150,
                 controller: _conditionInputCtrl,
                 decoration: InputDecoration(
                   hintText: 'Add custom condition...',
@@ -1349,6 +1366,11 @@ class _DoctorProfileSetupState extends ConsumerState<DoctorProfileSetup> {
     required String hint,
     int maxLines = 1,
     TextInputType? keyboardType,
+    // Capped like every other field in the app: a limit that suits the
+    // field, not an open-ended box. Call sites pass their own where the
+    // content is shorter (a phone, an age) or longer (notes, a bio).
+    int maxLength = 150,
+    List<TextInputFormatter>? inputFormatters,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1363,6 +1385,8 @@ class _DoctorProfileSetupState extends ConsumerState<DoctorProfileSetup> {
         ),
         const SizedBox(height: 8),
         TextFormField(
+          maxLength: maxLength,
+          inputFormatters: inputFormatters,
           controller: controller,
           maxLines: maxLines,
           keyboardType: keyboardType,

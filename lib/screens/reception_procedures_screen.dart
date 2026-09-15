@@ -148,6 +148,7 @@ class _ReceptionProceduresScreenState extends State<ReceptionProceduresScreen> {
                     const Divider(height: 1),
                     const SizedBox(height: 14),
                     TextField(
+                      maxLength: 80,
                       controller: nameCtrl,
                       decoration: InputDecoration(
                         labelText: 'Procedure name',
@@ -157,6 +158,7 @@ class _ReceptionProceduresScreenState extends State<ReceptionProceduresScreen> {
                     ),
                     const SizedBox(height: 14),
                     TextField(
+                      maxLength: 9,
                       controller: priceCtrl,
                       keyboardType: TextInputType.number,
                       decoration: InputDecoration(
@@ -320,6 +322,7 @@ class _ReceptionProceduresScreenState extends State<ReceptionProceduresScreen> {
                   ),
                   const SizedBox(height: 10),
                   TextField(
+                    maxLength: 150,
                     controller: _taxRateCtrl,
                     keyboardType: TextInputType.number,
                     decoration: const InputDecoration(labelText: 'Custom rate (%)', border: OutlineInputBorder()),

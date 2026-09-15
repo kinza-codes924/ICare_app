@@ -730,6 +730,7 @@ class _PatientHistoryFormScreenState extends State<PatientHistoryFormScreen> {
     return Padding(
       padding: const EdgeInsets.only(bottom: 14),
       child: TextField(
+        maxLength: 500,
         controller: controller,
         decoration: _inputDec(label),
         maxLines: maxLines,
@@ -811,9 +812,9 @@ class _PatientHistoryFormScreenState extends State<PatientHistoryFormScreen> {
           const SizedBox(height: 20),
           Row(
             children: [
-              Expanded(flex: 3, child: TextField(controller: _complaintController, decoration: _inputDec('Complaint'), textDirection: TextDirection.ltr)),
+              Expanded(flex: 3, child: TextField(maxLength: 500, controller: _complaintController, decoration: _inputDec('Complaint'), textDirection: TextDirection.ltr)),
               const SizedBox(width: 10),
-              Expanded(flex: 2, child: TextField(controller: _durationController, decoration: _inputDec('Duration', hint: 'e.g. 3 days'), textDirection: TextDirection.ltr)),
+              Expanded(flex: 2, child: TextField(maxLength: 20, controller: _durationController, decoration: _inputDec('Duration', hint: 'e.g. 3 days'), textDirection: TextDirection.ltr)),
               const SizedBox(width: 8),
               ElevatedButton(
                 onPressed: _addComplaint,
@@ -937,6 +938,7 @@ class _PatientHistoryFormScreenState extends State<PatientHistoryFormScreen> {
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
               child: TextField(
+                maxLength: 20,
                 decoration: _inputDec('Details', hint: 'Duration, severity, treatment...'),
                 controller: TextEditingController(text: details),
                 onChanged: (v) => onDetails(v.isEmpty ? null : v),
@@ -1000,13 +1002,13 @@ class _PatientHistoryFormScreenState extends State<PatientHistoryFormScreen> {
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            TextField(controller: procCtrl, decoration: _inputDec('Surgery / Procedure'), textDirection: TextDirection.ltr),
+            TextField(maxLength: 150, controller: procCtrl, decoration: _inputDec('Surgery / Procedure'), textDirection: TextDirection.ltr),
             const SizedBox(height: 12),
             Row(
               children: [
-                Expanded(child: TextField(controller: yearCtrl, decoration: _inputDec('Year'), keyboardType: TextInputType.number, textDirection: TextDirection.ltr)),
+                Expanded(child: TextField(maxLength: 4, controller: yearCtrl, decoration: _inputDec('Year'), keyboardType: TextInputType.number, textDirection: TextDirection.ltr)),
                 const SizedBox(width: 12),
-                Expanded(child: TextField(controller: hospitalCtrl, decoration: _inputDec('Hospital / Remarks'), textDirection: TextDirection.ltr)),
+                Expanded(child: TextField(maxLength: 500, controller: hospitalCtrl, decoration: _inputDec('Hospital / Remarks'), textDirection: TextDirection.ltr)),
               ],
             ),
           ],
@@ -1122,17 +1124,17 @@ class _PatientHistoryFormScreenState extends State<PatientHistoryFormScreen> {
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            TextField(controller: medCtrl, decoration: _inputDec('Medication Name'), textDirection: TextDirection.ltr),
+            TextField(maxLength: 80, controller: medCtrl, decoration: _inputDec('Medication Name'), textDirection: TextDirection.ltr),
             const SizedBox(height: 10),
             Row(
               children: [
-                Expanded(child: TextField(controller: doseCtrl, decoration: _inputDec('Dose'), textDirection: TextDirection.ltr)),
+                Expanded(child: TextField(maxLength: 40, controller: doseCtrl, decoration: _inputDec('Dose'), textDirection: TextDirection.ltr)),
                 const SizedBox(width: 10),
-                Expanded(child: TextField(controller: freqCtrl, decoration: _inputDec('Frequency'), textDirection: TextDirection.ltr)),
+                Expanded(child: TextField(maxLength: 40, controller: freqCtrl, decoration: _inputDec('Frequency'), textDirection: TextDirection.ltr)),
               ],
             ),
             const SizedBox(height: 10),
-            TextField(controller: durCtrl, decoration: _inputDec('Duration'), textDirection: TextDirection.ltr),
+            TextField(maxLength: 20, controller: durCtrl, decoration: _inputDec('Duration'), textDirection: TextDirection.ltr),
           ],
         ),
         actions: [
@@ -1180,9 +1182,9 @@ class _PatientHistoryFormScreenState extends State<PatientHistoryFormScreen> {
                 onChanged: (v) => setS(() => selectedType = v!),
               ),
               const SizedBox(height: 10),
-              TextField(controller: allergenCtrl, decoration: _inputDec('Allergen Name'), textDirection: TextDirection.ltr),
+              TextField(maxLength: 80, controller: allergenCtrl, decoration: _inputDec('Allergen Name'), textDirection: TextDirection.ltr),
               const SizedBox(height: 10),
-              TextField(controller: reactionCtrl, decoration: _inputDec('Reaction / Symptoms'), textDirection: TextDirection.ltr),
+              TextField(maxLength: 500, controller: reactionCtrl, decoration: _inputDec('Reaction / Symptoms'), textDirection: TextDirection.ltr),
             ],
           ),
           actions: [
@@ -1227,6 +1229,7 @@ class _PatientHistoryFormScreenState extends State<PatientHistoryFormScreen> {
               style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15, color: Color(0xFF475569))),
           const SizedBox(height: 8),
           TextField(
+            maxLength: 500,
             controller: _otherFamilyCtrl,
             decoration: _inputDec('Describe hereditary conditions, patterns, etc.'),
             maxLines: 3,
@@ -1253,6 +1256,7 @@ class _PatientHistoryFormScreenState extends State<PatientHistoryFormScreen> {
               Expanded(
                 flex: 3,
                 child: TextField(
+                  maxLength: 150,
                   controller: diseaseCtrl,
                   decoration: _inputDec('Disease / Condition'),
                   textDirection: TextDirection.ltr,
@@ -1262,6 +1266,7 @@ class _PatientHistoryFormScreenState extends State<PatientHistoryFormScreen> {
               Expanded(
                 flex: 2,
                 child: TextField(
+                  maxLength: 3,
                   controller: ageCtrl,
                   decoration: _inputDec('Age at Diagnosis'),
                   keyboardType: TextInputType.number,
@@ -1339,6 +1344,7 @@ class _PatientHistoryFormScreenState extends State<PatientHistoryFormScreen> {
               if (_substanceAbuse) ...[
                 const SizedBox(height: 8),
                 TextField(
+                  maxLength: 150,
                   decoration: _inputDec('Details'),
                   controller: _substanceDetailsCtrl,
                   textDirection: TextDirection.ltr,
@@ -1359,6 +1365,7 @@ class _PatientHistoryFormScreenState extends State<PatientHistoryFormScreen> {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: TextField(
+        maxLength: 150,
         decoration: _inputDec(label),
         controller: ctrl,
         textDirection: TextDirection.ltr,
@@ -1384,6 +1391,7 @@ class _PatientHistoryFormScreenState extends State<PatientHistoryFormScreen> {
                   const Text('Menarche (age)', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: Color(0xFF475569))),
                   const SizedBox(height: 8),
                   TextField(
+                    maxLength: 3,
                     decoration: _inputDec('Age in years'),
                     keyboardType: TextInputType.number,
                     controller: TextEditingController(text: _menarche?.toString()),
@@ -1398,6 +1406,7 @@ class _PatientHistoryFormScreenState extends State<PatientHistoryFormScreen> {
                   const Text('Menstrual Cycle', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: Color(0xFF475569))),
                   const SizedBox(height: 8),
                   TextField(
+                    maxLength: 150,
                     decoration: _inputDec('e.g. Regular, 28 days'),
                     controller: TextEditingController(text: _menstrualCycle),
                     onChanged: (v) => setState(() => _menstrualCycle = v),
@@ -1431,6 +1440,7 @@ class _PatientHistoryFormScreenState extends State<PatientHistoryFormScreen> {
               const Text('Contraceptive Use', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: Color(0xFF475569))),
               const SizedBox(height: 8),
               TextField(
+                maxLength: 20,
                 decoration: _inputDec('Type and duration', hint: 'e.g. OCP × 2 years'),
                 controller: TextEditingController(text: _contraceptive),
                 onChanged: (v) => _contraceptive = v.isEmpty ? null : v,
@@ -1464,6 +1474,7 @@ class _PatientHistoryFormScreenState extends State<PatientHistoryFormScreen> {
         Text(label, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Color(0xFF64748B)), textAlign: TextAlign.center),
         const SizedBox(height: 4),
         TextField(
+          maxLength: 150,
           controller: TextEditingController(text: value.toString()),
           keyboardType: TextInputType.number,
           textAlign: TextAlign.center,
@@ -1507,6 +1518,7 @@ class _PatientHistoryFormScreenState extends State<PatientHistoryFormScreen> {
           ...systems.map((s) => Padding(
             padding: const EdgeInsets.only(bottom: 12),
             child: TextField(
+              maxLength: 500,
               controller: s.$2,
               decoration: _inputDec(s.$1, hint: 'Findings or NAD (No Abnormality Detected)'),
               maxLines: 2,
@@ -1538,31 +1550,31 @@ class _PatientHistoryFormScreenState extends State<PatientHistoryFormScreen> {
             physics: const NeverScrollableScrollPhysics(),
             childAspectRatio: 3.2,
             children: [
-              TextField(controller: _bpController, decoration: _inputDec('Blood Pressure', hint: 'mmHg')),
-              TextField(controller: _pulseController, decoration: _inputDec('Pulse Rate', hint: 'bpm')),
-              TextField(controller: _rrController, decoration: _inputDec('Respiratory Rate', hint: '/min')),
-              TextField(controller: _tempController, decoration: _inputDec('Temperature', hint: '°F / °C')),
-              TextField(controller: _spo2Controller, decoration: _inputDec('O₂ Saturation', hint: '%')),
-              TextField(controller: _weightController, decoration: _inputDec('Weight', hint: 'kg')),
-              TextField(controller: _heightController, decoration: _inputDec('Height', hint: 'cm')),
-              TextField(controller: _bmiController, decoration: _inputDec('BMI', hint: 'kg/m²')),
+              TextField(maxLength: 7, controller: _bpController, decoration: _inputDec('Blood Pressure', hint: 'mmHg')),
+              TextField(maxLength: 3, controller: _pulseController, decoration: _inputDec('Pulse Rate', hint: 'bpm')),
+              TextField(maxLength: 3, controller: _rrController, decoration: _inputDec('Respiratory Rate', hint: '/min')),
+              TextField(maxLength: 5, controller: _tempController, decoration: _inputDec('Temperature', hint: '°F / °C')),
+              TextField(maxLength: 3, controller: _spo2Controller, decoration: _inputDec('O₂ Saturation', hint: '%')),
+              TextField(maxLength: 6, controller: _weightController, decoration: _inputDec('Weight', hint: 'kg')),
+              TextField(maxLength: 6, controller: _heightController, decoration: _inputDec('Height', hint: 'cm')),
+              TextField(maxLength: 5, controller: _bmiController, decoration: _inputDec('BMI', hint: 'kg/m²')),
             ],
           ),
           const SizedBox(height: 20),
           const Text('Virtual General Examination Findings',
               style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15, color: Color(0xFF475569))),
           const SizedBox(height: 12),
-          TextField(controller: _appearanceController, decoration: _inputDec('General Appearance on Video')),
+          TextField(maxLength: 150, controller: _appearanceController, decoration: _inputDec('General Appearance on Video')),
           const SizedBox(height: 10),
           Row(
             children: [
-              Expanded(child: TextField(controller: _consciousnessController, decoration: _inputDec('Level of Consciousness'))),
+              Expanded(child: TextField(maxLength: 150, controller: _consciousnessController, decoration: _inputDec('Level of Consciousness'))),
               const SizedBox(width: 12),
-              Expanded(child: TextField(controller: _orientationController, decoration: _inputDec('Orientation'))),
+              Expanded(child: TextField(maxLength: 150, controller: _orientationController, decoration: _inputDec('Orientation'))),
             ],
           ),
           const SizedBox(height: 10),
-          TextField(controller: _hydrationController, decoration: _inputDec('Hydration')),
+          TextField(maxLength: 150, controller: _hydrationController, decoration: _inputDec('Hydration')),
           const SizedBox(height: 16),
           const Text('Clinical Signs', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: Color(0xFF475569))),
           const SizedBox(height: 8),
@@ -1581,13 +1593,13 @@ class _PatientHistoryFormScreenState extends State<PatientHistoryFormScreen> {
           const SizedBox(height: 12),
           Row(
             children: [
-              Expanded(child: TextField(controller: _nutritionalController, decoration: _inputDec('Nutritional Status'))),
+              Expanded(child: TextField(maxLength: 150, controller: _nutritionalController, decoration: _inputDec('Nutritional Status'))),
               const SizedBox(width: 12),
-              Expanded(child: TextField(controller: _mobilityController, decoration: _inputDec('Mobility / Gait (virtual)'))),
+              Expanded(child: TextField(maxLength: 150, controller: _mobilityController, decoration: _inputDec('Mobility / Gait (virtual)'))),
             ],
           ),
           const SizedBox(height: 10),
-          TextField(controller: _examNotesController, decoration: _inputDec('Examination Notes'), maxLines: 3),
+          TextField(maxLength: 500, controller: _examNotesController, decoration: _inputDec('Examination Notes'), maxLines: 3),
         ],
       ),
     );

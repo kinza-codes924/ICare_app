@@ -416,6 +416,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
     return Padding(
       padding: const EdgeInsets.only(bottom: 14),
       child: TextFormField(
+        maxLength: 150,
         controller: controller,
         readOnly: readOnly,
         obscureText: obscure,

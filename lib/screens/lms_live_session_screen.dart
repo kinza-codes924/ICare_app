@@ -1161,6 +1161,7 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
           child: Row(children: [
             Expanded(
               child: TextField(
+                maxLength: 1000,
                 controller: _chatCtrl,
                 style: const TextStyle(color: Colors.white),
                 decoration: InputDecoration(
@@ -1429,6 +1430,7 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
         content: SingleChildScrollView(
           child: Column(mainAxisSize: MainAxisSize.min, children: [
             TextField(
+              maxLength: 150,
               controller: questionCtrl,
               style: const TextStyle(color: Colors.white),
               decoration: const InputDecoration(
@@ -1442,6 +1444,7 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
             ...optionCtrls.asMap().entries.map((e) => Padding(
               padding: const EdgeInsets.only(bottom: 8),
               child: TextField(
+                maxLength: 150,
                 controller: e.value,
                 style: const TextStyle(color: Colors.white),
                 decoration: InputDecoration(

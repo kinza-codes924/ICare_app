@@ -568,6 +568,7 @@ class _LabTestBuilderScreenState extends State<_LabTestBuilderScreen> {
               color: Colors.white,
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
               child: TextField(
+                maxLength: 80,
                 controller: _nameController,
                 decoration: InputDecoration(
                   labelText: 'Template Name',
