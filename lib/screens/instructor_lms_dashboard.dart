@@ -412,18 +412,20 @@ class _InstructorLmsDashboardState extends ConsumerState<InstructorLmsDashboard>
               onPressed: () => _scaffoldKey.currentState?.openDrawer(),
               tooltip: 'Menu',
             ),
-          if (!isWide) ...[
-            Image.asset('assets/Asset 1.png', height: 28, fit: BoxFit.contain),
-            const SizedBox(width: 6),
-          ],
           // On a phone, greet the instructor by name the way every other role
           // is greeted -- "Hello, <name>" with "Instructor Account" beneath it.
           // This bar showed only the page title, so the instructor was the one
           // account that never saw who it was signed in as. The wide layout
           // keeps the plain title: it has its own sidebar identity.
+          //
+          // The logo is dropped on a phone: with four icons on the right there
+          // was not enough width left, so the name truncated to "Hello, Pr..."
+          // and the role wrapped onto two lines. The menu button and the header
+          // already identify the app.
           if (!isWide)
             Expanded(
               child: Column(
+                mainAxisSize: MainAxisSize.min,
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -439,6 +441,11 @@ class _InstructorLmsDashboardState extends ConsumerState<InstructorLmsDashboard>
                   ),
                   const Text(
                     'Instructor Account',
+                    // One line, always: it wrapped to "Instructor" / "Account"
+                    // when the row ran short of width.
+                    maxLines: 1,
+                    softWrap: false,
+                    overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
@@ -448,12 +455,15 @@ class _InstructorLmsDashboardState extends ConsumerState<InstructorLmsDashboard>
                 ],
               ),
             )
-          else
+          else ...[
+            Image.asset('assets/Asset 1.png', height: 28, fit: BoxFit.contain),
+            const SizedBox(width: 6),
             Text(
               titles[_activePage] ?? 'iCare Academy',
               style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w400, color: Color(0xFF202124)),
             ),
-          const Spacer(),
+            const Spacer(),
+          ],
           IconButton(
             icon: const Icon(Icons.search_rounded, color: Color(0xFF444746), size: 22),
             onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const InstructorLmsCoursesScreen())),

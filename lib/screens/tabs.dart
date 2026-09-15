@@ -79,6 +79,61 @@ import 'package:icare/models/user.dart' as app_user;
 /// links all work. Previously this widget picked the screen itself from an
 /// internal `currentIndex`, which meant every screen shared the `/dashboard`
 /// URL.
+/// The account menu, identical on phone and on web.
+///
+/// Both bars built their own copy of these two items, which is how they drift
+/// apart. One list, one set of labels, everywhere.
+List<PopupMenuEntry<String>> _accountMenuItems() => const [
+      PopupMenuItem(
+        value: 'edit',
+        child: Row(
+          children: [
+            Icon(Icons.edit_outlined, size: 18, color: Color(0xFF64748B)),
+            SizedBox(width: 10),
+            Text(
+              'Edit Profile',
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+            ),
+          ],
+        ),
+      ),
+      PopupMenuItem(
+        value: 'logout',
+        child: Row(
+          children: [
+            Icon(Icons.logout_rounded, size: 18, color: Colors.redAccent),
+            SizedBox(width: 10),
+            Text(
+              'Logout',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: Colors.redAccent,
+              ),
+            ),
+          ],
+        ),
+      ),
+    ];
+
+/// Open the profile editor that belongs to this role.
+///
+/// Every role has one; they are pushed directly rather than sitting behind a
+/// /<role>/profile route, which is why routing by path only worked for two of
+/// them. Shared with the web bar so both open the same screen.
+void _openProfileEditor(BuildContext context, String role) {
+  final Widget screen = switch (role) {
+    'Doctor' => const DoctorProfileSetup(),
+    'Pharmacy' => const PharmacyProfileSetup(),
+    'Laboratory' => const LabProfileSetup(),
+    'Student' => const StudentProfileSetup(),
+    'Instructor' => InstructorProfileSetupScreen(),
+    // Patient and anything else edit through the generic screen.
+    _ => const ProfileEditScreen(),
+  };
+  Navigator.of(context).push(MaterialPageRoute(builder: (_) => screen));
+}
+
 class TabsScreen extends ConsumerStatefulWidget {
   final Widget child;
   final String? initialAdminTab;
@@ -158,23 +213,6 @@ class _TabsScreenState extends ConsumerState<TabsScreen> {
     // could not reach it.
     '/credential-vault',
   };
-
-  /// Where a role's own profile screen lives.
-  ///
-  /// Settings is the honest destination for the roles that have no dedicated
-  /// profile page -- it is where their details are edited. Doctors are one of
-  /// them: there is no /doctor/profile route, and linking to one that does not
-  /// exist would give them an avatar that goes nowhere.
-  static String _profilePathFor(String role) {
-    switch (role) {
-      case 'Patient':
-        return '/patient/profile';
-      case 'Student':
-        return '/student/profile';
-      default:
-        return '/settings';
-    }
-  }
 
   /// How far up from the bottom the WhatsApp button should float.
   ///
@@ -623,8 +661,26 @@ class _TabsScreenState extends ConsumerState<TabsScreen> {
                   final user = ref.watch(authProvider).user;
                   final img = buildProfileImageProvider(user?.profilePicture);
                   final name = user?.name ?? '';
-                  return GestureDetector(
-                    onTap: () => context.go(_profilePathFor(role)),
+                  // A menu rather than a straight link. Tapping through to a
+                  // profile screen was the wrong shape for an avatar: signing
+                  // out is the other thing people come here for, and it was
+                  // buried in Settings. This matches the instructor shell,
+                  // which has offered the same two choices all along.
+                  return PopupMenuButton<String>(
+                    offset: const Offset(0, 48),
+                    tooltip: 'Account',
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    onSelected: (value) {
+                      if (value == 'edit') {
+                        _openProfileEditor(context, role);
+                      } else if (value == 'logout') {
+                        ref.read(authProvider.notifier).setUserLogout();
+                        context.go('/login');
+                      }
+                    },
+                    itemBuilder: (_) => _accountMenuItems(),
                     child: CircleAvatar(
                       radius: 18,
                       backgroundColor: AppColors.primaryColor,
@@ -2085,93 +2141,13 @@ class _WebTopBarState extends ConsumerState<_WebTopBar> {
             elevation: 4,
             onSelected: (value) {
               if (value == 'edit') {
-                // Navigate to role-specific profile edit page
-                if (role == 'Doctor') {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (ctx) => const DoctorProfileSetup(),
-                    ),
-                  );
-                } else if (role == 'Pharmacy') {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (ctx) => const PharmacyProfileSetup(),
-                    ),
-                  );
-                } else if (role == 'Laboratory') {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (ctx) => const LabProfileSetup(),
-                    ),
-                  );
-                } else if (role == 'Student') {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (ctx) => const StudentProfileSetup(),
-                    ),
-                  );
-                } else if (role == 'Instructor') {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (ctx) => InstructorProfileSetupScreen(),
-                    ),
-                  );
-                } else {
-                  // Patient or other roles - use generic profile edit
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (ctx) => const ProfileEditScreen(),
-                    ),
-                  );
-                }
+                _openProfileEditor(context, role);
               } else if (value == 'logout') {
                 ref.read(authProvider.notifier).setUserLogout();
                 context.go('/login');
               }
             },
-            itemBuilder: (ctx) => [
-              PopupMenuItem(
-                value: 'edit',
-                child: Row(
-                  children: const [
-                    Icon(
-                      Icons.edit_outlined,
-                      size: 18,
-                      color: Color(0xFF64748B),
-                    ),
-                    SizedBox(width: 10),
-                    Text(
-                      'Edit Profile',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              PopupMenuItem(
-                value: 'logout',
-                child: Row(
-                  children: const [
-                    Icon(
-                      Icons.logout_rounded,
-                      size: 18,
-                      color: Colors.redAccent,
-                    ),
-                    SizedBox(width: 10),
-                    Text(
-                      'Logout',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.redAccent,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
+            itemBuilder: (ctx) => _accountMenuItems(),
             child: Row(
               children: [
                 Column(
