@@ -392,18 +392,26 @@ class _BookAppointmentScreenState extends ConsumerState<BookAppointmentScreen> {
             ),
             child: Row(
               children: [
-                CircleAvatar(
-                  radius: 28,
-                  backgroundColor: AppColors.primaryColor.withValues(alpha: 0.1),
-                  backgroundImage: (widget.doctor.user.profilePicture != null && widget.doctor.user.profilePicture!.isNotEmpty)
-                      ? NetworkImage(widget.doctor.user.profilePicture!)
-                      : null,
-                  child: (widget.doctor.user.profilePicture == null || widget.doctor.user.profilePicture!.isEmpty)
-                      ? Text(
-                          widget.doctor.user.name.isNotEmpty ? widget.doctor.user.name.substring(0, 1).toUpperCase() : 'D',
-                          style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: AppColors.primaryColor),
-                        )
-                      : null,
+                Builder(
+                  builder: (_) {
+                    // Same reason as the dashboard: these photos are base64
+                    // data: URIs or server-relative paths, neither of which
+                    // NetworkImage can load on its own.
+                    final img = buildProfileImageProvider(
+                        widget.doctor.user.profilePicture);
+                    return CircleAvatar(
+                      radius: 28,
+                      backgroundColor:
+                          AppColors.primaryColor.withValues(alpha: 0.1),
+                      backgroundImage: img,
+                      child: img == null
+                          ? Text(
+                              widget.doctor.user.name.isNotEmpty ? widget.doctor.user.name.substring(0, 1).toUpperCase() : 'D',
+                              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: AppColors.primaryColor),
+                            )
+                          : null,
+                    );
+                  },
                 ),
                 const SizedBox(width: 14),
                 Expanded(

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:icare/utils/utils.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:icare/providers/auth_provider.dart';
 import 'package:icare/services/security_service.dart';
@@ -159,18 +160,21 @@ class _LoginActivityScreenState extends ConsumerState<LoginActivityScreen> {
             height: 48,
             child: Stack(
               children: [
-                CircleAvatar(
-                  radius: 24,
-                  backgroundColor: const Color(0xFF1877F2),
-                  backgroundImage: (profilePic != null && profilePic.isNotEmpty)
-                      ? NetworkImage(profilePic)
-                      : null,
-                  child: (profilePic == null || profilePic.isEmpty)
-                      ? Text(
-                          userName.isNotEmpty ? userName[0].toUpperCase() : 'U',
-                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 18),
-                        )
-                      : null,
+                Builder(
+                  builder: (_) {
+                    final img = buildProfileImageProvider(profilePic);
+                    return CircleAvatar(
+                      radius: 24,
+                      backgroundColor: const Color(0xFF1877F2),
+                      backgroundImage: img,
+                      child: img == null
+                          ? Text(
+                              userName.isNotEmpty ? userName[0].toUpperCase() : 'U',
+                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 18),
+                            )
+                          : null,
+                    );
+                  },
                 ),
                 Positioned(
                   right: 0,

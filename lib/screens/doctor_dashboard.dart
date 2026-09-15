@@ -979,17 +979,27 @@ class _DoctorDashboardState extends ConsumerState<DoctorDashboard> {
                         children: [
                           Row(
                             children: [
-                              CircleAvatar(
-                                radius: 22,
-                                backgroundColor: statusColor.withValues(alpha: 0.15),
-                                child: Text(
-                                  initials.isEmpty ? 'P' : initials,
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w900,
-                                    color: statusColor,
-                                  ),
-                                ),
+                              Builder(
+                                builder: (_) {
+                                  final img = buildProfileImageProvider(
+                                      appt.patient?.profilePicture);
+                                  return CircleAvatar(
+                                    radius: 22,
+                                    backgroundColor:
+                                        statusColor.withValues(alpha: 0.15),
+                                    backgroundImage: img,
+                                    child: img == null
+                                        ? Text(
+                                            initials.isEmpty ? 'P' : initials,
+                                            style: TextStyle(
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.w900,
+                                              color: statusColor,
+                                            ),
+                                          )
+                                        : null,
+                                  );
+                                },
                               ),
                               const SizedBox(width: 12),
                               Expanded(
@@ -1127,22 +1137,30 @@ class _DoctorDashboardState extends ConsumerState<DoctorDashboard> {
             // Top section: Avatar and name
             Row(
               children: [
-                CircleAvatar(
-                  radius: 18,
-                  backgroundColor: statusColor.withValues(alpha: 0.15),
-                  backgroundImage: (patientPhoto != null && patientPhoto.isNotEmpty)
-                      ? NetworkImage(patientPhoto) as ImageProvider
-                      : null,
-                  child: (patientPhoto == null || patientPhoto.isEmpty)
-                      ? Text(
-                          initials.isEmpty ? 'P' : initials,
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w900,
-                            color: statusColor,
-                          ),
-                        )
-                      : null,
+                Builder(
+                  builder: (_) {
+                    // The photo arrives either as a base64 data: URI or, when
+                    // it is too big for a list payload, as a server-relative
+                    // path. NetworkImage understands neither, so every patient
+                    // fell back to their initial. buildProfileImageProvider
+                    // handles both, and is what the rest of the app uses.
+                    final img = buildProfileImageProvider(patientPhoto);
+                    return CircleAvatar(
+                      radius: 18,
+                      backgroundColor: statusColor.withValues(alpha: 0.15),
+                      backgroundImage: img,
+                      child: img == null
+                          ? Text(
+                              initials.isEmpty ? 'P' : initials,
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w900,
+                                color: statusColor,
+                              ),
+                            )
+                          : null,
+                    );
+                  },
                 ),
                 const SizedBox(width: 8),
                 Expanded(
@@ -2295,17 +2313,29 @@ class _PendingRequestCardState extends State<_PendingRequestCard> {
               children: [
                 Row(
                   children: [
-                    CircleAvatar(
-                      radius: 22,
-                      backgroundColor: AppColors.primaryColor.withValues(alpha: 0.1),
-                      child: Text(
-                        (widget.appointment.patient?.name ?? 'P').substring(0, 1).toUpperCase(),
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w900,
-                          fontSize: 16,
-                          color: AppColors.primaryColor,
-                        ),
-                      ),
+                    Builder(
+                      builder: (_) {
+                        final img = buildProfileImageProvider(
+                            widget.appointment.patient?.profilePicture);
+                        return CircleAvatar(
+                          radius: 22,
+                          backgroundColor:
+                              AppColors.primaryColor.withValues(alpha: 0.1),
+                          backgroundImage: img,
+                          child: img == null
+                              ? Text(
+                                  (widget.appointment.patient?.name ?? 'P')
+                                      .substring(0, 1)
+                                      .toUpperCase(),
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w900,
+                                    fontSize: 16,
+                                    color: AppColors.primaryColor,
+                                  ),
+                                )
+                              : null,
+                        );
+                      },
                     ),
                     const SizedBox(width: 12),
                     Expanded(
