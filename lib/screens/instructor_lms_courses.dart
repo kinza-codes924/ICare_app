@@ -563,6 +563,8 @@ class _InstructorLmsCoursesScreenState extends State<InstructorLmsCoursesScreen>
             Expanded(
               child: Text(
                 course['title'] ?? 'Untitled Course',
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,

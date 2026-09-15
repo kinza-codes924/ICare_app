@@ -1020,6 +1020,8 @@ class _QuestionDialogState extends State<_QuestionDialog> {
                     const SizedBox(width: 10),
                     Expanded(child: Text(
                       _documentUrl != null ? (_documentName ?? 'Document attached') : 'Attach document (PDF, DOC, PPT, XLS)',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                       style: TextStyle(fontSize: 13, color: _documentUrl != null ? const Color(0xFF10B981) : const Color(0xFF94A3B8)),
                     )),
                     if (_uploadingDoc) const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))

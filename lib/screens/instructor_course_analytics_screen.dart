@@ -602,6 +602,8 @@ class _InstructorCourseAnalyticsScreenState extends State<InstructorCourseAnalyt
               Expanded(
                 child: Text(
                   name,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w600,

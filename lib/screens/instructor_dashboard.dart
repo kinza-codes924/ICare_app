@@ -349,6 +349,8 @@ class _InstructorDashboardScreenState extends State<InstructorDashboardScreen> {
             Expanded(
               child: Text(
                 label,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w700,

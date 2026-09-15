@@ -259,6 +259,8 @@ class _InstructorCourseDetailScreenState extends State<InstructorCourseDetailScr
               Expanded(
                 child: Text(
                   '${modules.length} modules',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w600,

@@ -5775,6 +5775,8 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
                           Expanded(
                             child: Text(
                               title,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
                               style: const TextStyle(
                                 fontSize: 14,
                                 color: Color(0xFF202124),
@@ -5894,6 +5896,8 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
                       Expanded(
                         child: Text(
                           quizTitle,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
                             fontSize: 14,
                             color: Color(0xFF202124),
@@ -6627,6 +6631,8 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
                           Expanded(
                             child: Text(
                               name,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
                               style: const TextStyle(
                                 fontSize: 13,
                                 fontWeight: FontWeight.w600,
@@ -6717,6 +6723,8 @@ class _ClassroomCourseViewState extends State<ClassroomCourseView>
                           Expanded(
                             child: Text(
                               c['studentName'] ?? 'Student',
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
                               style: const TextStyle(
                                 fontWeight: FontWeight.w600,
                                 fontSize: 13,
@@ -7335,6 +7343,8 @@ class _RecordingPlaybackDialogState extends State<_RecordingPlaybackDialog> {
                   Expanded(
                     child: Text(
                       widget.title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         fontWeight: FontWeight.w800,
                         fontSize: 16,
@@ -7504,6 +7514,8 @@ class _StudentProgressDialogState extends State<_StudentProgressDialog> {
                   Expanded(
                     child: Text(
                       widget.studentName,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         fontWeight: FontWeight.w800,
                         fontSize: 16,

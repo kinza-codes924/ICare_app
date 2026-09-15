@@ -1038,6 +1038,8 @@ class InstructorCourseContentScreenState
                 Expanded(
                   child: Text(
                     title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                       fontWeight: FontWeight.w800,
                       fontSize: 14,
@@ -1166,6 +1168,7 @@ class InstructorCourseContentScreenState
           Expanded(
             child: Text(
               _course?['title']?.toString() ?? 'Course Content',
+              maxLines: 2,
               style: const TextStyle(
                 fontSize: 15,
                 fontWeight: FontWeight.w800,
@@ -1931,6 +1934,11 @@ class InstructorCourseContentScreenState
           ),
           title: Text(
             title,
+            // The lesson count, the tick and the menu sit in the trailing
+            // slot, so a long module name had very little room and broke
+            // across four or five lines on a phone.
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
             style: const TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w700,
@@ -2229,6 +2237,7 @@ class InstructorCourseContentScreenState
             ),
             const SizedBox(width: 12),
             Expanded(
+              flex: 3,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -2237,6 +2246,14 @@ class InstructorCourseContentScreenState
                       Expanded(
                         child: Text(
                           title,
+                          // On a phone the badges and the Recording button
+                          // claim their full width first, and the title was
+                          // left with whatever remained -- a few pixels, so
+                          // every letter wrapped onto its own line and the
+                          // card grew into a vertical column of characters.
+                          // Two lines and an ellipsis instead.
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w600,
@@ -2384,23 +2401,29 @@ class InstructorCourseContentScreenState
                           color: const Color(0xFF10B981),
                           borderRadius: BorderRadius.circular(10),
                         ),
-                        child: const Row(
+                        child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(
+                            const Icon(
                               Icons.play_arrow_rounded,
                               color: Colors.white,
                               size: 20,
                             ),
-                            SizedBox(width: 6),
-                            Text(
-                              'Recording',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 14,
-                                fontWeight: FontWeight.w700,
+                            // The word costs about 80px. On a phone that is
+                            // the difference between a readable title and a
+                            // column of single letters; the icon carries the
+                            // meaning on its own.
+                            if (MediaQuery.of(context).size.width >= 600) ...[
+                              const SizedBox(width: 6),
+                              const Text(
+                                'Recording',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w700,
+                                ),
                               ),
-                            ),
+                            ],
                           ],
                         ),
                       ),
@@ -5158,6 +5181,8 @@ class _RecordingDialogState extends State<_RecordingDialog> {
                   Expanded(
                     child: Text(
                       widget.title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         fontWeight: FontWeight.w800,
                         fontSize: 16,

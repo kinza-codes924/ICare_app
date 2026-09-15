@@ -1242,6 +1242,8 @@ class _ViewCourseState extends ConsumerState<ViewCourse> {
                 Expanded(
                   child: Text(
                     module['title'] ?? "Module ${mIndex + 1}",
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
                       color: isModuleLocked

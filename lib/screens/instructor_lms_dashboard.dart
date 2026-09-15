@@ -263,6 +263,8 @@ class _InstructorLmsDashboardState extends ConsumerState<InstructorLmsDashboard>
                           Expanded(
                             child: Text(
                               _roleDisplayNames[key] ?? r,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
                               style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
                             ),
                           ),

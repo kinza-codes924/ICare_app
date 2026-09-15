@@ -1593,6 +1593,8 @@ class _GradesTabState extends State<_GradesTab> {
                         style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12, color: AppColors.primaryColor))),
                     const SizedBox(width: 10),
                     Expanded(child: Text(c['studentName'] ?? 'Student',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                       style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13))),
                     TextButton(
                       onPressed: () => _approveCert(c['_id'].toString(), c['studentName'] ?? 'Student', 'reject'),
