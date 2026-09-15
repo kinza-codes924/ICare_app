@@ -159,6 +159,23 @@ class _TabsScreenState extends ConsumerState<TabsScreen> {
     '/credential-vault',
   };
 
+  /// Where a role's own profile screen lives.
+  ///
+  /// Settings is the honest destination for the roles that have no dedicated
+  /// profile page -- it is where their details are edited. Doctors are one of
+  /// them: there is no /doctor/profile route, and linking to one that does not
+  /// exist would give them an avatar that goes nowhere.
+  static String _profilePathFor(String role) {
+    switch (role) {
+      case 'Patient':
+        return '/patient/profile';
+      case 'Student':
+        return '/student/profile';
+      default:
+        return '/settings';
+    }
+  }
+
   /// How far up from the bottom the WhatsApp button should float.
   ///
   /// The lifts below date from when the bubble sat bottom-right, on top of each
@@ -593,6 +610,40 @@ class _TabsScreenState extends ConsumerState<TabsScreen> {
                   backgroundColor: AppColors.white,
                   child: SvgWrapper(assetPath: ImagePaths.notification),
                 ),
+              ),
+            ),
+            // Profile avatar, the way the instructor shell has always had one.
+            // Every other role's phone bar carried only the notification bell,
+            // so there was nothing on screen showing who was signed in and no
+            // quick way to reach the profile.
+            Padding(
+              padding: EdgeInsets.only(right: ScallingConfig.scale(10)),
+              child: Builder(
+                builder: (_) {
+                  final user = ref.watch(authProvider).user;
+                  final img = buildProfileImageProvider(user?.profilePicture);
+                  final name = user?.name ?? '';
+                  return GestureDetector(
+                    onTap: () => context.go(_profilePathFor(role)),
+                    child: CircleAvatar(
+                      radius: 18,
+                      backgroundColor: AppColors.primaryColor,
+                      backgroundImage: img,
+                      // The initial stands in for anyone who has not uploaded
+                      // a photo yet.
+                      child: img == null
+                          ? Text(
+                              name.isNotEmpty ? name[0].toUpperCase() : 'U',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 15,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            )
+                          : null,
+                    ),
+                  );
+                },
               ),
             ),
           ],

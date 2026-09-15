@@ -416,10 +416,43 @@ class _InstructorLmsDashboardState extends ConsumerState<InstructorLmsDashboard>
             Image.asset('assets/Asset 1.png', height: 28, fit: BoxFit.contain),
             const SizedBox(width: 6),
           ],
-          Text(
-            titles[_activePage] ?? 'iCare Academy',
-            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w400, color: Color(0xFF202124)),
-          ),
+          // On a phone, greet the instructor by name the way every other role
+          // is greeted -- "Hello, <name>" with "Instructor Account" beneath it.
+          // This bar showed only the page title, so the instructor was the one
+          // account that never saw who it was signed in as. The wide layout
+          // keeps the plain title: it has its own sidebar identity.
+          if (!isWide)
+            Expanded(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Hello, ${_userName.isNotEmpty ? _userName.split(' ').first : 'there'}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF202124),
+                    ),
+                  ),
+                  const Text(
+                    'Instructor Account',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF1A73E8),
+                    ),
+                  ),
+                ],
+              ),
+            )
+          else
+            Text(
+              titles[_activePage] ?? 'iCare Academy',
+              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w400, color: Color(0xFF202124)),
+            ),
           const Spacer(),
           IconButton(
             icon: const Icon(Icons.search_rounded, color: Color(0xFF444746), size: 22),
