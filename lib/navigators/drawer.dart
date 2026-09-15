@@ -501,22 +501,10 @@ class _CustomDrawerState extends ConsumerState<CustomDrawer> {
                       // Patients had "Book Appointment" and "View Lab Reports"
                       // shortcuts here; both duplicate entries already in
                       // MY ACCOUNT below, so the client asked for them to go.
-                      if (selectedRole == 'Laboratory') ...[
-                        _drawerActionItem(
-                          context,
-                          'New Requests',
-                          const Color(0xFF6366F1),
-                          Icons.pending_actions_outlined,
-                          () => context.go('/lab/bookings?title=New%20Requests&filter=pending'),
-                        ),
-                        _drawerActionItem(
-                          context,
-                          'Records',
-                          const Color(0xFF0EA5E9),
-                          Icons.folder_copy_outlined,
-                          () => context.go('/lab/reports'),
-                        ),
-                      ] else if (selectedRole == 'Instructor') ...[
+                      // The laboratory's "New Requests" and "Records" cards
+                      // went the same way: both repeat entries sitting in
+                      // MY ACCOUNT a few rows below.
+                      if (selectedRole == 'Instructor') ...[
                         _drawerActionItem(
                           context,
                           'Manage Courses',
