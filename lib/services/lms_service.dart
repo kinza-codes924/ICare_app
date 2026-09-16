@@ -1275,4 +1275,73 @@ class LmsService {
       return null;
     }
   }
+
+  /// Create (or re-create) the guest invite link for a live session.
+  ///
+  /// Returns the path to share, e.g. /join/<token>. Only the session's own
+  /// instructor may call this; the server checks, not the client.
+  Future<String?> createSessionInvite(String sessionId,
+      {bool regenerate = false}) async {
+    try {
+      final res = await _api.post(
+        '/live-sessions/$sessionId/invite',
+        regenerate ? {'regenerate': true} : {},
+      );
+      return res.data['path'] as String?;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Turn the invite link off. Anyone already in the session stays in.
+  Future<bool> revokeSessionInvite(String sessionId) async {
+    try {
+      await _api.delete('/live-sessions/$sessionId/invite');
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// What the guest page shows before anyone joins: the session title and
+  /// whether it has started. No account needed.
+  Future<Map<String, dynamic>?> getInviteInfo(String token) async {
+    try {
+      final res = await _api.get('/live-sessions/invite/$token');
+      final d = res.data;
+      if (d is Map && d['success'] == true) {
+        return Map<String, dynamic>.from(d);
+      }
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Join as a guest. Returns the Jitsi token and room, or a failure the
+  /// caller can show — 'NOT_LIVE' when the session has not started yet.
+  Future<Map<String, dynamic>> joinAsGuest(String token, String displayName) async {
+    try {
+      final res = await _api.post(
+        '/live-sessions/invite/$token/join',
+        {'displayName': displayName},
+      );
+      final d = res.data;
+      if (d is Map && d['success'] == true) {
+        return {'success': true, ...Map<String, dynamic>.from(d)};
+      }
+      return {'success': false, 'message': 'Could not join the session'};
+    } on DioException catch (e) {
+      final data = e.response?.data;
+      final code = (data is Map ? data['code'] : null)?.toString();
+      final msg = (data is Map ? data['message'] : null)?.toString();
+      return {
+        'success': false,
+        'code': code ?? '',
+        'message': msg ?? 'Could not join the session',
+      };
+    } catch (_) {
+      return {'success': false, 'message': 'Could not join the session'};
+    }
+  }
 }

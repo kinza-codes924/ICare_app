@@ -69,6 +69,18 @@ const liveSessionSchema = new mongoose.Schema({
     userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     agoraUid: String,
   }],
+
+  // Invite link for someone outside the course — a visiting speaker, say.
+  // The token is what the link carries, so it can be withdrawn on its own
+  // without disturbing the session or anyone already in it. Guests are never
+  // moderators and are not enrolled; they simply get into this one room.
+  inviteToken: { type: String, index: true, sparse: true },
+  inviteEnabled: { type: Boolean, default: false },
+  inviteCreatedAt: Date,
+  guests: [{
+    name: String,
+    joinedAt: { type: Date, default: Date.now },
+  }],
 }, { timestamps: true });
 
 module.exports = mongoose.models.LiveSession || mongoose.model('LiveSession', liveSessionSchema);

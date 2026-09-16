@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:icare/services/lms_service.dart';
@@ -713,7 +714,12 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
     if (kIsWeb && _cameraViewName != null) {
       return Scaffold(
         backgroundColor: const Color(0xFF1C2333),
-        body: SizedBox.expand(child: HtmlElementView(viewType: _cameraViewName!)),
+        body: Stack(
+          children: [
+            SizedBox.expand(child: HtmlElementView(viewType: _cameraViewName!)),
+            _buildInviteOverlay(),
+          ],
+        ),
       );
     }
 
@@ -721,7 +727,12 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
     if (!kIsWeb && _joined) {
       return Scaffold(
         backgroundColor: const Color(0xFF1C2333),
-        body: SizedBox.expand(child: buildJitsiWebView()),
+        body: Stack(
+          children: [
+            SizedBox.expand(child: buildJitsiWebView()),
+            _buildInviteOverlay(),
+          ],
+        ),
       );
     }
 
@@ -1676,6 +1687,202 @@ class _LmsLiveSessionScreenState extends State<LmsLiveSessionScreen>
           const SizedBox(height: 2),
           Text(label, style: TextStyle(color: color.withValues(alpha: 0.8), fontSize: 10)),
         ]),
+      ),
+    );
+  }
+
+  // ── Guest invite ───────────────────────────────────────────────────────────
+  // Only the instructor sees this. Jitsi has its own invite dialog, but it
+  // carries Jitsi's name and its own share sheet, so the link is minted and
+  // shown here instead.
+
+  String? _inviteLink;
+  bool _inviteBusy = false;
+
+  Widget _buildInviteOverlay() {
+    if (!widget.isInstructor) return const SizedBox.shrink();
+    return Positioned(
+      top: 12,
+      right: 12,
+      child: SafeArea(
+        child: Material(
+          color: Colors.black.withValues(alpha: 0.55),
+          borderRadius: BorderRadius.circular(24),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(24),
+            onTap: _openInviteSheet,
+            child: const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.person_add_alt_1_rounded,
+                      color: Colors.white, size: 18),
+                  SizedBox(width: 7),
+                  Text('Invite',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                      )),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _fullInviteUrl(String path) {
+    // Built from where the app is actually served, so the link works on the
+    // live site and on a staging host without a hardcoded domain.
+    final base = Uri.base;
+    return '${base.scheme}://${base.host}'
+        '${base.hasPort && base.port != 80 && base.port != 443 ? ':${base.port}' : ''}'
+        '$path';
+  }
+
+  Future<void> _openInviteSheet() async {
+    final sessionId = _sessionDocId.isNotEmpty ? _sessionDocId : widget.sessionId;
+    if (sessionId.isEmpty) return;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheet) {
+          Future<void> create({bool regenerate = false}) async {
+            setSheet(() => _inviteBusy = true);
+            final path = await _lms.createSessionInvite(sessionId,
+                regenerate: regenerate);
+            if (!ctx.mounted) return;
+            setSheet(() {
+              _inviteBusy = false;
+              _inviteLink = path == null ? null : _fullInviteUrl(path);
+            });
+            if (path == null && ctx.mounted) {
+              ScaffoldMessenger.of(ctx).showSnackBar(
+                const SnackBar(content: Text('Could not create the invite link')),
+              );
+            }
+          }
+
+          if (_inviteLink == null && !_inviteBusy) {
+            WidgetsBinding.instance.addPostFrameCallback((_) => create());
+          }
+
+          return Padding(
+            padding: EdgeInsets.fromLTRB(
+              20, 18, 20, MediaQuery.of(ctx).viewInsets.bottom + 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.person_add_alt_1_rounded,
+                        color: Color(0xFF1A73E8)),
+                    const SizedBox(width: 10),
+                    const Expanded(
+                      child: Text('Invite someone to this session',
+                          style: TextStyle(
+                              fontSize: 16, fontWeight: FontWeight.w800)),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close_rounded),
+                      onPressed: () => Navigator.pop(ctx),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  'Anyone with this link can join as a guest. They do not need '
+                  'an account, and cannot end the session or start a recording.',
+                  style: TextStyle(fontSize: 13, color: Color(0xFF64748B)),
+                ),
+                const SizedBox(height: 16),
+                if (_inviteBusy)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 20),
+                    child: Center(child: CircularProgressIndicator()),
+                  )
+                else if (_inviteLink != null) ...[
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                    ),
+                    child: SelectableText(
+                      _inviteLink!,
+                      style: const TextStyle(
+                          fontSize: 13, color: Color(0xFF0F172A)),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          onPressed: () async {
+                            await Clipboard.setData(
+                                ClipboardData(text: _inviteLink!));
+                            if (!ctx.mounted) return;
+                            ScaffoldMessenger.of(ctx).showSnackBar(
+                              const SnackBar(content: Text('Invite link copied')),
+                            );
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.primaryColor,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                          ),
+                          icon: const Icon(Icons.copy_rounded, size: 18),
+                          label: const Text('Copy link'),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      IconButton(
+                        tooltip: 'Create a new link (the old one stops working)',
+                        onPressed: () => create(regenerate: true),
+                        icon: const Icon(Icons.refresh_rounded),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  TextButton.icon(
+                    onPressed: () async {
+                      final ok = await _lms.revokeSessionInvite(sessionId);
+                      if (!ctx.mounted) return;
+                      if (ok) {
+                        setSheet(() => _inviteLink = null);
+                        Navigator.pop(ctx);
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                                content: Text('Invite link turned off')),
+                          );
+                        }
+                      }
+                    },
+                    style: TextButton.styleFrom(
+                        foregroundColor: const Color(0xFFDC2626)),
+                    icon: const Icon(Icons.link_off_rounded, size: 18),
+                    label: const Text('Turn off this link'),
+                  ),
+                ],
+              ],
+            ),
+          );
+        },
       ),
     );
   }

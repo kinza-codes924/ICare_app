@@ -4,6 +4,8 @@ const mongoose = require('mongoose');
 const multer = require('multer');
 const { connectMongoDB } = require('../config/mongodb');
 const { authMiddleware } = require('../middleware/auth');
+const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
 const LiveSession = require('../models/LiveSession');
 const Enrollment = require('../models/Enrollment');
 const cloudinary = require('../config/cloudinary');
@@ -1770,6 +1772,168 @@ router.post('/:id/retry-drive-backup', authMiddleware, async (req, res) => {
     if (!result.ok) return res.status(502).json({ success: false, message: result.reason || 'Drive backup failed' });
     res.json({ success: true, url: result.url });
   } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+
+// ── Guest invite links ───────────────────────────────────────────────────────
+// So an instructor can bring in someone outside the course — a visiting
+// speaker, an examiner — without enrolling them or handing over an account.
+//
+// The link carries a token that belongs to the session, so it can be turned
+// off on its own without disturbing the session or anyone already in it. A
+// guest is never a moderator, is never added to attendees, and gets nothing
+// beyond this one room.
+
+// POST /:id/invite — instructor creates (or re-creates) the invite link
+router.post('/:id/invite', authMiddleware, async (req, res) => {
+  try {
+    await connectMongoDB();
+    const session = await LiveSession.findById(toId(req.params.id));
+    if (!session) return res.status(404).json({ success: false, message: 'Session not found' });
+
+    // Only the session's own instructor may hand out access to it.
+    if (session.instructorId?.toString() !== req.user.id?.toString()) {
+      return res.status(403).json({ success: false, message: 'Only the instructor can invite guests' });
+    }
+
+    // Reuse the existing token unless asked for a fresh one, so a link already
+    // shared with a guest keeps working.
+    if (!session.inviteToken || req.body.regenerate === true) {
+      session.inviteToken = crypto.randomBytes(24).toString('hex');
+      session.inviteCreatedAt = new Date();
+    }
+    session.inviteEnabled = true;
+    await session.save();
+
+    res.json({
+      success: true,
+      token: session.inviteToken,
+      path: `/join/${session.inviteToken}`,
+    });
+  } catch (e) {
+    console.error('invite create error:', e.message);
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+// DELETE /:id/invite — instructor turns the link off
+router.delete('/:id/invite', authMiddleware, async (req, res) => {
+  try {
+    await connectMongoDB();
+    const session = await LiveSession.findById(toId(req.params.id));
+    if (!session) return res.status(404).json({ success: false, message: 'Session not found' });
+    if (session.instructorId?.toString() !== req.user.id?.toString()) {
+      return res.status(403).json({ success: false, message: 'Only the instructor can change the invite' });
+    }
+    session.inviteEnabled = false;
+    await session.save();
+    res.json({ success: true });
+  } catch (e) {
+    console.error('invite revoke error:', e.message);
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+// GET /invite/:token — what the guest page shows before anyone joins.
+// Deliberately public, and deliberately thin: the session title and whether it
+// is live. No ids, no course, no participants, nothing about who is enrolled.
+router.get('/invite/:token', async (req, res) => {
+  try {
+    await connectMongoDB();
+    const token = (req.params.token || '').trim();
+    if (!token) return res.status(400).json({ success: false, message: 'Invalid link' });
+
+    const session = await LiveSession.findOne({ inviteToken: token, inviteEnabled: true })
+      .select('title status scheduledAt duration').lean();
+    if (!session) {
+      return res.status(404).json({ success: false, message: 'This invite link is no longer valid' });
+    }
+
+    res.json({
+      success: true,
+      title: session.title,
+      status: session.status,
+      isLive: session.status === 'live',
+      scheduledAt: session.scheduledAt,
+    });
+  } catch (e) {
+    console.error('invite lookup error:', e.message);
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+// POST /invite/:token/join — the guest's way in.
+//
+// Public by necessity: a guest has no account. The token is the credential,
+// and it only ever yields a non-moderator JWT for this one room. Signing
+// happens here rather than in /api/jitsi/token so that route can keep
+// demanding a real app user.
+router.post('/invite/:token/join', async (req, res) => {
+  try {
+    await connectMongoDB();
+    const token = (req.params.token || '').trim();
+    const session = await LiveSession.findOne({ inviteToken: token, inviteEnabled: true });
+    if (!session) {
+      return res.status(404).json({ success: false, message: 'This invite link is no longer valid' });
+    }
+
+    // Guests join a session in progress. Letting them in beforehand would put
+    // a stranger alone in the instructor's room.
+    if (session.status !== 'live') {
+      return res.status(409).json({
+        success: false,
+        code: 'NOT_LIVE',
+        message: 'The session has not started yet. Please try again once it is live.',
+      });
+    }
+
+    const appId = (process.env.JWT_APP_ID || '').trim();
+    const secret = (process.env.JWT_APP_SECRET || '').trim();
+    if (!appId || !secret) {
+      return res.status(500).json({ success: false, message: 'Jitsi signing not configured' });
+    }
+
+    const rawName = ((req.body.displayName || '') + '').trim().slice(0, 50);
+    const displayName = rawName || 'Guest';
+    // Same room the enrolled participants are in — see the client, which
+    // builds it as 'icare' + the session id stripped of non-alphanumerics.
+    const room = 'icare' + session._id.toString().replace(/[^a-zA-Z0-9]/g, '');
+
+    const now = Math.floor(Date.now() / 1000);
+    const jitsiJwt = jwt.sign({
+      iss: appId,
+      aud: appId,
+      sub: 'vh.itserver.biz',
+      room,
+      nbf: now - 10,
+      exp: now + 7200,
+      context: {
+        user: {
+          id: `guest_${crypto.randomBytes(6).toString('hex')}`,
+          name: displayName,
+          // Never a moderator. A guest must not be able to end the session,
+          // remove anyone, or start a recording.
+          moderator: false,
+        },
+      },
+    }, secret, { algorithm: 'HS256' });
+
+    session.guests.push({ name: displayName });
+    await session.save().catch(() => {});
+
+    console.log(`[invite] guest "${displayName}" joined session ${session._id} room=${room}`);
+
+    res.json({
+      success: true,
+      token: jitsiJwt,
+      room,
+      title: session.title,
+      displayName,
+    });
+  } catch (e) {
+    console.error('invite join error:', e.message);
     res.status(500).json({ success: false, message: e.message });
   }
 });

@@ -235,6 +235,7 @@ import 'package:icare/screens/star_click_game.dart'
     deferred as d_star_click_game;
 import 'package:icare/screens/walkthrough.dart' deferred as d_walkthrough;
 import 'package:icare/models/appointment_detail.dart';
+import 'package:icare/screens/guest_session_join_screen.dart';
 import 'package:icare/utils/shared_pref.dart';
 import 'package:icare/utils/app_keys.dart';
 
@@ -287,6 +288,10 @@ const _publicPaths = [
   '/payment-cancelled',
   '/select-user-type',
   '/forget-password',
+  // Guest invite links for LMS live sessions. Whoever follows one has no
+  // account by definition, so the token in the URL is the credential; the
+  // server checks it and only ever issues a non-moderator seat.
+  '/join',
 ];
 
 final routerProvider = Provider<GoRouter>((ref) {
@@ -481,6 +486,13 @@ final routerProvider = Provider<GoRouter>((ref) {
                 : (signedIn?.name ?? ''),
           );
         },
+      ),
+      // Guest joining a live session from an invite link.
+      GoRoute(
+        path: '/join/:inviteToken',
+        builder: (_, state) => GuestSessionJoinScreen(
+          inviteToken: state.pathParameters['inviteToken'] ?? '',
+        ),
       ),
       GoRoute(path: '/splash', builder: (_, _) => const SplashScreen()),
       GoRoute(path: '/home', builder: (_, _) => const PublicHome()),
