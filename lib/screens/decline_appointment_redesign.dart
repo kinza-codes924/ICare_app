@@ -370,6 +370,7 @@ class _DeclineAppointmentScreenState extends State<DeclineAppointmentScreen> {
                         controller: _reasonController,
                         maxLines: 5,
                         decoration: const InputDecoration(
+                          counterText: '',
                           hintText:
                               'Provide any additional information or context...',
                           hintStyle: TextStyle(color: Color(0xFF94A3B8)),

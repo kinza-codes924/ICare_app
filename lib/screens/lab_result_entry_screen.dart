@@ -515,6 +515,7 @@ class _LabResultEntryScreenState extends State<LabResultEntryScreen>
             controller: _notesController,
             maxLines: 3,
             decoration: const InputDecoration(
+              counterText: '',
               hintText: 'Any additional observations or notes...',
               hintStyle: TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
               border: InputBorder.none,
@@ -799,6 +800,7 @@ class _LabResultEntryScreenState extends State<LabResultEntryScreen>
               controller: _notesController,
               maxLines: 3,
               decoration: const InputDecoration(
+                counterText: '',
                 hintText: 'Any additional observations or notes...',
                 hintStyle: TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
                 border: InputBorder.none,

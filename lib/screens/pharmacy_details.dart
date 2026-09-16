@@ -1425,6 +1425,7 @@ class _PharmacyDetailsScreenState extends State<PharmacyDetailsScreen> {
                           textAlign: TextAlign.center,
                           style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
                           decoration: const InputDecoration(
+                            counterText: '',
                             border: InputBorder.none,
                             isDense: true,
                             contentPadding: EdgeInsets.symmetric(vertical: 4),

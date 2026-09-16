@@ -613,6 +613,7 @@ class _HealthCommunityScreenState extends ConsumerState<HealthCommunityScreen> {
                     controller: controller,
                     style: const TextStyle(fontSize: 14),
                     decoration: const InputDecoration(
+                      counterText: '',
                       hintText: 'Add a comment...',
                       border: InputBorder.none,
                       hintStyle: TextStyle(color: Color(0xFF94A3B8)),
@@ -1078,6 +1079,7 @@ class _CreatePostSheetState extends State<_CreatePostSheet> {
                 maxLines: 4,
                 autofocus: true,
                 decoration: const InputDecoration(
+                  counterText: '',
                   hintText: "What's on your mind?",
                   border: InputBorder.none,
                 ),

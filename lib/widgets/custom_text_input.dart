@@ -162,6 +162,12 @@ class _CustomInputFieldState extends State<CustomInputField> {
                           ),
                       isCollapsed: true,
                       contentPadding: EdgeInsets.zero,
+                      // This widget draws its own compact bordered box, so
+                      // Flutter's "0/80" counter had nowhere to sit: it landed
+                      // inside the box, pushed the hint off centre and left a
+                      // number floating under every field. The limit still
+                      // applies -- only the readout is hidden.
+                      counterText: '',
                     ),
                   ),
                 ),

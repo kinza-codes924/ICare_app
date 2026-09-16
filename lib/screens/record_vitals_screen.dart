@@ -329,6 +329,7 @@ class _RecordVitalsScreenState extends State<RecordVitalsScreen> {
             keyboardType: TextInputType.number,
             style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
             decoration: InputDecoration(
+              counterText: '',
               suffixText: unit,
               suffixStyle: const TextStyle(
                 fontSize: 12,

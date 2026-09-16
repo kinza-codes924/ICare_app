@@ -404,6 +404,7 @@ class _PostBox extends StatelessWidget {
             controller: ctrl,
             maxLines: 3,
             decoration: const InputDecoration(
+              counterText: '',
               hintText: 'Announce something to your class...',
               border: InputBorder.none,
             ),

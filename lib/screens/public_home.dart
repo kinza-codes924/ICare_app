@@ -1082,6 +1082,7 @@ class _MedicineSearchBarState extends State<_MedicineSearchBar> {
                     controller: _controller,
                     focusNode: _focusNode,
                     decoration: InputDecoration(
+                      counterText: '',
                       hintText: hintMap[_filter],
                       hintStyle: TextStyle(fontSize: 13, color: Colors.grey[400]),
                       prefixIcon: const Icon(Icons.local_pharmacy_rounded, color: _accentColor, size: 20),
@@ -1380,6 +1381,7 @@ class _LabSearchBarState extends State<_LabSearchBar> {
                     controller: _controller,
                     focusNode: _focusNode,
                     decoration: InputDecoration(
+                      counterText: '',
                       hintText: hintMap[_filter],
                       hintStyle: TextStyle(fontSize: 13, color: Colors.grey[400]),
                       prefixIcon: const Icon(Icons.biotech_rounded, color: _accentColor, size: 20),

@@ -655,6 +655,7 @@ class _WebChatScreenState extends State<_WebChatScreen> {
                               controller: _messageController,
                               onSubmitted: (_) => _sendMessage(),
                               decoration: const InputDecoration(
+                                counterText: '',
                                 hintText: "Type a message...",
                                 hintStyle: TextStyle(
                                   color: Color(0xFF94A3B8),

@@ -304,6 +304,9 @@ class _BookLabScreenState extends State<BookLabScreen> {
             vertical: 14,
           ),
           hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 14),
+          // Borderless field inside its own container: the counter would sit
+          // inside the box rather than under it. The limit still applies.
+          counterText: '',
         ),
       ),
     );

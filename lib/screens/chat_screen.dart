@@ -765,6 +765,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   controller: _messageController,
                   focusNode: _messageFocusNode,
                   decoration: InputDecoration(
+                    counterText: '',
                     hintText: 'Type a message...'.tr(),
                     border: InputBorder.none,
                     hintStyle: TextStyle(color: Colors.grey),

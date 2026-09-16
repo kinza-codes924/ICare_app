@@ -769,6 +769,7 @@ class _FillLabFormState extends ConsumerState<FillLabForm> {
             maxLength: 150,
             controller: controller,
             decoration: InputDecoration(
+              counterText: '',
               icon: Icon(icon, size: 20, color: const Color(0xFF94A3B8)),
               hintText: hint,
               hintStyle: const TextStyle(
