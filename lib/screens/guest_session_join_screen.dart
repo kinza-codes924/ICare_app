@@ -9,6 +9,8 @@
 // room the class is in. The guest is never a moderator: they cannot end the
 // session, remove anyone, or start a recording.
 
+import 'dart:async';
+
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:icare/services/lms_service.dart';
@@ -28,6 +30,7 @@ class _GuestSessionJoinScreenState extends State<GuestSessionJoinScreen> {
   final LmsService _lms = LmsService();
   final TextEditingController _nameCtrl = TextEditingController();
 
+  Timer? _closedPoller;
   bool _loading = true;
   bool _joining = false;
   bool _inCall = false;
@@ -44,6 +47,7 @@ class _GuestSessionJoinScreenState extends State<GuestSessionJoinScreen> {
 
   @override
   void dispose() {
+    _closedPoller?.cancel();
     if (_inCall) {
       try {
         lmsLeaveChannel();
@@ -51,6 +55,25 @@ class _GuestSessionJoinScreenState extends State<GuestSessionJoinScreen> {
     }
     _nameCtrl.dispose();
     super.dispose();
+  }
+
+  /// Watch for the session ending.
+  ///
+  /// When the instructor ends it for everyone, or the guest presses hangup,
+  /// Jitsi tears its own iframe down and leaves nothing behind — the guest was
+  /// left staring at a blank dark page with no way out. A guest has no
+  /// dashboard to return to, so send them to the site's front page.
+  void _startClosedPoller() {
+    _closedPoller?.cancel();
+    _closedPoller = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!mounted) return;
+      if (lmsIsSessionClosed()) {
+        _closedPoller?.cancel();
+        // A full page load, not a router push: an SPA navigation straight
+        // after a Jitsi session leaves dead platform views behind.
+        lmsHardRedirect('/home');
+      }
+    });
   }
 
   Future<void> _loadInvite() async {
@@ -69,18 +92,13 @@ class _GuestSessionJoinScreenState extends State<GuestSessionJoinScreen> {
       _isLive = info['isLive'] == true;
     });
 
-    // Straight in. The point of the link is that someone whose portal login
-    // is not working can still get into the session that is running right
-    // now; stopping them at a form to type a name would put back the step the
-    // link exists to skip. A name is only asked for if joining fails, or if
-    // the session has not started yet.
-    if (_isLive) {
-      _nameCtrl.text = 'Guest';
-      await _join(auto: true);
-    }
+    // The guest types their own name and presses Join. Joining automatically
+    // under the placeholder "Guest" put a meaningless label on their tile,
+    // and nobody in the session could tell who had walked in. One field and
+    // one button is not the step the link exists to skip -- logging in is.
   }
 
-  Future<void> _join({bool auto = false}) async {
+  Future<void> _join() async {
     final name = _nameCtrl.text.trim();
     if (name.isEmpty) {
       setState(() => _error = 'Please enter your name.');
@@ -97,7 +115,6 @@ class _GuestSessionJoinScreenState extends State<GuestSessionJoinScreen> {
     if (result['success'] != true) {
       setState(() {
         _joining = false;
-        if (auto) _nameCtrl.clear();
         _error = result['code'] == 'NOT_LIVE'
             ? 'The session has not started yet. Please try again once it is live.'
             : (result['message'] ?? 'Could not join the session').toString();
@@ -122,6 +139,7 @@ class _GuestSessionJoinScreenState extends State<GuestSessionJoinScreen> {
         jwt: (result['token'] ?? '').toString(),
         subject: _title,
       );
+      _startClosedPoller();
     } catch (e) {
       if (mounted) {
         setState(() {
@@ -249,6 +267,11 @@ class _GuestSessionJoinScreenState extends State<GuestSessionJoinScreen> {
               controller: _nameCtrl,
               maxLength: 50,
               textCapitalization: TextCapitalization.words,
+              // Cursor already in the field, and Enter joins: the guest
+              // should be able to type a name and be in the session without
+              // reaching for the mouse.
+              autofocus: true,
+              textInputAction: TextInputAction.go,
               onSubmitted: (_) => _joining ? null : _join(),
               decoration: InputDecoration(
                 counterText: '',
