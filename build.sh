@@ -4,6 +4,20 @@
 
 echo "=== iCare Web Deploy Script ==="
 
+# Guard tests run before anything ships. These cover the faults that have
+# already reached users once -- a consultation ending itself when someone
+# navigated away, and a caller announced as "Unknown" -- so a change that
+# brings one back stops here instead of on someone's live call.
+echo "Running guard tests..."
+if ! flutter test test/consultation_identity_test.dart                   test/consultation_not_ended_on_leave_test.dart; then
+  echo ""
+  echo "ERROR: guard tests failed — NOT deploying."
+  echo "Read the failure above: it names the behaviour that broke and why it matters."
+  exit 1
+fi
+echo "Guard tests passed."
+echo ""
+
 BOOTSTRAP="build/web/flutter_bootstrap.js"
 
 if [ ! -f "$BOOTSTRAP" ]; then

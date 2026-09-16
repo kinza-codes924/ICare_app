@@ -23,6 +23,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:icare/utils/utils.dart';
+import 'package:icare/utils/consultation_identity.dart';
 
 class ConsultationChatScreenV2 extends StatefulWidget {
   final AppointmentDetail? appointment; // nullable — may be null for patient accepting call
@@ -89,18 +90,15 @@ class _ConsultationChatScreenV2State extends State<ConsultationChatScreenV2> {
   /// string and the person on the other end saw "Unknown" ringing them.
   /// The consultation record already names both sides, so fall back to that,
   /// the same way the role is re-derived above rather than trusted.
-  String get _myName {
-    if (widget.currentUserName.trim().isNotEmpty) {
-      return widget.currentUserName.trim();
-    }
-    final fromRecord = _isDoctor
-        ? (_fetchedDoctorName ?? _appointment?.doctor?.name)
-        : (_fetchedPatientName ?? _appointment?.patient?.name);
-    if (fromRecord != null && fromRecord.trim().isNotEmpty) {
-      return fromRecord.trim();
-    }
-    return _isDoctor ? 'Doctor' : 'Patient';
-  }
+  /// The rule itself lives in utils/consultation_identity.dart so it can be
+  /// tested without building this screen. See consultation_identity_test.dart.
+  String get _myName => resolveMyName(
+        isDoctor: _isDoctor,
+        passedInName: widget.currentUserName,
+        nameFromRecord: _isDoctor
+            ? (_fetchedDoctorName ?? _appointment?.doctor?.name)
+            : (_fetchedPatientName ?? _appointment?.patient?.name),
+      );
 
   @override
   void initState() {
@@ -561,9 +559,8 @@ class _ConsultationChatScreenV2State extends State<ConsultationChatScreenV2> {
     // Send ring signal to the other party via call signaling backend
     final callService = CallService();
     // Doctor calls with "Dr. [name]" so patient sees proper title
-    final callerDisplayName = _isDoctor
-        ? (_myName.startsWith('Dr.') ? _myName : withDoctorTitle(_myName))
-        : _myName;
+    final callerDisplayName =
+        resolveCallerDisplayName(isDoctor: _isDoctor, myName: _myName);
     final callResult = await callService.initiateCall(
       receiverId: receiverId,
       channelName: channelName,
