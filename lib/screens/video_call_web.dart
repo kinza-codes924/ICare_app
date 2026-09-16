@@ -178,8 +178,6 @@ class _VideoCallWebState extends State<VideoCall> {
     // Only poll status on PATIENT side — doctor ends consultation themselves
     // Check role from SharedPref to determine if this is doctor or patient
     _maybeStartStatusPolling();
-    // Register beforeunload handler so closing the browser marks appointment completed
-    _registerBeforeUnload();
     _initRole();
     // Jitsi's own UI handles ringing/joining — watch for its hangup button
     _startClosedPoller();
@@ -548,28 +546,19 @@ class _VideoCallWebState extends State<VideoCall> {
     });
   }
 
-  void _registerBeforeUnload() {
-    if (widget.appointmentId == null || widget.appointmentId!.isEmpty) return;
-    // When the browser tab/window is closed, mark appointment as completed
-    // so it doesn't stay stuck as "in_progress"
-    // addEventListener, not `window.onbeforeunload = ...`: the assignment form
-    // replaces whatever handler is already there, and web/index.html installs
-    // its own.
-    web.window.addEventListener(
-      'beforeunload',
-      ((web.Event _) {
-        if (widget.appointmentId != null && widget.appointmentId!.isNotEmpty) {
-          // Fire-and-forget: mark as completed so rejoin button disappears
-          try {
-            ApiService().put('/appointments/update_status', {
-              'appointmentId': widget.appointmentId!,
-              'status': 'completed',
-            });
-          } catch (_) {}
-        }
-      }).toJS,
-    );
-  }
+  // There was a beforeunload handler here that marked the appointment
+  // 'completed', to stop an abandoned session sitting at in_progress forever.
+  //
+  // beforeunload does not mean "the consultation finished". It fires on every
+  // reload and every navigation away, so pressing Back during a live call
+  // closed the appointment out: the call was still running, yet both sides
+  // lost the Rejoin card and the doctor's In Progress tab went empty.
+  // Stepping away and coming back is normal mid-consultation -- the chat
+  // screen offers "Leave (keep session)" for precisely that.
+  //
+  // Ending a consultation is now only ever something a person asks for. A
+  // session genuinely left behind is settled server-side when the next one
+  // starts, which costs nobody a live call.
 
   Future<void> _maybeStartStatusPolling() async {
     if (widget.appointmentId == null || widget.appointmentId!.isEmpty) return;

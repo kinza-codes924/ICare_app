@@ -81,6 +81,27 @@ class _ConsultationChatScreenV2State extends State<ConsultationChatScreenV2> {
   bool get _isDoctor => widget.isDoctor || _roleIsDoctor;
   AppointmentDetail? get _appointment => widget.appointment ?? _fetchedAppointment;
 
+  /// The viewer's own name, for the ring signal and the chat header.
+  ///
+  /// currentUserName arrives in GoRouter's `extra`, which exists only when
+  /// another screen pushed this one. Open /consultation/<id> directly, or
+  /// reload the page mid-call, and extra is null — the name was then an empty
+  /// string and the person on the other end saw "Unknown" ringing them.
+  /// The consultation record already names both sides, so fall back to that,
+  /// the same way the role is re-derived above rather than trusted.
+  String get _myName {
+    if (widget.currentUserName.trim().isNotEmpty) {
+      return widget.currentUserName.trim();
+    }
+    final fromRecord = _isDoctor
+        ? (_fetchedDoctorName ?? _appointment?.doctor?.name)
+        : (_fetchedPatientName ?? _appointment?.patient?.name);
+    if (fromRecord != null && fromRecord.trim().isNotEmpty) {
+      return fromRecord.trim();
+    }
+    return _isDoctor ? 'Doctor' : 'Patient';
+  }
+
   @override
   void initState() {
     super.initState();
@@ -541,8 +562,8 @@ class _ConsultationChatScreenV2State extends State<ConsultationChatScreenV2> {
     final callService = CallService();
     // Doctor calls with "Dr. [name]" so patient sees proper title
     final callerDisplayName = _isDoctor
-        ? (widget.currentUserName.startsWith('Dr.') ? widget.currentUserName : withDoctorTitle(widget.currentUserName))
-        : widget.currentUserName;
+        ? (_myName.startsWith('Dr.') ? _myName : withDoctorTitle(_myName))
+        : _myName;
     final callResult = await callService.initiateCall(
       receiverId: receiverId,
       channelName: channelName,

@@ -460,12 +460,25 @@ final routerProvider = Provider<GoRouter>((ref) {
           final consultationId = (pathId == 'new')
               ? (extra?['consultationId'] as String?)
               : pathId;
+          // `extra` is only there when another screen pushed this route.
+          // Reaching /consultation/<id> by URL, or simply reloading the page
+          // mid-call, leaves it null — and the signed-in user was then handed
+          // in as an empty id and an empty name, so the other side's phone
+          // rang as "Unknown". Take both from the session, which is present
+          // either way, and let `extra` only override it.
+          final signedIn = ref.read(authProvider).user;
+          final extraName = (extra?['currentUserName'] as String?)?.trim();
+          final extraId = (extra?['currentUserId'] as String?)?.trim();
           return ConsultationChatScreenV2(
             consultationId: consultationId,
             appointment: extra?['appointment'] as AppointmentDetail?,
             isDoctor: extra?['isDoctor'] as bool? ?? false,
-            currentUserId: extra?['currentUserId'] as String? ?? '',
-            currentUserName: extra?['currentUserName'] as String? ?? '',
+            currentUserId: (extraId != null && extraId.isNotEmpty)
+                ? extraId
+                : (signedIn?.id ?? ''),
+            currentUserName: (extraName != null && extraName.isNotEmpty)
+                ? extraName
+                : (signedIn?.name ?? ''),
           );
         },
       ),

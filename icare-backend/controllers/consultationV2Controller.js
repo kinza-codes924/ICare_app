@@ -298,6 +298,15 @@ exports.endConsultation = async (req, res) => {
     const { consultationId } = req.params;
     const { duration, prescriptionId, callType, endedBy } = req.body;
 
+    // Say who ended it and why. A consultation once closed itself mid-call
+    // with no duration and no endedBy, and there was no way to tell from the
+    // logs what had done it -- this handler said nothing on entry. Never
+    // again: every end is now attributable.
+    console.log('🔴 END CONSULTATION:', consultationId,
+      'by', endedBy || 'unspecified',
+      'user', req.user && req.user.id,
+      'duration', duration, 'callType', callType);
+
     // Verify consultation exists
     const consultation = await Consultation.findById(consultationId);
     if (!consultation) {

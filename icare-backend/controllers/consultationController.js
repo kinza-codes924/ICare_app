@@ -221,6 +221,12 @@ exports.endConsultation = async (req, res) => {
       });
     }
 
+    // The v1 path. It sets neither duration nor endedBy, which is the exact
+    // fingerprint left on a consultation that closed itself mid-call, so log
+    // it loudly: if anything still reaches this old handler we will see it.
+    console.log('🔴 END CONSULTATION (v1 path):', consultationId,
+      'user', userId, 'isDoctor', isDoctor);
+
     consultation.status = 'completed';
     consultation.endTime = new Date();
     await consultation.save();
