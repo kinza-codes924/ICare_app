@@ -68,9 +68,19 @@ class _GuestSessionJoinScreenState extends State<GuestSessionJoinScreen> {
       _title = (info['title'] ?? 'Live Session').toString();
       _isLive = info['isLive'] == true;
     });
+
+    // Straight in. The point of the link is that someone whose portal login
+    // is not working can still get into the session that is running right
+    // now; stopping them at a form to type a name would put back the step the
+    // link exists to skip. A name is only asked for if joining fails, or if
+    // the session has not started yet.
+    if (_isLive) {
+      _nameCtrl.text = 'Guest';
+      await _join(auto: true);
+    }
   }
 
-  Future<void> _join() async {
+  Future<void> _join({bool auto = false}) async {
     final name = _nameCtrl.text.trim();
     if (name.isEmpty) {
       setState(() => _error = 'Please enter your name.');
@@ -87,6 +97,7 @@ class _GuestSessionJoinScreenState extends State<GuestSessionJoinScreen> {
     if (result['success'] != true) {
       setState(() {
         _joining = false;
+        if (auto) _nameCtrl.clear();
         _error = result['code'] == 'NOT_LIVE'
             ? 'The session has not started yet. Please try again once it is live.'
             : (result['message'] ?? 'Could not join the session').toString();

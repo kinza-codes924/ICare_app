@@ -354,6 +354,11 @@ final routerProvider = Provider<GoRouter>((ref) {
           '/help',
           '/payment-success',
           '/payment-cancelled',
+          // A guest invite must open the session for whoever follows it. Being
+          // merely "public" was not enough: a visitor who happens to be signed
+          // in to any account was bounced to their own dashboard instead, and
+          // the link appeared to do nothing.
+          '/join',
         ];
         // Prefix match (not exact) — /payment-success/<pid> carries our own
         // payment id as a path segment and must stay reachable for logged-in
