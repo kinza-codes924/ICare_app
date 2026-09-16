@@ -1141,7 +1141,22 @@
               enableWelcomePage: false,
               enableClosePage: false,
               disableDeepLinking: true,
+              // Jitsi's own invite dialog hands out
+              // https://<jitsi-domain>/<room>, and this deployment requires a
+              // JWT, so anyone following that link is turned away at the door.
+              // Its built-in invite stays off; instructors get a button in the
+              // same toolbar that produces OUR guest link instead, which the
+              // backend can actually admit someone with.
               disableInviteFunctions: true,
+              customToolbarButtons: isInstructor ? [{
+                id: 'icare-invite',
+                text: 'Invite',
+                // Inline so it needs no extra request and cannot 404.
+                icon: 'data:image/svg+xml;base64,' + btoa(
+                  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="white">' +
+                  '<path d="M15 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm-9-2V7H4v3H1v2h3v3h2v-3h3v-2H6zm9 4c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>' +
+                  '</svg>'),
+              }] : [],
               toolbarButtons: _lmsToolbarButtonsFor(isInstructor),
               filmstrip: { disableResizable: false },
               startWithAudioMuted: false,
@@ -1169,6 +1184,59 @@
           });
           _lmsJitsiApi.on('videoConferenceLeft', function() { _onLmsJitsiClosed('videoConferenceLeft'); });
           _lmsJitsiApi.on('readyToClose',        function() { _onLmsJitsiClosed('readyToClose'); });
+
+          // The instructor's Invite button, in Jitsi's own toolbar. Asks our
+          // backend for a guest link and copies it, so the instructor can
+          // paste it wherever they like. Jitsi's built-in invite is not used:
+          // it shares the Jitsi room URL, which this JWT-protected deployment
+          // refuses anyone who has no token.
+          _lmsJitsiApi.on('toolbarButtonClicked', function(ev) {
+            if (!ev || ev.key !== 'icare-invite') return;
+            // roomName is 'icare' + the session id, which is how the room was
+            // built in the first place.
+            var sid = (roomName || '').replace(/^icare/, '');
+            if (!sid) return;
+            var tok = _lmsAuthToken || _lsToken();
+            fetch('/api/live-sessions/' + sid + '/invite', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer ' + tok,
+              },
+              body: '{}',
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(d) {
+              if (!d || !d.success || !d.path) throw new Error('no link');
+              var link = window.location.origin + d.path;
+              var done = function() {
+                if (_lmsJitsiApi) {
+                  _lmsJitsiApi.executeCommand('showNotification', {
+                    title: 'Guest link copied',
+                    description: link,
+                    timeout: 'long',
+                  });
+                }
+              };
+              if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(link).then(done, function() {
+                  window.prompt('Copy this guest link:', link);
+                });
+              } else {
+                window.prompt('Copy this guest link:', link);
+              }
+            })
+            .catch(function(e) {
+              console.warn('invite link failed', e);
+              if (_lmsJitsiApi) {
+                _lmsJitsiApi.executeCommand('showNotification', {
+                  title: 'Could not create the invite link',
+                  description: 'Please try again.',
+                  timeout: 'short',
+                });
+              }
+            });
+          });
 
           // Jitsi's own "new message" toast lives inside a NESTED cross-
           // origin iframe (Jitsi wraps its real React app in an inner

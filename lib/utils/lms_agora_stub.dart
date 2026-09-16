@@ -33,6 +33,15 @@ void lmsSetCallbacks({void Function(int, bool)? onRemote, void Function()? onJoi
 
 String _pendingRoom = '';
 String _pendingJwt = '';
+/// The app's own bearer token. Distinct from _pendingJwt, which is the Jitsi
+/// JWT: the invite endpoint authenticates as the instructor, not as a Jitsi
+/// participant.
+String _pendingAuthToken = '';
+
+/// Where the backend and the site live, for the invite call and the link it
+/// produces. On mobile the WebView has no origin of its own to infer from.
+const String _apiBase = 'https://icare.com.co/api';
+const String _siteOrigin = 'https://icare.com.co';
 String _pendingName = '';
 String _pendingSubject = '';
 bool _pendingIsInstructor = false;
@@ -42,6 +51,7 @@ Future<void> lmsJoinChannel(String roomName, String displayName, bool isInstruct
     {String jwt = '', String subject = '', String authToken = ''}) async {
   _pendingRoom = roomName;
   _pendingJwt = jwt.isNotEmpty ? jwt : authToken;
+  _pendingAuthToken = authToken;
   _pendingName = displayName;
   _pendingSubject = subject;
   _pendingIsInstructor = isInstructor;
@@ -123,7 +133,19 @@ String _buildHostHtml() {
         enableWelcomePage: false,
         enableClosePage: false,
         disableDeepLinking: true,
+        // Jitsi's own invite shares the Jitsi room URL, which this
+        // JWT-protected deployment refuses anyone without a token. Its invite
+        // stays off; instructors get a button in the same toolbar that
+        // produces our guest link instead.
         disableInviteFunctions: true,
+        customToolbarButtons: $_pendingIsInstructor ? [{
+          id: 'icare-invite',
+          text: 'Invite',
+          icon: 'data:image/svg+xml;base64,' + btoa(
+            '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="white">' +
+            '<path d="M15 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm-9-2V7H4v3H1v2h3v3h2v-3h3v-2H6zm9 4c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>' +
+            '</svg>'),
+        }] : [],
         toolbarButtons: [$toolbarJs],
         filmstrip: { disableResizable: false },
         startWithAudioMuted: false,
@@ -167,6 +189,48 @@ String _buildHostHtml() {
       pushContext();
       if (++ctxTries > 40) clearInterval(ctxTimer);
     }, 500);
+
+    api.on('toolbarButtonClicked', function(ev) {
+      if (!ev || ev.key !== 'icare-invite') return;
+      var sid = '${_jsString(_pendingRoom)}'.replace(/^icare/, '');
+      if (!sid) return;
+      fetch('$_apiBase/live-sessions/' + sid + '/invite', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + '${_jsString(_pendingAuthToken)}'
+        },
+        body: '{}'
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(d) {
+        if (!d || !d.success || !d.path) throw new Error('no link');
+        var link = '$_siteOrigin' + d.path;
+        var show = function() {
+          try {
+            api.executeCommand('showNotification', {
+              title: 'Guest link copied',
+              description: link,
+              timeout: 'long'
+            });
+          } catch(e) {}
+        };
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(link).then(show, function() { window.prompt('Copy this guest link:', link); });
+        } else {
+          window.prompt('Copy this guest link:', link);
+        }
+      })
+      .catch(function(e) {
+        try {
+          api.executeCommand('showNotification', {
+            title: 'Could not create the invite link',
+            description: 'Please try again.',
+            timeout: 'short'
+          });
+        } catch(_) {}
+      });
+    });
 
     api.on('videoConferenceJoined', function() {
       pushContext();
