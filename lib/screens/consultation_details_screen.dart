@@ -241,12 +241,15 @@ class _ConsultationDetailsScreenState
 
                     _label('Patient Name'),
                     const SizedBox(height: 8),
+                    // Editable for Myself too, at the client's request. The
+                    // profile only supplies the starting value: a patient may
+                    // book under a fuller name than their account carries, or
+                    // correct what the profile has, without leaving this form.
                     _textField(
                       maxLength: 80,
                       controller: _nameController,
                       hint: 'Enter patient name',
                       icon: Icons.person_outline_rounded,
-                      readOnly: _forMyself,
                     ),
                     const SizedBox(height: 12),
 
@@ -258,97 +261,54 @@ class _ConsultationDetailsScreenState
                             children: [
                               _label('Gender'),
                               const SizedBox(height: 8),
-                              if (_forMyself)
-                                // Read-only display for Myself
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 14,
-                                    vertical: 12,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFFF1F5F9),
-                                    borderRadius: BorderRadius.circular(10),
-                                    border: Border.all(
-                                      color: const Color(0xFFE2E8F0),
+                              // The same chips either way -- a read-only
+                              // box here meant a patient whose profile had
+                              // no gender could not supply one.
+                              Wrap(
+                                spacing: 8,
+                                runSpacing: 6,
+                                children: ['Male', 'Female', 'Other'].map((
+                                  g,
+                                ) {
+                                  final isSelected =
+                                      _genderController.text == g;
+                                  return GestureDetector(
+                                    behavior: HitTestBehavior.opaque, // taps on the transparent padding were being dropped
+                                    onTap: () => setState(
+                                      () => _genderController.text = g,
                                     ),
-                                  ),
-                                  child: Row(
-                                    children: [
-                                      Icon(
-                                        _genderController.text.toLowerCase() ==
-                                                'female'
-                                            ? Icons.female_rounded
-                                            : _genderController.text
-                                                      .toLowerCase() ==
-                                                  'male'
-                                            ? Icons.male_rounded
-                                            : Icons.wc_rounded,
-                                        size: 16,
-                                        color: const Color(0xFF94A3B8),
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 12,
+                                        vertical: 8,
                                       ),
-                                      const SizedBox(width: 8),
-                                      Text(
-                                        _genderController.text.isNotEmpty
-                                            ? _genderController.text
-                                            : 'Not set in profile',
-                                        style: TextStyle(
-                                          fontSize: 14,
-                                          color:
-                                              _genderController.text.isNotEmpty
-                                              ? const Color(0xFF0F172A)
-                                              : const Color(0xFF94A3B8),
+                                      decoration: BoxDecoration(
+                                        color: isSelected
+                                            ? AppColors.primaryColor
+                                            : const Color(0xFFF1F5F9),
+                                        borderRadius: BorderRadius.circular(
+                                          8,
                                         ),
-                                      ),
-                                    ],
-                                  ),
-                                )
-                              else
-                                // Editable chips for Someone Else
-                                Wrap(
-                                  spacing: 8,
-                                  runSpacing: 6,
-                                  children: ['Male', 'Female', 'Other'].map((
-                                    g,
-                                  ) {
-                                    final isSelected =
-                                        _genderController.text == g;
-                                    return GestureDetector(
-                                      behavior: HitTestBehavior.opaque, // taps on the transparent padding were being dropped
-                                      onTap: () => setState(
-                                        () => _genderController.text = g,
-                                      ),
-                                      child: Container(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 12,
-                                          vertical: 8,
-                                        ),
-                                        decoration: BoxDecoration(
+                                        border: Border.all(
                                           color: isSelected
                                               ? AppColors.primaryColor
-                                              : const Color(0xFFF1F5F9),
-                                          borderRadius: BorderRadius.circular(
-                                            8,
-                                          ),
-                                          border: Border.all(
-                                            color: isSelected
-                                                ? AppColors.primaryColor
-                                                : const Color(0xFFE2E8F0),
-                                          ),
-                                        ),
-                                        child: Text(
-                                          g,
-                                          style: TextStyle(
-                                            fontSize: 12,
-                                            fontWeight: FontWeight.w700,
-                                            color: isSelected
-                                                ? Colors.white
-                                                : const Color(0xFF64748B),
-                                          ),
+                                              : const Color(0xFFE2E8F0),
                                         ),
                                       ),
-                                    );
-                                  }).toList(),
-                                ),
+                                      child: Text(
+                                        g,
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w700,
+                                          color: isSelected
+                                              ? Colors.white
+                                              : const Color(0xFF64748B),
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                }).toList(),
+                              ),
                             ],
                           ),
                         ),
@@ -360,13 +320,11 @@ class _ConsultationDetailsScreenState
                               _label('Age'),
                               const SizedBox(height: 8),
                               _textField(
-                                maxLength: 150,
+                                // An age is three digits, not a sentence.
+                                maxLength: 3,
                                 controller: _ageController,
-                                hint: _forMyself
-                                    ? 'Not set in profile'
-                                    : 'e.g. 30',
+                                hint: 'e.g. 30',
                                 keyboardType: TextInputType.number,
-                                readOnly: _forMyself,
                               ),
                             ],
                           ),

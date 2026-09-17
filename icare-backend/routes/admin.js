@@ -147,15 +147,20 @@ router.get('/approved-users', authMiddleware, adminOnly, async (req, res) => {
   try {
     await connectMongoDB();
     const { role } = req.query;
-    // Use exact lowercase match so MongoDB can use the index on `role` —
-    // regex on an unindexed field causes a full collection scan.
     const roleLower = (role || '').toLowerCase();
 
     const query = {};
     if (roleLower) {
+      // The collection holds both cases for every role — 'patient' and
+      // 'Patient', 'doctor' and 'Doctor' — depending on which signup path
+      // created the account. Matching only lowercase hid a large share of
+      // every list from the admin (48 of 120 patients, for one). Match both
+      // spellings explicitly rather than with a regex: these are exact terms,
+      // so the index on `role` is still used.
+      const variants = [roleLower, roleLower.charAt(0).toUpperCase() + roleLower.slice(1)];
       query.$or = [
-        { role: roleLower },
-        { roles: roleLower },
+        { role: { $in: variants } },
+        { roles: { $in: variants } },
       ];
     }
 

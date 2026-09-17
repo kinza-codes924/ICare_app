@@ -6,6 +6,21 @@ import 'package:icare/widgets/back_button.dart';
 import 'package:intl/intl.dart';
 import 'package:icare/services/reminder_service.dart';
 
+/// Repeat choices offered on the Add Reminder screen.
+const List<(String, String)> _repeatOptions = [
+  ('none', 'Once'),
+  ('daily', 'Daily'),
+  ('weekly', 'Weekly'),
+  ('monthly', 'Monthly'),
+  ('custom', 'Specific days'),
+];
+
+/// Weekday numbers match DateTime.weekday, so a stored day needs no mapping.
+const List<(int, String)> _weekdays = [
+  (1, 'Mon'), (2, 'Tue'), (3, 'Wed'), (4, 'Thu'),
+  (5, 'Fri'), (6, 'Sat'), (7, 'Sun'),
+];
+
 class CreateReminder extends StatefulWidget {
   const CreateReminder({super.key, this.isEdit = false});
   final bool isEdit;
@@ -20,6 +35,14 @@ class _CreateReminderState extends State<CreateReminder> {
 
   DateTime? _selectedDate;
   TimeOfDay? _selectedTime;
+
+  /// How often the reminder repeats.
+  ///
+  /// A medicine taken at 11pm every night should be set once, not entered
+  /// again each day -- which is what "Once" alone forced. 'custom' carries the
+  /// chosen weekdays in _selectedDays.
+  String _recurrence = 'none';
+  final Set<int> _selectedDays = {}; // 1 = Mon ... 7 = Sun, as DateTime uses
   bool _isSubmitting = false;
 
   @override
@@ -78,7 +101,11 @@ class _CreateReminderState extends State<CreateReminder> {
       'type': 'self_created',
       'scheduledFor': dt.toIso8601String(),
       'remindBeforeMinutes': 15,
-      'recurrence': 'none',
+      // 'custom' is not a value the backend stores, so specific weekdays go
+      // as a weekly repeat plus the days themselves.
+      'recurrence': _recurrence == 'custom' ? 'weekly' : _recurrence,
+      if (_recurrence == 'custom')
+        'repeatDays': (_selectedDays.toList()..sort()),
     });
 
     if (mounted) {
@@ -226,6 +253,100 @@ class _CreateReminderState extends State<CreateReminder> {
                       isPlaceholder: _selectedTime == null,
                       onTap: _pickTime,
                     ),
+                    const SizedBox(height: 20),
+
+                    // Repeat
+                    _fieldLabel('Repeat'),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: _repeatOptions.map((opt) {
+                        final value = opt.$1;
+                        final selected = _recurrence == value;
+                        return GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onTap: () => setState(() {
+                            _recurrence = value;
+                            if (value != 'custom') _selectedDays.clear();
+                          }),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 14, vertical: 9),
+                            decoration: BoxDecoration(
+                              color: selected
+                                  ? AppColors.primaryColor
+                                  : const Color(0xFFF1F5F9),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                color: selected
+                                    ? AppColors.primaryColor
+                                    : const Color(0xFFE2E8F0),
+                              ),
+                            ),
+                            child: Text(
+                              opt.$2,
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                color: selected
+                                    ? Colors.white
+                                    : const Color(0xFF64748B),
+                              ),
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+
+                    // Weekday picker, shown only when specific days are wanted
+                    if (_recurrence == 'custom') ...[
+                      const SizedBox(height: 12),
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 6,
+                        children: _weekdays.map((d) {
+                          final day = d.$1;
+                          final on = _selectedDays.contains(day);
+                          return GestureDetector(
+                            behavior: HitTestBehavior.opaque,
+                            onTap: () => setState(() {
+                              if (on) {
+                                _selectedDays.remove(day);
+                              } else {
+                                _selectedDays.add(day);
+                              }
+                            }),
+                            child: Container(
+                              width: 46,
+                              padding: const EdgeInsets.symmetric(vertical: 9),
+                              alignment: Alignment.center,
+                              decoration: BoxDecoration(
+                                color: on
+                                    ? AppColors.primaryColor
+                                    : const Color(0xFFF1F5F9),
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(
+                                  color: on
+                                      ? AppColors.primaryColor
+                                      : const Color(0xFFE2E8F0),
+                                ),
+                              ),
+                              child: Text(
+                                d.$2,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  color: on
+                                      ? Colors.white
+                                      : const Color(0xFF64748B),
+                                ),
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                    ],
                     const SizedBox(height: 28),
 
                     // Submit button

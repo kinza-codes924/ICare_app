@@ -47,6 +47,32 @@ class _LifestyleTrackerScreenState extends State<LifestyleTrackerScreen>
   // Condition-specific
   String _conditionMode = 'General Wellness';
 
+  /// The condition checklists, built once.
+  ///
+  /// These used to be created inside build(): ticking a box called setState,
+  /// build ran again, and a fresh list was made with the original hardcoded
+  /// values — so the tick vanished the instant it was made and the checkboxes
+  /// looked dead. State that has to survive a rebuild cannot live in build().
+  late final Map<String, List<_CondItem>> _conditionCards = {
+    'General Wellness': [
+      _CondItem('🏃', 'Daily Exercise', 'Did you exercise today?', false),
+      _CondItem('🥦', 'Balanced Diet', 'Ate fruits/vegetables?', false),
+      _CondItem('💤', 'Good Sleep', 'Slept 7+ hours?', false),
+    ],
+    'Diabetes': [
+      _CondItem('🩸', 'Morning Sugar', 'Logged fasting glucose?', false),
+      _CondItem('💊', 'Insulin/Meds', 'Taken as prescribed?', false),
+      _CondItem('🦶', 'Foot Check', 'Daily foot inspection done?', false),
+      _CondItem('🥗', 'Carb Intake', 'Tracked carbohydrates?', false),
+    ],
+    'Hypertension': [
+      _CondItem('❤️', 'BP Logged', 'Blood pressure recorded?', false),
+      _CondItem('🧂', 'Low Salt', 'Avoided high-sodium foods?', false),
+      _CondItem('🚶', 'Light Walk', 'Done 30-min walk?', false),
+      _CondItem('😌', 'Stress Check', 'Practiced relaxation?', false),
+    ],
+  };
+
   // Mood
   String _selectedMood = '😊';
   int _stressLevel = 3;
@@ -299,15 +325,22 @@ class _LifestyleTrackerScreenState extends State<LifestyleTrackerScreen>
         final medsRaw = (presMap is Map ? presMap['medicines'] : null) as List? ?? [];
         for (final m in medsRaw) {
           if (m is! Map) continue;
-          final name = (m['name'] ?? '').toString().trim();
+          // Prescriptions are stored with medicineName/dose, not name/dosage.
+          // Reading only the latter found nothing in every real prescription,
+          // so the tab always said "No active prescriptions" even for a
+          // patient with a hundred of them. Accept both spellings.
+          final name =
+              (m['medicineName'] ?? m['name'] ?? '').toString().trim();
           if (name.isEmpty || seenNames.contains(name.toLowerCase())) continue;
           seenNames.add(name.toLowerCase());
           allMeds.add({
             'name': name,
-            'dosage': (m['dosage'] ?? '').toString(),
+            'dosage': (m['dose'] ?? m['dosage'] ?? '').toString(),
             'frequency': (m['frequency'] ?? '').toString(),
             'duration': (m['duration'] ?? '').toString(),
-            'instructions': (m['instructions'] ?? m['notes'] ?? '').toString(),
+            'instructions':
+                (m['instructions'] ?? m['notes'] ?? m['formType'] ?? '')
+                    .toString(),
           });
         }
         if (allMeds.isNotEmpty) break; // use medicines from the latest prescription only
@@ -2643,28 +2676,30 @@ class _LifestyleTrackerScreenState extends State<LifestyleTrackerScreen>
   // ════════════════════════════════════════════════════════════════════════
   // Tab 4 — CONDITION-SPECIFIC
   // ════════════════════════════════════════════════════════════════════════
-  Widget _buildConditionTab() {
-    final conditionCards = {
-      'General Wellness': [
-        _CondItem('🏃', 'Daily Exercise', 'Did you exercise today?', false),
-        _CondItem('🥦', 'Balanced Diet', 'Ate fruits/vegetables?', true),
-        _CondItem('💤', 'Good Sleep', 'Slept 7+ hours?', true),
-      ],
-      'Diabetes': [
-        _CondItem('🩸', 'Morning Sugar', 'Logged fasting glucose?', false),
-        _CondItem('💊', 'Insulin/Meds', 'Taken as prescribed?', true),
-        _CondItem('🦶', 'Foot Check', 'Daily foot inspection done?', false),
-        _CondItem('🥗', 'Carb Intake', 'Tracked carbohydrates?', true),
-      ],
-      'Hypertension': [
-        _CondItem('❤️', 'BP Logged', 'Blood pressure recorded?', true),
-        _CondItem('🧂', 'Low Salt', 'Avoided high-sodium foods?', false),
-        _CondItem('🚶', 'Light Walk', 'Done 30-min walk?', false),
-        _CondItem('😌', 'Stress Check', 'Practiced relaxation?', true),
-      ],
-    };
+  /// Tick a condition item, and record it.
+  ///
+  /// The tick updates immediately so the box responds to the tap, then the
+  /// entry is written to the tracker. Without the write these were forgotten
+  /// on the next page load — the checklist looked functional and remembered
+  /// nothing.
+  Future<void> _toggleConditionItem(_CondItem item, bool checked) async {
+    setState(() => item.checked = checked);
+    if (!checked) return; // unticking just clears today's local state
+    try {
+      await _healthTrackerService.addEntry(
+        vitalType: 'condition_check',
+        value: item.title,
+        unit: _conditionMode,
+        notes: item.subtitle,
+      );
+    } catch (_) {
+      // The tick stands either way; a failed write should not undo what the
+      // user just did in front of them.
+    }
+  }
 
-    final items = conditionCards[_conditionMode] ?? [];
+  Widget _buildConditionTab() {
+    final items = _conditionCards[_conditionMode] ?? [];
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
@@ -2682,7 +2717,7 @@ class _LifestyleTrackerScreenState extends State<LifestyleTrackerScreen>
               borderRadius: BorderRadius.circular(14),
             ),
             child: Row(
-              children: conditionCards.keys.map((mode) {
+              children: _conditionCards.keys.map((mode) {
                 final selected = _conditionMode == mode;
                 return Expanded(
                   child: GestureDetector(
@@ -2760,8 +2795,7 @@ class _LifestyleTrackerScreenState extends State<LifestyleTrackerScreen>
                       activeColor: AppColors.primaryColor,
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(6)),
-                      onChanged: (v) =>
-                          setState(() => item.checked = v ?? false),
+                      onChanged: (v) => _toggleConditionItem(item, v ?? false),
                     ),
                   ],
                 ),

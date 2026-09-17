@@ -1043,7 +1043,31 @@ class _ApptCardState extends State<_ApptCard> {
                       // status:'pending', so it read as a normal confirmed
                       // slot — patients thought a cancelled payment had still
                       // booked them in. Say so plainly instead.
+                      // A doctor who never set a fee leaves this at 0. There
+                      // is nothing to pay, so demanding payment reads as a
+                      // fault in the app; say the visit is free instead.
                       if (appt.status.toLowerCase() == 'pending' &&
+                          appt.paymentStatus.toLowerCase() != 'paid' &&
+                          appt.consultationFee <= 0) ...[
+                        const SizedBox(height: 5),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF10B981).withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: const Row(mainAxisSize: MainAxisSize.min, children: [
+                            Icon(Icons.info_outline_rounded, size: 11, color: Color(0xFF10B981)),
+                            SizedBox(width: 4),
+                            Flexible(
+                              child: Text(
+                                'No fee — awaiting doctor confirmation',
+                                style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Color(0xFF10B981)),
+                              ),
+                            ),
+                          ]),
+                        ),
+                      ] else if (appt.status.toLowerCase() == 'pending' &&
                           appt.paymentStatus.toLowerCase() != 'paid') ...[
                         const SizedBox(height: 5),
                         Container(
@@ -1081,7 +1105,8 @@ class _ApptCardState extends State<_ApptCard> {
                 // The slot isn't held until it's paid for, so offer the way to
                 // finish rather than only flagging that it's outstanding.
                 if (appt.status.toLowerCase() == 'pending' &&
-                    appt.paymentStatus.toLowerCase() != 'paid') ...[
+                    appt.paymentStatus.toLowerCase() != 'paid' &&
+                    appt.consultationFee > 0) ...[
                   GestureDetector(
                     onTap: _proceedToPayment,
                     child: Container(

@@ -18,6 +18,10 @@ const reminderSchema = new mongoose.Schema({
   consultationId: { type: mongoose.Schema.Types.ObjectId, ref: 'Consultation' },
   // For self-created reminders
   recurrence: { type: String, enum: ['none', 'daily', 'weekly', 'monthly'], default: 'none' },
+  // Which days a weekly reminder falls on: 1 = Monday ... 7 = Sunday, matching
+  // Dart's DateTime.weekday so neither side has to translate. Empty means
+  // every week on the day the reminder was first set for.
+  repeatDays: { type: [Number], default: [] },
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now },
 });

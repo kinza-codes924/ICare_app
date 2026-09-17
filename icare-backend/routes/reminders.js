@@ -25,7 +25,7 @@ router.post('/', authMiddleware, async (req, res) => {
     await connectMongoDB();
     const Reminder = require('../models/Reminder');
     const Notification = require('../models/Notification');
-    const { title, message, type, scheduledFor, remindBeforeMinutes, recurrence, prescriptionId, consultationId } = req.body;
+    const { title, message, type, scheduledFor, remindBeforeMinutes, recurrence, repeatDays, prescriptionId, consultationId } = req.body;
     if (!title || title.trim() === '') {
       return res.status(400).json({ success: false, message: 'Title is required' });
     }
@@ -37,6 +37,11 @@ router.post('/', authMiddleware, async (req, res) => {
       scheduledFor: scheduledFor || null,
       remindBeforeMinutes: remindBeforeMinutes || 15,
       recurrence: recurrence || 'none',
+      // Only meaningful for a weekly repeat; kept as given so the client can
+      // show back exactly the days the user picked.
+      repeatDays: Array.isArray(repeatDays)
+        ? repeatDays.filter(d => Number.isInteger(d) && d >= 1 && d <= 7)
+        : [],
       prescriptionId: prescriptionId || null,
       consultationId: consultationId || null,
     });

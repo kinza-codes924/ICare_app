@@ -32,7 +32,7 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
   // keyed by userId.
   final Map<String, Map<String, dynamic>> _lmsVerifications = {};
   String _currentTab =
-      'Pending'; // 'Pending', 'Student', 'Pharmacy', 'Laboratory', 'Instructor', 'PatientRecords'
+      'Pending'; // 'Pending', 'Doctor', 'Patient', 'Student', 'Pharmacy', 'Laboratory', 'Instructor', 'PatientRecords'
 
   // Patient Records state
   final MedicalRecordService _medicalRecordService = MedicalRecordService();
@@ -160,6 +160,7 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
         // Map tab name to backend role
         final roleMap = {
           'Doctor': 'doctor',
+          'Patient': 'patient',
           'Student': 'student',
           'Pharmacy': 'pharmacy',
           'Laboratory': 'lab',
@@ -1212,6 +1213,10 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
                 children: [
                   _buildTabItem('Pending',        Icons.pending_actions_rounded),
                   _buildTabItem('Doctor',         Icons.medical_services_rounded),
+                  // Patients were the one approved role with no list of their
+                  // own, so an admin could see every other kind of account but
+                  // not the people the platform is for.
+                  _buildTabItem('Patient',        Icons.personal_injury_rounded),
                   _buildTabItem('Student',        Icons.school_rounded),
                   _buildTabItem('Pharmacy',       Icons.local_pharmacy_rounded),
                   _buildTabItem('Laboratory',     Icons.biotech_rounded),
