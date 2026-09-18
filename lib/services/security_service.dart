@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:icare/services/api_service.dart';
 
 class SecurityService {
@@ -27,6 +28,16 @@ class SecurityService {
         return {'success': m['success'] ?? response.statusCode == 200, ...m};
       }
       return {'success': response.statusCode == 200};
+    } on DioException catch (e) {
+      // A wrong or expired code is a 400 from the backend, which Dio throws
+      // on before this method's own `data is Map` check ever runs -- so
+      // `e.toString()` (a generic "DioException [bad response]: ..." string)
+      // was what actually reached the screen on the one path every user
+      // takes: typing the code wrong. The real reason lives in
+      // e.response.data['message'] instead.
+      final body = e.response?.data;
+      final msg = (body is Map ? body['message'] : null)?.toString();
+      return {'success': false, 'message': msg ?? 'Invalid code. Please try again.'};
     } catch (e) {
       return {'success': false, 'message': e.toString()};
     }

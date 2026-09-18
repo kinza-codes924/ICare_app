@@ -115,6 +115,11 @@ class _OtpVerificationScreenState
         if (mounted) context.go('/dashboard');
       }
     } catch (e) {
+      // Clear the wrong code along with showing why -- otherwise the six
+      // wrong digits just sit there and the user has to notice and wipe
+      // them by hand before a retry can even begin.
+      _phonePinController.clear();
+      _phoneOtpCode = '';
       setState(() => _errorMsg = e.toString().replaceFirst('Exception: ', ''));
     } finally {
       setState(() => _loading = false);
@@ -152,6 +157,11 @@ class _OtpVerificationScreenState
       await notifier.setUser(user.copyWith(isEmailVerified: true));
       if (mounted) context.go('/dashboard');
     } catch (e) {
+      // Clear the wrong code along with showing why -- otherwise the six
+      // wrong digits just sit there and the user has to notice and wipe
+      // them by hand before a retry can even begin.
+      _emailPinController.clear();
+      _emailOtpCode = '';
       setState(() => _errorMsg = e.toString().replaceFirst('Exception: ', ''));
     } finally {
       setState(() => _loading = false);
