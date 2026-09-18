@@ -38,7 +38,7 @@ router.post('/2fa/setup-email', authMiddleware, async (req, res) => {
       },
       { strict: false }
     );
-    await sendOtpEmail({ to: user.email, name: user.name || user.username, otp });
+    await sendOtpEmail({ to: user.email, name: user.name || user.username, otp, purpose: 'login2fa' });
 
     res.json({
       success: true,
@@ -238,7 +238,7 @@ router.post('/2fa/resend-email', async (req, res) => {
         twoFactorEmailOtpLastSentAt: new Date(),
       },
     });
-    await sendOtpEmail({ to: user.email, name: user.name || user.username, otp });
+    await sendOtpEmail({ to: user.email, name: user.name || user.username, otp, purpose: 'login2fa' });
 
     res.json({ success: true, message: `We sent a new code to ${user.email}.` });
   } catch (err) {

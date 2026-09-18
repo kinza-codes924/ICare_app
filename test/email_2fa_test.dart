@@ -140,5 +140,47 @@ void main() {
         expect(source.contains(field), isTrue, reason: 'User.js is missing $field.');
       }
     });
+
+    test('2FA emails do not claim to be creating an account', () {
+      final source = _read('icare-backend/utils/emailOtp.js');
+      expect(
+        source.contains("purpose = 'signup'"),
+        isTrue,
+        reason: 'sendOtpEmail/otpEmailHtml must default to a signup purpose '
+            'but accept an override -- without a purpose parameter, every '
+            'caller shares signup\'s "finish creating your iCare account" '
+            'wording, which is wrong and confusing on a login 2FA code.',
+      );
+      expect(
+        source.contains("login2fa"),
+        isTrue,
+        reason: 'emailOtp.js must define login2fa wording distinct from '
+            'the signup wording.',
+      );
+
+      for (final path in [
+        'icare-backend/routes/security.js',
+        'icare-backend/controllers/authController.js',
+      ]) {
+        final fileSource = _read(path);
+        // Every sendOtpEmail call that is part of the 2FA flow (identified
+        // by sitting near twoFactorEmail* fields or a 2FA comment) must
+        // pass purpose: 'login2fa' -- otherwise it silently falls back to
+        // signup's wording again.
+        final twoFaCallSites = RegExp(r"sendOtpEmail\(\{[^)]*\}\)").allMatches(fileSource).where((m) {
+          final start = (m.start - 400).clamp(0, fileSource.length);
+          final context = fileSource.substring(start, m.end);
+          return context.contains('twoFactorEmailOtp') || context.contains('2FA');
+        });
+        for (final m in twoFaCallSites) {
+          expect(
+            m.group(0)!.contains("purpose: 'login2fa'"),
+            isTrue,
+            reason: '$path has a 2FA-context sendOtpEmail call missing '
+                "purpose: 'login2fa': ${m.group(0)}",
+          );
+        }
+      }
+    });
   });
 }

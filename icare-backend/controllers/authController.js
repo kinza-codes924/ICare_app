@@ -681,7 +681,7 @@ const login = async (req, res) => {
         });
         // Fire-and-forget, same as the other login-path OTP send above --
         // a slow mail provider must not hold up the login response itself.
-        sendOtpEmail({ to: user.email, name: user.name || user.username, otp })
+        sendOtpEmail({ to: user.email, name: user.name || user.username, otp, purpose: 'login2fa' })
           .catch(e => console.error('[login] 2FA email OTP failed:', e.message));
         message = `We sent a 6-digit code to ${user.email}.`;
       }
