@@ -66,5 +66,22 @@ void main() {
           'swallowed both successful switches (no navigation happened) and '
           'failures (no error shown).',
     );
+    expect(
+      RegExp(r'\bref\.read\(authProvider').hasMatch(body),
+      isFalse,
+      reason: '_switchRole must not call ref.read(authProvider...) directly '
+          '-- that ref belongs to _CustomDrawerState too, and Riverpod '
+          'throws "Bad state: ... unsafe to use when the widget is '
+          'deactivated" the moment the drawer finishes disposing, which can '
+          'land before this network call returns. Read providers through '
+          "ProviderScope.containerOf(navContext) instead, using the same "
+          'appNavigatorKey context.',
+    );
+    expect(
+      body.contains('ProviderScope.containerOf('),
+      isTrue,
+      reason: '_switchRole must read/write authProvider through '
+          'ProviderScope.containerOf(navContext), not the widget\'s own ref.',
+    );
   });
 }

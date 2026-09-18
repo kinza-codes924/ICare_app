@@ -85,30 +85,33 @@ class _CustomDrawerState extends ConsumerState<CustomDrawer> {
 
       if (result['success'] == true) {
         final inner = result['data'];
-        await ref.read(authProvider.notifier).setUserToken(inner['token'].toString());
-        final currentUser = ref.read(authProvider).user;
+        // `ref` here is _CustomDrawerState's own -- unsafe the moment the
+        // drawer (already closed to get here) finishes disposing, which on
+        // mobile can land before this network call even returns. Riverpod
+        // throws "Bad state: ... unsafe to use when the widget is
+        // deactivated" the instant that happens. appNavigatorKey's context
+        // always belongs to a live widget for as long as the app is
+        // running, so read providers through its ProviderScope instead.
+        final navContext = appNavigatorKey.currentContext;
+        if (navContext == null || !navContext.mounted) {
+          if (dialogContext.mounted) Navigator.of(dialogContext).pop();
+          return;
+        }
+        final container = ProviderScope.containerOf(navContext);
+        await container.read(authProvider.notifier).setUserToken(inner['token'].toString());
+        final currentUser = container.read(authProvider).user;
         final user = User.fromJson(Map<String, dynamic>.from(inner['user'] as Map)).copyWith(
           isEmailVerified: currentUser?.isEmailVerified ?? true,
           isPhoneVerified: currentUser?.isPhoneVerified ?? true,
         );
-        await ref.read(authProvider.notifier).setUser(user);
+        await container.read(authProvider.notifier).setUser(user);
         // Close the spinner, then move -- in that order, so it is never
         // left hanging over whatever screen navigation lands on.
         if (dialogContext.mounted) Navigator.of(dialogContext).pop();
         // go('/dashboard') depends on that route's own redirect re-reading
         // authProvider -- going straight to the new role's real route avoids
         // relying on that indirection firing again for a role switch.
-        //
-        // On mobile, `mounted`/`context` here are _CustomDrawerState's --
-        // and the drawer is already disposed by the time this runs, because
-        // opening the sheet closed it. That silently swallowed a
-        // *successful* switch: the backend call went through, but nothing
-        // ever navigated or showed an error, which read as the screen being
-        // stuck. dialogContext can go the same way right after the pop
-        // above tears its own dialog route down, so navigate via
-        // appNavigatorKey's context, which outlives all of it.
-        final navContext = appNavigatorKey.currentContext;
-        if (navContext != null && navContext.mounted) {
+        if (navContext.mounted) {
           navContext.go(dashboardRouteFor(user.role));
         }
       } else {
