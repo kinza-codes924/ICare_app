@@ -110,6 +110,11 @@ class AuthService {
             'requiresOtp': true,
             'tempToken': data['tempToken'],
             'emailSent': data['emailSent'],
+            // Dropped here, this always looked like a TOTP account to the
+            // caller -- login.dart's 2FA dialog defaults to 'totp' whenever
+            // this key is missing, so an email-2FA account was shown "Open
+            // Google Authenticator" with no way to get the right screen.
+            'twoFactorMethod': data['twoFactorMethod'],
             'message': data['message'] ?? 'Verification required',
           };
         }

@@ -80,6 +80,25 @@ void main() {
       expect(source.contains('Future<Map<String, dynamic>> resend2FAEmail('), isTrue);
       expect(source.contains("'/auth/2fa/resend-email'"), isTrue);
     });
+
+    test('login() forwards twoFactorMethod from the backend response', () {
+      final source = _read('lib/services/auth_service.dart');
+      final requiresOtpBranch = RegExp(
+        r"if \(data\['requiresOtp'\] == true\) \{[\s\S]*?\n        \}",
+      ).firstMatch(source);
+      expect(requiresOtpBranch, isNotNull,
+          reason: "login()'s requiresOtp branch was not found in the "
+              "expected shape.");
+      expect(
+        requiresOtpBranch!.group(0)!.contains("'twoFactorMethod': data['twoFactorMethod']"),
+        isTrue,
+        reason: "login()'s requiresOtp branch builds a fresh map with only "
+            "some of the backend's fields -- twoFactorMethod was left out, "
+            "so login.dart always saw it as null and defaulted to 'totp', "
+            "showing 'Open Google Authenticator' even for an account "
+            "correctly set to email 2FA in the database.",
+      );
+    });
   });
 
   group('Backend wires the email 2FA routes and fields', () {
