@@ -9,6 +9,7 @@ import 'package:icare/services/api_service.dart';
 import 'package:icare/services/auth_service.dart';
 import 'package:icare/screens/doctor_profile_setup.dart';
 import 'package:icare/screens/login.dart';
+import 'package:icare/utils/app_keys.dart';
 import 'package:icare/utils/theme.dart';
 import 'package:icare/widgets/custom_text.dart';
 
@@ -92,20 +93,29 @@ class _CustomDrawerState extends ConsumerState<CustomDrawer> {
         );
         await ref.read(authProvider.notifier).setUser(user);
         // Close the spinner, then move -- in that order, so it is never
-        // left hanging over whatever screen context.go lands on.
+        // left hanging over whatever screen navigation lands on.
         if (dialogContext.mounted) Navigator.of(dialogContext).pop();
         // go('/dashboard') depends on that route's own redirect re-reading
         // authProvider -- going straight to the new role's real route avoids
         // relying on that indirection firing again for a role switch.
-        if (mounted) {
-          // ignore: use_build_context_synchronously
-          context.go(dashboardRouteFor(user.role));
+        //
+        // On mobile, `mounted`/`context` here are _CustomDrawerState's --
+        // and the drawer is already disposed by the time this runs, because
+        // opening the sheet closed it. That silently swallowed a
+        // *successful* switch: the backend call went through, but nothing
+        // ever navigated or showed an error, which read as the screen being
+        // stuck. dialogContext can go the same way right after the pop
+        // above tears its own dialog route down, so navigate via
+        // appNavigatorKey's context, which outlives all of it.
+        final navContext = appNavigatorKey.currentContext;
+        if (navContext != null && navContext.mounted) {
+          navContext.go(dashboardRouteFor(user.role));
         }
       } else {
         if (dialogContext.mounted) Navigator.of(dialogContext).pop();
-        if (mounted) {
-          // ignore: use_build_context_synchronously
-          ScaffoldMessenger.of(context).showSnackBar(
+        final navContext = appNavigatorKey.currentContext;
+        if (navContext != null && navContext.mounted) {
+          ScaffoldMessenger.of(navContext).showSnackBar(
             SnackBar(
               content: Text(result['message']?.toString() ?? 'Role switch failed'),
               backgroundColor: Colors.red,
@@ -117,9 +127,9 @@ class _CustomDrawerState extends ConsumerState<CustomDrawer> {
       // A network error or a bad response shape must not leave the spinner
       // on screen forever either -- it used to, since nothing here caught it.
       if (dialogContext.mounted) Navigator.of(dialogContext).pop();
-      if (mounted) {
-        // ignore: use_build_context_synchronously
-        ScaffoldMessenger.of(context).showSnackBar(
+      final navContext = appNavigatorKey.currentContext;
+      if (navContext != null && navContext.mounted) {
+        ScaffoldMessenger.of(navContext).showSnackBar(
           SnackBar(
             content: Text('Could not switch role: $e'),
             backgroundColor: Colors.red,
@@ -142,9 +152,19 @@ class _CustomDrawerState extends ConsumerState<CustomDrawer> {
     // route push, where that overlap looks like a normal drawer dismissal --
     // a bottom sheet is the one action that visibly collides with it, so the
     // wait is here rather than in _closeDrawerThen itself.
+    //
+    // On mobile, closeDrawer() does more than start that animation: Flutter
+    // only keeps a Drawer's subtree mounted while it's open, so this whole
+    // CustomDrawer -- and the `context` passed in here, which belongs to
+    // it -- gets disposed as part of that same close. `context.mounted` was
+    // already false by the time the delay fired, so the sheet silently
+    // never opened; only the desktop sidebar (a permanent widget, never
+    // torn down) worked. appNavigatorKey's context belongs to the app's
+    // root Navigator, which outlives the drawer, so use that instead.
     Future.delayed(const Duration(milliseconds: 260), () {
-      if (!context.mounted) return;
-      _openSwitchRoleSheet(context, activeKey);
+      final rootContext = appNavigatorKey.currentContext;
+      if (rootContext == null || !rootContext.mounted) return;
+      _openSwitchRoleSheet(rootContext, activeKey);
     });
   }
 
@@ -194,13 +214,16 @@ class _CustomDrawerState extends ConsumerState<CustomDrawer> {
                     // builder that shadows the outer one, both belong to the
                     // sheet that Navigator.pop just tore down -- neither is
                     // safe to open a new dialog from, or to check .mounted
-                    // against afterwards. The drawer's own State.context
-                    // (captured below as `drawerContext`) is what outlives
-                    // the sheet.
-                    if (!mounted) return;
-                    final drawerContext = this.context;
+                    // against afterwards. The drawer's own State is already
+                    // unmounted on mobile by this point too (closing the
+                    // drawer disposes CustomDrawer's whole subtree), so
+                    // `this.context`/`mounted` can't be trusted here either
+                    // -- use the root Navigator's context, which is what
+                    // outlives both the sheet and the drawer.
+                    final rootContext = appNavigatorKey.currentContext;
+                    if (rootContext == null || !rootContext.mounted) return;
                     showDialog(
-                      context: drawerContext,
+                      context: rootContext,
                       barrierDismissible: false,
                       builder: (dialogContext) {
                         // Fire the switch once the dialog has a context of
