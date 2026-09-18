@@ -210,7 +210,12 @@ class _ForgetPasswordState extends State<ForgetPassword> {
                           child: Column(
                             children: [
                               CustomInputField(
-                                maxLength: 15,
+                                // This field takes either an email or a phone
+                                // number -- 15 was sized for a phone number
+                                // and silently capped emails at that length,
+                                // so "wajahatfrontdev" (15 chars on its own)
+                                // left no room to type "@gmail.com" after it.
+                                maxLength: 100,
                                 hintText: "Email or Phone Number".tr(),
                                 leadingIcon: const Icon(
                                   Icons.mail_outline_rounded,
@@ -445,7 +450,7 @@ class _ForgetPasswordState extends State<ForgetPassword> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     CustomInputField(
-                      maxLength: 15,
+                      maxLength: 100,
                       hintText: "Email or Phone Number".tr(),
                       leadingIcon: Icon(
                         Icons.person_outline,

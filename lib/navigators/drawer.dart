@@ -3,6 +3,7 @@ import 'package:icare/widgets/drag_scroll.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:icare/models/user.dart';
+import 'package:icare/navigators/dashboard_route.dart';
 import 'package:icare/providers/auth_provider.dart';
 import 'package:icare/services/api_service.dart';
 import 'package:icare/services/auth_service.dart';
@@ -93,9 +94,12 @@ class _CustomDrawerState extends ConsumerState<CustomDrawer> {
         // Close the spinner, then move -- in that order, so it is never
         // left hanging over whatever screen context.go lands on.
         if (dialogContext.mounted) Navigator.of(dialogContext).pop();
+        // go('/dashboard') depends on that route's own redirect re-reading
+        // authProvider -- going straight to the new role's real route avoids
+        // relying on that indirection firing again for a role switch.
         if (mounted) {
           // ignore: use_build_context_synchronously
-          context.go('/dashboard');
+          context.go(dashboardRouteFor(user.role));
         }
       } else {
         if (dialogContext.mounted) Navigator.of(dialogContext).pop();
@@ -210,6 +214,10 @@ class _CustomDrawerState extends ConsumerState<CustomDrawer> {
                     );
                   },
                   borderRadius: BorderRadius.circular(12),
+                  hoverColor: AppColors.primaryColor.withValues(alpha: 0.06),
+                  mouseCursor: isActive
+                      ? SystemMouseCursors.basic
+                      : SystemMouseCursors.click,
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                     decoration: BoxDecoration(

@@ -8,6 +8,7 @@ import 'package:icare/screens/admin_payments_screen.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_size_matters/flutter_size_matters.dart';
 import 'package:icare/navigators/bottom_tab_bar.dart';
+import 'package:icare/navigators/dashboard_route.dart';
 import 'package:icare/navigators/bottom_tabs.dart';
 import 'package:icare/providers/auth_provider.dart';
 import 'package:icare/screens/bookings_history.dart';
@@ -883,7 +884,11 @@ class _WebSidebarState extends ConsumerState<_WebSidebar> {
         // Close the spinner, then move -- in that order, so it is never
         // left hanging over whatever screen context.go lands on.
         if (dialogContext.mounted) Navigator.of(dialogContext).pop();
-        if (mounted) context.go('/dashboard');
+        // go('/dashboard') depends on that route's own redirect re-reading
+        // authProvider -- going straight to the new role's real route avoids
+        // relying on that indirection firing again for a role switch that
+        // never actually changes the URL's own path segment count.
+        if (mounted) context.go(dashboardRouteFor(user.role));
       } else {
         if (dialogContext.mounted) Navigator.of(dialogContext).pop();
         if (mounted) {
@@ -995,6 +1000,10 @@ class _WebSidebarState extends ConsumerState<_WebSidebar> {
                           );
                         },
                   borderRadius: BorderRadius.circular(12),
+                  hoverColor: AppColors.primaryColor.withValues(alpha: 0.06),
+                  mouseCursor: isActive
+                      ? SystemMouseCursors.basic
+                      : SystemMouseCursors.click,
                   child: Container(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 16,

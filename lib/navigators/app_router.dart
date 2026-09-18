@@ -567,6 +567,9 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       // Legacy /dashboard — bookmarks & old links land here. Redirect to the
       // role's real home so it never shows a URL-less shared screen again.
+      // Keep this switch in sync with dashboardRouteFor() in
+      // navigators/dashboard_route.dart, which a role switch navigates to
+      // directly rather than going through this redirect.
       GoRoute(
         path: '/dashboard',
         redirect: (context, state) {
