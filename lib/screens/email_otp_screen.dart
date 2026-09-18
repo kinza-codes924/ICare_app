@@ -154,10 +154,14 @@ class _EmailOtpScreenState extends ConsumerState<EmailOtpScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
+      // The code field sits mid-screen and the keyboard is tall on iOS, so
+      // the view has to shrink around it rather than be covered by it.
+      resizeToAvoidBottomInset: true,
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
+            padding: EdgeInsets.fromLTRB(
+              24, 24, 24, 24 + MediaQuery.viewInsetsOf(context).bottom * 0.2),
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 420),
               child: Container(

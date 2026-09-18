@@ -642,6 +642,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
 
     return Scaffold(
       backgroundColor: Colors.grey[200],
+      // The keyboard is part of the layout, not something painted over it.
+      resizeToAvoidBottomInset: true,
       body: isDesktop
           ? _buildDesktopLayout()
           : _buildMobileLayout(isTablet: isTablet),
@@ -1426,7 +1428,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
               width: isTablet
                   ? Utils.windowWidth(context) * 0.7
                   : double.infinity,
-              height: Utils.windowHeight(context) * 0.67,
+              // 67% of the screen, less whatever the keyboard covers. Held
+              // at a flat 67% the sheet kept its full height while the
+              // keyboard sat on top of it, so scrolling ran the fields up
+              // under the heading and into the status bar.
+              height: (Utils.windowHeight(context) * 0.67 -
+                      MediaQuery.viewInsetsOf(context).bottom)
+                  .clamp(Utils.windowHeight(context) * 0.40,
+                      Utils.windowHeight(context) * 0.67),
               decoration: BoxDecoration(
                 color: isTablet
                     ? AppColors.bgColor.withAlpha(70)
@@ -1438,9 +1447,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                 ),
               ),
               child: SingleChildScrollView(
-                padding: EdgeInsets.symmetric(
-                  horizontal: ScallingConfig.moderateScale(isTablet ? 50 : 15),
-                  vertical: ScallingConfig.moderateScale(22),
+                padding: EdgeInsets.fromLTRB(
+                  ScallingConfig.moderateScale(isTablet ? 50 : 15),
+                  ScallingConfig.moderateScale(22),
+                  ScallingConfig.moderateScale(isTablet ? 50 : 15),
+                  // Extra room so the field being typed into can always be
+                  // scrolled clear of the keyboard.
+                  ScallingConfig.moderateScale(22) +
+                      MediaQuery.viewInsetsOf(context).bottom * 0.25,
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.center,

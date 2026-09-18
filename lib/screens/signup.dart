@@ -1126,6 +1126,8 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
         }
       },
       child: Scaffold(
+      // The keyboard must be part of the layout, not painted over it.
+      resizeToAvoidBottomInset: true,
       body: Container(
         width: Utils.windowWidth(context),
         height: Utils.windowHeight(context),
@@ -1174,7 +1176,15 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
               alignment: Alignment.bottomCenter,
               child: Container(
                 width: double.infinity,
-                height: Utils.windowHeight(context) * 0.72,
+                // 72% of the screen, less whatever the keyboard is covering.
+                // Held at a flat 72% the sheet kept its full height while the
+                // keyboard sat on top of it, so scrolling ran the fields up
+                // under the heading and into the status bar. Never smaller
+                // than 40% of the screen, so it stays usable on a short one.
+                height: (Utils.windowHeight(context) * 0.72 -
+                        MediaQuery.viewInsetsOf(context).bottom)
+                    .clamp(Utils.windowHeight(context) * 0.40,
+                        Utils.windowHeight(context) * 0.72),
                 decoration: BoxDecoration(
                   color: Colors.white.withValues(alpha: 0.97),
                   borderRadius: const BorderRadius.only(
@@ -1190,7 +1200,14 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                   ],
                 ),
                 child: SingleChildScrollView(
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+                  // Extra bottom padding equal to the keyboard, so the field
+                  // being typed into can always be scrolled clear of it.
+                  padding: EdgeInsets.fromLTRB(
+                    20,
+                    24,
+                    20,
+                    24 + MediaQuery.viewInsetsOf(context).bottom * 0.25,
+                  ),
                   child: Form(
                     key: _formKey,
                     child: Column(
