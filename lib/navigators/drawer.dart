@@ -70,6 +70,10 @@ class _CustomDrawerState extends ConsumerState<CustomDrawer> {
   Future<void> _switchRole(String role) async {
     final result = await AuthService().switchRole(role);
     if (!mounted) return;
+    // Close the spinner before acting on the result either way, so a
+    // failure's snackbar is not shown underneath the still-open dialog.
+    // ignore: use_build_context_synchronously
+    Navigator.of(context, rootNavigator: true).pop();
     if (result['success'] == true) {
       final inner = result['data'];
       await ref.read(authProvider.notifier).setUserToken(inner['token'].toString());
@@ -138,6 +142,19 @@ class _CustomDrawerState extends ConsumerState<CustomDrawer> {
                 child: InkWell(
                   onTap: isActive ? null : () async {
                     Navigator.pop(sheetCtx);
+                    // The switch is a network round-trip (POST /auth/switch-
+                    // role, then two provider writes) with nothing on screen
+                    // in the meantime once the sheet closes -- the old
+                    // dashboard just sat there, which read as the tap having
+                    // done nothing. A blocking spinner fills that gap.
+                    if (!context.mounted) return;
+                    showDialog(
+                      context: context,
+                      barrierDismissible: false,
+                      builder: (_) => const Center(
+                        child: CircularProgressIndicator(),
+                      ),
+                    );
                     await _switchRole(key);
                   },
                   borderRadius: BorderRadius.circular(12),

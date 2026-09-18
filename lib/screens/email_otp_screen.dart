@@ -101,7 +101,14 @@ class _EmailOtpScreenState extends ConsumerState<EmailOtpScreen> {
       if (!mounted) return;
       if (result['success'] == true) {
         final token = (result['data']?['token'] ?? '').toString();
+        // Close this screen before handing back. It was left on the stack:
+        // the caller navigated on underneath it, which a web route change
+        // hides but a native push does not -- so on iOS the code screen just
+        // sat there after Verify and looked like nothing had happened.
+        final nav = Navigator.of(context);
+        if (nav.canPop()) nav.pop();
         await widget.onVerified(token);
+        return;
       } else {
         setState(() {
           _error = result['message']?.toString() ?? 'Invalid code';

@@ -9,7 +9,12 @@ echo "=== iCare Web Deploy Script ==="
 # navigated away, and a caller announced as "Unknown" -- so a change that
 # brings one back stops here instead of on someone's live call.
 echo "Running guard tests..."
-if ! flutter test test/consultation_identity_test.dart                   test/consultation_not_ended_on_leave_test.dart                   test/book_appointment_smoke_test.dart \n                  test/keyboard_insets_test.dart; then
+if ! flutter test \
+  test/consultation_identity_test.dart \
+  test/consultation_not_ended_on_leave_test.dart \
+  test/book_appointment_smoke_test.dart \
+  test/keyboard_insets_test.dart \
+  test/google_oauth_client_test.dart; then
   echo ""
   echo "ERROR: guard tests failed — NOT deploying."
   echo "Read the failure above: it names the behaviour that broke and why it matters."

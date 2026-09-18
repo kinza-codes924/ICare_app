@@ -857,6 +857,9 @@ class _WebSidebarState extends ConsumerState<_WebSidebar> {
   Future<void> _switchRole(String role) async {
     final result = await AuthService().switchRole(role);
     if (!mounted) return;
+    // Close the spinner before acting on the result either way, so a
+    // failure's snackbar is not shown underneath the still-open dialog.
+    Navigator.of(context, rootNavigator: true).pop();
     if (result['success'] == true) {
       final inner = result['data'];
       await ref
@@ -928,6 +931,18 @@ class _WebSidebarState extends ConsumerState<_WebSidebar> {
                       ? null
                       : () async {
                           Navigator.pop(sheetCtx);
+                          // The switch is a network round-trip with nothing
+                          // on screen once the sheet closes -- the old
+                          // dashboard just sat there, which read as the tap
+                          // doing nothing. A blocking spinner fills the gap.
+                          if (!context.mounted) return;
+                          showDialog(
+                            context: context,
+                            barrierDismissible: false,
+                            builder: (_) => const Center(
+                              child: CircularProgressIndicator(),
+                            ),
+                          );
                           await _switchRole(key);
                         },
                   borderRadius: BorderRadius.circular(12),

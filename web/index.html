@@ -5,7 +5,14 @@
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
   <meta name="description" content="iCare - Your Virtual Healthcare Platform">
-  <meta name="google-signin-client_id" content="1076307742101-avj49igc93qipdcnqbqsk3u14gdcb2oh.apps.googleusercontent.com">
+  <!-- Must stay the same OAuth client the app signs in with (Firebase
+       project 564788374793). The google_sign_in web plugin reads this meta
+       tag and it OVERRIDES the clientId passed from Dart, so a stale value
+       here silently decides every web sign-in. It used to name a client from
+       a different project (1076307742101) which was later disabled, and
+       every Google sign-in died with "Access blocked: Authorisation error —
+       Error 401: disabled_client". -->
+  <meta name="google-signin-client_id" content="564788374793-1eptqsl65ohkvsquqhc4qnhlia592v2f.apps.googleusercontent.com">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black">
   <meta name="apple-mobile-web-app-title" content="iCare">
