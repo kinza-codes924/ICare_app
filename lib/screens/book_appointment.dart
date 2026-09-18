@@ -75,7 +75,16 @@ class _BookAppointmentScreenState extends ConsumerState<BookAppointmentScreen> {
     final days = widget.doctor.availableDays;
     if (days.isEmpty) return true; // no restriction → all days open
     final dayName = _dayNames[date.weekday - 1]; // DateTime.weekday: 1=Mon…7=Sun
-    return days.any((d) => d.trim().toLowerCase() == dayName.toLowerCase());
+    final full = dayName.toLowerCase();
+    // Doctors are stored with either spelling — "Mon" from one form, "Monday"
+    // from another. Comparing only against the full name matched nothing for
+    // the short ones, which left the date list empty and took the whole
+    // booking screen down with a range error on the first date.
+    return days.any((d) {
+      final v = d.trim().toLowerCase();
+      if (v.isEmpty) return false;
+      return v == full || full.startsWith(v) || v.startsWith(full);
+    });
   }
 
   @override
@@ -256,7 +265,15 @@ class _BookAppointmentScreenState extends ConsumerState<BookAppointmentScreen> {
     }
   }
 
-  DateTime get _selectedDate => _dateRange[_selectedDateIndex];
+  /// The chosen day, or today when the doctor has no bookable days.
+  ///
+  /// This used to index straight into _dateRange. When that list came back
+  /// empty — which it did for any doctor whose days are stored short — the
+  /// getter threw before the screen could show its own "no availability"
+  /// message, so the patient saw a crash instead of an explanation.
+  DateTime get _selectedDate => _dateRange.isEmpty
+      ? DateTime.now()
+      : _dateRange[_selectedDateIndex.clamp(0, _dateRange.length - 1)];
 
   Future<void> _confirmBooking() async {
     if (_selectedSlot == null && !_isEmergency) return;

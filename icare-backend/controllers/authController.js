@@ -607,9 +607,35 @@ const login = async (req, res) => {
     // Email verification gate. Explicitly `=== false` — accounts created
     // before this feature have the field undefined and must keep working.
     if (user.emailVerified === false) {
+      // Send a fresh code as part of turning them away, rather than pointing
+      // at one that is very likely expired. Signing in again is exactly when
+      // someone needs a working code, and being told to look in the inbox for
+      // a dead one -- then having to find "Resend" -- is the whole complaint.
+      // The same cooldown as /resend-email-otp applies, so repeated sign-in
+      // attempts cannot be used to spam an inbox.
+      const lastSent = user.emailOtpLastSentAt
+        ? new Date(user.emailOtpLastSentAt).getTime()
+        : 0;
+      const waitedSeconds = (Date.now() - lastSent) / 1000;
+      if (waitedSeconds >= RESEND_COOLDOWN_SECONDS) {
+        const otp = generateOtp();
+        await User.updateOne({ _id: user._id }, {
+          $set: {
+            emailOtpHash: hashOtp(otp),
+            emailOtpExpiresAt: new Date(Date.now() + OTP_TTL_MINUTES * 60 * 1000),
+            // Reset the attempt count too: a previous run of wrong guesses
+            // otherwise locked the new code out before it was ever typed.
+            emailOtpAttempts: 0,
+            emailOtpLastSentAt: new Date(),
+          },
+        });
+        sendOtpEmail({ to: user.email, name: user.name || user.username, otp })
+          .catch(e => console.error('[login] OTP email failed:', e.message));
+      }
+
       return res.status(403).json({
         success: false,
-        message: 'Please verify your email to continue. Check your inbox for the code.',
+        message: 'Please verify your email to continue. We have sent you a new code.',
         emailVerificationRequired: true,
         email: user.email,
       });

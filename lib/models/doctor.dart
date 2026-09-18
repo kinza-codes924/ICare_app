@@ -118,9 +118,17 @@ class Doctor {
         return AvailableTime.fromJson(Map<String, dynamic>.from(value));
       }
       if (value is String && value.isNotEmpty) {
-        final parts = value.split(' - ');
+        // Split on a hyphen, an en dash or an em dash. Profiles are typed by
+        // hand and "10:00 AM – 10:00 PM" with an en dash is common; matching
+        // only ' - ' left the whole string in `start` and nothing in `end`,
+        // so the screen could work out no working hours at all.
+        final parts = value
+            .split(RegExp(r'\s*[-–—]\s*'))
+            .map((p) => p.trim())
+            .where((p) => p.isNotEmpty)
+            .toList();
         return AvailableTime(
-          start: parts.isNotEmpty ? parts[0] : value,
+          start: parts.isNotEmpty ? parts[0] : value.trim(),
           end: parts.length > 1 ? parts[1] : '',
         );
       }

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui' as ui;
 
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
@@ -59,10 +60,19 @@ class _EmailOtpScreenState extends ConsumerState<EmailOtpScreen> {
     super.dispose();
   }
 
+  /// The code that was last rejected, so auto-submit does not retry it.
+  String? _rejectedCode;
+
   void _onCodeChanged() {
     if (_error != null) setState(() => _error = null);
-    // Auto-submit on the sixth digit — the code is never longer.
-    if (_code.text.trim().length == 6 && !_verifying) _verify();
+    final code = _code.text.trim();
+    // Auto-submit on the sixth digit -- the code is never longer. But not the
+    // same six digits the server has already refused: that re-fired on every
+    // keystroke, disabled the field while it ran, and left the user unable to
+    // correct a typo. Editing a rejected code clears the block.
+    if (code.length == 6 && !_verifying && code != _rejectedCode) {
+      _verify();
+    }
   }
 
   void _startCooldown() {
@@ -93,7 +103,14 @@ class _EmailOtpScreenState extends ConsumerState<EmailOtpScreen> {
         final token = (result['data']?['token'] ?? '').toString();
         await widget.onVerified(token);
       } else {
-        setState(() => _error = result['message']?.toString() ?? 'Invalid code');
+        setState(() {
+          _error = result['message']?.toString() ?? 'Invalid code';
+          // Remember it so the next keystroke can edit rather than re-submit,
+          // and select the digits so typing simply replaces them.
+          _rejectedCode = code;
+        });
+        _code.selection =
+            TextSelection(baseOffset: 0, extentOffset: _code.text.length);
       }
     } finally {
       if (mounted) setState(() => _verifying = false);
@@ -112,6 +129,7 @@ class _EmailOtpScreenState extends ConsumerState<EmailOtpScreen> {
       if (!mounted) return;
       if (result['success'] == true) {
         _code.clear();
+        _rejectedCode = null;
         setState(() => _info = 'A new code is on its way.');
         _startCooldown();
       } else {
@@ -211,7 +229,13 @@ class _EmailOtpScreenState extends ConsumerState<EmailOtpScreen> {
                       keyboardType: TextInputType.number,
                       textAlign: TextAlign.center,
                       maxLength: 6,
-                      enabled: !_verifying,
+                      // Left enabled even while verifying. Disabling it
+                      // dropped focus and the keyboard mid-check, so a wrong
+                      // code could not be edited until the request finished.
+                      // Typing during a check is harmless: the guard above
+                      // stops a second submit.
+                      readOnly: false,
+                      textDirection: ui.TextDirection.ltr,
                       inputFormatters: [
                         FilteringTextInputFormatter.digitsOnly,
                         LengthLimitingTextInputFormatter(6),
