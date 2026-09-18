@@ -76,6 +76,23 @@ void main() async {
                 '${details.exception}',
                 style: const TextStyle(fontSize: 12, color: Color(0xFF7F1D1D)),
               ),
+              // Where it broke, not just what broke. Without this the screen
+              // said "Null check operator used on a null value" and nothing
+              // else, so finding the widget meant guessing at every `!` in
+              // the tree. The first frames name the file and line.
+              if (details.stack != null) ...[
+                const SizedBox(height: 12),
+                Text(
+                  details.stack
+                      .toString()
+                      .split(String.fromCharCode(10))
+                      .where((l) => l.contains('package:icare'))
+                      .take(6)
+                      .join(String.fromCharCode(10)),
+                  style: const TextStyle(
+                      fontSize: 10, color: Color(0xFF9F1239), height: 1.5),
+                ),
+              ],
             ],
           ),
         ),

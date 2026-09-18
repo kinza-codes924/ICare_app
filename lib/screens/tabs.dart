@@ -69,6 +69,7 @@ import 'package:icare/screens/lms_live_session_screen.dart';
 import 'package:icare/services/lms_service.dart';
 import 'package:icare/services/course_service.dart';
 import 'package:icare/services/notification_service.dart';
+import 'package:icare/services/reminder_service.dart';
 import 'package:icare/services/api_service.dart';
 import 'package:icare/services/auth_service.dart';
 import 'package:icare/models/user.dart' as app_user;
@@ -264,6 +265,18 @@ class _TabsScreenState extends ConsumerState<TabsScreen> {
   Future<void> _fetchNotifications() async {
     if (!mounted) return;
     try {
+      // Turn due reminders into notifications before reading the list, so a
+      // reminder that has just come due appears in this same round rather
+      // than thirty seconds later.
+      //
+      // The backend has always had /reminders/check-due, and the service has
+      // always had checkDueReminders() — but nothing ever called it. A patient
+      // could set a reminder for 11pm and 11pm would pass in silence, because
+      // the one thing that turns a due reminder into a notification was never
+      // run. Awaited, and its own failures are swallowed inside the service,
+      // so a bad network round does not stop notifications loading.
+      await ReminderService().checkDueReminders();
+      if (!mounted) return;
       final result = await NotificationService().getNotifications();
       final all = List<Map<String, dynamic>>.from(
         result['notifications'] ?? [],
