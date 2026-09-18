@@ -14,7 +14,8 @@ if ! flutter test \
   test/consultation_not_ended_on_leave_test.dart \
   test/book_appointment_smoke_test.dart \
   test/keyboard_insets_test.dart \
-  test/google_oauth_client_test.dart; then
+  test/google_oauth_client_test.dart \
+  test/switch_role_dialog_test.dart; then
   echo ""
   echo "ERROR: guard tests failed — NOT deploying."
   echo "Read the failure above: it names the behaviour that broke and why it matters."

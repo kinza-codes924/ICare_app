@@ -67,34 +67,61 @@ class _CustomDrawerState extends ConsumerState<CustomDrawer> {
     } catch (_) {}
   }
 
-  Future<void> _switchRole(String role) async {
-    final result = await AuthService().switchRole(role);
-    if (!mounted) return;
-    // Close the spinner before acting on the result either way, so a
-    // failure's snackbar is not shown underneath the still-open dialog.
-    // ignore: use_build_context_synchronously
-    Navigator.of(context, rootNavigator: true).pop();
-    if (result['success'] == true) {
-      final inner = result['data'];
-      await ref.read(authProvider.notifier).setUserToken(inner['token'].toString());
-      final currentUser = ref.read(authProvider).user;
-      final user = User.fromJson(Map<String, dynamic>.from(inner['user'] as Map)).copyWith(
-        isEmailVerified: currentUser?.isEmailVerified ?? true,
-        isPhoneVerified: currentUser?.isPhoneVerified ?? true,
-      );
-      await ref.read(authProvider.notifier).setUser(user);
-      if (!mounted) return;
-      // ignore: use_build_context_synchronously
-      context.go('/dashboard');
-    } else {
-      if (!mounted) return;
-      // ignore: use_build_context_synchronously
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(result['message']?.toString() ?? 'Role switch failed'),
-          backgroundColor: Colors.red,
-        ),
-      );
+  /// Switches the active role and returns the way in.
+  ///
+  /// [dialogContext] is the BuildContext the spinner dialog was built with --
+  /// it is guaranteed to have a matching Navigator entry to pop, regardless
+  /// of whether this State (_CustomDrawerState) is still mounted by the time
+  /// the network call returns. Popping via `this.context` after
+  /// `if (!mounted) return;` was the bug: closing the bottom sheet the
+  /// drawer itself sits in can unmount the drawer in the same frame, and the
+  /// early return then skipped the dialog dismissal entirely -- the spinner
+  /// spun forever with nothing left able to close it.
+  Future<void> _switchRole(String role, BuildContext dialogContext) async {
+    try {
+      final result = await AuthService().switchRole(role);
+
+      if (result['success'] == true) {
+        final inner = result['data'];
+        await ref.read(authProvider.notifier).setUserToken(inner['token'].toString());
+        final currentUser = ref.read(authProvider).user;
+        final user = User.fromJson(Map<String, dynamic>.from(inner['user'] as Map)).copyWith(
+          isEmailVerified: currentUser?.isEmailVerified ?? true,
+          isPhoneVerified: currentUser?.isPhoneVerified ?? true,
+        );
+        await ref.read(authProvider.notifier).setUser(user);
+        // Close the spinner, then move -- in that order, so it is never
+        // left hanging over whatever screen context.go lands on.
+        if (dialogContext.mounted) Navigator.of(dialogContext).pop();
+        if (mounted) {
+          // ignore: use_build_context_synchronously
+          context.go('/dashboard');
+        }
+      } else {
+        if (dialogContext.mounted) Navigator.of(dialogContext).pop();
+        if (mounted) {
+          // ignore: use_build_context_synchronously
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(result['message']?.toString() ?? 'Role switch failed'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      // A network error or a bad response shape must not leave the spinner
+      // on screen forever either -- it used to, since nothing here caught it.
+      if (dialogContext.mounted) Navigator.of(dialogContext).pop();
+      if (mounted) {
+        // ignore: use_build_context_synchronously
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Could not switch role: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 
@@ -140,22 +167,30 @@ class _CustomDrawerState extends ConsumerState<CustomDrawer> {
               return Padding(
                 padding: const EdgeInsets.only(bottom: 10),
                 child: InkWell(
-                  onTap: isActive ? null : () async {
+                  onTap: isActive ? null : () {
                     Navigator.pop(sheetCtx);
-                    // The switch is a network round-trip (POST /auth/switch-
-                    // role, then two provider writes) with nothing on screen
-                    // in the meantime once the sheet closes -- the old
-                    // dashboard just sat there, which read as the tap having
-                    // done nothing. A blocking spinner fills that gap.
-                    if (!context.mounted) return;
+                    // `sheetCtx`, and the `context` from DragScroll's
+                    // builder that shadows the outer one, both belong to the
+                    // sheet that Navigator.pop just tore down -- neither is
+                    // safe to open a new dialog from, or to check .mounted
+                    // against afterwards. The drawer's own State.context
+                    // (captured below as `drawerContext`) is what outlives
+                    // the sheet.
+                    if (!mounted) return;
+                    final drawerContext = this.context;
                     showDialog(
-                      context: context,
+                      context: drawerContext,
                       barrierDismissible: false,
-                      builder: (_) => const Center(
-                        child: CircularProgressIndicator(),
-                      ),
+                      builder: (dialogContext) {
+                        // Fire the switch once the dialog has a context of
+                        // its own, so _switchRole can always find and close
+                        // this exact dialog when it finishes.
+                        _switchRole(key, dialogContext);
+                        return const Center(
+                          child: CircularProgressIndicator(),
+                        );
+                      },
                     );
-                    await _switchRole(key);
                   },
                   borderRadius: BorderRadius.circular(12),
                   child: Container(

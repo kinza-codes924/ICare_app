@@ -854,36 +854,59 @@ class _WebSidebarState extends ConsumerState<_WebSidebar> {
     } catch (_) {}
   }
 
-  Future<void> _switchRole(String role) async {
-    final result = await AuthService().switchRole(role);
-    if (!mounted) return;
-    // Close the spinner before acting on the result either way, so a
-    // failure's snackbar is not shown underneath the still-open dialog.
-    Navigator.of(context, rootNavigator: true).pop();
-    if (result['success'] == true) {
-      final inner = result['data'];
-      await ref
-          .read(authProvider.notifier)
-          .setUserToken(inner['token'].toString());
-      final currentUser = ref.read(authProvider).user;
-      final user =
-          app_user.User.fromJson(
-            Map<String, dynamic>.from(inner['user'] as Map),
-          ).copyWith(
-            isEmailVerified: currentUser?.isEmailVerified ?? true,
-            isPhoneVerified: currentUser?.isPhoneVerified ?? true,
+  /// Switches the active role and returns the way in.
+  ///
+  /// [dialogContext] is the BuildContext the spinner dialog was built with --
+  /// it is guaranteed to have a matching Navigator entry to pop, regardless
+  /// of whether this State is still mounted by the time the network call
+  /// returns. Popping via `this.context` after `if (!mounted) return;` was
+  /// the bug: that early return could skip the dialog dismissal entirely,
+  /// leaving the spinner spinning with nothing left able to close it.
+  Future<void> _switchRole(String role, BuildContext dialogContext) async {
+    try {
+      final result = await AuthService().switchRole(role);
+
+      if (result['success'] == true) {
+        final inner = result['data'];
+        await ref
+            .read(authProvider.notifier)
+            .setUserToken(inner['token'].toString());
+        final currentUser = ref.read(authProvider).user;
+        final user =
+            app_user.User.fromJson(
+              Map<String, dynamic>.from(inner['user'] as Map),
+            ).copyWith(
+              isEmailVerified: currentUser?.isEmailVerified ?? true,
+              isPhoneVerified: currentUser?.isPhoneVerified ?? true,
+            );
+        await ref.read(authProvider.notifier).setUser(user);
+        // Close the spinner, then move -- in that order, so it is never
+        // left hanging over whatever screen context.go lands on.
+        if (dialogContext.mounted) Navigator.of(dialogContext).pop();
+        if (mounted) context.go('/dashboard');
+      } else {
+        if (dialogContext.mounted) Navigator.of(dialogContext).pop();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(result['message']?.toString() ?? 'Role switch failed'),
+              backgroundColor: Colors.red,
+            ),
           );
-      await ref.read(authProvider.notifier).setUser(user);
-      if (!mounted) return;
-      context.go('/dashboard');
-    } else {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(result['message']?.toString() ?? 'Role switch failed'),
-          backgroundColor: Colors.red,
-        ),
-      );
+        }
+      }
+    } catch (e) {
+      // A network error or a bad response shape must not leave the spinner
+      // on screen forever either -- it used to, since nothing here caught it.
+      if (dialogContext.mounted) Navigator.of(dialogContext).pop();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Could not switch role: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 
@@ -929,21 +952,30 @@ class _WebSidebarState extends ConsumerState<_WebSidebar> {
                 child: InkWell(
                   onTap: isActive
                       ? null
-                      : () async {
+                      : () {
                           Navigator.pop(sheetCtx);
                           // The switch is a network round-trip with nothing
                           // on screen once the sheet closes -- the old
                           // dashboard just sat there, which read as the tap
                           // doing nothing. A blocking spinner fills the gap.
-                          if (!context.mounted) return;
+                          //
+                          // sheetCtx belongs to the sheet Navigator.pop just
+                          // tore down, so it is not safe to open a dialog
+                          // from, or to check .mounted against, afterwards.
+                          if (!mounted) return;
                           showDialog(
                             context: context,
                             barrierDismissible: false,
-                            builder: (_) => const Center(
-                              child: CircularProgressIndicator(),
-                            ),
+                            builder: (dialogContext) {
+                              // Fire the switch once the dialog has a
+                              // context of its own, so _switchRole can
+                              // always find and close this exact dialog.
+                              _switchRole(key, dialogContext);
+                              return const Center(
+                                child: CircularProgressIndicator(),
+                              );
+                            },
                           );
-                          await _switchRole(key);
                         },
                   borderRadius: BorderRadius.circular(12),
                   child: Container(
