@@ -659,18 +659,39 @@ const login = async (req, res) => {
     // Log this login session
     await logLoginSession(req, user._id);
 
-    // 2FA check — if enabled, issue temp token for TOTP verification
+    // 2FA check — if enabled, issue temp token and, for email-based 2FA,
+    // send this login's own code before the client ever asks for one.
     if (user.twoFactorEnabled) {
       const tempToken = jwt.sign(
         { id: user._id.toString(), email: user.email, role: user.role, is2FA: true },
         process.env.JWT_SECRET,
         { expiresIn: '15m' }
       );
+
+      let message = 'Open Google Authenticator and enter your 6-digit code.';
+      if (user.twoFactorMethod === 'email') {
+        const otp = generateOtp();
+        await User.findByIdAndUpdate(user._id, {
+          $set: {
+            twoFactorEmailOtpHash: hashOtp(otp),
+            twoFactorEmailOtpExpiresAt: new Date(Date.now() + OTP_TTL_MINUTES * 60 * 1000),
+            twoFactorEmailOtpAttempts: 0,
+            twoFactorEmailOtpLastSentAt: new Date(),
+          },
+        });
+        // Fire-and-forget, same as the other login-path OTP send above --
+        // a slow mail provider must not hold up the login response itself.
+        sendOtpEmail({ to: user.email, name: user.name || user.username, otp })
+          .catch(e => console.error('[login] 2FA email OTP failed:', e.message));
+        message = `We sent a 6-digit code to ${user.email}.`;
+      }
+
       return res.status(200).json({
         success: true,
         requiresOtp: true,
         tempToken,
-        message: 'Open Google Authenticator and enter your 6-digit code.',
+        twoFactorMethod: user.twoFactorMethod || 'totp',
+        message,
       });
     }
 

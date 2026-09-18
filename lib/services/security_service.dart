@@ -54,6 +54,46 @@ class SecurityService {
     }
   }
 
+  // ── 2FA via Email code ──────────────────────────────────────────────────
+
+  /// Sends a confirmation code to the account's own email, no QR needed.
+  Future<Map<String, dynamic>> setup2FAEmail() async {
+    try {
+      final response = await _apiService.post('/auth/2fa/setup-email', {});
+      final data = response.data;
+      if (data is Map) return Map<String, dynamic>.from(data);
+      return {'success': response.statusCode == 200};
+    } on DioException catch (e) {
+      final body = e.response?.data;
+      final msg = (body is Map ? body['message'] : null)?.toString();
+      return {'success': false, 'message': msg ?? 'Failed to send confirmation code'};
+    } catch (e) {
+      return {'success': false, 'message': e.toString()};
+    }
+  }
+
+  /// Verifies the emailed code and activates email-based 2FA.
+  Future<Map<String, dynamic>> enable2FAEmailWithOtp(String otp) async {
+    try {
+      final response = await _apiService.post('/auth/2fa/enable-email', {'otp': otp, 'code': otp});
+      final data = response.data;
+      if (data is Map) {
+        final m = Map<String, dynamic>.from(data);
+        return {'success': m['success'] ?? response.statusCode == 200, ...m};
+      }
+      return {'success': response.statusCode == 200};
+    } on DioException catch (e) {
+      // Same Dio-throws-before-the-body-check-runs gotcha as
+      // enable2FAWithOtp: the backend's real message lives in
+      // e.response.data, not in a generic DioException string.
+      final body = e.response?.data;
+      final msg = (body is Map ? body['message'] : null)?.toString();
+      return {'success': false, 'message': msg ?? 'Invalid code. Please try again.'};
+    } catch (e) {
+      return {'success': false, 'message': e.toString()};
+    }
+  }
+
   Future<bool> verify2FA(String code) async {
     try {
       final response = await _apiService.post('/auth/2fa/verify', {'code': code, 'otp': code});

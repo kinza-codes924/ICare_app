@@ -514,6 +514,22 @@ class AuthService {
     }
   }
 
+  /// Re-sends the login-time email 2FA code for [tempToken]. No-ops with a
+  /// clear message if the account isn't on email 2FA.
+  Future<Map<String, dynamic>> resend2FAEmail({required String tempToken}) async {
+    try {
+      final response = await _apiService.post('/auth/2fa/resend-email', {'tempToken': tempToken});
+      if (response.statusCode == 200) {
+        return response.data as Map<String, dynamic>;
+      }
+      return {'success': false, 'message': (response.data as Map?)?['message'] ?? 'Failed to resend code'};
+    } on DioException catch (e) {
+      return {'success': false, 'message': _friendlyError(e)};
+    } catch (e) {
+      return {'success': false, 'message': 'Error: ${e.toString()}'};
+    }
+  }
+
   Future<Map<String, dynamic>> verify2FA({required String tempToken, required String otp}) async {
     try {
       final response = await _apiService.post('/auth/2fa/verify', {'tempToken': tempToken, 'otp': otp});

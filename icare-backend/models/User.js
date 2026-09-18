@@ -42,6 +42,18 @@ const userSchema = new mongoose.Schema({
   emailOtpExpiresAt: { type: Date },
   emailOtpAttempts: { type: Number, default: 0 },
   emailOtpLastSentAt: { type: Date },
+  // Which 2FA method to use once twoFactorEnabled is true. 'totp' (Google
+  // Authenticator) is the long-standing default; 'email' sends a login-time
+  // code to the account's own email instead. Separate hash/expiry/attempt
+  // fields from the signup-verification emailOtp* ones above so a pending
+  // signup verification (rare, but possible if emailVerified is somehow
+  // still false on a 2FA-enabled account) can never interfere with a login
+  // 2FA code, or vice versa.
+  twoFactorMethod: { type: String, enum: ['totp', 'email'], default: 'totp' },
+  twoFactorEmailOtpHash: { type: String },
+  twoFactorEmailOtpExpiresAt: { type: Date },
+  twoFactorEmailOtpAttempts: { type: Number, default: 0 },
+  twoFactorEmailOtpLastSentAt: { type: Date },
   is_approved: { type: Boolean, default: true },
   is_active: { type: Boolean, default: true },
   // Virtual hospital compat fields

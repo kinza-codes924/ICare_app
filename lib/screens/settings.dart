@@ -407,7 +407,26 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   Future<void> _toggle2FA(bool value) async {
     if (value) {
-      setState(() {});
+      final method = await _show2FAMethodChoiceDialog();
+      if (!mounted || method == null) return;
+      if (method == 'email') {
+        final result = await _securityService.setup2FAEmail();
+        if (!mounted) return;
+        if (result['success'] == true) {
+          _show2FAEmailSetupDialog();
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                result['message']?.toString() ??
+                    'Failed to send confirmation code. Please try again.',
+              ),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return;
+      }
       final result = await _securityService.setup2FA();
       if (!mounted) return;
       if (result['success'] == true) {
@@ -441,6 +460,222 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         ),
       );
     }
+  }
+
+  /// Asks which 2FA method to set up. Returns 'totp', 'email', or null if
+  /// the user backs out, in which case the switch must not flip on.
+  Future<String?> _show2FAMethodChoiceDialog() {
+    return showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: AppColors.primaryColor.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(Icons.security_rounded, color: AppColors.primaryColor, size: 22),
+            ),
+            const SizedBox(width: 10),
+            const Text('Choose 2FA Method', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _methodChoiceTile(
+              ctx: ctx,
+              icon: Icons.qr_code_2_rounded,
+              title: 'Authenticator App',
+              subtitle: 'Google Authenticator or Authy generates the code',
+              value: 'totp',
+            ),
+            const SizedBox(height: 10),
+            _methodChoiceTile(
+              ctx: ctx,
+              icon: Icons.mark_email_read_rounded,
+              title: 'Email',
+              subtitle: 'A code is sent to your account email at login',
+              value: 'email',
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel', style: TextStyle(color: Color(0xFF6B7280))),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _methodChoiceTile({
+    required BuildContext ctx,
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required String value,
+  }) {
+    return InkWell(
+      onTap: () => Navigator.pop(ctx, value),
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: const Color(0xFFE2E8F0)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: AppColors.primaryColor.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(icon, color: AppColors.primaryColor, size: 20),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Color(0xFF0F172A))),
+                  const SizedBox(height: 2),
+                  Text(subtitle, style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                ],
+              ),
+            ),
+            const Icon(Icons.chevron_right_rounded, color: Color(0xFF94A3B8)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _show2FAEmailSetupDialog() {
+    final otpController = TextEditingController();
+    bool verifying = false;
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setModal) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: AppColors.primaryColor.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(Icons.mark_email_read_rounded, color: AppColors.primaryColor, size: 22),
+              ),
+              const SizedBox(width: 10),
+              const Text('Confirm Your Email', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
+            ],
+          ),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEFF6FF),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFFBFDBFE)),
+                  ),
+                  child: const Text(
+                    "We've sent a 6-digit code to your email. Enter it below to turn on email-based 2FA.",
+                    style: TextStyle(fontSize: 13, color: Color(0xFF1E40AF), height: 1.4),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: otpController,
+                  keyboardType: TextInputType.number,
+                  maxLength: 6,
+                  autofocus: true,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900, letterSpacing: 8),
+                  decoration: InputDecoration(
+                    hintText: '000000',
+                    hintStyle: TextStyle(color: Colors.grey.shade300, letterSpacing: 8),
+                    counterText: '',
+                    filled: true,
+                    fillColor: const Color(0xFFF9FAFB),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFE5E7EB))),
+                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFE5E7EB))),
+                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: AppColors.primaryColor, width: 1.5)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel', style: TextStyle(color: Color(0xFF6B7280))),
+            ),
+            ElevatedButton(
+              onPressed: verifying
+                  ? null
+                  : () async {
+                      if (otpController.text.length < 6) return;
+                      setModal(() => verifying = true);
+                      final result = await _securityService.enable2FAEmailWithOtp(
+                        otpController.text.trim(),
+                      );
+                      if (!ctx.mounted) return;
+                      if (result['success'] == true) {
+                        setState(() => _is2FAEnabled = true);
+                        Navigator.pop(ctx);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Email-based 2FA enabled!'),
+                            backgroundColor: Colors.green,
+                          ),
+                        );
+                      } else {
+                        setModal(() => verifying = false);
+                        ScaffoldMessenger.of(ctx).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              result['message']?.toString() ??
+                                  'Invalid code. Please try again.',
+                            ),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                      }
+                    },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primaryColor,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+              child: verifying
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                    )
+                  : const Text('Verify'),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   void _show2FASetupDialog({

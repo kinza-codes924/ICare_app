@@ -2394,7 +2394,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
         // 2FA check
         if (result['requiresOtp'] == true) {
           final tempToken = result['tempToken']?.toString() ?? '';
-          if (mounted) await _show2FADialog(tempToken: tempToken);
+          final method = result['twoFactorMethod']?.toString() ?? 'totp';
+          if (mounted) {
+            await _show2FADialog(tempToken: tempToken, method: method);
+          }
           if (mounted) setState(() => isLoading = false);
           return;
         }
@@ -2659,9 +2662,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     Utils.showErrorSnackBar(context, error);
   }
 
-  Future<void> _show2FADialog({required String tempToken}) async {
+  Future<void> _show2FADialog({required String tempToken, String method = 'totp'}) async {
     final otpController = TextEditingController();
+    final isEmail = method == 'email';
     bool verifying = false;
+    bool resending = false;
+    String? resendMessage;
 
     await showDialog(
       context: context,
@@ -2678,14 +2684,19 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
           Container(
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(color: const Color(0xFFEFF6FF), borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xFFBFDBFE))),
-            child: const Row(children: [
-              Icon(Icons.phonelink_lock_rounded, color: Color(0xFF3B82F6), size: 20),
-              SizedBox(width: 10),
-              Expanded(child: Text('Open Google Authenticator and enter the 6-digit code for iCare.', style: TextStyle(fontSize: 13, color: Color(0xFF1E40AF), height: 1.4))),
+            child: Row(children: [
+              Icon(isEmail ? Icons.mark_email_read_rounded : Icons.phonelink_lock_rounded, color: const Color(0xFF3B82F6), size: 20),
+              const SizedBox(width: 10),
+              Expanded(child: Text(
+                isEmail
+                    ? 'We sent a 6-digit code to your email. Enter it below to continue.'
+                    : 'Open Google Authenticator and enter the 6-digit code for iCare.',
+                style: const TextStyle(fontSize: 13, color: Color(0xFF1E40AF), height: 1.4),
+              )),
             ]),
           ),
           const SizedBox(height: 16),
-          const Text('Authenticator Code', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF374151))),
+          Text(isEmail ? 'Email Code' : 'Authenticator Code', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF374151))),
           const SizedBox(height: 8),
           TextField(
             controller: otpController, keyboardType: TextInputType.number, maxLength: 6, autofocus: true, textAlign: TextAlign.center,
@@ -2698,6 +2709,27 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
               focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFF0036BC), width: 1.5)),
             ),
           ),
+          if (isEmail) ...[
+            const SizedBox(height: 10),
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton(
+                onPressed: resending ? null : () async {
+                  setModal(() => resending = true);
+                  final result = await _authService.resend2FAEmail(tempToken: tempToken);
+                  setModal(() {
+                    resending = false;
+                    resendMessage = result['message']?.toString();
+                  });
+                },
+                child: resending
+                    ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Text('Resend code', style: TextStyle(color: Color(0xFF0036BC), fontWeight: FontWeight.w600)),
+              ),
+            ),
+            if (resendMessage != null)
+              Text(resendMessage!, style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+          ],
         ])),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel', style: TextStyle(color: Color(0xFF6B7280)))),

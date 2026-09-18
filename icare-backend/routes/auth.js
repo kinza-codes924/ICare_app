@@ -157,6 +157,18 @@ router.post('/2fa/verify', (req, res, next) => {
   req.url = '/2fa/verify';
   securityRouter.handle(req, res, next);
 });
+router.post('/2fa/setup-email', authMiddleware, (req, res, next) => {
+  req.url = '/2fa/setup-email';
+  securityRouter.handle(req, res, next);
+});
+router.post('/2fa/enable-email', authMiddleware, (req, res, next) => {
+  req.url = '/2fa/enable-email';
+  securityRouter.handle(req, res, next);
+});
+router.post('/2fa/resend-email', (req, res, next) => {
+  req.url = '/2fa/resend-email';
+  securityRouter.handle(req, res, next);
+});
 
 // ── PHONE & EMAIL OTP VERIFICATION ───────────────────────────────────────────
 
