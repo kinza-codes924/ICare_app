@@ -915,10 +915,27 @@ class _WebSidebarState extends ConsumerState<_WebSidebar> {
     final activeKey = currentRole == 'laboratory' ? 'lab' : currentRole;
     showModalBottomSheet(
       context: context,
+      // Plain Column with no scroll bound: on a shorter desktop viewport, or
+      // an account with several roles, the sheet clipped its own content
+      // with no way to reach the rest and no scrollbar to show one existed.
+      // Scrollable now, capped at 80% of the screen so it never covers the
+      // whole view, matching the fix already applied to the mobile drawer's
+      // copy of this sheet.
+      isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      builder: (sheetCtx) => Padding(
+      builder: (sheetCtx) => SafeArea(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(sheetCtx).size.height * 0.8,
+          ),
+          // Scrollable already, but with no bar to grab - DragScroll gives
+          // it a draggable, always-visible one.
+          child: DragScroll(
+            builder: (context, roleScrollCtrl) => SingleChildScrollView(
+              controller: roleScrollCtrl,
+              child: Padding(
         padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -1064,6 +1081,10 @@ class _WebSidebarState extends ConsumerState<_WebSidebar> {
               );
             }),
           ],
+        ),
+              ),
+            ),
+          ),
         ),
       ),
     );

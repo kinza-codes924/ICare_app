@@ -128,6 +128,23 @@ class _CustomDrawerState extends ConsumerState<CustomDrawer> {
   void _showSwitchRoleSheet(BuildContext context) {
     final currentRole = ref.read(authProvider).userRole.toLowerCase();
     final activeKey = currentRole == 'laboratory' ? 'lab' : currentRole;
+    // This is called via _closeDrawerThen, so Scaffold.closeDrawer() has just
+    // fired -- but that starts a slide-out animation (Flutter's default
+    // drawer duration), it does not remove the drawer instantly. Opening the
+    // bottom sheet in the same frame pushed a sheet sliding up from the
+    // bottom while the drawer was still sliding out from the side: the two
+    // animated overlays visibly clipped into each other, which is what
+    // looked like a z-index/state bug. Every other _drawerItem action is a
+    // route push, where that overlap looks like a normal drawer dismissal --
+    // a bottom sheet is the one action that visibly collides with it, so the
+    // wait is here rather than in _closeDrawerThen itself.
+    Future.delayed(const Duration(milliseconds: 260), () {
+      if (!context.mounted) return;
+      _openSwitchRoleSheet(context, activeKey);
+    });
+  }
+
+  void _openSwitchRoleSheet(BuildContext context, String activeKey) {
     showModalBottomSheet(
       context: context,
       // An account with several roles overflowed this sheet: it was a plain
